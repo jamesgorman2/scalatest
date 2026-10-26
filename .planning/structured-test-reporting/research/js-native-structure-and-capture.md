@@ -1,6 +1,6 @@
 # How structure and test output leave a Scala.js or Scala Native run
 
-Where the JSON writer and the results renderer can run on Scala.js and Scala Native, what channel can carry envelopes or JSON lines, what one run consists of, and how test output can be captured on each runtime ([#4](https://github.com/jamesgorman2/scalatest/issues/4)). Context: `.planning/structured-test-reporting/SPECIFICATION.md` R-020, R-024, R-034, R-036, R-040; `.planning/structured-test-reporting/ARCHITECTURE.md` § Modules and § Data flow. Options are stated with their costs; no design is chosen.
+Where the JSON writer and the results renderer can run on Scala.js and Scala Native, what channel can carry envelopes or JSON lines, what one run consists of, and how test output can be captured on each runtime ([How do structure and test output leave a Scala.js or Scala Native run?](https://github.com/jamesgorman2/scalatest/issues/4)). Context: `.planning/structured-test-reporting/SPECIFICATION.md` R-020, R-024, R-034, R-036, R-040; `.planning/structured-test-reporting/ARCHITECTURE.md` § Modules and § Data flow. Options are stated with their costs; no design is chosen.
 
 ## Short answer
 
