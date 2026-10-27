@@ -27,7 +27,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - An ID for each use of the command, passed into every run, for example through `-D`, for the consolidator to filter on, puts a build-supplied identity back into the JSON, and every caller must mint and pass it.
 - Filtering by run start time depends on clocks, which differ across machines and CI caches.
 
-**Reasoning** Mill empties a task's `Task.dest` before each run of the task, so the Mill plugin gets a fresh directory per module for nothing, and the sbt recipe needs one delete per module before `test`. Each location then holds exactly the runs its caller just started, and one holding none is a module that did not run (`SPECIFICATION.md` R-051, R-053, R-060).
+**Reasoning** Mill empties a task's `Task.dest` before each run of the task, so the Mill plugin gets a fresh directory per module for nothing, and the sbt recipe needs one delete per module before `test`. Each location then holds exactly the runs its caller just started, and one holding none is a module with no run (`SPECIFICATION.md` R-051, R-053, R-060).
 
 **Costs** A hand-written sbt build that drops the delete consolidates stale runs silently.
 

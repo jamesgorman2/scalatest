@@ -47,9 +47,9 @@ Platforms: JVM on Scala 2.11, 2.12, 2.13 and 3.3; Scala.js and Scala Native on 2
 ### Compatibility with ScalaTest 3.2.x
 
 - R-001 The fork stays binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.19, the latest 3.2.x release the fork builds on.
-- R-002 For a sequential run of the same suites, every reporter built against the 3.2.x `Reporter` API — ScalaTest's own and any passed with `-C` — receives the same sequence of event types and field values as ScalaTest 3.2.19 does, apart from timestamps, durations and thread names.
-- R-057 Under every execution mode in § Test structure, every reporter built against the 3.2.x `Reporter` API receives the events ScalaTest 3.2.19 delivers in that mode, in an order 3.2.19 could deliver them.
-- R-003 Existing command-line flags keep their ScalaTest 3.2.19 meanings, including `-h` and the streaming output of a 3.2-format `-o` or `-e` reporter: one carrying a 3.2 config character other than `J`, and no `J` (R-030). For `-oDU` on a sequential run, the output is byte-for-byte what ScalaTest 3.2.19 prints, apart from timestamps, durations and thread names. The only exceptions are the default format of the spellings § Human-readable output names, and test output withheld from stdout and stderr under R-063. No new behaviour reuses an existing spelling with a new meaning.
+- R-002 For a sequential run of the same suites, every reporter built against the 3.2.x `Reporter` API — ScalaTest's own and any passed with `-C` — receives the same sequence of event types and field values as ScalaTest 3.2.19 does, apart from timestamps, durations and thread names, and except as R-075 provides.
+- R-057 Under every execution mode in § Test structure, every reporter built against the 3.2.x `Reporter` API receives the events ScalaTest 3.2.19 delivers in that mode, in an order 3.2.19 could deliver them, except as R-075 provides.
+- R-003 Existing command-line flags keep their ScalaTest 3.2.19 meanings, including `-h` and the streaming output of a 3.2-format `-o` or `-e` reporter: one carrying a 3.2 config character other than `J`, and no `J` (R-030). For `-oDU` on a sequential run, the output is byte-for-byte what ScalaTest 3.2.19 prints, apart from timestamps, durations and thread names. The only exceptions are the default format of the spellings § Human-readable output names, test output withheld from stdout and stderr under R-063, and R-075's `RunAborted`. No new behaviour reuses an existing spelling with a new meaning.
 - R-004 The `Framework` sends build tools the same test-interface events as ScalaTest 3.2.19 does.
 
 ### IntelliJ
@@ -62,7 +62,7 @@ IntelliJ's Scala plugin runs ScalaTest in three modes:
 
 ## Test structure
 
-These requirements govern the results output in § Human-readable output, the JSON output and the outputs in § Consolidation, on every launch path and whatever the execution mode: sequential, `-P`, `ParallelTestExecution`, async suites, `RandomTestOrder`, or sbt's parallel tasks.
+These requirements govern the results output in § Human-readable output, the JSON output and the outputs in § Consolidation, and R-075 also every reporter, on every launch path and whatever the execution mode: sequential, `-P`, `ParallelTestExecution`, async suites, `RandomTestOrder`, or sbt's parallel tasks.
 
 - R-010 Every node appears under the node that contains it, except as R-013 allows and in JUnit XML (R-055).
 - R-011 In results output and in every consolidated output other than merged JSON, siblings appear in the order their parent declares them, whatever order they ran in. Within a node, events keep the order the node emitted them.
@@ -70,6 +70,8 @@ These requirements govern the results output in § Human-readable output, the JS
 - R-013 An event whose emitting node cannot be identified attaches to an ancestor of that node, and is never lost or reordered.
 - R-014 Every node has an ID unique within its run, including where `suiteId`s and scope texts repeat and where the run spans several processes. In consolidated output, every node's ID is unique across all runs.
 - R-015 A node's outcome is the worst of its own and its descendants'. From worst to best: aborted, failed, canceled, pending, ignored, passed.
+- R-074 A test, scope or suite whose start was reported but whose end never was has its own outcome aborted, and existing reporters receive no event for its end. It is unfinished when, in addition, no suite containing it ended and its run reported no `RunAborted` or `RunStopped`.
+- R-075 When a run finishes — at `done()` under the `Framework`, at the end of the run under `Runner` — with any node unfinished (R-074), and has not already ended in `RunAborted` or `RunStopped`, every reporter, `-C` reporters included, receives `RunAborted` in place of `RunCompleted`.
 - R-016 Failure messages and throwables are preserved exactly: message text, throwable class, cause chain and location.
 - R-017 Every test and suite carries its duration.
 - R-018 A suite that aborts, including one whose constructor throws, is reported as aborted on every platform.
@@ -94,8 +96,9 @@ By default — plain `-o`, plain `-e`, and the `Framework` given no reporter arg
 - R-071 A reporter argument new under R-003, given a directory, writes each run's JSON to `<dir>/<run ID>.json`, so runs given the same directory, from one process or many, never overwrite each other's JSON.
 - R-034 JSON output holds all captured test output, whichever node it attaches to.
 - R-035 If any process of a run dies, the run's JSON holds, as complete objects, every event and chunk of test output that process reported before it died, except that the last may be truncated or missing.
+- R-076 A run whose JSON ends with no closing run event — `RunCompleted`, `RunAborted` or `RunStopped` — is aborted.
 - R-036 JSON output is available on every launch path in § Scope, with two exceptions. Where a Scala.js run cannot write files, the run reports `-fJ` and R-071's directory argument as configuration errors, and `-oJ` remains available. Under `testHtml`, no `J` spelling produces JSON.
-- R-037 The JSON format is documented well enough for a third party to render from it.
+- R-037 The JSON format is documented well enough for a third party to render from it, including how a reader recognises a run with no closing run event (R-076) and a run whose test process failed (R-077).
 
 ## Test output
 
@@ -115,15 +118,17 @@ When test output is captured:
 
 ## Consolidation
 
-- R-050 The consolidator is given each module expected to have run, with the location of that module's JSON. Module names come only from this caller. It reads every run found in those locations, across forked JVMs and platforms, and writes:
+- R-050 The consolidator is given each module expected to have run, with the location of that module's JSON and, where the caller has it, whether the module's test task failed. Module names come only from this caller. It reads every run found in those locations, across forked JVMs and platforms, and writes:
   - merged JSON;
   - results output, rendered as ScalaTest's own results output is;
   - JUnit XML;
   - Markdown.
-- R-051 Consolidated output distinguishes a module that did not run — one whose JSON location holds no run — and a module whose test process failed, from a module whose tests failed.
+- R-051 Consolidated output distinguishes a module that did not run — one whose JSON location holds no run, whatever its test-task result — and a module whose test process failed, from a module whose tests failed.
+- R-077 A run's test process failed when its JSON has no closing run event (R-076), or it ended in R-075's `RunAborted`, including one a forked JVM of the run emits, or in the `RunAborted` raised when a forked JVM of the run is lost. A run that ends in any other `RunAborted`, such as one raised for a suite that cannot be loaded or instantiated, is aborted.
 - R-059 A module's outcome is the worst of its runs' outcomes (R-015); "test process failed" and "did not run" rank with aborted.
-- R-053 The Mill plugin provides a command that runs the tests of every selected module, then consolidates the JSON of the runs it started and of no earlier runs, including when tests fail.
+- R-078 A module that has at least one run, none of them failed or aborted, and whose test task failed (R-050) has test process failed.
+- R-053 The Mill plugin provides a command that runs the tests of every selected module, then consolidates the JSON of the runs it started and of no earlier runs, with each module's test-task result (R-050), including when tests fail.
 - R-055 JUnit XML keeps each test's containment as its path in the test and suite names.
 - R-056 The Mill plugin turns on JSON output for each module it consolidates.
-- R-060 The documented sbt recipe turns on JSON output for each module it consolidates and, after `test`, consolidates the JSON of every selected module's runs that `test` started and of no earlier runs, including when tests fail.
+- R-060 The documented sbt recipe turns on JSON output for each module it consolidates and, after `test`, consolidates the JSON of every selected module's runs that `test` started and of no earlier runs, with each module's test-task result (R-050), including when tests fail.
 - R-073 A Scala.js module whose runs cannot write files (R-036) cannot be consolidated; neither the Mill plugin nor the sbt recipe turns on JSON output to files for it.
