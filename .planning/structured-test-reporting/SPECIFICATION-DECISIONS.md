@@ -2,6 +2,46 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## A node left unfinished has outcome aborted, not a new outcome.
+
+**Alternatives** A new outcome, incomplete, ranked worst or level with aborted, adds no information: why the node never finished is unknown either way, and the only evidence is the truncated output.
+
+**Reasoning** ScalaTest 3.2.19's `org.scalatest.events.RunAborted` already means "a runner encountered an error while attempting to run a suite of tests" (its scaladoc), which fits a node whose process died or whose run gave up on it, so the six outcomes of `SPECIFICATION.md` R-015 stand (R-074).
+
+**Costs** A suite that threw and a suite whose process died read alike at node level; only the run's label tells them apart (R-077).
+
+**Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
+
+---
+
+## A run that finishes with nodes unfinished ends in `RunAborted` for every reporter.
+
+**Alternatives** Recording the abort only in results output and the JSON, while existing reporters keep 3.2.19's `RunCompleted`, tells two stories of one run, and puts in the JSON a `RunAborted` no reporter received (`SPECIFICATION.md` R-031).
+
+**Reasoning** A node is left unfinished only when its process was lost or the wait for it gave up (`SPECIFICATION.md` R-074): a suite that aborts closes the tests and scopes open inside it, so a single-process sequential run in which a test throws a `VirtualMachineError` still ends in `RunCompleted`, as in 3.2.19 (R-002). Where nodes are left unfinished, tests have silently vanished, and 3.2.19's `RunCompleted`, with partial counts, reports the run as complete (`ARCHITECTURE.md` § Data flow, failure path). 3.2.19 already ends a run in `RunAborted` when sbt's forked JVM is lost, so R-075 extends that to the cases it misses.
+
+**Costs** The first deliberate departure from 3.2.19's event stream (R-002, R-057): a `-C` reporter, IntelliJ's among them, sees `RunAborted` where 3.2.19 sent `RunCompleted`.
+
+**Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
+
+---
+
+## The consolidator's caller passes each module's test-task result, and a failed task marks a module that has runs, none of them failed or aborted, as test process failed.
+
+**Alternatives**
+
+- Accepting the gap lets a module show passed while its build task failed, whenever a process died before writing any JSON, as a Mill test-worker JVM can.
+- Passing the expected number of runs is not possible: Mill decides its worker count at run time, and sbt folds forked groups into one run.
+- Marking every module whose task failed as "test process failed" mislabels modules whose tests failed or that did not compile, because the task result cannot tell a crash from either.
+
+**Reasoning** Only the build sees a process that died before writing JSON, and Mill and sbt both fail the task for it; neither tells a crash from failing tests (`ARCHITECTURE.md` § External systems). Pending, ignored and canceled tests never fail a task, so the result decides only for a module that has runs and none of them failed or aborted (`SPECIFICATION.md` R-050, R-078).
+
+**Costs** A dead process in a module whose other runs failed shows "failed", not "test process failed", and the consolidator's input becomes partly the build's verdict. A module whose only process died before writing any JSON reads "did not run".
+
+**Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
+
+---
+
 ## Runs that share a JSON destination write one file each, through a new reporter argument naming a directory.
 
 **Alternatives**
@@ -50,7 +90,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** A run's whole result first exists at `done()`, and the string `done()` returns is the one output every build tool prints once per run, on every platform, as soon as that run's tests finish (`ARCHITECTURE.md` § External systems), which meets `SPECIFICATION.md` R-023.
 
-**Costs** Under Mill, results output and progress output cannot be separated (`SPECIFICATION.md` R-022). A run that hangs or crashes before `done()` shows no results output, and a crashed worker's suites appear only as far as that worker reported them before it died.
+**Costs** Under Mill, results output and progress output cannot be separated (`SPECIFICATION.md` R-022). A run whose `done()` never runs shows no results output (`ARCHITECTURE.md` § Data flow, failure path); any other dead worker's suites appear only as far as that worker reported them.
 
 **Settled by** [Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6).
 
