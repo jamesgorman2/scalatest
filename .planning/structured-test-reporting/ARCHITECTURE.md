@@ -4,7 +4,7 @@ Decisions: [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md).
 
 ## Summary
 
-The test structure must travel with every event through a run without breaking compatibility with ScalaTest 3.2.x (`SPECIFICATION.md` § Constraints). The fork attaches it where each event is emitted, carries it through ScalaTest's internal reporters beside the unchanged `Event`, and hands it only to new reporters built to read it.
+The test structure must travel with every event through a run without breaking compatibility with ScalaTest 3.2.x (`SPECIFICATION.md` § Constraints). The fork attaches it where each event is emitted, carries it through ScalaTest's internal reporters beside the unchanged `Event`, and hands it only to new reporters built to read it. Test output written during a run must likewise be attributed to nodes, on every platform, without changing what existing reporters receive.
 
 ## Modules
 
@@ -14,12 +14,12 @@ Three deployable units, each built and released from this repo.
 
 `scalatest-core`, on every Scala version and platform in `SPECIFICATION.md` § Scope. Changes live in `jvm/core`, plus the per-platform `tools` sources in `js/core` and `native/core` (`Framework`, `MasterRunner`, `SlaveRunner`, `TaskRunner`). Every part below is internal (`private[scalatest]`); Scala.js and Native receive the `jvm/core` parts through the existing source generators, `project/GenScalaTestJS.scala`, `project/GenScalaTestNative.scala` and their Dotty equivalents.
 
-- **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. Each suite's wrapper mints IDs for the suite, its scopes and its tests. A wrapper knows its node's ID and its parent's node ID, tracks the scopes its node opens and closes, and wraps every `Event` it receives into an *envelope*: an `Event` or a chunk of test output, plus the ID of the node it attaches to and that node's parent's ID. Each wrapper knows each child's declared position among its siblings, and envelopes carry it, so structure-aware reporters restore declared order without the sorting reporters (`SPECIFICATION.md` R-011). The run node's wrapper wraps the reporter that `Runner`, the `Framework` and `MasterRunner` emit run-level events to, so every event passes through at least one wrapper.
+- **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. Each suite's wrapper mints IDs for the suite, its scopes and its tests. A wrapper knows its node's ID and its parent's node ID, tracks the scopes its node opens and closes, and wraps every `Event` it receives into an *envelope*: an `Event` or a chunk of test output, plus the ID of the node it attaches to and that node's parent's ID. Each wrapper knows each child's declared position among its siblings, and envelopes carry it, so structure-aware reporters restore declared order without the sorting reporters (`SPECIFICATION.md` R-011). The run node's wrapper wraps the reporter that `Runner`, the `Framework` and `MasterRunner` emit run-level events to, so every event passes through at least one wrapper. Wrappers report which tests and suites are running on each thread to test output capture.
 - **Envelope dispatch** — delivers each envelope to the *structure-aware reporters*, the JSON writer and the human renderer. Envelope dispatch sits ahead of `SuiteSortingReporter` and `TestSortingReporter` on every platform, because events held for sorting are lost on a crash (`SPECIFICATION.md` R-035); Scala.js and Native compile no `DispatchReporter`.
 - **JSON writer** — `SPECIFICATION.md` R-030 to R-036.
 - **Tree assembly** — assembles nodes into the test structure, restoring declared order, for the human renderer and for the consolidator.
 - **Human renderer** — the default output of `SPECIFICATION.md` § Human-readable output: R-020, R-022 to R-024 and R-058.
-- **Test output capture** — installed only when `SPECIFICATION.md` R-061 holds; attributes test output to nodes and sends it to envelope dispatch as envelopes, and passes output through to the original stdout and stderr under R-062 and R-007.
+- **Test output capture** — active only when `SPECIFICATION.md` R-061 holds. On Scala Native it is installed when the `Framework` loads, before anything initialises `scala.Console`, and passes everything through until activated. It attributes test output to nodes and sends it to envelope dispatch as envelopes, and passes output through to the original stdout and stderr under R-062 and R-007.
 
 ### Consolidator
 
@@ -49,7 +49,7 @@ flowchart LR
   G[Runner, Framework, MasterRunner] -- run-level events --> R
   R -- bare Event --> D["DispatchReporter (JVM only)"]
   D -- bare Event --> X[Existing reporters, -C, test-interface]
-  W -- current node per thread --> T[Test output capture]
+  W -- running nodes per thread --> T[Test output capture]
   W -- envelope --> A[Envelope dispatch]
   R -- envelope --> A
   T -- test output, in envelopes --> A

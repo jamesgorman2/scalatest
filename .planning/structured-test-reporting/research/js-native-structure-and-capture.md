@@ -152,3 +152,4 @@ On both runtimes ScalaTest's own output goes through `Logger`s, that is RPC, not
 5. Whether Native stdout reaches the user under sbt's thin client or server mode (§ 2.1).
 6. Whether jsdom's window exposes `process` or `require` (§ 2.3).
 7. Whether Mill's `loadFrameworks` thread differs from the test thread, which would start an idle extra VM (§ 1.3).
+8. Whether a Scala.js process ever runs two suites' tasks at once, as prior art guards against (§ 4.1).

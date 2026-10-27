@@ -2,6 +2,55 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## Test output is captured on Scala.js and Scala Native as well as the JVM.
+
+**Alternatives**
+
+- JVM only leaves a Scala.js or Native run under sbt, several worker processes with interleaved, unattributed stdout, as unreadable as the fork exists to stop.
+- Scala Native only would leave Scala.js, whose stdout already reaches the user, unattributed under parallel workers.
+
+**Reasoning** Both runtimes can capture what tests print through their own language-level streams, as prior art has done, and output that capture cannot pin to a test falls back to its suite or the run (`SPECIFICATION.md` R-040, R-067).
+
+**Costs** Each runtime needs its own capture code, and every Native run, 3.2-compatible or not, writes through a pass-through `System.out` and `System.err`.
+
+**Settled by** [Does the epic capture test output on Scala.js and Scala Native?](https://github.com/jamesgorman2/scalatest/issues/7).
+
+**See** `research/js-native-structure-and-capture.md` § 4.
+
+---
+
+## A test owns test output only while it is the only test running on the writing thread.
+
+**Alternatives**
+
+- Attaching output to the most recently started test misattributes it to a sibling whenever async tests overlap.
+- Attaching all output to the suite gives up per-test output for serial tests, where attributing it is exact.
+
+**Reasoning** A thread identifies its test only while no other test runs on it: always for synchronous tests on the JVM and Native, never for overlapping async tests, and on Scala.js, where one thread runs everything, only while tests do not overlap.
+
+**Costs** Overlapping tests of an async `ParallelTestExecution` suite, on every platform, lose their per-test output to the suite.
+
+**Settled by** [Does the epic capture test output on Scala.js and Scala Native?](https://github.com/jamesgorman2/scalatest/issues/7).
+
+---
+
+## Capture hooks streams inside the process, never file descriptors.
+
+**Alternatives**
+
+- `console` alone on Scala.js misses code that writes to `process.stdout` directly, a gap closed cheaply on Node, where nearly every build-tool run executes.
+- Redirecting file descriptors 1 and 2 on Scala Native catches C code and child processes, but cannot attribute by thread, needs a thread to drain the pipe and a flush of C stdio at every boundary, and is POSIX only.
+
+**Reasoning** Each runtime captures what Scala tests print through the language's own streams, the overwhelming case; the descriptor-level output Native gives up could only attach to an ancestor anyway.
+
+**Costs** Outside Node, Scala.js captures only `console`; on Native, output from C code and child processes is not captured and, under Mill's daemon, still never reaches the console.
+
+**Settled by** [Does the epic capture test output on Scala.js and Scala Native?](https://github.com/jamesgorman2/scalatest/issues/7).
+
+**See** `research/js-native-structure-and-capture.md` § 4.1 and § 4.2.
+
+---
+
 ## Captured test output is withheld from stdout and stderr unless a `-C` reporter or a 3.2-format `-o` or `-e` reporter is configured.
 
 **Alternatives**
@@ -24,7 +73,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - Always on, every 3.2-compatible configuration, including IntelliJ's forked and sbt-shell modes, would run under replaced streams, so compliance with `SPECIFICATION.md` R-002 and R-003 would rest on capture being invisible.
 - An opt-in flag would keep `SPECIFICATION.md` R-024's failed-test output out of the default output unless the flag was set.
 
-**Reasoning** Not capturing where nothing reads the output loses nothing, and 3.2-compatible configurations run exactly as ScalaTest 3.2.19 does.
+**Reasoning** Not capturing where nothing reads the output loses nothing, and on the JVM and Scala.js, 3.2-compatible configurations run exactly as ScalaTest 3.2.19 does; on Native they run under a pass-through stream.
 
 **Costs** Whether capture is on depends on the reporter set, so adding `J` beside a `-C` reporter turns capture on under it.
 
