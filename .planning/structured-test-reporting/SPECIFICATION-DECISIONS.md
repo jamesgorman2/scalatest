@@ -2,6 +2,40 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## Under the `Framework`, a run's results output is one block per run, printed wherever the build tool prints the test framework's summary.
+
+**Alternatives**
+
+- One block per suite, written through that suite's task loggers, needs no traffic between processes and keeps partial results after a crash, but reproduces the per-suite blocks sbt's default `logBuffered := true` already prints, which this epic exists to replace.
+- Writing the block at `done()` through a task logger kept from an earlier `execute`, on the JVM only, would give it a log level, but no such logger exists under sbt's forked mode, on a run that executes no task, or on Scala.js and Native, so the level would vary by launch path; and it relies on undocumented sbt behaviour.
+
+**Reasoning** A run's whole result first exists at `done()`, and the string `done()` returns is the one output every build tool prints once per run, on every platform, as soon as that run's tests finish (`ARCHITECTURE.md` § External systems), which meets `SPECIFICATION.md` R-023.
+
+**Costs** Under Mill, results output and progress output cannot be separated (`SPECIFICATION.md` R-022). A run that hangs or crashes before `done()` shows no results output, and a crashed worker's suites appear only as far as that worker reported them before it died.
+
+**Settled by** [Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6).
+
+**See** `research/js-native-structure-and-capture.md` § 3.2.
+
+---
+
+## Where a Scala.js run cannot write files, `-fJ` is a configuration error and `-oJ` is the route for JSON.
+
+**Alternatives**
+
+- Falling back silently from `-fJ` to `-oJ`'s logger output puts the JSON in build-tool logs, where neither the Mill plugin nor the sbt recipe looks, so the module drops out of consolidation unexplained.
+- Relaying the JSON out over another channel collapses into that fallback: from jsdom or a browser the build tool's loggers are the only way out, since no ScalaTest code runs on the build tool's JVM and an sbt plugin is out of scope.
+
+**Reasoning** A user who asks for a file that cannot be written is told so by the run itself, not by a consolidation that comes up short. `-oJ` reaches the build tool from every environment that has one, so the JSON stays available to whoever extracts it.
+
+**Costs** jsdom and browser users who want consolidation extract `-oJ` lines from build logs themselves.
+
+**Settled by** [Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6).
+
+**See** `research/js-native-structure-and-capture.md` § 2.3 and § 3.1.
+
+---
+
 ## A write belongs to the run whose node or own code is running on the writing thread, and output belonging to no run is never captured.
 
 **Alternatives**
@@ -49,7 +83,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## Capture hooks streams inside the process, never file descriptors.
+## Only output written through the runtime's own streams is captured; output written straight to file descriptors, from native code or by child processes is not.
 
 **Alternatives**
 
@@ -88,7 +122,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - Always on, every 3.2-compatible configuration, including IntelliJ's forked and sbt-shell modes, would run under replaced streams, so compliance with `SPECIFICATION.md` R-002 and R-003 would rest on capture being invisible.
 - An opt-in flag would keep `SPECIFICATION.md` R-024's failed-test output out of the default output unless the flag was set.
 
-**Reasoning** Not capturing where nothing reads the output loses nothing, and on the JVM and Scala.js, 3.2-compatible configurations run exactly as ScalaTest 3.2.19 does; on Native they run under a pass-through stream.
+**Reasoning** Not capturing where nothing reads the output loses nothing, and on the JVM and Scala.js, 3.2-compatible configurations run exactly as ScalaTest 3.2.19 does.
 
 **Costs** Whether capture is on depends on the reporter set, so adding `J` beside a `-C` reporter turns capture on under it.
 
@@ -135,7 +169,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## Completion is the end of one run, not of the whole build.
+## A run's results output is printed when that run completes, not when the whole build does.
 
 **Alternatives** Waiting for every module would need a view of the build that ScalaTest does not have: it sees one `Runner` run, or one `Framework` runner up to `done()`.
 

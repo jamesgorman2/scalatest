@@ -33,7 +33,7 @@ The full human-readable account of a run's, or a consolidation's, nodes and thei
 _Avoid_: Report, summary
 
 **Test output**:
-The stdout and stderr that a run's tests, suites and the code they call write while it runs.
+The stdout and stderr written on a thread while one of a run's nodes, or the run's own code, is running on it.
 _Avoid_: Logs, console output, captured output
 
 ## Consolidation

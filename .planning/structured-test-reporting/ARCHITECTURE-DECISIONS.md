@@ -2,6 +2,23 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## A run's `-fJ` file is written by the process that runs its `done()`, not by each process of the run.
+
+**Alternatives**
+
+- Each process writing its own file yields 1 + N files per run, N unknown until `done()`, all tied together by a run identity that processes sharing no ID cannot agree on.
+- Every process appending to one shared file has the same identity problem, and needs single-write appends of whole lines from concurrent processes.
+
+**Reasoning** The run's results output is rendered in the process that runs its `done()` (`SPECIFICATION-DECISIONS.md` § Under the `Framework`, a run's results output is one block per run, printed wherever the build tool prints the test framework's summary), so every envelope of the run already reaches that process; writing the JSON there adds no traffic, and that process can stamp one run identity on one file (`SPECIFICATION.md` R-033). Under sbt's forked mode that process is sbt's JVM, whose runner already receives the fork's events over its socket and already owns every file reporter.
+
+**Costs** Complete JSON (`SPECIFICATION.md` R-035) depends on the adapter delivering each worker's messages before the controller's `done`, which the adapters' source implies but does not document (`research/js-native-structure-and-capture.md` § 2.2). Each worker envelope makes two hops with its payload wrapped twice.
+
+**Settled by** [Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6).
+
+**See** `research/js-native-structure-and-capture.md` § 2.2, § 3.1 and § 5 item 2.
+
+---
+
 ## Tree assembly and the human renderer are internal to ScalaTest core, which the consolidator depends on.
 
 **Alternatives**
@@ -17,7 +34,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## Each JSON event points at its parent node only; consumers assemble the tree.
+## Each JSON event names its node and that node's parent, not its full ancestry; consumers assemble the tree.
 
 **Alternatives** Full ancestry on every event grows with depth and repeats every ancestor on every line.
 

@@ -76,24 +76,24 @@ These requirements govern the results output in § Human-readable output, the JS
 
 ## Human-readable output
 
-By default — plain `-o`, plain `-e`, and the `Framework` given no reporter argument (sbt's loggers):
+By default — plain `-o`, plain `-e`, and the `Framework` given no reporter argument (the build tool's loggers):
 
-- R-020 A run shows progress output while it runs, followed by its results output.
-- R-022 A user can send progress output and results output each to stdout, stderr or both, independently. Under a build tool, the user chooses a build-tool log level for each output instead of a stream.
+- R-020 A run shows progress output while it runs, followed, after all of its progress output, by its results output.
+- R-022 Under `Runner`, a user can send progress output and results output each to stdout, stderr or both, independently. Under a build tool, results output goes wherever the build tool prints the test framework's summary, and where the build tool has log levels, as sbt does, the user chooses one for progress output. Under Mill, which prints every line with no level, neither output can be separated by level.
 - R-023 A run's results output never waits for other runs or modules.
 - R-024 Results output shows the captured test output attached to every node whose outcome (R-015) is failed or aborted.
-- R-058 A run's results output appears as one contiguous block, never interleaved with its own progress output or with other output ScalaTest writes.
+- R-058 A run's results output appears as one contiguous block that no other output ScalaTest writes splits, except that a build tool printing the block line by line may interleave other runs' output printed at the same moment.
 
 ## JSON output
 
-- R-030 JSON output is written only when asked for with the `J` presentation config character. Every `J` spelling — `-fJ <file>`, `-oJ`, `-eJ`, and `-oJ` passed to the `Framework` — produces the JSON output this section describes.
+- R-030 JSON output is written only when asked for with the `J` presentation config character. Every `J` spelling — `-fJ <file>`, `-oJ`, `-eJ`, and `-oJ` passed to the `Framework` — produces the JSON output this section describes, wherever R-036 makes it available.
 - R-031 It stays one JSON object per event or chunk of test output, and every field ScalaTest 3.2.19 writes keeps its name and meaning.
 - R-064 Where JSON output shares stdout or stderr with other output, each JSON object occupies whole lines that no other output ScalaTest writes or captures splits.
 - R-032 JSON events appear in the order they arrive. From a run's JSON alone, a reader can rebuild its test structure, each node's event order and its siblings' declared order.
 - R-033 Every JSON file identifies its run distinctly from every other run, including runs that share a module, platform or process.
 - R-034 JSON output holds all captured test output, whichever node it attaches to.
-- R-035 If any process of a run dies, the run's JSON holds, as complete objects, every event and chunk of test output that process reported before it died; at most the final object is truncated.
-- R-036 JSON output is available on every launch path in § Scope.
+- R-035 If any process of a run dies, the run's JSON holds, as complete objects, every event and chunk of test output that process reported before it died, except that the last may be truncated or missing.
+- R-036 JSON output is available on every launch path in § Scope, with two exceptions. Where a Scala.js run cannot write files, the run reports `-fJ` as a configuration error, and `-oJ` remains available. Under `testHtml`, no `J` spelling produces JSON.
 - R-037 The JSON format is documented well enough for a third party to render from it.
 
 ## Test output
@@ -109,7 +109,7 @@ When test output is captured:
 - R-067 Output that belongs to a run but to none of its suites under R-040 attaches to the run's node, except that output written while a suite is constructed attaches to that suite or to the run's node. Every captured chunk attaches to exactly one node.
 - R-068 Output ScalaTest itself writes, including its reporters' and any `-C` reporter's, is not test output: it is never captured, attributed or withheld.
 - R-062 When any `-C` reporter or any 3.2-format `-o` or `-e` reporter (R-003) is configured, captured test output reaches the process's stdout and stderr live and unaltered, whatever `-f` reporters are configured.
-- R-063 When R-062 does not apply, captured test output is withheld from stdout and stderr: it is not passed to them as it is written, and appears only within results output (R-024) and JSON output (R-034).
+- R-063 When R-062 does not apply, captured test output is withheld from stdout and stderr: it is not passed to them as it is written, and appears only within results output (R-024) and JSON output (R-034), except as R-007 provides.
 - R-007 Under R-063, TeamCity service-message lines in captured test output still reach stdout unaltered.
 
 ## Consolidation
