@@ -5,7 +5,7 @@ This repo is a fork of ScalaTest that keeps test output readable, by people and 
 ## Runs and modules
 
 **Run**:
-One ScalaTest execution, from start to completion: one `Runner` run, or everything one `Framework` runner executes before its `done()`. On Scala.js and Native, one run spans a controller process and the worker processes the build tool starts for it.
+One ScalaTest execution, from start to completion: one `Runner` run, or everything one `Framework` runner executes before its `done()`. On Scala.js and Native, one run spans a controller process and the worker processes that serve it.
 _Avoid_: Build, test session, invocation
 
 **Module**:
@@ -33,7 +33,7 @@ The full human-readable account of a run's, or a consolidation's, nodes and thei
 _Avoid_: Report, summary
 
 **Test output**:
-The stdout and stderr written by tests while they run.
+The stdout and stderr that a run's tests, suites and the code they call write while it runs.
 _Avoid_: Logs, console output, captured output
 
 ## Consolidation

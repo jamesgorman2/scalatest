@@ -88,24 +88,26 @@ By default — plain `-o`, plain `-e`, and the `Framework` given no reporter arg
 
 - R-030 JSON output is written only when asked for with the `J` presentation config character. Every `J` spelling — `-fJ <file>`, `-oJ`, `-eJ`, and `-oJ` passed to the `Framework` — produces the JSON output this section describes.
 - R-031 It stays one JSON object per event or chunk of test output, and every field ScalaTest 3.2.19 writes keeps its name and meaning.
-- R-064 Where JSON output shares stdout or stderr with other output, each JSON object occupies whole lines that no other output splits.
+- R-064 Where JSON output shares stdout or stderr with other output, each JSON object occupies whole lines that no other output ScalaTest writes or captures splits.
 - R-032 JSON events appear in the order they arrive. From a run's JSON alone, a reader can rebuild its test structure, each node's event order and its siblings' declared order.
-- R-033 Every JSON file identifies its run — module, platform and JVM — distinctly from every other run.
-- R-034 JSON output holds all captured test output, attributed or not.
+- R-033 Every JSON file identifies its run distinctly from every other run, including runs that share a module, platform or process.
+- R-034 JSON output holds all captured test output, whichever node it attaches to.
 - R-035 If any process of a run dies, the run's JSON holds, as complete objects, every event and chunk of test output that process reported before it died; at most the final object is truncated.
 - R-036 JSON output is available on every launch path in § Scope.
 - R-037 The JSON format is documented well enough for a third party to render from it.
 
 ## Test output
 
-- R-061 Test output is captured when, and only when, a reporter that consumes it is configured: the default output of § Human-readable output, or any `J` reporter (R-030). Otherwise a run handles test output as ScalaTest 3.2.19 does.
-- R-065 Capture catches test output written through `println`, `System.out` and `System.err`; on Scala.js also through `console`, and on Node also through `process.stdout` and `process.stderr`. Output written any other way, such as straight to a file descriptor, from native code, by a child process or through a stream reference obtained before capture began, is never captured: it reaches stdout and stderr as under ScalaTest 3.2.19.
+- R-061 Test output is captured when, and only when, a reporter that consumes it is configured: the default output of § Human-readable output, or any `J` reporter (R-030).
+- R-070 A write belongs to the run whose node, or whose own code, is running on the writing thread; where several runs are, to the one started most recently. A run's own code is ScalaTest's code that starts, discovers, loads and finishes the run's suites, on every launch path. Where several runs share a process, each run's own configuration alone decides whether its writes are captured, withheld or passed through.
+- R-065 Capture catches test output written through `println`, `System.out` and `System.err`; on Scala.js also through `console`, and on Node also through `process.stdout` and `process.stderr`. Output written any other way, such as straight to a file descriptor, from native code, by a child process or through a stream reference obtained before capture began, is never captured.
+- R-069 Output that is not captured — because R-061 does not hold for its run, R-065 does not catch it, or it belongs to no run under R-070 — reaches stdout and stderr as under ScalaTest 3.2.19. Output belonging to no run includes output from a thread pool or background thread a test uses, the build tool's own output, and other test frameworks' output.
 
 When test output is captured:
 
 - R-040 Output written on a thread while exactly one test runs on that thread attaches to that test. Other output written on a thread while a suite runs on it attaches to the innermost such suite. On Scala.js, every test and suite of a process runs on its one thread.
-- R-067 Output not tied to a running node attaches to the run as unattributed. Every chunk attaches to exactly one node or to the run.
-- R-068 Output written by ScalaTest's reporters, including `-C` reporters, is not test output: it is never captured, attributed or withheld.
+- R-067 Output that belongs to a run but to none of its suites under R-040 attaches to the run's node, except that output written while a suite is constructed attaches to that suite or to the run's node. Every captured chunk attaches to exactly one node.
+- R-068 Output ScalaTest itself writes, including its reporters' and any `-C` reporter's, is not test output: it is never captured, attributed or withheld.
 - R-062 When any `-C` reporter or any 3.2-format `-o` or `-e` reporter (R-003) is configured, captured test output reaches the process's stdout and stderr live and unaltered, whatever `-f` reporters are configured.
 - R-063 When R-062 does not apply, captured test output is withheld from stdout and stderr: it is not passed to them as it is written, and appears only within results output (R-024) and JSON output (R-034).
 - R-007 Under R-063, TeamCity service-message lines in captured test output still reach stdout unaltered.

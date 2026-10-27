@@ -2,6 +2,21 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## A write belongs to the run whose node or own code is running on the writing thread, and output belonging to no run is never captured.
+
+**Alternatives**
+
+- Giving output on other threads to the process's only active run, passing it through when several are active, makes behaviour depend on what else the process is running, and captures the build tool's and other frameworks' output while one module runs.
+- Giving a thread to the run whose node started it misattributes pooled threads, which the first run to need them creates and later runs reuse.
+
+**Reasoning** Only a thread running a run's node or own code identifies a run without depending on what else the process is running (`SPECIFICATION.md` R-067, R-070). It keeps ScalaTest from capturing or withholding the build tool's output, other frameworks' output, and callbacks a finished run leaves in a shared Scala.js or Native process that fire while no run's code is running.
+
+**Costs** On the JVM and Native, output from a test's own `Future` on a shared pool, or from a thread the test starts, reaches the console live and interleaved even when other test output is withheld, and is absent from results output and JSON. On Scala.js, a late callback from a finished run attaches to whichever test is running.
+
+**Settled by** [Which run owns test output when one process hosts several runs?](https://github.com/jamesgorman2/scalatest/issues/8).
+
+---
+
 ## Test output is captured on Scala.js and Scala Native as well as the JVM.
 
 **Alternatives**
@@ -9,7 +24,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - JVM only leaves a Scala.js or Native run under sbt, several worker processes with interleaved, unattributed stdout, as unreadable as the fork exists to stop.
 - Scala Native only would leave Scala.js, whose stdout already reaches the user, unattributed under parallel workers.
 
-**Reasoning** Both runtimes can capture what tests print through their own language-level streams, as prior art has done, and output that capture cannot pin to a test falls back to its suite or the run (`SPECIFICATION.md` R-040, R-067).
+**Reasoning** Both runtimes can capture what tests print through their own language-level streams, as prior art has done, and output that capture cannot pin to a test falls back to its suite or its run, or is not captured (`SPECIFICATION.md` R-040, R-067, R-069).
 
 **Costs** Each runtime needs its own capture code, and every Native run, 3.2-compatible or not, writes through a pass-through `System.out` and `System.err`.
 
@@ -41,7 +56,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - `console` alone on Scala.js misses code that writes to `process.stdout` directly, a gap closed cheaply on Node, where nearly every build-tool run executes.
 - Redirecting file descriptors 1 and 2 on Scala Native catches C code and child processes, but cannot attribute by thread, needs a thread to drain the pipe and a flush of C stdio at every boundary, and is POSIX only.
 
-**Reasoning** Each runtime captures what Scala tests print through the language's own streams, the overwhelming case; the descriptor-level output Native gives up could only attach to an ancestor anyway.
+**Reasoning** Each runtime captures what Scala tests print through the language's own streams, the overwhelming case; the descriptor-level output Native gives up could not be attributed to a node, or, where runs share a process, even to a run.
 
 **Costs** Outside Node, Scala.js captures only `console`; on Native, output from C code and child processes is not captured and, under Mill's daemon, still never reaches the console.
 
