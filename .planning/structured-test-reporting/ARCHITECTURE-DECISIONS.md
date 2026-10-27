@@ -2,14 +2,47 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
-## A run's `-fJ` file is written by the process that runs its `done()`, not by each process of the run.
+## On Scala.js and Native, the controller writes all of a run's console output, only through its tasks' loggers or the `done()` string; workers only forward envelopes.
 
 **Alternatives**
 
-- Each process writing its own file yields 1 + N files per run, N unknown until `done()`, all tied together by a run identity that processes sharing no ID cannot agree on.
-- Every process appending to one shared file has the same identity problem, and needs single-write appends of whole lines from concurrent processes.
+- Each worker writing its own progress output and `-oJ` through its task's loggers keeps sbt's log level on every line, but spreads one run's console output across processes, unlike the JVM's, and leaves worker `-oJ` without the run ID: the adapter gives every process identical arguments, and a JS worker cannot block on the asynchronous reply to a `notifyServer` message (`research/js-native-structure-and-capture.md` § 2.2).
+- Writing to the controller's stdout whenever it has no task's loggers loses output: on Native that stdout is the build tool's inherited file descriptor, which does not reach the console under the Mill daemon and probably not under sbt server mode, and on Scala.js the adapter never waits for its pipe threads, so output near `done()` can be dropped.
+- Holding that output and writing what is left to stdout at `done()` is late and still lossy in the same ways.
 
-**Reasoning** The run's results output is rendered in the process that runs its `done()` (`SPECIFICATION-DECISIONS.md` § Under the `Framework`, a run's results output is one block per run, printed wherever the build tool prints the test framework's summary), so every envelope of the run already reaches that process; writing the JSON there adds no traffic, and that process can stamp one run identity on one file (`SPECIFICATION.md` R-033). Under sbt's forked mode that process is sbt's JVM, whose runner already receives the fork's events over its socket and already owns every file reporter.
+**Reasoning** Every envelope of the run already reaches the controller (`ARCHITECTURE.md` § Modules, envelope forwarding), so writing the console output there adds no traffic, makes Scala.js and Native output match the JVM's as far as the platform allows, and puts the controller's run ID on every `-oJ` object (`SPECIFICATION.md` R-033). Its tasks' loggers and the `done()` string are the controller's only channels to the console that do not drop output, so holding output for them keeps the run-level events (`RunStarting`, `RunCompleted`, …) without which `-oJ` cannot rebuild the run (`SPECIFICATION.md` R-032).
+
+**Costs** Under sbt, where workers run most tasks, worker progress output may appear only at the controller's next task or at `done()` (`SPECIFICATION.md` R-020, R-022). Output still held when the controller dies before `done()` is lost; `-fJ` is unaffected.
+
+**Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
+
+**See** `research/js-native-structure-and-capture.md` § 2.1 and § 2.2.
+
+---
+
+## Each consolidating caller gives every module a fresh JSON directory each time its command runs; neither ScalaTest nor the consolidator tells one use of the command from another.
+
+**Alternatives**
+
+- An ID for each use of the command, passed into every run, for example through `-D`, for the consolidator to filter on, puts a build-supplied identity back into the JSON, and every caller must mint and pass it.
+- Filtering by run start time depends on clocks, which differ across machines and CI caches.
+
+**Reasoning** Mill empties a task's `Task.dest` before each run of the task, so the Mill plugin gets a fresh directory per module for nothing, and the sbt recipe needs one delete per module before `test`. Each location then holds exactly the runs its caller just started, and one holding none is a module that did not run (`SPECIFICATION.md` R-051, R-053, R-060).
+
+**Costs** A hand-written sbt build that drops the delete consolidates stale runs silently.
+
+**Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
+
+---
+
+## A run's JSON file is written by the process that runs its `done()`, not by each process of the run.
+
+**Alternatives**
+
+- Each process writing its own file yields 1 + N files per run, N unknown until `done()`, all tied together by a run ID that a Scala.js worker has no way to learn from the controller (`research/js-native-structure-and-capture.md` § 2.2).
+- Every process appending to one shared file has the same run ID problem, and needs single-write appends of whole lines from concurrent processes.
+
+**Reasoning** The run's results output is rendered in the process that runs its `done()` (`SPECIFICATION-DECISIONS.md` § Under the `Framework`, a run's results output is one block per run, printed wherever the build tool prints the test framework's summary), so every envelope of the run already reaches that process; writing the JSON there adds no traffic, and that process mints the run ID every object of the run carries (`SPECIFICATION.md` R-033). Under sbt's forked mode that process is sbt's JVM, whose runner already receives the fork's events over its socket and already owns every file reporter.
 
 **Costs** Complete JSON (`SPECIFICATION.md` R-035) depends on the adapter delivering each worker's messages before the controller's `done`, which the adapters' source implies but does not document (`research/js-native-structure-and-capture.md` § 2.2). Each worker envelope makes two hops with its payload wrapped twice.
 

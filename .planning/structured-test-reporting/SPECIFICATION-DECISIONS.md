@@ -2,6 +2,45 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## Runs that share a JSON destination write one file each, through a new reporter argument naming a directory.
+
+**Alternatives**
+
+- Making `-fJ` append changes an existing spelling's meaning (`SPECIFICATION.md` R-003), puts many runs in one file, needs atomic whole-line appends from concurrent JVMs, and leaves a rerun appending to stale output.
+- Leaving callers to keep paths distinct, through Mill's per-worker sandbox working directory with a relative path or a per-project sbt path, fails silently when a user turns off Mill's `testSandboxWorkingDir`, and leaves a bare `Runner` user the same risk.
+
+**Reasoning** Runs given identical arguments are normal: each Mill test-worker JVM is its own run (`ARCHITECTURE.md` § External systems), several sbt projects can share one path, and so can a module's platforms. A file named for its run ID (`SPECIFICATION.md` R-033, R-071) cannot collide whatever the caller passes, and `-fJ <file>` keeps its 3.2.19 truncating meaning as a single-run destination.
+
+**Costs** One new reporter spelling.
+
+**Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
+
+---
+
+## Every JSON object carries its run's run ID, not only a file's first object.
+
+**Alternatives** The run ID in a file's opening object alone saves about 40 bytes a line, but leaves `-oJ` lines from parallel runs in one log inseparable, and makes a file's format differ from `-oJ`'s.
+
+**Reasoning** An object read alone names its run, so every `J` spelling writes one format (`SPECIFICATION.md` R-030, R-033), and the objects of runs sharing a log can be told apart.
+
+**Costs** About 40 bytes on every object.
+
+**Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
+
+---
+
+## ScalaTest's JSON names no module; the consolidator's caller names each module and where its JSON is.
+
+**Alternatives** A new ScalaTest argument stamping a module name into the JSON would make the JSON self-describing and let `-oJ` lines in one build log be sorted by module, but, as a new spelling under `SPECIFICATION.md` R-003, it is a flag every launch path must pass per module, and bare `Runner` and IntelliJ would not.
+
+**Reasoning** A module is a build-tool concept, and the callers that consolidate, the Mill plugin and the sbt recipe, already know each module and where its JSON goes (`SPECIFICATION.md` R-050).
+
+**Costs** A third party reading JSON gets runs but no module names, and `-oJ` lines from several modules in one build log cannot be assigned to their modules.
+
+**Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
+
+---
+
 ## Under the `Framework`, a run's results output is one block per run, printed wherever the build tool prints the test framework's summary.
 
 **Alternatives**
@@ -19,11 +58,11 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## Where a Scala.js run cannot write files, `-fJ` is a configuration error and `-oJ` is the route for JSON.
+## Where a Scala.js run cannot write files, `-fJ` and the JSON directory argument are configuration errors and `-oJ` is the route for JSON.
 
 **Alternatives**
 
-- Falling back silently from `-fJ` to `-oJ`'s logger output puts the JSON in build-tool logs, where neither the Mill plugin nor the sbt recipe looks, so the module drops out of consolidation unexplained.
+- Falling back silently from a file argument to `-oJ`'s logger output puts the JSON in build-tool logs, where neither the Mill plugin nor the sbt recipe looks, so the module drops out of consolidation unexplained.
 - Relaying the JSON out over another channel collapses into that fallback: from jsdom or a browser the build tool's loggers are the only way out, since no ScalaTest code runs on the build tool's JVM and an sbt plugin is out of scope.
 
 **Reasoning** A user who asks for a file that cannot be written is told so by the run itself, not by a consolidation that comes up short. `-oJ` reaches the build tool from every environment that has one, so the JSON stays available to whoever extracts it.

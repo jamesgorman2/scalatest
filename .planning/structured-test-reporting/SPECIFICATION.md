@@ -68,7 +68,7 @@ These requirements govern the results output in § Human-readable output, the JS
 - R-011 In results output and in every consolidated output other than merged JSON, siblings appear in the order their parent declares them, whatever order they ran in. Within a node, events keep the order the node emitted them.
 - R-012 `info`, `alert`, `note` and `markup` attach to the node that emitted them.
 - R-013 An event whose emitting node cannot be identified attaches to an ancestor of that node, and is never lost or reordered.
-- R-014 Every node has an ID unique across all consolidated output, including where `suiteId`s and scope texts repeat.
+- R-014 Every node has an ID unique within its run, including where `suiteId`s and scope texts repeat and where the run spans several processes. In consolidated output, every node's ID is unique across all runs.
 - R-015 A node's outcome is the worst of its own and its descendants'. From worst to best: aborted, failed, canceled, pending, ignored, passed.
 - R-016 Failure messages and throwables are preserved exactly: message text, throwable class, cause chain and location.
 - R-017 Every test and suite carries its duration.
@@ -78,27 +78,28 @@ These requirements govern the results output in § Human-readable output, the JS
 
 By default — plain `-o`, plain `-e`, and the `Framework` given no reporter argument (the build tool's loggers):
 
-- R-020 A run shows progress output while it runs, followed, after all of its progress output, by its results output.
-- R-022 Under `Runner`, a user can send progress output and results output each to stdout, stderr or both, independently. Under a build tool, results output goes wherever the build tool prints the test framework's summary, and where the build tool has log levels, as sbt does, the user chooses one for progress output. Under Mill, which prints every line with no level, neither output can be separated by level.
+- R-020 A run shows progress output while it runs, followed, after all of its progress output, by its results output. On Scala.js and Native, progress output may arrive late, as late as with the results output.
+- R-022 Under `Runner`, a user can send progress output and results output each to stdout, stderr or both, independently. Under a build tool, results output goes wherever the build tool prints the test framework's summary, and where the build tool has log levels, as sbt does, the user chooses one for progress output, except that on Scala.js and Native progress output that arrives with the results output (R-020) goes where the results output goes. Under Mill, which prints every line with no level, neither output can be separated by level.
 - R-023 A run's results output never waits for other runs or modules.
 - R-024 Results output shows the captured test output attached to every node whose outcome (R-015) is failed or aborted.
 - R-058 A run's results output appears as one contiguous block that no other output ScalaTest writes splits, except that a build tool printing the block line by line may interleave other runs' output printed at the same moment.
 
 ## JSON output
 
-- R-030 JSON output is written only when asked for with the `J` presentation config character. Every `J` spelling — `-fJ <file>`, `-oJ`, `-eJ`, and `-oJ` passed to the `Framework` — produces the JSON output this section describes, wherever R-036 makes it available.
+- R-030 JSON output is written only when asked for by a `J` spelling: `-fJ <file>`, `-oJ`, `-eJ`, `-oJ` passed to the `Framework`, or the directory argument of R-071. Each produces the JSON output this section describes, wherever R-036 makes it available.
 - R-031 It stays one JSON object per event or chunk of test output, and every field ScalaTest 3.2.19 writes keeps its name and meaning.
-- R-064 Where JSON output shares stdout or stderr with other output, each JSON object occupies whole lines that no other output ScalaTest writes or captures splits.
+- R-064 Within one run's JSON output, each JSON object occupies whole lines that no other output ScalaTest writes or captures splits; an object may span several lines. Where several runs' JSON output shares one stream, nothing is guaranteed about how it interleaves.
 - R-032 JSON events appear in the order they arrive. From a run's JSON alone, a reader can rebuild its test structure, each node's event order and its siblings' declared order.
-- R-033 Every JSON file identifies its run distinctly from every other run, including runs that share a module, platform or process.
+- R-033 Every JSON object carries its run's run ID, which distinguishes the run from every other run, including runs that share a module, platform or process.
+- R-071 A reporter argument new under R-003, given a directory, writes each run's JSON to `<dir>/<run ID>.json`, so runs given the same directory, from one process or many, never overwrite each other's JSON.
 - R-034 JSON output holds all captured test output, whichever node it attaches to.
 - R-035 If any process of a run dies, the run's JSON holds, as complete objects, every event and chunk of test output that process reported before it died, except that the last may be truncated or missing.
-- R-036 JSON output is available on every launch path in § Scope, with two exceptions. Where a Scala.js run cannot write files, the run reports `-fJ` as a configuration error, and `-oJ` remains available. Under `testHtml`, no `J` spelling produces JSON.
+- R-036 JSON output is available on every launch path in § Scope, with two exceptions. Where a Scala.js run cannot write files, the run reports `-fJ` and R-071's directory argument as configuration errors, and `-oJ` remains available. Under `testHtml`, no `J` spelling produces JSON.
 - R-037 The JSON format is documented well enough for a third party to render from it.
 
 ## Test output
 
-- R-061 Test output is captured when, and only when, a reporter that consumes it is configured: the default output of § Human-readable output, or any `J` reporter (R-030).
+- R-061 Test output is captured when, and only when, a reporter that consumes it is configured: the default output of § Human-readable output, or any `J` spelling (R-030).
 - R-070 A write belongs to the run whose node, or whose own code, is running on the writing thread; where several runs are, to the one started most recently. A run's own code is ScalaTest's code that starts, discovers, loads and finishes the run's suites, on every launch path. Where several runs share a process, each run's own configuration alone decides whether its writes are captured, withheld or passed through.
 - R-065 Capture catches test output written through `println`, `System.out` and `System.err`; on Scala.js also through `console`, and on Node also through `process.stdout` and `process.stderr`. Output written any other way, such as straight to a file descriptor, from native code, by a child process or through a stream reference obtained before capture began, is never captured.
 - R-069 Output that is not captured — because R-061 does not hold for its run, R-065 does not catch it, or it belongs to no run under R-070 — reaches stdout and stderr as under ScalaTest 3.2.19. Output belonging to no run includes output from a thread pool or background thread a test uses, the build tool's own output, and other test frameworks' output.
@@ -114,14 +115,15 @@ When test output is captured:
 
 ## Consolidation
 
-- R-050 The consolidator is given runs' JSON — across modules, forked JVMs and platforms — and the set of modules expected to have run, and writes:
+- R-050 The consolidator is given each module expected to have run, with the location of that module's JSON. Module names come only from this caller. It reads every run found in those locations, across forked JVMs and platforms, and writes:
   - merged JSON;
   - results output, rendered as ScalaTest's own results output is;
   - JUnit XML;
   - Markdown.
-- R-051 Consolidated output distinguishes a module that did not run, and a module whose test process failed, from a module whose tests failed.
+- R-051 Consolidated output distinguishes a module that did not run — one whose JSON location holds no run — and a module whose test process failed, from a module whose tests failed.
 - R-059 A module's outcome is the worst of its runs' outcomes (R-015); "test process failed" and "did not run" rank with aborted.
-- R-053 The Mill plugin provides a command that runs the tests of every selected module, then consolidates their runs' JSON, including when tests fail.
+- R-053 The Mill plugin provides a command that runs the tests of every selected module, then consolidates the JSON of the runs it started and of no earlier runs, including when tests fail.
 - R-055 JUnit XML keeps each test's containment as its path in the test and suite names.
 - R-056 The Mill plugin turns on JSON output for each module it consolidates.
-- R-060 The documented sbt recipe turns on JSON output for each module and consolidates every selected module's runs' JSON after `test`, including when tests fail.
+- R-060 The documented sbt recipe turns on JSON output for each module it consolidates and, after `test`, consolidates the JSON of every selected module's runs that `test` started and of no earlier runs, including when tests fail.
+- R-073 A Scala.js module whose runs cannot write files (R-036) cannot be consolidated; neither the Mill plugin nor the sbt recipe turns on JSON output to files for it.
