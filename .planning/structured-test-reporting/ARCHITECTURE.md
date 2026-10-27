@@ -19,7 +19,7 @@ Three deployable units, each built and released from this repo.
 - **JSON writer** — `SPECIFICATION.md` R-030 to R-036.
 - **Tree assembly** — assembles nodes into the test structure, restoring declared order, for the human renderer and for the consolidator.
 - **Human renderer** — the default output of `SPECIFICATION.md` § Human-readable output: R-020, R-022 to R-024 and R-058.
-- **Test output capture** — attributes test output to nodes and sends it to envelope dispatch as envelopes.
+- **Test output capture** — installed only when `SPECIFICATION.md` R-061 holds; attributes test output to nodes and sends it to envelope dispatch as envelopes, and passes output through to the original stdout and stderr under R-062 and R-007.
 
 ### Consolidator
 
@@ -33,7 +33,7 @@ A standalone executable that writes the outputs of `SPECIFICATION.md` R-050. Tow
 
 No public `Event`, `Reporter`, `Args` or style-trait API is added or changed.
 
-Envelopes never leave ScalaTest's internal reporters. Every existing reporter — `-o` and `-e` with 3.2 config characters, `-f`, `-u`, `-h`, `-k`, `-K`, `-M`, `-C`, the GUI, and the `Framework`'s test-interface event handler — receives the bare `Event` it receives today. Only the structure-aware reporters receive envelopes.
+Envelopes never leave ScalaTest's internal reporters. Every existing reporter — 3.2-format `-o` and `-e`, `-f`, `-u`, `-h`, `-k`, `-K`, `-M`, `-C`, the GUI, and the `Framework`'s test-interface event handler — receives the bare `Event` it receives today. Only the structure-aware reporters receive envelopes. Every reporter, existing or structure-aware, writes to the original stdout and stderr, never through test output capture.
 
 A structure wrapper adds no event, removes none and changes no field: it decorates. An event the wrapper never sees still reaches every existing reporter.
 
@@ -53,6 +53,7 @@ flowchart LR
   W -- envelope --> A[Envelope dispatch]
   R -- envelope --> A
   T -- test output, in envelopes --> A
+  T -- forwarded output --> P[Original stdout and stderr]
   A --> TA[Tree assembly]
   TA --> H[Human renderer]
   A --> J[JSON writer]

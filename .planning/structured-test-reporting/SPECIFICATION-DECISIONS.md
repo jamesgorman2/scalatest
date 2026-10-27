@@ -2,6 +2,36 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## Captured test output is withheld from stdout and stderr unless a `-C` reporter or a 3.2-format `-o` or `-e` reporter is configured.
+
+**Alternatives**
+
+- Always forwarding leaves the default console output under parallel runs as unreadable as today, the readable copy arriving only at the end.
+- Forwarding whenever no reporter writes to the console, as with `-fJ` alone, would make enabling JSON also put raw test output on the console, which a CI configuration should have to request explicitly.
+
+**Reasoning** Withheld output reappears, attributed, where it is rendered (`SPECIFICATION.md` R-024 and R-034), so the default console reads cleanly under parallelism. Forwarding exactly when a `-C` reporter or a 3.2-format `-o` or `-e` reporter is configured (`SPECIFICATION.md` R-062) keeps 3.2-format output and IntelliJ's forked and sbt-shell modes unchanged.
+
+**Costs** `println` debugging of passing tests, and a hung or crashed run's test output, disappear from the default console; a run with only `-fJ` prints no test output. IDEs driving the `Framework` with no reporter argument (IntelliJ BSP, Metals, Bloop) no longer show test output live.
+
+**Settled by** [What does the console show of test output, and when is capture on?](https://github.com/jamesgorman2/scalatest/issues/5).
+
+---
+
+## Test output is captured only when a reporter consumes it.
+
+**Alternatives**
+
+- Always on, every 3.2-compatible configuration, including IntelliJ's forked and sbt-shell modes, would run under replaced streams, so compliance with `SPECIFICATION.md` R-002 and R-003 would rest on capture being invisible.
+- An opt-in flag would keep `SPECIFICATION.md` R-024's failed-test output out of the default output unless the flag was set.
+
+**Reasoning** Not capturing where nothing reads the output loses nothing, and 3.2-compatible configurations run exactly as ScalaTest 3.2.19 does.
+
+**Costs** Whether capture is on depends on the reporter set, so adding `J` beside a `-C` reporter turns capture on under it.
+
+**Settled by** [What does the console show of test output, and when is capture on?](https://github.com/jamesgorman2/scalatest/issues/5).
+
+---
+
 ## The consolidator ships as an executable and a Mill plugin; sbt users get a recipe.
 
 **Alternatives**
