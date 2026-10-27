@@ -8,6 +8,10 @@ This repo is a fork of ScalaTest that keeps test output readable, by people and 
 One ScalaTest execution, from start to completion: one `Runner` run, or everything one `Framework` runner executes before its `done()`. On Scala.js and Native, one run spans a controller process and the worker processes that serve it.
 _Avoid_: Build, test session, invocation
 
+**Run ID**:
+The identifier that distinguishes one run's JSON from every other run's, including runs of the same module, platform or process.
+_Avoid_: Run stamp, session ID
+
 **Module**:
 A build module whose tests produce one or more runs, for example one per platform or per forked JVM. In consolidated output, a module groups its runs.
 _Avoid_: Project, subproject, target
