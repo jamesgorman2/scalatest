@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: Creating, updating and reading a project or epic's roadmap, starting or completing work on an epic or feature, or promoting a feature to an epic. Not for designing or executing an epic or feature (design-loop, build-loop).
+description: Creating, updating and reading a project or epic's roadmap, starting or completing work on an epic or feature, breaking an epic into features, or promoting a feature to an epic. Not for designing or executing an epic or feature (design-loop, build-loop).
 ---
 
 A roadmap file contains upcoming and in-progress features. It is used to avoid flooding GitHub issues with work that has not been fully committed to. As features are completed, the work required may change. This reduces the level of commitment to future work while still recording the intended work. 
@@ -21,7 +21,7 @@ A roadmap file contains upcoming and in-progress features. It is used to avoid f
 
 ## Summary
 
-<sections>
+<backlog items>
 
 ## Deferred
 
@@ -31,7 +31,7 @@ A roadmap file contains upcoming and in-progress features. It is used to avoid f
 ### Summary
 
 
-### Sections
+### Backlog itams
 
 The main body of the roadmap is a list of epics and features in the approximate intended order of implementation.
 
@@ -70,9 +70,9 @@ The brief is a short, 1-2 paragraph, description of the intent of the feature. I
 
 Any additional *already known* information that is known should be included in addition to the main 1-2 paragraph brief. Include it as a reference if it is already recorded.
 
-#### Optional sections
+#### Optional subsections
 
-An epic roadmap adds sections that state how the [SKILL.md](../../../../sync-engine/.claude/skills/design-loop/SKILL.md)features address the epic. Each is a simple list referencing, *not repeating* the source section(s) only. Only include necessary sections.
+An epic roadmap adds sections that state how the features address the epic. Each is a simple list referencing, *not repeating* the source section(s) only. Only include necessary sections.
 
 - **Enables**: specification and/or architecture sections implemented by this feature 
 - **Settles**: key behaviours left open in the specification and/or architecture this feature settles
@@ -84,9 +84,20 @@ A list of possible features that were deliberately excluded and are not recorded
 
 ## Starting an epic or feature
 
-When an epic or feature is started:
+Starting a feature requires at one of:
+- a reference to a backlog item in a roadmap
+- a brief or short description
+
+And, optionally, a parent epic.
+
+- get the brief text
+  - from a roadmap, this is the full section text without the section title, including optional subsections
+  - otherwise it is the provided brief
+- assess the likely size of the work to determine if it is an epic or a feature
+  - if there is any ambiguity, ask the user 
 - create an issue with the tag `epic` or `feature`
-  - its body is the brief text from its section in ROADMAP.md
+  - if the epic or feature is created from a roadmap item 
+  - its body is the brief
   - if the feature is in an epic, create it as a sub-issue of the epic
 - delete the epic or feature's section from the `ROADMAP.md`
 - create its design issue as a sub-issue, per `design-loop`
@@ -117,11 +128,14 @@ When the `build-loop` issue is close, close the parent `feature` issue.
 
 After an epic has been specified in a `design-loop`, it should be broken into features for implementation.
 
-A feature is the smallest releasable unit of customer value. The customer is whoever consumes what the project provides - for a web application this is the end user; for a library this is the library consumer.
-
-When building a greenfield project, the work may not be releasable until a large body of work has been completed. Substitute 'releasable' with 'verifiable'. Is it sufficiently coherent that some domain expert can validate its behaviour? Is it sufficiently small that this is not an onerous task?
-
-When you have broken the epic in to features, record them in the epic's `ROADMAP.md`.
+When you have broken the epic in to features:
+- confirm the proposed features with the user. Present them with a 1-2 sentence summary or each feature 
+- record them in the epic's `ROADMAP.md`.
 
 Use a subagent to review the features and ensure that all requirements and architecture are covered by at least one feature.
 
+## Feature size
+
+A feature is the smallest releasable unit of customer value. The customer is whoever consumes what the project provides - for a web application this is the end user; for a library this is the library consumer.
+
+When building a greenfield project, the work may not be releasable until a large body of work has been completed. Substitute 'releasable' with 'verifiable'. Is it sufficiently coherent that some domain expert can validate its behaviour? Is it sufficiently small that this is not an onerous task?
