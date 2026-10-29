@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false,
+    "compound-engineering@compound-engineering-plugin": false
+  }
+}
