@@ -4,7 +4,7 @@ Features of the epic [Structured test reporting](SPECIFICATION.md), in intended 
 
 ## 1. Structured JSON from `Runner`
 
-Under `Runner` on the JVM, every `J` spelling writes JSON from which the test structure can be rebuilt, in every execution mode. This covers `-fJ`, `-oJ`, `-eJ` and the new directory argument. It covers `Runner`'s paths only; the `Framework`'s come in feature 4.
+Under `Runner` on the JVM, every `J` spelling writes JSON from which the test structure can be rebuilt, in every execution mode. This covers `-fJ`, `-oJ` and `-eJ`. It covers `Runner`'s paths only; the `Framework`'s come in feature 4.
 
 - Structure wrappers on every path `Runner` takes that builds `Args`.
 - Node IDs and declared positions.
@@ -16,7 +16,7 @@ Existing reporters receive exactly what 3.2.19 sends them.
 
 Enables:
 
-- `SPECIFICATION.md` § Scope (JVM on Scala 2.11, 2.12, 2.13 and 3.3), § Constraints (R-001, R-002, R-057), R-010 to R-014 (within one process), R-016 to R-018 (JVM), § JSON output (R-030 to R-033, R-035, R-064, R-071; R-036 and R-037 for `Runner`)
+- `SPECIFICATION.md` § Scope (JVM on Scala 2.11, 2.12, 2.13 and 3.3), § Constraints (R-001, R-002, R-057), R-010 to R-014 (within one process), R-016 to R-018 (JVM), § JSON output (R-030 to R-033, R-035, R-064; R-036 and R-037 for `Runner`)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (structure wrapper, envelope dispatch, JSON writer; the Dotty source generators, such as `project/GenScalaTestDotty.scala`), § The compatibility boundary, § Data flow (the in-process path), § External systems (IntelliJ forked mode, `-C`)
 
 Settles:
@@ -82,14 +82,14 @@ Under sbt unforked, Mill, Metals, Bloop and IntelliJ BSP:
 
 - Progress output goes through the task loggers. Run-level output is held for the next task or for `done()`.
 - Each run returns one results block as its `done()` string, without waiting for other runs.
-- `-oJ`, `-fJ` and the directory argument work.
+- `-oJ` and `-fJ` work.
 - Test-interface events are unchanged.
 
 Enables:
 
-- `SPECIFICATION.md` R-002, R-057, R-003, R-010 to R-013, R-014 (within one process), R-015, R-016 to R-018, R-031 to R-033, R-064, R-071 and R-035 (a Mill test-worker JVM dying), all for the JVM `Framework`
+- `SPECIFICATION.md` R-002, R-057, R-003, R-010 to R-013, R-014 (within one process), R-015, R-016 to R-018, R-031 to R-033, R-064 and R-035 (a Mill test-worker JVM dying), all for the JVM `Framework`
 - `SPECIFICATION.md` R-004, R-020, R-022 (build tools), R-023, R-058, R-030 (`-oJ` passed to the `Framework`), R-036 (JVM `Framework`)
-- `ARCHITECTURE.md` § Modules § ScalaTest core (structure wrapper, including the run node's wrapper for the `Framework`'s runner; JSON writer, including the run ID the `Framework`'s runner mints; human renderer, for the `Framework`), § External systems (IntelliJ sbt-shell and BSP modes, sbt unforked, Mill, Metals and Bloop)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (structure wrapper, including the run node's wrapper for the `Framework`'s runner; JSON writer, including the run ID the `Framework`'s runner mints and the file created only once the run executes; human renderer, for the `Framework`), § External systems (IntelliJ sbt-shell and BSP modes, sbt unforked, Mill, Metals and Bloop)
 
 Risks:
 
@@ -168,7 +168,7 @@ Risks:
 
 ## 8. Consolidator: merged JSON and results output
 
-A standalone executable takes each module, the location of its JSON and the module's test-task result. It writes merged JSON and a results output of the whole build. It distinguishes "did not run", "test process failed" and "tests failed".
+A standalone executable takes one or more test run labels, unique within the consolidation, each with a list of JSON files and, where the caller has it, the test-task result behind them. It merges each label's files under that label, without collapsing suites or tests that share a name across files, and writes merged JSON and a results output of the whole build. For each label, it distinguishes "did not run", "test process failed" and "tests failed".
 
 Enables:
 
@@ -180,8 +180,7 @@ Settles (all from [Which module owns the shared tree model and renderers?](https
 - Where JSON reading lives.
 - The consolidator's Scala versions and platforms, and how it is packaged and invoked.
 - The merged JSON format.
-- Whether the expected set is per module or per module and platform.
-- Module order in consolidated output ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
+- Test run label order in consolidated output ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
 
 Risks:
 
@@ -204,8 +203,8 @@ Settles:
 
 The plugin provides a command that:
 
-- turns on JSON for each selected JVM module, pointed into the command's `Task.dest`;
-- runs the tests and consolidates only the runs it started, with each module's task result, even when tests fail.
+- turns on JSON for each selected JVM module through a relative `-fJ` path, so that each test-worker JVM writes its own file in its own sandbox, `Task.dest[/<group>][/worker-<i>]/sandbox`, and fails the build for a module whose `testSandboxWorkingDir` is off;
+- runs the tests and consolidates only the runs it started, even when tests fail, under one test run label per module covering all its worker files, with that module's task result, so that no label collides.
 
 Enables:
 
@@ -220,15 +219,16 @@ Settles:
 
 Risks:
 
-- `SPECIFICATION-DECISIONS.md` § The consolidator ships as an executable and a Mill plugin; sbt users get a recipe (Alternatives: Mill skips downstream tasks when tests fail)
+- `SPECIFICATION-DECISIONS.md` § The consolidator is an executable, with a Mill plugin whose command runs the tests and consolidates; sbt users get a recipe (Alternatives: Mill skips downstream tasks when tests fail)
 - `ARCHITECTURE.md` § External systems (Mill: a dead worker JVM never calls `done()`)
+- `ARCHITECTURE-DECISIONS.md` § The Mill plugin, not ScalaTest, gives each test-worker JVM its own JSON file: it passes a relative `-fJ` path, which resolves inside each worker's own sandbox, and fails the build when the sandbox is off (Costs: a user who turns off `testSandboxWorkingDir` cannot use the command)
 
 ## 11. sbt recipe
 
 A documented recipe that:
 
-- gives each JVM module its own JSON directory and deletes it before `test`;
-- after `test`, consolidates with each module's task result, even when tests fail.
+- gives each JVM module its own `-fJ` path and deletes the file before `test`;
+- after `test`, consolidates under one test run label per module, with that module's task result, even when tests fail.
 
 Enables:
 
@@ -241,19 +241,19 @@ Settles:
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` § Each consolidating caller gives every module a fresh JSON directory each time its command runs; neither ScalaTest nor the consolidator tells one use of the command from another (Costs: a dropped delete consolidates stale runs silently)
+- `ARCHITECTURE-DECISIONS.md` § Each consolidating caller gives every test run label fresh JSON files each time its command runs; neither ScalaTest nor the consolidator tells one use of the command from another (Costs: a dropped delete consolidates stale runs silently)
 
 ## 12. Structured output on Scala.js
 
 - Workers forward envelopes to the controller through `notifyServer`.
-- The controller writes all console output, the results block and the JSON. `-fJ` and the directory argument use Node's `fs`.
-- Where files cannot be written, `-fJ` and the directory argument are configuration errors; `testHtml` produces no JSON.
+- The controller writes all console output, the results block and the JSON. `-fJ` uses Node's `fs`.
+- Where files cannot be written, `-fJ` is a configuration error; `testHtml` produces no JSON.
 - Suites whose constructor throws are reported as aborted.
 - `MasterRunner` runs open-node tracking and applies R-075 when its `done()` runs with nodes unfinished. A dead Scala.js worker never reaches the controller's `done()`, so it leaves JSON with no closing run event instead.
 
 Enables:
 
-- `SPECIFICATION.md` R-002, R-057, R-003, R-004, R-010 to R-013, R-014, R-015 to R-017, R-018, R-020 and R-022 (late progress), R-023, R-030 to R-033, R-035 and R-036, R-058, R-064, R-071 (where files can be written), R-074, R-075 (all for Scala.js)
+- `SPECIFICATION.md` R-002, R-057, R-003, R-004, R-010 to R-013, R-014, R-015 to R-017, R-018, R-020 and R-022 (late progress), R-023, R-030 to R-033, R-035 and R-036, R-058, R-064, R-074, R-075 (all for Scala.js)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (the structure wrapper in `TaskRunner`'s `Args`; envelope dispatch with no `DispatchReporter`, ahead of `TestSortingReporter`; envelope forwarding; JSON writer; tree assembly's open-node tracking on `MasterRunner`; human renderer for Scala.js; the source generators `project/GenScalaTestJS.scala`, `project/GenScalaTestNative.scala` and their Dotty equivalents), § The compatibility boundary (the one `-o` reporter writes through loggers), § Data flow (the Scala.js and Native bullet), § External systems (Scala.js and Native test interface)
 
 Risks:
@@ -283,7 +283,7 @@ Risks:
 
 ## 14. Build integrations for Scala.js and Native modules
 
-The Mill plugin (feature 10) and the sbt recipe (feature 11) turn on JSON for Scala.js and Scala Native modules and consolidate their runs alongside JVM modules. They skip the Scala.js modules that cannot write files.
+The Mill plugin (feature 10) and the sbt recipe (feature 11) turn on JSON for Scala.js and Scala Native modules and consolidate their runs alongside JVM modules, each module under its own test run label, so the same suites run on several platforms stay apart. They skip the Scala.js modules that cannot write files.
 
 Enables:
 
@@ -296,7 +296,7 @@ Settles:
 
 Risks:
 
-- `SPECIFICATION-DECISIONS.md` § Where a Scala.js run cannot write files, `-fJ` and the JSON directory argument are configuration errors and `-oJ` is the route for JSON (Costs)
+- `SPECIFICATION-DECISIONS.md` § Where a Scala.js run cannot write files, `-fJ` is a configuration error and `-oJ` is the route for JSON (Costs)
 - `research/js-native-structure-and-capture.md` § 2.3 (jsdom, browser, ES modules without `process.getBuiltinModule`), § 1.3 (both plugins reject forking; Mill drives a run on one thread), § 2.1 (Native stdout under the Mill daemon), § 5 item 6
 - `ARCHITECTURE.md` § External systems, Scala.js and Native test interface (a dead Scala.js worker means the controller's `done()` never runs, leaving JSON with no closing run event)
 
@@ -332,5 +332,5 @@ Risks:
 
 - **Per-test attribution of overlapping async tests on Node** through `AsyncLocalStorage`. Unverified; the accepted limitation is in `research/js-native-structure-and-capture.md` § 4.1 and `SPECIFICATION-DECISIONS.md` § A test owns test output only while it is the only test running on the writing thread.
 - **Attributing output from a test's own `Future` or the threads it starts on the JVM and Native**, by propagating the owning node. Today this output passes through live (`SPECIFICATION-DECISIONS.md` § A write belongs to the run whose node or own code is running on the writing thread, and output belonging to no run is never captured, Costs).
-- **A tool that pulls `-oJ` lines out of build logs** so jsdom and browser runs can be consolidated (`SPECIFICATION-DECISIONS.md` § Where a Scala.js run cannot write files, `-fJ` and the JSON directory argument are configuration errors and `-oJ` is the route for JSON, Costs).
+- **A tool that pulls `-oJ` lines out of build logs** so jsdom and browser runs can be consolidated (`SPECIFICATION-DECISIONS.md` § Where a Scala.js run cannot write files, `-fJ` is a configuration error and `-oJ` is the route for JSON, Costs).
 - **A configurable wait for sbt's fork socket**, in place of the fixed 15 s (`ARCHITECTURE.md` § Modules, envelope forwarding).

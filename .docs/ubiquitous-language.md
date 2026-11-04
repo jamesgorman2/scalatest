@@ -13,7 +13,7 @@ The identifier that distinguishes one run's JSON from every other run's, includi
 _Avoid_: Run stamp, session ID
 
 **Module**:
-A build module whose tests produce one or more runs, for example one per platform or per forked JVM. In consolidated output, a module groups its runs.
+A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM. It is not a unit of consolidation; the Mill plugin and the sbt recipe give each module one test run label by default.
 _Avoid_: Project, subproject, target
 
 ## Test structure
@@ -28,14 +28,6 @@ _Avoid_: Element, item, entry, test case
 
 ## Output
 
-**Progress output**:
-The human-readable account of a run while it is running: what has started and finished, and optionally pass and fail counts.
-_Avoid_: Status, ticker, log
-
-**Results output**:
-The full human-readable account of a run's, or a consolidation's, nodes and their outcomes, shown at completion.
-_Avoid_: Report, summary
-
 **Test output**:
 The stdout and stderr written on a thread while one of a run's nodes, or the run's own code, is running on it.
 _Avoid_: Logs, console output, captured output
@@ -43,9 +35,9 @@ _Avoid_: Logs, console output, captured output
 ## Consolidation
 
 **Consolidation**:
-Merging the JSON of many runs into one set of outputs covering all of them.
+Bringing things together into a single place
 _Avoid_: Aggregation, merging, report generation
 
-**Consolidator**:
-The tool that performs consolidation.
-_Avoid_: Aggregator, merger, report generator
+**Test run label**:
+The name a consolidator's caller gives a list of JSON files, unique within one consolidation, under which those files' runs are merged. It tells apart runs whose JSON is otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
+_Avoid_: Module, module name, group, tag

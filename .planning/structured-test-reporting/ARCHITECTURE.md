@@ -31,9 +31,10 @@ Three deployable units, each built and released from this repo.
     - Scala.js and Native: the adapter delivers each worker's messages before the controller's `done` runs (`research/js-native-structure-and-capture.md` § 2.2).
     - `Runner` and in-process runs: nothing is forwarded.
   - On Native, every `send` ScalaTest makes, of events, logger lines and envelopes, goes through one lock per process, because the adapter's own `send` takes none (`research/js-native-structure-and-capture.md` § 2.2).
-- **JSON writer** — `SPECIFICATION.md` R-030 to R-036, R-064 and R-071.
+- **JSON writer** — `SPECIFICATION.md` R-030 to R-036 and R-064.
   - The process that runs `done()` mints the run ID of `SPECIFICATION.md` R-033 when the run starts. Under sbt's forked mode, the runner in sbt's JVM passes it to the forked JVM in `remoteArgs`. On Scala.js and Native no worker writes JSON, so no worker needs the run ID.
-  - The run's one JSON file is `-fJ`'s or R-071's `<dir>/<run ID>.json`. On Scala.js it is written through Node's `fs`; where `fs` cannot be loaded, as in an ES module where `process.getBuiltinModule` is absent (`research/js-native-structure-and-capture.md` § 2.3), both are the configuration error of R-036.
+  - The run's one JSON file is at `-fJ`'s path, with `-fJ`'s 3.2.19 meaning. ScalaTest does not name the file and does not keep apart runs given the same path: their caller does (§ Mill plugin). On Scala.js it is written through Node's `fs`; where `fs` cannot be loaded, as in an ES module where `process.getBuiltinModule` is absent (`research/js-native-structure-and-capture.md` § 2.3), `-fJ` is the configuration error of R-036.
+  - The writer creates its file only once the run is executing: at the run's first envelope from a node other than the run node, or at `done()`, whichever comes first. Until then it holds the run node's envelopes, among them the `RunStarting` the `Framework`'s runner emits when it is constructed. Mill constructs one runner from the workers' arguments only to discover tests and never calls its `done()` (§ External systems), so that runner leaves no file, and no run without a closing run event reaches the consolidator from it (`research/mill-test-worker-args.md` § 1.4, I-5).
   - `Runner`'s `-oJ` and `-eJ` write each envelope as it arrives to the stdout or stderr taken before capture is installed.
   - `-oJ` passed to the `Framework` is written where its progress output is (§ Human renderer).
 - **Tree assembly** — assembles nodes into the test structure, restoring declared order, for the human renderer and for the consolidator.
@@ -57,15 +58,18 @@ Three deployable units, each built and released from this repo.
 
 A standalone executable that writes the outputs of `SPECIFICATION.md` R-050. Toward third parties its only contract is the documented JSON format (R-037); it rebuilds `Event`s from the JSON and renders results output with scalatest-core's internal tree assembly and human renderer.
 
-- Its caller names each module, that module's JSON location and, where the caller has it, the module's test-task result. Neither it nor ScalaTest tells one use of the caller's command from another: it reads every run in each location, so the caller gives it locations holding only the runs the caller has just started. The sbt recipe gives each module its own directory and deletes it before `test`.
+- Its caller gives it one or more test run labels, unique within the consolidation, each with a list of JSON files and, where the caller has it, the test-task result of the build task that wrote them. It merges each label's files under that label, and does not collapse suites or tests that share a name across files.
+- Neither it nor ScalaTest tells one use of the caller's command from another: it reads every run in the files it is given, so the caller gives it only files from the runs the caller has just started. The Mill plugin gives it one label per selected module, covering that module's files under the command's `Task.dest` (§ Mill plugin); the sbt recipe gives one label per module, covering that module's own `-fJ` path, and deletes the file before `test`.
 - A run whose JSON has no closing run event ends where its JSON does (§ ScalaTest core, tree assembly; `SPECIFICATION.md` R-076).
 - It namespaces node IDs by run ID, so node IDs stay distinct across runs (`SPECIFICATION.md` R-014).
 
 ### Mill plugin
 
-`SPECIFICATION.md` R-053 and R-056.
+`SPECIFICATION.md` R-053 and R-056, and § Multi-run consolidation plugin ("ensures no test run label or file collision"). The plugin, not ScalaTest, guarantees one JSON file per test-worker JVM (`research/mill-test-worker-args.md` § Short answer) and one test run label per module.
 
-- Points each module's R-071 directory argument at a directory inside its command's `Task.dest`, which Mill empties before each run of the task. Every test-worker JVM of the module writes its own run's file there.
+- Its command passes each selected JVM module's forked test command a relative `-fJ` path. Each test-worker JVM resolves it against its own working directory, `Task.dest[/<group>][/worker-<i>]/sandbox`, which Mill gives every JVM of the command while `testSandboxWorkingDir` is on, and refuses to reuse within the command (`research/mill-test-worker-args.md` § 2.3, I-1). Each worker JVM is one run, so each run writes its own file, and Mill empties `Task.dest` before each run of the command.
+- It fails the build for any selected module whose `testSandboxWorkingDir` is off, before running its tests: every worker JVM would then share `forkWorkingDir` and overwrite one file. It cannot force the setting on, because a user's override wins (`research/mill-test-worker-args.md` I-2).
+- It gives the consolidator one test run label per selected module, named for the module's path in the build, which Mill keeps unique, so no two labels collide. Each label covers all the JSON files found under that module's sandboxes in the command's `Task.dest`, one per worker JVM. A file's name is not its run ID; the consolidator reads the run ID from the JSON.
 
 ## The compatibility boundary
 
@@ -108,9 +112,9 @@ flowchart LR
   HP -- "Framework: progress output still held at done()" --> Q
   M -- "Framework: -oJ still held at done()" --> Q
   M --> J[JSON writer]
-  J --> F[("One JSON file per run: -fJ, or named for its run ID in a directory")]
+  J --> F[("One JSON file per run, at -fJ's path")]
   F --> C[Consolidator]
-  B["Mill plugin, sbt recipe, other callers"] -- "each module, its JSON location and its test-task result" --> C
+  B["Mill plugin, sbt recipe, other callers"] -- "each test run label, its JSON files and its test-task result" --> C
   C -. uses .-> TA
   C -. uses .-> H
   C --> O["Consolidated outputs (R-050)"]
@@ -120,11 +124,11 @@ flowchart LR
 
 - On Scala.js and Native, bare events go from the wrappers, through any `TestSortingReporter` an async suite installs, to the one `-o` reporter `TaskRunner` puts in `Args`.
 - The JSON writer writes each envelope as it arrives (`SPECIFICATION.md` R-035), so envelopes from different workers interleave in arrival order.
-- The consolidator receives the JSON of many runs, from many modules, JVMs and platforms, and tells them apart by run ID.
+- The consolidator receives the JSON of many runs, from many modules, JVMs and platforms, grouped by test run label, and tells the runs apart by run ID.
 - Failure path: a worker or forked JVM that dies loses at most the envelope it was sending (`SPECIFICATION.md` R-035), and leaves its unfinished nodes open.
   - Where `done()` still runs — after a Native worker dies, an sbt forked JVM calls `System.exit` or is lost, or the wait on the fork socket gives up — the run ends in `RunAborted` (R-075, R-077); after `System.exit`, the forked JVM's own `done()` emits it (§ External systems; § Modules, envelope forwarding and tree assembly).
   - Where `done()` never runs — after a Scala.js worker dies, or when the process that runs `done()` dies or hangs, as a Mill test-worker JVM can — the run leaves a JSON file with no closing run event (R-076) and no results output.
-  - A process that runs `done()` and dies before writing any JSON leaves no file. A module with no other run then reads "did not run" (R-051); one with other runs is judged by R-078.
+  - A process that runs `done()` and dies before its JSON writer creates its file leaves no file. A test run label with no other run then reads "did not run".
 
 ## External systems
 
@@ -135,7 +139,7 @@ flowchart LR
   - Forked, the runner stays in sbt's JVM and runs `done()` there, and the forked JVM runs the tasks; every forked `testGrouping` group belongs to that one run.
   - `System.exit`: a forked JVM's `ForkMain` runs that JVM's runner's `done()` from a shutdown hook (sbt `v1.11.7` `testing/agent/src/main/java/sbt/ForkMain.java`), so a forked JVM that calls `System.exit` closes its socket as one that finished does.
   - Failure: the `test` task fails alike when tests fail and when a forked JVM exits early or dies, so its result does not tell a dead process from failing tests (sbt `v1.11.7` `main/src/main/scala/sbt/ForkTests.scala`, and the `test` task in `main/src/main/scala/sbt/Defaults.scala`).
-- **Mill** — drives the JVM `Framework` in forked test-worker JVMs, each creating its own runner, and so its own run and file reporters, from identical arguments. It `println`s every logger line and the `done()` string to the task's stdout, line by line and with no level, so the `done()` string can interleave with other runs' output (`SPECIFICATION.md` R-058). A test-worker JVM that dies never calls `done()`, and Mill fails the task, as it does when tests fail, so the task result does not tell a dead process from failing tests (Mill `1.1.10` `TestModuleUtil`). The plugin owns its command.
+- **Mill** — drives the JVM `Framework` in forked test-worker JVMs, each creating its own runner, and so its own run and file reporters, from identical arguments, env and system properties; no Mill hook gives one worker a value another lacks (`research/mill-test-worker-args.md` § 2.1, § 2.2). While `testSandboxWorkingDir` is on, its default, each worker JVM of a command runs in its own working directory, `Task.dest[/<group>][/worker-<i>]/sandbox`; while it is off, all of them run in `forkWorkingDir`, the workspace root by default (`research/mill-test-worker-args.md` § 2.3). Before any worker starts, Mill constructs one more runner from the same arguments, in its own process or a JVM-worker subprocess and outside any sandbox, to discover tests, and drops it without calling `done()` (`research/mill-test-worker-args.md` § 1.4). It `println`s every logger line and the `done()` string to the task's stdout, line by line and with no level, so the `done()` string can interleave with other runs' output (`SPECIFICATION.md` R-058). A test-worker JVM that dies never calls `done()`, and Mill fails the task, as it does when tests fail, so the task result does not tell a dead process from failing tests (Mill `1.1.10` `TestModuleUtil`). The plugin owns its command.
 - **Metals and Bloop** — drive the `Framework` and read its test-interface events (`SPECIFICATION.md` R-004).
 - **Scala.js and Native test interface** — sbt and Mill drive the `Framework` through the platform's test adapter, which runs `MasterRunner` and `SlaveRunner` in JS VMs or native executables; today they carry one `-o` reporter and no file reporters. The adapter forces this shape (`research/js-native-structure-and-capture.md` § 1 and § 2):
   - The adapter runs a run's controller in the process of the build-tool thread that creates the runner, and starts a worker for each other build-tool thread that calls `tasks` or `execute`. A run's worker count is known only at `done()`.

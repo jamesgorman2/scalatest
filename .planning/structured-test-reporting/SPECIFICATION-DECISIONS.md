@@ -8,7 +8,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** ScalaTest 3.2.19's `org.scalatest.events.RunAborted` already means "a runner encountered an error while attempting to run a suite of tests" (its scaladoc), which fits a node whose process died or whose run gave up on it, so the six outcomes of `SPECIFICATION.md` R-015 stand (R-074).
 
-**Costs** A suite that threw and a suite whose process died read alike at node level; only the run's label tells them apart (R-077).
+**Costs** A suite that threw and a suite whose process died read alike at node level; only whether the run's test process failed tells them apart (R-077).
 
 **Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
 
@@ -26,34 +26,32 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## The consolidator's caller passes each module's test-task result, and a failed task marks a module that has runs, none of them failed or aborted, as test process failed.
+## The consolidator's caller passes each test run label's test-task result, and a failed task marks a label that has runs, none of them failed or aborted, as test process failed.
 
 **Alternatives**
 
-- Accepting the gap lets a module show passed while its build task failed, whenever a process died before writing any JSON, as a Mill test-worker JVM can.
+- Accepting the gap lets a label show passed while its build task failed, whenever a process died before writing any JSON, as a Mill test-worker JVM can.
 - Passing the expected number of runs is not possible: Mill decides its worker count at run time, and sbt folds forked groups into one run.
-- Marking every module whose task failed as "test process failed" mislabels modules whose tests failed or that did not compile, because the task result cannot tell a crash from either.
+- Marking every label whose task failed as "test process failed" misreports labels whose tests failed or whose module did not compile, because the task result cannot tell a crash from either.
 
-**Reasoning** Only the build sees a process that died before writing JSON, and Mill and sbt both fail the task for it; neither tells a crash from failing tests (`ARCHITECTURE.md` § External systems). Pending, ignored and canceled tests never fail a task, so the result decides only for a module that has runs and none of them failed or aborted (`SPECIFICATION.md` R-050, R-078).
+**Reasoning** Only the build sees a process that died before writing JSON, and Mill and sbt both fail the task for it; neither tells a crash from failing tests (`ARCHITECTURE.md` § External systems). The Mill plugin and the sbt recipe give each module one label, so each label has one test task. Pending, ignored and canceled tests never fail a task, so the result decides only for a label that has runs and none of them failed or aborted.
 
-**Costs** A dead process in a module whose other runs failed shows "failed", not "test process failed", and the consolidator's input becomes partly the build's verdict. A module whose only process died before writing any JSON reads "did not run".
+**Costs** A dead process under a label whose other runs failed shows "failed", not "test process failed", and the consolidator's input becomes partly the build's verdict. A label whose only process died before writing any JSON reads "did not run".
 
 **Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
 
 ---
 
-## Runs that share a JSON destination write one file each, through a new reporter argument naming a directory.
+## The consolidating caller keeps runs that share arguments from colliding on one JSON file; ScalaTest gains no directory argument, and `-fJ` keeps its meaning.
 
 **Alternatives**
 
 - Making `-fJ` append changes an existing spelling's meaning (`SPECIFICATION.md` R-003), puts many runs in one file, needs atomic whole-line appends from concurrent JVMs, and leaves a rerun appending to stale output.
-- Leaving callers to keep paths distinct, through Mill's per-worker sandbox working directory with a relative path or a per-project sbt path, fails silently when a user turns off Mill's `testSandboxWorkingDir`, and leaves a bare `Runner` user the same risk.
+- A new reporter argument naming a directory, into which each run writes a file named for its run ID, cannot collide whatever the caller passes, but adds a spelling to ScalaTest to prevent a collision the consolidating caller can prevent itself.
 
-**Reasoning** Runs given identical arguments are normal: each Mill test-worker JVM is its own run (`ARCHITECTURE.md` § External systems), several sbt projects can share one path, and so can a module's platforms. A file named for its run ID (`SPECIFICATION.md` R-033, R-071) cannot collide whatever the caller passes, and `-fJ <file>` keeps its 3.2.19 truncating meaning as a single-run destination.
+**Reasoning** Runs given identical arguments are normal: each Mill test-worker JVM is its own run (`ARCHITECTURE.md` § External systems), and several sbt projects can share one path. The callers that consolidate already choose each module's paths and test run label, so the Mill plugin ensures no test run label or file collision, and fails the build where it cannot, and the sbt recipe gives each module its own path and label (`SPECIFICATION.md` § Multi-run consolidation plugin). `-fJ <file>` keeps its 3.2.19 truncating meaning as a single-run destination. The mechanism is in `ARCHITECTURE-DECISIONS.md` § The Mill plugin, not ScalaTest, gives each test-worker JVM its own JSON file: it passes a relative `-fJ` path, which resolves inside each worker's own sandbox, and fails the build when the sandbox is off.
 
-**Costs** One new reporter spelling.
-
-**Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
+**Costs** Runs outside a consolidating caller that share one `-fJ` path, such as bare `Runner` users, overwrite one another's files. A Mill user who turns off `testSandboxWorkingDir` cannot use the plugin's command.
 
 ---
 
@@ -69,13 +67,13 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## ScalaTest's JSON names no module; the consolidator's caller names each module and where its JSON is.
+## ScalaTest's JSON carries no test run label; the consolidator's caller gives each label and its JSON files.
 
-**Alternatives** A new ScalaTest argument stamping a module name into the JSON would make the JSON self-describing and let `-oJ` lines in one build log be sorted by module, but, as a new spelling under `SPECIFICATION.md` R-003, it is a flag every launch path must pass per module, and bare `Runner` and IntelliJ would not.
+**Alternatives** A new ScalaTest argument stamping a label, such as a module name, into the JSON would make the JSON self-describing and let `-oJ` lines in one build log be sorted by label, but, as a new spelling under `SPECIFICATION.md` R-003, it is a flag every launch path must pass per module, and bare `Runner` and IntelliJ would not.
 
-**Reasoning** A module is a build-tool concept, and the callers that consolidate, the Mill plugin and the sbt recipe, already know each module and where its JSON goes (`SPECIFICATION.md` R-050).
+**Reasoning** Which files belong together is the caller's knowledge: the same suites run on the JVM, Scala.js and Native write JSON that only the caller can tell apart. The callers that consolidate, the Mill plugin and the sbt recipe, already know each module and where its JSON goes, so they give each module a label (`SPECIFICATION.md` § Multi-run consolidation plugin).
 
-**Costs** A third party reading JSON gets runs but no module names, and `-oJ` lines from several modules in one build log cannot be assigned to their modules.
+**Costs** A third party reading JSON gets runs but no labels, and `-oJ` lines from several modules in one build log cannot be assigned to their modules.
 
 **Settled by** [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2).
 
@@ -98,11 +96,11 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## Where a Scala.js run cannot write files, `-fJ` and the JSON directory argument are configuration errors and `-oJ` is the route for JSON.
+## Where a Scala.js run cannot write files, `-fJ` is a configuration error and `-oJ` is the route for JSON.
 
 **Alternatives**
 
-- Falling back silently from a file argument to `-oJ`'s logger output puts the JSON in build-tool logs, where neither the Mill plugin nor the sbt recipe looks, so the module drops out of consolidation unexplained.
+- Falling back silently from `-fJ` to `-oJ`'s logger output puts the JSON in build-tool logs, where neither the Mill plugin nor the sbt recipe looks, so the module drops out of consolidation unexplained.
 - Relaying the JSON out over another channel collapses into that fallback: from jsdom or a browser the build tool's loggers are the only way out, since no ScalaTest code runs on the build tool's JVM and an sbt plugin is out of scope.
 
 **Reasoning** A user who asks for a file that cannot be written is told so by the run itself, not by a consolidation that comes up short. `-oJ` reaches the build tool from every environment that has one, so the JSON stays available to whoever extracts it.
@@ -209,14 +207,14 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 ---
 
-## The consolidator ships as an executable and a Mill plugin; sbt users get a recipe.
+## The consolidator is an executable, with a Mill plugin whose command runs the tests and consolidates; sbt users get a recipe.
 
 **Alternatives**
 
 - An sbt plugin costs a second plugin to build and maintain, and the executable already covers CI.
-- A Mill recipe, as for sbt, must hand-maintain the module set and each module's JSON location, which the plugin knows, and cannot consolidate after failed tests, because Mill skips every task downstream of a module whose tests fail; the plugin owns a command that can.
+- A Mill recipe, as for sbt, must hand-maintain each test run label and its JSON files, which the plugin derives from the build's modules, and cannot consolidate after failed tests, because Mill skips every task downstream of a module whose tests fail; the plugin owns a command that can.
 
-**Reasoning** The executable runs anywhere a JSON file exists, which covers CI. The Mill plugin derives the module set and each module's JSON location from the build. sbt users get the same result through the recipe (`SPECIFICATION.md` R-060), so an sbt plugin would add only its cost.
+**Reasoning** The executable runs anywhere a JSON file exists, which covers CI. The Mill plugin derives a test run label and its JSON files for each module from the build. sbt users get the same result through the recipe (`SPECIFICATION.md` R-060), so an sbt plugin would add only its cost.
 
 **Costs** sbt users wire the executable into their build themselves.
 

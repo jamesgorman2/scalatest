@@ -2,6 +2,23 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## The Mill plugin, not ScalaTest, gives each test-worker JVM its own JSON file: it passes a relative `-fJ` path, which resolves inside each worker's own sandbox, and fails the build when the sandbox is off.
+
+**Alternatives**
+
+- A shim framework: the plugin sets `testFramework` to its own class, which inside each worker rewrites `-fJ` to a name unique to that JVM and hands off to ScalaTest's `org.scalatest.tools.Framework`. It holds whatever the working directory, but the shim must be published as an artifact on every test module's classpath, and Metals and Bloop, which read `testFramework` through BSP, run through it too (`research/mill-test-worker-args.md` § 3, I-3). It is the fallback if requiring the sandbox proves too restrictive.
+- A ScalaTest reporter argument naming a directory, into which each run writes `<dir>/<run ID>.json`, holds whatever the caller passes, but adds a reporter spelling to ScalaTest to solve a collision the caller can prevent: the runs the plugin starts with shared arguments are Mill's worker JVMs, and Mill already gives each its own directory (`research/mill-test-worker-args.md` § 2.3, § 4). Callers outside Mill choose their own paths.
+- Collecting or renaming files after the run gathers files that may already have overwritten one another, so it prevents no collision. A `testTask` override that collects after `super.testTask` never reaches its collection when tests fail (`research/mill-test-worker-args.md` § 3, I-4).
+- Giving each worker its own path through `testArgsDefault`, `forkArgs` or `forkEnv` cannot work: every worker of a command gets identical values, and Mill has no per-worker hook (`research/mill-test-worker-args.md` § 2.1, § 2.2).
+
+**Reasoning** While `testSandboxWorkingDir` is on, Mill's default, each worker JVM of a command runs in its own `Task.dest[/<group>][/worker-<i>]/sandbox`, and Mill fails rather than start a second JVM in a folder already used in that command (`research/mill-test-worker-args.md` § 2.3, I-1). A relative path therefore gives one file per worker JVM, each a run, all under a `Task.dest` that Mill empties before each run of the command. A user can still turn the sandbox off, through an override the plugin cannot win, so the plugin reads the setting and fails the build: a collision is never silent (`research/mill-test-worker-args.md` I-2). The plugin gives the consolidator one test run label per module, covering all that module's worker files, so a module's several runs merge under one label and no two labels collide (`SPECIFICATION.md` § Multi-run consolidation plugin). ScalaTest keeps `-fJ`'s 3.2.19 meaning and adds no spelling. It still mints the run ID in the process that runs `done()`; only file naming moves to the caller (`research/mill-test-worker-args.md` § 4).
+
+**Costs** A Mill user who turns off `testSandboxWorkingDir` cannot use the plugin's command. A file's name is not its run ID. Runs outside Mill that share one `-fJ` path, such as sbt projects or bare `Runner` users, overwrite one another's files; the sbt recipe gives each module its own path and its own test run label. The JSON writer must defer creating its file until the run executes, so that Mill's discovery runner, which never calls `done()`, leaves no file in Mill's own working directory (`ARCHITECTURE.md` § Modules, JSON writer; `research/mill-test-worker-args.md` § 1.4, I-5).
+
+**See** `research/mill-test-worker-args.md` § Short answer, § 1.4, § 2.1 to § 2.3, § 3, § 4 and § 5 (I-1 to I-5).
+
+---
+
 ## On Scala.js and Native, the controller writes all of a run's console output, only through its tasks' loggers or the `done()` string; workers only forward envelopes.
 
 **Alternatives**
@@ -20,14 +37,14 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## Each consolidating caller gives every module a fresh JSON directory each time its command runs; neither ScalaTest nor the consolidator tells one use of the command from another.
+## Each consolidating caller gives every test run label fresh JSON files each time its command runs; neither ScalaTest nor the consolidator tells one use of the command from another.
 
 **Alternatives**
 
 - An ID for each use of the command, passed into every run, for example through `-D`, for the consolidator to filter on, puts a build-supplied identity back into the JSON, and every caller must mint and pass it.
 - Filtering by run start time depends on clocks, which differ across machines and CI caches.
 
-**Reasoning** Mill empties a task's `Task.dest` before each run of the task, so the Mill plugin gets a fresh directory per module for nothing, and the sbt recipe needs one delete per module before `test`. Each location then holds exactly the runs its caller just started, and one holding none is a module with no run (`SPECIFICATION.md` R-051, R-053, R-060).
+**Reasoning** Mill empties a task's `Task.dest`, and with it every worker sandbox inside it, before each run of the task, so the Mill plugin gets fresh files for each label, one per module, for nothing, and the sbt recipe needs one delete of each module's `-fJ` file before `test`. Each label's files then hold exactly the runs its caller just started, and a label with none is a label with no run (`SPECIFICATION.md` R-051, R-053, R-060).
 
 **Costs** A hand-written sbt build that drops the delete consolidates stale runs silently.
 
