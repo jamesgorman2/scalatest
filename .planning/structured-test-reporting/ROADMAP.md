@@ -1,7 +1,5 @@
 # Roadmap - Structured test reporting
 
-## Summary
-
 Features of the epic [Structured test reporting](SPECIFICATION.md), in intended implementation order. The JVM `Runner` comes first, then the JVM `Framework`, then consolidation and build integration for JVM modules, then Scala.js and Scala Native. Spec document paths are relative to `.planning/structured-test-reporting/`; code paths are relative to the repo root. "Review of X" means the review comment on that closed design issue.
 
 ## 2. Progress-then-results output from `Runner`
@@ -18,7 +16,7 @@ Settles:
 - How the independent destinations of R-022 are spelled under `Runner`.
 - Top-level suite order ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
 
-Traps:
+Risks:
 
 - `SPECIFICATION.md` R-003 (`-oDU`)
 - `SPECIFICATION-DECISIONS.md` § Progress-then-results is the default for plain `-o`, `-e` and the `Framework`, not an opt-in (Costs)
@@ -43,7 +41,7 @@ Settles:
 - How JVM `println` reaches capture ([Does the epic capture test output on Scala.js and Scala Native?](https://github.com/jamesgorman2/scalatest/issues/7), review; [Which run owns test output when one process hosts several runs?](https://github.com/jamesgorman2/scalatest/issues/8), review).
 - Whether output written during suite construction attaches to the suite or the run node ([Which run owns test output when one process hosts several runs?](https://github.com/jamesgorman2/scalatest/issues/8), review).
 
-Traps:
+Risks:
 
 - `SPECIFICATION-DECISIONS.md` § Captured test output is withheld from stdout and stderr unless a `-C` reporter or a 3.2-format `-o` or `-e` reporter is configured (Costs), and § Test output is captured only when a reporter consumes it (Costs)
 - `ARCHITECTURE.md` § The compatibility boundary (reporter writes on `DispatchReporter`'s thread)
@@ -64,7 +62,7 @@ Enables:
 - `SPECIFICATION.md` R-004, R-020, R-022 (build tools), R-023, R-058, R-030 (`-oJ` passed to the `Framework`), R-036 (JVM `Framework`)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (structure wrapper, including the run node's wrapper for the `Framework`'s runner; JSON writer, including the run ID the `Framework`'s runner mints; human renderer, for the `Framework`), § External systems (IntelliJ sbt-shell and BSP modes, sbt unforked, Mill, Metals and Bloop)
 
-Traps:
+Risks:
 
 - `SPECIFICATION.md` § Constraints § IntelliJ (sbt-shell regex parsing)
 - `ARCHITECTURE.md` § Modules § ScalaTest core, human renderer (loggers exist only during `execute`)
@@ -89,7 +87,7 @@ Settles:
 
 - Where the fork's own `done()` string goes ([What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9), review).
 
-Traps:
+Risks:
 
 - `ARCHITECTURE.md` § Modules, envelope forwarding (the 15 s wait; envelopes arriving late are dropped)
 - `ARCHITECTURE.md` § Modules, tree assembly (the fork's run-level events are dropped or redispatched)
@@ -111,7 +109,7 @@ Settles:
 - Whether the shutdown-hook `done()` can block on a still-running async suite ([What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9), review).
 - How the JSON marks the `RunAborted` of R-075 apart from other `RunAborted` events.
 
-Traps:
+Risks:
 
 - `SPECIFICATION-DECISIONS.md` § A run that finishes with nodes unfinished ends in `RunAborted` for every reporter (Costs: the first departure from 3.2.19; IntelliJ)
 - `SPECIFICATION-DECISIONS.md` § A run that finishes with nodes unfinished ends in `RunAborted` for every reporter (Reasoning: a `VirtualMachineError` under `SuiteAborted` is not unfinished)
@@ -135,7 +133,7 @@ Settles:
 
 - The mechanism by which captures from separately loaded copies of ScalaTest chain ([Which run owns test output when one process hosts several runs?](https://github.com/jamesgorman2/scalatest/issues/8), review).
 
-Traps:
+Risks:
 
 - `SPECIFICATION-DECISIONS.md` § A write belongs to the run whose node or own code is running on the writing thread, and output belonging to no run is never captured (Costs), and § Captured test output is withheld from stdout and stderr unless a `-C` reporter or a 3.2-format `-o` or `-e` reporter is configured (Costs: BSP, Metals and Bloop lose live output)
 
@@ -156,7 +154,7 @@ Settles (all from [Which module owns the shared tree model and renderers?](https
 - Whether the expected set is per module or per module and platform.
 - Module order in consolidated output ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
 
-Traps:
+Risks:
 
 - `ARCHITECTURE-DECISIONS.md` § Tree assembly and the human renderer are internal to ScalaTest core, which the consolidator depends on (Costs: lockstep release, core's dependencies)
 
@@ -191,7 +189,7 @@ Settles:
 - A consolidated module's console output ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
 - Mill plugin constraints ([Plan: structured test reporting](https://github.com/jamesgorman2/scalatest/issues/1), review).
 
-Traps:
+Risks:
 
 - `SPECIFICATION-DECISIONS.md` § The consolidator ships as an executable and a Mill plugin; sbt users get a recipe (Alternatives: Mill skips downstream tasks when tests fail)
 - `ARCHITECTURE.md` § External systems (Mill: a dead worker JVM never calls `done()`)
@@ -212,7 +210,7 @@ Settles:
 
 - The sbt versions supported ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
 
-Traps:
+Risks:
 
 - `ARCHITECTURE-DECISIONS.md` § Each consolidating caller gives every module a fresh JSON directory each time its command runs; neither ScalaTest nor the consolidator tells one use of the command from another (Costs: a dropped delete consolidates stale runs silently)
 
@@ -229,7 +227,7 @@ Enables:
 - `SPECIFICATION.md` R-002, R-057, R-003, R-004, R-010 to R-013, R-014, R-015 to R-017, R-018, R-020 and R-022 (late progress), R-023, R-030 to R-033, R-035 and R-036, R-058, R-064, R-071 (where files can be written), R-074, R-075 (all for Scala.js)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (the structure wrapper in `TaskRunner`'s `Args`; envelope dispatch with no `DispatchReporter`, ahead of `TestSortingReporter`; envelope forwarding; JSON writer; tree assembly's open-node tracking on `MasterRunner`; human renderer for Scala.js; the source generators `project/GenScalaTestJS.scala`, `project/GenScalaTestNative.scala` and their Dotty equivalents), § The compatibility boundary (the one `-o` reporter writes through loggers), § Data flow (the Scala.js and Native bullet), § External systems (Scala.js and Native test interface)
 
-Traps:
+Risks:
 
 - `research/js-native-structure-and-capture.md` § 2.1 (loggers detached when `execute` returns), § 2.2 (ordering inference; asynchronous-only replies; Encoding, unpaired surrogates), § 2.3 (Node version floor for ES modules), § 5 items 1, 2 and 6
 - `ARCHITECTURE-DECISIONS.md` § On Scala.js and Native, the controller writes all of a run's console output, only through its tasks' loggers or the `done()` string; workers only forward envelopes (Costs)
@@ -249,7 +247,7 @@ Enables:
 - `SPECIFICATION.md` R-075 (dead Native worker)
 - `ARCHITECTURE.md` § Modules, envelope forwarding (Native `send` lock)
 
-Traps:
+Risks:
 
 - `research/js-native-structure-and-capture.md` § 2.1 (stdout is an inherited file descriptor), § 2.2 (Native thread safety; Encoding, unpaired surrogates), § 2.3 (Native partial writes), § 5 items 3 to 5
 - The constructor throws outside the `try` today (`native/core/src/main/scala/org/scalatest/tools/TaskRunner.scala` lines 78–82), so R-018 is a real gap.
@@ -267,7 +265,7 @@ Settles:
 
 - How the plugin and the recipe recognise a Scala.js module whose runs cannot write files.
 
-Traps:
+Risks:
 
 - `SPECIFICATION-DECISIONS.md` § Where a Scala.js run cannot write files, `-fJ` and the JSON directory argument are configuration errors and `-oJ` is the route for JSON (Costs)
 - `research/js-native-structure-and-capture.md` § 2.3 (jsdom, browser, ES modules without `process.getBuiltinModule`), § 1.3 (both plugins reject forking; Mill drives a run on one thread), § 2.1 (Native stdout under the Mill daemon), § 5 item 6
@@ -282,7 +280,7 @@ Enables:
 - `SPECIFICATION.md` R-065 (Scala.js), R-040 (Scala.js), R-061 to R-063, R-067 to R-070, R-007, R-024 and R-034 (Scala.js)
 - `ARCHITECTURE.md` § Modules § ScalaTest core, test output capture
 
-Traps:
+Risks:
 
 - `research/js-native-structure-and-capture.md` § 4.1 (partial-line buffer; overlapping tasks), § 1.1 (VMs outlive runs), § 2.2 (Encoding, unpaired surrogates in captured output), § 5 item 8
 - `SPECIFICATION-DECISIONS.md` § A test owns test output only while it is the only test running on the writing thread (Costs)
@@ -296,7 +294,7 @@ Enables:
 - `SPECIFICATION.md` R-065 (Native), R-040, R-061 to R-063, R-067 to R-070, R-007, R-024 and R-034 (Native)
 - `ARCHITECTURE.md` § Modules § ScalaTest core, test output capture (Native)
 
-Traps:
+Risks:
 
 - `research/js-native-structure-and-capture.md` § 4.2
 - `SPECIFICATION-DECISIONS.md` § Test output is captured on Scala.js and Scala Native as well as the JVM (Costs: every Native run writes through a pass-through stream)
