@@ -2,6 +2,35 @@
 
 Features of the epic [Structured test reporting](SPECIFICATION.md), in intended implementation order. The JVM `Runner` comes first, then the JVM `Framework`, then consolidation and build integration for JVM modules, then Scala.js and Scala Native. Spec document paths are relative to `.planning/structured-test-reporting/`; code paths are relative to the repo root. "Review of X" means the review comment on that closed design issue.
 
+## 1. Structured JSON from `Runner`
+
+Under `Runner` on the JVM, every `J` spelling writes JSON from which the test structure can be rebuilt, in every execution mode. This covers `-fJ`, `-oJ`, `-eJ` and the new directory argument. It covers `Runner`'s paths only; the `Framework`'s come in feature 4.
+
+- Structure wrappers on every path `Runner` takes that builds `Args`.
+- Node IDs and declared positions.
+- The run node and run ID.
+- Envelope dispatch placed ahead of the sorting reporters.
+- The first version of the documented format.
+
+Existing reporters receive exactly what 3.2.19 sends them.
+
+Enables:
+
+- `SPECIFICATION.md` § Scope (JVM on Scala 2.11, 2.12, 2.13 and 3.3), § Constraints (R-001, R-002, R-057), R-010 to R-014 (within one process), R-016 to R-018 (JVM), § JSON output (R-030 to R-033, R-035, R-064, R-071; R-036 and R-037 for `Runner`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (structure wrapper, envelope dispatch, JSON writer; the Dotty source generators, such as `project/GenScalaTestDotty.scala`), § The compatibility boundary, § Data flow (the in-process path), § External systems (IntelliJ forked mode, `-C`)
+
+Settles:
+
+- Emission-point wrapping coverage and the JSON schema policy ([Plan: structured test reporting](https://github.com/jamesgorman2/scalatest/issues/1), first review).
+- The JSON format version ([Where are a Framework run's JSON and results output produced?](https://github.com/jamesgorman2/scalatest/issues/6), review).
+- How a throwable's class and cause chain survive the JSON ([Which module owns the shared tree model and renderers?](https://github.com/jamesgorman2/scalatest/issues/3), review).
+
+Risks:
+
+- `ARCHITECTURE-DECISIONS.md` § Structure is attached where each event is emitted, not reconstructed after the merge (Costs)
+- `ARCHITECTURE.md` § The compatibility boundary (no second envelope; suites whose own `run` or `runNestedSuites` bypasses the wrappers)
+- `SPECIFICATION.md` § Constraints § IntelliJ (forked-mode ordering needs)
+
 ## 2. Progress-then-results output from `Runner`
 
 Plain `-o` and `-e` under `Runner` show progress output, then one contiguous results block assembled from the tree: declared order, outcome roll-up, durations. Progress and results can each be sent to stdout, stderr or both. 3.2-format spellings stay byte-for-byte the same.
