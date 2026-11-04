@@ -4,8 +4,10 @@ This is a fork of `ScalaTest` that that keeps test output readable, by people an
 
 ## Skills to use
 
-- `design-loop` - discovering and designing work, at both epic and feature scale
-- `search-best-practices-and-learnings` - when writing a technical design, or writing, testing or reviewing code. **After you have understood the problem, but before you act.** Do not use this for documentation, general architecture, or system design. When no `.planning/<feature>/` directory exists, pass `<repo-root>/.planning` as its scope-path, so that it searches `.docs/learnings/`.
+- `roadmap` - Creating, updating and reading a project or epic's roadmap, starting, completing or abandoning work on an epic or feature, breaking an epic into features, or promoting a feature to an epic.
+- `design-loop` - discovering and designing work, at both epic and feature altitude
+- `build-loop` - planning and implementing features after they have been designed
+- `search-best-practices-and-learnings` - when writing a technical design, or writing, testing or reviewing code. **After you have understood the problem, but before you act.** Do not use this for documentation, general architecture, or system design.
 - `codegraph` - before exploring, navigating, reviewing, or planning edits in code
 
 ### Document amendments
