@@ -4,7 +4,7 @@ Decisions: [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.md).
 
 ## Summary
 
-The JSON writer (`../ARCHITECTURE.md` § Modules § ScalaTest core) turns tree assembly's structure of a run into the object of `SPECIFICATION.md` § The JSON object. This document fixes that object's layout, which third-party readers, the consolidator and the documentation of `SPECIFICATION.md` R-010 build against: each node holds its final state, folded from its events, never the events themselves. Three values the layout needs are not in 3.2.19's events when it needs them: a scope's or test's name as written in the source and a suite's source file, which no event carries, and a test's label, which only its closing event carries; `Engine` supplies them through the envelope.
+The JSON writer (`../ARCHITECTURE.md` § Modules § ScalaTest core) turns tree assembly's structure of a run into the object of `SPECIFICATION.md` § The JSON object. This document fixes that object's layout, which third-party readers, the consolidator and the documentation of `SPECIFICATION.md` R-010 build against: each node holds its final state, folded from its events, never the events themselves. Three values the layout needs are missing from 3.2.19's events: a scope's or test's name as written in the source and a suite's source file, which no event carries, and a test's label, which only its closing event carries, and so may never arrive. `Engine` supplies all three through the envelope.
 
 ## APIs
 
@@ -42,7 +42,7 @@ A node's keys, in order: `kind`, `name`, `label`, `suiteId`, `location`, `outcom
 - `contents` — always present, `[]` when empty: the node's children and messages in the one sequence of `SPECIFICATION.md` R-003. A child or message states its own `kind`.
 - `output` — reserved for test output, as `{ "stdout": …, "stderr": … }`. `../ROADMAP.md` § 7 defines its content; this feature never writes it.
 
-A suite named as `DeferredAbortedSuite` names one (`ACCEPTANCE-CRITERIA.md` AC-022), for class `p.B`, has `name` `B`, `suiteId` `p.B` and `location.className` `p.B`.
+A suite that `DeferredAbortedSuite` names (`ACCEPTANCE-CRITERIA.md` AC-022), for class `p.B`, has `name` `B`, `suiteId` `p.B` and `location.className` `p.B`.
 
 #### The run node
 
@@ -124,7 +124,9 @@ No 3.2.19 event carries a scope's or test's name, or a suite's file: `ScopeOpene
 
 - **`Engine`** (the `private[scalatest]` `SuperEngine` and `AsyncSuperEngine` families) keeps, at registration, each scope's and test's name before a parent's child prefix is applied or its test name is joined, its label, and the scalactic `Position` of each registration. Where a style trait hands `Engine` text already combined with a verb, it hands the name separately.
 - **A suite's file** is the file of its registrations' `Position`s where they all share one; otherwise it has none. No line is kept.
-- **The structure wrapper** puts the name and label in the envelope of the node's events, and the file in the suite's (`../ARCHITECTURE.md` § Modules § ScalaTest core, Structure wrapper). `Engine` gives them to the wrapper it finds as `Args.reporter`; where `Args.reporter` is not a structure wrapper, as when a suite wraps the reporter it is given, or the suite is not built on `Engine` (a hand-written `Suite`, a third-party style, the JUnit and TestNG wrappers), no name, label or file is supplied and `name` and `label` fall back as § Nodes says.
+- **The structure wrapper** puts the name and label in the envelope of the node's events, and the file in the suite's (`../ARCHITECTURE.md` § Modules § ScalaTest core, Structure wrapper). `Engine` gives them to the wrapper it finds as `Args.reporter`. No name, label or file is supplied, and `name` and `label` fall back as § Nodes says, where:
+  - `Args.reporter` is not a structure wrapper, as when a suite wraps the reporter it is given; or
+  - the suite is not built on `Engine`: a hand-written `Suite`, a third-party style, the JUnit and TestNG wrappers.
 - **A top-level suite that never ran** but was constructed, as under `ACCEPTANCE-CRITERIA.md` AC-022, gets its file from `Runner`, which reads it from the suite's `Engine` when it gives the suite to tree assembly (`../ARCHITECTURE.md` § Modules § ScalaTest core, Tree assembly). A suite never constructed has none.
 - **Tree assembly** stores them on the node, and the JSON writer reads them from there.
 

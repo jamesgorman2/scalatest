@@ -8,7 +8,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 **Reasoning** Every registration in an `Engine`-built suite already captures a scalactic `Position`, so the suite's file is known wherever its registrations share one, at no cost to any compiled suite.
 
-**Costs** A suite with no registrations, with registrations across several files, or not built on `Engine` has no file; and since no registration marks where the suite itself is declared, no suite has a line, so none can be opened at its declaration from the JSON.
+**Costs** A suite with no registrations, with registrations across several files, or not built on `Engine` has no file. No registration marks where the suite itself is declared, so no suite has a line and none can be opened at its declaration from the JSON.
 
 **Settled by** [How is a run's test structure laid out as JSON?](https://github.com/jamesgorman2/scalatest/issues/19).
 
