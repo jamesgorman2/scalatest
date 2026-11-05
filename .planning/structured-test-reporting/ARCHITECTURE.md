@@ -16,6 +16,7 @@ Three deployable units, each built and released from this repo.
 
 - **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`, which envelopes every `Event` it receives.
   - An *envelope* is an `Event` or a chunk of test output, plus the ID of the node it attaches to and that node's parent's ID.
+  - An envelope also carries its node's name as written in the source, its label (formatted name) and, for a suite, the source file of its registrations. `Engine` supplies all three; no 3.2.19 event carries the first or the last, nor a test's label before it closes.
   - Each suite's wrapper mints IDs for the suite, its scopes and its tests, unique within the run.
   - A run can span processes:
     - on Scala.js and Native, a *controller* process running `MasterRunner` and the *worker* processes, each running `SlaveRunner`, that the adapter starts for it (§ External systems);
@@ -83,7 +84,7 @@ Three deployable units, each built and released from this repo.
 
 ### Multi-run consolidation executable
 
-A standalone executable, the *consolidator*, that writes the outputs of `SPECIFICATION.md` § Multi-run consolidation plugin. It rebuilds `Event`s from ScalaTest's JSON and renders with scalatest-core's internal tree assembly and human renderer.
+A standalone executable, the *consolidator*, that writes the outputs of `SPECIFICATION.md` § Multi-run consolidation plugin. It rebuilds approximate `Event`s from the node state in ScalaTest's JSON, which holds no ordinals, formatters or rerunners, and renders with scalatest-core's internal tree assembly and human renderer.
 
 - Its caller gives it one or more test run labels, unique within the consolidation, each with a list of JSON files. It merges each listed file's content under its label's node, keeping each file's closing run event and its reason, and does not collapse suites or tests that share a name across files.
 - A listed file that is absent becomes an entry under its label holding a `RunAborted` with reason *not run* and no nodes.

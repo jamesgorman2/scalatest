@@ -26,6 +26,16 @@ _Avoid_: Test tree, hierarchy, nesting
 A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, a test run label is also a node.
 _Avoid_: Element, item, entry, test case
 
+**Name**:
+A node's own text as written in the source file: a suite's suite name, or a scope's or test's text without the text of the scopes around it. ScalaTest's test name, which joins a test's scopes' text with its own, is not a node's name.
+_Avoid_: Test name, full name, text
+_Context_: A node of the test structure
+
+**Label**:
+A scope's or test's name as ScalaTest's formatter renders it, such as `when b` or `- should c`, without its indentation. Suites and the run node have none. It is not a test run label.
+_Avoid_: Formatted name, display name
+_Context_: A node of the test structure
+
 **Outcome**:
 How a node ended. Succeeded, failed, cancelled and ignored belong to tests alone; pending belongs to tests and scopes; aborted may belong to any node; stopped belongs to the run node alone.
 _Avoid_: Result, status, verdict

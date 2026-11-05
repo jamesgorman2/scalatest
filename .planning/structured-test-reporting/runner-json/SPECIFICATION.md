@@ -12,6 +12,7 @@ ScalaTest 3.2.19's `J` reporters write one JSON line per event, and no event nam
 
 ## Spec documents
 
+- [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md) — the object's layout: every key of a node, message, throwable and location, which event supplies each, and how a node's name and a suite's file reach the writer.
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — why a suite whose constructor throws is aborted in the test structure only, and why a halted run lists no suite that only an unbound `-z` or `-t` would select.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic specification this feature is written against; its § Test structure and § JSON output fix what the object holds.
 - [../SPECIFICATION-DECISIONS.md](../SPECIFICATION-DECISIONS.md) — the epic's decisions this feature carries: filter characters drop only data, and the format has no version of its own.
@@ -71,18 +72,18 @@ In this document, *3.2.19* means `org.scalatest:scalatest` 3.2.19 run with the s
 
 - R-002 The object holds the run's test structure (`../SPECIFICATION.md` § Test structure), rooted at the run node. Every node states its kind — run, suite, scope or test.
 - R-003 A node's children and messages form one sequence. Its children appear in declared order. Each message appears after every child of its node that the run had reached when the message was emitted, whether that child then ran at once, concurrently or later, and before every other child. Its messages keep the order in which they were emitted. This holds in every execution mode.
-- R-004 For every event attached to a node and passed by the reporter's event filter (R-009), the object holds every field value of that event apart from its payload, with throwables as R-006 records them and each config-map value as its `toString`.
-- R-005 Every event the run sends its reporters contributes its data, as far as R-009 lets it, to exactly one node, and no two events or nodes are merged. The one exception is the `RunAborted` that a suite's throwing constructor causes (AC-023, AC-025, AC-026), which also gives its message and throwable to the suite that threw. The `SuiteStarting` and `SuiteCompleted` of a `DiscoverySuite` contribute nothing, and a `DistributedTestRunnerSuite` is not a node: its `SuiteStarting` and `SuiteCompleted` contribute nothing, and a `SuiteAborted` it sends contributes to the one test it ran (AC-052).
+- R-004 Each node holds its final state, not its events: the values `TECHNICAL-DESIGN.md` § APIs lists, each taken from the event attached to the node that supplies it, as far as R-009 lets it, with throwables as R-006 records them and each config-map value as its `toString`. No event's ordinal, formatter, rerunner or payload is held.
+- R-005 Every event the run sends its reporters contributes its data, as far as R-009 lets it, to exactly one node; each message is its own item, and no two nodes are merged. The one exception is the `RunAborted` that a suite's throwing constructor causes (AC-023, AC-025, AC-026), which also gives its message and throwable to the suite that threw. The `SuiteStarting` and `SuiteCompleted` of a `DiscoverySuite` contribute nothing, and a `DistributedTestRunnerSuite` is not a node: its `SuiteStarting` and `SuiteCompleted` contribute nothing, and a `SuiteAborted` it sends contributes to the one test it ran (AC-052).
 - R-011 `RunStarting`, `RunCompleted`, `RunAborted`, `RunStopped`, `DiscoveryStarting` and `DiscoveryCompleted` attach to the run node.
 - R-006 A throwable is recorded with:
   - its class name;
   - its `getMessage`, absent when `null`;
-  - for a `StackDepthException`, its `failedCodeFileName` and `failedCodeLineNumber`, each where defined;
-  - every frame of its stack trace, each with its class name, method name, file name and line number;
-  - its cause and its suppressed exceptions, in order, each recorded the same way, except that a throwable already recorded within the same event's throwable is recorded as a reference to that record, so a cycle ends.
+  - for a `StackDepthException`, its failed code's file and line number, each where defined, and no stack trace;
+  - for any other throwable, every frame of its stack trace, each with its class name and method name, its file name and line number where known, and whether it is native;
+  - its cause and its suppressed exceptions, in order, each recorded the same way by its own type, except that a throwable already recorded within the same node's or message's throwable is recorded as a reference to that record, so a cycle ends.
 - R-007 The root records the ScalaTest version that `Runner -v` prints, and the reporter's event-filter characters.
 - R-008 Configuration characters other than the event-filter characters do not change the object.
-- R-009 On a `J` reporter, the events whose data the object holds are exactly those that 3.2.19's `FilterReporter` passes for the reporter's event-filter characters, with each test's recorded events filtered as it filters them. A node's kind, its name (a suite's suite name, a scope's text, a test's name) and its place in the test structure are present whatever the characters.
+- R-009 On a `J` reporter, a node's kind, its name (a suite's suite name; a scope's or test's name as written in the source, or, in a suite that does not record it, its event's text), its label, a suite's suite ID, its location and its place in the test structure are present whatever the characters. Every other value the object holds is present exactly when an event that supplies it passes 3.2.19's `FilterReporter` for the reporter's event-filter characters, with each test's recorded events filtered as it filters them.
 - R-010 The fork's documentation describes the format for third-party readers: every field, what it means, when it is empty or absent, the effect of each event-filter character, and the compatibility promise of `../SPECIFICATION.md` § JSON output.
 
 ## Acceptance criteria
@@ -183,6 +184,19 @@ Feature: Structured JSON from Runner
       When a run with "-s A -fJ out.json" ends
       Then A has two suite nodes named B and two scope nodes named "s", each with its own children
 
+    Scenario Outline: AC-053 A scope or test is named as written in the source and labelled as formatted
+      Given suite W is an AnyWordSpec registering "A" when { "b" should { "c" in { <body> } } }
+      When a run with "-s W -fJ<chars> out.json" ends
+      Then scope "A" has name "A" and label "A"
+      And scope "b" has name "b" and label "when b"
+      And test "c" has name "c" and label "- should c"
+      Examples:
+        | body                     | chars |
+        | succeed                  |       |
+        | pending                  |       |
+        | succeed                  | C     |
+        | throw StackOverflowError |       |
+
     Scenario: AC-008 Tests that a filter excludes do not appear
       Given suite A has test "t1" tagged Slow, test "t2", and ignored test "t3"
       When a run with "-s A -l Slow -fJ out.json" ends
@@ -217,7 +231,7 @@ Feature: Structured JSON from Runner
 | AC-018 | `RunStopped`                                         | run node                | stopped     |
 | AC-019 | `ScopeClosed`, `SuiteCompleted`, `RunCompleted`      | scope, suite, run node  | none        |
 
-An aborted or failed node carries its closing event's message and throwable (R-004).
+A failed, cancelled or aborted node carries its closing event's message and throwable (R-004).
 
 ```gherkin
     Scenario: AC-052 A test's failure outside its body aborts the test, not its suite
@@ -358,16 +372,16 @@ Durations:
       And every other event's data is present
       Examples:
         | chars | absent                                                                          |
-        | N     | the data of each test's TestStarting                                            |
-        | C     | "t1"'s outcome, duration and recorded messages                                  |
-        | X     | "t2"'s outcome                                                                  |
-        | E     | "t3"'s outcome, duration and recorded messages                                  |
-        | H     | the data of A's SuiteStarting                                                   |
-        | L     | the data of A's SuiteCompleted, including its duration                          |
+        | N     | the start time of each test                                                     |
+        | C     | "t1"'s outcome, end time, duration and recorded messages                        |
+        | X     | "t2"'s outcome, end time and thread name                                        |
+        | E     | "t3"'s outcome, end time, duration and recorded messages                        |
+        | H     | A's start time                                                                  |
+        | L     | A's end time and duration                                                       |
         | O     | A's info and "t1"'s info "i", while "t1"'s markup "m" remains                   |
-        | P     | the data of each ScopeOpened, and the durations of "s" and "p"                  |
-        | Q     | the data of the ScopeClosed of "s", and its duration                            |
-        | R     | the data of the ScopePending of "p", including its outcome and duration         |
+        | P     | the start times and durations of "s" and "p"                                    |
+        | Q     | the end time and duration of "s"                                                |
+        | R     | "p"'s outcome, end time and duration                                            |
         | M     | "t1"'s markup "m", while its info "i" remains                                   |
 
     Scenario: AC-041 Events that no filter character names keep their data
@@ -376,14 +390,14 @@ Durations:
       Then out.json holds the data of every DiscoveryStarting, DiscoveryCompleted, RunStarting, RunCompleted, RunAborted, SuiteAborted, TestFailed, TestCanceled, AlertProvided and NoteProvided the run sent
       And its TestFailed and TestCanceled data holds none of their recorded infos or markups
 
-  Rule: Throwables keep their class, message, location, stack trace, causes and suppressed exceptions
+  Rule: Throwables keep their class, message, location or stack trace, causes and suppressed exceptions
 
     Scenario: AC-042 A failed test's throwable is recorded whole
-      Given test "t" fails with a TestFailedException at Spec.scala line 12, whose cause E1 has suppressed exception E2
+      Given test "t" fails with a TestFailedException at Spec.scala line 12, whose cause E1, a RuntimeException, has suppressed exception E2
       And E2's cause is E1
       When a run with "-fJ out.json" ends
-      Then "t"'s throwable records class TestFailedException, its message, file Spec.scala and line 12, and every frame of its stack trace
-      And its cause records E1 the same way, with E2 among E1's suppressed exceptions
+      Then "t"'s throwable records class TestFailedException, its message, file Spec.scala and line 12, and no stack trace
+      And its cause records E1's class, message and every frame of its stack trace, with E2 among E1's suppressed exceptions
       And E2's cause is recorded as a reference to E1's record
 
     Scenario Outline: AC-043 A null message is told apart from an empty one
