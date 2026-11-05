@@ -27,7 +27,6 @@ All three cover runs on the JVM, Scala.js and Native. Every requirement below ho
 Terms this document adds:
 
 - A *Mill command* is one execution of Mill from the command line, whatever number of selectors, modules, runtimes and runs it covers.
-- A *runtime* is the platform a run executes on: the JVM, Scala.js or Native.
 - A *selector* is the part of a Mill command that names test tasks to run; one command may carry several.
 - A *channel* is the one ordered stream a run's emitter writes and the consolidation library reads.
 

@@ -8,6 +8,10 @@ This repo is a fork of ScalaTest that keeps test output readable, by people and 
 One ScalaTest execution, from start to completion: one `Runner` run, or everything one `Framework` runner executes before its `done()`. On Scala.js and Native, one run spans a controller process and the worker processes that serve it.
 _Avoid_: Build, test session, invocation
 
+**Runtime**:
+The platform a run executes on: the JVM, Scala.js or Native.
+_Avoid_: Platform, target, backend
+
 **Execution mode**:
 How a run schedules its suites and tests: *sequential*, one after another on one thread, or *concurrent*, on several threads at once; under `Runner`, a concurrent run may also sort its events by suite.
 _Avoid_: Parallelism level, run mode
