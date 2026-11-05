@@ -23,7 +23,7 @@ The tree of nodes a run reports: the run at its root, containing suites, which c
 _Avoid_: Test tree, hierarchy, nesting
 
 **Node**:
-A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure.
+A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, a test run label is also a node.
 _Avoid_: Element, item, entry, test case
 
 ## Output
@@ -39,5 +39,5 @@ Bringing things together into a single place
 _Avoid_: Aggregation, merging, report generation
 
 **Test run label**:
-The name a consolidator's caller gives a list of JSON files, unique within one consolidation, under which those files' runs are merged. It tells apart runs whose JSON is otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
+A node in consolidated output that wraps the suites of the JSON files its caller names together, named by the caller and unique within one consolidation. It tells apart runs whose JSON is otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag

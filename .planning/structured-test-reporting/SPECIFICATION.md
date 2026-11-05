@@ -16,6 +16,7 @@ ScalaTest events do not carry the test structure: no event names a suite's paren
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the contested behaviour choices and the alternatives they beat.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — modules, how the test structure travels through a run, the compatibility boundary and the data flow.
 - [research/js-native-structure-and-capture.md](research/js-native-structure-and-capture.md) — what one Scala.js or Scala Native run consists of, the channels out of it, and how test output can be captured on each runtime.
+- [research/mill-test-worker-args.md](research/mill-test-worker-args.md) — how Mill passes arguments to its test-worker JVMs, and whether each can be given its own JSON file.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
@@ -71,6 +72,7 @@ A node is any suite or test (Something about nested suites and test descriptions
 - `info`, `alert`, `note` and `markup` attach to the node that emitted them. 
 - An event whose emitting node cannot be identified attaches to the first identifiable ancestor of that node, and is never lost or reordered.
 -  When a run finishes — at `done()` under the `Framework`, at the end of the run under `Runner` — with any nodes unfinished, and has not already ended in `RunAborted` or `RunStopped`, every reporter, `-C` reporters included, receives `RunAborted` in place of `RunCompleted`.
+- Every node the run was to execute, known before its run ends, that has no result is reported as aborted, in JSON as well as human-readable output. This includes a top-level suite discovered or given a task that never started, and a test registered in a constructed suite that never ran. A node excluded by a filter, such as a tag or a test-name selector, is reported as ScalaTest 3.2.19 reports it.
 - every node has a duration
 - A suite that aborts, including one whose constructor throws, is reported as aborted on every platform.
 - nodes that share a name are never consolidated
@@ -78,7 +80,9 @@ A node is any suite or test (Something about nested suites and test descriptions
 ## Human-readable output
 
 - human-readable form:
-  - is emitted in the ScalaTest 3.2.19 format, except, if necessary, additional suite hierarchy indentation is added
+  - is emitted in the ScalaTest 3.2.19 format, except that:
+    - additional suite hierarchy indentation is added where necessary
+    - by default, a subtree whose nodes all share one error is collapsed to its root; `-oDU` output is never collapsed
   - is consolidated and reported as a single block at the end of each invocation of scalatest
   - test output is streamed out as it is received, not part of the consolidated results
   - reports run aborted if printed before receiving a valid completion event
@@ -98,7 +102,7 @@ A node is any suite or test (Something about nested suites and test descriptions
 
 - JSON form:
   - is emitted as a single structured JSON object
-  - represents the full node hierarchy of the invocation. In JS/Native this includes all sub-processes 
+  - represents the full node hierarchy of the invocation, every node and result, with nothing collapsed. In JS/Native this includes all sub-processes
   - is consolidated and reported at the end of each invocation of scalatest
   - writes stderr and stdout output as properties on the closest recognisable node
   - reports run aborted if printed before receiving a valid completion event 
@@ -128,7 +132,7 @@ Other outputs include, but are not limited to, output to stderr/stdout from:
 Is exposed as an executable and a mill plugin
 
 - executable 
-  - expects one or more pairs of a test run label and a list of ScalaTest JSON files as input
+  - expects one or more pairs of a test run label and a list of JSON files written by ScalaTest as input
     - test run label must be unique per consolidation
   - outputs a consolidated files for one or more of:
     - JSON
@@ -136,8 +140,8 @@ Is exposed as an executable and a mill plugin
     - JUnit XML
   - outputs use the same flags as ScalaTest
     - best effort dependent on the data in the input JSON
-  - distinguishes test files that did not run (one whose JSON location holds no run, whatever its test-task result), test files whose test processes failed, and test files whose tests failed.
-  - reports as non-successful if any test file is missing or not successful.
+  - shows a listed JSON file that does not exist as not run
+  - its exit code does not depend on test results: input in which no run succeeded still consolidates successfully
   - suites and tests with the same name across files are not collapsed
 
 - mill plugin provides a command that 

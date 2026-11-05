@@ -2,13 +2,28 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## The consolidator's exit code does not depend on test results.
+
+**Alternatives**
+
+- Exiting non-zero when any run failed or aborted makes the consolidator judge results the build's test task already judges, and a failed consolidation could no longer be told from failing tests.
+- Exiting non-zero only when a listed file is not run still judges results, and only one kind of them.
+
+**Reasoning** The consolidator reports; it does not judge. Its exit code says only whether it consolidated, so twenty JSON files from runs whose test processes all failed still consolidate successfully.
+
+**Costs** CI must read the results, or rely on the build tool's own test task, to fail on test failures.
+
+**Settled by** [What does a run leave on disk when it never reaches its end, and how does the consolidator classify it?](https://github.com/jamesgorman2/scalatest/issues/16).
+
+---
+
 ## A node left unfinished has outcome aborted, not a new outcome.
 
 **Alternatives** A new outcome, incomplete, ranked worst or level with aborted, adds no information: why the node never finished is unknown either way, and the only evidence is the truncated output.
 
 **Reasoning** ScalaTest 3.2.19's `org.scalatest.events.RunAborted` already means "a runner encountered an error while attempting to run a suite of tests" (its scaladoc), which fits a node whose process died or whose run gave up on it, so the six outcomes of `SPECIFICATION.md` R-015 stand (R-074).
 
-**Costs** A suite that threw and a suite whose process died read alike at node level; only whether the run's test process failed tells them apart (R-077).
+**Costs** A suite that threw and a suite whose process died read alike at node level; only the run's `RunAborted` reason, *process failed*, tells them apart.
 
 **Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
 
@@ -21,22 +36,6 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 **Reasoning** A node is left unfinished only when its process was lost or the wait for it gave up (`SPECIFICATION.md` R-074): a suite that aborts closes the tests and scopes open inside it, so a single-process sequential run in which a test throws a `VirtualMachineError` still ends in `RunCompleted`, as in 3.2.19 (R-002). Where nodes are left unfinished, tests have silently vanished, and 3.2.19's `RunCompleted`, with partial counts, reports the run as complete (`ARCHITECTURE.md` § Data flow, failure path). 3.2.19 already ends a run in `RunAborted` when sbt's forked JVM is lost, so R-075 extends that to the cases it misses.
 
 **Costs** The first deliberate departure from 3.2.19's event stream (R-002, R-057): a `-C` reporter, IntelliJ's among them, sees `RunAborted` where 3.2.19 sent `RunCompleted`.
-
-**Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
-
----
-
-## The consolidator's caller passes each test run label's test-task result, and a failed task marks a label that has runs, none of them failed or aborted, as test process failed.
-
-**Alternatives**
-
-- Accepting the gap lets a label show passed while its build task failed, whenever a process died before writing any JSON, as a Mill test-worker JVM can.
-- Passing the expected number of runs is not possible: Mill decides its worker count at run time, and sbt folds forked groups into one run.
-- Marking every label whose task failed as "test process failed" misreports labels whose tests failed or whose module did not compile, because the task result cannot tell a crash from either.
-
-**Reasoning** Only the build sees a process that died before writing JSON, and Mill and sbt both fail the task for it; neither tells a crash from failing tests (`ARCHITECTURE.md` § External systems). The Mill plugin and the sbt recipe give each module one label, so each label has one test task. Pending, ignored and canceled tests never fail a task, so the result decides only for a label that has runs and none of them failed or aborted.
-
-**Costs** A dead process under a label whose other runs failed shows "failed", not "test process failed", and the consolidator's input becomes partly the build's verdict. A label whose only process died before writing any JSON reads "did not run".
 
 **Settled by** [What outcome does an unfinished node get, and how does a run's JSON record a dead process?](https://github.com/jamesgorman2/scalatest/issues/9).
 

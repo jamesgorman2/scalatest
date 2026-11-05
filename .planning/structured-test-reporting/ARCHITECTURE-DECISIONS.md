@@ -2,6 +2,47 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## On a soft death, a shutdown hook replaces a run's marker with the tree of every node it knows, with results where they exist.
+
+**Alternatives** The marker alone loses every result the run reached whenever a test calls `System.exit` or the process receives SIGTERM under Mill or `Runner`.
+
+**Reasoning** The hook recovers every result reached before a soft death, at no cost to a run that ends normally, because it is deregistered at the end.
+
+**Costs** A hook runs inside a dying process, so it is best effort. On Scala.js and Native it exists only where the runtime offers an exit handler, and on Node it never fires on a signal (`ARCHITECTURE.md` § Modules, JSON writer).
+
+**Settled by** [What does a run leave on disk when it never reaches its end, and how does the consolidator classify it?](https://github.com/jamesgorman2/scalatest/issues/16).
+
+---
+
+## Every run with a `-fJ` reporter that can write its file leaves that file once it starts executing: a marker recording a failed process, written at its first execution and replaced at the end.
+
+**Alternatives**
+
+- Writing only at the end leaves no file when a Mill or Scala.js worker dies, when a main process hangs or is killed, or when a test calls `System.exit` under Mill or `Runner`, and an absent file cannot be told from a run that never started.
+- Rewriting the file with results as the run goes costs quadratic I/O, and on Scala.js synchronous `fs` blocks the event loop.
+
+**Reasoning** Only a file written before anything can die records that the run started. The JSON alone then shows a dead process, without the build's task result, and an absent file in a cleared location can only mean a run that never started. Because the marker carries structure only, it is rewritten only when a new top-level suite becomes known.
+
+**Costs** A hard death (SIGKILL, OOM kill, crash) loses every result the run reached: its file shows only the top-level suites known.
+
+**Settled by** [What does a run leave on disk when it never reaches its end, and how does the consolidator classify it?](https://github.com/jamesgorman2/scalatest/issues/16).
+
+**See** `research/mill-test-worker-args.md` § 1.2.
+
+---
+
+## A `RunAborted` may carry an explicit reason, *process failed* or *not run*, beside the `Event`.
+
+**Alternatives** Inferring the cause from a 3.2.19 `RunAborted`'s fields ties the consolidator and every JSON reader to free-text messages written for people, and leaves a run that never started with no event to infer from.
+
+**Reasoning** The reason tells a dead process apart from an abort with any other cause in the JSON, and lets the consolidator report an absent file in the same shape as a run's closing event. Held beside the `Event`, as the structure is, it leaves reporters built against the 3.2.x API receiving the plain `RunAborted` (`ARCHITECTURE.md` § The compatibility boundary).
+
+**Costs** Every path that brings a `RunAborted` to the main process must carry or assign its reason, and reporters built against the 3.2.x API cannot see it.
+
+**Settled by** [What does a run leave on disk when it never reaches its end, and how does the consolidator classify it?](https://github.com/jamesgorman2/scalatest/issues/16).
+
+---
+
 ## The Mill plugin, not ScalaTest, gives each test-worker JVM its own JSON file: it passes a relative `-fJ` path, which resolves inside each worker's own sandbox, and fails the build when the sandbox is off.
 
 **Alternatives**
@@ -58,7 +99,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - An ID for each use of the command, passed into every run, for example through `-D`, for the consolidator to filter on, puts a build-supplied identity back into the JSON, and every caller must mint and pass it.
 - Filtering by run start time depends on clocks, which differ across machines and CI caches.
 
-**Reasoning** Mill empties a task's `Task.dest`, and with it every worker sandbox inside it, before each run of the task, so the Mill plugin gets fresh files for each label, one per module, at no cost. The sbt recipe needs only one delete of each module's `-fJ` file before `test`. Each label's files then hold exactly the runs its caller just started, and a label with none is a label with no run (`SPECIFICATION.md` § Multi-run consolidation plugin).
+**Reasoning** Mill empties a task's `Task.dest`, and with it every worker sandbox inside it, before each run of the task, so the Mill plugin gets fresh files for each label, one per module, at no cost. The sbt recipe needs only one delete of each module's `-fJ` file before `test`. Each label's files then hold exactly the runs its caller just started, and a label with none appears with nothing under it (`ARCHITECTURE.md` § Multi-run consolidation executable).
 
 **Costs** A hand-written sbt build that drops the delete consolidates stale runs silently.
 
