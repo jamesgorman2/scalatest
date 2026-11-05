@@ -22,11 +22,12 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - A consolidation library that reads the channels of many runs and produces their consolidated output.
 - A Mill plugin that runs a module's or a build's tests with the emitter on, and hosts the consolidation library.
 
-All three cover runs on the JVM, Scala.js and Scala Native. Every requirement below holds on each runtime.
+All three cover runs on the JVM, Scala.js and Native. Every requirement below holds on each runtime.
 
 Terms this document adds:
 
 - A *Mill command* is one execution of Mill from the command line, whatever number of selectors, modules, runtimes and runs it covers.
+- A *runtime* is the platform a run executes on: the JVM, Scala.js or Native.
 - A *selector* is the part of a Mill command that names test tasks to run; one command may carry several.
 - A *channel* is the one ordered stream a run's emitter writes and the consolidation library reads.
 
@@ -61,4 +62,4 @@ Terms this document adds:
 - R-021 The human-readable and JSON output hold everything every run sent; no event, node or test output is dropped.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
 - R-023 Given the same channels, the consolidation library produces the same human-readable and JSON output when used without Mill.
-- R-025 Where one Mill command runs the same suite on several runtimes, the consolidated output keeps each runtime's run of that suite distinct and identifies its runtime.
+- R-025 Where one Mill command runs the same suite on several runtimes, the consolidated output identifies the runtime of each run of that suite.
