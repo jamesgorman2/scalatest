@@ -4,7 +4,7 @@ Scale: epic.
 
 ## Summary
 
-One Mill command can start many runs: several test-worker JVMs per module, several modules, and several selectors. Each run prints for itself, so the command's output interleaves, loses the test structure, and cannot be read as one result by people or by tools. This epic has each run send everything it knows over one channel, and has a Mill plugin consolidate the channels of every run the command started into one set of output.
+One Mill command can start many runs: several test-worker JVMs per module, several modules, and several selectors. Each run prints for itself, so the command's output interleaves, loses the test structure, and cannot be read as one whole by people or by tools. This epic has each run send everything it knows over one channel, and has a Mill plugin consolidate the channels of every run the command started into one set of output.
 
 ## Plan
 
@@ -12,22 +12,21 @@ One Mill command can start many runs: several test-worker JVMs per module, sever
 
 ## Spec documents
 
-- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, the existing ways events leave a process, what capturing test output needs, and how Mill launches its test workers.
-
-Written against:
-
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md` — how Mill passes arguments to its test-worker JVMs.
-- `.planning/structured-test-reporting/research/js-native-structure-and-capture.md` — what one Scala.js or Scala Native run consists of, the channels out of it, and how test output can be captured on each runtime.
+- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, the existing ways events leave a process, where a reporter attaches, what attributing test output needs, and what is and is not known about a channel out of a Mill test-worker JVM.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
 ## Scope
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
-- A consolidation library that reads the channels of many runs and produces their consolidated output. It does not depend on Mill.
+- A consolidation library that reads the channels of many runs and produces their consolidated output.
 - A Mill plugin that runs a module's or a build's tests with the emitter on, and hosts the consolidation library.
 
-A *Mill command* is one execution of Mill from the command line, whatever number of modules, selectors and test-worker JVMs it covers.
+Terms this document adds:
+
+- A *Mill command* is one execution of Mill from the command line, whatever number of modules, selectors and test-worker JVMs it covers.
+- A *selector* is the part of a Mill command that names test tasks to run; one command may carry several.
+- A *channel* is the one ordered stream a run's emitter writes and the consolidation library reads.
 
 ### Out of scope
 
@@ -40,9 +39,9 @@ A *Mill command* is one execution of Mill from the command line, whatever number
 
 ### Compatibility with ScalaTest 3.2.x
 
-- R-001 A run that does not use the Mill plugin behaves as ScalaTest 3.2.x does: the same reporters, the same output and the same test-interface events.
+- R-001 A run with the emitter off behaves as ScalaTest 3.2.19 does: the same reporters, the same output and the same test-interface events.
 - R-002 Every existing ScalaTest reporter, and any reporter passed with `-C`, receives the same events with the emitter on as with it off.
-- R-003 IDE and BSP test runs behave as they do against ScalaTest 3.2.x.
+- R-003 Test runs launched by Metals, Bloop and IntelliJ, in its forked, sbt shell and BSP modes, behave as they do against ScalaTest 3.2.19, including in a build that uses the Mill plugin.
 
 ## The emitter
 
@@ -53,11 +52,10 @@ A *Mill command* is one execution of Mill from the command line, whatever number
 
 ## Consolidation
 
-- R-020 For one Mill command, the Mill plugin produces one set of output covering every run the command started:
+- R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started:
   - progress output while the runs execute;
-  - human-readable results;
-  - JSON results.
-- R-021 The consolidated results hold everything every run sent; no event, node or test output is dropped.
-- R-022 Output from different runs is never interleaved within a node's results.
-- R-023 The consolidation library produces the same results from the same channels when used without Mill.
-- R-024 The consolidated results hold what a consolidated HTML report needs, so that report can be added without changing the emitter.
+  - human-readable output;
+  - JSON output.
+- R-021 The human-readable and JSON output hold everything every run sent; no event, node or test output is dropped.
+- R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
+- R-023 Given the same channels, the consolidation library produces the same human-readable and JSON output when used without Mill.
