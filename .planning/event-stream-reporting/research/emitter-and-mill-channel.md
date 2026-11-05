@@ -1,6 +1,6 @@
 # What a lossless emitter and Mill-side consolidation have to work with
 
-What ScalaTest's events carry and lose on the way out of a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what is known about a channel from a Mill test-worker JVM to a Mill plugin ([Event-stream test reporting for Mill](https://github.com/jamesgorman2/scalatest/issues/20)). Facts only; no design is chosen.
+What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what is known about a channel from a Mill test-worker JVM to a Mill plugin ([Event-stream test reporting for Mill](https://github.com/jamesgorman2/scalatest/issues/20)). Facts only; no design is chosen.
 
 Two earlier notes hold facts this one relies on and does not repeat:
 
@@ -30,7 +30,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 - `TOOLS/` is `jvm/core/src/main/scala/org/scalatest/tools/`.
 - `JS/` is `js/core/src/main/scala/org/scalatest/tools/`.
 
-No experiment was run for this note. §§ 1–5 are read from `[this]` source. Every `[this]` citation was opened and confirmed unless marked *unverified*, which means it was reported by a research agent in the session that wrote this note and not re-opened. No Mill source was read for this note: § 6 states only what follows from `MILL` and `JSN` for a channel, and § 7 lists what neither establishes.
+No experiment was run for this note. §§ 1–5 are read from `[this]` source. Every `[this]` citation was opened and confirmed unless marked *unverified*, which means a research agent reported it and it was not re-opened. No Mill source was read: § 6 states only what follows from `MILL` and `JSN` for a channel, and § 7 lists what neither establishes.
 
 ## 1. The event model
 
@@ -102,11 +102,9 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 - **Recorded events arrive late.** Information and markup recorded during a test travel in the test-completion event's `recordedEvents` (`EV/Event.scala` line 358), not as they happen.
 - **Filtering precedes reporters.** A `FilterReporter` in front of a reporter removes whole events (§ 3.2). `.planning/structured-test-reporting/runner-json/prototype-json-layout/06-filtered-fCJ.notes.md` shows `-fCJ` losing a test's outcome and duration.
 - **The summary is outside the reporter chain under `Framework`.** `done()` builds the `Summary` from `SummaryCounter` and returns the summary and reminder text as its result string (`TOOLS/Framework.scala` lines 790–812). `RunCompleted` carries the same `Summary` to reporters (line 794); the reminder text reaches no reporter.
-- **A run that starts and never ends.** An emitter attached to Mill's discovery runner sees `RunStarting` and nothing after it (`MILL` § 1.4, I-5).
+- **A run that never ends.** An emitter attached to Mill's discovery runner sees `RunStarting` and nothing after it (`MILL` § 1.4, I-5).
 
 ## 6. Mill: what the earlier notes mean for a channel
-
-Nothing here was re-read from Mill source.
 
 - **Telling workers apart.** Only a worker's working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3).
 - **Plugin code inside the worker.** The shim `testFramework` is the one place plugin code runs in the worker JVM before ScalaTest (`MILL` § 3, I-3). `MILL` examines it only for rewriting `-fJ`, not for capture or for opening a channel.
