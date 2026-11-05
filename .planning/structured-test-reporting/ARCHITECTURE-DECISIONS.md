@@ -31,33 +31,53 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## A `RunAborted` may carry an explicit reason, *process failed* or *not run*, beside the `Event`.
+## An aborted node may carry an explicit reason, *process failed* or *not run*, held in the structure, never in an `Event`.
 
-**Alternatives** Inferring the cause from a 3.2.19 `RunAborted`'s fields ties the consolidator and every JSON reader to free-text messages written for people, and leaves a run that never started with no event to infer from.
+**Alternatives** Inferring the cause from a 3.2.19 `RunAborted`'s fields ties the consolidator and every JSON reader to free-text messages written for people, and leaves a node that never started, or a run that never started, with no event to infer from.
 
-**Reasoning** The reason tells a dead process apart from an abort with any other cause in the JSON, and lets the consolidator report an absent file in the same shape as a run's closing event. Held beside the `Event`, as the structure is, it leaves reporters built against the 3.2.x API receiving the plain `RunAborted` (`ARCHITECTURE.md` § The compatibility boundary).
+**Reasoning** The reason tells a dead process apart from an abort with any other cause in the JSON, tells a node that never ran apart from one that started and failed, and lets the consolidator report an absent file in the same shape as a run's closing event. Held in the structure, it leaves reporters built against the 3.2.x API receiving the plain `RunAborted` or `SuiteAborted` (`ARCHITECTURE.md` § The compatibility boundary).
 
 **Costs** Every path that brings a `RunAborted` to the main process must carry or assign its reason, and reporters built against the 3.2.x API cannot see it.
 
-**Settled by** [What does a run leave on disk when it never reaches its end, and how does the consolidator classify it?](https://github.com/jamesgorman2/scalatest/issues/16).
+**Settled by**
+
+- [What does a run leave on disk when it never reaches its end, and how does the consolidator classify it?](https://github.com/jamesgorman2/scalatest/issues/16).
+- the user, in grilling on [Plan: structured JSON from `Runner`](https://github.com/jamesgorman2/scalatest/issues/18).
 
 ---
 
-## The Mill plugin, not ScalaTest, gives each test-worker JVM its own JSON file: it passes a relative `-fJ` path, which resolves inside each worker's own sandbox, and fails the build when the sandbox is off.
+## The Mill plugin fails the build for a selected module whose `testSandboxWorkingDir` is off.
 
 **Alternatives**
 
-- A shim framework: the plugin sets `testFramework` to its own class, which inside each worker rewrites `-fJ` to a name unique to that JVM and hands off to ScalaTest's `org.scalatest.tools.Framework`. It holds whatever the working directory, but it must be published as an artifact on every test module's classpath, and Metals and Bloop, which read `testFramework` through BSP, run through it too (`research/mill-test-worker-args.md` § 3, I-3).
-- Collecting or renaming files after the run gathers files that may already have overwritten one another, so it prevents no collision. A `testTask` override that collects after `super.testTask` never reaches its collection when tests fail (`research/mill-test-worker-args.md` § 3, I-4).
-- Giving each worker its own path through `testArgsDefault`, `forkArgs` or `forkEnv` cannot work: every worker of a command gets identical values, and Mill has no per-worker hook (`research/mill-test-worker-args.md` § 2.1, § 2.2).
+- Forcing the setting on cannot work: a user's override wins.
+- Running with the sandbox off lets the module's worker JVMs overwrite one file silently.
 
-**Reasoning** While `testSandboxWorkingDir` is on, Mill's default, each worker JVM of a command runs in its own `Task.dest[/<group>][/worker-<i>]/sandbox`, and Mill fails rather than start a second JVM in a folder already used in that command (`research/mill-test-worker-args.md` § 2.3, I-1). A relative path therefore gives one file per worker JVM, each a run. A user can still turn the sandbox off, through an override the plugin cannot defeat, so the plugin reads the setting and fails the build. A collision is never silent (`research/mill-test-worker-args.md` I-2).
+**Reasoning** Without the sandbox, the plugin's relative `-fJ` path no longer gives each worker JVM its own file (`ARCHITECTURE.md` § External systems, Mill), and failing the build is the only way the plugin keeps a collision from being silent.
 
 **Costs** A Mill user who turns off `testSandboxWorkingDir` cannot use the plugin's command.
 
 **Settled by** the user, without a sub-issue, in commit `df10bf6a4`.
 
-**See** `research/mill-test-worker-args.md` § Short answer, § 1.4, § 2.1 to § 2.3, § 3, § 4 and § 5 (I-1 to I-5).
+**See** `research/mill-test-worker-args.md` I-2.
+
+---
+
+## The Mill plugin, not ScalaTest, gives each test-worker JVM its own JSON file, by passing a relative `-fJ` path that resolves inside each worker's own sandbox.
+
+**Alternatives**
+
+- A shim `testFramework` that gives each worker a unique `-fJ` must ship on every test module's classpath, and Metals and Bloop run through it too.
+- Collecting or renaming files after the run cannot undo files that have already overwritten one another.
+- Per-worker values through `testArgsDefault`, `forkArgs` or `forkEnv` cannot exist: every worker gets identical values.
+
+**Reasoning** While `testSandboxWorkingDir` is on, each worker JVM of a command runs in its own sandbox, and Mill refuses to start a second JVM in one already used (`ARCHITECTURE.md` § External systems, Mill), so a relative path gives one file per worker JVM, each a run.
+
+**Costs** The plugin depends on Mill's sandbox layout under `Task.dest` to find each worker's file.
+
+**Settled by** the user, without a sub-issue, in commit `df10bf6a4`.
+
+**See** `research/mill-test-worker-args.md` § Short answer, § 1.4, § 2.1 to § 2.3, § 3 (I-3, I-4), § 4 and § 5 (I-1 to I-5).
 
 ---
 
@@ -65,7 +85,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** Each worker writing its own progress output through its task's loggers keeps sbt's log level on every line, but spreads one run's console output across processes, unlike the JVM's, and no worker holds the whole run for the progress summary.
 
-**Reasoning** Every envelope of the run already reaches the controller (`ARCHITECTURE.md` § Modules, envelope forwarding), so only the controller holds the whole run that the human-readable block and progress output's summary of the whole invocation need (`SPECIFICATION.md` § Human-readable output, § Progress output). Writing the console output there adds no traffic and makes Scala.js and Native output match the JVM's as far as the platform allows.
+**Reasoning** Every envelope of the run already reaches the controller (`ARCHITECTURE.md` § Modules, envelope forwarding), so only the controller holds the whole run that the human-readable block and progress output's summary of the whole run need (`SPECIFICATION.md` § Human-readable output, § Progress output). Writing the console output there adds no traffic and makes Scala.js and Native output match the JVM's as far as the platform allows.
 
 **Costs** Under sbt, where workers run most tasks, worker progress output reaches the console only when the controller can write, at its next task or at `done()`, which `SPECIFICATION.md` § Progress output's best effort on JS/Native allows.
 
@@ -96,7 +116,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- An ID for each use of the command, passed into every run, for example through `-D`, for the consolidator to filter on, puts a build-supplied identity back into the JSON, and every caller must mint and pass it.
+- An ID for each use of the command, passed into every run for the consolidator to filter on, puts a build-supplied identity back into the JSON.
 - Filtering by run start time depends on clocks, which differ across machines and CI caches.
 
 **Reasoning** Mill empties a task's `Task.dest`, and with it every worker sandbox inside it, before each run of the task, so the Mill plugin gets fresh files for each label, one per module, at no cost. The sbt recipe needs only one delete of each module's `-fJ` file before `test`. Each label's files then hold exactly the runs its caller just started, and a label with none appears with nothing under it (`ARCHITECTURE.md` § Multi-run consolidation executable).
@@ -111,8 +131,8 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- A new shared artifact that scalatest-core depends on adds a transitive dependency for every ScalaTest user, needs its own 2.11, Scala.js, Native and Scala 3 projects, and makes its types a published contract, against `SPECIFICATION-DECISIONS.md` § The test structure gets no public API, not even an additive one.
-- Shared sources compiled into both core and a core-independent consolidator fit no build pattern, since every Scala.js and Native copy passes through the source generators' line filter, and would ship the same classes in two artifacts.
+- A new shared artifact under scalatest-core adds a dependency for every ScalaTest user and makes its types a published contract.
+- Shared sources compiled into both core and a core-independent consolidator fit no build pattern and ship the same classes in two artifacts.
 
 **Reasoning** The human renderer runs wherever a run runs, so its code is on every run's classpath whatever the choice; internal to core is the only option that adds no runtime dependency and no public type. The consolidator's input is ScalaTest's JSON, so its dependency on core is a convenience, not a coupling third parties inherit.
 

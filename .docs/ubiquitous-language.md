@@ -8,9 +8,9 @@ This repo is a fork of ScalaTest that keeps test output readable, by people and 
 One ScalaTest execution, from start to completion: one `Runner` run, or everything one `Framework` runner executes before its `done()`. On Scala.js and Native, one run spans a controller process and the worker processes that serve it.
 _Avoid_: Build, test session, invocation
 
-**Run ID**:
-The identifier that distinguishes one run's JSON from every other run's, including runs of the same module, platform or process.
-_Avoid_: Run stamp, session ID
+**Execution mode**:
+How a run schedules its suites and tests: *sequential*, one after another on one thread, or *concurrent*, on several threads at once; under `Runner`, a concurrent run may also sort its events by suite.
+_Avoid_: Parallelism level, run mode
 
 **Module**:
 A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM. It is not a unit of consolidation; the Mill plugin and the sbt recipe give each module one test run label by default.
@@ -26,7 +26,23 @@ _Avoid_: Test tree, hierarchy, nesting
 A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, a test run label is also a node.
 _Avoid_: Element, item, entry, test case
 
+**Outcome**:
+How a node ended. Succeeded, failed, cancelled and ignored belong to tests alone; pending belongs to tests and scopes; aborted may belong to any node; stopped belongs to the run node alone.
+_Avoid_: Result, status, verdict
+
+**Declared order**:
+The order in which a sequential run reports a node's children, except that the tests of a suite mixing in `RandomTestOrder` keep the order in which the suite registers them. For top-level suites that never start, it is the order in which the run would have started them.
+_Avoid_: Source order
+
 ## Output
+
+**`J` reporter**:
+An `-o`, `-e` or `-f` reporter whose configuration characters include `J`, so that it writes JSON in place of text.
+_Avoid_: JSON lines reporter
+
+**Event-filter characters**:
+The reporter configuration characters `N C X E H L O P Q R M`, each of which drops one kind of event from what the reporter writes.
+_Avoid_: Filter flags, suppression characters
 
 **Test output**:
 The stdout and stderr written on a thread while one of a run's nodes, or the run's own code, is running on it.
@@ -35,7 +51,7 @@ _Avoid_: Logs, console output, captured output
 ## Consolidation
 
 **Consolidation**:
-Bringing things together into a single place
+Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
 **Test run label**:
