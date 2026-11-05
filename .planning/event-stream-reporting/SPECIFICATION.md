@@ -12,7 +12,7 @@ One Mill command can start many runs: several test-worker JVMs per module, sever
 
 ## Spec documents
 
-- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, the existing ways events leave a process, where a reporter attaches, what attributing test output needs, and what is and is not known about a channel out of a Mill test-worker JVM.
+- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, what attributing test output needs, and what is known about a channel out of a Mill test-worker JVM.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
