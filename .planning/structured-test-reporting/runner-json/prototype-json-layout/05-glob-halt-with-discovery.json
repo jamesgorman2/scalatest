@@ -1,0 +1,109 @@
+{
+  "kind": "run",
+  "scalatestVersion": "3.2.19-fork.1",
+  "filterCharacters": "",
+  "configMap": {},
+  "discovery": {
+    "startedAt": 1762600000005,
+    "duration": 30
+  },
+  "outcome": "aborted",
+  "message": "Exception encountered when attempting to run a suite with class name: q.D",
+  "throwable": {
+    "id": 1,
+    "className": "java.lang.IllegalStateException",
+    "message": "database not available",
+    "stackTrace": [
+      {
+        "className": "q.D",
+        "methodName": "<init>",
+        "fileName": "D.scala",
+        "lineNumber": 6
+      },
+      {
+        "className": "jdk.internal.reflect.NativeConstructorAccessorImpl",
+        "methodName": "newInstance0",
+        "isNative": true
+      },
+      {
+        "className": "jdk.internal.reflect.NativeConstructorAccessorImpl",
+        "methodName": "newInstance",
+        "fileName": "NativeConstructorAccessorImpl.java",
+        "lineNumber": 77
+      },
+      {
+        "className": "java.lang.reflect.Constructor",
+        "methodName": "newInstance",
+        "fileName": "Constructor.java",
+        "lineNumber": 499
+      },
+      {
+        "className": "org.scalatest.tools.Runner$",
+        "methodName": "doRunRunRunDaDoRunRun",
+        "fileName": "Runner.scala",
+        "lineNumber": 1020
+      }
+    ]
+  },
+  "endedAt": 1762600000052,
+  "contents": [
+    {
+      "kind": "suite",
+      "name": "D",
+      "suiteId": "q.D",
+      "location": {
+        "className": "q.D"
+      },
+      "outcome": "aborted",
+      "message": "Exception encountered when attempting to run a suite with class name: q.D",
+      "throwable": {
+        "id": 1,
+        "className": "java.lang.IllegalStateException",
+        "message": "database not available",
+        "stackTrace": [
+          {
+            "className": "q.D",
+            "methodName": "<init>",
+            "fileName": "D.scala",
+            "lineNumber": 6
+          },
+          {
+            "className": "jdk.internal.reflect.NativeConstructorAccessorImpl",
+            "methodName": "newInstance0",
+            "isNative": true
+          },
+          {
+            "className": "jdk.internal.reflect.NativeConstructorAccessorImpl",
+            "methodName": "newInstance",
+            "fileName": "NativeConstructorAccessorImpl.java",
+            "lineNumber": 77
+          },
+          {
+            "className": "java.lang.reflect.Constructor",
+            "methodName": "newInstance",
+            "fileName": "Constructor.java",
+            "lineNumber": 499
+          },
+          {
+            "className": "org.scalatest.tools.Runner$",
+            "methodName": "doRunRunRunDaDoRunRun",
+            "fileName": "Runner.scala",
+            "lineNumber": 1020
+          }
+        ]
+      },
+      "contents": []
+    },
+    {
+      "kind": "suite",
+      "name": "E",
+      "suiteId": "q.E",
+      "location": {
+        "className": "q.E"
+      },
+      "outcome": "aborted",
+      "reason": "notRun",
+      "contents": []
+    }
+  ]
+}
