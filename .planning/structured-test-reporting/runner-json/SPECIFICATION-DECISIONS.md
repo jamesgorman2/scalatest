@@ -11,7 +11,11 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** A tool needs the text the user wrote, to match a node to its source, and the text ScalaTest prints, to render a node as 3.2.19 would; together they reconstruct any joined name, so neither is derived from the other and nothing is stored twice.
 
-**Costs** No 3.2.19 event carries the source text, so `Engine` must supply it through the envelope; a suite not built on `Engine` falls back to the event's text, so a node's name means slightly different things by suite kind; and a reader wanting ScalaTest's test name must rebuild it.
+**Costs**
+
+- No 3.2.19 event carries the source text, so `Engine` must supply it through the envelope.
+- A suite not built on `Engine` falls back to the event's text, so a node's name means slightly different things by suite kind.
+- A reader wanting ScalaTest's test name must rebuild it.
 
 **Settled by** [How is a run's test structure laid out as JSON?](https://github.com/jamesgorman2/scalatest/issues/19).
 
@@ -62,7 +66,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** Under `ParallelTestExecution`, ScalaTest runs each test in its own `DistributedTestRunnerSuite`, so that suite's `SuiteAborted` reports a failure of that one test outside its body, as from a throwing `beforeEach`; the test is the node that failed.
 
-**Costs** The test's outcome comes from a suite event, so it has no `TestStarting` data, and the run's summary counts it as an aborted suite while the test structure shows an aborted test.
+**Costs** The test's outcome comes from a suite event, so it has no `TestStarting` data. The run's summary counts it as an aborted suite, while the test structure shows an aborted test.
 
 **Settled by** the user, in grilling on [Plan: structured JSON from `Runner`](https://github.com/jamesgorman2/scalatest/issues/18).
 
