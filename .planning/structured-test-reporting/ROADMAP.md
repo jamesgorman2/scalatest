@@ -2,37 +2,6 @@
 
 Features of the epic [Structured test reporting](SPECIFICATION.md), in intended implementation order: the JVM `Runner`, then the JVM `Framework`, then JVM test output capture, then consolidation and build integration for JVM modules, then Scala.js and Scala Native. Spec document paths are relative to `.planning/structured-test-reporting/`; code paths are relative to the repo root. `SPECIFICATION.md` bullets carry no IDs, except R-073 (§ Multi-run consolidation plugin), so the rest are cited by section and a short quotation. "Review of #N" means the review comment on that closed design issue; "#N question" means the question of an issue closed without an answer.
 
-## 1. Structured JSON from `Runner`
-
-Under `Runner` on the JVM, `-fJ`, `-oJ` and `-eJ` write one JSON object per run, at the end of the run, holding the run's whole test structure in every execution mode: every node, its result and duration, declared order, and `info`, `alert`, `note` and `markup` on the node that emitted them. Existing reporters, `-C` included, receive exactly what 3.2.19 sends them.
-
-- Structure wrappers on every path `Runner` takes that builds `Args`; node IDs; declared positions; the run node and its wrapper.
-- Envelope dispatch ahead of `SuiteSortingReporter` and `TestSortingReporter`.
-- Tree assembly, without open-node tracking (feature 5).
-- The JSON writer's end-of-run write, replacing the file atomically, and the first version of the documented format.
-
-Enables:
-
-- `SPECIFICATION.md` § Scope (`Runner` launch path; JVM platforms), § Constraints § Compatibility with ScalaTest 3.2.x (MiMa; "the same sequence of event types and field values"; "every execution mode"; "Failure messages and throwables are preserved exactly"), § Constraints § IntelliJ (forked mode), § Test structure ("attach to the node that emitted them"; "first identifiable ancestor"; "every node has a duration"; "nodes that share a name are never consolidated"; "A suite that aborts", for `Runner`), § JSON output (all but the test output and "reports run aborted" bullets)
-- `ARCHITECTURE.md` § Modules § ScalaTest core (structure wrapper, except thread reporting; envelope dispatch; tree assembly, except open-node tracking; JSON writer, end-of-run write for `-fJ`, `-oJ` and `-eJ`), § The compatibility boundary, § Data flow (the in-process path), § External systems (IntelliJ forked mode)
-
-Settles:
-
-- The JSON format's compatibility promise and how a reader learns its version ([What compatibility does the JSON format promise, and how does a reader learn its version?](https://github.com/jamesgorman2/scalatest/issues/13) question; `SPECIFICATION.md` § JSON output is silent).
-- What filter characters (`N`, `H`, `P`, `Q` and others) do on a `J` spelling, against § JSON output's "nothing collapsed" ([How is the directory argument spelled, and what do filter characters do on a J spelling?](https://github.com/jamesgorman2/scalatest/issues/14) question, second half).
-- How a throwable's class, cause chain and location survive the JSON (review of #3).
-- Whether the object carries a run ID, and who mints it (`SPECIFICATION-DECISIONS.md` § Every JSON object carries its run's run ID, not only a file's first object predates the single-object JSON; `ARCHITECTURE.md` names no run ID).
-- Emission-point wrapping coverage (review of #1).
-- How a suite constructor's failure under `Runner` becomes an aborted suite node, and which top-level suites are known when discovery fails (`SPECIFICATION.md` § Test structure, "A suite that aborts").
-
-Risks:
-
-- `ARCHITECTURE-DECISIONS.md` § Structure is attached where each event is emitted, not reconstructed after the merge (Costs: every path that builds `Args`)
-- `ARCHITECTURE.md` § The compatibility boundary (no second envelope; a suite's own `run` or `runNestedSuites` bypassing the wrappers)
-- `SPECIFICATION.md` § Constraints § IntelliJ (forked-mode ordering needs)
-- 3.2.19's `J` writes one JSON line per event; consumers of that format break, which § Constraints allows ("human and JSON output changes")
-- `Runner` constructs every suite inside the run's `try` and before `RunStarting`, discovered suites in `DiscoverySuite`'s constructor (`jvm/core/src/main/scala/org/scalatest/tools/Runner.scala` lines 1119–1143 and 1190, `RunStarting` at line 1235; `jvm/core/src/main/scala/org/scalatest/tools/DiscoverySuite.scala` lines 36–38), so a throwing constructor ends the run in `RunAborted` (`Runner.scala` lines 1324–1332) with no `SuiteAborted`, possibly before `RunStarting`
-
 ## 2. Results block from `Runner`
 
 Under `Runner`, every human-readable `-o`, `-e` and `-f` reporter other than `-oDU` prints one human-readable block at the end of the run, rendered from tree assembly:
