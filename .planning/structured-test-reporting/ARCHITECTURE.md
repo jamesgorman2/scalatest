@@ -42,7 +42,7 @@ Three deployable units, each built and released from this repo.
   - On Scala.js and Native, each worker sends it to the controller through `notifyServer`.
   - Under sbt's forked mode, the forked JVM sends it over the socket that today carries its `Event`s to the runner in sbt's JVM. That runner already owns every `-f`, `-u`, `-h` and `-C` reporter; the forked JVM keeps only `-o`, written through its task loggers.
   - The main process renders the human-readable block and writes the JSON once every process's envelopes have arrived, or once `done()` gives up waiting for them. What marks the end of a process's envelopes depends on the path:
-    - sbt's forked mode: the forked JVM closes its socket, and `done()` waits for the thread reading that socket until the last envelope has arrived. Today's `ScalaTestRunner.done` in `jvm/core/src/main/scala/org/scalatest/tools/Framework.scala` gives up that wait after 15 s. Whatever the fork had not yet reported finished is then unfinished, so the run ends in `RunAborted` (`SPECIFICATION.md` § Test structure) even if the fork was only slow. Envelopes arriving after `done()` returns are dropped. A failed read on that socket means the forked JVM is gone; `Skeleton.React.tryReact` in the same file then emits `RunAborted`, as it does today.
+    - sbt's forked mode: the forked JVM closes its socket, and `done()` waits for the thread reading that socket until the last envelope has arrived. Today's `ScalaTestRunner.done` in `jvm/core/src/main/scala/org/scalatest/tools/Framework.scala` gives up that wait after 15 s. Whatever the fork had not yet reported finished is then unfinished, so the run ends in `RunAborted` (`SPECIFICATION.md` § Test structure) even if the fork was only slow. Envelopes arriving after `done()` returns are dropped. A failed read on that socket means the forked JVM is gone; `Skeleton.React.tryReact` in the same file then emits `RunAborted`, as it does today, with reason *process failed* (§ Tree assembly).
     - Scala.js and Native: the adapter delivers each worker's messages before the controller's `done` runs, which the adapters' source implies but does not document (`research/js-native-structure-and-capture.md` § 2.2).
     - `Runner` and in-process runs: nothing is forwarded.
   - On Native, every `send` ScalaTest makes, of events, logger lines and envelopes, goes through one lock per process, because the adapter's own `send` takes none (`research/js-native-structure-and-capture.md` § 2.2).
@@ -50,13 +50,32 @@ Three deployable units, each built and released from this repo.
   - The main process writes it, because only that process receives every envelope of the run, from every process the object must cover.
   - `-fJ` writes the run's one JSON file at its path, with `-fJ`'s 3.2.19 meaning. `-oJ` and `-eJ` write the object through the channel that carries the human-readable block (§ Human renderer).
   - ScalaTest does not name the file and does not keep apart runs given the same path: their caller does (§ Mill plugin). On Scala.js the file is written through Node's `fs`; where `fs` cannot be loaded, as in an ES module where `process.getBuiltinModule` is absent (`research/js-native-structure-and-capture.md` § 2.3), `-fJ` writes no file (`SPECIFICATION-DECISIONS.md` § Where a Scala.js run cannot write files, `-fJ` is a configuration error and `-oJ` is the route for JSON).
-  - The writer leaves no file from Mill's discovery runner, which never calls `done()` (§ External systems; `research/mill-test-worker-args.md` § 1.4, I-5).
+  - Every run with a `-fJ` reporter that can write its file leaves a file once it starts executing or reaches its end:
+    - A run's *first execution* is the first task `execute` in its main process, or the first envelope of a node other than the run node to reach that process, whichever comes first. Constructing the runner and calling `tasks` do not count.
+    - At the first execution, the main process writes a *marker*: a valid object for a run that ended in `RunAborted` with reason *process failed* (§ Tree assembly), listing the top-level suites known at that point. The marker carries structure only, never results.
+    - When the main process learns of another top-level suite before the end, it rewrites the marker to include it. This happens wherever tasks are created after the first execution:
+      - Mill's queue path, where each worker JVM claims classes one at a time (`research/mill-test-worker-args.md` § 1.2).
+      - sbt's forked mode, when a later `testGrouping` group's forked JVM creates its tasks.
+
+      A Scala.js or Native controller under sbt receives all of its run's tasks in one `tasks` call, before any executes.
+    - A run whose end is reached — `done()` under the `Framework`, the end of the run under `Runner` — always writes its full object, whether or not it wrote a marker. Every write replaces the file atomically, so a reader never sees a partial object.
+    - A *shutdown hook*, registered at the first execution and deregistered at the end, overwrites the marker on a soft death with the full tree: every known node, with results where they exist, ending in `RunAborted` with reason *process failed*. Its code is shared across platforms; each runtime supplies the exit handler:
+      - JVM: a `Runtime.addShutdownHook` thread, run on `System.exit` and SIGTERM.
+      - Scala Native: a `Runtime.addShutdownHook` thread, run at `exit` and on SIGINT and SIGTERM (Scala Native `v0.5.12` `javalib/src/main/scala/java/lang/Runtime.scala`).
+      - Scala.js on Node: a `process.on('exit')` listener, which fires on `process.exit()` or when the event loop empties, not on a signal, and may only do synchronous work, so it writes with synchronous `fs` (https://nodejs.org/api/process.html#event-exit: "Listener functions must only perform synchronous operations"). Scala.js `v1.20.2` implements neither `Runtime.addShutdownHook` nor `System.exit`.
+    - A shutdown hook never writes over a file that another run has written since its own run's last write.
+    - A run that dies leaves, on every platform, the marker, or the hook's tree where the hook fired. A hard death (SIGKILL, OOM kill, crash), and on Node any signal, leaves the marker.
+  - The writer leaves no file from Mill's discovery runner, which never executes and never reaches `done()` (§ External systems; `research/mill-test-worker-args.md` § 1.4, I-5).
 - **Tree assembly** — assembles nodes into the test structure, restoring declared order, for the human renderer, the JSON writer and the consolidator.
   - Only its open-node tracking runs in every run, whatever reporters are configured: in the main process, and in each sbt forked JVM for that JVM's own runner. Full assembly runs only for the human-readable block, the JSON writer and the consolidator.
-  - It gives the outcome aborted to every node still open when a suite containing it ends, when its run ends, or when its input ends: in a live run, at the run's last envelope or once `done()` gives up waiting for it (`SPECIFICATION-DECISIONS.md` § A node left unfinished has outcome aborted, not a new outcome).
-  - When a run finishes, it reports whether any node is unfinished: still open, with no suite containing it ended. If one is, and no closing run event (`RunCompleted`, `RunAborted` or `RunStopped`) has already passed the run node's wrapper, as the lost-fork `RunAborted` does (§ Envelope forwarding), `Runner`, the JVM `Framework`'s runner or `MasterRunner` emits `RunAborted` in place of `RunCompleted`, through the run node's wrapper, so every reporter and the JSON receive it (`SPECIFICATION.md` § Test structure).
+  - A top-level suite becomes a node when `Runner` discovers it, or when the `tasks` of the JVM `Framework`'s runner or of `MasterRunner` creates its task, in whichever process that is; envelope forwarding brings it to the main process.
+  - It gives the outcome aborted to every node the run was to execute that has no result, whether open or never started, but never to a node a filter excluded. It does so when a suite containing the node ends, when its run ends, or when its input ends; in a live run, at the run's last envelope or once `done()` gives up waiting for it (`SPECIFICATION-DECISIONS.md` § A node left unfinished has outcome aborted, not a new outcome).
+  - When a run finishes, it reports whether any node is unfinished: still open, with no suite containing it ended. If one is, and no closing run event (`RunCompleted`, `RunAborted` or `RunStopped`) has already passed the run node's wrapper, as the lost-fork `RunAborted` does (§ Envelope forwarding), `Runner`, the JVM `Framework`'s runner or `MasterRunner` emits `RunAborted` with reason *process failed* in place of `RunCompleted`, through the run node's wrapper, so every reporter and the JSON receive it (`SPECIFICATION.md` § Test structure).
+  - A `RunAborted` may carry a reason, held beside the `Event` as the structure is, never in it, so reporters built against the 3.2.x API see the plain `RunAborted`:
+    - *process failed*: set by ScalaTest when a process of the run failed or the run gave up waiting for one;
+    - *not run*: set only by the consolidator (§ Multi-run consolidation executable).
   - In an sbt forked JVM, `ForkMain`'s shutdown hook runs that JVM's own runner's `done()` (§ External systems), which applies the same rule to the nodes open in that JVM: it emits `RunAborted` to its own `-o` and over the socket, where, as today, `runTerminated` suppresses the sbt-side `RunCompleted`.
-  - The fork's run-level events are not forwarded into the run's JSON as envelopes: as today, the sbt-side runner drops the fork's `RunStarting` and `RunCompleted` and dispatches its `RunAborted` and `RunStopped` through the run node's wrapper, so the JSON holds that `RunAborted`.
+  - The fork's run-level events are not forwarded into the run's JSON as envelopes: as today, the sbt-side runner drops the fork's `RunStarting` and `RunCompleted` and dispatches its `RunAborted` and `RunStopped` through the run node's wrapper, so the JSON holds that `RunAborted`. A fork's `RunAborted` for unfinished nodes is recorded with reason *process failed*.
 - **Human renderer** — writes `SPECIFICATION.md` § Human-readable output and § Progress output for each human-readable reporter, with that reporter's own configuration.
   - Assumption: `SPECIFICATION.md` § Progress output's "may not be run with HTML, XML or JSON" applies per reporter, not per invocation, so one run may have a `-o`, `-e` or `-f` writing progress output and a `-fJ` writing JSON, as every run the Mill plugin and the sbt recipe start does.
   - Progress output is written to `Runner`'s stdout and stderr, or, under the JVM `Framework`, through the loggers of the task that produced it, in the process running that task. A `-f` reporter's progress output and block go to its file, from the process that owns the reporter (§ Envelope forwarding).
@@ -75,8 +94,10 @@ Three deployable units, each built and released from this repo.
 
 A standalone executable, the *consolidator*, that writes the outputs of `SPECIFICATION.md` § Multi-run consolidation plugin. It rebuilds `Event`s from ScalaTest's JSON and renders with scalatest-core's internal tree assembly and human renderer.
 
-- Its caller gives it one or more test run labels, unique within the consolidation, each with a list of JSON files. It merges each label's files under that label, and does not collapse suites or tests that share a name across files.
-- It classifies each test file and the consolidation's success as `SPECIFICATION.md` § Multi-run consolidation plugin requires.
+- Its caller gives it one or more test run labels, unique within the consolidation, each with a list of JSON files. It merges each listed file's content under its label's node, keeping each file's closing run event and its reason, and does not collapse suites or tests that share a name across files. Whether a run is itself a rendered node is left to the features.
+- A listed file that is absent becomes an entry under its label holding a `RunAborted` with reason *not run* and no nodes.
+- A label with no files appears as a label node with nothing under it.
+- It classifies nothing: an absent file, a process that failed and failed tests appear only as the `RunAborted` reason and node outcomes. A label shows the results of all its files, so one file that failed never hides those that succeeded.
 - Neither it nor ScalaTest tells one use of the caller's command from another: it reads every run in the files it is given, so the caller gives it only files from the runs the caller has just started. The Mill plugin gives it one label per selected module, covering that module's files under the command's `Task.dest` (§ Mill plugin); the sbt recipe gives one label per module, covering that module's own `-fJ` path, and deletes the file before `test`.
 
 ### Mill plugin
@@ -85,7 +106,7 @@ A standalone executable, the *consolidator*, that writes the outputs of `SPECIFI
 
 - Its command passes each selected JVM module's forked test command a relative `-fJ` path, which each test-worker JVM resolves against its own sandbox (§ External systems, Mill), so each run writes its own file.
 - It fails the build for any selected JVM module whose `testSandboxWorkingDir` is off, before running its tests, because its worker JVMs would then share one working directory and overwrite one file. It cannot force the setting on, because a user's override wins (`research/mill-test-worker-args.md` I-2).
-- It gives the consolidator one test run label per selected module, named for the module's path in the build, which Mill keeps unique, so no two labels collide. Each label covers all the JSON files found under that module's sandboxes in the command's `Task.dest`, one per worker JVM.
+- It gives the consolidator one test run label per selected module, named for the module's path in the build, which Mill keeps unique, so no two labels collide. Each label covers all the JSON files found under that module's sandboxes in the command's `Task.dest`: one for each worker JVM that reached its first execution or its `done()` (§ ScalaTest core, JSON writer).
 
 ## The compatibility boundary
 
@@ -126,12 +147,12 @@ flowchart LR
   HP -- "Framework: progress output still held at done()" --> Q
   TA --> J[JSON writer]
   J -- "-oJ, -eJ" --> Q
-  J -- "-fJ" --> F[("One JSON file per run, at -fJ's path")]
+  J -- "-fJ: marker at first execution, replaced at the end or by the shutdown hook" --> F[("One JSON file per run, at -fJ's path")]
   F --> C[Consolidator]
   B["Mill plugin, sbt recipe, other callers"] -- "each test run label and its JSON files" --> C
   C -. uses .-> TA
   C -. uses .-> H
-  C --> O["Consolidated JSON, human-readable and JUnit XML"]
+  C --> O["Consolidated JSON, human-readable and JUnit XML, each file's content under its test run label's node"]
 ```
 
 *Existing reporters receive bare events after any sorting; structure-aware reporters receive envelopes before it. Each run's JSON and human-readable block come from its main process.*
@@ -139,7 +160,8 @@ flowchart LR
 - On Scala.js and Native, bare events go from the wrappers, through any `TestSortingReporter` an async suite installs, to the one `-o` reporter `TaskRunner` puts in `Args`.
 - Failure path: a worker or forked JVM that dies leaves its unfinished nodes open.
   - Where `done()` still runs — after a Native worker dies, an sbt forked JVM calls `System.exit` or is lost, or the wait on the fork socket gives up — the run ends in `RunAborted` (`SPECIFICATION.md` § Test structure); after `System.exit`, the forked JVM's own `done()` emits it (§ External systems; § Modules, envelope forwarding and tree assembly).
-  - Where `done()` never runs — after a Scala.js worker dies, or when the run's main process dies or hangs, as a Mill test-worker JVM can — the run writes no human-readable block, and its JSON writer never writes the run's full object.
+  - Where `done()` never runs — after a Scala.js worker dies, or when the run's main process dies or hangs, as a Mill test-worker JVM can — the run writes no human-readable block. Its JSON file is the marker, or the shutdown hook's tree where the hook fired (§ Modules, JSON writer).
+  - Where the caller clears a run's `-fJ` path before the run, as the Mill plugin and the sbt recipe do (§ Modules, multi-run consolidation executable), an absent file therefore means no run there reached its first execution or its end.
 
 ## External systems
 
