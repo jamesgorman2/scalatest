@@ -1,0 +1,149 @@
+{
+  "kind": "run",
+  "scalatestVersion": "3.2.19-fork.1",
+  "filterCharacters": "",
+  "testCount": 4,
+  "configMap": {},
+  "startedAt": 1762500000000,
+  "endedAt": 1762500000120,
+  "duration": 120,
+  "summary": {
+    "testsSucceededCount": 3,
+    "testsFailedCount": 0,
+    "testsIgnoredCount": 0,
+    "testsPendingCount": 0,
+    "testsCanceledCount": 0,
+    "suitesCompletedCount": 1,
+    "suitesAbortedCount": 1,
+    "scopesPendingCount": 0
+  },
+  "contents": [
+    {
+      "kind": "suite",
+      "name": "PSpec",
+      "suiteId": "p.PSpec",
+      "location": {
+        "className": "p.PSpec",
+        "filePath": "src/test/scala/p/PSpec.scala"
+      },
+      "startedAt": 1762500000010,
+      "endedAt": 1762500000115,
+      "duration": 105,
+      "threadName": "pool-1-thread-1",
+      "contents": [
+        {
+          "kind": "scope",
+          "name": "s",
+          "label": "s",
+          "location": {
+            "filePath": "src/test/scala/p/PSpec.scala",
+            "lineNumber": 14
+          },
+          "startedAt": 1762500000015,
+          "endedAt": 1762500000085,
+          "duration": 70,
+          "contents": [
+            {
+              "kind": "test",
+              "name": "t1",
+              "label": "- t1",
+              "location": {
+                "filePath": "src/test/scala/p/PSpec.scala",
+                "lineNumber": 15
+              },
+              "outcome": "succeeded",
+              "startedAt": 1762500000020,
+              "endedAt": 1762500000060,
+              "duration": 40,
+              "threadName": "pool-1-thread-2",
+              "contents": []
+            },
+            {
+              "kind": "test",
+              "name": "t2",
+              "label": "- t2",
+              "location": {
+                "filePath": "src/test/scala/p/PSpec.scala",
+                "lineNumber": 16
+              },
+              "outcome": "succeeded",
+              "startedAt": 1762500000022,
+              "endedAt": 1762500000080,
+              "duration": 58,
+              "threadName": "pool-1-thread-3",
+              "contents": [
+                {
+                  "kind": "info",
+                  "message": "waiting on the other worker",
+                  "at": 1762500000050,
+                  "location": {
+                    "filePath": "src/test/scala/p/PSpec.scala",
+                    "lineNumber": 17
+                  },
+                  "threadName": "pool-1-thread-4"
+                }
+              ]
+            },
+            {
+              "kind": "test",
+              "name": "t3",
+              "label": "- t3",
+              "location": {
+                "filePath": "src/test/scala/p/PSpec.scala",
+                "lineNumber": 19
+              },
+              "outcome": "succeeded",
+              "startedAt": 1762500000025,
+              "endedAt": 1762500000055,
+              "duration": 30,
+              "threadName": "pool-1-thread-4",
+              "contents": []
+            }
+          ]
+        },
+        {
+          "kind": "scope",
+          "name": "s2",
+          "label": "s2",
+          "location": {
+            "filePath": "src/test/scala/p/PSpec.scala",
+            "lineNumber": 22
+          },
+          "startedAt": 1762500000086,
+          "endedAt": 1762500000110,
+          "duration": 24,
+          "contents": [
+            {
+              "kind": "test",
+              "name": "t",
+              "label": "- t",
+              "location": {
+                "filePath": "src/test/scala/p/PSpec.scala",
+                "lineNumber": 23
+              },
+              "outcome": "aborted",
+              "message": "beforeEach failed: connection refused",
+              "throwable": {
+                "id": 1,
+                "className": "java.lang.RuntimeException",
+                "message": "beforeEach failed: connection refused",
+                "stackTrace": [
+                  { "className": "p.PSpec", "methodName": "beforeEach", "fileName": "PSpec.scala", "lineNumber": 9 },
+                  { "className": "org.scalatest.BeforeAndAfterEach", "methodName": "runTest", "fileName": "BeforeAndAfterEach.scala", "lineNumber": 247 },
+                  { "className": "org.scalatest.BeforeAndAfterEach", "methodName": "runTest$", "fileName": "BeforeAndAfterEach.scala", "lineNumber": 237 },
+                  { "className": "org.scalatest.ParallelTestExecution", "methodName": "runTests", "fileName": "ParallelTestExecution.scala", "lineNumber": 124 },
+                  { "className": "org.scalatest.tools.DistributedTestRunnerSuite", "methodName": "run", "fileName": "DistributedTestRunnerSuite.scala", "lineNumber": 41 },
+                  { "className": "java.util.concurrent.ThreadPoolExecutor", "methodName": "runWorker", "fileName": "ThreadPoolExecutor.java", "lineNumber": 1144 },
+                  { "className": "java.lang.Thread", "methodName": "run", "fileName": "Thread.java", "lineNumber": 833 }
+                ]
+              },
+              "endedAt": 1762500000100,
+              "threadName": "pool-1-thread-2",
+              "contents": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
