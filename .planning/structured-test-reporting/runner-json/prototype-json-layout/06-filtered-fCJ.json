@@ -1,0 +1,138 @@
+{
+  "kind": "run",
+  "scalatestVersion": "3.2.19-fork.1",
+  "filterCharacters": "C",
+  "testCount": 3,
+  "configMap": {},
+  "startedAt": 1762300000000,
+  "endedAt": 1762300000412,
+  "duration": 412,
+  "summary": {
+    "testsSucceededCount": 1,
+    "testsFailedCount": 2,
+    "testsIgnoredCount": 0,
+    "testsPendingCount": 0,
+    "testsCanceledCount": 0,
+    "suitesCompletedCount": 1,
+    "suitesAbortedCount": 0,
+    "scopesPendingCount": 0
+  },
+  "contents": [
+    {
+      "kind": "suite",
+      "name": "ASpec",
+      "suiteId": "p.ASpec",
+      "location": {
+        "className": "p.ASpec",
+        "filePath": "src/test/scala/p/ASpec.scala"
+      },
+      "startedAt": 1762300000010,
+      "endedAt": 1762300000390,
+      "duration": 380,
+      "threadName": "main",
+      "contents": [
+        {
+          "kind": "scope",
+          "name": "s",
+          "label": "s",
+          "location": {
+            "filePath": "src/test/scala/p/ASpec.scala",
+            "lineNumber": 5
+          },
+          "startedAt": 1762300000015,
+          "endedAt": 1762300000375,
+          "duration": 360,
+          "contents": [
+            {
+              "kind": "test",
+              "name": "t1",
+              "label": "- t1",
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 6
+              },
+              "startedAt": 1762300000020,
+              "threadName": "main",
+              "contents": [],
+              "output": {
+                "stderr": "...",
+                "stdout": "..."
+              }
+            },
+            {
+              "kind": "test",
+              "name": "t2",
+              "label": "- t2",
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 8
+              },
+              "outcome": "failed",
+              "message": "1 did not equal 2",
+              "throwable": {
+                "id": 1,
+                "className": "org.scalatest.exceptions.TestFailedException",
+                "message": "1 did not equal 2",
+                "location": {
+                  "filePath": "src/test/scala/p/ASpec.scala",
+                  "lineNumber": 9
+                }
+              },
+              "startedAt": 1762300000070,
+              "endedAt": 1762300000370,
+              "duration": 300,
+              "threadName": "main",
+              "contents": []
+            },
+            {
+              "kind": "test",
+              "name": "t3",
+              "label": "- t3",
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 11
+              },
+              "outcome": "failed",
+              "message": "could not load fixture",
+              "throwable": {
+                "id": 1,
+                "className": "java.lang.IllegalStateException",
+                "message": "could not load fixture",
+                "stackTrace": [
+                  { "className": "p.Fixtures$", "methodName": "load", "fileName": "Fixtures.scala", "lineNumber": 14 },
+                  { "className": "p.ASpec", "methodName": "$anonfun$new$3", "fileName": "ASpec.scala", "lineNumber": 12 },
+                  { "className": "org.scalatest.Transformer", "methodName": "apply", "fileName": "Transformer.scala", "lineNumber": 22 }
+                ],
+                "cause": {
+                  "id": 2,
+                  "className": "java.io.IOException",
+                  "message": "fixture.json: no such file",
+                  "stackTrace": [
+                    { "className": "java.io.FileInputStream", "methodName": "open0", "isNative": true },
+                    { "className": "java.io.FileInputStream", "methodName": "open", "fileName": "FileInputStream.java", "lineNumber": 216 },
+                    { "className": "p.Fixtures$", "methodName": "load", "fileName": "Fixtures.scala", "lineNumber": 13 }
+                  ],
+                  "suppressed": [
+                    {
+                      "id": 3,
+                      "className": "java.lang.RuntimeException",
+                      "stackTrace": [
+                        { "className": "p.Fixtures$", "methodName": "close", "fileName": "Fixtures.scala", "lineNumber": 20 }
+                      ],
+                      "cause": { "ref": 2 }
+                    }
+                  ]
+                }
+              },
+              "startedAt": 1762300000371,
+              "endedAt": 1762300000380,
+              "duration": 9,
+              "threadName": "main",
+              "contents": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

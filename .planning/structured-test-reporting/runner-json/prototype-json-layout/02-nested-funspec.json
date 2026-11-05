@@ -1,0 +1,227 @@
+{
+  "kind": "run",
+  "scalatestVersion": "3.2.19-fork.1",
+  "filterCharacters": "",
+  "testCount": 4,
+  "configMap": {},
+  "startedAt": 1762400000000,
+  "endedAt": 1762400000150,
+  "duration": 150,
+  "summary": {
+    "testsSucceededCount": 4,
+    "testsFailedCount": 0,
+    "testsIgnoredCount": 1,
+    "testsPendingCount": 0,
+    "testsCanceledCount": 0,
+    "suitesCompletedCount": 4,
+    "suitesAbortedCount": 0,
+    "scopesPendingCount": 1
+  },
+  "contents": [
+    {
+      "kind": "suite",
+      "name": "ASpec",
+      "suiteId": "p.ASpec",
+      "location": {
+        "className": "p.ASpec",
+        "filePath": "src/test/scala/p/ASpec.scala"
+      },
+      "startedAt": 1762400000010,
+      "endedAt": 1762400000140,
+      "duration": 130,
+      "threadName": "main",
+      "contents": [
+        {
+          "kind": "info",
+          "message": "before",
+          "at": 1762400000012,
+          "location": {
+            "filePath": "src/test/scala/p/ASpec.scala",
+            "lineNumber": 8
+          }
+        },
+        {
+          "kind": "suite",
+          "name": "BSpec",
+          "suiteId": "p.BSpec",
+          "location": {
+            "className": "p.BSpec",
+            "filePath": "src/test/scala/p/BSpec.scala"
+          },
+          "startedAt": 1762400000020,
+          "endedAt": 1762400000050,
+          "duration": 30,
+          "threadName": "main",
+          "contents": [
+            {
+              "kind": "test",
+              "name": "u",
+              "label": "- u",
+              "location": {
+                "filePath": "src/test/scala/p/BSpec.scala",
+                "lineNumber": 5
+              },
+              "outcome": "succeeded",
+              "startedAt": 1762400000025,
+              "endedAt": 1762400000045,
+              "duration": 20,
+              "threadName": "main",
+              "contents": []
+            }
+          ]
+        },
+        {
+          "kind": "suite",
+          "name": "CSpec",
+          "suiteId": "p.CSpec",
+          "location": {
+            "className": "p.CSpec"
+          },
+          "startedAt": 1762400000055,
+          "endedAt": 1762400000060,
+          "duration": 5,
+          "threadName": "main",
+          "contents": []
+        },
+        {
+          "kind": "suite",
+          "name": "WSpec",
+          "suiteId": "p.WSpec",
+          "location": {
+            "className": "p.WSpec",
+            "filePath": "src/test/scala/p/WSpec.scala"
+          },
+          "startedAt": 1762400000065,
+          "endedAt": 1762400000105,
+          "duration": 40,
+          "threadName": "main",
+          "contents": [
+            {
+              "kind": "scope",
+              "name": "A",
+              "label": "A",
+              "location": {
+                "filePath": "src/test/scala/p/WSpec.scala",
+                "lineNumber": 6
+              },
+              "startedAt": 1762400000067,
+              "endedAt": 1762400000101,
+              "duration": 34,
+              "contents": [
+                {
+                  "kind": "scope",
+                  "name": "b",
+                  "label": "when b",
+                  "location": {
+                    "filePath": "src/test/scala/p/WSpec.scala",
+                    "lineNumber": 7
+                  },
+                  "startedAt": 1762400000069,
+                  "endedAt": 1762400000099,
+                  "duration": 30,
+                  "contents": [
+                    {
+                      "kind": "test",
+                      "name": "c",
+                      "label": "- should c",
+                      "location": {
+                        "filePath": "src/test/scala/p/WSpec.scala",
+                        "lineNumber": 8
+                      },
+                      "outcome": "succeeded",
+                      "startedAt": 1762400000071,
+                      "endedAt": 1762400000091,
+                      "duration": 20,
+                      "threadName": "main",
+                      "contents": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "scope",
+          "name": "s",
+          "label": "s",
+          "location": {
+            "filePath": "src/test/scala/p/ASpec.scala",
+            "lineNumber": 12
+          },
+          "startedAt": 1762400000110,
+          "endedAt": 1762400000132,
+          "duration": 22,
+          "contents": [
+            {
+              "kind": "test",
+              "name": "t1",
+              "label": "- t1",
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 13
+              },
+              "outcome": "succeeded",
+              "startedAt": 1762400000112,
+              "endedAt": 1762400000120,
+              "duration": 8,
+              "threadName": "main",
+              "contents": []
+            },
+            {
+              "kind": "info",
+              "message": "between",
+              "at": 1762400000121,
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 15
+              }
+            },
+            {
+              "kind": "test",
+              "name": "t2",
+              "label": "- t2",
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 16
+              },
+              "outcome": "succeeded",
+              "startedAt": 1762400000122,
+              "endedAt": 1762400000130,
+              "duration": 8,
+              "threadName": "main",
+              "contents": []
+            },
+            {
+              "kind": "test",
+              "name": "t3",
+              "label": "- t3",
+              "location": {
+                "filePath": "src/test/scala/p/ASpec.scala",
+                "lineNumber": 18
+              },
+              "outcome": "ignored",
+              "endedAt": 1762400000131,
+              "threadName": "main",
+              "contents": []
+            }
+          ]
+        },
+        {
+          "kind": "scope",
+          "name": "p",
+          "label": "p",
+          "location": {
+            "filePath": "src/test/scala/p/ASpec.scala",
+            "lineNumber": 21
+          },
+          "outcome": "pending",
+          "startedAt": 1762400000133,
+          "endedAt": 1762400000134,
+          "duration": 1,
+          "contents": []
+        }
+      ]
+    }
+  ]
+}
