@@ -1,6 +1,6 @@
 # Can the Mill plugin give each test-worker JVM its own JSON file?
 
-Can the Mill plugin, without ScalaTest's directory argument, guarantee one distinct JSON file per Mill test-worker JVM? Context: `.planning/structured-test-reporting/SPECIFICATION-DECISIONS.md` lines 45–56 (the directory-argument decision); `.planning/structured-test-reporting/ARCHITECTURE.md` lines 35, 68, 138; [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2). Scope: the JVM `TestModule` (`testForked`, `testOnly`, `testCached`). Scala.js and Native override `testTask` (`[mill] libs/scalajslib/src/mill/scalajslib/ScalaJSModule.scala` line 408, `libs/scalanativelib/src/mill/scalanativelib/ScalaNativeModule.scala` line 492) and are not covered.
+Can the Mill plugin, without ScalaTest's directory argument, guarantee one distinct JSON file per Mill test-worker JVM? Context: `.planning/structured-test-reporting/SPECIFICATION-DECISIONS.md` § The consolidating caller keeps runs that share arguments from colliding on one JSON file …; `.planning/structured-test-reporting/ARCHITECTURE.md` § Modules and § External systems; [Who guarantees node-ID uniqueness and run identity?](https://github.com/jamesgorman2/scalatest/issues/2). Scope: the JVM `TestModule` (`testForked`, `testOnly`, `testCached`). Scala.js and Native override `testTask` (`[mill] libs/scalajslib/src/mill/scalajslib/ScalaJSModule.scala` line 408, `libs/scalanativelib/src/mill/scalanativelib/ScalaNativeModule.scala` line 492) and are not covered.
 
 ## Short answer
 
@@ -10,8 +10,6 @@ Can the Mill plugin, without ScalaTest's directory argument, guarantee one disti
 - With `testSandboxWorkingDir = true`, the default, each worker JVM has a unique working directory, `Task.dest[/<group>][/worker-<i>]/sandbox`. Mill fails rather than start a second JVM in a folder already used in the same run (§ 2.3, I-1). A relative `-fJ` path then yields one file per JVM. With the setting off, every JVM runs in `forkWorkingDir`, the workspace root by default, and the files collide. The plugin can read the setting and fail the build instead of colliding silently (I-2).
 - A guarantee that holds without that condition: the plugin sets `testFramework` to a plugin-owned shim class on the test classpath. The shim rewrites `-fJ` to a per-JVM unique name, then delegates to `org.scalatest.tools.Framework` (I-3). The shim runs inside the worker JVM, so the working directory does not matter.
 - A caveat for every option, ScalaTest's directory argument included: before any worker starts, Mill calls `Framework.runner` once more with the same args, outside any worker, for test discovery, and never calls `done()` on it (§ 1.4). ScalaTest 3.2.19 opens `-f` files when the runner is constructed. Unless the JSON writer defers creating its file, each test command leaves one extra file from a run that never finished (I-5).
-
-The rejection recorded in `SPECIFICATION-DECISIONS.md` line 50 says the relative-path approach "fails silently when a user turns off Mill's `testSandboxWorkingDir`". That holds for a plugin that only passes a relative path. It does not hold for a plugin that checks the setting or uses a shim. The decision's other grounds, sbt projects sharing a path and bare `Runner` users (lines 50 and 52), are outside this note.
 
 ## Sources
 
@@ -146,7 +144,7 @@ The working directory follows from `processFolder`:
 - The decision comment on caller responsibility: "**Callers own a fresh directory per invocation**: the Mill plugin's `Task.dest`, and a delete before `test` in the sbt recipe (R-053, R-060)." `[#2]`
 - The decision comment on run identity: "The process that runs `done()` (for `Runner`, its own) mints a random run ID when the run starts". `[#2]`
 
-The issue establishes that runs share arguments and records the directory argument as its answer. It gives no reason why the Mill plugin cannot keep files apart. The only such reasoning in the planning docs is in `SPECIFICATION-DECISIONS.md` line 50: the sandbox can be turned off, and a bare `Runner` user faces the same risk. ScalaTest owns the run ID because it mints the ID in the process that runs `done()`. That ownership is separate from who names the file.
+The issue establishes that runs share arguments and records the directory argument as its answer. It gives no reason why the Mill plugin cannot keep files apart.
 
 ## 5. Inferences
 
