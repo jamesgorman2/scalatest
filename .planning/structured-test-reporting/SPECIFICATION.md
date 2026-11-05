@@ -8,7 +8,8 @@ ScalaTest events do not carry the test structure: no event names a suite's paren
 
 ## Plan
 
-[Plan: structured test reporting](https://github.com/jamesgorman2/scalatest/issues/1)
+- [Plan: structured test reporting](https://github.com/jamesgorman2/scalatest/issues/1)
+- [Plan: reconcile structured test reporting architecture with the rewritten spec](https://github.com/jamesgorman2/scalatest/issues/15)
 
 ## Spec documents
 
