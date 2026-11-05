@@ -154,7 +154,7 @@ Settles:
 
 - Where output written during suite construction attaches: the suite or the run node (review of #8).
 - How JVM `println` reaches capture (reviews of #7 and #8).
-- What a node's `output` key holds, which `runner-json/TECHNICAL-DESIGN.md` § APIs § Nodes reserves with `stdout` and `stderr`, and whether output keeps its place against the node's messages.
+- What a node's `output` key holds, which [Structured JSON from `Runner`](https://github.com/jamesgorman2/scalatest/issues/17) reserves on every node as `{ "stdout": …, "stderr": … }` and never writes, and whether output keeps its place against the node's messages.
 - Which channel the human renderer streams test output through under `Runner`, and how it is placed against progress output (`ARCHITECTURE.md` § Modules § ScalaTest core, human renderer, is silent).
 - Which reporters are the 3.2-format `-o` and `-e` of `SPECIFICATION-DECISIONS.md` § Captured test output is withheld from stdout and stderr unless a `-C` reporter or a 3.2-format `-o` or `-e` reporter is configured, given that `SPECIFICATION.md` § Test output names only `-C`; and whether `-oDU` consumes test output, has it reach stdout and stderr, or neither (`SPECIFICATION.md` § Constraints, "`-oDU` remains unchanged").
 
@@ -198,7 +198,7 @@ A standalone executable takes one or more test run labels, each with a list of J
 - shows an absent file as `RunAborted` with reason *not run*, and a label with no files as an empty label node;
 - classifies nothing, and exits independently of test results;
 - rejects duplicate labels;
-- rebuilds approximate `Event`s from the JSON's node state, which holds no ordinals, formatters or rerunners, and renders with core's tree assembly and human renderer.
+- rebuilds envelopes from the JSON's node state and renders them with core's tree assembly and human renderer (`ARCHITECTURE.md` § Multi-run consolidation executable).
 
 Enables:
 

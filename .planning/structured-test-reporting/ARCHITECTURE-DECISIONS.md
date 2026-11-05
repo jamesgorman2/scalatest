@@ -77,7 +77,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Settled by** the user, without a sub-issue, in commit `df10bf6a4`.
 
-**See** `research/mill-test-worker-args.md` § Short answer, § 1.4, § 2.1 to § 2.3, § 3 (I-3, I-4), § 4 and § 5 (I-1 to I-5).
+**See** `research/mill-test-worker-args.md` § 2.1 to § 2.3, § 3, and § 5 I-1, I-3 and I-4.
 
 ---
 
