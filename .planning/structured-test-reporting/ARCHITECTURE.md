@@ -15,15 +15,13 @@ Three deployable units, each built and released from this repo.
 `scalatest-core`, on every Scala version and platform in `SPECIFICATION.md` § Scope. Changes live in `jvm/core`, plus the per-platform `tools` sources in `js/core` and `native/core` (`Framework`, `MasterRunner`, `SlaveRunner`, `TaskRunner`). Every part below is internal (`private[scalatest]`); Scala.js and Native receive the `jvm/core` parts through the existing source generators, `project/GenScalaTestJS.scala`, `project/GenScalaTestNative.scala` and their Dotty equivalents.
 
 - **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`, which envelopes every `Event` it receives.
-  - An *envelope* is an `Event` or a chunk of test output, plus the ID of the node it attaches to and that node's parent's ID.
-  - An envelope also carries its node's name as written in the source, its label (formatted name) and, for a suite, the source file of its registrations. `Engine` supplies all three; no 3.2.19 event carries the first or the last, nor a test's label before it closes.
+  - An *envelope* is an `Event` or a chunk of test output, plus the ID of the node it attaches to, that node's parent's ID and its declared position among its siblings, and, where the emitting suite supplies them, the node's name, its label and, for a suite, its source file, which 3.2.19's events lack or carry only once a test closes. The declared position lets structure-aware reporters restore declared order without the sorting reporters (`SPECIFICATION.md` § Human-readable output).
   - Each suite's wrapper mints IDs for the suite, its scopes and its tests, unique within the run.
   - A run can span processes:
     - on Scala.js and Native, a *controller* process running `MasterRunner` and the *worker* processes, each running `SlaveRunner`, that the adapter starts for it (§ External systems);
     - under sbt's forked mode (`Test / fork := true`), the runner in sbt's JVM and the forked JVMs.
   - Each process has its own `Tracker`, so ordinals repeat across a run's processes. Every ID a process mints therefore carries a component unique to that process.
   - A wrapper knows its node's ID and its parent's, and tracks the scopes its node opens and closes.
-  - Envelopes carry each child's declared position among its siblings, so structure-aware reporters restore declared order without the sorting reporters (`SPECIFICATION.md` § Human-readable output).
   - Each run's structure is rooted at a *run node*, to which run-level events (`RunStarting`, `RunCompleted`, `RunAborted`, discovery events) attach. Its wrapper wraps the reporter that `Runner`, the `Framework` and `MasterRunner` emit run-level events to, so every event passes through at least one wrapper.
   - Wrappers report to test output capture which tests and suites are running on each thread.
 - **Envelope dispatch** — delivers each envelope to the *structure-aware reporters* of its process:
@@ -84,7 +82,7 @@ Three deployable units, each built and released from this repo.
 
 ### Multi-run consolidation executable
 
-A standalone executable, the *consolidator*, that writes the outputs of `SPECIFICATION.md` § Multi-run consolidation plugin. It rebuilds approximate `Event`s from the node state in ScalaTest's JSON, which holds no ordinals, formatters or rerunners, and renders with scalatest-core's internal tree assembly and human renderer.
+A standalone executable, the *consolidator*, that writes the outputs of `SPECIFICATION.md` § Multi-run consolidation plugin. It renders with scalatest-core's internal tree assembly and human renderer, feeding them envelopes it rebuilds from the node state in ScalaTest's JSON: `Event`s carrying each node's recorded values, with node IDs it mints, unique within the consolidation, each node's position taken from its place in the JSON, and each node's name and label. The JSON holds no ordinals, formatters or rerunners, so the rebuilt `Event`s carry none.
 
 - Its caller gives it one or more test run labels, unique within the consolidation, each with a list of JSON files. It merges each listed file's content under its label's node, keeping each file's closing run event and its reason, and does not collapse suites or tests that share a name across files.
 - A listed file that is absent becomes an entry under its label holding a `RunAborted` with reason *not run* and no nodes.
