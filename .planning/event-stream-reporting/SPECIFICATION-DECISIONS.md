@@ -17,15 +17,17 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## The test command runs every selected test module by default; `--halt-on-failure` opts into skipping modules not yet started.
+## The test command runs every selected test module by default and treats one that cannot start as a failed run; `--halt-on-failure` opts into skipping modules not yet started.
 
 **Alternatives**
 
 - Following Mill's `--keep-going`, failing fast by default, suits a build, but with modules running unordered and in parallel, which modules report depends on timing.
 - Showing only the runs that started, as Mill does, hides that modules were skipped.
 - Always running every module, with no opt-in, loses fast feedback on a large build.
+- Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
+- Leaving a module that cannot start to Mill's own console error omits it from the report.
 
-**Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
+**Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058), including any that could not start (R-046).
 
 **Costs** The default differs from Mill's, and the test command ignores Mill's `--keep-going`. Unless the user opts in, a failing build takes as long as a passing one.
 
