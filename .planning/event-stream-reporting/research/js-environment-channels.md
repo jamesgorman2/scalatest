@@ -12,13 +12,19 @@ Other notes hold facts this one relies on and does not repeat:
 - **Environments.** Mill `1.1.10` offers five besides Node: `JsDom`, `ExoegoJsDomNodeJs`, `Phantom`, `Selenium` and `Playwright` (§ 1).
 - **jsdom (`JsDom`).** A Node process running the page in a jsdom window. It uses Node's own com channel, so the `Logger` reaches Mill in order as on Node, and the streams are the Node process's pipes, as on Node (§ 2.1). Window code has no `require`, so it has no Node socket. jsdom's own `WebSocket` and `XMLHttpRequest` make real connections, and a synchronous `XMLHttpRequest` blocks until the server replies (§ 2.2). Every window `console` method reaches Node's `console`. `log`, `info` and `debug` go to stdout, and `error`, `warn` and `trace` to stderr (§ 2.3).
 - **jsdom with Node APIs (`ExoegoJsDomNodeJs`).** As `JsDom`, but window code also gets Node's `require`, so every Node channel in `JNC` § 2–3 is open to it (§ 2.2). It calls `virtualConsole.sendTo`, which jsdom `27.0.0` no longer has. *Inference:* it fails to start with jsdom 27 or later (§ 2.3).
-- **PhantomJS (`Phantom`).** The com channel is a WebSocket from the page to a Jetty 8 server in Mill's process. Jetty is a `provided` dependency, and Mill adds none. *Inference:* the com channel, and so the test adapter, cannot start under Mill as configured (§ 3.1). Every page console message reaches the PhantomJS process's stdout through `console.log` (§ 3.3).
-- **Selenium and Playwright.** No pipe exists. An injected script buffers `scalajsCom.send`, `console.log` and `console.error` in page arrays. A JVM thread fetches and clears them every 100 ms through `executeScript` or `page.evaluate`, then writes the console lines into `PipedOutputStream`s it handed to `onOutputStream` (§ 4.1, § 4.3).
-  - Com messages keep their order.
-  - Only `console.log` and `console.error` are captured. Playwright writes both to the stdout stream.
-  - What the page buffered after the last fetch is dropped when the adapter closes the run (§ 4.4).
-  - Under Playwright, `onOutputStream` and every received message run on cats-effect threads, not the test task's thread (§ 4.2, § 4.3).
-- **`onOutputStream` wrapper.** Every environment invokes the callback with both streams when neither is inherited. jsdom and PhantomJS invoke it on the starting thread, as Node does. Selenium invokes it on the starting thread. Playwright invokes it later on a cats-effect blocking thread (§ 2.4, § 3.4, § 4.3).
+- **PhantomJS (`Phantom`).** The com channel is a WebSocket from the page to a Jetty 8 server in Mill's process. Jetty is a `provided` dependency, and Mill adds none. *Inference:* the com channel, and so the test adapter, cannot start under Mill as configured (§ 3.1). *Inference:* every page console message that `onConsoleMessage` receives reaches the PhantomJS process's stdout through `console.log`. Which messages it receives was not established (§ 3.3).
+- **Selenium and Playwright.** No pipe exists. An injected script buffers `scalajsCom.send`, `console.log` and `console.error` in page arrays. Every 100 ms the env fetches and clears them, through `executeScript` under Selenium or `page.evaluate` under Playwright. It writes the console lines into `PipedOutputStream`s whose input ends it handed to `onOutputStream` (§ 4.1, § 4.3).
+  - Com messages are fetched in push order and dispatched in list order on one thread. *Inference:* the `Logger` reaches Mill's adapter in the order the run calls it, complete up to the last fetch (§ 4.1).
+  - Only `console.log` and `console.error` are captured. Playwright writes both to the stdout stream (§ 4.3).
+  - *Inference:* what the page buffered after the last fetch began is dropped when the adapter closes the run (§ 4.4).
+  - *Inference:* under Playwright, every received message is dispatched on a cats-effect runtime thread, which need not carry the test task's streams (§ 4.1).
+- **`onOutputStream` wrapper.** Every environment invokes the callback with both streams when neither is inherited. jsdom invokes it on the starting thread, as Node does (§ 2.4). PhantomJS invokes it from Jetty's started callback, on a thread not established (§ 3.4). Selenium invokes it on the starting thread. Playwright invokes it later, on a cats-effect blocking-pool thread (*general*, § 4.3).
+- **What `JNC` §§ 2–5 relies on that each environment lacks.**
+  - `JsDom`: `require`, so the Node socket and file, and *inference:* `jsEnvConfig`'s `env` and `args` in window code (§ 2.2).
+  - `ExoegoJsDomNodeJs`: nothing, with jsdom before 27 (§ 2.1, § 2.2, § 2.3, § 2.4).
+  - `Phantom`: Jetty, so *inference:* the com channel and the `Logger` (§ 3.1). `env` and `args` in page code (§ 3.2).
+  - `Selenium` and `Playwright`: process pipes, since `onOutputStream` receives `PipedInputStream`s (§ 4.3). A VM that exits when the com socket closes, since `close()` tears the browser down (§ 4.2, § 4.4). `env` and `args` in page code (§ 1). Under Playwright, the test task's thread for `Logger` calls (*inference*, § 4.1) and for `onOutputStream` (*general*, § 4.3).
+  - Whether `Phantom`, `Selenium` and `Playwright` page code has `require` or a filesystem was not established (§ 5).
 
 ## Sources
 
@@ -56,7 +62,7 @@ Paths are relative to each source's root. Abbreviations:
 
 **Which library versions load.** `scalaJSLinkerClasspath` resolves `scalajs-sbt-test-adapter_2.13` at the module's `scalaJSVersion` plus the one env artifact `scalaJSJsEnvMvnDeps` picks, bound to Mill's own Scala version (`SJM` lines 69–86, 88–115). The worker module depends on the env artifacts only at compile time (`[mill] libs/scalajslib/package.mill` lines 82–94). *Inference, resolution not run:*
 
-- `scalajs-js-envs` resolves to `1.4.0` for every non-Node environment. The test adapter `1.20.2` asks for `1.4.0` (`JSN` § Sources), and no env asks for more: `[jsdomenv]` `1.0.0`, `[exoego]` `1.0.1`, `[phantom]` `1.0.0`, `[selenium]` `1.1.1` (`build.sbt` line 81), `[playwright]` `1.4.0` (`build.sbt` line 53). `JNC` § Sources gives its two differences from `1.5.0`.
+- `scalajs-js-envs` resolves to `1.4.0` for every non-Node environment, since no env asks for more than the test adapter does (`JNC` § Sources): `[jsdomenv]` `1.0.0`, `[exoego]` `1.0.1`, `[phantom]` `1.0.0`, `[selenium]` `1.1.1` (`build.sbt` line 81), `[playwright]` `1.4.0` (`build.sbt` line 53). `JNC` § Sources gives `1.4.0`'s two differences from `1.5.0`.
 - Under both jsdom envs, `scalajs-env-nodejs` resolves to the `1.0.0` or `1.0.1` that the env depends on (`[jsdomenv]` and `[exoego]` `build.sbt`, `scalajs-env-nodejs % scalaJSVersion`, with `project/plugins.sbt` at `1.0.0` and `1.0.1`), not to Node's `1.5.0`. Its `ComSupport.scala` differs from `[envs]` `v1.5.0`'s only in the loopback address. The JVM binds `InetAddress.getByName(null)`, and Node calls `connect($port)` with no host (`NE1/ComSupport.scala` lines 212, 251).
 - The Playwright dependency has no `withDottyCompat` (`Deps.scala` lines 44–45), so it resolves the `_3` artifact. `[playwright]` is built with Scala `3.7.2` and depends on Playwright Java `1.54.0`, cats-effect `3.6.3` and scribe `3.17.0` (`build.sbt` lines 14, 52–58).
 
@@ -91,6 +97,7 @@ Both envs run `executable :: args` through `ExternalJSRun`, with `NODE_MODULE_CO
 
 - **`JsDom`.** Window code has no `require` (`JSN` § 2.3), so no Node socket or file.
 - **`ExoegoJsDomNodeJs`.** The program copies `global.require` onto the window (`[exoego] JD` lines 119–121). Node defines `globalThis.require` for a program read from stdin, which it evaluates as CommonJS by default (`[node] lib/internal/main/eval_stdin.js` lines 23–57; `lib/internal/process/execution.js` lines 433–440). So window code can `require('net')` and `require('fs')`, and `JNC` § 2.1 and § 3 apply to it. *Inference:* `require('process').env` gives it `jsEnvConfig`'s `env`.
+  - This contradicts `JSN` § Short answer and § 2.3, which say jsdom runs have no filesystem. `JSN` § 2.3 cites only `[jsdomenv]`'s env, for which it holds (`JsDom`, above).
 - **jsdom's own APIs, both envs.**
   - jsdom's `WebSocket` opens a real connection through the `ws` package, sending the window's origin (`[jsdom] lib/jsdom/living/websockets/WebSocket-impl.js` lines 129–136). Its `send` hands data to `ws` and decrements `bufferedAmount` in the completion callback (lines 285–310).
   - jsdom's `XMLHttpRequest` applies CORS against the window's origin, `http://localhost` (`lib/jsdom/living/xhr/xhr-utils.js` lines 62–78).
@@ -109,7 +116,7 @@ Both envs run `executable :: args` through `ExternalJSRun`, with `NODE_MODULE_CO
 
 ### 2.4 An `onOutputStream` wrapper
 
-Both envs validate with `ExternalJSRun.supports` (`[jsdomenv] JD` line 144; `[exoego] JD` line 142) and start through `ExternalJSRun`, which calls `onOutputStream` with both pipes straight after the process starts, on the starting thread (`JE/ExternalJSRun.scala` lines 35–44, 120–127). So a wrapper receives them as on Node (`JNC` § 5.1).
+Both envs validate with `ExternalJSRun.supports` (`[jsdomenv] JD` line 144; `[exoego] JD` line 142) and start through `ExternalJSRun`, so a wrapper receives both pipes as on Node (`JNC` § 5.1).
 
 ## 3. PhantomJS: `Phantom`
 
@@ -119,6 +126,7 @@ Both envs validate with `ExternalJSRun.supports` (`[jsdomenv] JD` line 144; `[ex
 - `JettyWebsocketManager` uses Jetty 8's server and WebSocket classes (`PJ/JettyWebsocketManager.scala` lines 11–17, 29–44). The env declares both Jetty artifacts `provided` (`[phantom] build.sbt` lines 79–80). Its sbt plugin supplies them in a private configuration and class loader (`phantomjs-sbt-plugin/src/main/scala/org/scalajs/jsenv/phantomjs/sbtplugin/PhantomJSEnvPlugin.scala` lines 35–44, 58–70, 87–103).
 - Mill resolves only the env artifact (§ Sources), and no Jetty appears in Mill's Scala.js build or module code (`[mill] libs/scalajslib`, `mill-build`).
 - *Inference:* `startWithCom` throws a `LinkageError` under Mill as configured, so the test adapter cannot run on PhantomJS. A module that overrides `scalaJSJsEnvMvnDeps`, a public task, could add Jetty to the tools class path (`SJM` line 69).
+  - This contradicts `JSN` § 3.1 W3, which calls the `Logger` "the only channel that reaches the JVM everywhere". No experiment settled which holds.
 - **If Jetty is present:**
   - The page's setup script opens `new WebSocket("ws://localhost:<port>")` to a Jetty server bound to `localhost` on an ephemeral port (`PJ/ComRun.scala` lines 289–375; `PJ/JettyWebsocketManager.scala` lines 29–32).
   - `scalajsCom.send` buffers until the socket opens, sends each message in 32 KB fragments, and drops messages once the socket has closed (`PJ/ComRun.scala` lines 300–374).
@@ -135,7 +143,7 @@ Both envs validate with `ExternalJSRun.supports` (`[jsdomenv] JD` line 144; `[ex
 
 - The launcher, which runs in PhantomJS's own context, sets `page.onConsoleMessage = function(msg) { console.log(msg); }` (`PJ/PhantomJSEnv.scala` lines 138–140). *Inference:* every page console message the callback receives reaches PhantomJS's stdout as one line, `console.error` included, with no stderr. Which page console methods PhantomJS passes to `onConsoleMessage` was not established.
 - A page error prints to `console.error` and exits with status 2 (lines 141–152).
-- The env logs two `debug` lines per run through `runConfig.logger` (lines 173–174, 194–195). Mill's adapter logger prints every message to `Console.err` (`JNC` § 1.1).
+- The env logs two `debug` lines per run through `runConfig.logger` (lines 173–174, 194–195). Where Mill's adapter logger prints them: `JNC` § 1.1.
 
 ### 3.4 An `onOutputStream` wrapper
 
@@ -195,7 +203,7 @@ Both envs inject the same setup script ahead of the Scala.js scripts and poll th
 
 - **Selenium.** `close()` sets `wantClose` and returns (`SE/SeleniumRun.scala` line 48). The loop ends at its next check, without another fetch. Then the env quits the driver, closes the streams and closes the materializer (lines 35–46).
 - **Playwright.** `close()` sets the stop flag and waits up to 5 seconds for the resources to be released (`PW/Runner.scala` lines 99–107). The loop ends after its next 100 ms wait, without another fetch (`PW/ResourcesFactory.scala` line 70).
-- Mill sleeps 100 ms before `close()` (`JNC` § 5.1).
+- When Mill calls `close()`: `JNC` § 5.1.
 - *Inference:* console lines and com messages the page buffered after the last fetch began are dropped. With one fetch every 100 ms, that covers up to about the last 100 ms of page activity before `close()`.
 - Closing the `PipedOutputStream`s gives Mill's `PipeOutputThread`s end of stream once they have read what was written.
 
@@ -209,6 +217,7 @@ Both envs inject the same setup script ahead of the Scala.js scripts and poll th
 - Which library versions Mill's resolver actually loads for each environment (§ Sources).
 - Whether the `nodejs-env` `1.0.0` com channel, whose JVM end binds `InetAddress.getByName(null)` while Node connects to `localhost` with no host, connects on hosts where `localhost` resolves to IPv6 first (§ Sources).
 - Which page console methods PhantomJS passes to `onConsoleMessage`. Whether `phantom.exit` flushes pending stdout. Which thread Jetty runs the started callback and message callbacks on (§ 3).
+- Whether `Phantom`, `Selenium` and `Playwright` page code has `require`, a Node socket or a filesystem. No source here was opened for it. `JSN` § 2.3 states that a Selenium run has no filesystem.
 - Whether PhantomJS, Chromium, Firefox and WebKit allow a `file:` page to reach `http://` or `ws://` on loopback under Mill's default options (§ 3.2, § 4.2).
 - What the browser driver, the Playwright driver process and the envs' own logging (scribe, under `showLogs` and `debug`) write, and whether it reaches Mill's console outside the run's streams (§ 4).
 - Whether any of this holds on versions other than those in § Sources, or with jsdom versions other than `27.0.0`.

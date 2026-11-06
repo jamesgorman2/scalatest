@@ -6,7 +6,7 @@ Three later notes take the Mill questions further:
 
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the channel itself.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what can host plugin code across test tasks.
-- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels from a Scala.js or Native run.
+- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels from a Scala.js run on Node or a Native run.
 
 Two earlier notes hold facts this one relies on and does not repeat:
 

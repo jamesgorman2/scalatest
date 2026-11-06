@@ -14,7 +14,7 @@ Three other notes hold facts this one relies on and does not repeat:
 
 - `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: Mill's test tasks and test-worker JVMs.
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: how Mill wires a test-worker JVM's streams and what it does to a task's output.
-- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js or Native run under Mill.
+- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js run on Node or a Native run under Mill.
 
 ## Short answer
 

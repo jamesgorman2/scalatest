@@ -6,7 +6,7 @@ Other notes hold facts this one relies on and does not repeat:
 
 - `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches test-worker JVMs.
 - `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
-- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js or Native run under Mill.
+- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js run on Node or a Native run under Mill.
 - `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`: what was known about a channel before this note.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what can host plugin code across a Mill command, and what Mill does to an exclusive command's streams.
 
