@@ -120,9 +120,9 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 - **Telling workers apart.** From inside the worker, only its working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3). What differs from Mill's side: `MWC` § 1.3–1.4.
 - **Plugin code inside the worker.** The shim `testFramework` is the one place plugin code runs in the worker JVM before ScalaTest (`MILL` § 3, I-3). `MILL` examines it only for rewriting `-fJ`, not for capture or for opening a channel. `MWC` § 2.4 examines it for capturing the worker's streams.
 - **Plugin code after failing tests.** Inside the test task it runs only through a direct call into the `@experimental` `TestModuleUtil` (`MILL` § 2.2, I-4; `MWC` § 2.3, § 5). Outside the test task: `MCL` § 2.
-- **What is known about printing.** sbt test-interface `Logger` lines and the `done()` string: `MILL` § 1.4 for a JVM worker, `JNC` § 4 for Scala.js and Native. Raw writes to stdout or stderr: `MWC` § 1 for a JVM worker, `JNC` § 5 for a JS VM or native process.
+- **What is known about printing.** sbt test-interface `Logger` lines and the `done()` string: `MILL` § 1.4 for a JVM worker, `JNC` § 4 for Scala.js on Node and for Native. Raw writes to stdout or stderr: `MWC` § 1 for a JVM worker, `JNC` § 5 for a Node VM or native process. Both, for the other JS environments: `.planning/event-stream-reporting/research/js-environment-channels.md` §§ 2–4.
 - **End of the channel.** The worker exits straight after `done()` (`MILL` § 1.3).
-- **No worker JVM.** `testLocal` runs in Mill's own process (`MILL` § 1.1), as do Scala.js and Native runs through the adapter (`JSN` § 1.3). The channels out of a Scala.js or Native run: `JNC` §§ 2–5.
+- **No worker JVM.** `testLocal` runs in Mill's own process (`MILL` § 1.1), as do Scala.js and Native runs through the adapter (`JSN` § 1.3). The channels out of a Native run or a Scala.js run on Node: `JNC` §§ 2–5. Out of a Scala.js run in another JS environment: `js-environment-channels.md` §§ 2–4.
 
 ## 7. What is not known
 
