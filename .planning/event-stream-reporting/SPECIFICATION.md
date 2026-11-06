@@ -69,10 +69,29 @@ Terms this document adds:
 ## Consolidation
 
 - R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started: progress output, human-readable output and JSON output. Each is a separate output.
-- R-026 Progress output is written while the runs execute, from the events received so far.
+- R-026 Progress output is written while the runs execute, from the events received so far, as promptly as Mill lets the plugin write.
 - R-027 The human-readable and JSON output are written together, once every run has completed or halted.
 - R-028 The JSON output is one object for the Mill command. Its root wraps each run's test structure in the layout `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object gives one run, each node holding its final state.
 - R-021 Each output receives everything every run sent; no event, node or test output is dropped.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
 - R-023 Given the same channels, the consolidation library produces the same human-readable and JSON output when used without Mill.
 - R-025 By default, the Mill plugin gives each module one test run label.
+
+## Each run's own output under the Mill plugin
+
+These hold for every run the Mill plugin starts.
+
+- R-040 The plugin captures the stdout and stderr of every process executing the run. None of it reaches the console except through the consolidated output.
+- R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured. What a reporter the user configures writes to stdout or stderr is worker output.
+- R-042 The human-readable and JSON output show the run's worker output on the run's node, and drop none of it. This differs from `../structured-test-reporting/SPECIFICATION.md` § Test output, which streams output that is not test output directly to stdout and stderr.
+- R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
+- R-044 The console does not show Mill's list of failed tests, Mill's own progress for the test task, or ScalaTest's end-of-run summary for the run. Progress output and human-readable output carry what these showed.
+- R-045 The plugin may show as worker output what Mill's own test runner writes for the run.
+- R-046 The Mill command fails if any run it started reports a failure or does not complete.
+- R-047 Mill writes its JUnit XML report for each module as it does without the plugin.
+
+Where the consolidated output goes:
+
+- R-048 Progress output and human-readable output are each written to the console when turned on.
+- R-049 JSON output is written to a file, never to the console.
+- R-050 Output written by anything the plugin did not start is neither captured nor changed. On the console it may interleave with the consolidated output.

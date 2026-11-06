@@ -2,6 +2,37 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## Under the Mill plugin, Mill's own console results for a test task are replaced by the consolidated output.
+
+**Alternatives**
+
+- Leaving Mill's list of failed tests, its test progress and ScalaTest's end-of-run summary on the console needs no change to Mill's test task, but each speaks for one run and misleads when several runs are active.
+- Also turning off Mill's JUnit XML report for each module removes the last per-run result, but the consolidation writes no JUnit XML to take its place.
+
+**Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`SPECIFICATION.md` R-044). The XML report is a file read by tools, not by the person at the console, and nothing else here serves those tools (`SPECIFICATION.md` R-047).
+
+**Costs** The plugin must produce the test task's result itself instead of taking Mill's. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
+
+**Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
+
+---
+
+## Worker output is captured and shown on its run.
+
+**Alternatives**
+
+- Streaming it to the console as `../structured-test-reporting/SPECIFICATION.md` § Test output does keeps the two epics alike, but it interleaves across runs, which is the problem this epic addresses.
+- Writing it to a file for each run keeps the consolidated output to what came over the channel, but separates a crash message from the run it explains.
+- Discarding it loses the only account of some halted runs.
+
+**Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's node is where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
+
+**Costs** Worker output arrives apart from the channel, so its place among the run's events is approximate (`SPECIFICATION.md` R-043). What a reporter the user configured prints appears on the run as text repeating the events.
+
+**Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
+
+---
+
 ## The consolidation produces no JUnit XML.
 
 **Alternatives**
