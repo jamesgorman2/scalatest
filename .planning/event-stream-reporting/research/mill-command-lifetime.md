@@ -18,6 +18,8 @@ Three other notes hold facts this one relies on and does not repeat:
 
 ## Short answer
 
+In this note and the notes citing it, *Mill command* and *selector* have Mill's senses: one run of `mill` from the command line, and a token on it naming tasks or modules. They are not the test command and module selector of `.docs/ubiquitous-language.md`.
+
 - **Of the mechanisms examined, one spans the test tasks: an exclusive command that takes the `Evaluator` and executes the test tasks itself** (§ 2). Its body runs before the first test task, regains control after the last whether those tasks passed or failed, receives every task's result, and returns the command's success or failure. Without `--keep-going`, the body does not run at all when a task that ran before it in the same evaluation failed (§ 2.2). Mill documents evaluator commands as experimental.
 - **It spans one evaluation, not one Mill command.** A command line holding `+` is several goals of one evaluation, and `--watch` repeats the evaluation inside one Mill command (§ 1, § 2.6).
 - **The command learns the modules and selectors from its own parameters**, and resolves selector tokens through the `Evaluator`. Mill consumes a `+` before the command sees it (§ 2.3).

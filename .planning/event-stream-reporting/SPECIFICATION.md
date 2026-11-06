@@ -29,7 +29,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
 - A consolidation library that reads the channels of many runs, takes each run's test run label and worker output, and produces their consolidated output.
-- A Mill plugin that hosts the consolidation library and adds a test command, which runs the tests of every test module its module selectors name with the emitter on.
+- A Mill plugin that hosts the consolidation library and adds a command, each evaluation of which is a test command: it runs the tests of every test module its module selectors name with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
@@ -44,7 +44,7 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 - A consolidated CTRF (Common Test Report Format) report; a possible later feature.
 - Build tools other than Mill.
 - A `--local` option on the test command, running each module as `testLocal` does, in Mill's JVM.
-- A `--cached` option on the test command, returning cached test results, each flagged as cached (newer than the last edit) or missing; tracking edits and timing needs prototyping first.
+- A `--cached` option on the test command, returning cached test results, each flagged as cached (newer than the last edit) or missing.
 
 ## Constraints
 
@@ -55,7 +55,7 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 - R-001 A run with the emitter off uses the reporters ScalaTest 3.2.19 uses. Each receives what 3.2.19 sends, and the build tool receives the test-interface events 3.2.19 sends.
 - R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.19 sends, except as R-041 states.
 - R-051 With the emitter on, the build tool still receives the test-interface events 3.2.19 sends.
-- R-003 Test runs launched by Metals, Bloop and IntelliJ, in the forked, sbt shell and BSP modes of `../structured-test-reporting/SPECIFICATION.md` § Constraints § IntelliJ, behave as they do against ScalaTest 3.2.19, including in a build that uses the Mill plugin.
+- R-003 Test runs launched by Metals, Bloop and IntelliJ, in each IntelliJ mode `../structured-test-reporting/SPECIFICATION.md` § Constraints § IntelliJ lists, behave as they do against ScalaTest 3.2.19, including in a build that uses the Mill plugin.
 - R-060 In a build that uses the Mill plugin, Mill's test tasks (`testForked`, `testOnly`, `testCached` and `testLocal`), including when run as `mill __.test`, behave as they do without the plugin.
 - R-004 The fork stays binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.19.
 
@@ -78,18 +78,17 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 
 ## The test command
 
-- R-054 Only the Mill plugin's test command produces consolidated output. The user runs it explicitly.
-- R-055 The test command takes one or more module selectors, and optionally class globs and framework arguments as Mill's `testOnly` takes them. The class globs and framework arguments apply alike to every selected test module. Module selectors are separate arguments; `+` cannot join them, because Mill consumes it before the test command runs.
+- R-054 In a Mill build, only a test command produces consolidated output.
+- R-055 The test command's arguments include one or more module selectors, optional class globs and framework arguments as Mill's `testOnly` takes them, and `--halt-on-failure` (R-057). The class globs and framework arguments apply alike to every selected test module. Module selectors are separate arguments; `+` cannot join them, because Mill consumes it before the test command runs.
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the same processes, with the same working directory;
-  - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
-  - a result that holds the same test results and succeeds or fails as that task's does, except that it omits Mill's list of failed tests (R-044) and fails whenever the run did not complete (R-046). Mill's Native test task succeeds when the test binary crashes (`research/native-stdio-wrapper.md` § 4).
+  - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require.
 - R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs. Mill's `--keep-going` does not change which modules start.
 - R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming those modules.
 
 WHERE `--halt-on-failure` is given:
 
-- R-057 Once any run fails or does not complete, the test command does not start the tests of any selected test module whose tests have not started.
+- R-057 Once any run has ended in a way that fails the test command (R-046), the test command does not start the tests of any selected test module whose tests have not started.
 - R-058 The consolidated output shows each test module R-057 skipped as not run.
 
 ## Consolidation
@@ -114,11 +113,11 @@ These hold for every run a test command starts.
 - R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 - R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the module's tests, or ScalaTest's end-of-run summary for the run.
 - R-045 The plugin may show as worker output Mill's own progress for the module's tests and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
-- R-046 The test command fails if any run it started reports a failure or does not complete.
-- R-047 Mill writes its JUnit XML report for each module as it does without the plugin.
+- R-046 The test command fails if any run it started reports a failure or does not complete. Its failure does not list the failed tests.
+- R-047 The test command writes each selected test module's JUnit XML report as the Mill task R-053 names writes it.
 
 Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each written to the console when turned on.
 - R-049 JSON output is written to a file, never to the console.
-- R-050 Output written by other goals on the same Mill command line, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed. On the console it may interleave with the consolidated output.
+- R-050 Output written by other tasks named on the same `mill` command line, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed. On the console it may interleave with the consolidated output.

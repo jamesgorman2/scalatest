@@ -26,7 +26,7 @@ The prototype is on branch `prototype/native-stdio-wrapper`, in `.planning/event
 - **The suites,** ScalaTest `AnyFunSuite`:
   - `OutputSuite` writes 500 numbered lines to each of `System.out` and `System.err`; writes with C `fputs` to `stdout` (once flushed, once not) and `stderr`; starts two child processes with `inheritIO()`, one writing to each stream; and has one failing test.
   - `CrashSuite` writes from Scala, a child process and C, then calls `abort()`.
-- **The measure.** Each Mill command ran with its own stdout and stderr redirected to files. A *marker* is a line beginning `MARK-`; every line the suites write is one. A marker in those files without the `PLUGIN|` prefix reached the console raw.
+- **The measure.** Each `mill` command line ran with its own stdout and stderr redirected to files. A *marker* is a line beginning `MARK-`; every line the suites write is one. A marker in those files without the `PLUGIN|` prefix reached the console raw.
 - **The runs made by `run.ps1` (Windows) and `run.sh` (Linux):**
   - `plain.test` and `wrapped.test` with the script launcher (on Linux the `exec` form): each of `OutputSuite` and `CrashSuite`, each under the daemon and under `--no-daemon`.
   - `wrapped.test` `OutputSuite` with a stand-in emulator that only runs its arguments (`cmd /c` on Windows, `/usr/bin/env` on Linux), under the daemon and under `--no-daemon`.
