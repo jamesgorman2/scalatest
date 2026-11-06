@@ -1,0 +1,332 @@
+//| mill-version: 1.1.10
+
+// PROTOTYPE - throwaway. Question: does an emitter-to-plugin spike work end to end under parallel
+// workers and several modules? (https://github.com/jamesgorman2/scalatest/issues/30)
+//
+// `spike.test <selector> ...` is an exclusive command taking the Evaluator. It opens a socket
+// listener, executes each selected module's `testForked` with `-C spike.SocketEmitter`, reads every
+// worker's events live, prints a progress line per event, then a per-module summary.
+// SPIKE_CONSOLE=raw|log picks the command's raw streams or its Task.log streams for that output;
+// SPIKE_PROGRESS=cr rewrites one progress line with `\r` instead of printing a line per event.
+//
+// `<module>.test.captureDirect <globs>` and `<module>.test.withStreamsRunTests` are the stream checks.
+package build
+
+import mill.*
+import mill.scalalib.*
+import mill.javalib.TestModuleUtil
+import mill.api.{BuildCtx, Evaluator, SelectMode, SystemStreamsUtils}
+import mill.api.daemon.{DummyInputStream, ExecResult, SystemStreams}
+import mill.api.daemon.internal.TestReporter
+
+import java.io.{BufferedReader, IOException, InputStreamReader, PrintStream}
+import java.net.{InetAddress, ServerSocket, Socket}
+import java.nio.charset.StandardCharsets.UTF_8
+import scala.collection.mutable
+
+object emitter extends ScalaModule {
+  def scalaVersion = "3.3.6"
+  def mvnDeps = Seq(mvn"org.scalatest::scalatest:3.2.19", mvn"org.scala-sbt:test-interface:1.0")
+}
+
+trait Fixture extends ScalaModule {
+  def scalaVersion = "3.3.6"
+
+  trait SpikeTests extends ScalaTests with TestModule.ScalaTest {
+    def moduleDeps = super.moduleDeps ++ Seq(build.emitter)
+    def mvnDeps = super.mvnDeps() ++ Seq(mvn"org.scalatest::scalatest:3.2.19")
+
+    /** Calls callTestRunnerSubprocess itself, with os.Inherit.out/err set to its own readers. */
+    def captureDirect(globs: String*) = Task.Command {
+      val util = new TestModuleUtil(
+        testUseArgsFile(), forkArgs(), Seq.empty, jvmWorker().scalalibClasspath(), resources(),
+        testFramework(), runClasspath(), testClasspath(), testArgsDefault(), testForkGrouping(),
+        jvmWorker().testrunnerEntrypointClasspath(), allForkEnv(), testSandboxWorkingDir(),
+        forkWorkingDir(), testReportXml(), javaHome().map(_.path), testParallelism(),
+        testLogLevel(), propagateEnv(), jvmWorker().internalWorker()
+      )
+      val dir = Task.dest / "direct"
+      val lines = new java.util.concurrent.ConcurrentLinkedQueue[String]()
+      val res = os.Inherit.out.withValue(os.ProcessOutput.Readlines(l => lines.add("out|" + l))) {
+        os.Inherit.err.withValue(os.ProcessOutput.Readlines(l => lines.add("err|" + l))) {
+          util.callTestRunnerSubprocess(dir, dir / "result.log", Left(globs), () => ())
+        }
+      }
+      lines.forEach(l => println("CAPTURED|" + l))
+      println(s"CAPTURED-COUNT ${lines.size}")
+      res.map(_._1)
+    }
+
+    /** Wraps runTests() in SystemStreamsUtils.withStreams over a buffer. */
+    def withStreamsRunTests() = Task.Command {
+      val util = new TestModuleUtil(
+        testUseArgsFile(), forkArgs(), Seq.empty, jvmWorker().scalalibClasspath(), resources(),
+        testFramework(), runClasspath(), testClasspath(), testArgsDefault(), testForkGrouping(),
+        jvmWorker().testrunnerEntrypointClasspath(), allForkEnv(), testSandboxWorkingDir(),
+        forkWorkingDir(), testReportXml(), javaHome().map(_.path), testParallelism(),
+        testLogLevel(), propagateEnv(), jvmWorker().internalWorker()
+      )
+      val bos = new java.io.ByteArrayOutputStream
+      val ps = new PrintStream(bos, true)
+      val res = SystemStreamsUtils.withStreams(new SystemStreams(ps, ps, DummyInputStream)) {
+        util.runTests()
+      }
+      val captured = bos.toString(UTF_8).linesIterator.toSeq
+      captured.foreach(l => println("CAPTURED|" + l))
+      println(s"CAPTURED-COUNT ${captured.size} testParallelism=${testParallelism()}")
+      res.map(_.msg)
+    }
+  }
+}
+
+/** Four suites, two fork groups, testParallelism on: four worker JVMs at once. */
+object alpha extends Fixture {
+  object test extends SpikeTests {
+    def testForkGrouping = Task { discoveredTestClasses().sorted.grouped(2).toSeq }
+    def testParallelism = Task { true }
+  }
+}
+
+/** One suite with a failing test. */
+object beta extends Fixture {
+  object test extends SpikeTests
+}
+
+/** Each suite its own fork group: one halts its JVM, one is killed from outside. */
+object crash extends Fixture {
+  object test extends SpikeTests {
+    def testForkGrouping = Task { discoveredTestClasses().sorted.map(Seq(_)) }
+  }
+}
+
+/** Test sources do not compile. */
+object broken extends Fixture {
+  object test extends SpikeTests
+}
+
+/** Passing tests that cannot start until 6 s into each Mill command: an input sleeps. */
+object late extends Fixture {
+  def delay = Task.Input { Thread.sleep(6000); 0 }
+  object test extends SpikeTests {
+    def forkArgs = Task { late.delay(); super.forkArgs() }
+  }
+}
+
+/** Twelve one-second tests in each of two suites; used by run-interactive.ps1. */
+object slow extends Fixture {
+  object test extends SpikeTests
+}
+
+object quiet extends Fixture {
+  object test extends SpikeTests {
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "levels" / "src")
+    def testLogLevel = Task(TestReporter.LogLevel.Error)
+  }
+}
+
+object loud extends Fixture {
+  object test extends SpikeTests {
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "levels" / "src")
+  }
+}
+
+object shimmed extends Fixture {
+  object test extends SpikeTests {
+    def testFramework = "spike.ShimFramework"
+    def forkEnv = Task { super.forkEnv() ++ Map("SPIKE_SHIM_CAPTURE" -> "1") }
+  }
+}
+
+object spike extends Module {
+
+  final class Conn(val id: Int) {
+    var pid = -1L; var module = "?"; var cwd = "?"; var workerStart = "?"; var addrFrom = "?"
+    var runId = "?"; var helloAt = 0L; var firstEvAt = 0L; var lastAt = 0L; var lines = 0
+    var lastSeq = 0L; var gaps = 0; var runCompleted = false; var end = "open"; var endAt = 0L
+    var lastKind = ""; var maxLatency = 0L
+    val bursts = mutable.Map[String, (Int, Int)]() // tag -> (lines received, highest index)
+  }
+  final class Counts { var ok = 0; var failed = 0; var other = 0; var suites = 0 }
+
+  def test(evaluator: Evaluator, selectors: String*) = Task.Command(exclusive = true) {
+    val t0 = System.currentTimeMillis
+    def rel(t: Long) = f"+${(t - t0) / 1000.0}%.3fs"
+    val mode = Task.env.getOrElse("SPIKE_CONSOLE", "raw")
+    val cr = Task.env.get("SPIKE_PROGRESS").contains("cr")
+    val con: PrintStream = if (mode == "log") Task.log.streams.out else SystemStreamsUtils.current().out
+    val lock = new Object
+    var pendingCr = false
+    def say(s: String): Unit = lock.synchronized {
+      if (pendingCr) { con.print("\n"); pendingCr = false }
+      con.println(s); con.flush()
+    }
+
+    val server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress)
+    val addr = s"127.0.0.1:${server.getLocalPort}"
+    val millPid = ProcessHandle.current.pid
+    say(s"SPIKE body-start ${rel(t0)} epochMs=$t0 selectors=${selectors.mkString("[", "|", "]")} addr=$addr console=$mode millPid=$millPid")
+
+    // Resolve selectors to test modules.
+    val mods: Seq[(String, TestModule)] = selectors.flatMap { s =>
+      evaluator.resolveModulesOrTasks(Seq(s), SelectMode.Separated) match {
+        case mill.api.Result.Success(list) =>
+          list.collect {
+            case Left(m: TestModule) => m.toString -> m
+            case other => say(s"SPIKE not-a-test-module $s -> $other"); null
+          }.filter(_ != null)
+        case f => say(s"SPIKE resolve-failed $s $f"); Nil
+      }
+    }
+    val counts = mods.map(_._1 -> new Counts).toMap
+    val conns = mutable.ArrayBuffer[Conn]()
+    val evFile = new java.io.PrintWriter(java.nio.file.Files.newBufferedWriter((Task.dest / "events.tsv").toNIO, UTF_8))
+    var killedExt = false
+
+    def progress(): Unit = lock.synchronized {
+      val body = counts.toSeq.sortBy(_._1).map { (m, c) =>
+        val cs = conns.filter(_.module == m)
+        s"$m ok=${c.ok} fail=${c.failed} other=${c.other} suites=${c.suites} workers=${cs.count(_.end == "open")}/${cs.size}"
+      }.mkString(" | ")
+      val l = s"PROGRESS ${rel(System.currentTimeMillis)} $body"
+      if (cr) { con.print("\r" + l + "   "); con.flush(); pendingCr = true }
+      else { con.println(l); con.flush() }
+    }
+
+    def handle(c: Conn, line: String, at: Long): Unit = {
+      val f = line.split("\t", -1)
+      lock.synchronized {
+        evFile.println(s"$at\t${rel(at)}\t${c.id}\t$line")
+        c.lines += 1; c.lastAt = at
+      }
+      f(0) match {
+        case "HELLO" =>
+          lock.synchronized {
+            c.runId = f(1); c.pid = f(2).toLong; c.module = f(3); c.cwd = f(4); c.workerStart = f(5)
+            c.addrFrom = f(6); c.helloAt = at
+          }
+          say(s"SPIKE conn#${c.id} hello ${rel(at)} module=${c.module} pid=${c.pid} runId=${c.runId} workerStartedAt=${if (c.workerStart == "?") "?" else rel(c.workerStart.toLong)} addrFrom=${c.addrFrom} cwd=${c.cwd}")
+        case "EV" | "BURST" =>
+          val seq = f(2).toLong
+          val sent = f(3).toLong
+          lock.synchronized {
+            if (seq != c.lastSeq + 1) c.gaps += 1
+            c.lastSeq = seq
+            if (c.firstEvAt == 0) c.firstEvAt = at
+            if (f(0) == "EV" && f(4) != "RunStarting") c.maxLatency = math.max(c.maxLatency, at - sent)
+          }
+          if (f(0) == "EV") {
+            val cnt = counts.getOrElse(c.module, new Counts)
+            lock.synchronized {
+              c.lastKind = f(4)
+              f(4) match {
+                case "TestSucceeded" => cnt.ok += 1
+                case "TestFailed" => cnt.failed += 1
+                case "TestIgnored" | "TestCanceled" | "SuiteAborted" | "RunAborted" | "RunStopped" => cnt.other += 1
+                case "SuiteCompleted" => cnt.suites += 1
+                case "RunCompleted" => c.runCompleted = true
+                case _ =>
+              }
+            }
+            if (f(4) != "TestStarting" && f(4) != "SuiteStarting") progress()
+          } else {
+            val tag = f(4); val i = f(5).toInt
+            lock.synchronized {
+              val (n, hi) = c.bursts.getOrElse(tag, (0, 0))
+              c.bursts(tag) = (n + 1, math.max(hi, i))
+            }
+            if (tag == "haltlag" && i == 1) {
+              say(s"SPIKE conn#${c.id} first haltlag burst line ${rel(at)}: pausing reader 3000 ms")
+              Thread.sleep(3000)
+              say(s"SPIKE conn#${c.id} resuming read ${rel(System.currentTimeMillis)}; worker alive=${ProcessHandle.of(c.pid).map(_.isAlive).orElse(false)}")
+            }
+            if (tag == "ext" && !killedExt) {
+              killedExt = true
+              say(s"SPIKE conn#${c.id} first ext burst line ${rel(at)}: pausing reader 1500 ms, then killing pid ${c.pid}")
+              Thread.sleep(1500)
+              val ok = ProcessHandle.of(c.pid).map(_.destroyForcibly()).orElse(false)
+              say(s"SPIKE conn#${c.id} destroyForcibly(${c.pid})=$ok ${rel(System.currentTimeMillis)}; resuming read in 500 ms")
+              Thread.sleep(500)
+            }
+          }
+        case _ => say(s"SPIKE conn#${c.id} unknown line: $line")
+      }
+    }
+
+    val acceptor = new Thread(() => {
+      try {
+        while (true) {
+          val s: Socket = server.accept()
+          val c = lock.synchronized { val c = new Conn(conns.size + 1); conns += c; c }
+          new Thread(() => {
+            val r = new BufferedReader(new InputStreamReader(s.getInputStream, UTF_8))
+            var end = ""
+            try {
+              var l = r.readLine()
+              while (l != null) { handle(c, l, System.currentTimeMillis); l = r.readLine() }
+              end = "EOF"
+            } catch { case e: IOException => end = s"IOException: ${e.getMessage}" }
+            val at = System.currentTimeMillis
+            lock.synchronized { c.end = end; c.endAt = at }
+            say(s"SPIKE conn#${c.id} end ${rel(at)} module=${c.module} pid=${c.pid} ${end} lastEvent=${c.lastKind} runCompleted=${c.runCompleted}")
+            progress()
+          }, s"spike-reader-${c.id}").start()
+        }
+      } catch { case _: IOException => () }
+    }, "spike-acceptor")
+    acceptor.setDaemon(true)
+    acceptor.start()
+
+    val tasks = mods.map { (label, m) =>
+      label -> m.testForked("-C", "spike.SocketEmitter", s"-Dspike.addr=$addr", s"-Dspike.module=$label")
+    }
+    val tExec = System.currentTimeMillis
+    say(s"SPIKE execute-start ${rel(tExec)} tasks=${tasks.map(_._2.toString).mkString(",")}")
+    val res = evaluator.execute(tasks.map(_._2))
+    val tRet = System.currentTimeMillis
+    say(s"SPIKE execute-returned ${rel(tRet)}")
+
+    // Let readers reach the end of every connection, at most 5 s.
+    val deadline = tRet + 5000
+    while (lock.synchronized(conns.exists(_.end == "open")) && System.currentTimeMillis < deadline) Thread.sleep(20)
+    server.close()
+    lock.synchronized(evFile.close())
+    if (cr) say("")
+
+    say("SPIKE ===== summary =====")
+    var failed = false
+    for ((label, t) <- tasks) {
+      val r = res.executionResults.transitiveResults.get(t)
+      val rs = r match {
+        case Some(ExecResult.Success(_)) => "Success"
+        case Some(ExecResult.Failure(msg, _)) => failed = true; s"Failure: ${msg.linesIterator.mkString(" / ")}"
+        case Some(ExecResult.Exception(e, _)) => failed = true; s"Exception: $e"
+        case Some(other) => failed = true; s"$other"
+        case None => failed = true; "no result"
+      }
+      val c = counts(label)
+      if (c.failed > 0) failed = true
+      say(s"SPIKE module $label task=$rs")
+      say(s"SPIKE module $label events ok=${c.ok} fail=${c.failed} other=${c.other} suitesCompleted=${c.suites}")
+      for (k <- conns if k.module == label) {
+        if (!k.runCompleted) failed = true
+        val bursts = k.bursts.toSeq.map((tag, v) => s"$tag:received=${v._1},highestIndex=${v._2}").mkString(" ")
+        say(s"SPIKE   conn#${k.id} pid=${k.pid} runId=${k.runId} lines=${k.lines} lastSeq=${k.lastSeq} gaps=${k.gaps} firstEvent=${rel(k.firstEvAt)} lastLine=${rel(k.lastAt)} end=${k.end} at ${rel(k.endAt)} maxLatencyMs=${k.maxLatency} runCompleted=${k.runCompleted} $bursts cwd=${k.cwd}")
+      }
+    }
+    for (k <- conns if !counts.contains(k.module)) say(s"SPIKE unattributed conn#${k.id} pid=${k.pid} module=${k.module} cwd=${k.cwd}")
+    for ((k, v) <- res.executionResults.transitiveFailing.toSeq.sortBy(_._1.toString)) {
+      val msg = v match {
+        case ExecResult.Failure(m, _) => m.linesIterator.take(3).mkString(" / ")
+        case ExecResult.Exception(e, _) => e.toString
+      }
+      say(s"SPIKE transitive failing task $k: $msg")
+    }
+    say(s"SPIKE connections from Mill's own pid: ${conns.count(_.pid == millPid)}; total connections: ${conns.size}")
+    say(s"SPIKE nested execute values: ${res.values match { case mill.api.Result.Success(_) => "Success"; case f => f.toString.linesIterator.take(2).mkString(" / ") }}")
+    val skipped = res.executionResults.transitiveResults.collect { case (k, ExecResult.Skipped) => k.toString }.toSeq.sorted
+    say(s"SPIKE skipped tasks: ${skipped.mkString(", ")}")
+    say(s"SPIKE events file ${Task.dest / "events.tsv"}")
+    say(s"SPIKE body-end ${rel(System.currentTimeMillis)} result=${if (failed) "FAIL" else "OK"}")
+    if (failed) Task.fail("spike.test: a module failed or a run did not complete") else "ok"
+  }
+}
