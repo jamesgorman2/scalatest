@@ -15,7 +15,9 @@ One Mill command can start many runs: several selectors, several modules, parall
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document.
 - [../structured-test-reporting/SPECIFICATION.md](../structured-test-reporting/SPECIFICATION.md) — the test structure, what each output shows, and how test output is attributed, which this epic takes by default.
 - [../structured-test-reporting/runner-json/SPECIFICATION.md](../structured-test-reporting/runner-json/SPECIFICATION.md) — the layout of one run's JSON object, which this epic takes.
-- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, what attributing test output needs, and what is known about a channel out of a Mill test-worker JVM.
+- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, and what attributing test output needs.
+- [research/mill-worker-channels.md](research/mill-worker-channels.md) — how Mill wires a test worker's stdout and stderr, whether plugin code can take them, and what a sandbox file, a socket and stdout can each rely on as a channel, on each runtime.
+- [research/mill-command-lifetime.md](research/mill-command-lifetime.md) — which Mill mechanisms run plugin code before the first test task and after the last, how that code learns what ran and how it ended, what Mill does to its console output, and how it sets the exit status.
 - [research/emission-gap-analysis.md](research/emission-gap-analysis.md) — for each need of the consolidated output, whether a run's events already provide it on each runtime, lose it when serialised, leave it derivable, or need new code at the point of emission.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
