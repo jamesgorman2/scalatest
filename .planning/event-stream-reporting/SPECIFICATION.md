@@ -49,7 +49,7 @@ Terms this document adds:
 
 *Receives what 3.2.19 sends* has the meaning `../structured-test-reporting/runner-json/SPECIFICATION.md` § Constraints gives it.
 
-- R-001 A run with the emitter off uses the reporters ScalaTest 3.2.19 uses, each receives what 3.2.19 sends, and the build tool receives the test-interface events 3.2.19 sends.
+- R-001 A run with the emitter off uses the reporters ScalaTest 3.2.19 uses. Each receives what 3.2.19 sends, and the build tool receives the test-interface events 3.2.19 sends.
 - R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.19 sends, except as R-041 states.
 - R-051 With the emitter on, the build tool still receives the test-interface events 3.2.19 sends.
 - R-003 Test runs launched by Metals, Bloop and IntelliJ, in the forked, sbt shell and BSP modes of `../structured-test-reporting/SPECIFICATION.md` § Constraints § IntelliJ, behave as they do against ScalaTest 3.2.19, including in a build that uses the Mill plugin.
@@ -66,7 +66,12 @@ Terms this document adds:
 ## Behaviour taken from structured test reporting
 
 - R-030 Where this document is silent, the test structure and what the human-readable, progress and JSON output show are as `../structured-test-reporting/SPECIFICATION.md` § Test structure, § Human-readable output, § Progress output and § JSON output state. Where the two differ, this document holds.
-- R-031 No statement in `../structured-test-reporting/SPECIFICATION.md` or `../structured-test-reporting/runner-json/SPECIFICATION.md` about a reporter, a reporter's flags, or where and when a single run writes its output applies to this epic, unless a requirement here cites it. This excludes, among others, what `-C` and other existing reporters receive, event-filter characters, the reporters progress output is written to, test output streamed as it is received, and a block or file written at the end of each run.
+- R-031 No statement in `../structured-test-reporting/SPECIFICATION.md` or `../structured-test-reporting/runner-json/SPECIFICATION.md` about a reporter, a reporter's flags, or where and when a single run writes its output applies to this epic, unless a requirement here cites it. This excludes, among others:
+  - what `-C` and other existing reporters receive;
+  - event-filter characters;
+  - which reporters progress output is written to;
+  - test output streamed as it is received;
+  - a block or file written at the end of each run.
 
 ## Consolidation
 
@@ -88,7 +93,7 @@ These hold for every run the Mill plugin starts.
 - R-042 The human-readable and JSON output show the run's worker output on the run's node, and drop none of it except as R-045 allows. This differs from `../structured-test-reporting/SPECIFICATION.md` § Test output.
 - R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 - R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the test task, or ScalaTest's end-of-run summary for the run.
-- R-045 The plugin may show as worker output Mill's own progress for the test task and what Mill's own test runner writes for the run, except Mill's list of failed tests and ScalaTest's end-of-run summary, which the consolidated output does not show.
+- R-045 The plugin may show as worker output Mill's own progress for the test task and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
 - R-046 The Mill command fails if any run it started reports a failure or does not complete.
 - R-047 Mill writes its JUnit XML report for each module as it does without the plugin.
 
