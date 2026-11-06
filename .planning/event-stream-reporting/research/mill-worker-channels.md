@@ -116,9 +116,9 @@ Besides what tests and ScalaTest write:
 
 ### 2.2 Through a direct `runTests()` call
 
-- **Sequential path.** The spawn happens on the thread that called `runTests()` (TMU line 307). *Inference:* a plugin that wraps the call in `os.Inherit.out.withValue(...)` and `os.Inherit.err.withValue(...)` supplies the `os.ProcessOutput` the worker's pipes are read by, and Mill's pump to the logger streams is not created.
+- **Sequential path.** The spawn happens on the thread that called `runTests()` (TMU line 307). *Inference:* a plugin that wraps the call in `os.Inherit.out.withValue(...)` and `os.Inherit.err.withValue(...)` supplies the `os.ProcessOutput` that reads the worker's pipes, and Mill's pump to the logger streams is not created.
 - **Parallel path.** Each worker is spawned inside `Task.fork.async`, which calls `withStreams(logger.streams)` on a pool thread (EC lines 129–137) and so sets `os.Inherit.out` and `os.Inherit.err` again (SSU lines 47–49). The caller's values are not seen. The logger is built from `ctx.log` of the `TaskCtx` given to `TestModuleUtil` (TMU lines 54, 200; EC lines 112–116). Whether a plugin can pass a `TaskCtx` of its own was not examined.
-- On the parallel path the per-worker `.log` file of § 1.4 is written whoever called `runTests()`.
+- On the parallel path the per-worker `.log` file of § 1.4 is written regardless of who called `runTests()`.
 
 ### 2.3 Through a direct `callTestRunnerSubprocess` call
 
@@ -150,7 +150,7 @@ Besides what tests and ScalaTest write:
   - Whether a file the worker is appending to can be read concurrently on Windows was not determined (§ 6).
 - **The discovery runner.** It resolves a relative path against the working directory of the process it runs in (`MILL` § 1.4, I-5). The Mill daemon is started with working directory `<daemon dir>/sandbox` (`[mill] runner/launcher/src/mill/launcher/MillProcessLauncher.scala` lines 83–102). *Inference:* the discovery runners of every module and every command resolve one relative path to the same file.
 - **A dead worker.** The file stays on disk. `Task.dest` is cleared only when the task next runs (`MILL` § 2.3). *General:* bytes already handed to the operating system survive the death of the process; bytes still in a buffer inside the JVM do not. Mill reports the worker as `Result.Failure("Test reporting Failed: … out.json does not exist")` (TMU lines 177–178).
-- **Mill APIs.** `Task.dest`. The folder layout under it is shown in Mill's examples (`MILL` § 2.3) and is otherwise the body of `@experimental` `TestModuleUtil`.
+- **Mill APIs.** `Task.dest`. The folder layout under it is shown in Mill's examples (`MILL` § 2.3) and is otherwise set only by the body of the `@experimental` `TestModuleUtil`.
 
 ### 3.2 A socket
 
@@ -164,7 +164,7 @@ Besides what tests and ScalaTest write:
 ### 3.3 The worker's stdout
 
 - **How the worker finds it.** It needs no discovery.
-- **Reading it while the run is in progress.** Mill reads it live (§ 1.3). Plugin code reaches the bytes through the `.log` file of § 1.4, or as raw bytes by the means of § 2.2 and § 2.3. A `testTask` override that calls `super.testTask` reaches neither during the run (§ 2.1).
+- **Reading it while the run is in progress.** Mill reads it live (§ 1.3). Plugin code reaches the bytes through the `.log` file of § 1.4, or as raw bytes by the routes of § 2.2 and § 2.3. A `testTask` override that calls `super.testTask` reaches neither during the run (§ 2.1).
 - **What shares the stream.** Test output, ScalaTest's test-interface `Logger` lines, Mill's `done()` `println` (§ 1.6), and anything written to file descriptor 1. Through the `.log` file, stderr shares it too (§ 1.4).
 - **What reaches the console.** Unless the pipes are read by the plugin's own `os.ProcessOutput` (§ 2.2, § 2.3), everything on them also goes to the console through the `PrefixLogger` (§ 1.5).
 - **The discovery runner.** In Mill's own process its `System.out` is the proxy to the calling thread's streams (§ 2.4), which are the test task's logger streams (§ 1.4). In a JVM-worker subprocess its streams are forwarded to the client (`[mill] libs/javalib/worker/src/mill/javalib/worker/MillJvmWorkerMain.scala` lines 81–86). In neither case is it a worker pipe.
@@ -196,7 +196,7 @@ Besides what tests and ScalaTest write:
 - `@experimental` is documented as "experimental API, which is not guaranteed to stay", and `@internal` as "internal API, which is not guaranteed to stay" (`[mill] core/api/daemon/src/mill/api/daemon/experimental.scala`; `[mill] core/api/daemon/src/mill/api/daemon/internal/internal.scala`). Mill's MiMa check excludes `@experimental` members (`[mill] mill-build/src/millbuild/MillStableJavaModule.scala` line 100).
 - **Inside the test task, after failures.** `runTests()` returns failing tests and a missing `out.json` as a `Result.Failure` value (TMU lines 99–109, 177–178, 395–420), so code after a direct call runs. It throws when a selector matches nothing (lines 97, 104) and when a worker future failed (line 235). *Inference:* the body of a `testTask` override that calls `super.testTask` does not run after a failure (`MILL` I-4).
 - **Mill's list of failed tests** is the message of that `Result.Failure` (TMU lines 401–418). The caller of `runTests()` holds it and decides what its own task returns.
-- **Inside the test task, during the run.** `runTests()` and `callTestRunnerSubprocess` block. The only callback is `poll` on `callTestRunnerSubprocess` (§ 2.3). Any other live reader is a thread the plugin starts before the call.
+- **Inside the test task, during the run.** `runTests()` and `callTestRunnerSubprocess` block. The only callback is `poll` on `callTestRunnerSubprocess` (§ 2.3).
 - **Outside the test task.** An exclusive command that takes an `Evaluator`: `MCL` § 2. A `Task.Worker`: `MCL` § 3.3.
 
 ## 6. What was not determined

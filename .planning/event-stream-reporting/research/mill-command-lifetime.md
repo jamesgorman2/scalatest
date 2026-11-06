@@ -1,6 +1,14 @@
 # What gives plugin code one lifetime spanning a whole Mill command?
 
-Which Mill mechanisms let plugin code run once for a Mill command, before the first test task and after the last; how that code learns the modules and selectors, and that the command ended; what Mill does to its terminal output; whether it can set the exit status; and how stable the APIs are. Question: [What gives plugin code one lifetime spanning a whole Mill command?](https://github.com/jamesgorman2/scalatest/issues/28). Facts only; no design is chosen.
+This note covers:
+
+- which Mill mechanisms let plugin code run once for a Mill command, before the first test task and after the last;
+- how that code learns the modules and selectors, and that the command ended;
+- what Mill does to its terminal output;
+- whether it can set the exit status;
+- how stable the APIs are.
+
+Question: [What gives plugin code one lifetime spanning a whole Mill command?](https://github.com/jamesgorman2/scalatest/issues/28). Facts only; no design is chosen.
 
 Two other notes hold facts this one relies on and does not repeat:
 
@@ -12,7 +20,13 @@ Two other notes hold facts this one relies on and does not repeat:
 - **Of the mechanisms examined, one spans the test tasks: an exclusive command that takes the `Evaluator` and executes the test tasks itself** (§ 2). Its body runs before the first test task, regains control after the last whether those tasks passed or failed, receives every task's result, and returns the command's success or failure. Without `--keep-going`, the body does not run at all when a task that ran before it in the same evaluation failed (§ 2.2). Mill documents evaluator commands as experimental.
 - **It spans one evaluation, not one Mill command.** A command line holding `+` is several goals of one evaluation, and `--watch` repeats the evaluation inside one Mill command (§ 1, § 2.6).
 - **The command learns the modules and selectors from its own parameters**, and resolves selector tokens through the `Evaluator`. Mill consumes a `+` before the command sees it (§ 2.3).
-- **Each other mechanism examined lacks a start, an end, or the failure path, or does not run once per Mill command** (§ 3): an aggregating command's body is skipped when a test task fails; a sibling exclusive command is skipped after a failure unless `--keep-going` is set; a `Task.Worker` outlives the command and has no end-of-command callback; a JVM shutdown hook runs once per Mill command under `--no-daemon`, and under the daemon only when the daemon exits; no evaluator or runner hook exists; Mill has no cross-module test report.
+- **Each other mechanism examined lacks a start, an end, or the failure path, or does not run once per Mill command** (§ 3):
+  - An aggregating command's body is skipped when a test task fails.
+  - A sibling exclusive command is skipped after a failure unless `--keep-going` is set.
+  - A `Task.Worker` outlives the command and has no end-of-command callback.
+  - A JVM shutdown hook runs once per Mill command under `--no-daemon`, and under the daemon only when the daemon exits.
+  - No evaluator or runner hook exists.
+  - Mill has no cross-module test report.
 - **Terminal output.** Tasks run by the nested `execute` write through Mill's prompt, prefixed per task. The command's own `System.out` is the raw streams, which bypass the prompt; its `Task.log.streams` go through the prompt. *Inferred:* a raw write during a nested `execute` can interleave with the prompt on an interactive terminal (§ 4).
 - **Under the daemon, a user interrupt exits the JVM without interrupting the command's thread** (§ 5.1). *Inferred:* the command body's `finally` blocks do not run and only a JVM shutdown hook observes the interrupt, and the same holds under `--no-daemon` (§ 5.1, § 5.2).
 - **Exit status is 0 or 1 from the command's result**; any other code needs `systemExitWithReason`, which stops the daemon (§ 6).
@@ -126,7 +140,7 @@ Statements marked *inferred* follow from the cited source and were not observed.
 - A worker is created when a task that depends on it first runs, and one worker in an `ExternalModule` can be shared by tasks of many modules, as `ScoverageReportWorker` is (`ScoverageReport.scala` lines 42, 106–107).
 - `close()` is called on an `AutoCloseable` worker when its inputs change (`GE` lines 744–773), when the build's classloader is replaced (`BOOT` lines 327–345), and on `clean` (`MainModule.scala` lines 251–256). The documentation states only the first: "Mill will call the `close()` method on it before any newer version of this worker is created" (`example/fundamentals/tasks/6-workers/build.mill` lines 189–190).
 - No call closes workers at the end of a command or when the daemon exits: `runner/daemon/src/mill/daemon/RunnerState.scala`, `MillDaemonMain0.scala` and `MillNoDaemonMain0.scala` contain none.
-- *Inferred:* a worker has a lifetime longer than a command under the daemon, equal to the process under `--no-daemon`, and receives no signal that a command started or ended.
+- *Inferred:* a worker outlives a command under the daemon, lives as long as the process under `--no-daemon`, and receives no signal that a command started or ended.
 
 ### 3.4 Evaluator and runner hooks
 
@@ -232,7 +246,7 @@ Statements marked *inferred* follow from the cited source and were not observed.
 - Ctrl-C on Windows: whether the launcher and daemon receive the console control event, and what the daemon does with it. `Signal.handle(new Signal("INT"), …)` is the only handling read.
 - How the launcher process itself handles SIGINT; `MillLauncherMain.scala` holds no signal handling, and the native launcher was not read.
 - Whether the daemon's command thread is a daemon thread, and how long `System.exit` takes with test-worker JVMs alive.
-- How `destroyOnExit` is implemented in os-lib, and whether test-worker JVMs survive a daemon exit.
+- Whether test-worker JVMs survive a daemon exit. The os-lib shutdown hook behind `destroyOnExit`: `MWC` § 6.
 - Whether a plugin compiled into a package under `mill` can implement `Logger` and pass it to `execute` (§ 2.5).
 - Whether several `execute` calls can run concurrently from one exclusive command.
 - Whether these facts hold on Mill versions other than `1.1.10`. The changelog records `Task.Command(exclusive = true)` as introduced in 0.12.0 (`changelog.adoc` lines 1678, 1798).

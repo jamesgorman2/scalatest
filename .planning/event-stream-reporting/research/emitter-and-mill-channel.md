@@ -2,7 +2,10 @@
 
 What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what the earlier Mill notes mean for a channel from a Mill test-worker JVM to a Mill plugin. Facts only; no design is chosen.
 
-The channel itself is examined in `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`, and what can host plugin code across test tasks in `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`.
+Two later notes take the Mill questions further:
+
+- `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the channel itself.
+- `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what can host plugin code across test tasks.
 
 Two earlier notes hold facts this one relies on and does not repeat:
 
