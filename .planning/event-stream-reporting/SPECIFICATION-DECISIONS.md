@@ -11,7 +11,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** No output drops what a run sent (`SPECIFICATION.md` R-021), and neither format can hold a failure outside a test.
 
-**Costs** CI tools that read only JUnit XML get nothing from the consolidation. The two epics differ by one output when they are compared, an exception to reuse by default that consolidating many runs does not force.
+**Costs** CI tools that read only JUnit XML get nothing from the consolidation. When the two epics are compared, they differ by one output, an exception to reuse by default that consolidating many runs does not force.
 
 **Settled by** [Is consolidated JUnit XML in scope?](https://github.com/jamesgorman2/scalatest/issues/34).
 
