@@ -23,7 +23,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 - Streaming it to the console as `../structured-test-reporting/SPECIFICATION.md` § Test output does keeps the two epics alike, but it interleaves across runs, which is the problem this epic addresses.
 - Writing it to a file for each run keeps the consolidated output to what came over the channel, but separates a crash message from the run it explains.
-- Discarding it loses the only account of some halted runs.
+- Discarding it loses the only account of some runs that did not complete.
 
 **Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's node is where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
@@ -38,7 +38,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **Alternatives**
 
 - Consolidated JUnit XML, as `../structured-test-reporting/SPECIFICATION.md` § Multi-run consolidation plugin writes it, keeps the two epics' outputs the same, but loses failures outside tests.
-- CTRF (Common Test Report Format) is a more plausible standard for CI readers, but loses the same failures, so it stays out of this epic; a later feature may add it.
+- CTRF (Common Test Report Format) is a more plausible standard for CI readers, but loses the same failures.
 
 **Reasoning** Neither format can hold a failure outside a test, so either would report a run as cleaner than the human-readable and JSON output show it (`SPECIFICATION.md` R-021).
 

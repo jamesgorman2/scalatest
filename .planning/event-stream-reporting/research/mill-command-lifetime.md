@@ -2,18 +2,22 @@
 
 Which Mill mechanisms let plugin code run once for a Mill command, before the first test task and after the last; how that code learns the modules and selectors, and that the command ended; what Mill does to its terminal output; whether it can set the exit status; and how stable the APIs are. Question: [What gives plugin code one lifetime spanning a whole Mill command?](https://github.com/jamesgorman2/scalatest/issues/28). Facts only; no design is chosen.
 
-Two earlier notes hold facts this one relies on and does not repeat:
+Two other notes hold facts this one relies on and does not repeat:
 
 - `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: Mill's test tasks and test-worker JVMs.
-- `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `CHAN`: what is known about a channel out of a test-worker JVM.
+- `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: how Mill wires a test-worker JVM's streams and what it does to a task's output.
 
 ## Short answer
 
-- **One mechanism spans the test tasks: an exclusive command that takes the `Evaluator` and executes the test tasks itself** (§ 2). Its body runs before the first test task, regains control after the last whether tests passed or failed, receives every task's result, and returns the command's success or failure. Mill documents evaluator commands as experimental.
+- **Of the mechanisms examined, one spans the test tasks: an exclusive command that takes the `Evaluator` and executes the test tasks itself** (§ 2). Its body runs before the first test task, regains control after the last whether those tasks passed or failed, receives every task's result, and returns the command's success or failure. Without `--keep-going`, the body does not run at all when a task that ran before it in the same evaluation failed (§ 2.2). Mill documents evaluator commands as experimental.
 - **It spans one evaluation, not one Mill command.** A command line holding `+` is several goals of one evaluation, and `--watch` repeats the evaluation inside one Mill command (§ 1, § 2.6).
-- **Every other candidate lacks a start, an end, or the failure path** (§ 3): an aggregating command's body is skipped when a test task fails; a sibling exclusive command is skipped after a failure unless `--keep-going` is set; a `Task.Worker` outlives the command and has no end-of-command callback; no evaluator or runner hook exists; Mill has no cross-module test report.
-- **A user interrupt ends the process, not the command body** (§ 5). Under the daemon, the daemon detects the lost client and exits the JVM without interrupting the command's thread. Only a JVM shutdown hook observes it.
+- **The command learns the modules and selectors from its own parameters**, and resolves selector tokens through the `Evaluator`. Mill consumes a `+` before the command sees it (§ 2.3).
+- **Each other mechanism examined lacks a start, an end, or the failure path, or does not run once per Mill command** (§ 3): an aggregating command's body is skipped when a test task fails; a sibling exclusive command is skipped after a failure unless `--keep-going` is set; a `Task.Worker` outlives the command and has no end-of-command callback; a JVM shutdown hook runs once per Mill command under `--no-daemon`, and under the daemon only when the daemon exits; no evaluator or runner hook exists; Mill has no cross-module test report.
+- **Terminal output.** Tasks run by the nested `execute` write through Mill's prompt, prefixed per task. The command's own `System.out` is the raw streams, which bypass the prompt; its `Task.log.streams` go through the prompt. *Inferred:* a raw write during a nested `execute` can interleave with the prompt on an interactive terminal (§ 4).
+- **Under the daemon, a user interrupt exits the JVM without interrupting the command's thread** (§ 5.1). *Inferred:* the command body's `finally` blocks do not run and only a JVM shutdown hook observes the interrupt, and the same holds under `--no-daemon` (§ 5.1, § 5.2).
 - **Exit status is 0 or 1 from the command's result**; any other code needs `systemExitWithReason`, which stops the daemon (§ 6).
+- **API stability.** `Task.Command(exclusive = true)`, `mill.api.Evaluator` and `Evaluator.Result` are public in `mill.api`, which Mill's binary-compatibility policy covers. `TestModuleUtil` and the API `Task.fork` returns are `@experimental`, `Logger.prompt` is `private[mill]`, and `mill.exec` and `mill.internal` are outside the policy (§ 7).
+- **Not known** (§ 8): among others, Ctrl-C on Windows, how the launcher handles SIGINT, and whether test-worker JVMs survive a daemon exit.
 - **Nothing here was run.** Every behaviour is read from source at one Mill version.
 
 ## Sources
@@ -22,7 +26,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 |---|---|---|
 | `[mill]` | <https://github.com/com-lihaoyi/mill> | tag `1.1.10` (`92d51b79bc2243fd2e82a022c924b03b822b2d7b`), the version `MILL` pins |
 | `MILL` | `.planning/structured-test-reporting/research/mill-test-worker-args.md` | as committed |
-| `CHAN` | `.planning/event-stream-reporting/research/emitter-and-mill-channel.md` | as committed |
+| `MWC` | `.planning/event-stream-reporting/research/mill-worker-channels.md` | as committed |
 
 Permalink base: `https://github.com/com-lihaoyi/mill/blob/92d51b79bc2243fd2e82a022c924b03b822b2d7b/`. Paths are relative to the `[mill]` root. Abbreviations:
 
@@ -39,14 +43,14 @@ Permalink base: `https://github.com/com-lihaoyi/mill/blob/92d51b79bc2243fd2e82a0
 - `PL` is `core/internal/src/mill/internal/PromptLogger.scala`.
 - `TM` and `TMU` are as in `MILL`.
 
-No experiment was run. §§ 1–7 are read from `[mill]` source and every citation was opened. Statements marked *inferred* follow from the cited source and were not observed. § 8 lists what was not determined.
+Statements marked *inferred* follow from the cited source and were not observed. § 8 lists what was not determined.
 
 ## 1. How a command line reaches tasks
 
 - **One evaluation per command line.** The runner passes all of the command line's task arguments to one `evaluator.evaluate(tasksAndParams, SelectMode.Separated, …)` call (`BOOT` lines 399–413, 586–600). `evaluate` resolves them to tasks and makes one `execute` call (`EI` lines 405–426).
 - **`+` separates goals.** `ParseArgs.separate` splits the arguments at each `+` token; `\+` passes a literal `+` (`core/api/src/mill/api/internal/ParseArgs.scala` lines 59–82). Each group is one selector followed by its arguments (lines 101–115). `mill foo.test + bar.test` is documented (`website/docs/modules/ROOT/pages/cli/flags.adoc` line 53).
 - **`foo.test` is `foo.test.testForked`.** A selector that resolves to a `DefaultTaskModule` resolves to its default task (`core/resolve/src/mill/resolve/Resolve.scala` lines 147–153); `TestModule`'s is `testForked` (`TM` line 34).
-- **`mill __.test`** therefore resolves to one `testForked` command per test module, all goals of the same `execute` call. `testOnly` and `testCached` are per module likewise (`MILL` § 1.1).
+- **`mill __.test`** therefore resolves to one `testForked` command per test module, all goals of the same `execute` call.
 - **Scheduling.** Within one `execute`, all tasks that are not exclusive commands run first, in parallel on the `--jobs` pool. Exclusive commands then run one at a time on the calling thread (`EX` lines 216–223, 358–367).
 - **`--watch`.** With `-w`, one Mill process repeats the whole evaluation on each change or Enter key, until interrupted (`runner/daemon/src/mill/daemon/Watching.scala` lines 70–92; `MAIN` lines 489–509).
 - **BSP.** The BSP server calls `execute` directly with its own `testReporter` (`runner/bsp/worker/src/mill/bsp/worker/Endpoints.scala` lines 436–455). It does not go through a command line.
@@ -68,6 +72,7 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 - `execute` returns when every task it started has finished. Its nested call is anticipated: `Execution` counts nesting depth so that only the outermost call prints the final status (`EX` lines 46–47, 131–147, 369–375).
 - The nested test tasks run in parallel on the same `--jobs` pool as any top-level goal (`EX` lines 220–223, 365).
 - Other goals of the same command line are not spanned. Non-exclusive goals run before the exclusive command's body starts, and other exclusive goals run before or after it (§ 1 Scheduling).
+- **The command is itself a goal of the top-level `execute`, and its body can be skipped.** One fail-fast flag serves both the non-exclusive and the exclusive tasks of an `execute` call (`EX` lines 159, 365–367). Without `--keep-going`, a task that does not succeed sets it, and a task that has not started when it is set is recorded as skipped without running its body (`EX` lines 276, 315–316, 401). The command's body therefore does not run when another goal of the command line, or a task the command depends on, failed before it. With `--keep-going` it is skipped only when a task it depends on failed (§ 2.4).
 
 ### 2.3 How it learns the modules and selectors
 
@@ -81,7 +86,7 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 
 - `execute` returns `Evaluator.Result(watchable, values, selectedTasks, executionResults)` (`EV` lines 160–172). It does not throw on task failure: `values` is a `Result.Failure` built from the failing tasks, and `executionResults.transitiveResults` maps every task to its `ExecResult`: success, failure, exception or skipped (`EI` lines 340, 383–398; `EX` lines 398–422).
 - The command body continues after a failed nested `execute` and decides its own result. `selective.run` shows the pattern (`SelectiveExecutionModule.scala` lines 105–110).
-- A failed test task's result is the `Result.Failure` holding Mill's list of failed tests (`TMU` lines 395–420). It reaches the console only if something prints it; the nested `execute` does not.
+- A failed test task's result holds Mill's list of failed tests (`MWC` § 5). It reaches the console only if something prints it; the nested `execute` does not.
 - **Fail-fast applies inside the nested call.** Without `--keep-going`, the first task that does not succeed sets a flag, and every task that has not yet started is recorded as skipped (`EX` lines 159, 276, 315–316, 401; `BOOT` line 498; `MAIN` line 288). Tasks already running finish. The flag is local to each `execute` call (`EX` line 159).
 - With `--keep-going`, only tasks downstream of a failed task are skipped (`GE` lines 509–514), and Mill logs `"<task> task failed"` for each failed task as it fails (`GE` lines 570–573).
 - No public member of `Evaluator` changes fail-fast for one call. `failFast` is a constructor field of `mill.exec.Execution` (`EX` line 27).
@@ -91,7 +96,7 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 - `execute` takes `testReporter: TestReporter` and `logger: Logger` (`EV` lines 98–105). The reporter reaches each task as `Task.testReporter` (`GE` lines 516–529; `TASK` line 119).
 - `TestReporter` has `logStart(event)` and `logFinish(event)` over `sbt.testing.Event` (`core/api/daemon/src/mill/api/daemon/internal/TestReporter.scala` lines 11–18).
 - Tasks that use it: `testLocal` (`TM` lines 347–358), the Scala.js test task (`libs/scalajslib/src/mill/scalajslib/ScalaJSModule.scala` line 420) and the Native test task (`libs/scalanativelib/src/mill/scalanativelib/ScalaNativeModule.scala` line 509).
-- The forked JVM path does not: each test-worker JVM builds its own no-op reporter from the log level (`libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerMain0.scala` lines 20, 33).
+- The forked JVM path does not (`MWC` § 1.6).
 - `evaluator.withBaseLogger(logger)` returns an evaluator whose tasks log through `logger` (`EV` line 43). `show` uses it to send task stdout to stderr (`MainModule.scala` lines 491–502).
 - `Logger` has abstract `private[mill]` members, `prompt` among them (`core/api/daemon/src/mill/api/daemon/Logger.scala` lines 83–96). *Inferred:* a plugin outside package `mill` cannot implement `Logger`.
 
@@ -101,12 +106,12 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 - **Selective execution is off** for an `execute` whose goals include an exclusive command (`EI` line 300).
 - **A non-command task cannot depend on an exclusive command**; Mill fails it (`EX` lines 235–239).
 
-## 3. The other candidates
+## 3. The other mechanisms examined
 
 ### 3.1 A command that depends on the test tasks
 
 - A command can depend on other modules' commands or take `Tasks[T]`, as `publishAll` does (`PublishModule.scala` line 743).
-- Its body runs only after every dependency succeeded. A task with any input that did not succeed is `Skipped` and its body does not run (`GE` lines 509–514; `MILL` I-4).
+- Its body runs only after every dependency succeeded. A task with any input that did not succeed is `Skipped` and its body does not run (`GE` lines 509–514).
 - Its body cannot run before its dependencies. This gives no start and no failure path.
 
 ### 3.2 A sibling exclusive command on the same command line
@@ -121,7 +126,7 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 - A worker is created when a task that depends on it first runs, and one worker in an `ExternalModule` can be shared by tasks of many modules, as `ScoverageReportWorker` is (`ScoverageReport.scala` lines 42, 106–107).
 - `close()` is called on an `AutoCloseable` worker when its inputs change (`GE` lines 744–773), when the build's classloader is replaced (`BOOT` lines 327–345), and on `clean` (`MainModule.scala` lines 251–256). The documentation states only the first: "Mill will call the `close()` method on it before any newer version of this worker is created" (`example/fundamentals/tasks/6-workers/build.mill` lines 189–190).
 - No call closes workers at the end of a command or when the daemon exits: `runner/daemon/src/mill/daemon/RunnerState.scala`, `MillDaemonMain0.scala` and `MillNoDaemonMain0.scala` contain none.
-- A worker therefore has a lifetime longer than a command under the daemon, equal to the process under `--no-daemon`, and receives no signal that a command started or ended.
+- *Inferred:* a worker has a lifetime longer than a command under the daemon, equal to the process under `--no-daemon`, and receives no signal that a command started or ended.
 
 ### 3.4 Evaluator and runner hooks
 
@@ -142,19 +147,16 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 
 ### 4.1 What Mill does to a task's output
 
-- Mill replaces `System.out`, `System.err` and `System.in` with proxies that forward to per-thread streams (`core/api/java11/src/mill/api/SystemStreamsUtils.scala` lines 21–58, 84–104).
-- A non-exclusive task's streams are its `PrefixLogger`'s. Output is buffered to whole lines, then passed to `PromptLogger.logPrefixedLine` (`core/internal/src/mill/internal/PrefixLogger.scala` lines 47–56).
-- With the ticker on, `logPrefixedLine` prints the task's `[N]` key before each line and strips every ANSI code except colours (`PL` lines 169–273, strip at lines 237–246). With the ticker off, lines pass unchanged (`PL` line 273).
-- Each task's output is also written to its `out/<task>.log` file (`GE` lines 643–657; `CTX` lines 100–106).
+- How the output of a non-exclusive task, and of a test-worker JVM it spawns, reaches the task's `PrefixLogger` and `.log` file: `MWC` § 1.1–1.4. The per-thread `System.out` proxy: `MWC` § 2.4.
+- What the `PrefixLogger` does to each line with the ticker on: `MWC` § 1.5. With the ticker off, lines pass unchanged (`PL` line 273).
 - All lines then pass through one pipe to a pumper thread, which clears and redraws the prompt around them on an interactive terminal (`PL` lines 391–412, 439–492).
-- A subprocess spawned with `os.Inherit` has its output pumped into the spawning thread's streams (`SystemStreamsUtils.scala` lines 16–20, 35–41). The test-worker JVM is spawned with `stdout = os.Inherit` (`TMU` lines 159–160).
 
 ### 4.2 What an exclusive command's own output gets
 
 - An exclusive command's body runs with `exclusiveSystemStreams`: the command's raw streams, not the prompt logger's (`GE` lines 861–863; `BOOT` line 502; `MAIN` line 298). Its working directory is the workspace root (`GE` line 862).
 - Mill prints the command's key once, then pauses the prompt for the body (`GE` lines 885–891). The pause first drains pending output, because the raw streams bypass the pipe (`PL` lines 288–294).
 - **A nested `execute` unpauses the prompt** for its duration (`EX` line 137; `PL` lines 296–297). Nested tasks then write through the pipe with prefixes and prompt redraws, as in § 4.1.
-- *Inferred:* while a nested `execute` runs, a write from the command's own thread to `System.out` goes to the raw streams and is not coordinated with the prompt's cursor movement, so the two can interleave on an interactive terminal. Not observed.
+- *Inferred:* while a nested `execute` runs, a write from the command's own thread to `System.out` goes to the raw streams and is not coordinated with the prompt's cursor movement, so the two can interleave on an interactive terminal.
 - `Task.log` inside the command is the command's `PrefixLogger` teed to its log file (`GE` lines 503, 516–519). Writes through `Task.log.streams` take the § 4.1 path: line-buffered, prefixed with the command's key, non-colour ANSI stripped, coordinated with the prompt.
 - `SystemStreams.original` is public and documented as not to be used: it is not captured by Mill's redirection and, under the daemon, reaches only the daemon's log files (`core/api/daemon/src/mill/api/daemon/SystemStreams.scala` lines 20–28).
 - `Logger.prompt`, with `withPromptPaused`, `setPromptLine` and `logPrefixedLine`, is `private[mill]` (`Logger.scala` lines 83–89).
@@ -175,14 +177,14 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 - The daemon polls the client with a heartbeat every millisecond while the command runs (`SRV` lines 226–243, 267; `DSRV` lines 43–52).
 - When the client is gone and the command is not idle, the daemon does not interrupt the command's thread ("`interrupt` has lots of weird side effects"); it closes its server socket (`SRV` lines 267–278).
 - Closing the socket ends the accept loop, `run()` returns, and `main` calls `System.exit` (`SRV` lines 142–169; `MillDaemonMain0.scala` lines 60–67).
-- *Inferred:* the command body's thread is not unwound, so its `finally` blocks and any `close()` do not run; JVM shutdown hooks do. Not observed.
+- *Inferred:* the command body's thread is not unwound, so its `finally` blocks and any `close()` do not run; JVM shutdown hooks do.
 - Subprocesses spawned through `Jvm.spawnProcess` default to `destroyOnExit = true` (`libs/util/java11/src/mill/util/Jvm.scala` lines 134–149).
-- The next command starts a new daemon.
+- *Inferred:* the next command starts a new daemon.
 
 ### 5.2 Under `--no-daemon`
 
 - `MillNoDaemonMain0` installs no SIGINT handler (`MillNoDaemonMain0.scala` lines 14–73).
-- *Inferred:* SIGINT has the JVM's default effect: shutdown hooks run and the process exits, without unwinding the command's thread. Not observed.
+- *Inferred:* SIGINT has the JVM's default effect: shutdown hooks run and the process exits, without unwinding the command's thread.
 
 ### 5.3 Under `--watch`
 
@@ -215,7 +217,7 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 | `mill.util.Tasks` | Public, in `mill.util` (`Tasks.scala` line 10). |
 | `Task.Worker` | Public, in `mill.api` (`TASK` line 311). |
 | `Task.ctx().systemExitWithReason` | Public (`CTX` line 33). |
-| `Task.fork` | `@experimental` (`CTX` line 193). |
+| `Task.fork` | The accessor carries no annotation (`TASK` line 131). The `TaskCtx.Fork.Api` it returns is declared in `object Fork`, which is `@experimental` (`CTX` lines 193–196). |
 | `mill.exec.Execution`, `GroupExecution` | Package `mill.exec`, not in the policy's list. |
 | `mill.internal.PromptLogger`, `PrefixLogger` | Package `mill.internal`, not in the policy's list. |
 | `TestModuleUtil` | `@experimental` (`MILL` § 2.2). |
@@ -224,7 +226,7 @@ No experiment was run. §§ 1–7 are read from `[mill]` source and every citati
 
 ## 8. What is not known
 
-- Whether any behaviour above holds when run; no experiment was run.
+- Whether any behaviour above holds when run.
 - Whether a write from an exclusive command's thread during a nested `execute` corrupts an interactive terminal (§ 4.2), and whether `Task.log.streams` output from that thread is ordered correctly against nested tasks' output.
 - Whether the `[N]` prefix is printed on an exclusive command's `Task.log.streams` lines. `PrefixLogger` computes an empty `linePrefix` for it (`PrefixLogger.scala` lines 40–42), but `logPrefixedLine` formats the prefix from the key (`PL` lines 221–222).
 - Ctrl-C on Windows: whether the launcher and daemon receive the console control event, and what the daemon does with it. `Signal.handle(new Signal("INT"), …)` is the only handling read.

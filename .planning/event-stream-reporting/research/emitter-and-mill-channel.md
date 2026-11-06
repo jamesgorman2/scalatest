@@ -16,7 +16,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 - **`-C` is JVM-only and attaches late.** It works under `Runner` and the JVM `Framework`, takes no arguments, sits after sorting and filtering, and has no equivalent on Scala.js or Native (§ 3).
 - **ScalaTest captures no test output today**, and a reporter cannot attribute output to a test (§ 4).
 - **Events alone do not rebuild the tree or identify the run** (§ 5).
-- **Inside a Mill test worker, only the working directory tells one worker from another** (§ 6). `MWC` covers the candidate channels.
+- **From inside a Mill test worker, only the working directory tells one worker from another** (§ 6). `MWC` covers the candidate channels.
 
 ## Sources
 
@@ -25,6 +25,8 @@ Two earlier notes hold facts this one relies on and does not repeat:
 | `[this]` | this repo | `f3a9c910a` |
 | `MILL` | `.planning/structured-test-reporting/research/mill-test-worker-args.md` | read from Mill tag `1.1.10` (`92d51b7`) |
 | `JSN` | `.planning/structured-test-reporting/research/js-native-structure-and-capture.md` | read from the sources its § Sources lists |
+| `MWC` | `.planning/event-stream-reporting/research/mill-worker-channels.md` | read from the sources its § Sources lists |
+| `MCL` | `.planning/event-stream-reporting/research/mill-command-lifetime.md` | read from Mill tag `1.1.10` (`92d51b7`) |
 
 `[this]` paths are relative to the repo root. Abbreviations:
 
@@ -32,7 +34,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 - `TOOLS/` is `jvm/core/src/main/scala/org/scalatest/tools/`.
 - `JS/` is `js/core/src/main/scala/org/scalatest/tools/`.
 
-No experiment was run for this note. §§ 1–5 are read from `[this]` source. Every `[this]` citation was opened and confirmed unless marked *unverified*, which means a research agent reported it and it was not re-opened. No Mill source was read: § 6 states only what follows from `MILL` and `JSN` for a channel, and § 7 lists what neither establishes.
+No experiment was run for this note. §§ 1–5 are read from `[this]` source. Every `[this]` citation was opened and confirmed unless marked *unverified*, which means a research agent reported it and it was not re-opened. No Mill source was read for this note: § 6 states what `MILL`, `JSN`, `MWC` and `MCL` establish for a channel.
 
 ## 1. The event model
 
@@ -110,9 +112,9 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 
 ## 6. Mill: what the earlier notes mean for a channel
 
-- **Telling workers apart.** From inside the worker, only its working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3). What differs from Mill's side: `MWC` § 1.4.
-- **Plugin code inside the worker.** The shim `testFramework` is the one place plugin code runs in the worker JVM before ScalaTest (`MILL` § 3, I-3). `MILL` examines it only for rewriting `-fJ`, not for capture or for opening a channel.
-- **Plugin code after failing tests.** Inside the test task it runs only through a direct call to the `@experimental` `TestModuleUtil.runTests` (`MILL` § 2.2, I-4). Outside the test task: `MCL` § 2.
+- **Telling workers apart.** From inside the worker, only its working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3). What differs from Mill's side: `MWC` § 1.3–1.4.
+- **Plugin code inside the worker.** The shim `testFramework` is the one place plugin code runs in the worker JVM before ScalaTest (`MILL` § 3, I-3). `MILL` examines it only for rewriting `-fJ`, not for capture or for opening a channel. `MWC` § 2.4 examines it for capturing the worker's streams.
+- **Plugin code after failing tests.** Inside the test task it runs only through a direct call into the `@experimental` `TestModuleUtil` (`MILL` § 2.2, I-4; `MWC` § 2.3, § 5). Outside the test task: `MCL` § 2.
 - **What is known about printing.** `MILL` § 1.4 and `JSN` § 2.1 cover sbt test-interface `Logger` lines and the `done()` string. Raw writes to the worker's stdout or stderr: `MWC` § 1.
 - **End of the channel.** The worker exits straight after `done()` (`MILL` § 1.3).
 - **No worker JVM.** `testLocal` runs in Mill's own process (`MILL` § 1.1), as do Scala.js and Native runs through the adapter (`JSN` § 1.3). Their channels out: `JSN` § 2.1, § 2.3.
