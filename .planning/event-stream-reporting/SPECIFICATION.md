@@ -12,6 +12,9 @@ One Mill command can start many runs: several selectors, several modules, parall
 
 ## Spec documents
 
+- [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document.
+- [../structured-test-reporting/SPECIFICATION.md](../structured-test-reporting/SPECIFICATION.md) — the test structure, human-readable output and progress output this epic is written against.
+- [../structured-test-reporting/runner-json/SPECIFICATION.md](../structured-test-reporting/runner-json/SPECIFICATION.md) — the layout of one run's JSON object, which this epic is written against.
 - [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, what attributing test output needs, and what is known about a channel out of a Mill test-worker JVM.
 - [research/emission-gap-analysis.md](research/emission-gap-analysis.md) — for each need of the consolidated output, whether a run's events already provide it on each runtime, lose it when serialised, leave it derivable, or need new code at the point of emission.
 
@@ -51,15 +54,19 @@ Terms this document adds:
 - R-010 Each run sends over one channel: every event the run reports, the test structure those events belong to, and the run's test output.
 - R-011 Nothing a run reports is lost or altered between the run and the channel's reader. This includes failure messages, throwables with their cause chains, and the order of events within a node.
 - R-012 Each piece of test output is attributed to the node that was running when it was written, and keeps its position among that node's events.
-- R-013 A reader can tell apart the channels of different runs started by one Mill command.
+- R-013 A channel carries one run. A run carries no identifier of its own: the caller of the channel's reader names the test run label each channel belongs to.
+
+## Behaviour taken from structured test reporting
+
+- R-030 Where this document is silent, the test structure, the human-readable output and the progress output behave as `../structured-test-reporting/SPECIFICATION.md` § Test structure, § Human-readable output and § Progress output state. Where the two differ, this document holds.
 
 ## Consolidation
 
-- R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started:
-  - progress output while the runs execute;
-  - human-readable output;
-  - JSON output.
-- R-021 The human-readable and JSON output hold everything every run sent; no event, node or test output is dropped.
+- R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started: progress output, human-readable output and JSON output. Each is a separate output.
+- R-026 Progress output is written while the runs execute, from the events received so far.
+- R-027 The human-readable and JSON output are written together, once every run has completed or halted.
+- R-028 The JSON output is one object for the Mill command. Within it, each run's test structure has the layout `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object gives one run, each node holding its final state.
+- R-021 Each output's formatter receives everything every run sent; no event, node or test output is dropped before it.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
 - R-023 Given the same channels, the consolidation library produces the same human-readable and JSON output when used without Mill.
-- R-025 Where one Mill command runs the same suite on several runtimes, the consolidated output identifies the runtime of each run of that suite.
+- R-025 The Mill plugin gives each module one test run label. Where one Mill command runs the same suite on several runtimes, each run of that suite appears under its own module's label.

@@ -69,5 +69,5 @@ Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
 **Test run label**:
-A node in consolidated output that wraps the suites of the JSON files its caller names together, named by the caller and unique within one consolidation. It tells apart runs whose JSON is otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
+A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag
