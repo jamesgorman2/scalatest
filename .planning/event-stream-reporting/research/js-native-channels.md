@@ -1,6 +1,6 @@
-# Channels from a Scala.js or Native run to plugin code in Mill's process
+# Channels from a Scala.js run on Node or a Native run to plugin code in Mill's process
 
-On Scala.js and Scala Native under Mill: which channels can carry a run's event stream to plugin code in Mill's process while the run is in progress, and whether plugin code can take the run's stdout and stderr before they reach the console. Answers [Which channels can carry a Scala.js or Native run's event stream and worker output to the plugin under Mill?](https://github.com/jamesgorman2/scalatest/issues/37). Facts only; no channel or hook is chosen or recommended.
+On Scala.js on Node and on Scala Native under Mill: which channels can carry a run's event stream to plugin code in Mill's process while the run is in progress, and whether plugin code can take the run's stdout and stderr before they reach the console. Answers [Which channels can carry a Scala.js or Native run's event stream and worker output to the plugin under Mill?](https://github.com/jamesgorman2/scalatest/issues/37). Facts only; no channel or hook is chosen or recommended.
 
 Other notes hold facts this one relies on and does not repeat:
 
@@ -10,7 +10,7 @@ Other notes hold facts this one relies on and does not repeat:
 
 ## Short answer
 
-- **Socket.** Both runtimes can open a TCP socket to Mill's process: the test adapters' own com channels already do, to `127.0.0.1` (§ 2). The address can reach a JS VM through the framework arguments, `jsEnvConfig`'s `env`, or Node's own arguments, and a native process through the framework arguments or `forkEnv`. A native binary's command line carries only the com port, and `TestMain` rejects any other argument (§ 2.2). Neither com channel can be reused for a second stream (§ 2.3). A Node socket write that is still queued when Node exits is lost, and Node exits as soon as the com socket closes (§ 2.1).
+- **Socket.** A Node VM and a native process can each open a TCP socket to Mill's process: the test adapters' own com channels already do, to `127.0.0.1` (§ 2). The address can reach a Node VM through the framework arguments, `jsEnvConfig`'s `env`, or Node's own arguments, and a native process through the framework arguments or `forkEnv`. A native binary's command line carries only the com port, and `TestMain` rejects any other argument (§ 2.2). Neither com channel can be reused for a second stream (§ 2.3). A Node socket write that is still queued when Node exits is lost, and Node exits as soon as the com socket closes (§ 2.1).
 - **Working directory and files.** Both processes inherit Mill's own working directory: under the daemon `out/mill-daemon/sandbox`, and under `--no-daemon` `out/mill-no-daemon/<sig>/sandbox`. This holds for every module, every run, and under the daemon every command (§ 3.1). A relative path is therefore never unique to a run. On Windows, Node and Scala Native open files with sharing modes that allow a JDK `FileInputStream` to read the file while it is being written (§ 3.2).
 - **Logger.** Mill passes one `Logger` per task. It prints `info`, `warn` and `error` lines with `println` to the task's streams, filtered by `Task.testReporter.logLevel` and not by `testLogLevel`. `trace` is never filtered, and `error` cannot be filtered out (§ 4.1). Mill builds that logger inline in `@internal` code, so no parameter substitutes it (§ 4.2). Code that calls `Task.execute` itself chooses the loggers, and the adapters call exactly those loggers (§ 4.2). *Inference:* wrapping the `Framework` that `testFrameworkInstance` returns lets JS plugin code supply its own loggers (§ 6.1).
 - **JS VM stdout and stderr.** Each goes through a pipe to a thread that Mill never waits for, which writes to `System.out` or `System.err`. In Mill's process those are the per-thread proxies, so *inference:* the bytes reach the test task's `PrefixLogger` and `.log` file (§ 5.1). Plugin code that builds its own `TestAdapter` can give it a `JSEnv` that replaces `RunConfig.onOutputStream` and so receives both pipes itself (§ 5.1). Mill's own `getFramework` path offers no such hook (§ 6.1).
@@ -50,7 +50,7 @@ Paths are relative to each source's root. Abbreviations:
 
 No experiment was run for this note. Every citation was opened at the version above. A statement marked *inference* follows from the code read and was not observed. A statement marked *general* is operating-system, JDK or Scala behaviour that no source here was opened for. § 7 lists what could not be determined.
 
-The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other JS environments Mill can select are `.planning/event-stream-reporting/research/js-environment-channels.md`.
+The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other JS environments Mill can select are covered in `.planning/event-stream-reporting/research/js-environment-channels.md`.
 
 ## 1. How Mill launches a run's processes
 
