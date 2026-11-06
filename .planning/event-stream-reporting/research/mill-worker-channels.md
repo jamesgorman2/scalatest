@@ -6,6 +6,7 @@ Other notes hold facts this one relies on and does not repeat:
 
 - `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches test-worker JVMs.
 - `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
+- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js or Native run under Mill.
 - `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`: what was known about a channel before this note.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what can host plugin code across a Mill command, and what Mill does to an exclusive command's streams.
 
@@ -174,12 +175,12 @@ Besides what tests and ScalaTest write:
 ## 4. Scala.js and Native under Mill
 
 - **No worker JVM and no discovery runner.** `TestScalaJSModule` and `TestScalaNativeModule` override `testTask` to call `TestRunner.runTestFramework` in Mill's own process on the adapter's `Framework`, and make `testLocal` an alias of `testForked` (`[mill] libs/scalajslib/src/mill/scalajslib/ScalaJSModule.scala` lines 395–432; `[mill] libs/scalanativelib/src/mill/scalanativelib/ScalaNativeModule.scala` lines 488–519). They build no `TestModuleUtil`, so nothing sends `ZincOp.GetTestTasks`. ScalaTest runs only in the JS VMs or native processes (`JSN` § 1).
-- **Arguments and environment.** The framework arguments reach the adapter's runner unchanged (same lines). Mill gives the Node environment its executable, arguments and environment and no working directory (`[mill] libs/scalajslib/worker/1/src/mill/scalajslib/worker/jsenv/NodeJs.scala` lines 15–21). It gives the native adapter the binary, `allForkEnv` and a logger (`[mill] libs/scalanativelib/worker/0.5/src/mill/scalanativelib/worker/ScalaNativeWorkerImpl.scala` lines 135–156). *Inference:* each JS VM and native process inherits the working directory of the process that starts it, so a relative path is the same for every run.
-- **File.** `JSN` § 3.
-- **Socket.** Not examined for either runtime. The native adapter itself reaches its processes over TCP (`JSN` § 1.3).
-- **Stdout.** `JSN` § 2.1. Mill sleeps 100 ms before closing the adapter because output is otherwise dropped (`ScalaJSModule.scala` lines 425–429; `ScalaNativeModule.scala` lines 513–517).
+- **Arguments and environment.** The framework arguments reach the adapter's runner unchanged (same lines). Mill gives the Node environment its executable, arguments and environment and no working directory (`[mill] libs/scalajslib/worker/1/src/mill/scalajslib/worker/jsenv/NodeJs.scala` lines 15–21). It gives the native adapter the binary, `allForkEnv` and a logger (`[mill] libs/scalanativelib/worker/0.5/src/mill/scalanativelib/worker/ScalaNativeWorkerImpl.scala` lines 135–156). The working directory each process gets: `JNC` § 3.1.
+- **File.** `JSN` § 3; `JNC` § 3.
+- **Socket.** `JNC` § 2.
+- **Stdout and stderr.** `JNC` § 5. Mill sleeps 100 ms before closing the adapter (`ScalaJSModule.scala` lines 425–429; `ScalaNativeModule.scala` lines 513–517).
 - **The test-interface `Logger`.** The channel that reaches Mill's process in order on both runtimes (`JSN` § 2.1). Mill prints each line with `systemOut.println`, where `systemOut` is Mill's proxy `System.out` (`TR/TestRunnerUtils.scala` lines 179–191, 252–254).
-- **Hooks for plugin code.** Scala.js has a `protected def testFrameworkInstance` task returning the adapter's `sbt.testing.Framework` (`ScalaJSModule.scala` lines 399–406). Native builds its framework inline in `testTask` (`ScalaNativeModule.scala` lines 497–502). `TestRunner` and `TestRunnerUtils` are `@internal` (`TR/TestRunner.scala` line 6; `MILL` § 2.2).
+- **Hooks for plugin code.** `JNC` § 6.
 
 ## 5. Running plugin code during the run and after tests fail
 
@@ -211,6 +212,5 @@ Besides what tests and ScalaTest write:
 - Whether a file being appended by the worker can be read concurrently on Windows without sharing violations. *General:* expected to work; not checked.
 - Whether live workers are destroyed when the command is interrupted. `spawn` registers a shutdown hook that destroys the process when Mill's JVM exits (`[os] os/src/ProcessOps.scala` lines 326–342); the daemon's handling of a client interrupt is `MCL` § 5.1.
 - What `testLocal` on a JVM module does with test output beyond running the framework in Mill's process (`MILL` § 1.1).
-- Sockets from a JS VM or a native process, and the working directory those processes get (§ 4).
 - Whether data written to a file, a socket or stdout survives the death of a JS VM or a native process (§ 4).
 - Whether any of this holds on Mill versions other than `1.1.10`.
