@@ -2,28 +2,28 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
-## Under the Mill plugin, a module's tests run as they do without it.
+## Under the Mill plugin, a module's tests run, and pass or fail, as they do without it.
 
-**Alternatives** Holding only which tests run and what the test task returns, and leaving the processes they run in to each feature, is cheaper to build, but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
+**Alternatives** Holding only which tests run and their results, and leaving the processes they run in to each feature, is cheaper to build, but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
-**Reasoning** A user who adds the plugin expects the output to change and nothing else. Running the same build with and without the plugin and comparing everything but the console tests it from outside (`SPECIFICATION.md` R-053).
+**Reasoning** A user who adds the plugin expects the output to change and nothing else (`SPECIFICATION.md` R-053).
 
-**Costs** On Scala.js and Native the plugin's own discovery and task loop must follow Mill's release by release. On the JVM the plugin cannot force every module onto one worker to make its output easier to take.
+**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
 ---
 
-## The Mill plugin runs each module's tests itself, in place of Mill's test task, on every runtime.
+## `SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime, though meeting them needs Mill API that Mill does not keep stable.
 
 **Alternatives**
 
-- Overriding the test task and calling Mill's own inside it uses only stable API, but such an override cannot take a run's stdout and stderr and does not run after a failure, so worker output and Mill's list of failed tests reach the console.
-- Relaxing `SPECIFICATION.md` R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
+- Holding only what Mill's stable API allows keeps the plugin working across Mill releases, but that API gives the plugin neither a run's stdout and stderr nor the test task's result after tests fail, so worker output and Mill's list of failed tests reach the console.
+- Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 
-**Reasoning** Only the code that starts a run holds its stdout, its stderr and its result. Without all three the plugin adds a consolidated report beside the console it was meant to replace.
+**Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin depends on Mill API marked `@experimental`, and on Scala.js and Native re-implements the discovery and task loop Mill keeps `@internal`. Either can change in any Mill release, so the plugin may need a release for each.
+**Costs** Holding them obliges the plugin to run each module's tests itself rather than call Mill's own test task, on Mill API marked `@experimental` and with logic Mill keeps `@internal` re-implemented, so it may need a release for each Mill release. On Native no public API takes a run's stdout and stderr, so how R-040 is met there is not yet proven.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
@@ -43,7 +43,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`SPECIFICATION.md` R-044).
 
-**Costs** The plugin must produce the test task's result itself instead of taking Mill's. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
+**Costs** A failed test task's result no longer lists the failed tests (`SPECIFICATION.md` R-053), so a tool reading Mill's failure report sees only that the task failed. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
