@@ -2,10 +2,11 @@
 
 What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what the earlier Mill notes mean for a channel from a Mill test-worker JVM to a Mill plugin. Facts only; no design is chosen.
 
-Two later notes take the Mill questions further:
+Three later notes take the Mill questions further:
 
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the channel itself.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what can host plugin code across test tasks.
+- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels from a Scala.js or Native run.
 
 Two earlier notes hold facts this one relies on and does not repeat:
 
@@ -30,6 +31,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 | `JSN` | `.planning/structured-test-reporting/research/js-native-structure-and-capture.md` | read from the sources its § Sources lists |
 | `MWC` | `.planning/event-stream-reporting/research/mill-worker-channels.md` | read from the sources its § Sources lists |
 | `MCL` | `.planning/event-stream-reporting/research/mill-command-lifetime.md` | read from Mill tag `1.1.10` (`92d51b7`) |
+| `JNC` | `.planning/event-stream-reporting/research/js-native-channels.md` | read from the sources its § Sources lists |
 
 `[this]` paths are relative to the repo root. Abbreviations:
 
@@ -37,7 +39,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 - `TOOLS/` is `jvm/core/src/main/scala/org/scalatest/tools/`.
 - `JS/` is `js/core/src/main/scala/org/scalatest/tools/`.
 
-No experiment was run for this note. §§ 1–5 are read from `[this]` source. Every `[this]` citation was opened and confirmed unless marked *unverified*, which means a research agent reported it and it was not re-opened. No Mill source was read for this note: § 6 states what `MILL`, `JSN`, `MWC` and `MCL` establish for a channel.
+No experiment was run for this note. §§ 1–5 are read from `[this]` source. Every `[this]` citation was opened and confirmed unless marked *unverified*, which means a research agent reported it and it was not re-opened. No Mill source was read for this note: § 6 states what `MILL`, `JSN`, `MWC`, `MCL` and `JNC` establish for a channel.
 
 ## 1. The event model
 
@@ -118,9 +120,9 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 - **Telling workers apart.** From inside the worker, only its working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3). What differs from Mill's side: `MWC` § 1.3–1.4.
 - **Plugin code inside the worker.** The shim `testFramework` is the one place plugin code runs in the worker JVM before ScalaTest (`MILL` § 3, I-3). `MILL` examines it only for rewriting `-fJ`, not for capture or for opening a channel. `MWC` § 2.4 examines it for capturing the worker's streams.
 - **Plugin code after failing tests.** Inside the test task it runs only through a direct call into the `@experimental` `TestModuleUtil` (`MILL` § 2.2, I-4; `MWC` § 2.3, § 5). Outside the test task: `MCL` § 2.
-- **What is known about printing.** `MILL` § 1.4 and `JSN` § 2.1 cover sbt test-interface `Logger` lines and the `done()` string. Raw writes to the worker's stdout or stderr: `MWC` § 1.
+- **What is known about printing.** sbt test-interface `Logger` lines and the `done()` string: `MILL` § 1.4 for a JVM worker, `JNC` § 4 for Scala.js and Native. Raw writes to stdout or stderr: `MWC` § 1 for a JVM worker, `JNC` § 5 for a JS VM or native process.
 - **End of the channel.** The worker exits straight after `done()` (`MILL` § 1.3).
-- **No worker JVM.** `testLocal` runs in Mill's own process (`MILL` § 1.1), as do Scala.js and Native runs through the adapter (`JSN` § 1.3). Their channels out: `JSN` § 2.1, § 2.3.
+- **No worker JVM.** `testLocal` runs in Mill's own process (`MILL` § 1.1), as do Scala.js and Native runs through the adapter (`JSN` § 1.3). The channels out of a Scala.js or Native run: `JNC` §§ 2–5.
 
 ## 7. What is not known
 
