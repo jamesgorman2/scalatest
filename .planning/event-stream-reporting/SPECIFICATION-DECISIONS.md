@@ -7,9 +7,9 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **Alternatives**
 
 - Leaving Mill's list of failed tests, its test progress and ScalaTest's end-of-run summary on the console needs no change to Mill's test task, but each speaks for one run and misleads when several runs are active.
-- Also turning off Mill's JUnit XML report for each module removes the last per-run result, but the consolidation writes no JUnit XML to take its place.
+- Also turning off Mill's JUnit XML report for each module removes the last per-run result, but that report is a file read by tools, not by the person at the console, and the consolidation writes no JUnit XML to take its place (`SPECIFICATION.md` R-047).
 
-**Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`SPECIFICATION.md` R-044). The XML report is a file read by tools, not by the person at the console, and nothing else here serves those tools (`SPECIFICATION.md` R-047).
+**Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`SPECIFICATION.md` R-044).
 
 **Costs** The plugin must produce the test task's result itself instead of taking Mill's. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
 
@@ -27,7 +27,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's node is where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
-**Costs** Worker output arrives apart from the channel, so its place among the run's events is approximate (`SPECIFICATION.md` R-043). What a reporter the user configured prints appears on the run as text repeating the events.
+**Costs** Worker output arrives apart from the channel, so its place among the run's events is approximate (`SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
@@ -38,9 +38,9 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **Alternatives**
 
 - Consolidated JUnit XML, as `../structured-test-reporting/SPECIFICATION.md` § Multi-run consolidation plugin writes it, keeps the two epics' outputs the same, but loses failures outside tests.
-- CTRF (Common Test Report Format) is a more plausible standard for CI readers, but loses the same failures.
+- CTRF (Common Test Report Format) is a more plausible standard for CI readers, but loses the same failures, so it stays out of this epic; a later feature may add it.
 
-**Reasoning** No output drops what a run sent (`SPECIFICATION.md` R-021), and neither format can hold a failure outside a test.
+**Reasoning** Neither format can hold a failure outside a test, so either would report a run as cleaner than the human-readable and JSON output show it (`SPECIFICATION.md` R-021).
 
 **Costs** CI tools that read only JUnit XML get nothing from the consolidation. When the two epics are compared, they differ by one output, an exception to reuse by default that consolidating many runs does not force.
 
@@ -48,7 +48,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## This epic's test structure and outputs behave as structured test reporting's, departing only where consolidating many runs forces it.
+## This epic's test structure and outputs behave as structured test reporting's by default; each departure is a requirement or decision of this epic.
 
 **Alternatives** Designing the test structure and the JSON, human-readable and progress output afresh frees this epic from choices shaped by reporting inside one run, but the two epics' outcomes would then differ in ways their architectures do not force.
 

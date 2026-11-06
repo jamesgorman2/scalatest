@@ -23,7 +23,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 ## Scope
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
-- A consolidation library that reads the channels of many runs and produces their consolidated output.
+- A consolidation library that reads the channels of many runs, takes each run's test run label and worker output, and produces their consolidated output.
 - A Mill plugin that runs a module's or a build's tests with the emitter on, and hosts the consolidation library.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
@@ -50,7 +50,8 @@ Terms this document adds:
 *Receives what 3.2.19 sends* has the meaning `../structured-test-reporting/runner-json/SPECIFICATION.md` § Constraints gives it.
 
 - R-001 A run with the emitter off uses the reporters ScalaTest 3.2.19 uses, each receives what 3.2.19 sends, and the build tool receives the test-interface events 3.2.19 sends.
-- R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.19 sends.
+- R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.19 sends, except as R-041 states.
+- R-051 With the emitter on, the build tool still receives the test-interface events 3.2.19 sends.
 - R-003 Test runs launched by Metals, Bloop and IntelliJ, in the forked, sbt shell and BSP modes of `../structured-test-reporting/SPECIFICATION.md` § Constraints § IntelliJ, behave as they do against ScalaTest 3.2.19, including in a build that uses the Mill plugin.
 - R-004 The fork stays binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.19.
 
@@ -59,7 +60,8 @@ Terms this document adds:
 - R-010 Each run sends over one channel every event the run reports, the run's test structure and the run's test output.
 - R-011 Nothing a run reports is lost or altered between the run and the channel's reader. This includes failure messages, throwables with their cause chains, and the order of events within a node.
 - R-012 Each piece of test output is attributed to a node as `../structured-test-reporting/SPECIFICATION.md` § Test output states, and keeps its position among that node's events.
-- R-013 A channel carries one run, and the consolidation library's caller names the test run label it belongs to.
+- R-013 A channel carries one run.
+- R-052 The consolidation library's caller names the test run label each channel belongs to.
 
 ## Behaviour taken from structured test reporting
 
@@ -68,25 +70,25 @@ Terms this document adds:
 
 ## Consolidation
 
-- R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started: progress output, human-readable output and JSON output. Each is a separate output.
-- R-026 Progress output is written while the runs execute, from the events received so far, as promptly as Mill lets the plugin write.
+- R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output.
+- R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the command completes.
 - R-027 The human-readable and JSON output are written together, once every run has completed or halted.
 - R-028 The JSON output is one object for the Mill command. Its root wraps each run's test structure in the layout `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object gives one run, each node holding its final state.
-- R-021 Each output receives everything every run sent; no event, node or test output is dropped.
+- R-021 The human-readable and JSON output show every node, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
-- R-023 Given the same channels, the consolidation library produces the same human-readable and JSON output when used without Mill.
+- R-023 Given the same channels, test run labels and worker output, the consolidation library produces the same human-readable and JSON output when used without Mill.
 - R-025 By default, the Mill plugin gives each module one test run label.
 
 ## Each run's own output under the Mill plugin
 
 These hold for every run the Mill plugin starts.
 
-- R-040 The plugin captures the stdout and stderr of every process executing the run. None of it reaches the console except through the consolidated output.
-- R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured. What a reporter the user configures writes to stdout or stderr is worker output.
-- R-042 The human-readable and JSON output show the run's worker output on the run's node, and drop none of it. This differs from `../structured-test-reporting/SPECIFICATION.md` § Test output, which streams output that is not test output directly to stdout and stderr.
+- R-040 Nothing the run writes to stdout or stderr reaches the console except through the consolidated output.
+- R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured.
+- R-042 The human-readable and JSON output show the run's worker output on the run's node, and drop none of it except as R-045 allows. This differs from `../structured-test-reporting/SPECIFICATION.md` § Test output.
 - R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
-- R-044 The console does not show Mill's list of failed tests, Mill's own progress for the test task, or ScalaTest's end-of-run summary for the run. Progress output and human-readable output carry what these showed.
-- R-045 The plugin may show as worker output what Mill's own test runner writes for the run.
+- R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the test task, or ScalaTest's end-of-run summary for the run.
+- R-045 The plugin may show as worker output Mill's own progress for the test task and what Mill's own test runner writes for the run, except Mill's list of failed tests and ScalaTest's end-of-run summary, which the consolidated output does not show.
 - R-046 The Mill command fails if any run it started reports a failure or does not complete.
 - R-047 Mill writes its JUnit XML report for each module as it does without the plugin.
 
@@ -94,4 +96,4 @@ Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each written to the console when turned on.
 - R-049 JSON output is written to a file, never to the console.
-- R-050 Output written by anything the plugin did not start is neither captured nor changed. On the console it may interleave with the consolidated output.
+- R-050 Output written by the Mill command's other tasks, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed. On the console it may interleave with the consolidated output.
