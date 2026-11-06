@@ -79,7 +79,7 @@ Terms this document adds:
 
 - R-020 For one Mill command, the Mill plugin produces one set of consolidated output covering every run the command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the command completes.
-- R-027 The human-readable and JSON output are written together, once every run has completed or halted.
+- R-027 The human-readable and JSON output are written together, once every run has completed or has ended without completing.
 - R-028 The JSON output is one object for the Mill command. Its root wraps each run's test structure in the layout `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object gives one run, each node holding its final state.
 - R-021 The human-readable and JSON output show every node, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.

@@ -110,7 +110,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 2. Identity
 
-**Need.** No node holds another run's events (`ESR` R-022). A channel carries one run, and the consolidation library's caller names its test run label (`ESR` R-013), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`STR` § Test structure, Durations and names).
+**Need.** No node holds another run's events (`ESR` R-022). A channel carries one run (`ESR` R-013), and the consolidation library's caller names its test run label (`ESR` R-052), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`STR` § Test structure, Durations and names).
 
 **In memory and `toJson`.**
 
