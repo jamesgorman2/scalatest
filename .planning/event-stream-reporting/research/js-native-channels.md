@@ -46,11 +46,11 @@ Paths are relative to each source's root. Abbreviations:
 - `[envs]`: `JE/` is `js-envs/src/main/scala/org/scalajs/jsenv/`, and `NE/` is `nodejs-env/src/main/scala/org/scalajs/jsenv/nodejs/`.
 - `[sn]`: `SNTR/` is `test-runner/src/main/scala/scala/scalanative/testinterface/`, `SNTI/` is `test-interface/src/main/scala/scala/scalanative/testinterface/`, and `SNJL/` is `javalib/src/main/scala/java/`.
 
-`[envs]` `v1.5.0` differs from `v1.4.0`, the version `JSN` cites, in its main sources only by two removed `final` modifiers (`NE/ComSupport.scala` line 238; `JE/RunConfig.scala` line 122). *Inference, resolution not run:* `scalajs-sbt-test-adapter` `1.20.2` depends on `scalajs-js-envs` `1.4.0` (`JSN` § Sources), and `scalajs-env-nodejs` `1.5.0` on `1.5.0`, so Mill's resolver loads `1.5.0`.
+`[envs]` `v1.5.0` differs from `v1.4.0`, the version `JSN` cites, in its main sources only by two removed `final` modifiers (`NE/ComSupport.scala` line 238; `JE/RunConfig.scala` line 122). *Inference, resolution not run:* `scalajs-sbt-test-adapter` `1.20.2` depends on `scalajs-js-envs` `1.4.0` (`JSN` § Sources), and `scalajs-env-nodejs` `1.5.0` on `1.5.0`, so Mill's resolver loads `1.5.0` for the Node environment.
 
 No experiment was run for this note. Every citation was opened at the version above. A statement marked *inference* follows from the code read and was not observed. A statement marked *general* is operating-system, JDK or Scala behaviour that no source here was opened for. § 7 lists what could not be determined.
 
-The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS environments are covered only where stated; their filesystem and `require` limits are `JSN` § 2.3.
+The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other JS environments Mill can select are `.planning/event-stream-reporting/research/js-environment-channels.md`.
 
 ## 1. How Mill launches a run's processes
 
@@ -84,7 +84,7 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
   - Mill sets nothing on `TestAdapter.Config.env` (§ 1.1). `forkEnv` does not reach a JS VM (§ 1.2).
 - **Writes are asynchronous.** `socket.write` "Returns `true` if the entire data was flushed successfully to the kernel buffer. Returns `false` if all or part of the data was queued in user memory" (`[node] doc/api/net.md` lines 1487–1489).
 - **Exit abandons queued writes.** `process.exit()` forces exit "even if there are still asynchronous operations pending that have not yet completed fully" (`[node] doc/api/process.md` lines 1832–1835). The com setup script calls `process.exit(0)` when the com socket closes (`NE/ComSupport.scala` line 287), and Mill's `close()` closes it (§ 5.1). *Inference:* bytes still queued in Node's memory on a second socket when Mill closes the adapter are lost.
-- jsdom and browser environments: no `require` (`JSN` § 2.3). Whether they can open a socket to Mill's process was not examined.
+- Other JS environments: `.planning/event-stream-reporting/research/js-environment-channels.md` § 2.2, § 3.2 and § 4.2.
 
 ### 2.2 From a native test process
 
@@ -235,7 +235,6 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
 - Whether Node stdout or socket writes queued when the com socket closes are lost in practice, given Mill's 100 ms sleep (§ 2.1, § 5.1).
 - Whether a `TestAdapter` built by plugin code against one Scala.js or Scala Native version works with a test bridge or `test-interface` linked at another (§ 6).
 - Whether the Unix `System.getenv` behaviour in Scala Native `0.5.12` is observed as the source implies (§ 2.2).
-- Sockets and stdout in jsdom, Selenium, Playwright and PhantomJS environments (§ 2.1).
 - Whether Scala Native's `java.net.Socket` writes survive the process's exit (§ 2.2).
 - Whether a JS VM or native process that dies or is killed loses bytes it wrote to a socket, a file or stdout (§ 2, § 3.2, § 5).
 - What the daemon's environment is relative to the client that ran the command, which decides what a JS VM and a native process inherit beyond `env` and `allForkEnv` (§ 1).
