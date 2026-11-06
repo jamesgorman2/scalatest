@@ -7,6 +7,7 @@ Other notes hold facts this one relies on and does not repeat:
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the JVM answer (§§ 1–3), how Mill passes a Scala.js or Native run its framework arguments (§ 4), and the APIs for running plugin code after tests fail (§ 5).
 - `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what hosts plugin code across a Mill command, and what Mill does to its console output.
+- `.planning/event-stream-reporting/research/native-stdio-wrapper.md`, cited as `NSW`: what was observed when a prototype ran Native tests through a launcher. Every observation this note states is cited from it.
 
 ## Short answer
 
@@ -14,8 +15,8 @@ Other notes hold facts this one relies on and does not repeat:
 - **Working directory and files.** Both processes inherit Mill's own working directory: under the daemon `out/mill-daemon/sandbox`, and under `--no-daemon` `out/mill-no-daemon/<sig>/sandbox`. This holds for every module, every run, and under the daemon every command (§ 3.1). A relative path is therefore never unique to a run. On Windows, Node and Scala Native open files with sharing modes that allow a JDK `FileInputStream` to read the file while it is being written (§ 3.2).
 - **Logger.** Mill passes one `Logger` per task. It prints `info`, `warn` and `error` lines with `println` to the task's streams, filtered by `Task.testReporter.logLevel` and not by `testLogLevel`. `trace` is never filtered, and `error` cannot be filtered out (§ 4.1). Mill builds that logger inline in `@internal` code, so no parameter substitutes it (§ 4.2). Code that calls `Task.execute` itself chooses the loggers, and the adapters call exactly those loggers (§ 4.2). *Inference:* wrapping the `Framework` that `testFrameworkInstance` returns lets JS plugin code supply its own loggers (§ 6.1).
 - **JS VM stdout and stderr.** Each goes through a pipe to a thread that Mill never waits for, which writes to `System.out` or `System.err`. In Mill's process those are the per-thread proxies, so *inference:* the bytes reach the test task's `PrefixLogger` and `.log` file (§ 5.1). Plugin code that builds its own `TestAdapter` can give it a `JSEnv` that replaces `RunConfig.onOutputStream` and so receives both pipes itself (§ 5.1). Mill's own `getFramework` path offers no such hook (§ 6.1).
-- **Native process stdout and stderr.** Both are inherited descriptors, and no public Scala Native or Mill API changes that (§ 5.2). Under the daemon they are the daemon's `stdout` and `stderr` files. A `TailManager` thread copies those files line by line to the command's top-level logger, and so to the console, while every command runs (§ 5.3). Under `--no-daemon` they are the launcher's own console descriptors (§ 5.3). This contradicts `JSN` § 2.1, which says this output does not reach the console under the daemon.
-- **Hooks.** Scala.js has `protected def testFrameworkInstance` and `protected def testTask`. Native has only `protected def testTask`, and everything its body uses to get a framework is `private[scalanativelib]`. A Native override can still build Scala Native's public `TestAdapter` from the public `nativeLink`, `allForkEnv` and `bridgeFullClassPath` tasks (§ 6.2).
+- **Native process stdout and stderr.** Both are inherited descriptors. The adapter has no stdio setting, but a `binaryFile` naming a launcher redirects the real binary's streams (§ 5.2; observed in `NSW` § 3). Under the daemon they are the daemon's `stdout` and `stderr` files. A `TailManager` thread copies those files line by line to the command's top-level logger while every command runs; *inference:* on an interactive terminal they so reach the console. With the command's output redirected to files they did not reach it (`NSW` § 2) (§ 5.3). Under `--no-daemon` they are the launcher's own console descriptors (§ 5.3). The `TailManager` source contradicts `JSN` § 2.1, which says this output does not reach the console under the daemon.
+- **Hooks.** Scala.js has `protected def testFrameworkInstance` and `protected def testTask`. Native has only `protected def testTask`, and everything its body uses to get a framework is `private[scalanativelib]`. A Native override can still build Scala Native's public `TestAdapter` from the public `nativeLink`, `allForkEnv` and `bridgeFullClassPath` tasks, and give it a launcher as `binaryFile` (§ 6.2).
 
 ## Sources
 
@@ -172,10 +173,11 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other 
 
 - `ProcessRunner` calls `inheritIO()` (`SNTR/ProcessRunner.scala` line 36). The process's stdin, stdout and stderr are Mill's own process's descriptors, and no byte passes through a JVM stream.
 - Mill's comment before its 100 ms sleep says the subprocess's stdout streams "to the JVM" (`SNM` lines 514–517), which `ProcessRunner` does not do.
-- **Nothing configures it.**
+- **The adapter has no stdio setting; `binaryFile` is the route.**
   - `ProcessRunner`, `NativeRunnerRPC` and `ComRunner` are `private[testinterface]` (`SNTR/ProcessRunner.scala` line 9; `SNTR/NativeRunnerRPC.scala` line 14; `SNTR/ComRunner.scala` line 19).
   - `TestAdapter.Config` exposes only `binaryFile`, `envVars` and `logger` (`SNTR/adapter/TestAdapter.scala` lines 133–164).
   - `binaryFile` must exist (lines 22–25) and is run as `<path> <port>` (§ 1.2).
+  - `binaryFile` need not be the test binary. Given a launcher that starts the real binary with stdout and stderr redirected to files, the adapter ran the tests and the binary's output went to the files, on Windows and Linux (`NSW` § 3).
   - *General:* Scala's `private[pkg]` is checked at compile time against the accessing code's package.
 - **Order.** *Inference:* within one process, bytes written to one descriptor keep their order on that descriptor. Stdout and stderr are separate descriptors.
 
@@ -186,10 +188,10 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other 
   - Every command runs inside `Using.resources(new TailManager(daemonDir), …)` and `tailManager.withOutErr(logger.streams.out, logger.streams.err)` (`[mill] runner/daemon/src/mill/daemon/MillMain0.scala` lines 247, 278–282).
   - `TailManager` starts one `FileToStreamTailer` per file, polling every 2 ms, and writes to the streams set by `withOutErr` (`[mill] runner/daemon/src/mill/daemon/TailManager.scala` lines 9–49).
   - The tailer skips what the file holds on its first read, then copies each `readLine()` result with `println` (`[mill] libs/daemon/client/src/mill/client/FileToStreamTailer.scala` lines 5–58).
-  - *Inference:* a native process's output reaches the console through the command's top-level logger while the command runs. It carries no task prefix, does not reach the test task's `.log` file, and arrives line by line within 2 ms of being written.
+  - *Inference:* on an interactive terminal, a native process's output reaches the console through the command's top-level logger while the command runs. It carries no task prefix, does not reach the test task's `.log` file, and arrives line by line within 2 ms of being written.
   - The same files receive every other inherited write: other native runs of the command, and processes Mill runs in the background, which append to them (`RunModule.scala` lines 381–389).
-  - This contradicts `JSN` § 2.1, which says, citing prior art, that Native stdout "does not reach the console" under the Mill daemon. Mill's own comment on `SystemStreams.original` agrees with the `TailManager` source (`MCL` § 4.2). No experiment settled which holds.
-- **Under `--no-daemon`:** the launcher spawns `MillNoDaemonMain` with the default `os.Inherit` (`MPL` lines 39, 74–79). *Inference:* the native process writes to the launcher's own console descriptors, bypassing Mill's prompt logger. `TailManager` tails `<out>/mill-no-daemon/<sig>/stdout`, which nothing writes.
+  - This contradicts `JSN` § 2.1, which says, citing prior art, that Native stdout "does not reach the console" under the Mill daemon. Mill's own comment on `SystemStreams.original` agrees with the `TailManager` source (`MCL` § 4.2). With the command's output redirected to files, the output did not reach the redirected console on Windows or Linux, and on Windows was in the daemon's files (`NSW` § 2). An interactive terminal was not tried.
+- **Under `--no-daemon`:** the launcher spawns `MillNoDaemonMain` with the default `os.Inherit` (`MPL` lines 39, 74–79). *Inference:* the native process writes to the launcher's own console descriptors, bypassing Mill's prompt logger. With the command's output redirected to files, the output reached them (`NSW` § 2). `TailManager` tails `<out>/mill-no-daemon/<sig>/stdout`, which nothing writes.
 - **What plugin code can do.** Plugin code in Mill's process can read the daemon's `stdout` and `stderr` files. Nothing found stops `TailManager` copying them: its streams are set only inside `MillMain0` (`MillMain0.scala` line 282). In-process descriptor redirection with `dup2`: `JSN` § 4.2.
 
 ## 6. Hooks for plugin code
@@ -223,7 +225,7 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other 
 | `aheadOfTimeDiscoveredTestClassesIfNeeded` | `TM` line 138 | `protected def` |
 | `TestModule.handleResults` | `MWC` § 5 | public |
 
-- *Inference:* a `testTask` override can build Scala Native's `TestAdapter` from `nativeLink().path`, `allForkEnv()` and a logger, load the framework, and run it with its own loggers (§ 4.2). It cannot change how the binary's stdio is wired (§ 5.2).
+- A `testTask` override built Scala Native's `TestAdapter` from `nativeLink().path`, `allForkEnv()` and a logger, loaded the framework and ran it (`NSW` § 1). *Inference:* it can run it with its own loggers (§ 4.2). The adapter gives it no stdio setting, but a launcher passed as `binaryFile` redirects the real binary's stdout and stderr (§ 5.2).
 - Discovery, `runner.tasks` and the task loop are in `@internal` `TestRunnerUtils` (`TRU` lines 124–154, 246–298). An override that avoids them must re-implement them.
 
 ## 7. What was not determined
@@ -231,11 +233,11 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other 
 - Whether each *inference* above holds when run. In particular:
   - that `PipeOutputThread` and the receiver threads inherit the test task's streams (§ 4.1, § 5.1);
   - that a wrapped `testFrameworkInstance` framework replaces Mill's loggers (§ 6.1).
-- Whether inherited native output reaches an interactive console under the daemon, as the `TailManager` source and Mill's comment on `SystemStreams.original` (`MCL` § 4.2) imply, or does not, as `JSN` § 2.1 and the prior art it cites state (§ 5.3). With the command's output redirected to files it does not (`.planning/event-stream-reporting/research/native-stdio-wrapper.md` § 2).
+- Whether inherited native output reaches an interactive console under the daemon, as the `TailManager` source and Mill's comment on `SystemStreams.original` (`MCL` § 4.2) imply, or does not, as `JSN` § 2.1 and the prior art it cites state (§ 5.3). With the command's output redirected to files it does not (`NSW` § 2).
 - Whether Node stdout or socket writes queued when the com socket closes are lost in practice, given Mill's 100 ms sleep (§ 2.1, § 5.1).
 - Whether a `TestAdapter` built by plugin code against one Scala.js or Scala Native version works with a test bridge or `test-interface` linked at another (§ 6).
 - Whether the Unix `System.getenv` behaviour in Scala Native `0.5.12` is observed as the source implies (§ 2.2).
 - Whether Scala Native's `java.net.Socket` writes survive the process's exit (§ 2.2).
-- Whether a JS VM or native process that dies or is killed loses bytes it wrote to a socket, a file or stdout (§ 2, § 3.2, § 5).
+- Whether a JS VM that dies or is killed loses bytes it wrote to a socket, a file or stdout, and whether a native process loses bytes it wrote to a socket or a file, or, when killed, to stdout or stderr (§ 2, § 3.2, § 5). A native binary that called `abort()` lost, of what it wrote to redirected stdout and stderr, only a C `stdout` line it had not flushed (`NSW` § 3).
 - What the daemon's environment is relative to the client that ran the command, which decides what a JS VM and a native process inherit beyond `env` and `allForkEnv` (§ 1).
 - Whether any of this holds on Mill versions other than `1.1.10`, Scala.js versions other than `1.20.2` with `scalajs-env-nodejs` `1.5.0`, Scala Native versions other than `0.5.12`, or Node versions other than `22`.

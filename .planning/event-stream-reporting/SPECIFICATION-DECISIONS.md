@@ -2,13 +2,13 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
-## Under the Mill plugin, a module's tests run, and pass or fail, as they do without it.
+## Under the Mill plugin, a module's tests run, and pass or fail, as they do without it, except that a run that did not complete always fails.
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
-**Reasoning** A user who adds the plugin expects the output to change and nothing else (`SPECIFICATION.md` R-053).
+**Reasoning** A user who adds the plugin expects the output to change and nothing else, save that a run that did not complete is reported as a failure (`SPECIFICATION.md` R-053, R-046).
 
-**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module.
+**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module. A build whose Native test binary crashes passes under Mill and fails under the plugin (`research/native-stdio-wrapper.md` § 4).
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
@@ -23,7 +23,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native no public API takes a run's stdout and stderr, so how R-040 is met there is not yet proven.
+**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native it takes a run's stdout and stderr only by putting a launcher between Scala Native's test adapter and the test binary, a route observed on Windows and Linux only, and the launcher must be compiled where an emulator cannot load a script.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
@@ -31,6 +31,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 - `research/mill-worker-channels.md` § 2, § 5.
 - `research/js-native-channels.md` § 5, § 6.
+- `research/native-stdio-wrapper.md` § 3, § 5.
 
 ---
 
