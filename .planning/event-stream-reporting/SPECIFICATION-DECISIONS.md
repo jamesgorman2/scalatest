@@ -2,6 +2,38 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## Under the Mill plugin, a module's tests run as they do without it.
+
+**Alternatives** Holding only which tests run and what the test task returns, and leaving the processes they run in to each feature, is cheaper to build, but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
+
+**Reasoning** A user who adds the plugin expects the output to change and nothing else. Running the same build with and without the plugin and comparing everything but the console tests it from outside (`SPECIFICATION.md` R-053).
+
+**Costs** On Scala.js and Native the plugin's own discovery and task loop must follow Mill's release by release. On the JVM the plugin cannot force every module onto one worker to make its output easier to take.
+
+**Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
+
+---
+
+## The Mill plugin runs each module's tests itself, in place of Mill's test task, on every runtime.
+
+**Alternatives**
+
+- Overriding the test task and calling Mill's own inside it uses only stable API, but such an override cannot take a run's stdout and stderr and does not run after a failure, so worker output and Mill's list of failed tests reach the console.
+- Relaxing `SPECIFICATION.md` R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
+
+**Reasoning** Only the code that starts a run holds its stdout, its stderr and its result. Without all three the plugin adds a consolidated report beside the console it was meant to replace.
+
+**Costs** The plugin depends on Mill API marked `@experimental`, and on Scala.js and Native re-implements the discovery and task loop Mill keeps `@internal`. Either can change in any Mill release, so the plugin may need a release for each.
+
+**Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
+
+**See**
+
+- `research/mill-worker-channels.md` § 2, § 5.
+- `research/js-native-channels.md` § 5, § 6.
+
+---
+
 ## Under the Mill plugin, Mill's own console results for a test task are replaced by the consolidated output.
 
 **Alternatives**
