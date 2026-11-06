@@ -39,7 +39,7 @@ Terms this document adds:
 - sbt and command-line front ends for the consolidation library.
 - Changing any existing ScalaTest reporter.
 - A consolidated HTML report; a follow-up epic.
-- Consolidated JUnit XML, or any other CI report format.
+- Consolidated JUnit XML.
 - Build tools other than Mill.
 
 ## Constraints
