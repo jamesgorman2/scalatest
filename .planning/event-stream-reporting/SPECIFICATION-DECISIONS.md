@@ -23,7 +23,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native it takes a run's stdout and stderr only by putting a launcher between Scala Native's test adapter and the test binary, a route observed on Windows and Linux only, and the launcher must be compiled where an emulator cannot load a script.
+**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native it takes a run's stdout and stderr only by putting a launcher between Scala Native's test adapter and the test binary. That route was observed on Windows and Linux only, and the launcher must be compiled where an emulator cannot load a script.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
