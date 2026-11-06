@@ -231,7 +231,7 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). The other 
 - Whether each *inference* above holds when run. In particular:
   - that `PipeOutputThread` and the receiver threads inherit the test task's streams (§ 4.1, § 5.1);
   - that a wrapped `testFrameworkInstance` framework replaces Mill's loggers (§ 6.1).
-- Whether inherited native output reaches the console under the daemon, as the `TailManager` source and Mill's comment on `SystemStreams.original` (`MCL` § 4.2) imply, or does not, as `JSN` § 2.1 and the prior art it cites state (§ 5.3).
+- Whether inherited native output reaches an interactive console under the daemon, as the `TailManager` source and Mill's comment on `SystemStreams.original` (`MCL` § 4.2) imply, or does not, as `JSN` § 2.1 and the prior art it cites state (§ 5.3). With the command's output redirected to files it does not (`.planning/event-stream-reporting/research/native-stdio-wrapper.md` § 2).
 - Whether Node stdout or socket writes queued when the com socket closes are lost in practice, given Mill's 100 ms sleep (§ 2.1, § 5.1).
 - Whether a `TestAdapter` built by plugin code against one Scala.js or Scala Native version works with a test bridge or `test-interface` linked at another (§ 6).
 - Whether the Unix `System.getenv` behaviour in Scala Native `0.5.12` is observed as the source implies (§ 2.2).
