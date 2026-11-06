@@ -18,6 +18,7 @@ One Mill command can start many runs: several selectors, several modules, parall
 - [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, and what attributing test output needs.
 - [research/mill-worker-channels.md](research/mill-worker-channels.md) — on the JVM under Mill: how Mill wires a test worker's stdout and stderr, whether plugin code can take them, what a sandbox file, a socket and stdout can each rely on as a channel, and which APIs let plugin code run inside the test task after tests fail.
 - [research/js-native-channels.md](research/js-native-channels.md) — on Scala.js on Node and on Native under Mill: what a socket, a file and the test-interface `Logger` can each rely on as a channel, where a run's stdout and stderr go, and which hooks let plugin code take them.
+- [research/native-stdio-wrapper.md](research/native-stdio-wrapper.md) — what was observed on Windows and Linux when plugin code gave Scala Native's test adapter a launcher that redirects the test binary's stdout and stderr to files: what reaches the console and the plugin, the exit status, and behaviour under an emulator.
 - [research/js-environment-channels.md](research/js-environment-channels.md) — for each JS environment Mill can select other than Node: whether the test adapter's com channel works, which other transports reach Mill's process, and what console output reaches the run's stdout and stderr.
 - [research/mill-command-lifetime.md](research/mill-command-lifetime.md) — which Mill mechanisms run plugin code before the first test task and after the last, how that code learns what ran and how it ended, what Mill does to its console output, and how it sets the exit status.
 - [research/emission-gap-analysis.md](research/emission-gap-analysis.md) — for each need of the consolidated output, whether a run's events already provide it on each runtime, lose it when serialised, leave it derivable, or need new code at the point of emission.
@@ -93,7 +94,7 @@ Terms this document adds:
 - R-053 When the Mill plugin runs the tests of a test task that a selector names, it runs them as the task runs them without the plugin:
   - the same tests, in the same processes, with the same working directory;
   - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
-  - a result that succeeds or fails as the task's does and holds the same test results, but omits Mill's list of failed tests (R-044).
+  - a result that succeeds or fails as the task's does and holds the same test results, but omits Mill's list of failed tests (R-044). It also fails where the task's succeeds although the run did not complete (R-046), as Mill's Native test task does when the test binary crashes.
 
 ## Each run's own output under the Mill plugin
 
