@@ -75,3 +75,11 @@ _Avoid_: Aggregation, merging, report generation
 **Test run label**:
 A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag
+
+**Test command**:
+One evaluation of the Mill plugin's test command, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.
+_Avoid_: Mill command, invocation
+
+**Module selector**:
+An argument of the test command that names test modules, such as `__.test` or `foo.test`.
+_Avoid_: Selector, task selector
