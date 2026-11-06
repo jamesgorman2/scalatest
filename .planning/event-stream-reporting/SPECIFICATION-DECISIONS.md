@@ -48,13 +48,13 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## Under the Mill plugin, a module's tests run, and pass or fail, as they do without it, except that a run that did not complete always fails.
+## Under the test command, each selected module's tests run, and pass or fail, as Mill's `testOnly` or `testForked` runs them, except that a run that did not complete always fails.
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
-**Reasoning** A user who adds the plugin expects the output to change and nothing else, save that a run that did not complete is reported as a failure (`SPECIFICATION.md` R-053, R-046).
+**Reasoning** A user who runs the test command in place of Mill's test task expects the output to change and nothing else, save that a run that did not complete is reported as a failure (`SPECIFICATION.md` R-053, R-046).
 
-**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module. A build whose Native test binary crashes passes under Mill and fails under the plugin (`research/native-stdio-wrapper.md` § 4).
+**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module. A build whose Native test binary crashes passes under Mill's test task and fails under the test command (`research/native-stdio-wrapper.md` § 4).
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
@@ -90,7 +90,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`SPECIFICATION.md` R-044).
 
-**Costs** A failed test task's result no longer lists the failed tests (`SPECIFICATION.md` R-053), so a tool reading Mill's failure report sees only that the task failed. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
+**Costs** The test command's result does not list the failed tests (`SPECIFICATION.md` R-046), so a tool reading Mill's failure report sees only that the test command failed. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 

@@ -77,7 +77,7 @@ A node in consolidated output that wraps the suites of the runs its caller names
 _Avoid_: Module, module name, group, tag
 
 **Test command**:
-One evaluation of the Mill plugin's test command, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.
+One evaluation of the command the Mill plugin adds for consolidated testing, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.
 _Avoid_: Mill command, invocation
 
 **Module selector**:
