@@ -2,6 +2,52 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged.
+
+**Alternatives**
+
+- A trait overriding each module's test tasks keeps `mill __.test` working, but each task consolidates only its own module's runs, so modules still interleave, and IDE and BSP launches reach the replacement (`SPECIFICATION.md` R-003).
+- Offering both the trait and the command doubles the surface, while only the command consolidates across modules.
+
+**Reasoning** Of the Mill mechanisms examined, only an exclusive command that takes the `Evaluator` has a start, an end and the failure path (`research/mill-command-lifetime.md` § 2, § 3). Confining the plugin's replacement of a module's test task to that command keeps `SPECIFICATION.md` R-003 and R-060 without the replacement having to stand aside for other launches.
+
+**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental. `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055), and nothing covers `testLocal` or `testCached`.
+
+**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+
+---
+
+## The test command runs every selected test module by default; `--halt-on-failure` opts into skipping modules not yet started.
+
+**Alternatives**
+
+- Following Mill's `--keep-going`, failing fast by default, suits a build, but with modules running unordered and in parallel, which modules report depends on timing.
+- Showing only the runs that started, as Mill does, hides that modules were skipped.
+- Always running every module, with no opt-in, loses fast feedback on a large build.
+
+**Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
+
+**Costs** The default differs from Mill's, and the test command ignores Mill's `--keep-going`. Unless the user opts in, a failing build takes as long as a passing one.
+
+**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+
+---
+
+## A selected test module that does not test with this fork of ScalaTest fails the test command before any test starts.
+
+**Alternatives**
+
+- Running it as Mill does, showing only its worker output and whether it passed, supports mixed builds, but every requirement on test structure, failures and test output would need an exemption for it.
+- Skipping it with a warning yields a report that looks complete when it is not.
+
+**Reasoning** Every requirement then holds for every run in the consolidated output, and the failure comes before any time is spent on tests (`SPECIFICATION.md` R-059).
+
+**Costs** A build mixing test frameworks cannot use a bare `__.test` and must narrow its module selectors.
+
+**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+
+---
+
 ## Under the Mill plugin, a module's tests run, and pass or fail, as they do without it, except that a run that did not complete always fails.
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
@@ -35,7 +81,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## Under the Mill plugin, Mill's own console results for a test task are replaced by the consolidated output.
+## Under the test command, Mill's own console results for a module's tests are replaced by the consolidated output.
 
 **Alternatives**
 
