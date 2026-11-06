@@ -28,7 +28,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
 - A consolidation library that reads the channels of many runs, takes each run's test run label and worker output, and produces their consolidated output.
-- A Mill plugin that runs a module's or a build's tests with the emitter on, and hosts the consolidation library.
+- A Mill plugin that runs a module's or a build's tests itself, in place of Mill's test task, with the emitter on, and hosts the consolidation library.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
@@ -100,6 +100,7 @@ These hold for every run the Mill plugin starts.
 - R-045 The plugin may show as worker output Mill's own progress for the test task and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
 - R-046 The Mill command fails if any run it started reports a failure or does not complete.
 - R-047 Mill writes its JUnit XML report for each module as it does without the plugin.
+- R-053 Which tests a module runs, in which processes, with which arguments, environment and working directory, and what the module's test task returns, are as they are without the plugin.
 
 Where the consolidated output goes:
 
