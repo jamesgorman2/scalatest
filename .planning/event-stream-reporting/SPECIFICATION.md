@@ -29,7 +29,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
 - A consolidation library that reads the channels of many runs, takes each run's test run label and worker output, and produces their consolidated output.
-- A Mill plugin that hosts the consolidation library and adds a command, each evaluation of which is a test command: it runs the tests of every test module its module selectors name with the emitter on.
+- A Mill plugin that hosts the consolidation library and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
@@ -79,17 +79,20 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 ## The test command
 
 - R-054 In a Mill build, only a test command produces consolidated output.
-- R-055 The test command's arguments include one or more module selectors, optional class globs and framework arguments as Mill's `testOnly` takes them, and `--halt-on-failure` (R-057). The class globs and framework arguments apply alike to every selected test module. Module selectors are separate arguments; `+` cannot join them, because Mill consumes it before the test command runs.
+- R-055 The test command's arguments include:
+  - one or more module selectors, each a separate argument; `+` cannot join them, because Mill consumes it before the test command runs;
+  - optional class globs and framework arguments, as Mill's `testOnly` takes them, applying alike to every selected test module;
+  - `--halt-on-failure` (R-057).
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the same processes, with the same working directory;
   - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require.
-- R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs. Mill's `--keep-going` does not change which modules start. Modules compile and test as Mill schedules them; no test waits for every module to compile.
+- R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs and whether or not Mill's `--keep-going` is given. Tests start without waiting for every selected test module to compile.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
-- R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming those modules.
+- R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming each such module.
 
 WHERE `--halt-on-failure` is given:
 
-- R-057 Once anything has failed the test command (R-046), the test command does not start the tests of any selected test module whose tests have not started.
+- R-057 Once anything has failed the test command (R-046), the test command starts no further selected test module's tests.
 
 ## Consolidation
 
@@ -111,10 +114,14 @@ These hold for every run a test command starts.
 - R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured.
 - R-042 The human-readable and JSON output show the run's worker output on the run's node, and drop none of it except as R-045 allows. This differs from `../structured-test-reporting/SPECIFICATION.md` § Test output.
 - R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
-- R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the module's tests, or ScalaTest's end-of-run summary for the run.
-- R-045 The plugin may show as worker output Mill's own progress for the module's tests and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
-- R-046 The test command fails if any run it started reports a failure or does not complete, or if the tests of any selected test module cannot start, for example because it or a module it depends on fails to compile. Its failure does not list the failed tests.
-- R-047 The test command writes each selected test module's JUnit XML report as the Mill task R-053 names writes it.
+- R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the tests of the run's module, or ScalaTest's end-of-run summary for the run.
+- R-045 The plugin may show as worker output Mill's own progress for the tests of the run's module and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
+- R-046 The test command fails if:
+  - any run it started reports a failure or does not complete; or
+  - the tests of any selected test module cannot start, for example because it or a module it depends on fails to compile.
+
+  Its failure does not list the failed tests.
+- R-047 The test command writes each selected test module's JUnit XML report as Mill's `testOnly` or `testForked`, whichever R-053 names, writes it.
 
 Where the consolidated output goes:
 
