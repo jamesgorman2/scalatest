@@ -6,10 +6,10 @@ What was observed when plugin code built Scala Native's `TestAdapter` itself and
 
 ## Short answer
 
-- **Off the console.** With the launcher, nothing the binary wrote to stdout or stderr reached the console, under the daemon and under `--no-daemon`, on Windows and Linux. This covers Scala writes, C `stdio` writes, child processes that inherit the binary's stdio, and what a binary wrote before `abort()` (§ 3).
+- **Off the console.** With the launcher, nothing the binary wrote to stdout or stderr reached the console, on Windows and Linux, in the runs § 1 lists. This covers Scala writes, C `stdio` writes, child processes that inherit the binary's stdio, and what a binary wrote before `abort()` (§ 3). The console separates launcher from control only under `--no-daemon`: under the daemon the control's output also stayed off the redirected console (§ 2). There the daemon's `stdout` and `stderr` files separate them: where inspected, they held the control's output and none of a launcher run's (§ 3).
 - **To the plugin.** The plugin read all of it from the launcher's files after `TestAdapter.close()`, each stream in the order written (§ 3).
 - **Exit status and com channel.** Mill's exit status, the test results and the adapter's warnings matched Mill's own Native test task in every case. Only the exit value the adapter logs for a crashed binary differed, with a Windows `.cmd` launcher (§ 4).
-- **Emulator.** A script launcher works where `CROSSCOMPILING_EMULATOR` names a program that only runs its arguments. It fails under `qemu-user`, which cannot load a script. A launcher compiled to an executable, which redirects and then runs `<emulator words> <real binary> <port>` itself, worked under `qemu-user` (§ 5).
+- **Emulator.** A script launcher works where `CROSSCOMPILING_EMULATOR` names a program that only runs its arguments. It fails under `qemu-user`, which cannot load a script. A launcher compiled to an executable, which redirects and then runs `<emulator words> <real binary> <port>` itself, worked under `qemu-user`, run under `--no-daemon` only (§ 5).
 - **A crashed binary does not fail Mill.** When the test binary aborted, Mill's own Native test task and the prototype's both ended with exit status 0 (§ 4).
 - **Not run:** macOS; an interactive terminal; a binary built for another architecture than the host (§ 7).
 
@@ -18,7 +18,7 @@ What was observed when plugin code built Scala Native's `TestAdapter` itself and
 The prototype is on branch `prototype/native-stdio-wrapper`, in `.planning/event-stream-reporting/prototype-native-stdio-wrapper/`.
 
 - **The control, `plain.test`:** Mill's `TestScalaNativeModule` unchanged.
-- **The route, `wrapped.test`:** a `testTask` override that copies Mill's (`JNC` § 1.2) except that it builds `TestAdapter` itself, with `withBinaryFile(<launcher>)`. `test-runner_2.13` `0.5.12` is on the build's own class path, not loaded per module at the module's Scala Native version. After the tests it calls `adapter.close()`, waits until the capture files have not grown for 300 ms, and prints each captured line with a `PLUGIN|` prefix.
+- **The route, `wrapped.test`:** a `testTask` override that copies Mill's (`JNC` § 1.2) except that it builds `TestAdapter` itself, with `withBinaryFile(<launcher>)`. `test-runner_2.13` `0.5.12` is on the build's own class path, not loaded per module at the module's Scala Native version. After the tests it calls `adapter.close()`, waits until the capture files have not grown for 300 ms, at most 5 s, and prints each captured line with a `PLUGIN|` prefix.
 - **The launchers,** each run by the adapter as `<launcher> <port>` and each naming its files by `<port>`:
   - Linux, script: `#!/bin/sh` then `exec '<binary>' "$@" >'<dir>'/stdout-"$1".bin 2>'<dir>'/stderr-"$1".bin`. A second form runs the binary without `exec` and writes its exit status to a file.
   - Windows, script: a `.cmd` file that runs `"<binary>" %* 1>"<dir>\stdout-%1.bin" 2>"<dir>\stderr-%1.bin"`, writes `%ERRORLEVEL%` to a file, and exits with it.
@@ -26,7 +26,15 @@ The prototype is on branch `prototype/native-stdio-wrapper`, in `.planning/event
 - **The suites,** ScalaTest `AnyFunSuite`:
   - `OutputSuite` writes 500 numbered lines to each of `System.out` and `System.err`; writes with C `fputs` to `stdout` (once flushed, once not) and `stderr`; starts two child processes with `inheritIO()`, one writing to each stream; and has one failing test.
   - `CrashSuite` writes from Scala, a child process and C, then calls `abort()`.
-- **The measure.** Each Mill command ran with its own stdout and stderr redirected to files. A marker line in those files without the `PLUGIN|` prefix reached the console raw.
+- **The measure.** Each Mill command ran with its own stdout and stderr redirected to files. A *marker* is a line beginning `MARK-`; every line the suites write is one. A marker in those files without the `PLUGIN|` prefix reached the console raw.
+- **The runs made by `run.ps1` (Windows) and `run.sh` (Linux):**
+  - `plain.test` and `wrapped.test` with the script launcher (on Linux the `exec` form): each of `OutputSuite` and `CrashSuite`, each under the daemon and under `--no-daemon`.
+  - `wrapped.test` `OutputSuite` with a stand-in emulator that only runs its arguments (`cmd /c` on Windows, `/usr/bin/env` on Linux), under the daemon and under `--no-daemon`.
+  - Windows only: `plain.test` `OutputSuite` with the stand-in emulator, under the daemon.
+  - Linux only: `wrapped.test` `OutputSuite` and `CrashSuite` with the script launcher that does not `exec` (`PROTO_NO_EXEC=1`), under the daemon.
+- **The runs made by hand,** on Linux, all under `--no-daemon`:
+  - With `CROSSCOMPILING_EMULATOR` set to the path of `qemu-x86_64`: `plain.test` `OutputSuite`, and `wrapped.test` `OutputSuite` with the script launcher.
+  - With the compiled launcher (`PROTO_ELF_LAUNCHER=1`): `wrapped.test` `OutputSuite` and `CrashSuite` without an emulator, then the same two with `qemu-x86_64` as the emulator.
 
 Versions: Mill `1.1.10`, Scala Native `0.5.12`, Scala `3.3.6`, ScalaTest `3.2.19`.
 
@@ -42,13 +50,16 @@ Versions: Mill `1.1.10`, Scala Native `0.5.12`, Scala `3.3.6`, ScalaTest `3.2.19
 
 ## 3. Capture with the launcher
 
-The same on Windows and Linux, under the daemon and under `--no-daemon`, for each launcher form:
+The same in every `wrapped.test` run § 1 lists, for the suite that ran, except the script launcher under `qemu-x86_64`, which failed (§ 5):
 
 - No marker reached the console raw.
-- `OutputSuite`: the plugin read 504 stdout lines and 503 stderr lines. The 500 numbered lines of each stream were in order. The child processes' lines sat where they were written. The unflushed C line came last on stdout, after later Scala writes: C `stdio` held it until the process exited.
+- The daemon's files, inspected after two sequences of daemon runs only:
+  - Windows: the daemon was restarted, then ran `wrapped.test` `OutputSuite` and then `plain.test` `OutputSuite`, both with the stand-in emulator. Afterwards `out/mill-daemon/stdout` held 504 markers (9971 bytes) and `out/mill-daemon/stderr` 503 (9942 bytes): one `OutputSuite` run's worth, the control's.
+  - Linux: the last daemon ran only `wrapped.test`, `OutputSuite` and `CrashSuite`, with the script launcher that does not `exec`. Afterwards neither file held a marker.
+- `OutputSuite`: the plugin read 504 stdout lines and 503 stderr lines. The 500 numbered lines of each stream were in order. The child processes' lines sat where they were written. The unflushed C line came last on stdout, after later Scala writes. *Inference:* C `stdio` held it until the process exited.
 - `CrashSuite`: the plugin read the Scala, child-process and C `stderr` lines written before `abort()`. The unflushed C `stdout` line was lost, as it was from the control's console.
-- The files stopped growing within the 300 ms wait after `close()` in every run.
-- No test binary was left running after any run.
+- Every run reported the files quiet between 303 and 370 ms after `close()` was called: they did not grow in the first 300 ms window.
+- No test binary was running when checked: on Windows by `tasklist`, once, after all the `run.ps1` runs; on Linux by `pgrep`, at the end of `run.sh` and after the compiled-launcher runs. No check followed each run.
 
 ## 4. Exit status and the com channel
 
@@ -60,7 +71,7 @@ The same on Windows and Linux, under the daemon and under `--no-daemon`, for eac
 
 - After a crash Mill prints "Test result: 1 completed, 1 failures" and ends with exit status 0, with and without the launcher.
 - The Linux script launcher that does not `exec` recorded the binary's exit status as 134 after `abort()` and 0 otherwise.
-- The Windows `.cmd` launcher recorded 0 after `OutputSuite` and wrote nothing after `CrashSuite`. *Inference:* the adapter's `close()`, which calls `destroyForcibly()` on the launcher (`[sn] SNTR/ProcessRunner.scala`, `close`), ended `cmd.exe` before it wrote the file.
+- The Windows `.cmd` launcher recorded 0 after `OutputSuite` and wrote nothing after `CrashSuite`. *Inference:* the adapter's `close()`, which calls `destroyForcibly()` on the launcher (`scala-native` `v0.5.12`, `test-runner/src/main/scala/scala/scalanative/testinterface/ProcessRunner.scala`, `close`), ended `cmd.exe` before it wrote the file.
 
 ## 5. `CROSSCOMPILING_EMULATOR`
 
@@ -68,23 +79,26 @@ The same on Windows and Linux, under the daemon and under `--no-daemon`, for eac
 
 | Emulator | Launcher | Result |
 |---|---|---|
-| `cmd /c` (Windows), `/usr/bin/env` (Linux): run their arguments | script | as § 3, under the daemon and `--no-daemon` |
-| `qemu-x86_64` | none (control) | tests run; output reaches the console raw |
-| `qemu-x86_64` | script | the run fails: "Error while loading …/launcher.sh: Exec format error" |
+| `cmd /c` (Windows), `/usr/bin/env` (Linux): run their arguments | script | as § 3, `OutputSuite`, under the daemon and `--no-daemon` |
+| `qemu-x86_64` | none (control) | `OutputSuite`, under `--no-daemon`: tests run; output reaches the console raw |
+| `qemu-x86_64` | script | `OutputSuite`, under `--no-daemon`: the run fails: "Error while loading …/launcher.sh: Exec format error" |
 | `qemu-x86_64` | compiled | as § 3, `OutputSuite` and `CrashSuite`, under `--no-daemon` |
 
-The compiled launcher was built for the host. `qemu-user` ran it, and it started `qemu-x86_64 <binary> <port>` as a host process.
+The adapter logged "Using test process emulator: …" in each emulator run. The compiled launcher was built for the host. *Inference:* `qemu-user` ran it, and it started `qemu-x86_64 <binary> <port>` as a host process; no process listing was taken.
 
 ## 6. What the prototype did not do
 
 - It read the files after `close()`; it did not read them while the run wrote them.
-- It passed the launcher its paths in the launcher's text or through the environment; it did not vary them per module or per command.
+- It wrote the script launchers' paths into their own text, and passed the compiled launcher its paths through the environment, which the test binary inherits. The environment was the prototype's choice: no run tried a compiled launcher with its paths compiled in. It did not vary the paths per module or per command.
 - It ran one process per task: no run started the launcher from more than one thread.
 
 ## 7. What was not determined
 
 - Anything on macOS.
 - Whether the control's output reaches an interactive terminal under the daemon (§ 2).
+- Any combination § 1 does not list, among them: the compiled launcher or `qemu-x86_64` under the daemon; `CrashSuite` with a script launcher under an emulator; the script launcher that does not `exec` under `--no-daemon`.
+- What the daemon's files held after the daemon runs § 3 does not name.
+- Whether a test binary outlived any single run (§ 3).
 - Whether a compiled launcher built for another architecture than the host works under that architecture's emulator.
 - Whether a compiled launcher on Windows records a crashed binary's exit status where the `.cmd` launcher does not (§ 4).
 - Whether a `TestAdapter` loaded at the module's Scala Native version, apart from the build's class path, behaves the same (`JNC` § 7).

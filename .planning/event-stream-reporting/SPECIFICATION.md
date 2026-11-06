@@ -94,7 +94,7 @@ Terms this document adds:
 - R-053 When the Mill plugin runs the tests of a test task that a selector names, it runs them as the task runs them without the plugin:
   - the same tests, in the same processes, with the same working directory;
   - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
-  - a result that succeeds or fails as the task's does and holds the same test results, but omits Mill's list of failed tests (R-044). It also fails where the task's succeeds although the run did not complete (R-046), as Mill's Native test task does when the test binary crashes.
+  - a result that holds the same test results and succeeds or fails as the task's does, except that it omits Mill's list of failed tests (R-044) and fails whenever the run did not complete (R-046). Mill's Native test task succeeds when the test binary crashes (`research/native-stdio-wrapper.md` § 4).
 
 ## Each run's own output under the Mill plugin
 
