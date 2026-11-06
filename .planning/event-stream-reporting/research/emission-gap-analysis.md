@@ -1,15 +1,15 @@
 # What the consolidated outputs need that a run does not emit
 
-For each need of the consolidated progress, human-readable and JSON output: what ScalaTest's events carry in memory on the JVM, Scala.js and Native, what `Event.toJson` keeps of it, and whether new code is needed at the point of emission Facts only; no design is chosen or recommended.
+For each need of the consolidated progress, human-readable and JSON output: what ScalaTest's events carry in memory on the JVM, Scala.js and Native, what `Event.toJson` keeps of it, and whether new code is needed at the point of emission. Facts only; no design is chosen or recommended.
 
-The needs are read from the baseline `.planning/event-stream-reporting/SPECIFICATION.md` R-028 and R-030 adopt: the structured-test-reporting epic and its `runner-json` feature. Where this epic's own requirements (R-010 to R-025) state a need, they are cited as well.
+The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from the parts of the structured-test-reporting epic and its `runner-json` feature that its R-012, R-028 and R-030 take.
 
 `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`, already lists what serialisation loses; this note does not repeat it.
 
 ## Short answer
 
 - **Needing new code at the point of emission on every runtime:** test output, a scope's or test's name as written in the source, a test's label before it closes, the reasons *not run* and *process failed*, every node that never produces an event, and the ScalaTest version (§ 2, § 4, § 6, § 7, § 9, § 10).
-- **Needing new code on Scala.js and Native only:** every run-level event and what it carries, a suite whose constructor throws, and the identity of the process within a run (§ 2, § 4, § 9).
+- **Needing new code on Scala.js and Native only:** every run-level event and what it carries, and a suite whose constructor throws (§ 4, § 9).
 - **Needing new code under every `Framework`:** the expected test count, which the JVM `Framework` sends as 0 and Scala.js and Native never send (§ 9).
 - **In memory but lost by `toJson`:** the order of events within a run, a throwable's cause chain, suppressed exceptions and failed-code path, `TestFailed.analysis`, and the payload (§ 3, § 4).
 - **Derivable by the reader, under conditions that concurrent runs break:** a nested suite's parent, a scope's parent, a test's scope, declared order, and a scope's identity (§ 1, § 2, § 3).
@@ -19,9 +19,9 @@ The needs are read from the baseline `.planning/event-stream-reporting/SPECIFICA
 
 | Tag | Source | Version |
 |---|---|---|
-| `[this]` | this repo | `95cc4eb44` |
-| `EMC` | `.planning/event-stream-reporting/research/emitter-and-mill-channel.md` | as committed at `95cc4eb44` |
-| `ESR` | `.planning/event-stream-reporting/SPECIFICATION.md` | the same |
+| `[this]` | this repo | `47f849e7d` |
+| `EMC` | `.planning/event-stream-reporting/research/emitter-and-mill-channel.md` | as committed at `47f849e7d` |
+| `ESR` | `.planning/event-stream-reporting/SPECIFICATION.md` | as committed with this note |
 | `STR` | `.planning/structured-test-reporting/SPECIFICATION.md` | the same |
 | `RJ` | `.planning/structured-test-reporting/runner-json/SPECIFICATION.md` | the same |
 | `TD` | `.planning/structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` | the same |
@@ -51,7 +51,7 @@ Verdicts: **P** provided; **L** provided but lost when serialised; **D** derivab
 | 1 | Message's scope | D | D | D |
 | 2 | Run an event belongs to | — | — | — |
 | 2 | Runtime of a run | — | — | — |
-| 2 | Process within a run | — | A | A |
+| 2 | Process within a run | — | — | — |
 | 2 | Suite identity | P | P | P |
 | 2 | Test identity | P | P | P |
 | 2 | Scope identity | D | D | D |
@@ -110,13 +110,13 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 2. Identity
 
-**Need.** No node holds another run's events (`ESR` R-022). A run carries no identifier: the caller of a channel's reader names the test run label each channel belongs to, and the label tells apart runs on different runtimes (`ESR` R-013, R-025). No event therefore needs to name its run or its runtime. Nodes that share a name are never merged (`STR` § Test structure, Durations and names).
+**Need.** No node holds another run's events (`ESR` R-022). A channel carries one run, and the consolidation library's caller names its test run label (`ESR` R-013), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`STR` § Test structure, Durations and names).
 
 **In memory and `toJson`.**
 
 - **Run.** The only run field is `ordinal.runStamp`, which is 0 under every `Framework` runner (`EMC` § 5; on Scala.js and Native, `JS/MasterRunner.scala` line 129 and `NAT/MasterRunner.scala` line 131). `Runner` uses a run stamp it is given (`TOOLS/Runner.scala` line 1076). `toJson` writes it. Absent under every `Framework`; not needed.
 - **Runtime.** No event field names the runtime (`EV/Event.scala` lines 268–1814, every case class). Absent; not needed.
-- **Process within a run.** Scala.js and Native workers each build `new Tracker` (`JS/SlaveRunner.scala` line 115; `NAT/SlaveRunner.scala` line 116), and no event names its process (`JSN` § 1.4). **Absent.**
+- **Process within a run.** Scala.js and Native workers each build `new Tracker` (`JS/SlaveRunner.scala` line 115; `NAT/SlaveRunner.scala` line 116), and no event names its process (`JSN` § 1.4). Absent; not needed.
 - **Suite.** `suiteId` is on every suite, test, scope and in-suite message event, and `toJson` writes it. **Provided**, unique only while no two suites of a run share a `suiteId`; `SuiteSortingReporter` assumes the same (`TOOLS/SuiteSortingReporter.scala`, `slotMap`).
 - **Test.** `suiteId` with `testName`; `Engine` rejects a duplicate test name (`CORE/Engine.scala` lines 668–674). **Provided.**
 - **Scope.** No identifier; a scope is known only by its `message`, level and position in its suite's events. **Derivable**, under § 1's conditions.
@@ -136,7 +136,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 4. Outcome
 
-**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run node when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`STR` § Test structure, Outcomes; `TD` § Nodes, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`STR` § Constraints; `RJ` R-006; `ESR` R-011).
+**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run node when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`STR` § Test structure, Outcomes; `TD` § Nodes, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`RJ` R-006; `ESR` R-011).
 
 **In memory and `toJson`.**
 
