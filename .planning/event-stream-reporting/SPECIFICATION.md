@@ -90,10 +90,10 @@ Terms this document adds:
 
 ## How tests run under the Mill plugin
 
-- R-053 Where the Mill plugin runs the tests of a test task that a selector names, they run as that task runs them without the plugin:
+- R-053 When the Mill plugin runs the tests of a test task that a selector names, it runs them as the task runs them without the plugin:
   - the same tests, in the same processes, with the same working directory;
-  - with the same arguments and environment, plus only what turning the emitter on with its channel, and turning off the reporter R-041 names, require;
-  - with a result that succeeds or fails as the task's does and holds the same test results, but does not carry Mill's list of failed tests (R-044).
+  - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
+  - a result that succeeds or fails as the task's does and holds the same test results, but omits Mill's list of failed tests (R-044).
 
 ## Each run's own output under the Mill plugin
 

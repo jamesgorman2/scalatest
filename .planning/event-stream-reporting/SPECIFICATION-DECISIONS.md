@@ -4,7 +4,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ## Under the Mill plugin, a module's tests run, and pass or fail, as they do without it.
 
-**Alternatives** Holding only which tests run and their results, and leaving the processes they run in to each feature, is cheaper to build, but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
+**Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
 **Reasoning** A user who adds the plugin expects the output to change and nothing else (`SPECIFICATION.md` R-053).
 
@@ -18,12 +18,12 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives**
 
-- Holding only what Mill's stable API allows keeps the plugin working across Mill releases, but that API gives the plugin neither a run's stdout and stderr nor the test task's result after tests fail, so worker output and Mill's list of failed tests reach the console.
+- Holding only what Mill's stable API allows survives Mill releases, but that API gives the plugin neither a run's stdout and stderr nor the test task's result after tests fail, so worker output and Mill's list of failed tests reach the console.
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** Holding them obliges the plugin to run each module's tests itself rather than call Mill's own test task, on Mill API marked `@experimental` and with logic Mill keeps `@internal` re-implemented, so it may need a release for each Mill release. On Native no public API takes a run's stdout and stderr, so how R-040 is met there is not yet proven.
+**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native no public API takes a run's stdout and stderr, so how R-040 is met there is not yet proven.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
