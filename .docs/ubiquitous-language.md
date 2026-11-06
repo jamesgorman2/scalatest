@@ -62,6 +62,10 @@ _Avoid_: Filter flags, suppression characters
 The stdout and stderr written on a thread while one of a run's nodes, or the run's own code, is running on it.
 _Avoid_: Logs, console output, captured output
 
+**Worker output**:
+The stdout and stderr of the processes executing a run that is not test output, such as a JVM warning or a write from native code. It belongs to the run as a whole, never to a node within it.
+_Avoid_: Other output, raw output, leftover output
+
 ## Consolidation
 
 **Consolidation**:
