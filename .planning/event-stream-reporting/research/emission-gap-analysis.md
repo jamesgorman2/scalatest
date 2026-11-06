@@ -212,11 +212,6 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 - What a `Throwable` holds on Scala.js and Native: stack frames, cause and suppressed exceptions.
 - What the progress output needs beyond `STR` § Progress output, which fixes no fields.
 
-## 12. Corrections to earlier notes
+## 12. A correction to an earlier note
 
-- `EMC` § 1.1, **Location.** `Location` is sealed with four subtypes, all matched (`EV/Location.scala`; `EV/Event.scala` lines 119–126), so the empty-string branch at lines 127–128 is unreachable.
-- `EMC` § 1.1 omits two losses: `TestFailed.analysis`, and a `None` run or discovery duration written as `0` (§ 4, § 5).
-- `EMC` § 1 marks `Formatter`, `Location` and `Ordinal` as `Serializable`, *unverified*. Confirmed: `EV/Formatter.scala`, `EV/Location.scala`, `EV/Ordinal.scala` line 172.
-- `EMC` § 2 cites `TOOLS/Framework.scala` lines 921–922 for the dropped `RunStarting` and `RunCompleted`. Confirmed at those lines.
-- `EMC` § 5, **The summary is outside the reporter chain under `Framework`**, holds for the JVM. On Scala.js and Native no `RunCompleted` exists to carry a summary (§ 4).
 - `JSN` § 1.4 says no `SuiteSortingReporter` is compiled for Scala.js or Native. The line it cites, `project/GenScalaTestJS.scala` line 129, skips `DispatchReporter.scala` only; neither skip list names `SuiteSortingReporter.scala` or `TestSortingReporter.scala`, and `CORE/AsyncEngine.scala` line 38 imports both. Neither is in `TaskRunner`'s chain.

@@ -13,6 +13,7 @@ One Mill command can start many runs: several selectors, several modules, parall
 ## Spec documents
 
 - [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, what attributing test output needs, and what is known about a channel out of a Mill test-worker JVM.
+- [research/emission-gap-analysis.md](research/emission-gap-analysis.md) — for each need of the consolidated output, whether a run's events already provide it on each runtime, lose it when serialised, leave it derivable, or need new code at the point of emission.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
