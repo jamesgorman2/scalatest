@@ -9,7 +9,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 
 ## Short answer
 
-- **Events are Java-serialisable but have no lossless language-neutral form.** `Event.toJson` drops the ordinal's stamps, the payload and the throwable's cause chain, and does not escape control characters (§ 1).
+- **Events are Java-serialisable but have no lossless language-neutral form.** `Event.toJson` drops the ordinal's stamps, the payload, `TestFailed.analysis` and the throwable's cause chain, and does not escape control characters (§ 1).
 - **No existing transport is both lossless and cross-platform.** `-K` is the nearest and is JVM-only Java serialisation (§ 2).
 - **`-C` is JVM-only and attaches late.** It works under `Runner` and the JVM `Framework`, takes no arguments, sits after sorting and filtering, and has no equivalent on Scala.js or Native (§ 3).
 - **ScalaTest captures no test output today**, and a reporter cannot attribute output to a test (§ 4).
@@ -35,7 +35,7 @@ No experiment was run for this note. §§ 1–5 are read from `[this]` source. E
 ## 1. The event model
 
 - `Event` is `sealed abstract class Event extends Ordered[Event] with Product with Serializable` (`EV/Event.scala` line 34). Every event carries `ordinal`, `formatter`, `location`, `payload: Option[Any]`, `threadName` and `timeStamp` (lines 34–70).
-- `Formatter`, `Location` and `Ordinal` are `Serializable` (`EV/Formatter.scala`, `EV/Location.scala`, `EV/Ordinal.scala`; *unverified*).
+- `Formatter`, `Location` and `Ordinal` are `Serializable` (`EV/Formatter.scala` line 23, `EV/Location.scala` line 21, `EV/Ordinal.scala` line 172).
 
 ### 1.1 What `Event.toJson` loses
 
@@ -46,7 +46,8 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 - **Throwable.** Written as class name, message, stack depth and stack frames (lines 137–143). The cause and suppressed chains are not written.
 - **String escaping.** `string()` escapes only `\` and `"` (lines 93–94). A message holding a newline or another control character yields invalid JSON.
 - **Config map.** Values are written with `toString` (line 1034).
-- **Location.** An unmatched `Location` subtype yields an empty string, not a JSON value (lines 127–128).
+- **Analysis.** `TestFailed.analysis` (line 449) is not written (line 477).
+- **Missing durations.** A `None` run or discovery duration is written as `0` (lines 1109, 1185, 1258, 1837).
 
 ### 1.2 What Java serialisation loses
 
@@ -101,7 +102,8 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 - **No run identity.** Every `Framework` runner creates `new Tracker` (`TOOLS/Framework.scala` line 672), whose default first ordinal is `new Ordinal(0)` (`jvm/core/src/main/scala/org/scalatest/Tracker.scala` line 48). Every Mill test-worker JVM and sbt fork therefore issues the same ordinals. JS and Native: `JSN` § 1.4.
 - **Recorded events arrive late.** Information and markup recorded during a test travel in the test-completion event's `recordedEvents` (`EV/Event.scala` line 358), not as they happen.
 - **Filtering precedes reporters.** A `FilterReporter` in front of a reporter removes whole events (§ 3.2). `.planning/structured-test-reporting/runner-json/prototype-json-layout/06-filtered-fCJ.notes.md` shows `-fCJ` losing a test's outcome and duration.
-- **The summary is outside the reporter chain under `Framework`.** `done()` builds the `Summary` from `SummaryCounter` and returns the summary and reminder text as its result string (`TOOLS/Framework.scala` lines 790–812). `RunCompleted` carries the same `Summary` to reporters (line 794); the reminder text reaches no reporter.
+- **The reminder text is outside the reporter chain under the JVM `Framework`.** `done()` builds the `Summary` from `SummaryCounter` and returns the summary and reminder text as its result string (`TOOLS/Framework.scala` lines 790–812). `RunCompleted` carries the same `Summary` to reporters (line 794); the reminder text reaches no reporter.
+- **Scala.js and Native send no run-level event.** `JS/` and `native/core/src/main/scala/org/scalatest/tools/` create no `RunStarting`, `RunCompleted`, `RunAborted` or `RunStopped`, so no event carries a summary there.
 - **A run that never ends.** An emitter attached to Mill's discovery runner sees `RunStarting` and nothing after it (`MILL` § 1.4, I-5).
 
 ## 6. Mill: what the earlier notes mean for a channel
