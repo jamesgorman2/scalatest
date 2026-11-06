@@ -1,6 +1,8 @@
 # What a lossless emitter and Mill-side consolidation have to work with
 
-What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what is known about a channel from a Mill test-worker JVM to a Mill plugin Facts only; no design is chosen.
+What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what the earlier Mill notes mean for a channel from a Mill test-worker JVM to a Mill plugin. Facts only; no design is chosen.
+
+The channel itself is examined in `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`, and what can host plugin code across test tasks in `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`.
 
 Two earlier notes hold facts this one relies on and does not repeat:
 
@@ -14,7 +16,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 - **`-C` is JVM-only and attaches late.** It works under `Runner` and the JVM `Framework`, takes no arguments, sits after sorting and filtering, and has no equivalent on Scala.js or Native (§ 3).
 - **ScalaTest captures no test output today**, and a reporter cannot attribute output to a test (§ 4).
 - **Events alone do not rebuild the tree or identify the run** (§ 5).
-- **How a Mill test-worker's stdout and stderr are wired is not established**, so stdout as the channel is neither confirmed nor ruled out (§ 6, § 7).
+- **Inside a Mill test worker, only the working directory tells one worker from another** (§ 6). `MWC` covers the candidate channels.
 
 ## Sources
 
@@ -108,20 +110,16 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 
 ## 6. Mill: what the earlier notes mean for a channel
 
-- **Telling workers apart.** Only a worker's working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3).
+- **Telling workers apart.** From inside the worker, only its working directory differs from another's, and only while `testSandboxWorkingDir` is on (`MILL` § 2.1–2.3). What differs from Mill's side: `MWC` § 1.4.
 - **Plugin code inside the worker.** The shim `testFramework` is the one place plugin code runs in the worker JVM before ScalaTest (`MILL` § 3, I-3). `MILL` examines it only for rewriting `-fJ`, not for capture or for opening a channel.
-- **Plugin code after failing tests.** It runs only through a direct call to the `@experimental` `TestModuleUtil.runTests` (`MILL` § 2.2, I-4).
-- **What is known about printing.** `MILL` § 1.4 and `JSN` § 2.1 cover sbt test-interface `Logger` lines and the `done()` string. Neither covers raw writes to the worker's stdout or stderr.
+- **Plugin code after failing tests.** Inside the test task it runs only through a direct call to the `@experimental` `TestModuleUtil.runTests` (`MILL` § 2.2, I-4). Outside the test task: `MCL` § 2.
+- **What is known about printing.** `MILL` § 1.4 and `JSN` § 2.1 cover sbt test-interface `Logger` lines and the `done()` string. Raw writes to the worker's stdout or stderr: `MWC` § 1.
 - **End of the channel.** The worker exits straight after `done()` (`MILL` § 1.3).
 - **No worker JVM.** `testLocal` runs in Mill's own process (`MILL` § 1.1), as do Scala.js and Native runs through the adapter (`JSN` § 1.3). Their channels out: `JSN` § 2.1, § 2.3.
 
 ## 7. What is not known
 
-- How Mill wires a test-worker JVM's stdout and stderr: inherited, piped or redirected to a file. `MILL` § 1.3 lists the spawn's arguments, environment and working directory, and not its streams.
-- Whether `callTestRunnerSubprocess` exposes the worker's streams to its caller.
-- What Mill does with worker output before a plugin could see it: prefixing, line buffering, or merging of stdout and stderr.
-- Whether a shim `testFramework` can install output capture, or open a channel of its own, inside the worker before any test runs.
-- Whether a live channel from a worker JVM to Mill's own process (socket, pipe or tailed file) works. No note evaluates one, and no experiment has been run.
+- Whether a live channel from a worker JVM to Mill's own process works when run. `MWC` evaluates the candidates from source; no experiment has been run.
 - How `testLocal` routes test output.
 - Whether the facts in § 6 hold on Mill versions other than `1.1.10`.
 - Every item marked *unverified* above.
