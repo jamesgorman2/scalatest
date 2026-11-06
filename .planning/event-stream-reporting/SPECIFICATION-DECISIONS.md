@@ -6,7 +6,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives**
 
-- A trait overriding each module's test tasks keeps `mill __.test` working, but each task consolidates only its own module's runs, so modules still interleave, and IDE and BSP launches reach the replacement (`SPECIFICATION.md` R-003).
+- A trait overriding each module's test tasks keeps `mill __.test` working, but each task consolidates only its own module's runs, leaving modules interleaved, and IDE and BSP launches reach the replacement (`SPECIFICATION.md` R-003).
 - Offering both the trait and the command doubles the surface, while only the command consolidates across modules.
 
 **Reasoning** Of the Mill mechanisms examined, only an exclusive command that takes the `Evaluator` has a start, an end and the failure path (`research/mill-command-lifetime.md` § 2, § 3). Confining the plugin's replacement of a module's test task to that command keeps `SPECIFICATION.md` R-003 and R-060 without the replacement having to stand aside for other launches.
@@ -17,17 +17,31 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## The test command runs every selected test module by default and treats one that cannot start as a failed run; `--halt-on-failure` opts into skipping modules not yet started.
+## A selected test module whose tests cannot start is a failed run: shown as not run with its failure, failing the test command and triggering `--halt-on-failure`.
 
 **Alternatives**
 
-- Following Mill's `--keep-going`, failing fast by default, suits a build, but with modules running unordered and in parallel, which modules report depends on timing.
+- Leaving it to Mill's own console error omits it from the report (`SPECIFICATION.md` R-058).
+- Showing it as not run without failing the test command lets a build whose tests never ran look green.
+
+**Reasoning** A module that did not run is a gap in coverage whatever stopped it, so the test command fails (R-046) and the consolidated output shows both that it did not run and why (R-058). Counting it as a failure makes `--halt-on-failure` stop on it as on any other (R-057).
+
+**Costs** One module that fails to compile fails the whole test command, and under `--halt-on-failure` it also skips the modules not yet started.
+
+**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+
+---
+
+## The test command runs every selected test module by default; `--halt-on-failure` opts into skipping modules not yet started.
+
+**Alternatives**
+
+- Failing fast unless `--keep-going` is given, as Mill does, suits a build; but modules run unordered and in parallel, so which modules report depends on timing.
 - Showing only the runs that started, as Mill does, hides that modules were skipped.
 - Always running every module, with no opt-in, loses fast feedback on a large build.
 - Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
-- Leaving a module that cannot start to Mill's own console error omits it from the report.
 
-**Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058), including any that could not start (R-046).
+**Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
 
 **Costs** The default differs from Mill's, and the test command ignores Mill's `--keep-going`. Unless the user opts in, a failing build takes as long as a passing one.
 
@@ -50,7 +64,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## Under the test command, each selected module's tests run, and pass or fail, as Mill's `testOnly` or `testForked` runs them, except that a run that did not complete always fails.
+## Under the test command, each selected module's tests run, and pass or fail, as Mill's `testOnly` or `testForked` would run them, except that a run that did not complete always fails.
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
