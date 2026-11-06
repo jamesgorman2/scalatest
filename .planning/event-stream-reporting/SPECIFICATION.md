@@ -83,13 +83,13 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the same processes, with the same working directory;
   - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require.
-- R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs. Mill's `--keep-going` does not change which modules start.
+- R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs. Mill's `--keep-going` does not change which modules start. Modules compile and test as Mill schedules them; no test waits for every module to compile.
+- R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
 - R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming those modules.
 
 WHERE `--halt-on-failure` is given:
 
-- R-057 Once any run has ended in a way that fails the test command (R-046), the test command does not start the tests of any selected test module whose tests have not started.
-- R-058 The consolidated output shows each test module R-057 skipped as not run.
+- R-057 Once anything has failed the test command (R-046), the test command does not start the tests of any selected test module whose tests have not started.
 
 ## Consolidation
 
@@ -113,7 +113,7 @@ These hold for every run a test command starts.
 - R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 - R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the module's tests, or ScalaTest's end-of-run summary for the run.
 - R-045 The plugin may show as worker output Mill's own progress for the module's tests and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
-- R-046 The test command fails if any run it started reports a failure or does not complete. Its failure does not list the failed tests.
+- R-046 The test command fails if any run it started reports a failure or does not complete, or if the tests of any selected test module cannot start, for example because it or a module it depends on fails to compile. Its failure does not list the failed tests.
 - R-047 The test command writes each selected test module's JUnit XML report as the Mill task R-053 names writes it.
 
 Where the consolidated output goes:
