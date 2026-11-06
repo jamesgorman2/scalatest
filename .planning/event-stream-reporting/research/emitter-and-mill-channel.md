@@ -1,6 +1,6 @@
 # What a lossless emitter and Mill-side consolidation have to work with
 
-What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what is known about a channel from a Mill test-worker JVM to a Mill plugin ([Event-stream test reporting for Mill](https://github.com/jamesgorman2/scalatest/issues/20)). Facts only; no design is chosen.
+What ScalaTest's events carry and lose leaving a process, what already ships events out of process, where a new emitter can attach, what capturing test output needs, and what is known about a channel from a Mill test-worker JVM to a Mill plugin Facts only; no design is chosen.
 
 Two earlier notes hold facts this one relies on and does not repeat:
 
@@ -10,7 +10,7 @@ Two earlier notes hold facts this one relies on and does not repeat:
 ## Short answer
 
 - **Events are Java-serialisable but have no lossless language-neutral form.** `Event.toJson` drops the ordinal's stamps, the payload, `TestFailed.analysis` and the throwable's cause chain, and does not escape control characters (§ 1).
-- **No existing transport is both lossless and cross-platform.** `-K` is the nearest and is JVM-only Java serialisation (§ 2).
+- **No existing transport is both lossless and available on every runtime.** `-K` is the nearest and is JVM-only Java serialisation (§ 2).
 - **`-C` is JVM-only and attaches late.** It works under `Runner` and the JVM `Framework`, takes no arguments, sits after sorting and filtering, and has no equivalent on Scala.js or Native (§ 3).
 - **ScalaTest captures no test output today**, and a reporter cannot attribute output to a test (§ 4).
 - **Events alone do not rebuild the tree or identify the run** (§ 5).
