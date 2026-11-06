@@ -40,6 +40,7 @@ Terms this document adds:
 - Changing any existing ScalaTest reporter.
 - A consolidated HTML report; a follow-up epic.
 - Consolidated JUnit XML.
+- A consolidated CTRF (Common Test Report Format) report; a possible later feature.
 - Build tools other than Mill.
 
 ## Constraints
