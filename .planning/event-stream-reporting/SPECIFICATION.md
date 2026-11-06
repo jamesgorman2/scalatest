@@ -28,7 +28,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
 - A consolidation library that reads the channels of many runs, takes each run's test run label and worker output, and produces their consolidated output.
-- A Mill plugin that runs a module's or a build's tests itself, in place of Mill's test task, with the emitter on, and hosts the consolidation library.
+- A Mill plugin that runs a module's or a build's tests with the emitter on, and hosts the consolidation library.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
@@ -65,7 +65,6 @@ Terms this document adds:
 - R-011 Nothing a run reports is lost or altered between the run and the channel's reader. This includes failure messages, throwables with their cause chains, and the order of events within a node.
 - R-012 Each piece of test output is attributed to a node as `../structured-test-reporting/SPECIFICATION.md` § Test output states, and keeps its position among that node's events.
 - R-013 A channel carries one run.
-- R-052 The consolidation library's caller names the test run label each channel belongs to.
 
 ## Behaviour taken from structured test reporting
 
@@ -86,7 +85,15 @@ Terms this document adds:
 - R-021 The human-readable and JSON output show every node, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
 - R-023 Given the same channels, test run labels and worker output, the consolidation library produces the same human-readable and JSON output when used without Mill.
+- R-052 The consolidation library's caller names the test run label each channel belongs to.
 - R-025 By default, the Mill plugin gives each module one test run label.
+
+## How tests run under the Mill plugin
+
+- R-053 Where the Mill plugin runs the tests of a test task that a selector names, they run as that task runs them without the plugin:
+  - the same tests, in the same processes, with the same working directory;
+  - with the same arguments and environment, plus only what turning the emitter on with its channel, and turning off the reporter R-041 names, require;
+  - with a result that succeeds or fails as the task's does and holds the same test results, but does not carry Mill's list of failed tests (R-044).
 
 ## Each run's own output under the Mill plugin
 
@@ -100,7 +107,6 @@ These hold for every run the Mill plugin starts.
 - R-045 The plugin may show as worker output Mill's own progress for the test task and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
 - R-046 The Mill command fails if any run it started reports a failure or does not complete.
 - R-047 Mill writes its JUnit XML report for each module as it does without the plugin.
-- R-053 Which tests a module runs, in which processes, with which arguments, environment and working directory, and what the module's test task returns, are as they are without the plugin.
 
 Where the consolidated output goes:
 
