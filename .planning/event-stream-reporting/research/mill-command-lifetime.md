@@ -10,10 +10,11 @@ This note covers:
 
 Question: [What gives plugin code one lifetime spanning a whole Mill command?](https://github.com/jamesgorman2/scalatest/issues/28). Facts only; no design is chosen.
 
-Two other notes hold facts this one relies on and does not repeat:
+Three other notes hold facts this one relies on and does not repeat:
 
 - `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: Mill's test tasks and test-worker JVMs.
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: how Mill wires a test-worker JVM's streams and what it does to a task's output.
+- `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js or Native run under Mill.
 
 ## Short answer
 
@@ -41,6 +42,7 @@ Two other notes hold facts this one relies on and does not repeat:
 | `[mill]` | <https://github.com/com-lihaoyi/mill> | tag `1.1.10` (`92d51b79bc2243fd2e82a022c924b03b822b2d7b`), the version `MILL` pins |
 | `MILL` | `.planning/structured-test-reporting/research/mill-test-worker-args.md` | as committed |
 | `MWC` | `.planning/event-stream-reporting/research/mill-worker-channels.md` | as committed |
+| `JNC` | `.planning/event-stream-reporting/research/js-native-channels.md` | as committed |
 
 Permalink base: `https://github.com/com-lihaoyi/mill/blob/92d51b79bc2243fd2e82a022c924b03b822b2d7b/`. Paths are relative to the `[mill]` root. Abbreviations:
 
@@ -172,7 +174,7 @@ Statements marked *inferred* follow from the cited source and were not observed.
 - **A nested `execute` unpauses the prompt** for its duration (`EX` line 137; `PL` lines 296–297). Nested tasks then write through the pipe with prefixes and prompt redraws, as in § 4.1.
 - *Inferred:* while a nested `execute` runs, a write from the command's own thread to `System.out` goes to the raw streams and is not coordinated with the prompt's cursor movement, so the two can interleave on an interactive terminal.
 - `Task.log` inside the command is the command's `PrefixLogger` teed to its log file (`GE` lines 503, 516–519). Writes through `Task.log.streams` take the § 4.1 path: line-buffered, prefixed with the command's key, non-colour ANSI stripped, coordinated with the prompt.
-- `SystemStreams.original` is public and documented as not to be used: it is not captured by Mill's redirection and, under the daemon, reaches only the daemon's log files (`core/api/daemon/src/mill/api/daemon/SystemStreams.scala` lines 20–28).
+- `SystemStreams.original` is public and documented as not to be used: its streams "do not get captured properly by Mill's stdout/err redirection, and thus only get picked up from the Mill server log files asynchronously", so logs "may appear out of order" (`core/api/daemon/src/mill/api/daemon/SystemStreams.scala` lines 20–28). How the daemon's `stdout` and `stderr` files reach the console: `JNC` § 5.3.
 - `Logger.prompt`, with `withPromptPaused`, `setPromptLine` and `logPrefixedLine`, is `private[mill]` (`Logger.scala` lines 83–89).
 - `--ticker false` turns the prompt and the prefixes off for the whole command (`MAIN` lines 216–221; `PL` line 273).
 

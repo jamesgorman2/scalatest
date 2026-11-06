@@ -15,11 +15,11 @@ Other notes hold facts this one relies on and does not repeat:
 - **Worker stdout and stderr are two pipes, not inherited descriptors and not files.** Mill spawns each `MillTestRunnerMain` JVM with `os.Inherit` for both, and inside a non-exclusive Mill task `os.Inherit` resolves to a pipe that a Mill thread pumps into the task's logger streams (§ 1.1–1.3). A stream that is the process's original stream is inherited instead (§ 1.3). An exclusive command runs with `exclusiveSystemStreams` (`MCL` § 4.2); whether a worker spawned under them is piped or inherits was not determined (§ 6).
 - **Mill line-buffers and prefixes that output on its way to the console, and tees it unprefixed to a log file.** On the parallel path the file is per worker, `Task.dest[/<group>]/worker-<i>.log`, holding stdout and stderr together (§ 1.4–1.5).
 - **Of the routes examined, plugin code in Mill's process can take the raw streams only by calling `TestModuleUtil` itself.** A `testTask` override that calls `super.testTask` cannot. A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. A direct `runTests()` call does so only on its non-parallel path. Inside the worker, a shim `testFramework` can replace `System.out` and `System.err` before Mill's runner captures `System.out` (§ 2). The last three are *inferences* (§ 6).
-- **Sandbox file.** Found by a relative path, only while `testSandboxWorkingDir` is on. It sits under `Task.dest`, where Mill itself polls two files every 10 ms; whether it can be read on Windows while the worker appends to it was not determined (§ 6). The discovery runner resolves the same relative path against Mill's own working directory (§ 3.1).
+- **Sandbox file.** Found by a relative path, only while `testSandboxWorkingDir` is on. It sits under `Task.dest`, where Mill itself polls two files every 10 ms. On Windows, whether it can be read while the worker appends to it depends on the share mode of the worker's writer (§ 3.1). The discovery runner resolves the same relative path against Mill's own working directory (§ 3.1).
 - **Socket.** Found through an address in the arguments, environment or system properties, which are the same for every worker. Mill is not involved in the transport. The discovery runner receives the same address (§ 3.2).
 - **Stdout.** Needs no discovery. It shares one pipe with test output, Mill's own runner lines and the `done()` string. The discovery runner's `System.out` is not a worker pipe (§ 3.3).
 - **After a JVM worker dies**, the sandbox file stays on disk until the task next runs, and Mill reads both pipes to end of stream. By *general* operating-system behaviour, bytes handed to the operating system before the death remain in the file and are still read from the pipes, and bytes buffered inside the worker JVM are lost. Whether socket bytes written but not yet received are delivered was not determined (§ 3.1–3.3, § 6).
-- **Scala.js and Native have no `MillTestRunnerMain` worker and no discovery runner.** Their runs execute through the test adapters in Mill's own process (§ 4). Whether written data survives a dead JS VM or native process was not determined (§ 6).
+- **Scala.js and Native have no `MillTestRunnerMain` worker and no discovery runner.** Their runs execute through the test adapters in Mill's own process (§ 4). Whether data a JS VM or native process wrote survives its death: `JNC` § 7.
 - **Plugin code that must run inside the test task after tests fail needs `@experimental` API**, which Mill excludes from its binary-compatibility check (§ 5).
 
 ## Sources
@@ -148,8 +148,8 @@ Besides what tests and ScalaTest write:
   - Every worker's `processFolder` exists, with a `result.log`, before any worker is spawned: `runTestFuture` writes it outside the forked block, for every worker index (TMU lines 210–229, 287–288). The `sandbox` folder is created just before the spawn (TMU lines 142–145).
   - Mill reads files in these folders live itself. The `poll` callback re-reads `claim.log` every 10 ms (TMU lines 165–175, 332–361), and `waitForFutures` re-reads every `result.log`, retrying when one is "malformed … since that might happen transiently during a write" (TMU lines 597–623).
   - `runTests()` blocks until every worker has finished (TMU lines 231–235).
-  - Whether a file the worker is appending to can be read concurrently on Windows was not determined (§ 6).
-- **The discovery runner.** It resolves a relative path against the working directory of the process it runs in (`MILL` § 1.4, I-5). The Mill daemon is started with working directory `<daemon dir>/sandbox` (`[mill] runner/launcher/src/mill/launcher/MillProcessLauncher.scala` lines 83–102). *Inference:* the discovery runners of every module and every command resolve one relative path to the same file.
+  - On Windows, the JDK's `FileInputStream` shares a file it opens for reading and writing (`JNC` § 3.2). Whether Mill's process can read the file while the worker appends to it then depends on the share mode the worker's writer opens it with, which was not determined (§ 6).
+- **The discovery runner.** It resolves a relative path against the working directory of the process it runs in (`MILL` § 1.4, I-5). The working directory of Mill's own process: `JNC` § 3.1. *Inference:* where the discovery runner runs in Mill's own process, under the daemon the discovery runners of every module and every command resolve one relative path to the same file, and under `--no-daemon` and BSP those of every module in one command do.
 - **A dead worker.** The file stays on disk. `Task.dest` is cleared only when the task next runs (`MILL` § 2.3). *General:* bytes already handed to the operating system survive the death of the process; bytes still in a buffer inside the JVM do not. Mill reports the worker as `Result.Failure("Test reporting Failed: … out.json does not exist")` (TMU lines 177–178).
 - **Mill APIs.** `Task.dest`. The folder layout under it is shown in Mill's examples (`MILL` § 2.3) and is otherwise set only by the body of the `@experimental` `TestModuleUtil`.
 
@@ -175,11 +175,11 @@ Besides what tests and ScalaTest write:
 ## 4. Scala.js and Native under Mill
 
 - **No worker JVM and no discovery runner.** `TestScalaJSModule` and `TestScalaNativeModule` override `testTask` to call `TestRunner.runTestFramework` in Mill's own process on the adapter's `Framework`, and make `testLocal` an alias of `testForked` (`[mill] libs/scalajslib/src/mill/scalajslib/ScalaJSModule.scala` lines 395–432; `[mill] libs/scalanativelib/src/mill/scalanativelib/ScalaNativeModule.scala` lines 488–519). They build no `TestModuleUtil`, so nothing sends `ZincOp.GetTestTasks`. ScalaTest runs only in the JS VMs or native processes (`JSN` § 1).
-- **Arguments and environment.** The framework arguments reach the adapter's runner unchanged (same lines). Mill gives the Node environment its executable, arguments and environment and no working directory (`[mill] libs/scalajslib/worker/1/src/mill/scalajslib/worker/jsenv/NodeJs.scala` lines 15–21). It gives the native adapter the binary, `allForkEnv` and a logger (`[mill] libs/scalanativelib/worker/0.5/src/mill/scalanativelib/worker/ScalaNativeWorkerImpl.scala` lines 135–156). The working directory each process gets: `JNC` § 3.1.
+- **Arguments.** The framework arguments reach the adapter's runner unchanged (same lines). How Mill launches each JS VM and native process, with its environment and working directory: `JNC` § 1, § 3.1.
 - **File.** `JSN` § 3; `JNC` § 3.
 - **Socket.** `JNC` § 2.
-- **Stdout and stderr.** `JNC` § 5. Mill sleeps 100 ms before closing the adapter (`ScalaJSModule.scala` lines 425–429; `ScalaNativeModule.scala` lines 513–517).
-- **The test-interface `Logger`.** The channel that reaches Mill's process in order on both runtimes (`JSN` § 2.1). Mill prints each line with `systemOut.println`, where `systemOut` is Mill's proxy `System.out` (`TR/TestRunnerUtils.scala` lines 179–191, 252–254).
+- **Stdout and stderr.** `JNC` § 5.
+- **The test-interface `Logger`.** The channel that reaches Mill's process in order on both runtimes (`JSN` § 2.1). What Mill does with its lines: `JNC` § 4.
 - **Hooks for plugin code.** `JNC` § 6.
 
 ## 5. Running plugin code during the run and after tests fail
@@ -209,8 +209,7 @@ Besides what tests and ScalaTest write:
 - Whether `scala.Console` is initialised before a shim `testFramework` is constructed (§ 2.4).
 - Whether a plugin can give `TestModuleUtil` a `TaskCtx` of its own, to control the parallel path's logger (§ 2.2).
 - Delivery of unread socket bytes after a worker is killed, on each operating system (§ 3.2).
-- Whether a file being appended by the worker can be read concurrently on Windows without sharing violations. *General:* expected to work; not checked.
+- On Windows, the share mode the worker's writer opens a sandbox file with, which decides whether Mill's process can read it while the worker appends (§ 3.1).
 - Whether live workers are destroyed when the command is interrupted. `spawn` registers a shutdown hook that destroys the process when Mill's JVM exits (`[os] os/src/ProcessOps.scala` lines 326–342); the daemon's handling of a client interrupt is `MCL` § 5.1.
 - What `testLocal` on a JVM module does with test output beyond running the framework in Mill's process (`MILL` § 1.1).
-- Whether data written to a file, a socket or stdout survives the death of a JS VM or a native process (§ 4).
 - Whether any of this holds on Mill versions other than `1.1.10`.

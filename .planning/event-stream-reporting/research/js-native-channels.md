@@ -4,10 +4,9 @@ On Scala.js and Scala Native under Mill: which channels can carry a run's event 
 
 Other notes hold facts this one relies on and does not repeat:
 
-- `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the JVM answer (§§ 1–3) and what was known for these runtimes (§ 4).
+- `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the JVM answer (§§ 1–3), how Mill passes a Scala.js or Native run its framework arguments (§ 4), and the APIs for running plugin code after tests fail (§ 5).
 - `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what hosts plugin code across a Mill command, and what Mill does to its console output.
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches JVM test workers.
 
 ## Short answer
 
@@ -29,7 +28,6 @@ Other notes hold facts this one relies on and does not repeat:
 | `[scala3]` | <https://github.com/scala/scala3> | tag `3.8.2`, the Scala version `[mill] Deps.scala` line 18 pins |
 | `[node]` | <https://github.com/nodejs/node> | tag `v22.21.1`: `doc/api/*.md` and the bundled `deps/uv`. Mill does not pin Node: `JsEnvConfig.NodeJs` runs `node` from the path (`[mill] libs/scalajslib/src/mill/scalajslib/api/JsEnvConfig.scala` lines 24–29) |
 | `[jdk]` | <https://github.com/openjdk/jdk21u> | tag `jdk-21.0.5-ga`. Mill does not pin the daemon's JDK; this is a reference version |
-| `[this]` | this repo | `75bcc24a2` |
 
 Paths are relative to each source's root. Abbreviations:
 
@@ -63,7 +61,7 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
 - For Node, the `JSEnv` is `NodeJSEnv` with the config's `executable`, `args`, `env` and `sourceMap` (`SJWI` lines 229–231; `[mill] libs/scalajslib/worker/1/src/mill/scalajslib/worker/jsenv/NodeJs.scala` lines 15–21).
 - `NodeJSEnv` runs `executable :: args` and feeds the program to Node's standard input (`NE/NodeJSEnv.scala` lines 58–64, 98–166). It adds `NODE_MODULE_CONTEXTS=0` to the config's `env` (lines 72–73).
 - `ExternalJSRun.startProcess` puts that `env` into a `ProcessBuilder`'s environment and sets no working directory (`JE/ExternalJSRun.scala` lines 129–154). A `ProcessBuilder`'s environment starts as a copy of the current process's, and its working directory defaults to the current process's (`[jdk] src/java.base/share/classes/java/lang/ProcessBuilder.java` lines 67–73).
-- The adapter starts one VM per JVM thread that calls it (`JSN` § 1.1). `testFrameworkInstance` is a `Task.Anon`, so Mill groups it with the named task that uses it (`[mill] core/exec/src/mill/exec/PlanImpl.scala` lines 30–59). It evaluates a group's tasks in one loop with one logger (`GE` lines 502–548). *Inference:* `loadFrameworks` and the run execute on the same thread, so one VM serves the run. This settles `JSN` § 5 item 7 from source, not by experiment.
+- The adapter starts one VM per JVM thread that calls it (`JSN` § 1.1). `testFrameworkInstance` is a `Task.Anon`, so Mill groups it with the named task that uses it (`[mill] core/exec/src/mill/exec/PlanImpl.scala` lines 30–59). It evaluates a group's tasks in one loop with one logger (`GE` lines 502–548). *Inference:* `loadFrameworks` and the run execute on the same thread, so one VM serves the run.
 
 ### 1.2 Scala Native
 
@@ -108,10 +106,10 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
 
 ### 3.1 The working directory
 
-- Neither launcher sets a working directory (§ 1.1, § 1.2), so each JS VM and native process starts in the working directory of Mill's process (`[jdk]` `ProcessBuilder.java` lines 71–73). This verifies the inference in `MWC` § 4.
+- Neither launcher sets a working directory (§ 1.1, § 1.2), so each JS VM and native process starts in the working directory of Mill's process (`[jdk]` `ProcessBuilder.java` lines 71–73).
 - **Under the daemon,** that directory is `<out>/mill-daemon/sandbox`. The launcher spawns the daemon with `cwd = daemonDir / "sandbox"`, where `daemonDir` is `<out>/mill-daemon` (`MPL` lines 52–72, 83–84, 101–103; `[mill] runner/launcher/src/mill/launcher/MillLauncherMain.scala` line 101). Mill's own background-run code finds the daemon's files by resolving `Paths.get(".")` and going up one level (`RunModule.scala` lines 383–389).
 - **Under `--no-daemon` and BSP,** it is `<out>/mill-no-daemon/<sig>/sandbox`, where `<sig>` is random per Mill command (`MPL` lines 24–28, 39, 83–84; `MillLauncherMain.scala` lines 43, 65–67).
-- So a relative path resolves to one file for every module and every run of a command, and under the daemon for every command. `MWC` § 3.1 gives the same fact for the JVM discovery runner.
+- So a relative path resolves to one file for every module and every run of a command, and under the daemon for every command.
 - `Task.dest` and `nativeWorkdir` (`SNM` line 146) are not the processes' working directory.
 
 ### 3.2 Reading a file while the run writes it
@@ -173,7 +171,7 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
 ### 5.2 A native process
 
 - `ProcessRunner` calls `inheritIO()` (`SNTR/ProcessRunner.scala` line 36). The process's stdin, stdout and stderr are Mill's own process's descriptors, and no byte passes through a JVM stream.
-- Mill's comment before its 100 ms sleep says the subprocess's stdout streams "to the JVM" (`SNM` lines 514–517), which `ProcessRunner` does not do. `MWC` § 4 restates that rationale for both runtimes.
+- Mill's comment before its 100 ms sleep says the subprocess's stdout streams "to the JVM" (`SNM` lines 514–517), which `ProcessRunner` does not do.
 - **Nothing configures it.**
   - `ProcessRunner`, `NativeRunnerRPC` and `ComRunner` are `private[testinterface]` (`SNTR/ProcessRunner.scala` line 9; `SNTR/NativeRunnerRPC.scala` line 14; `SNTR/ComRunner.scala` line 19).
   - `TestAdapter.Config` exposes only `binaryFile`, `envVars` and `logger` (`SNTR/adapter/TestAdapter.scala` lines 133–164).
@@ -190,7 +188,7 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
   - The tailer skips what the file holds on its first read, then copies each `readLine()` result with `println` (`[mill] libs/daemon/client/src/mill/client/FileToStreamTailer.scala` lines 5–58).
   - *Inference:* a native process's output reaches the console through the command's top-level logger while the command runs. It carries no task prefix, does not reach the test task's `.log` file, and arrives line by line within 2 ms of being written.
   - The same files receive every other inherited write: other native runs of the command, and processes Mill runs in the background, which append to them (`RunModule.scala` lines 381–389).
-  - This contradicts `JSN` § 2.1, which says, citing prior art, that Native stdout "does not reach the console" under the Mill daemon. No experiment settled which holds.
+  - This contradicts `JSN` § 2.1, which says, citing prior art, that Native stdout "does not reach the console" under the Mill daemon. Mill's own comment on `SystemStreams.original` agrees with the `TailManager` source (`MCL` § 4.2). No experiment settled which holds.
 - **Under `--no-daemon`:** the launcher spawns `MillNoDaemonMain` with the default `os.Inherit` (`MPL` lines 39, 74–79). *Inference:* the native process writes to the launcher's own console descriptors, bypassing Mill's prompt logger. `TailManager` tails `<out>/mill-no-daemon/<sig>/stdout`, which nothing writes.
 - **What plugin code can do.** Plugin code in Mill's process can read the daemon's `stdout` and `stderr` files. Nothing found stops `TailManager` copying them: its streams are set only inside `MillMain0` (`MillMain0.scala` line 282). In-process descriptor redirection with `dup2`: `JSN` § 4.2.
 
@@ -233,11 +231,12 @@ The default `jsEnvConfig` is `JsEnvConfig.NodeJs()` (`SJM` line 274). Other JS e
 - Whether each *inference* above holds when run. In particular:
   - that `PipeOutputThread` and the receiver threads inherit the test task's streams (§ 4.1, § 5.1);
   - that a wrapped `testFrameworkInstance` framework replaces Mill's loggers (§ 6.1).
-- Whether inherited native output reaches the console under the daemon, as the `TailManager` source implies, or does not, as `JSN` § 2.1 and the prior art it cites state (§ 5.3).
+- Whether inherited native output reaches the console under the daemon, as the `TailManager` source and Mill's comment on `SystemStreams.original` (`MCL` § 4.2) imply, or does not, as `JSN` § 2.1 and the prior art it cites state (§ 5.3).
 - Whether Node stdout or socket writes queued when the com socket closes are lost in practice, given Mill's 100 ms sleep (§ 2.1, § 5.1).
 - Whether a `TestAdapter` built by plugin code against one Scala.js or Scala Native version works with a test bridge or `test-interface` linked at another (§ 6).
 - Whether the Unix `System.getenv` behaviour in Scala Native `0.5.12` is observed as the source implies (§ 2.2).
 - Sockets and stdout in jsdom, Selenium, Playwright and PhantomJS environments (§ 2.1).
-- Whether Scala Native's `java.net.Socket` writes survive the process's exit, and whether a native process killed by `destroyForcibly` loses bytes it wrote to a socket or file (§ 2.2).
+- Whether Scala Native's `java.net.Socket` writes survive the process's exit (§ 2.2).
+- Whether a JS VM or native process that dies or is killed loses bytes it wrote to a socket, a file or stdout (§ 2, § 3.2, § 5).
 - What the daemon's environment is relative to the client that ran the command, which decides what a JS VM and a native process inherit beyond `env` and `allForkEnv` (§ 1).
 - Whether any of this holds on Mill versions other than `1.1.10`, Scala.js versions other than `1.20.2` with `scalajs-env-nodejs` `1.5.0`, Scala Native versions other than `0.5.12`, or Node versions other than `22`.
