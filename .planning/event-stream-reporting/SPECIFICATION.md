@@ -31,16 +31,18 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 ## Scope
 
 - An emitter in ScalaTest that sends one run's events, test structure and test output over a single channel.
-- A consolidation library that reads the channels of many runs, takes each run's test run label and worker output, and produces their consolidated output.
-- A Mill plugin that hosts the consolidation library and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
+- A consolidation library that takes many runs' *event streams*, each the run's events, test structure and test output in order, with each run's test run label and worker output, and writes each consolidated output to a file, pipe or writer its caller supplies.
+- A Mill plugin that hosts the consolidation library, turns the channel of each run it starts into that run's event stream, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
-This document adds one term: a *channel* is the one ordered stream a run's emitter writes and the consolidation library reads.
+A *channel* is the one ordered stream a run's emitter writes, in a format private to the release of this fork that wrote it; only a reader of the same release reads it.
 
 ### Out of scope
 
 - sbt and command-line front ends for the consolidation library.
+- A way to turn the emitter on outside Mill.
+- Carrying an event's payload, or a throwable's fields beyond those R-064 names.
 - Changing any existing ScalaTest reporter.
 - A consolidated HTML report; a follow-up epic.
 - Consolidated JUnit XML.
@@ -65,7 +67,9 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 ## The emitter
 
 - R-010 Each run sends over one channel every event the run reports, the run's test structure and the run's test output.
-- R-011 Nothing a run reports is lost or altered between the run and the channel's reader. This includes failure messages, throwables with their cause chains, and the order of events within a node.
+- R-063 What a run sends does not depend on its reporter configuration. Event-filter characters given to a reporter, including one passed with `-C`, affect only that reporter.
+- R-011 Nothing the consolidated output shows or uses is lost or altered between the run and the channel's reader. This includes failure messages and the order of events within a node.
+- R-064 A throwable reaches the channel's reader with its class name, message, stack frames, cause chain and suppressed exceptions, and with the fields ScalaTest's own exceptions add.
 - R-012 Each piece of test output is attributed to a node as `../structured-test-reporting/SPECIFICATION.md` § Test output states, and keeps its position among that node's events.
 - R-013 A channel carries one run.
 
@@ -95,7 +99,7 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
-- R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming each such module.
+- R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest at the Mill plugin's version, such as one testing with MUnit, uTest, upstream ScalaTest 3.2.19 or another version of this fork, THEN the test command fails before any test starts, naming each such module.
 
 WHERE `--halt-on-failure` is given:
 
@@ -109,8 +113,8 @@ WHERE `--halt-on-failure` is given:
 - R-028 The JSON output is one object for the test command. Its root wraps each run's test structure in the layout `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object gives one run, each node holding its final state.
 - R-021 The human-readable and JSON output show every node, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
-- R-023 Given the same channels, test run labels and worker output, the consolidation library produces the same human-readable and JSON output when used without Mill.
-- R-052 The consolidation library's caller names the test run label each channel belongs to.
+- R-023 Given the same event streams, test run labels and worker output, the consolidation library produces the same human-readable and JSON output when used without Mill.
+- R-052 The consolidation library's caller names the test run label for each event stream.
 - R-025 By default, the Mill plugin gives each module one test run label.
 
 ## Each run's own output under the test command
