@@ -88,6 +88,7 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
   - the same tests, in the same processes, with the same working directory;
   - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require.
 - R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs and whether or not Mill's `--keep-going` is given. Tests start without waiting for every selected test module to compile.
+- R-061 IF a task the test command depends on fails, or another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
 - R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming each such module.
 

@@ -126,7 +126,6 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 
 ## 7. What is not known
 
-- Whether a live channel from a worker JVM to Mill's own process works when run. `MWC` evaluates the candidates from source; no experiment has been run.
 - How `testLocal` routes test output.
 - Whether the facts in § 6 hold on Mill versions other than `1.1.10`.
 - Every item marked *unverified* above.

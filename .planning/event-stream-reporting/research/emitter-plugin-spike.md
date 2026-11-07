@@ -7,7 +7,7 @@ Two notes hold the source reading this note tests: `.planning/event-stream-repor
 ## Short answer
 
 - **Lifetime.** The command's body ran before any test task and regained control after the last, with a result for every task, with and without `--keep-going`. Without it, a module whose tests had not started when another task failed was skipped; tests already running finished. Exit status was 0 only when every module passed (§ 2).
-- **Live events.** Every worker of every module connected and sent its events as the tests ran, each connection attributable to its module and worker. Mill's discovery runner never connected (§ 3).
+- **Live events.** Every worker of every module connected and sent its events as the tests ran, each connection attributable to its module and worker. No connection came from Mill's own process (§ 3).
 - **Killed worker.** On Linux the reader saw end of stream and received every byte the worker had written. On Windows it saw `Connection reset`, and lost every byte it had not yet read when the worker died. Mill reported the task as failed with `out.json does not exist` for one of the dead workers (§ 4).
 - **Selectors.** Separate arguments reached the command; Mill consumed `+` before it (§ 5).
 - **Worker streams.** A direct `callTestRunnerSubprocess` call honoured the caller's `os.Inherit.out` and `os.Inherit.err`, and nothing reached the console. A shim `testFramework`'s `System.setOut` took effect before Mill's capture. `SystemStreamsUtils.withStreams` around `runTests()` captured nothing on the parallel path (§ 6).
@@ -23,7 +23,7 @@ The prototype is on branch `prototype/emitter-plugin-spike`, in `.planning/event
 - **The emitter,** `spike.SocketEmitter`, a ScalaTest `Reporter` on each test module's class path through a module dependency, turned on with `-C spike.SocketEmitter`.
   - Its constructor opens nothing. It holds `RunStarting`, which ScalaTest fires when the runner is constructed, and connects on the first other event.
   - The address and a module label reach it as the framework arguments `-Dspike.addr=127.0.0.1:<port>` and `-Dspike.module=<module>`, which ScalaTest puts in `RunStarting`'s config map.
-  - On connecting it sends one `HELLO` line: a run identifier it generates, its PID, the module label, its working directory and its JVM's start time. Each event follows as one tab-separated line carrying the run identifier, a sequence number and the send time, written straight to the socket's unbuffered stream. It closes the socket after `RunCompleted`.
+  - On connecting it sends one `HELLO` line: a run identifier it generates, its PID, the module label, its working directory and its JVM's start time. Each event follows as one tab-separated line carrying the run identifier, a sequence number and the send time, or for the held `RunStarting` the time it was held, written straight to the socket's unbuffered stream. It closes the socket after `RunCompleted`.
   - `SocketEmitter.burst(n, tag)` writes `n` lines the same way, and logs to stderr every 500 lines how many it has written.
 - **The plugin,** `spike.test`, an exclusive command in `build.mill` taking the `Evaluator` and module selectors as `String*` (`MCL` § 2).
   - It opens a loopback `ServerSocket`, resolves each selector with `resolveModulesOrTasks`, builds `<module>.testForked("-C", "spike.SocketEmitter", "-Dspike.addr=…", "-Dspike.module=…")` for each, and passes them all to one `evaluator.execute`.
@@ -81,13 +81,13 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`.
 - **What Mill printed for the nested tasks.** Without `--keep-going`, nothing: no list of failed tests and no task failure. With it, `"<task> task failed"` for `broken.test.compile`, `beta.test.testForked` and `crash.test.testForked`, and `"spike.test task failed"`. In both, the command's own failure message followed Mill's final status line.
 - **Exit status.** 0 for `spike.test alpha.test`; 1 for every run with a failing module, with and without `--keep-going`.
 - **A failing sibling goal.** `beta.test + spike.test alpha.test` without `--keep-going`: the command's body did not run, and the exit status was 1. With `--keep-going` the body ran, `alpha.test` passed, and the exit status was 1 from `beta.test`.
-- **A class run twice.** On Windows, in 3 of the 13 runs in which a module ran several workers (`daemon-all`, `nodaemon-console-raw`, `nodaemon-console-log`), two workers of one fork group each ran the same first class: Mill logged `Running Test Class alpha.A1`, `alpha.A3` and `beta.BetaFail` twice each, the plugin received their events twice, and `beta.test`'s failure read "2 tests failed: beta.BetaFail fails / beta.BetaFail fails". It also happened in a trial run before the matrix. It did not happen on Linux.
+- **A class run twice.** On Windows, in 9 of the 23 runs in which a module ran several workers, two workers of one fork group each ran the same first class: 3 of the 13 runs with output redirected (`daemon-all`, `nodaemon-console-raw`, `nodaemon-console-log`), 5 of the 8 ConPTY runs (`conpty-daemon-raw-lines` and the four `conpty-nodaemon-*` runs) and 1 of the 2 Ctrl-C runs (`conpty-ctrl-c-nodaemon`). Mill logged `Running Test Class` twice for `alpha.A1`, `alpha.A3` and `beta.BetaFail`, or for `slow.S1` in the Ctrl-C run, and the plugin received their events twice. Where `beta.test` ran, its failure read "2 tests failed: beta.BetaFail fails / beta.BetaFail fails". It also happened in a trial run before the matrix. It did not happen on Linux.
 
 ## 3. Events from every worker, live
 
-- **Every worker connected.** Each worker JVM that ran a class opened one connection. No connection came from Mill's own PID in any run, so the discovery runner (`MWC` § 3.2) never connected.
+- **Every worker connected.** Each worker JVM that ran a class opened one connection. No connection came from Mill's own PID in any run. *Inference:* the discovery runner (`MWC` § 3.2) never connected.
 - **Attribution.** The `HELLO` line's module label matched the selector the plugin had built the task for in every connection. Its working directory named the worker's sandbox, for example `out/alpha/test/testForked.dest/group-0-alpha.A1/worker-1/sandbox`; its PID and run identifier were distinct per connection.
-- **Live.** Events arrived while the tests ran: progress lines stepped up at the tests' 400 ms interval, interleaved with the workers' own `MARK-` lines, and in the Windows run of all five modules each connection of a worker that completed ended 0.3 s to 2.5 s before `execute` returned. The largest gap between an event's send time and its receipt, where the reader was not deliberately paused, was 64 ms on Windows and 43 ms on Linux.
+- **Live.** Events arrived while the tests ran: progress lines stepped up at the tests' 400 ms interval, interleaved with the workers' own `MARK-` lines, and in the Windows run of all five modules each connection of a worker that completed ended 0.3 s to 2.5 s before `execute` returned. The largest gap between an event's send time and its receipt, where the reader was not deliberately paused, was 64 ms on Windows and 43 ms on Linux, except in `conpty-nodaemon-log-cr` on Windows, where it reached 461 ms. The maximum excludes `RunStarting`, which the emitter holds until it connects: its gap reached 657 ms on Windows and 653 ms on Linux.
 - **Order.** Sequence numbers had no gap on any connection.
 
 ## 4. A killed worker
@@ -126,7 +126,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`.
 ### 8.1 Redirected to files
 
 - **`SPIKE_CONSOLE=log`.** Every line the command wrote reached stdout prefixed `1] `, whole, under the daemon and `--no-daemon`, on both platforms.
-- **`SPIKE_CONSOLE=raw`.** The command's lines reached stdout unprefixed. Under the daemon, a line of the command sometimes landed inside one of Mill's prefixed lines: Mill's prefix, then the command's whole line, then the rest of Mill's line on the next line, for example `319-1] PROGRESS +2.354s …` followed by `MARK-OUT BetaOk ok3`. This happened in 3 of the 6 daemon runs in which the command wrote raw while tests ran on Windows (1 or 2 lines each), and in 1 of 6 on Linux. It did not happen in either `--no-daemon` raw run on either platform.
+- **`SPIKE_CONSOLE=raw`.** The command's lines reached stdout unprefixed. Under the daemon, a line of the command sometimes landed inside one of Mill's prefixed lines: Mill's prefix, then the command's whole line, then the rest of Mill's line on the next line, for example `699-0-1]PROGRESS +4.432s …` followed by ` MARK-OUT A1 t1 pid=21104` (Windows, `daemon-all`). This happened in 3 of the 6 daemon runs in which the command wrote raw while tests ran on Windows (1 or 2 lines each), and in 1 of 6 on Linux. It did not happen in either `--no-daemon` raw run on either platform.
 - **Under the daemon,** the command's raw lines reached the client's redirected stdout; `out/mill-daemon/stdout` held none of them.
 
 ### 8.2 Under a pseudo-terminal
@@ -135,12 +135,12 @@ Mill treated both pseudo-terminals as interactive: its prompt, a header and one 
 
 | Case | Linux, daemon | Linux, `--no-daemon` | Windows, daemon | Windows, `--no-daemon` |
 |---|---|---|---|---|
-| raw, a line per event | 28 of 77 intact; 35 stale | 25 of 77; 28 | 34 of 91; 48 | 37 of 90; 39 |
+| raw, a line per event | 28 of 77 intact; 34 stale | 25 of 77; 27 | 34 of 91; 48 | 37 of 90; 39 |
 | log, a line per event | 78 of 78; 0 | 77 of 77; 0 | 77 of 78; 0 | 92 of 92; 0 |
-| raw, `\r` rewrite | 22 of 78; 19 | 21 of 77; 20 | 24 of 78; 16 | 32 of 92; 20 |
+| raw, `\r` rewrite | 22 of 78; 18 | 21 of 77; 19 | 24 of 78; 16 | 32 of 92; 20 |
 | log, `\r` rewrite | 42 of 78; 0 | 43 of 78; 0 | 41 of 77; 0 | 41 of 92; 0 |
 
-Each cell gives the command lines shown intact out of those written, then the stale prompt lines left in the scrollback. Mill's own key line, `1] spike.test`, printed once in every case, is not counted as stale.
+Each cell gives the command lines shown intact out of those written, then the stale prompt lines left in the scrollback. Mill's own key line, `1] spike.test`, printed once in every case, is not counted as stale. The Windows runs with 90 to 92 lines written are those in which a class ran twice (§ 2), each extra event adding a progress line.
 
 - **Raw.** The prompt's next redraw moved the cursor up by the prompt's height from below the command's lines, so it overwrote them and left the upper part of the previous prompt in the scrollback. Lines written after `execute` returned were all intact.
 - **Log.** Lines were prefixed `1] `, and the prompt was cleared and redrawn around them as it was around the workers' lines. On Windows the ConPTY cases ran twice. In two of the four runs with a line per event, one line was erased: the pseudo-console's output held the line followed by a carriage return, `ESC[0K` and another carriage return. The line was `SPIKE body-start` in one run and `SPIKE nested execute values` in the other. It did not happen on Linux.
@@ -150,27 +150,24 @@ Each cell gives the command lines shown intact out of those written, then the st
 ### 8.3 Ctrl-C
 
 - **Linux, under the daemon.** The terminal showed nothing more after Ctrl-C: no `execute-returned`, summary or `body-end` line. The client exited with status 130.
-- **Linux, under `--no-daemon`.** The readers printed end of stream for both workers, with `TestStarting` as each connection's last event, then nothing more; status 130.
-- **Windows, both modes.** `cmd.exe` asked "Terminate batch job (Y/N)?", and the client had exited 0.1 s after Ctrl-C, with status `0xC000013A`. Both readers recorded `Connection reset` with `TestStarting` as the last event. That was the last line the command wrote; it never wrote `execute-returned` or `body-end`.
+- **Linux, under `--no-daemon`.** The readers printed end of stream for both workers, with `TestStarting` as each connection's last event, and the command printed the progress lines those ends triggered, then nothing more; status 130.
+- **Windows, both modes.** `cmd.exe` asked "Terminate batch job (Y/N)?", and the client had exited 0.1 s after Ctrl-C, with status `0xC000013A`. Both readers recorded `Connection reset` with `TestStarting` as the last event. Those connection-end lines and the progress lines they triggered were the last the command wrote; it never wrote `execute-returned` or `body-end`.
 - **Afterwards.** On both platforms, in both modes, no test-worker JVM and no `mill.daemon.MillDaemonMain` process was running 20 s after Ctrl-C. On Windows none was running right after the client exited either.
 
 ## 9. Against the source reading
 
-- `MCL` § 2.2, § 2.4, § 2.3, § 4.2 and § 6, and `MWC` § 2.2, § 2.3 and § 2.4, held as observed in §§ 2–8. `MCL` § 4.2's *inferred* interleaving occurred, and also with output redirected to files under the daemon (§ 8.1).
-- `MCL` § 8 asks whether the `[N]` prefix is printed on an exclusive command's `Task.log.streams` lines: it was, as `1] ` (§ 8.1).
-- `MWC` § 3.2 leaves open whether unread socket bytes survive a killed worker: on Windows they did not, on Linux they did (§ 4).
-- `MCL` § 8 leaves Ctrl-C on Windows open: under ConPTY it ended the Mill command at once in both modes, and no test-worker JVM or daemon survived. `MCL` § 5.1's *inferred* outcome, that the command body does not unwind, matched: after Ctrl-C it wrote only its readers' connection-end lines, never `execute-returned` or `body-end` (§ 8.3).
+- `MCL` § 2.2, § 2.3, § 2.4, § 4.2, § 5.1, § 5.2 and § 6, and `MWC` § 2.2, § 2.3 and § 2.4, held as observed in §§ 2–8. `MCL` § 4.2's interleaving also occurred with output redirected to files under the daemon (§ 8.1).
 - `.planning/structured-test-reporting/research/mill-test-worker-args.md` § 1.2 describes a class as claimed by one worker through an atomic move. On Windows two workers ran the same class (§ 2).
 
 ## 10. What was not run or not determined
 
 - anything on macOS, or on Scala.js or Native;
 - a terminal emulator's own rendering: the pseudo-terminal output was rendered by `pyte` on Windows and by `render-pty.py` on Linux, not by Windows Terminal, conhost or a Linux terminal emulator;
-- Ctrl-C under `--watch`, and Ctrl-C answered `Y` at `cmd.exe`'s prompt;
+- Ctrl-C answered `Y` at `cmd.exe`'s prompt;
 - why a `Task.log` line was erased under ConPTY (§ 8.2);
 - a killed worker that had further classes queued, and a reader that was not paused when an external kill came;
 - why a class ran on two workers on Windows (§ 2), and how often;
 - whether the Windows reset depends on the JDK's socket implementation or on the reader pausing for the lengths used here;
 - a command line holding the plugin together with other non-test goals, and `--watch`;
-- R-040 for the whole of a module's run under the plugin: the spike ran `testForked` unchanged, so worker output reached the console in every `spike.test` run;
+- `.planning/event-stream-reporting/SPECIFICATION.md` R-040 for the whole of a module's run under the plugin: the spike ran `testForked` unchanged, so worker output reached the console in every `spike.test` run;
 - versions other than § 1 lists.
