@@ -96,14 +96,18 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native it takes a run's stdout and stderr only through a launcher between Scala Native's test adapter and the test binary, a route observed on Windows and Linux only, whose launcher must be compiled where an emulator cannot load a script.
+**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and `@internal`, so it may need a release for each Mill release. On the JVM it takes a parallel worker's streams only by giving `TestModuleUtil` a `TaskCtx` whose `fork` it replaces, a route observed on Windows and Linux only. On Native it takes a run's stdout and stderr only through a launcher between Scala Native's test adapter and the test binary, a route observed on Windows and Linux only, whose launcher must be compiled where an emulator cannot load a script.
 
-**Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
+**Settled by**
+
+- [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
+- [Can the plugin take a JVM worker's stdout and stderr when Mill runs a module's tests in parallel workers?](https://github.com/jamesgorman2/scalatest/issues/42).
 
 **See**
 
 - `research/mill-worker-channels.md` § 2, § 5.
 - `research/emitter-plugin-spike.md` § 6.
+- `research/mill-parallel-worker-capture.md` § 2, § 6.
 - `research/js-native-channels.md` § 5, § 6.
 - `research/native-stdio-wrapper.md` § 3, § 5.
 
