@@ -38,11 +38,12 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
-A channel's format, and the switch by which the Mill plugin turns the emitter on, are private to one release of this fork. A channel is read only by the release that wrote it.
+A channel's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on are private to one release of this fork. A channel is read only by the release that wrote it.
 
 ### Out of scope
 
 - sbt and command-line front ends for the consolidation library.
+- A consolidation library API that callers outside this fork may rely on across releases.
 - A supported way to turn the emitter on outside Mill.
 - Carrying an event's payload, or any other part of an event or throwable that the consolidated output neither shows nor uses.
 - Changing any existing ScalaTest reporter.
