@@ -9,7 +9,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 - The plugin's list of classes as the authority gives class names only, with no scopes, tests or tags, and on the JVM lists `@DoNotDiscover` suites that ScalaTest's `Framework` drops unless named explicitly, so they would show falsely as not run.
 - Each run sending its whole intended tree before running anything is impossible under Mill's test queue, where no worker knows which suites it will claim.
 
-**Reasoning** Losing the rest of a module needs every worker of its fork group to die, which points at the harness rather than a test, and the user must rerun it anyway; the test command still fails (`SPECIFICATION.md` R-046). The test classes left in the group's queue are still shown (R-068).
+**Reasoning** Losing the rest of a module needs every worker of its fork group to die. That points at the harness rather than a test, and the user must rerun the module anyway. The test command still fails (`SPECIFICATION.md` R-046), and the test classes left in the group's queue are still shown (R-068).
 
 **Costs** A suite a dead worker was given but never constructed does not appear (`SPECIFICATION.md` R-066), so a reader cannot tell from the output how much of a module is missing beyond the classes left in its queue.
 
@@ -23,7 +23,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives**
 
-- A placeholder JSON file written when the test command starts exists in structured test reporting solely so each ScalaTest invocation can list its tests for its consolidator, and the test command is the only consolidator, already knowing its runs.
+- A placeholder JSON file written when the test command starts exists in structured test reporting solely so each ScalaTest invocation can list its tests for its consolidator. The test command is the only consolidator and already knows its runs.
 - A JVM shutdown hook writing partial results would tell a user who pressed Ctrl-C only what they already know: they killed the tests.
 
 **Reasoning** A user who interrupts the tests knows they killed them (`SPECIFICATION.md` R-069, R-046). After Ctrl-C, Mill gives the test command's body no further control (`research/mill-command-lifetime.md` § 5.1, § 5.2).
@@ -44,7 +44,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **Alternatives**
 
 - A run beginning at its first task loses a worker that dies before its first task from the output.
-- Every runner constructed while the test command executes tests takes in another module's discovery runner, constructed during that time (`SPECIFICATION.md` R-056), which never calls `done()` and so would fail every test command (R-046, R-072).
+- Every runner constructed while the test command executes tests also takes in another module's discovery runner (`SPECIFICATION.md` R-056), which never calls `done()` and so would fail every test command (R-046, R-072).
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`SPECIFICATION.md` R-064, R-071), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 
@@ -66,7 +66,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** A single worker's death more often comes from a test (`System.exit`, running out of memory, a native crash) than from the harness, and that test is the fact the reader needs, so the output shows it (`SPECIFICATION.md` R-073, R-075). Bytes still buffered inside the dying process are lost whatever the channel.
 
-**Costs** The bound narrows the channel choice before the architecture is written: a plain socket on Windows lost unread bytes on `Connection reset`, so it qualifies only if its reader can be shown never to lag, which must be re-confirmed when the channel is chosen.
+**Costs** The bound narrows the channel choice before the architecture is written. A plain socket on Windows lost unread bytes on `Connection reset`, so it qualifies only if its reader can be shown never to lag, which must be re-confirmed when the channel is chosen.
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 
@@ -84,7 +84,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 - A public API with a compatibility promise, checked by MiMa as `SPECIFICATION.md` R-004 checks the fork, serves callers the goal does not name.
 - A documented API marked experimental invites outside callers but gives them no more to rely on.
 
-**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a channel outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release; any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, as in structured test reporting (`../structured-test-reporting/SPECIFICATION.md` § Scope § Out of scope).
+**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a channel outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release. Any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, as in structured test reporting (`../structured-test-reporting/SPECIFICATION.md` § Scope § Out of scope).
 
 **Costs** A third party that builds on the library, such as another build tool's plugin, may break on any release of the fork.
 
@@ -155,7 +155,12 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Of the Mill mechanisms examined, only an exclusive command that takes the `Evaluator` has a start, an end and the failure path (`research/mill-command-lifetime.md` § 2, § 3). Confining the plugin's replacement of a module's test task to that command keeps `SPECIFICATION.md` R-003 and R-060 without the replacement having to stand aside for other launches.
 
-**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental, and get no consolidated output when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-062). `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055), and nothing covers `testLocal` or `testCached`.
+**Costs**
+
+- Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental.
+- No consolidated output appears when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-062).
+- `+` cannot join module selectors, and one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055).
+- Nothing covers `testLocal` or `testCached`.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -252,7 +257,11 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests through Mill API marked `@experimental` and `@internal` instead of calling Mill's test task, so it may need a release for each Mill release, and on Native its launcher must be compiled where an emulator cannot load a script. Taking a JVM parallel worker's streams and a Native run's stdout and stderr have each been observed only on Windows and Linux, and the JVM's never with class globs, with test parallelism off, with a killed worker or in a command running several modules.
+**Costs**
+
+- The plugin must run each module's tests through Mill API marked `@experimental` and `@internal` instead of calling Mill's test task, so it may need a release for each Mill release.
+- On Native, the launcher must be compiled where an emulator cannot load a script.
+- Taking a JVM parallel worker's streams and a Native run's stdout and stderr have each been observed only on Windows and Linux. The JVM's have never been observed with class globs, with test parallelism off, with a killed worker or in a command running several modules.
 
 **Settled by**
 
