@@ -43,7 +43,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
 
-**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run, and the plugin cannot leave that to one nested `execute`, whose fail-fast without `--keep-going` skips every task not yet started (`research/mill-command-lifetime.md` § 2.4). Unless the user opts in, a failing build takes as long as a passing one.
+**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run, and the plugin cannot leave that to one nested `execute`, whose fail-fast without `--keep-going` skips every task not yet started (`research/mill-command-lifetime.md` § 2.4). The only route that keeps going and still starts each module's tests on its own compile reaches Mill internals by reflection, with no compatibility promise (`research/mill-nested-keep-going.md` § 3, § 5). Unless the user opts in, a failing build takes as long as a passing one.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
