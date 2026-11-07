@@ -28,7 +28,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** A user who interrupts the tests knows they killed them (`SPECIFICATION.md` R-069, R-046). After Ctrl-C, Mill gives the test command's body no further control (`research/mill-command-lifetime.md` § 5.1, § 5.2).
 
-**Costs** A JSON file from an earlier test command may be read as this one's result, and a CI timeout that sends SIGTERM gets no partial results.
+**Costs** A CI timeout that sends SIGTERM gets no partial results.
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 

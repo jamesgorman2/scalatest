@@ -108,7 +108,7 @@ A channel's format, the consolidation library's API and the switch by which the 
 - R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
 - R-068 The consolidated output shows as not run each test class left in a fork group's queue when the group's last worker ended. It may also show as not run any other test class the Mill plugin knows was to run but that no run reported.
-- R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON file, not even a placeholder; its progress output may show runs the interrupt ended. A JSON file an earlier test command wrote may remain.
+- R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON, not even a placeholder; its progress output may show runs the interrupt ended. The JSON file stays as R-077 left it.
 
 WHERE `--halt-on-failure` is given:
 
@@ -162,4 +162,5 @@ Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each written to the console when turned on.
 - R-049 JSON output is written to a file, never to the console.
+- R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
 - R-050 Output written by other tasks named on the same `mill` command line, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed. On the console it may interleave with the consolidated output.
