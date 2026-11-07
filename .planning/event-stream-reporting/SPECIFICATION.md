@@ -87,10 +87,13 @@ This document adds one term: a *channel* is the one ordered stream a run's emitt
   - optional class globs and framework arguments, as Mill's `testOnly` takes them, applying alike to every selected test module;
   - `--halt-on-failure` (R-057).
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
-  - the same tests, in the processes Mill's fork grouping, test parallelism and test queue start, with the same working directory;
-  - the same arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require. Environment variables Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the test command's command line.
+  - the same tests, in the processes Mill's fork grouping, test parallelism and test queue start;
+  - the same working directory, arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
+  - except that a path that would lie inside the task folder (`Task.dest`) of `testOnly` or `testForked` lies at the same relative path inside a folder the test command owns;
+  - and except that environment variables Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the `mill` command line that started the test command.
 - R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs and whether or not Mill's `--keep-going` is given. Tests start without waiting for every selected test module to compile.
-- R-061 IF a task the test command depends on fails, or another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
+- R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among these tasks; R-046 and R-058 cover their failure.
+- R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
 - R-059 IF a module selector resolves to a test module that does not test with this fork of ScalaTest, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, THEN the test command fails before any test starts, naming each such module.
 

@@ -11,7 +11,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Of the Mill mechanisms examined, only an exclusive command that takes the `Evaluator` has a start, an end and the failure path (`research/mill-command-lifetime.md` § 2, § 3). Confining the plugin's replacement of a module's test task to that command keeps `SPECIFICATION.md` R-003 and R-060 without the replacement having to stand aside for other launches.
 
-**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental, and get no consolidated output when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-061). `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055), and nothing covers `testLocal` or `testCached`.
+**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental, and get no consolidated output when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-062). `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055), and nothing covers `testLocal` or `testCached`.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -36,7 +36,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives** Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
 
-**Reasoning** Mill's test task starts each module's tests on its own compile, and a user who runs the test command in place of that task expects the output to change and nothing else (`SPECIFICATION.md` R-056).
+**Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`SPECIFICATION.md` R-056).
 
 **Costs** Of the routes examined, only one both starts each module's tests on its own compile and runs every selected module without `--keep-going`. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`research/mill-nested-keep-going.md` § 3, § 5).
 
@@ -75,13 +75,25 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## Under the test command, each selected module's tests run, and pass or fail, as Mill's `testOnly` or `testForked` would run them, except that a run that did not complete always fails.
+## A run that did not complete fails the test command, even where Mill's test task passes it.
+
+**Alternatives** Passing or failing it as Mill's test task does keeps the two results alike, but lets a build whose tests never finished look green.
+
+**Reasoning** A run that did not complete leaves tests unrun, a gap in coverage whatever ended it (`SPECIFICATION.md` R-046).
+
+**Costs** A build whose Native test binary crashes passes under Mill's test task and fails under the test command (`research/native-stdio-wrapper.md` § 4).
+
+**Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
+
+---
+
+## Under the test command, each selected module's tests run as Mill's `testOnly` or `testForked` would run them.
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
-**Reasoning** A user who runs the test command in place of Mill's test task expects the output to change and nothing else, save that a run that did not complete is reported as a failure (`SPECIFICATION.md` R-053, R-046).
+**Reasoning** A user who runs the test command in place of Mill's test task expects the output to change and nothing else (`SPECIFICATION.md` R-053).
 
-**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module. A build whose Native test binary crashes passes under Mill's test task and fails under the test command (`research/native-stdio-wrapper.md` § 4).
+**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
@@ -96,7 +108,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and `@internal`, so it may need a release for each Mill release. On the JVM it takes a parallel worker's streams only by giving `TestModuleUtil` a `TaskCtx` whose `fork` it replaces, a route observed on Windows and Linux only. On Native it takes a run's stdout and stderr only through a launcher between Scala Native's test adapter and the test binary, a route observed on Windows and Linux only, whose launcher must be compiled where an emulator cannot load a script.
+**Costs** The plugin must run each module's tests through Mill API marked `@experimental` and `@internal` instead of calling Mill's test task, so it may need a release for each Mill release. Taking a JVM parallel worker's streams and a Native run's stdout and stderr has each been observed on Windows and Linux only, the JVM's never with class globs, with test parallelism off, with a killed worker or in a command running several modules, and Native's launcher must be compiled where an emulator cannot load a script.
 
 **Settled by**
 
@@ -107,7 +119,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 - `research/mill-worker-channels.md` § 2, § 5.
 - `research/emitter-plugin-spike.md` § 6.
-- `research/mill-parallel-worker-capture.md` § 2, § 6.
+- `research/mill-parallel-worker-capture.md` § 3–6, § 8.
 - `research/js-native-channels.md` § 5, § 6.
 - `research/native-stdio-wrapper.md` § 3, § 5.
 
