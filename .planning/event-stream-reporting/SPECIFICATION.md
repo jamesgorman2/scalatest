@@ -35,7 +35,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - A consolidation library that takes the following and writes each consolidated output to a file, pipe or writer its caller supplies:
   - many runs' event streams, each with its run's test run label and worker output;
   - each module whose tests did not start, with its test run label and, where a failure stopped them, that failure;
-  - each module selector, module and test class its caller knows was to run but that no run reported.
+  - each test class its caller knows was to run but that no run reported.
 - A Mill plugin that hosts the consolidation library, turns the channel of each run it starts into that run's event stream, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
@@ -75,7 +75,8 @@ A channel's format, the consolidation library's API and the switch by which the 
 - R-011 Nothing the consolidated output shows or uses is lost or altered between the run and the channel's reader. This includes failure messages and the order of events within a node.
 - R-012 Each piece of test output is attributed to a node as `../structured-test-reporting/SPECIFICATION.md` § Test output states, and keeps its position among that node's events.
 - R-013 A channel carries one run.
-- R-073 When a run's process dies, R-011 holds for everything the run had handed to the operating system. It does not cover what was still buffered inside the process.
+- R-074 On every runtime, each run's channel carries how the run ended: completed, aborted or stopped.
+- R-073 When a run's process dies, R-010, R-011, R-021 and R-042 hold for everything the run had handed to the operating system. They do not cover what was still buffered inside the process.
 
 ## Behaviour taken from structured test reporting
 
@@ -99,19 +100,15 @@ A channel's format, the consolidation library's API and the switch by which the 
   - the same working directory, arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
   - except that a path inside the task folder (`Task.dest`) of `testOnly` or `testForked` is instead at the same relative path inside a folder the test command owns;
   - except that environment variables Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the `mill` command line that started the test command.
-- R-071 Every ScalaTest runner constructed while the test command executes tests is a run, whether or not it executes a task, including one whose worker dies before its first task.
-- R-072 Mill's discovery runner, which Mill constructs to list a module's test classes before any worker starts, is not a run: it does not appear in the consolidated output and does not affect whether the test command fails.
+- R-071 A run given no task appears in the consolidated output, including one whose process dies before its first task.
+- R-072 A runner that is not a run, such as Mill's discovery runner, does not appear in the consolidated output and does not affect whether the test command fails.
 - R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs and whether or not Mill's `--keep-going` is given. Tests start without waiting for every selected test module to compile.
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
-- R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
-- R-068 Beyond R-058, the consolidated output shows as not run, on a best-effort basis, each module selector, module and test class the Mill plugin knows was to run but that no run reported, such as the classes left in a fork group's queue when its last worker died.
-
-IF the test command is interrupted, as by Ctrl-C:
-
-- R-069 It writes nothing beyond the progress output already written: no human-readable output and no JSON file, not even a placeholder. A JSON file an earlier test command wrote may remain.
-- R-070 Its exit status is set by Mill's client and the operating system, not by the test command.
 - R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork.
+- R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
+- R-068 The consolidated output shows as not run each test class left in a fork group's queue when the group's last worker ended. It may also show as not run any other test class the Mill plugin knows was to run but that no run reported.
+- R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON file, not even a placeholder; its progress output may show runs the interrupt ended. A JSON file an earlier test command wrote may remain.
 
 WHERE `--halt-on-failure` is given:
 
@@ -121,7 +118,7 @@ WHERE `--halt-on-failure` is given:
 
 - R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output. Any combination can be on together, including progress output with JSON output, unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
-- R-027 Unless the test command is interrupted (R-069), the human-readable and JSON output are written together, once every run has completed or has ended without completing.
+- R-027 Unless the test command is interrupted (R-069), the human-readable and JSON output are written together, once every run's event stream has ended.
 - R-028 The JSON output is one object for the test command. Its root wraps each run's test structure in the layout that `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object and `../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` § APIs give one run, key names included, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them.
 - R-021 The human-readable and JSON output show every node, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
@@ -131,12 +128,17 @@ WHERE `--halt-on-failure` is given:
 
 ## A run that does not finish
 
-These hold for a run whose event stream ends without a closing run event (`RunCompleted`, `RunAborted` or `RunStopped`), as when its worker dies.
+A run *does not finish* when its event stream ends without how the run ended (R-074), as when its process dies. These hold for such a run unless the test command is interrupted (R-069).
 
-- R-064 The consolidated output shows the run aborted, with reason *process failed*, and each test that started in it without an event ending it, aborted.
-- R-065 The nodes known before the run ended (`../structured-test-reporting/SPECIFICATION.md` § Test structure) include every test registered in each suite the run constructed.
+- R-064 The run, and each suite, scope and test that started in it without an event ending it, are aborted.
+- R-065 Every scope and test registered in a suite the run constructed appears, even where the run's process died before the scope or test started.
 - R-066 A suite the run did not construct does not appear in it, even where the run was given a task for it.
+- R-075 Where a test ended the run's process, as a call to `System.exit` does, the consolidated output shows that test and every event the run reported before the test started.
 - R-067 Progress output shows the run as aborted as soon as its event stream ends.
+
+A process started to execute tests may end before any run exists in it, as when it dies before its runner is constructed:
+
+- R-076 The human-readable and JSON output show that process's stdout and stderr on its module's test run label, and nowhere else.
 
 ## Each run's own output under the test command
 
@@ -148,11 +150,12 @@ These hold for every run a test command starts.
 - R-043 Worker output written to stdout keeps its order, as does worker output written to stderr. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 - R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the tests of the run's module, or ScalaTest's end-of-run summary for the run.
 - R-045 The plugin may show as worker output Mill's own progress for the tests of the run's module and what Mill's own test runner writes for the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
-- R-046 Unless it is interrupted (R-069, R-070), the test command fails if:
-  - any run (R-071) reports a failure or does not complete; or
+- R-046 The test command fails if:
+  - any run reports a failure or does not complete: it ends aborted or stopped, or does not finish (§ A run that does not finish);
+  - a process started to execute tests ends before any run exists in it (R-076); or
   - the tests of any selected test module cannot start, for example because it or a module it depends on fails to compile.
 
-  Its failure does not list the failed tests.
+  Its failure does not list the failed tests. What R-068 shows adds no cause of failure: it arises only where a worker died, which already fails the test command. When the test command is interrupted (R-069), Mill's client and the operating system set its exit status instead.
 - R-047 The test command writes each selected test module's JUnit XML report as Mill's `testOnly` or `testForked`, whichever R-053 names, writes it.
 
 Where the consolidated output goes:
