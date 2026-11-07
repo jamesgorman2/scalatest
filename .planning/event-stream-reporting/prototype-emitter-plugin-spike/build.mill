@@ -155,10 +155,12 @@ object spike extends Module {
     val cr = Task.env.get("SPIKE_PROGRESS").contains("cr")
     val con: PrintStream = if (mode == "log") Task.log.streams.out else SystemStreamsUtils.current().out
     val lock = new Object
+    val echoFile = Task.dest / "console.txt" // every line the command writes, for comparison with the terminal
+    def echo(s: String): Unit = os.write.append(echoFile, s + System.lineSeparator)
     var pendingCr = false
     def say(s: String): Unit = lock.synchronized {
       if (pendingCr) { con.print("\n"); pendingCr = false }
-      con.println(s); con.flush()
+      con.println(s); con.flush(); echo(s)
     }
 
     val server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress)
@@ -188,6 +190,7 @@ object spike extends Module {
         s"$m ok=${c.ok} fail=${c.failed} other=${c.other} suites=${c.suites} workers=${cs.count(_.end == "open")}/${cs.size}"
       }.mkString(" | ")
       val l = s"PROGRESS ${rel(System.currentTimeMillis)} $body"
+      echo(l)
       if (cr) { con.print("\r" + l + "   "); con.flush(); pendingCr = true }
       else { con.println(l); con.flush() }
     }
