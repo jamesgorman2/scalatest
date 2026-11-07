@@ -12,7 +12,7 @@ Two notes hold the source reading this note tests: `.planning/event-stream-repor
 - **Selectors.** Separate arguments reached the command; Mill consumed `+` before it (§ 5).
 - **Worker streams.** A direct `callTestRunnerSubprocess` call honoured the caller's `os.Inherit.out` and `os.Inherit.err`, and nothing reached the console. A shim `testFramework`'s `System.setOut` took effect before Mill's capture. `SystemStreamsUtils.withStreams` around `runTests()` captured nothing on the parallel path (§ 6).
 - **`testLogLevel = Error`** silenced ScalaTest's per-test lines but not its end-of-run summary (§ 7).
-- **Console.** Raw writes from the command broke Mill's prefixed lines even in redirected output under the daemon. In a pseudo-terminal, on Windows (ConPTY) and Linux, Mill's prompt was live and overwrote most raw lines, leaving stale copies of itself in the scrollback. `Task.log` writes were prefixed `1] ` and intact, apart from one line in two of the four Windows runs (§ 8).
+- **Console.** Raw writes from the command broke Mill's prefixed lines even in redirected output under the daemon. In a pseudo-terminal, on Windows (ConPTY) and Linux, Mill's prompt was live: it overwrote most raw lines and left stale copies of itself in the scrollback. `Task.log` writes were prefixed `1] ` and intact, apart from one line in two of the four Windows runs (§ 8).
 - **Ctrl-C** ended the Mill command at once on both platforms, under the daemon and `--no-daemon`. The command body never regained control, and 20 s later no test-worker JVM or daemon was running (§ 8.3).
 - **Not run:** macOS; Scala.js and Native (§ 10).
 
@@ -23,7 +23,9 @@ The prototype is on branch `prototype/emitter-plugin-spike`, in `.planning/event
 - **The emitter,** `spike.SocketEmitter`, a ScalaTest `Reporter` on each test module's class path through a module dependency, turned on with `-C spike.SocketEmitter`.
   - Its constructor opens nothing. It holds `RunStarting`, which ScalaTest fires when the runner is constructed, and connects on the first other event.
   - The address and a module label reach it as the framework arguments `-Dspike.addr=127.0.0.1:<port>` and `-Dspike.module=<module>`, which ScalaTest puts in `RunStarting`'s config map.
-  - On connecting it sends one `HELLO` line: a run identifier it generates, its PID, the module label, its working directory and its JVM's start time. Each event follows as one tab-separated line carrying the run identifier, a sequence number and the send time, or for the held `RunStarting` the time it was held, written straight to the socket's unbuffered stream. It closes the socket after `RunCompleted`.
+  - On connecting it sends one `HELLO` line holding a run identifier it generates, its PID, the module label, its working directory and its JVM's start time.
+  - Each event follows as one tab-separated line, written straight to the socket's unbuffered stream. The line carries the run identifier, a sequence number and the send time; for the held `RunStarting`, the time it was held.
+  - It closes the socket after `RunCompleted`.
   - `SocketEmitter.burst(n, tag)` writes `n` lines the same way, and logs to stderr every 500 lines how many it has written.
 - **The plugin,** `spike.test`, an exclusive command in `build.mill` taking the `Evaluator` and module selectors as `String*` (`MCL` § 2).
   - It opens a loopback `ServerSocket`, resolves each selector with `resolveModulesOrTasks`, builds `<module>.testForked("-C", "spike.SocketEmitter", "-Dspike.addr=…", "-Dspike.module=…")` for each, and passes them all to one `evaluator.execute`.
@@ -81,13 +83,19 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`.
 - **What Mill printed for the nested tasks.** Without `--keep-going`, nothing: no list of failed tests and no task failure. With it, `"<task> task failed"` for `broken.test.compile`, `beta.test.testForked` and `crash.test.testForked`, and `"spike.test task failed"`. In both, the command's own failure message followed Mill's final status line.
 - **Exit status.** 0 for `spike.test alpha.test`; 1 for every run with a failing module, with and without `--keep-going`.
 - **A failing sibling goal.** `beta.test + spike.test alpha.test` without `--keep-going`: the command's body did not run, and the exit status was 1. With `--keep-going` the body ran, `alpha.test` passed, and the exit status was 1 from `beta.test`.
-- **A class run twice.** On Windows, in 9 of the 23 runs in which a module ran several workers, two workers of one fork group each ran the same first class: 3 of the 13 runs with output redirected (`daemon-all`, `nodaemon-console-raw`, `nodaemon-console-log`), 5 of the 8 ConPTY runs (`conpty-daemon-raw-lines` and the four `conpty-nodaemon-*` runs) and 1 of the 2 Ctrl-C runs (`conpty-ctrl-c-nodaemon`). Mill logged `Running Test Class` twice for `alpha.A1`, `alpha.A3` and `beta.BetaFail`, or for `slow.S1` in the Ctrl-C run, and the plugin received their events twice. Where `beta.test` ran, its failure read "2 tests failed: beta.BetaFail fails / beta.BetaFail fails". It also happened in a trial run before the matrix. It did not happen on Linux.
+- **A class run twice.** On Windows, in 9 of the 23 runs in which a module ran several workers, two workers of one fork group each ran the same first class:
+  - 3 of the 13 runs with output redirected (`daemon-all`, `nodaemon-console-raw`, `nodaemon-console-log`);
+  - 5 of the 8 ConPTY runs (`conpty-daemon-raw-lines` and the four `conpty-nodaemon-*` runs);
+  - 1 of the 2 Ctrl-C runs (`conpty-ctrl-c-nodaemon`).
+
+  Mill logged `Running Test Class` twice for `alpha.A1`, `alpha.A3` and `beta.BetaFail`, or for `slow.S1` in the Ctrl-C run, and the plugin received their events twice. Where `beta.test` ran, its failure read "2 tests failed: beta.BetaFail fails / beta.BetaFail fails". It also happened in a trial run before the matrix. It did not happen on Linux.
 
 ## 3. Events from every worker, live
 
 - **Every worker connected.** Each worker JVM that ran a class opened one connection. No connection came from Mill's own PID in any run. *Inference:* the discovery runner (`MWC` § 3.2) never connected.
 - **Attribution.** The `HELLO` line's module label matched the selector the plugin had built the task for in every connection. Its working directory named the worker's sandbox, for example `out/alpha/test/testForked.dest/group-0-alpha.A1/worker-1/sandbox`; its PID and run identifier were distinct per connection.
-- **Live.** Events arrived while the tests ran: progress lines stepped up at the tests' 400 ms interval, interleaved with the workers' own `MARK-` lines, and in the Windows run of all five modules each connection of a worker that completed ended 0.3 s to 2.5 s before `execute` returned. The largest gap between an event's send time and its receipt, where the reader was not deliberately paused, was 64 ms on Windows and 43 ms on Linux, except in `conpty-nodaemon-log-cr` on Windows, where it reached 461 ms. The maximum excludes `RunStarting`, which the emitter holds until it connects: its gap reached 657 ms on Windows and 653 ms on Linux.
+- **Live.** Events arrived while the tests ran. Progress lines stepped up at the tests' 400 ms interval, interleaved with the workers' own `MARK-` lines. In the Windows run of all five modules, each connection of a worker that completed ended 0.3 s to 2.5 s before `execute` returned.
+- **Delay.** Where the reader was not deliberately paused, the largest gap between an event's send time and its receipt was 64 ms on Windows and 43 ms on Linux, except in `conpty-nodaemon-log-cr` on Windows, where it reached 461 ms. That maximum excludes `RunStarting`, which the emitter holds until it connects: its gap reached 657 ms on Windows and 653 ms on Linux.
 - **Order.** Sequence numbers had no gap on any connection.
 
 ## 4. A killed worker
