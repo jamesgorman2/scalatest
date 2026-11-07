@@ -15,6 +15,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document.
 - [../structured-test-reporting/SPECIFICATION.md](../structured-test-reporting/SPECIFICATION.md) — the test structure, what each output shows, and how test output is attributed, which this epic takes by default.
 - [../structured-test-reporting/runner-json/SPECIFICATION.md](../structured-test-reporting/runner-json/SPECIFICATION.md) — the layout of one run's JSON object, which this epic takes.
+- [../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md](../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md) — every key of that object, which this epic takes.
 - [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, and what attributing test output needs.
 - [research/mill-worker-channels.md](research/mill-worker-channels.md) — on the JVM under Mill: how Mill wires a test worker's stdout and stderr, whether plugin code can take them, what a sandbox file, a socket and stdout can each rely on as a channel, and which APIs let plugin code run inside the test task after tests fail.
 - [research/js-native-channels.md](research/js-native-channels.md) — on Scala.js on Node and on Native under Mill: what a socket, a file and the test-interface `Logger` can each rely on as a channel, where a run's stdout and stderr go, and which hooks let plugin code take them.
@@ -38,12 +39,11 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
 
-A channel's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on are private to one release of this fork. A channel is read only by the release that wrote it.
+A channel's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them.
 
 ### Out of scope
 
 - sbt and command-line front ends for the consolidation library.
-- A consolidation library API that callers outside this fork may rely on across releases.
 - A supported way to turn the emitter on outside Mill.
 - Carrying an event's payload, or any other part of an event or throwable that the consolidated output neither shows nor uses.
 - Changing any existing ScalaTest reporter.
@@ -101,7 +101,7 @@ A channel's format, the consolidation library's API and the switch by which the 
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
-- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module. Such a module may test with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork.
+- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module. For example, such a module tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork.
 
 WHERE `--halt-on-failure` is given:
 
@@ -109,13 +109,13 @@ WHERE `--halt-on-failure` is given:
 
 ## Consolidation
 
-- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output.
+- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output. Any combination of them can be on together, progress output with JSON output included, unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
 - R-027 The human-readable and JSON output are written together, once every run has completed or has ended without completing.
-- R-028 The JSON output is one object for the test command. Its root wraps each run's test structure in the layout `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object gives one run, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them.
+- R-028 The JSON output is one object for the test command. Its root wraps each run's test structure in the layout that `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object and `../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` § APIs give one run, key names included, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them.
 - R-021 The human-readable and JSON output show every node, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no node of one run's test structure holds an event or test output of another run.
-- R-023 Given the same inputs (§ Scope), the consolidation library produces the same human-readable and JSON output when used without Mill.
+- R-023 The consolidation library is published and depends on no Mill artifact. Given the same inputs (§ Scope), it produces the same human-readable and JSON output when called without Mill as when the Mill plugin calls it.
 - R-052 The consolidation library's caller names the test run label for each event stream.
 - R-025 By default, the Mill plugin gives each module one test run label.
 
