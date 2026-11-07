@@ -92,6 +92,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **See**
 
 - `research/mill-worker-channels.md` § 2, § 5.
+- `research/emitter-plugin-spike.md` § 6.
 - `research/js-native-channels.md` § 5, § 6.
 - `research/native-stdio-wrapper.md` § 3, § 5.
 
