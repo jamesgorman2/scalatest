@@ -2,6 +2,64 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## In consolidated output a run is not a node: its own state is a run record on its test run label, named by each of its suites.
+
+**Alternatives**
+
+- A run node between each label and its suites, as in the single-run layout, splits one module's suites across as many nodes as Mill's test queue started workers, a split that changes from one test command to the next.
+- Inlining the run's state on every suite duplicates it and leaves no place for a run with no suites (`SPECIFICATION.md` R-071).
+- Rolling the runs' state up onto their label loses which worker died and which process wrote which worker output.
+
+**Reasoning** The hierarchy then describes what the user configured, modules and their suites, while how the tests were scheduled is held in properties, as a suite's thread name already is (`SPECIFICATION.md` R-078, R-080). Each suite naming its run record keeps which worker ran it.
+
+**Costs** The consolidated JSON departs from the single-run layout above the suites, so a tool reading both handles two layouts, and listing one run's suites means filtering its label's suites by run record.
+
+**Settled by** [How do modules, module selectors and runs appear in the consolidated output?](https://github.com/jamesgorman2/scalatest/issues/29).
+
+---
+
+## Human-readable output shows each run's own output and abnormal end on its test run label, without naming the run.
+
+**Alternatives**
+
+- Leaving runs to the JSON output lets a test command fail with no visible cause, as when a worker given no task dies.
+- Showing only how a run ended abnormally drops worker output, often the only explanation of that end, from the human-readable output.
+
+**Reasoning** A reader at the console needs every cause of failure and the message that explains it, but which worker ran which suites is scheduling they did not choose (`SPECIFICATION.md` R-082). One block for each run keeps each run's stdout and stderr in order (R-043).
+
+**Costs** The human-readable output cannot tell a reader which suites shared a process with a crash; only the JSON output can.
+
+**Settled by** [How do modules, module selectors and runs appear in the consolidated output?](https://github.com/jamesgorman2/scalatest/issues/29).
+
+---
+
+## A test run label whose module's tests did not run is aborted, with reason *not run* where it was skipped and *could not start* where a failure stopped it.
+
+**Alternatives**
+
+- One reason for both leaves the reader to infer from the presence of a failure whether the module was skipped or broken.
+- A status of the label's own, beside the outcome every other node uses, adds a second way to say how a node ended.
+
+**Reasoning** The two call for different remedies: a skipped module needs a rerun, one that could not start needs a fix (`SPECIFICATION.md` R-058). Aborted with a reason is how the test structure already shows a node that never ran.
+
+**Costs** A label carries an outcome even though it is not rolled up from its runs (`SPECIFICATION.md` R-083), so a label whose runs all failed shows none.
+
+**Settled by** [How do modules, module selectors and runs appear in the consolidated output?](https://github.com/jamesgorman2/scalatest/issues/29).
+
+---
+
+## Module selectors are recorded at the JSON output's root, not as nodes.
+
+**Alternatives** A node for each module selector, above its modules' labels, duplicates every module that two selectors name, such as `__.test` and `foo.test`, or places it under one by an arbitrary tie-break, and adds a level to every path.
+
+**Reasoning** Selectors overlap, while each test module runs once, so recording each selector with the modules it resolved to keeps the hierarchy free of duplicates and still lets a tool see what was asked for (`SPECIFICATION.md` R-081).
+
+**Costs** The human-readable output does not show which selector named a module.
+
+**Settled by** [How do modules, module selectors and runs appear in the consolidated output?](https://github.com/jamesgorman2/scalatest/issues/29).
+
+---
+
 ## A run's expected tests come from the run, one suite at a time as it constructs each, not from the Mill plugin's list of classes.
 
 **Alternatives**
@@ -166,12 +224,12 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## A selected test module whose tests cannot start is a failed run: shown as not run with its failure, failing the test command and triggering `--halt-on-failure`.
+## A selected test module whose tests cannot start is a failed run: shown with the failure that stopped it, failing the test command and triggering `--halt-on-failure`.
 
 **Alternatives**
 
 - Leaving it to Mill's own console error omits it from the report (`SPECIFICATION.md` R-058).
-- Showing it as not run without failing the test command lets a build whose tests never ran look green.
+- Showing it without failing the test command lets a build whose tests never ran look green.
 
 **Reasoning** A module that did not run is a gap in coverage whatever stopped it, so the test command fails (R-046) and the consolidated output shows both that it did not run and why (R-058). Counting it as a failure makes `--halt-on-failure` stop on it as on any other (R-057).
 
@@ -293,7 +351,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## Worker output is captured and shown on its run.
+## Worker output is captured and shown with its run's results.
 
 **Alternatives**
 
@@ -301,7 +359,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 - Writing it to a file for each run keeps the consolidated output to what came over the channel, but separates a crash message from the run it explains.
 - Discarding it loses the only account of some runs that did not complete.
 
-**Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's node is where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
+**Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's results are where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
 **Costs** Worker output arrives apart from the channel, so its place among the run's events is approximate (`SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
 
@@ -328,7 +386,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives** Designing the test structure and the JSON, human-readable and progress output afresh frees this epic from choices shaped by reporting inside one run, but the two epics' outcomes would then differ in ways their architectures do not force.
 
-**Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Holding the reported behaviour common leaves one difference to compare: reporting inside each run, or in a plugin reading every run's channel. Of what is reused, only the JSON layout, key names included, is designed in depth, so this epic takes it whole (`SPECIFICATION.md` R-028).
+**Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Holding the reported behaviour common leaves one difference to compare: reporting inside each run, or in a plugin reading every run's channel. Of what is reused, only the JSON layout, key names included, is designed in depth, so this epic takes it whole for suites and every node below them (`SPECIFICATION.md` R-028).
 
 **Costs** A flaw found in the reused documents, which this plan may not edit, is carried here as a stated difference. Because each JSON node holds its final state, a tool that reads only the JSON cannot recover the order of events across nodes.
 

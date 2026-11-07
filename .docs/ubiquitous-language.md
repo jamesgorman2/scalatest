@@ -27,7 +27,7 @@ The tree of nodes a run reports: the run at its root, containing suites, which c
 _Avoid_: Test tree, hierarchy, nesting
 
 **Node**:
-A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, a test run label is also a node.
+A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, a test run label is also a node and a run is not: the run's top-level suites sit directly under its test run label.
 _Avoid_: Element, item, entry, test case
 
 **Name**:
@@ -83,6 +83,10 @@ _Avoid_: Transport, connection, pipe
 **Test run label**:
 A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag
+
+**Run record**:
+One run's own state in consolidated JSON, such as its outcome, timings, summary counts and worker output, held in a list on the run's test run label. Each of the run's suites names its run record.
+_Avoid_: Run node, worker record
 
 **Test command**:
 One evaluation of the command the Mill plugin adds for consolidated testing, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.
