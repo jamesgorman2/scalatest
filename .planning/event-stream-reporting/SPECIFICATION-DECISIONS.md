@@ -32,6 +32,18 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
+## Each selected test module's tests start once that module compiles, without waiting for other selected modules to compile.
+
+**Alternatives** Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
+
+**Reasoning** Mill's test task starts each module's tests on its own compile, and a user who runs the test command in place of that task expects the output to change and nothing else (`SPECIFICATION.md` R-056).
+
+**Costs** Of the routes examined, only one also runs every selected module without `--keep-going`. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`research/mill-nested-keep-going.md` § 3, § 5).
+
+**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+
+---
+
 ## The test command runs every selected test module by default; `--halt-on-failure` opts into skipping modules not yet started.
 
 **Alternatives**
@@ -39,11 +51,10 @@ Decisions behind `SPECIFICATION.md`, newest first.
 - Failing fast unless `--keep-going` is given, as Mill does, suits a build; but modules run unordered and in parallel, so which modules report depends on timing.
 - Showing only the runs that started, as Mill does, hides that modules were skipped.
 - Always running every module, with no opt-in, loses fast feedback on a large build.
-- Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
 
 **Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
 
-**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run, and the plugin cannot leave that to one nested `execute`, whose fail-fast without `--keep-going` skips every task not yet started (`research/mill-command-lifetime.md` § 2.4). The only route that keeps going and still starts each module's tests on its own compile reaches Mill internals by reflection, with no compatibility promise (`research/mill-nested-keep-going.md` § 3, § 5). Unless the user opts in, a failing build takes as long as a passing one.
+**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run. Unless the user opts in, a failing build takes as long as a passing one.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -85,7 +96,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native it takes a run's stdout and stderr only by putting a launcher between Scala Native's test adapter and the test binary. That route was observed on Windows and Linux only, and the launcher must be compiled where an emulator cannot load a script.
+**Costs** The plugin must run each module's tests itself instead of calling Mill's test task, using Mill API marked `@experimental` and re-implementing logic Mill keeps `@internal`, so it may need a release for each Mill release. On Native it takes a run's stdout and stderr only through a launcher between Scala Native's test adapter and the test binary, a route observed on Windows and Linux only, whose launcher must be compiled where an emulator cannot load a script.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 
