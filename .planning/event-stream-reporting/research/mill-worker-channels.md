@@ -9,16 +9,17 @@ Other notes hold facts this one relies on and does not repeat:
 - `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js run on Node or a Native run under Mill.
 - `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`: what was known about a channel before this note.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what can host plugin code across a Mill command, and what Mill does to an exclusive command's streams.
+- `.planning/event-stream-reporting/research/emitter-plugin-spike.md`, cited as `EPS`: what was observed when several of this note's routes were run.
 
 ## Short answer
 
-- **Worker stdout and stderr are two pipes, not inherited descriptors and not files.** Mill spawns each `MillTestRunnerMain` JVM with `os.Inherit` for both, and inside a non-exclusive Mill task `os.Inherit` resolves to a pipe that a Mill thread pumps into the task's logger streams (§ 1.1–1.3). A stream that is the process's original stream is inherited instead (§ 1.3). An exclusive command runs with `exclusiveSystemStreams` (`MCL` § 4.2); whether a worker spawned under them is piped or inherits was not determined (§ 6).
+- **Worker stdout and stderr are two pipes, not inherited descriptors and not files.** Mill spawns each `MillTestRunnerMain` JVM with `os.Inherit` for both, and inside a non-exclusive Mill task `os.Inherit` resolves to a pipe that a Mill thread pumps into the task's logger streams (§ 1.1–1.3). A stream that is the process's original stream is inherited instead (§ 1.3). An exclusive command runs with `exclusiveSystemStreams` (`MCL` § 4.2); whether a worker spawned under them is piped or inherits under `--no-daemon` was not determined (§ 6).
 - **Mill line-buffers and prefixes that output on its way to the console, and tees it unprefixed to a log file.** On the parallel path the file is per worker, `Task.dest[/<group>]/worker-<i>.log`, holding stdout and stderr together (§ 1.4–1.5).
-- **Of the routes examined, plugin code in Mill's process can take the raw streams only by calling `TestModuleUtil` itself.** A `testTask` override that calls `super.testTask` cannot. A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. A direct `runTests()` call does so only on its non-parallel path. Inside the worker, a shim `testFramework` can replace `System.out` and `System.err` before Mill's runner captures `System.out` (§ 2). The last three are *inferences* (§ 6).
+- **Of the routes examined, plugin code in Mill's process can take the raw streams only by calling `TestModuleUtil` itself.** A `testTask` override that calls `super.testTask` cannot. A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. A direct `runTests()` call does so only on its non-parallel path. Inside the worker, a shim `testFramework` can replace `System.out` and `System.err` before Mill's runner captures `System.out` (§ 2). The `runTests()` claim is an *inference*; the other two were observed (`EPS` § 6).
 - **Sandbox file.** Found by a relative path, only while `testSandboxWorkingDir` is on. It sits under `Task.dest`, where Mill itself polls two files every 10 ms. On Windows, whether it can be read while the worker appends to it depends on the share mode of the worker's writer (§ 3.1). The discovery runner resolves the same relative path against Mill's own working directory (§ 3.1).
 - **Socket.** Found through an address in the arguments, environment or system properties, which are the same for every worker. Mill is not involved in the transport. The discovery runner receives the same address (§ 3.2).
 - **Stdout.** Needs no discovery. It shares one pipe with test output, Mill's own runner lines and the `done()` string. The discovery runner's `System.out` is not a worker pipe (§ 3.3).
-- **After a JVM worker dies**, the sandbox file stays on disk until the task next runs, and Mill reads both pipes to end of stream. By *general* operating-system behaviour, bytes handed to the operating system before the death remain in the file and are still read from the pipes, and bytes buffered inside the worker JVM are lost. Whether socket bytes written but not yet received are delivered was not determined (§ 3.1–3.3, § 6).
+- **After a JVM worker dies**, the sandbox file stays on disk until the task next runs, and Mill reads both pipes to end of stream. By *general* operating-system behaviour, bytes handed to the operating system before the death remain in the file and are still read from the pipes, and bytes buffered inside the worker JVM are lost (§ 3.1–3.3). Socket bytes written but not yet received: `EPS` § 4.
 - **Scala.js and Native have no `MillTestRunnerMain` worker and no discovery runner.** Their runs execute through the test adapters in Mill's own process (§ 4). Whether data a JS VM or native process wrote survives its death: `JNC` § 7.
 - **Plugin code that must run inside the test task after tests fail needs `@experimental` API**, which Mill excludes from its binary-compatibility check (§ 5).
 
@@ -124,7 +125,7 @@ Besides what tests and ScalaTest write:
 ### 2.3 Through a direct `callTestRunnerSubprocess` call
 
 - The method is public on the `@experimental` class and takes `(baseFolder, resultPath, selector, poll)` (TMU lines 30–31, 112–122). It returns `Result[(String, Seq[TestResult])]`, not the process.
-- It spawns on the calling thread, so the caller's `os.Inherit.out` and `os.Inherit.err` values apply (*inference*, as § 2.2). os-lib's public `os.ProcessOutput.ReadBytes` and `os.ProcessOutput.Readlines` each read the pipe on a dedicated thread (`[os] os/src/SubProcess.scala` lines 500–540). Mill waits for those threads before returning (TMU lines 165–175).
+- It spawns on the calling thread, so the caller's `os.Inherit.out` and `os.Inherit.err` values apply (`EPS` § 6). os-lib's public `os.ProcessOutput.ReadBytes` and `os.ProcessOutput.Readlines` each read the pipe on a dedicated thread (`[os] os/src/SubProcess.scala` lines 500–540). Mill waits for those threads before returning (TMU lines 165–175).
 - `poll` runs on the calling thread about every 10 ms while the process or a pumper thread is alive (TMU lines 165–175).
 - `selector` is either `Left(globs)`, where the one JVM runs every matching class with no queue (`TR/TestRunnerMain0.scala` lines 11–23), or `Right((startingClass, queueFolder, claimFolder))`, where the caller must prepare the queue and claim folders as `runTestFuture` does (TMU lines 183–191, 310–340).
 - It makes no discovery call: `ZincOp.GetTestTasks` is sent only by `runTests()` (TMU lines 82–92).
@@ -133,9 +134,9 @@ Besides what tests and ScalaTest write:
 ### 2.4 Through a shim `testFramework` in the worker
 
 - The worker instantiates `testFramework` by reflection in `MillTestRunnerMain`'s own class loader, before it creates the runner (`TR/TestRunnerMain0.scala` lines 15, 26; `TR/Framework.scala` lines 6–12; `[mill] libs/javalib/testrunner/entrypoint/src/mill/javalib/testrunner/entrypoint/MillTestRunnerMain.java` lines 38–42; `TR/TestRunnerUtils.scala` lines 380–382).
-- Mill captures `System.out` only after `framework.runner(...)` returns (§ 1.6). *Inference:* a shim that calls `System.setOut` and `System.setErr` in its constructor or in `runner` also receives Mill's test-interface `Logger` lines, and can keep the original streams for itself.
+- Mill captures `System.out` only after `framework.runner(...)` returns (§ 1.6). A shim that calls `System.setOut` and `System.setErr` in `runner` also receives Mill's test-interface `Logger` lines, and can keep the original streams for itself (`EPS` § 6). *Inference:* the same holds for a shim that calls them in its constructor.
 - Such a replacement sees only writes made through `System.out` and `System.err`. Writes to the file descriptors, such as JVM warnings, native code and child processes, go straight to the pipes (`JSN` § 4.2 states the same limit for Native).
-- Whether `scala.Console` is initialised before the shim runs, and so whether the `done()` `println` follows a replaced `System.out`, was not determined.
+- Whether `scala.Console` is initialised before the shim runs, and so whether the `done()` `println` follows a replaced `System.out`: `EPS` § 6.
 - The shim cannot reach the Mill end of the pipes; it runs only in the worker.
 - The shim is also instantiated in Mill's own process: by the discovery call (`TR/GetTestTasks.scala` lines 7–25) and by BSP class discovery (TM lines 368–380; `MILL` § 3). There `System.out` is Mill's process-wide proxy to per-thread streams (SSU lines 69–94; `[mill] runner/daemon/src/mill/daemon/MillDaemonMain0.scala` line 54). *Inference:* a shim that replaced `System.out` unconditionally would replace it for the whole Mill process.
 
@@ -159,7 +160,7 @@ Besides what tests and ScalaTest write:
 - **Getting the address to the worker.** `testTask` takes `args` as a `Task[Seq[String]]` (TM lines 312–315), and `testForked` builds it as a `Task.Anon` over `testArgsDefault() ++ args` (TM lines 159–166). `testArgsDefault`, `forkArgs` and `forkEnv` are cached tasks (`MILL` § 2.2). Prior art for the argument form is `-K host port` (`EMC` § 2).
 - **Reading it while the run is in progress.** The reader is ordinary JVM code in Mill's process; no Mill code sits between a worker's socket and it. No Mill source restricting a worker's network access was looked for.
 - **The discovery runner.** It receives the same arguments (`MILL` § 1.4), so an emitter that connects when its runner is constructed connects from Mill's own process as well, and that runner never calls `done()`. ScalaTest 3.2.19's `SocketReporter` connects in its constructor (`[this] jvm/core/src/main/scala/org/scalatest/tools/SocketReporter.scala` lines 26–29), and reporters are built when the runner is constructed (`MILL` § 1.4). When such a connection closes was not determined.
-- **A dead worker.** What the reader has received stays with the reader. *General:* the reader then sees end of stream or a connection reset. Whether bytes the worker had written but the reader had not yet received are delivered was not determined.
+- **A dead worker.** What the reader has received stays with the reader. *General:* the reader then sees end of stream or a connection reset. Whether bytes the worker had written but the reader had not yet received are delivered: `EPS` § 4.
 - **Mill APIs.** None for the transport. The reader's lifetime is § 5.
 
 ### 3.3 The worker's stdout
@@ -202,14 +203,11 @@ Besides what tests and ScalaTest write:
 
 ## 6. What was not determined
 
-- Whether each *inference* above holds when run, in particular that the caller's `os.Inherit.out` and `os.Inherit.err` reach the spawn (§ 2.2, § 2.3) and that a shim's `System.setOut` precedes Mill's capture (§ 2.4).
-- Which tasks, if any, run with the process's original streams, so that a worker's descriptors are inherited rather than piped (§ 1.3). An exclusive command receives `exclusiveSystemStreams`, the command's raw streams (`MCL` § 4.2); whether those are the process's original streams in daemon or no-daemon mode was not determined.
+- Whether each remaining *inference* above holds when run, in particular that the caller's `os.Inherit.out` and `os.Inherit.err` reach a spawn on `runTests()`'s sequential path (§ 2.2).
+- Which tasks, if any, run with the process's original streams, so that a worker's descriptors are inherited rather than piped (§ 1.3). An exclusive command receives `exclusiveSystemStreams`, the command's raw streams (`MCL` § 4.2). Under the daemon they are not the daemon's own stdout (`EPS` § 8.1); whether they are the process's original streams under `--no-daemon` was not determined.
 - What the Mill client does to `PromptLogger`'s output (§ 1.5).
 - Whether the worker's `System.out` is flushed on every write, and what `System.exit(0)` does to bytes buffered in the JVM (§ 3.3).
-- Whether `scala.Console` is initialised before a shim `testFramework` is constructed (§ 2.4).
 - Whether a plugin can give `TestModuleUtil` a `TaskCtx` of its own, to control the parallel path's logger (§ 2.2).
-- Delivery of unread socket bytes after a worker is killed, on each operating system (§ 3.2).
 - On Windows, the share mode the worker's writer opens a sandbox file with, which decides whether Mill's process can read it while the worker appends (§ 3.1).
-- Whether live workers are destroyed when the command is interrupted. `spawn` registers a shutdown hook that destroys the process when Mill's JVM exits (`[os] os/src/ProcessOps.scala` lines 326–342); the daemon's handling of a client interrupt is `MCL` § 5.1.
 - What `testLocal` on a JVM module does with test output beyond running the framework in Mill's process (`MILL` § 1.1).
 - Whether any of this holds on Mill versions other than `1.1.10`.

@@ -11,7 +11,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Of the Mill mechanisms examined, only an exclusive command that takes the `Evaluator` has a start, an end and the failure path (`research/mill-command-lifetime.md` § 2, § 3). Confining the plugin's replacement of a module's test task to that command keeps `SPECIFICATION.md` R-003 and R-060 without the replacement having to stand aside for other launches.
 
-**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental. `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055), and nothing covers `testLocal` or `testCached`.
+**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental, and get no consolidated output when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-061). `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055), and nothing covers `testLocal` or `testCached`.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -43,7 +43,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** A test report's coverage should not vary with scheduling (`SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
 
-**Costs** The default differs from Mill's, and the test command ignores Mill's `--keep-going`. Unless the user opts in, a failing build takes as long as a passing one.
+**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run, and the plugin cannot leave that to one nested `execute`, whose fail-fast without `--keep-going` skips every task not yet started (`research/mill-command-lifetime.md` § 2.4). Unless the user opts in, a failing build takes as long as a passing one.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -80,7 +80,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives**
 
-- Holding only what Mill's stable API allows survives Mill releases, but that API gives the plugin neither a run's stdout and stderr nor the test task's result after tests fail, so worker output and Mill's list of failed tests reach the console.
+- Holding only what Mill's stable API allows survives Mill releases, but its one route into a JVM worker's streams, a shim `testFramework`, takes only writes made through `System.out` and `System.err`, so JVM warnings, native code and child processes still write to the console.
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
