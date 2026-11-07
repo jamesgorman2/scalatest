@@ -140,7 +140,7 @@ Each route run was compared with the `testForked` run of the same platform, mode
   - `G03`, the failing class, never ran twice, so no failure message differed.
   - *Inference:* with three rounds a cell, the daemon counts do not show whether a route changes the rate.
 
-Every difference between a route and `testForked` was one of these: the worker count or a duplicate run.
+Every difference between a route and `testForked` was one of these: the worker count, a duplicate run, or `MILL_PARAMS` on Windows.
 
 ## 6. Cost of each route
 
@@ -157,10 +157,7 @@ Every difference between a route and `testForked` was one of these: the worker c
 
 ## 7. Against the source reading
 
-- `MWC` § 2.2 left open whether a plugin can pass a `TaskCtx` of its own, and § 6 lists it as not determined. It can: § 2 and Route A's runs.
 - `MWC` § 2.2's statement that on the parallel path `fork.async` sets `os.Inherit` again and the caller's values are not seen held; Route A works because its `withValue` is inside the `fork.async` body.
-- `MWC` § 2.2 says the per-worker `.log` file is written regardless of who called `runTests()`. Under Route A it was written but held only Mill's ticker lines; under Route B there was none (§ 3).
-- `MWC` § 1.4 describes the per-worker log file as holding the worker's stdout and stderr together. Under `testForked` it also held Mill's ticker lines (§ 3).
 - `MWC` § 2.3 held: `callTestRunnerSubprocess` with `Right(...)` from plugin threads honoured each thread's `os.Inherit.out` and `err`, and the caller owed discovery and the report.
 - `EPS` § 2 describes the class run twice as the first class of a group. Here later classes also ran twice, once without the first (§ 5), and it happened under the daemon as well as `--no-daemon`.
 
