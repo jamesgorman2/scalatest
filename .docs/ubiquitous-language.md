@@ -72,6 +72,14 @@ _Avoid_: Other output, raw output, leftover output
 Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
+**Event stream**:
+One run's events, test structure and test output, in the order the run produced them, apart from how they are carried.
+_Avoid_: Event log, event feed
+
+**Channel**:
+An ordered stream that carries a run's event stream out of the processes executing the run.
+_Avoid_: Transport, connection, pipe
+
 **Test run label**:
 A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag

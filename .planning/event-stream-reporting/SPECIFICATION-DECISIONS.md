@@ -2,11 +2,11 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
-## The consolidation library takes each run's event stream, not its channel, and writes to destinations its caller supplies.
+## The consolidation library takes each run's event stream, not its channel.
 
-**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and a recorded channel outside Mill needs a way to turn the emitter on there, which is new public surface on `Runner` and the `Framework` under `SPECIFICATION.md` R-001 and R-004.
+**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and a recorded channel outside Mill needs a supported way to turn the emitter on there, which is new public surface on `Runner` and the `Framework` under `SPECIFICATION.md` R-001 and R-004.
 
-**Reasoning** Separating decoding from consolidation lets any front end, live under Mill or reading files, feed the same library, so whether a channel is live or recorded never reaches it. A command-line front end could, for example, parse recorded channel files in parallel and feed the library.
+**Reasoning** Separating decoding from consolidation lets any front end, live under Mill or reading files, feed the same library, so whether a channel is live or recorded never reaches it.
 
 **Costs** Every front end must turn channels into event streams. This epic gives no way outside Mill to produce a channel, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
 
@@ -21,21 +21,36 @@ Decisions behind `SPECIFICATION.md`, newest first.
 - Carrying the payload as its `toString` sends unbounded text that no output reads.
 - Carrying the whole event, with the payload kept where serialisable, needs a rule for each runtime because Scala.js and Native have no general serialisation, and nothing reads the payload.
 
-**Reasoning** The emitter then makes no judgement at runtime about what can be sent (`SPECIFICATION.md` R-011, R-063, R-064). Because the channel's format is private, a later epic that needs the payload can add it without breaking a reader.
+**Reasoning** The emitter then makes no judgement at runtime about what can be sent (`SPECIFICATION.md` R-011, R-063). Because the channel's format is private, a later epic that needs the payload can add it without breaking a reader.
 
-**Costs** Payloads and the fields of custom exceptions reach no output until an epic adds them.
+**Costs** A later output that needs more of an event, such as its payload or a custom exception's fields, needs a change to the emitter in ScalaTest itself, not only to the consolidation library.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 
 ---
 
-## The channel's format is private to one release of this fork.
+## A channel is read only by the release of this fork that wrote it.
+
+**Alternatives** A private format versioned and read across releases lets one plugin read test modules on several releases of the fork, but each reader must keep decoding every older format, a compatibility burden the goal names no need for.
+
+**Reasoning** The emitter and its reader ship in the same release, so the format can change in any release without any reader decoding more than one.
+
+**Costs**
+
+- A test module on another release of the fork fails the test command (`SPECIFICATION.md` R-059).
+- The Mill plugin reads one fork release and may need a release for each Mill release, so it needs a release for each pairing of the two that it supports.
+
+**Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
+
+---
+
+## The channel's format is private to this fork.
 
 **Alternatives** A documented format that third parties may read is a second public contract beside the JSON output (`SPECIFICATION.md` R-028), needing its own specification and compatibility policy, and the goal names no reader for it.
 
-**Reasoning** The JSON output stays the documented contract for tools, so the channel serves only this fork's own reader. Because the emitter and that reader ship in the same release, the format can change in any release.
+**Reasoning** Tools already have a documented account of every run in the JSON output, so the channel need serve only this fork's own reader.
 
-**Costs** No live consumer other than this fork's own can read a channel, and a test module on another version of the fork fails the test command (`SPECIFICATION.md` R-059).
+**Costs** No consumer other than this fork's own can read a channel.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 
@@ -99,7 +114,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## A selected test module that does not test with this fork of ScalaTest fails the test command before any test starts.
+## A selected test module that does not test with the release of this fork whose channels the Mill plugin reads fails the test command before any test starts.
 
 **Alternatives**
 
@@ -216,7 +231,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Holding the reported behaviour common leaves one difference to compare: reporting inside each run, or in a plugin reading every run's channel. Of what is reused, only the JSON layout of `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object is designed in depth (`SPECIFICATION.md` R-028).
 
-**Costs** A flaw found in the reused documents, which this plan may not edit, is carried here as a stated difference. Because each JSON node holds its final state, a tool that reads only the JSON cannot recover a payload or the order of events across nodes.
+**Costs** A flaw found in the reused documents, which this plan may not edit, is carried here as a stated difference. Because each JSON node holds its final state, a tool that reads only the JSON cannot recover the order of events across nodes.
 
 **Settled by** [What does this epic reuse from structured test reporting?](https://github.com/jamesgorman2/scalatest/issues/25).
 
