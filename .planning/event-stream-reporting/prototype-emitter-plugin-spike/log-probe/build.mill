@@ -1,0 +1,26 @@
+//| mill-version: 1.1.10
+
+// PROTOTYPE - throwaway. Compile probe for Route A's other variant
+// (https://github.com/jamesgorman2/scalatest/issues/42): can build code supply a TaskCtx whose
+// `log` is a Logger of its own? Fork.async builds PrefixLogger(ctx.log, ...), whose worker lines go
+// to ctx.log.prompt.logPrefixedLine, so such a Logger would have to supply `prompt`.
+// Run: cd log-probe && .\mill.bat --no-daemon resolve _   (expected to fail to compile)
+// As written: "private[mill] method prompt can only be accessed from package mill."
+// Without the `prompt` line: "class PluginLogger needs to be abstract, since private[mill] def
+// prompt: mill.api.daemon.Logger.Prompt in trait Upstream in object Logger is not defined".
+package build
+
+import mill.*
+import mill.api.daemon.{Logger, SystemStreams}
+
+final class PluginLogger(real: Logger, mine: SystemStreams) extends Logger {
+  def streams: SystemStreams = mine
+  def info(s: String): Unit = real.info(s)
+  def debug(s: String): Unit = real.debug(s)
+  def warn(s: String): Unit = real.warn(s)
+  def error(s: String): Unit = real.error(s)
+  def ticker(s: String): Unit = real.ticker(s)
+  def prompt = real.prompt
+}
+
+object probe extends Module

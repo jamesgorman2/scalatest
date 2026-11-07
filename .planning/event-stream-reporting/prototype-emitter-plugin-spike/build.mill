@@ -23,6 +23,76 @@ import java.io.{BufferedReader, IOException, InputStreamReader, PrintStream}
 import java.net.{InetAddress, ServerSocket, Socket}
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.collection.mutable
+import scala.concurrent.Future
+import mill.api.TaskCtx
+import mill.javalib.testrunner.TestResult
+import mill.javalib.api.internal.ZincOp
+
+// ---- Parallel worker capture (https://github.com/jamesgorman2/scalatest/issues/42) ----
+// `gamma.test.routeCtx`: Route A, runTests() with a TaskCtx whose `fork` wraps Mill's own
+// fork.async so each worker's spawn sees the plugin's os.Inherit.out/err.
+// `gamma.test.routeQueue`: Route B, the plugin prepares the queue, runs one thread per worker
+// calling callTestRunnerSubprocess under its own os.Inherit.out/err, then reports.
+// Neither prints worker output; each writes it raw to Task.dest/captured/<label>.out|.err.
+
+/** Collects each worker's raw stdout and stderr bytes in memory, keyed by worker label. */
+final class WorkerSink(root: os.Path) {
+  private val buffers = mutable.LinkedHashMap[String, java.io.ByteArrayOutputStream]()
+  private val index = mutable.ArrayBuffer[String]()
+  private def buffer(key: String) = synchronized(buffers.getOrElseUpdate(key, new java.io.ByteArrayOutputStream))
+  def outputs(label: String, folder: os.Path): (os.ProcessOutput, os.ProcessOutput) = {
+    synchronized(index += s"$label\t$folder\t${Thread.currentThread.getName}")
+    def reader(stream: String) = {
+      val b = buffer(s"$label.$stream")
+      os.ProcessOutput.ReadBytes((bytes, n) => b.synchronized(b.write(bytes, 0, n)))
+    }
+    (reader("out"), reader("err"))
+  }
+  /** Writes every buffer to root/<label>.<stream> and returns a one-line summary. */
+  def save(): String = synchronized {
+    os.makeDir.all(root)
+    for ((k, b) <- buffers) os.write.over(root / k, b.synchronized(b.toByteArray))
+    os.write.over(root / "index.tsv", index.mkString("", "\n", "\n"))
+    s"workers=${index.size} labels=${index.map(_.takeWhile(_ != '\t')).mkString(",")} " +
+      buffers.map((k, b) => s"$k=${b.size}B").mkString(" ")
+  }
+}
+
+/** Route B: one worker of the queue scheduler, as runTestFuture lays it out. */
+final case class QueueJob(priority: Int, order: Int, label: String, groupName: String, folder: os.Path, queue: os.Path, processIndex: Int)
+
+/** Route A: Mill's own fork.async, with the plugin's os.Inherit.out/err set inside the body. */
+final class CaptureFork(real: TaskCtx, sink: WorkerSink) extends TaskCtx.Fork.Api {
+  def blocking[T](t: => T): T = real.fork.blocking(t)
+  def await[T](f: Future[T]): T = real.fork.await(f)
+  def awaitAll[T](f: Seq[Future[T]]): Seq[T] = real.fork.awaitAll(f)
+  def async[T](dest: os.Path, key: String, message: String, priority: Int)(
+      t: mill.api.daemon.Logger => T
+  )(using ctx: TaskCtx): Future[T] =
+    real.fork.async(dest, key, message, priority) { logger =>
+      val (out, err) = sink.outputs(key, dest)
+      os.Inherit.out.withValue(out) { os.Inherit.err.withValue(err) { t(logger) } }
+    }(using real)
+}
+
+/** Route A: every member delegates to the task's own TaskCtx except `fork`. */
+final class CaptureCtx(real: TaskCtx, fork0: TaskCtx.Fork.Api) extends TaskCtx {
+  def dest: os.Path = real.dest
+  def log: mill.api.daemon.Logger = real.log
+  def args: IndexedSeq[?] = real.args
+  def arg[T](index: Int): T = real.arg[T](index)
+  def env: Map[String, String] = real.env
+  def workspace: os.Path = real.workspace
+  def fork: TaskCtx.Fork.Api = fork0
+  def jobs: Int = real.jobs
+  def offline: Boolean = real.offline
+  override def useFileLocks: Boolean = real.useFileLocks
+  def fail(msg: String): Nothing = real.fail(msg)
+  def reporter = real.reporter
+  def testReporter = real.testReporter
+  override def systemExitWithReason(reason: String, exitCode: Int): Nothing =
+    real.systemExitWithReason(reason, exitCode)
+}
 
 object emitter extends ScalaModule {
   def scalaVersion = "3.3.6"
@@ -76,6 +146,145 @@ trait Fixture extends ScalaModule {
       println(s"CAPTURED-COUNT ${captured.size} testParallelism=${testParallelism()}")
       res.map(_.msg)
     }
+
+    /** A TestModuleUtil built as TestModule.testTask builds it for testForked, for a given TaskCtx. */
+    def utilFor: Task[TaskCtx => TestModuleUtil] = Task.Anon {
+      val a = (
+        testUseArgsFile(), forkArgs(), jvmWorker().scalalibClasspath(), resources(), testFramework(),
+        runClasspath(), testClasspath(), testArgsDefault(), testForkGrouping(),
+        jvmWorker().testrunnerEntrypointClasspath(), allForkEnv(), testSandboxWorkingDir(),
+        forkWorkingDir(), testReportXml(), javaHome().map(_.path), testParallelism(), testLogLevel(),
+        propagateEnv(), jvmWorker().internalWorker(), aheadOfTimeDiscoveredTestClassesIfNeeded()
+      )
+      (c: TaskCtx) =>
+        new TestModuleUtil(
+          a._1, a._2, Seq.empty, a._3, a._4, a._5, a._6, a._7, a._8, a._9, a._10, a._11, a._12, a._13,
+          a._14, a._15, a._16, a._17, a._18, a._19, discoveredClassesOpt = a._20
+        )(using c)
+    }
+
+    /** Route A: runTests() under a TaskCtx whose fork.async sets the plugin's os.Inherit.out/err. */
+    def routeCtx(): Task.Command[(msg: String, results: Seq[TestResult])] = Task.Command {
+      val real = Task.ctx()
+      val sink = new WorkerSink(Task.dest / "captured")
+      val util = utilFor()(new CaptureCtx(real, new CaptureFork(real, sink)))
+      val res = util.runTests()
+      println(s"SPIKE-ROUTE routeCtx ${sink.save()} result=${res.getClass.getSimpleName}")
+      res
+    }
+
+    /** Route B: the plugin drives the queue scheduler and reports, as runTests() would. */
+    def routeQueue(): Task.Command[(msg: String, results: Seq[TestResult])] = Task.Command {
+      val ctx = Task.ctx()
+      val util = utilFor()(ctx)
+      val sink = new WorkerSink(Task.dest / "captured")
+      val parallel = testParallelism()
+      val groups0 = testForkGrouping()
+      val reportXml = testReportXml()
+      val worker = jvmWorker().internalWorker()
+      val runCp = runClasspath().map(_.path)
+      val entryCp = jvmWorker().testrunnerEntrypointClasspath().map(_.path)
+      val testCp = testClasspath().map(_.path)
+      val framework = testFramework()
+      val args = testArgsDefault()
+      val discoveredOpt = aheadOfTimeDiscoveredTestClassesIfNeeded()
+      val jh = javaHome().map(_.path)
+
+      // Discovery, as runTests() does it (no class globs, so Mill's own glob filter keeps all).
+      val discovered = worker
+        .apply(ZincOp.GetTestTasks(runCp ++ entryCp, testCp, framework, Nil, args, discoveredOpt), javaHome = jh)
+        .toSet
+      val lists = groups0.filter(_.nonEmpty).map(_.filter(discovered)).filter(_.nonEmpty)
+      val classCount = lists.map(_.size).sum
+
+      // Copied from TestModuleUtil: prepareTestGroups, jobsProcessLength, runTestFuture's layout,
+      // TestRunnerUtils.claimFile and TestModuleUtil.processTestResults.
+      def pad(s: String, n: Int) = "0" * (n - s.length) + s
+      val groups: Seq[(os.Path, os.Path, Int)] = lists match {
+        case Nil => Seq((Task.dest, util.prepareTestClassesFolder(Nil, Task.dest), 0))
+        case Seq(one) => Seq((Task.dest, util.prepareTestClassesFolder(one, Task.dest), one.length))
+        case many =>
+          many.zipWithIndex.map { (l, i) =>
+            val name = l match {
+              case Seq(single) => single
+              case multiple => s"group-${pad(i.toString, many.length.toString.length)}-${multiple.head}"
+            }
+            (Task.dest / name, util.prepareTestClassesFolder(l, Task.dest / name), l.length)
+          }
+      }
+      def claimFile(file: os.Path, claimFolder: os.Path): Option[String] =
+        Option.when(os.exists(file) && scala.util.Try(os.move(file, claimFolder / file.last, atomicMove = true)).isSuccess)(file.last)
+
+      val jobs = for {
+        (((groupFolder, queue, numTests), groupIndex), _) <- groups.zipWithIndex.zipWithIndex
+        cappedJobs = math.max(math.min(ctx.jobs, numTests), 1)
+        maxLen = cappedJobs.toString.length
+        processIndex <- 0 until cappedJobs
+      } yield {
+        val pIdx = pad(processIndex.toString, maxLen)
+        val folder = if (parallel && classCount != 1) groupFolder / s"worker-$pIdx" else groupFolder
+        os.write.over(folder / "result.log", upickle.write((0L, 0L)), createFolders = true)
+        val label = if (groups.size == 1) pIdx else s"${pad(groupIndex.toString, groups.length.toString.length)}-$pIdx"
+        QueueJob(if (processIndex == 0) -1 else processIndex, 0, label, groupFolder.last, folder, queue, processIndex)
+      }
+      val ordered = jobs.zipWithIndex.map((j, i) => j.copy(order = i)).sortBy(j => (j.priority, j.order))
+
+      val pool = java.util.concurrent.Executors.newFixedThreadPool(ctx.jobs)
+      val futures = ordered.map { j =>
+        pool.submit[(Int, String, Option[mill.api.Result[(String, Seq[TestResult])]])](() => {
+          val claimFolder = j.folder / "claim"
+          os.makeDir.all(claimFolder)
+          val starting = os.list.stream(j.queue).map(claimFile(_, claimFolder)).collectFirst { case Some(n) => n }
+          val result = Option.when(j.processIndex == 0 || starting.nonEmpty) {
+            os.write.over(j.folder / "claim.log", Array.empty[Byte])
+            val (out, err) = sink.outputs(j.label, j.folder)
+            os.Inherit.out.withValue(out) {
+              os.Inherit.err.withValue(err) {
+                util.callTestRunnerSubprocess(j.folder, j.folder / "result.log", Right((starting, j.queue, claimFolder)), () => ())(using ctx)
+              }
+            }
+          }
+          (if (os.exists(claimFolder)) os.list(claimFolder).size else 0, j.groupName, result)
+        })
+      }
+      val outputs = futures.map(_.get)
+      pool.shutdown()
+
+      val failMap = mutable.Map.empty[String, mill.api.Result.Failure]
+      val successMap = mutable.Map.empty[String, (String, Seq[TestResult])]
+      outputs.foreach {
+        case (_, name, Some(f: mill.api.Result.Failure)) =>
+          failMap.updateWith(name) {
+            case Some(old) => Some(mill.api.Result.Failure.join(Seq(old, f)))
+            case None => Some(f)
+          }
+        case (_, name, Some(mill.api.Result.Success((msg, results)))) =>
+          successMap.updateWith(name) {
+            case Some((oldMsg, oldResults)) => Some((oldMsg + " " + msg, oldResults ++ results))
+            case None => Some((msg, results))
+          }
+        case _ => ()
+      }
+      val res: mill.api.Result[(msg: String, results: Seq[TestResult])] =
+        if (failMap.nonEmpty) mill.api.Result.Failure.join(failMap.values.toSeq)
+        else {
+          val doneMsg = successMap.values.map(_._1).mkString("\n")
+          val results = successMap.values.flatMap(_._2).toSeq
+          try TestModule.handleResults(doneMsg, results, ctx, reportXml)
+          catch { case e: Throwable => mill.api.Result.Failure("Test reporting failed: " + e) }
+        }
+      println(s"SPIKE-ROUTE routeQueue ${sink.save()} result=${res.getClass.getSimpleName}")
+      res
+    }
+  }
+}
+
+/** Ten suites in two fork groups of five, testParallelism on; run with `-j 3`. */
+object gamma extends Fixture {
+  object test extends SpikeTests {
+    def testForkGrouping = Task { discoveredTestClasses().sorted.grouped(5).toSeq }
+    def testParallelism = Task { true }
+    def forkArgs = Task { super.forkArgs() ++ Seq("-Xverify:none") }
   }
 }
 
