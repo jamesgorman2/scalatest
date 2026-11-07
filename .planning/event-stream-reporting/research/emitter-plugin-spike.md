@@ -13,7 +13,7 @@ Two notes hold the source reading this note tests: `.planning/event-stream-repor
 - **Worker streams.** A direct `callTestRunnerSubprocess` call honoured the caller's `os.Inherit.out` and `os.Inherit.err`, and nothing reached the console. A shim `testFramework`'s `System.setOut` took effect before Mill's capture. `SystemStreamsUtils.withStreams` around `runTests()` captured nothing on the parallel path (§ 6).
 - **`testLogLevel = Error`** silenced ScalaTest's per-test lines but not its end-of-run summary (§ 7).
 - **Console.** Raw writes from the command broke Mill's prefixed lines even in redirected output under the daemon, and under `--no-daemon` too in MinTTY without its pseudo-console. In a pseudo-terminal, Mill's prompt was live and overwrote most raw lines, leaving stale copies of itself in the scrollback. That held on Linux, under a Windows pseudo-console (ConPTY), and in Git Bash's MinTTY, whose default gives Windows programs a pseudo-console. `Task.log` writes were prefixed `1] ` and intact, apart from one line erased or missing in some Windows runs. On every terminal, Mill itself sometimes merged a worker's stdout and stderr lines (§ 8).
-- **MinTTY without its pseudo-console** (`MSYS=disable_pcon`): Mill printed no prompt (*inference:* it saw no terminal), so every raw line with a line per event was shown (§ 8.4).
+- **MinTTY without its pseudo-console** (`MSYS=disable_pcon`): Mill printed no prompt (*inference:* it saw no terminal), so every raw line of the line-per-event case was shown (§ 8.4).
 - **`./mill` in Git Bash** stopped with "This native mill launcher supports only Linux and macOS." With `MILL_VERSION=1.1.10-jvm` it ran, with the same results as `mill.bat` (§ 1, § 2, § 8.4).
 - **Ctrl-C** ended the Mill command at once on Linux, under ConPTY and in MinTTY, under the daemon and `--no-daemon`. The command body never regained control, and 20 s later no test-worker JVM or daemon was running (§ 8.3).
 - **Not run:** macOS; Scala.js and Native (§ 10).
@@ -60,7 +60,7 @@ The prototype is on branch `prototype/emitter-plugin-spike`, in `.planning/event
 
 - **Windows, Git Bash MinTTY** (`run-mintty.sh`, run from Git Bash):
   - Each case started a hidden 160 by 40 MinTTY window with `mintty -w hide -s 160,40 --log <file> -e /usr/bin/bash -lc 'cd <prototype> && MILL_VERSION=1.1.10-jvm … ./mill …'`, then rendered MinTTY's log with `pyte` (`render-pyte.py`), counting as for ConPTY. Without `MILL_VERSION=1.1.10-jvm`, `./mill` stopped with "This native mill launcher supports only Linux and macOS." It covered the pseudo-terminal cases above, first with the user's default MSYS settings and then with `MSYS=disable_pcon`.
-  - Which one a Windows program gets was checked first, with `mintty-probe/probe.sh` in the same kind of window: under the default, `MSYS` was empty, PowerShell reported `[Console]::IsOutputRedirected` as `False` and a window width of 160, and Java's `System.console()` was not null. With `MSYS=disable_pcon`, PowerShell's console call failed with "The handle is invalid." and `System.console()` was null. *Inference:* MSYS runtime `3.6.6` gives Windows programs a pseudo-console by default.
+  - Whether a Windows program gets a pseudo-console was checked first, with `mintty-probe/probe.sh` in the same kind of window: under the default, `MSYS` was empty, PowerShell reported `[Console]::IsOutputRedirected` as `False` and a window width of 160, and Java's `System.console()` was not null. With `MSYS=disable_pcon`, PowerShell's console call failed with "The handle is invalid." and `System.console()` was null. *Inference:* MSYS runtime `3.6.6` gives Windows programs a pseudo-console by default.
   - The five-module command of § 2 also ran once under `./mill` from Git Bash, with output redirected to files.
   - For Ctrl-C (`mintty-ctrl-c.py`), `WM_CHAR` with character `0x03` was posted to the hidden MinTTY window 3 s after the first worker connected, the path MinTTY's own keyboard handling takes for a typed Ctrl-C. It is not a hardware keypress. The same process listing as for ConPTY followed.
 
@@ -178,7 +178,13 @@ Each cell gives the command lines shown intact out of those written, then the st
 - **Raw.** The prompt's next redraw moved the cursor up by the prompt's height from below the command's lines, so it overwrote them and left the upper part of the previous prompt in the scrollback. Lines written after `execute` returned were all intact.
 - **Log.** Lines were prefixed `1] `, and the prompt was cleared and redrawn around them as it was around the workers' lines. On Windows the ConPTY cases ran twice. In two of the four runs with a line per event, one line was erased: the pseudo-console's output held the line followed by a carriage return, `ESC[0K` and another carriage return. The line was `SPIKE body-start` in one run and `SPIKE nested execute values` in the other. It did not happen on Linux.
 - **Log with `\r`.** Each update reached the terminal as a prefixed segment ending in a carriage return, so the next line written, the workers' included, overwrote it. *Inference:* the counts under `\r` rewrite include updates that the design itself overwrites.
-- **Mill's own lines.** Mill itself occasionally merged two worker lines: two prefixes on one line, followed by one of a worker's stdout and stderr lines, with the other on the next line, for example `319-0-0]319-0-0] MARK-ERR A1 t1` followed by ` MARK-OUT A1 t1 pid=…`. It happened in every Linux recording, 2 to 13 times each, and in every Windows recording of the cases above: 8 to 19 times under ConPTY, 3 to 12 under MinTTY's default and 2 to 9 under `MSYS=disable_pcon` (§ 8.4). No Windows Ctrl-C recording held one. Output redirected to files, stdout and stderr apart, cannot show it. *Inference:* this is stdout and stderr lines of one worker interleaving where both reach one terminal, independent of the command's writes.
+- **Mill's own lines.** Mill itself occasionally merged two worker lines: two prefixes on one line, followed by one of a worker's stdout and stderr lines, with the other on the next line, for example `319-0-0]319-0-0] MARK-ERR A1 t1` followed by ` MARK-OUT A1 t1 pid=…`. It happened in every recording of the cases above, per recording:
+  - Linux: 2 to 13 times.
+  - ConPTY: 8 to 19 times.
+  - MinTTY's default: 3 to 12 times.
+  - MinTTY under `MSYS=disable_pcon`: 2 to 9 times (§ 8.4).
+
+  No Windows Ctrl-C recording held one. Output redirected to files, stdout and stderr apart, cannot show it. *Inference:* this is stdout and stderr lines of one worker interleaving where both reach one terminal, independent of the command's writes.
 
 ### 8.3 Ctrl-C
 
@@ -213,10 +219,16 @@ Each cell gives the command lines shown intact out of those written, then the st
 
 - anything on macOS, or on Scala.js or Native;
 - a terminal emulator's own rendering: the pseudo-terminal output was rendered by `pyte` on Windows and by `render-pty.py` on Linux, not by Windows Terminal, conhost, MinTTY's own window or a Linux terminal emulator. MinTTY's `--log` records the bytes it received, not what it drew;
-- Ctrl-C as a hardware keypress in MinTTY: it was delivered as a posted `WM_CHAR`; Ctrl-C with `MSYS=disable_pcon`; Ctrl-C answered `Y` at `cmd.exe`'s prompt;
+- Ctrl-C in these cases:
+  - as a hardware keypress in MinTTY: it was delivered as a posted `WM_CHAR`;
+  - in MinTTY with `MSYS=disable_pcon`;
+  - answered `Y` at `cmd.exe`'s prompt;
 - why a `Task.log` line was erased under ConPTY and never reached MinTTY's log (§ 8.2, § 8.4);
 - a killed worker that had further classes queued, and a reader that was not paused when an external kill came;
-- whether two atomic moves of one file both succeed on Windows, which the inference in § 2 rests on; why a class ran twice in every `--no-daemon` run and in only some daemon runs; and whether it happens on macOS (§ 2);
+- the class run twice (§ 2):
+  - whether two atomic moves of one file both succeed on Windows, which the inference rests on;
+  - why it happened in every `--no-daemon` run and in only some daemon runs;
+  - whether it happens on macOS;
 - whether the Windows reset depends on the JDK's socket implementation or on the reader pausing for the lengths used here;
 - a command line holding the plugin together with other non-test goals, and `--watch`;
 - `.planning/event-stream-reporting/SPECIFICATION.md` R-040 for the whole of a module's run under the plugin: the spike ran `testForked` unchanged, so worker output reached the console in every `spike.test` run;
