@@ -15,8 +15,12 @@ Other notes hold facts this one relies on and does not repeat:
 ## Short answer
 
 - **Worker stdout and stderr are two pipes, not inherited descriptors and not files.** Mill spawns each `MillTestRunnerMain` JVM with `os.Inherit` for both, and inside a non-exclusive Mill task `os.Inherit` resolves to a pipe that a Mill thread pumps into the task's logger streams (§ 1.1–1.3). A stream that is the process's original stream is inherited instead (§ 1.3). An exclusive command runs with `exclusiveSystemStreams` (`MCL` § 4.2); whether a worker spawned under them is piped or inherits under `--no-daemon` was not determined (§ 6).
-- **Mill line-buffers and prefixes that output on its way to the console, and tees it unprefixed to a log file.** On the parallel path the file is per worker, `Task.dest[/<group>]/worker-<i>.log`, holding stdout and stderr together and, under Mill's own `testForked`, Mill's ticker lines too (§ 1.4–1.5; `MPC` § 3).
-- **Of the routes examined, plugin code in Mill's process can take the raw streams only by calling `TestModuleUtil` itself.** A `testTask` override that calls `super.testTask` cannot. A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. A direct `runTests()` call does so on its non-parallel path. On its parallel path it does so when given a plugin-built `TaskCtx` whose `fork.async` sets them inside the body (`MPC` § 2–4); a plugin-supplied `log` cannot be built from build code. Inside the worker, a shim `testFramework` can replace `System.out` and `System.err` before Mill's runner captures `System.out` (§ 2). The sequential-path `runTests()` claim is an *inference*; the others were observed (`EPS` § 6; `MPC` § 3–4).
+- **Mill line-buffers and prefixes that output on its way to the console, and tees it unprefixed to a log file.** On the parallel path the file is per worker, `Task.dest[/<group>]/worker-<i>.log`, holding stdout and stderr together, and under Mill's own `testForked` Mill's ticker lines too (§ 1.4–1.5; `MPC` § 3).
+- **Of the routes examined, plugin code in Mill's process can take the raw streams only by calling `TestModuleUtil` itself** (§ 2):
+  - A `testTask` override that calls `super.testTask` cannot.
+  - A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. Observed (`EPS` § 6).
+  - A direct `runTests()` call does so on its sequential path, an *inference*. On its parallel path it does so when given a plugin-built `TaskCtx` whose `fork.async` sets them inside the body, observed (`MPC` § 2–4); a plugin-supplied `log` cannot be built from build code.
+  - Inside the worker, a shim `testFramework` can replace `System.out` and `System.err` before Mill's runner captures `System.out`. Observed (`EPS` § 6).
 - **Sandbox file.** Found by a relative path, only while `testSandboxWorkingDir` is on. It sits under `Task.dest`, where Mill itself polls two files every 10 ms. On Windows, whether it can be read while the worker appends to it depends on the share mode of the worker's writer (§ 3.1). The discovery runner resolves the same relative path against Mill's own working directory (§ 3.1).
 - **Socket.** Found through an address in the arguments, environment or system properties, which are the same for every worker. Mill is not involved in the transport. The discovery runner receives the same address (§ 3.2).
 - **Stdout.** Needs no discovery. It shares one pipe with test output, Mill's own runner lines and the `done()` string. The discovery runner's `System.out` is not a worker pipe (§ 3.3).
@@ -87,7 +91,7 @@ Which streams the pumps write to depends on the path through `runTestFuture` (TM
 - A `MultiLogger`'s `out` writes each byte array to both loggers' `out`, and likewise `err` (`INT/MultiLogger.scala` lines 13–17; `INT/MultiStream.scala` lines 3–25).
 - A `FileLogger` uses one file stream for both `out` and `err`, writes bytes unchanged, opens the file on first write, and truncates it (`INT/FileLogger.scala` lines 8–45).
 
-So on the parallel path Mill already writes each worker's stdout and stderr, unprefixed and merged, to one per-worker file under `Task.dest`. Under Mill's own `testForked` that file also holds Mill's ticker lines, which `MultiLogger.ticker` passes to the `FileLogger` (`MPC` § 3). *Inference:* the two streams are merged in the order the two pumper threads deliver their chunks. On the sequential path the same bytes go to the test task's log file, with anything else the task prints.
+So on the parallel path Mill already writes each worker's stdout and stderr, unprefixed and merged, to one per-worker file under `Task.dest`. *Inference:* the two streams are merged in the order the two pumper threads deliver their chunks. Under Mill's own `testForked` that file also holds Mill's ticker lines, which `MultiLogger.ticker` passes to the `FileLogger` (`MPC` § 3). On the sequential path the same bytes go to the test task's log file, with anything else the task prints.
 
 ### 1.5 What Mill does to the bytes before the console
 
@@ -121,7 +125,7 @@ Besides what tests and ScalaTest write:
 
 - **Sequential path.** The spawn happens on the thread that called `runTests()` (TMU line 307). *Inference:* a plugin that wraps the call in `os.Inherit.out.withValue(...)` and `os.Inherit.err.withValue(...)` supplies the `os.ProcessOutput` that reads the worker's pipes, and Mill's pump to the logger streams is not created.
 - **Parallel path.** Each worker is spawned inside `Task.fork.async`, which calls `withStreams(logger.streams)` on a pool thread (EC lines 129–137) and so sets `os.Inherit.out` and `os.Inherit.err` again (SSU lines 47–49). The caller's values are not seen. The logger is built from `ctx.log` of the `TaskCtx` given to `TestModuleUtil` (TMU lines 54, 200; EC lines 112–116).
-  - A plugin can pass `TestModuleUtil` a `TaskCtx` of its own (`MPC` § 2.2). One whose `fork.async` sets `os.Inherit.out` and `os.Inherit.err` inside the body took every worker's raw streams, observed (`MPC` § 3–4).
+  - A plugin can pass `TestModuleUtil` a `TaskCtx` of its own (`MPC` § 2.2). Observed: one whose `fork.async` sets `os.Inherit.out` and `os.Inherit.err` inside the body took every worker's raw streams (`MPC` § 3–4).
   - Under that `TaskCtx`, `worker-<i>.log` of § 1.4 was still written but held only Mill's ticker lines (`MPC` § 3).
   - A plugin-supplied `log` cannot be built from build code: `Logger.prompt` is `private[mill]` (`MPC` § 2.2).
 
