@@ -2,16 +2,16 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
-## The consolidation library's API is private to one release of this fork.
+## The consolidation library's API carries no compatibility promise across releases and is not for callers outside this fork.
 
 **Alternatives**
 
-- A public API with a compatibility promise, checked by MiMa as `SPECIFICATION.md` R-004 checks the fork, makes the event-stream type a second public contract beside the JSON output, needing its own specification and compatibility policy, for callers the goal does not name.
-- A documented API marked experimental invites outside callers while giving them nothing more to rely on than a private one.
+- A public API with a compatibility promise, checked by MiMa as `SPECIFICATION.md` R-004 checks the fork, serves callers the goal does not name.
+- A documented API marked experimental invites outside callers but gives them no more to rely on.
 
-**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a channel outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release; any later front end in this fork ships likewise. The epic then has one public contract, the JSON output, as structured test reporting does (`../structured-test-reporting/SPECIFICATION.md` § Scope § Out of scope).
+**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a channel outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release; any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, as in structured test reporting (`../structured-test-reporting/SPECIFICATION.md` § Scope § Out of scope).
 
-**Costs** A third party that builds on the library, such as another build tool's plugin, may break on any release of the fork. Usable without Mill (`SPECIFICATION.md` R-023) means only that the library does not depend on Mill.
+**Costs** A third party that builds on the library, such as another build tool's plugin, may break on any release of the fork.
 
 **Settled by** [Is the consolidation library's event-stream input a public API, and under what compatibility promise?](https://github.com/jamesgorman2/scalatest/issues/46).
 
@@ -53,7 +53,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **Costs**
 
 - A test module on another release of the fork fails the test command (`SPECIFICATION.md` R-059).
-- The Mill plugin reads one fork release and may need a release for each Mill release, so it needs a release for each pairing of fork release and Mill release that it supports.
+- The Mill plugin needs a release for each pairing of fork release and Mill release that it supports.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 
@@ -244,7 +244,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives** Designing the test structure and the JSON, human-readable and progress output afresh frees this epic from choices shaped by reporting inside one run, but the two epics' outcomes would then differ in ways their architectures do not force.
 
-**Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Holding the reported behaviour common leaves one difference to compare: reporting inside each run, or in a plugin reading every run's channel. Of what is reused, only the JSON layout of `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object is designed in depth (`SPECIFICATION.md` R-028).
+**Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Holding the reported behaviour common leaves one difference to compare: reporting inside each run, or in a plugin reading every run's channel. Of what is reused, only the JSON layout, key names included, is designed in depth, so this epic takes it whole (`SPECIFICATION.md` R-028).
 
 **Costs** A flaw found in the reused documents, which this plan may not edit, is carried here as a stated difference. Because each JSON node holds its final state, a tool that reads only the JSON cannot recover the order of events across nodes.
 
