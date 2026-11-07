@@ -73,7 +73,7 @@ Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
 **Event stream**:
-One run's events, test structure and test output, in the order the run produced them, apart from how they are carried.
+One run's events, test structure and test output, in the order the run produced them, independent of how they are carried.
 _Avoid_: Event log, event feed
 
 **Channel**:

@@ -4,9 +4,9 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ## The consolidation library takes each run's event stream, not its channel.
 
-**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and a recorded channel outside Mill needs a supported way to turn the emitter on there, which is new public surface on `Runner` and the `Framework` under `SPECIFICATION.md` R-001 and R-004.
+**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and recording a channel outside Mill needs a supported way to turn the emitter on there: new public surface on `Runner` and the `Framework`, bound by `SPECIFICATION.md` R-001 and R-004.
 
-**Reasoning** Separating decoding from consolidation lets any front end, live under Mill or reading files, feed the same library, so whether a channel is live or recorded never reaches it.
+**Reasoning** Separating decoding from consolidation lets any front end, live under Mill or reading files, feed the same library, so the library never knows whether a channel was live or recorded.
 
 **Costs** Every front end must turn channels into event streams. This epic gives no way outside Mill to produce a channel, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
 
@@ -31,14 +31,14 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ## A channel is read only by the release of this fork that wrote it.
 
-**Alternatives** A private format versioned and read across releases lets one plugin read test modules on several releases of the fork, but each reader must keep decoding every older format, a compatibility burden the goal names no need for.
+**Alternatives** A private format versioned across releases lets one plugin read test modules on several releases of the fork, but each reader must keep decoding every older format, which the goal does not need.
 
 **Reasoning** The emitter and its reader ship in the same release, so the format can change in any release without any reader decoding more than one.
 
 **Costs**
 
 - A test module on another release of the fork fails the test command (`SPECIFICATION.md` R-059).
-- The Mill plugin reads one fork release and may need a release for each Mill release, so it needs a release for each pairing of the two that it supports.
+- The Mill plugin reads one fork release and may need a release for each Mill release, so it needs a release for each pairing of fork release and Mill release that it supports.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 
