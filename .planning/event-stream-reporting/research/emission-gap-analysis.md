@@ -136,7 +136,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 4. Outcome
 
-**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run node when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`STR` § Test structure, Outcomes; `TD` § Nodes, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`RJ` R-006; `ESR` R-011).
+**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run node when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`STR` § Test structure, Outcomes; `TD` § Nodes, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`RJ` R-006, which `ESR` R-011 and R-028 take).
 
 **In memory and `toJson`.**
 
@@ -146,7 +146,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 - **Run outcome.** The JVM `Framework` sends `RunCompleted` in `done()` and forwards a fork's `RunAborted` and `RunStopped` (`TOOLS/Framework.scala` lines 794, 921–924, 941). Scala.js and Native send no run-level event (`EMC` § 5). **Provided** on the JVM; **absent** on Scala.js and Native.
 - **Reasons.** No event has a reason field; `ADR` § An aborted node may carry an explicit reason holds it in the structure, never in an `Event`. **Absent.**
 - **Throwable.** The event holds the `Throwable` itself. Of it, `toJson` keeps class, message and stack, which are **provided**, and drops the cause chain and suppressed exceptions, which are **lost** (`EMC` § 1.1). Also lost is a `StackDepthException`'s `failedCodeFilePathname`, which `TD` § Throwables needs as `filePath`.
-- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The baseline keeps neither (`RJ` R-004); `ESR` R-011 covers both.
+- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The baseline keeps neither (`RJ` R-004), and the channel does not carry the payload (`ESR` § Out of scope).
 
 ## 5. Duration
 
