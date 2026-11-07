@@ -101,7 +101,7 @@ A channel's format, the consolidation library's API and the switch by which the 
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
 - R-058 The consolidated output shows each selected test module whose tests did not run as not run. For a module whose tests could not start, it also shows the failure that stopped it.
-- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module. For example, such a module tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork.
+- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork.
 
 WHERE `--halt-on-failure` is given:
 
@@ -109,7 +109,7 @@ WHERE `--halt-on-failure` is given:
 
 ## Consolidation
 
-- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output. Any combination of them can be on together, progress output with JSON output included, unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output.
+- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output. Any combination can be on together, including progress output with JSON output, unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
 - R-027 The human-readable and JSON output are written together, once every run has completed or has ended without completing.
 - R-028 The JSON output is one object for the test command. Its root wraps each run's test structure in the layout that `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object and `../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` § APIs give one run, key names included, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them.
