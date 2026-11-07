@@ -2,6 +2,45 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## The consolidation library takes each run's event stream, not its channel, and writes to destinations its caller supplies.
+
+**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and a recorded channel outside Mill needs a way to turn the emitter on there, which is new public surface on `Runner` and the `Framework` under `SPECIFICATION.md` R-001 and R-004.
+
+**Reasoning** Separating decoding from consolidation lets any front end, live under Mill or reading files, feed the same library, so whether a channel is live or recorded never reaches it. A command-line front end could, for example, parse recorded channel files in parallel and feed the library.
+
+**Costs** Every front end must turn channels into event streams. This epic gives no way outside Mill to produce a channel, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
+
+**Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
+
+---
+
+## A channel carries what the consolidated output shows or uses, not the whole event.
+
+**Alternatives**
+
+- Carrying the payload as its `toString` sends unbounded text that no output reads.
+- Carrying the whole event, with the payload kept where serialisable, needs a rule for each runtime because Scala.js and Native have no general serialisation, and nothing reads the payload.
+
+**Reasoning** The emitter then makes no judgement at runtime about what can be sent (`SPECIFICATION.md` R-011, R-063, R-064). Because the channel's format is private, a later epic that needs the payload can add it without breaking a reader.
+
+**Costs** Payloads and the fields of custom exceptions reach no output until an epic adds them.
+
+**Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
+
+---
+
+## The channel's format is private to one release of this fork.
+
+**Alternatives** A documented format that third parties may read is a second public contract beside the JSON output (`SPECIFICATION.md` R-028), needing its own specification and compatibility policy, and the goal names no reader for it.
+
+**Reasoning** The JSON output stays the documented contract for tools, so the channel serves only this fork's own reader. Because the emitter and that reader ship in the same release, the format can change in any release.
+
+**Costs** No live consumer other than this fork's own can read a channel, and a test module on another version of the fork fails the test command (`SPECIFICATION.md` R-059).
+
+**Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
+
+---
+
 ## Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged.
 
 **Alternatives**
