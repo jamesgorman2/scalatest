@@ -2,11 +2,26 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## The consolidation library's API is private to one release of this fork.
+
+**Alternatives**
+
+- A public API with a compatibility promise, checked by MiMa as `SPECIFICATION.md` R-004 checks the fork, makes the event-stream type a second public contract beside the JSON output, needing its own specification and compatibility policy, for callers the goal does not name.
+- A documented API marked experimental invites outside callers while giving them nothing more to rely on than a private one.
+
+**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a channel outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release; any later front end in this fork ships likewise. The epic then has one public contract, the JSON output, as structured test reporting does (`../structured-test-reporting/SPECIFICATION.md` § Scope § Out of scope).
+
+**Costs** A third party that builds on the library, such as another build tool's plugin, may break on any release of the fork. Usable without Mill (`SPECIFICATION.md` R-023) means only that the library does not depend on Mill.
+
+**Settled by** [Is the consolidation library's event-stream input a public API, and under what compatibility promise?](https://github.com/jamesgorman2/scalatest/issues/46).
+
+---
+
 ## The consolidation library takes each run's event stream, not its channel.
 
 **Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and recording a channel outside Mill needs a supported way to turn the emitter on there: new public surface on `Runner` and the `Framework`, bound by `SPECIFICATION.md` R-001 and R-004.
 
-**Reasoning** Separating decoding from consolidation lets any front end, live under Mill or reading files, feed the same library, so the library never knows whether a channel was live or recorded.
+**Reasoning** Separating decoding from consolidation lets any front end in this fork, live under Mill or reading files, feed the same library, so the library never knows whether a channel was live or recorded.
 
 **Costs** Every front end must turn channels into event streams. This epic gives no way outside Mill to produce a channel, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
 
