@@ -38,7 +38,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Mill's test task starts each module's tests on its own compile, and a user who runs the test command in place of that task expects the output to change and nothing else (`SPECIFICATION.md` R-056).
 
-**Costs** Of the routes examined, only one also runs every selected module without `--keep-going`. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`research/mill-nested-keep-going.md` § 3, § 5).
+**Costs** Of the routes examined, only one both starts each module's tests on its own compile and runs every selected module without `--keep-going`. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`research/mill-nested-keep-going.md` § 3, § 5).
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
