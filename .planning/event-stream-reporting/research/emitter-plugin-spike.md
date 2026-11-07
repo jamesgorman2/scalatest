@@ -12,8 +12,10 @@ Two notes hold the source reading this note tests: `.planning/event-stream-repor
 - **Selectors.** Separate arguments reached the command; Mill consumed `+` before it (§ 5).
 - **Worker streams.** A direct `callTestRunnerSubprocess` call honoured the caller's `os.Inherit.out` and `os.Inherit.err`, and nothing reached the console. A shim `testFramework`'s `System.setOut` took effect before Mill's capture. `SystemStreamsUtils.withStreams` around `runTests()` captured nothing on the parallel path (§ 6).
 - **`testLogLevel = Error`** silenced ScalaTest's per-test lines but not its end-of-run summary (§ 7).
-- **Console.** Raw writes from the command broke Mill's prefixed lines even in redirected output under the daemon. In a pseudo-terminal, on Windows (ConPTY) and Linux, Mill's prompt was live: it overwrote most raw lines and left stale copies of itself in the scrollback. `Task.log` writes were prefixed `1] ` and intact, apart from one line in two of the four Windows runs (§ 8).
-- **Ctrl-C** ended the Mill command at once on both platforms, under the daemon and `--no-daemon`. The command body never regained control, and 20 s later no test-worker JVM or daemon was running (§ 8.3).
+- **Console.** Raw writes from the command broke Mill's prefixed lines even in redirected output under the daemon. In a pseudo-terminal, Mill's prompt was live and overwrote most raw lines, leaving stale copies of itself in the scrollback. That held on Linux, under a Windows pseudo-console (ConPTY), and in Git Bash's MinTTY, whose default gives Windows programs a pseudo-console. `Task.log` writes were prefixed `1] ` and intact, apart from one erased line in some Windows runs (§ 8).
+- **MinTTY without its pseudo-console** (`MSYS=disable_pcon`): Mill saw no terminal and printed no prompt, so every raw line with a line per event was shown (§ 8.4).
+- **`./mill` in Git Bash** stopped with "This native mill launcher supports only Linux and macOS." With `MILL_VERSION=1.1.10-jvm` it ran, with the same results as `mill.bat` (§ 2, § 8.4).
+- **Ctrl-C** ended the Mill command at once on Linux, under ConPTY and in MinTTY, under the daemon and `--no-daemon`. The command body never regained control, and 20 s later no test-worker JVM or daemon was running (§ 8.3).
 - **Not run:** macOS; Scala.js and Native (§ 10).
 
 ## 1. What was run
@@ -56,13 +58,19 @@ The prototype is on branch `prototype/emitter-plugin-spike`, in `.planning/event
   - Each `mill.bat` command ran as `cmd /c .\mill.bat …` in the pseudo-console. The script saved what the pseudo-console emitted, rendered it, scrollback included, with `pyte`, and compared the result with every line the command wrote, which the plugin also appends to `console.txt` in its `Task.dest`. A written line counts as shown when its characters, spaces aside, appear in order in the rendering, so that a line the terminal wrapped still counts.
   - For Ctrl-C it wrote `\x03` to the pseudo-console 8 s in. When `cmd.exe` then asked "Terminate batch job (Y/N)?", it answered `N`. It listed `java.exe` processes whose command line names `MillTestRunnerMain` or `MillDaemonMain` once the client had exited, and again 20 s later.
 
+- **Windows, Git Bash MinTTY** (`run-mintty.sh`, run from Git Bash):
+  - Each case started a hidden 160 by 40 MinTTY window with `mintty -w hide -s 160,40 --log <file> -e /usr/bin/bash -lc 'cd <prototype> && MILL_VERSION=1.1.10-jvm … ./mill …'`, then rendered MinTTY's log with `pyte` (`render-pyte.py`), counting as for ConPTY. It covered the pseudo-terminal cases above, first with the user's default MSYS settings and then with `MSYS=disable_pcon`.
+  - Which one a Windows program gets was checked first, with `mintty-probe/probe.sh` in the same kind of window: under the default, `MSYS` was empty, PowerShell reported `[Console]::IsOutputRedirected` as `False` and a window width of 160, and Java's `System.console()` was not null. With `MSYS=disable_pcon`, PowerShell's console call failed with "The handle is invalid." and `System.console()` was null. *Inference:* MSYS runtime `3.6.6` gives Windows programs a pseudo-console by default.
+  - The five-module command of § 2 also ran once under `./mill` from Git Bash, with output redirected to files.
+  - For Ctrl-C (`mintty-ctrl-c.py`), `WM_CHAR` with character `0x03` was posted to the hidden MinTTY window 3 s after the first worker connected, the path MinTTY's own keyboard handling takes for a typed Ctrl-C. It is not a hardware keypress. The same process listing as for ConPTY followed.
+
 The matrix ran twice on each platform; the counts below are from the second round, whose outputs were kept. The first round showed the same behaviour, with different counts.
 
 Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`.
 
 | Platform | JDK |
 |---|---|
-| Windows 11 (`10.0.22631`), x86-64 | Microsoft OpenJDK `21.0.12.1` |
+| Windows 11 (`10.0.22631`), x86-64 | Microsoft OpenJDK `21.0.12.1`; Git for Windows with MSYS runtime `3.6.6` and its MinTTY |
 | Ubuntu 26.04 under WSL 2, x86-64 | Azul Zulu `21.0.10`, fetched by Mill |
 
 ## 2. The command's lifetime, results and exit status
@@ -83,12 +91,29 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`.
 - **What Mill printed for the nested tasks.** Without `--keep-going`, nothing: no list of failed tests and no task failure. With it, `"<task> task failed"` for `broken.test.compile`, `beta.test.testForked` and `crash.test.testForked`, and `"spike.test task failed"`. In both, the command's own failure message followed Mill's final status line.
 - **Exit status.** 0 for `spike.test alpha.test`; 1 for every run with a failing module, with and without `--keep-going`.
 - **A failing sibling goal.** `beta.test + spike.test alpha.test` without `--keep-going`: the command's body did not run, and the exit status was 1. With `--keep-going` the body ran, `alpha.test` passed, and the exit status was 1 from `beta.test`.
+- **`./mill` from Git Bash.** The five-module command, under the daemon with `MILL_VERSION=1.1.10-jvm`, gave the same task results, fail-fast skips, Mill output and exit status 1 as the redirected `mill.bat` run without `--keep-going` (`daemon-all`). That included `beta.BetaFail` running twice, as it had in that run (next item). Its crash connections followed the Windows pattern of § 4: each ended in `Connection reset`, with 20 000 (`HaltSuite`), 4 (`HaltLaggingSuite`) and 1 (`KillSuite`) of 20 000 burst lines received.
 - **A class run twice.** On Windows, in 9 of the 23 runs in which a module ran several workers, two workers of one fork group each ran the same first class:
   - 3 of the 13 runs with output redirected (`daemon-all`, `nodaemon-console-raw`, `nodaemon-console-log`);
   - 5 of the 8 ConPTY runs (`conpty-daemon-raw-lines` and the four `conpty-nodaemon-*` runs);
   - 1 of the 2 Ctrl-C runs (`conpty-ctrl-c-nodaemon`).
 
+  Under MinTTY it happened in all 8 `--no-daemon` runs, in none of the 8 daemon runs, and in both Ctrl-C runs. It also happened in the Git Bash `./mill` run of the five modules.
+
   Mill logged `Running Test Class` twice for `alpha.A1`, `alpha.A3` and `beta.BetaFail`, or for `slow.S1` in the Ctrl-C run, and the plugin received their events twice. Where `beta.test` ran, its failure read "2 tests failed: beta.BetaFail fails / beta.BetaFail fails". It also happened in a trial run before the matrix. It did not happen on Linux.
+
+  **Without the plugin.** `run-dup.sh` ran `alpha.test.testForked + beta.test.testForked`, and for comparison `spike.test alpha.test beta.test`, 8 times each under `--no-daemon` with output redirected. It ran each from Git Bash with `MILL_VERSION=1.1.10-jvm ./mill` and through `cmd /c mill.bat`. A class ran twice in every one of the 32 runs:
+
+  | Command | Git Bash `./mill` | `cmd /c mill.bat` |
+  |---|---|---|
+  | Mill's own `testForked`, no exclusive command | 8 of 8 | 8 of 8 |
+  | `spike.test` | 8 of 8 | 8 of 8 |
+
+  **The worker folders** under `out/<module>/test/testForked.dest/`, kept after every run:
+  - In 94 of the 96 fork groups, both workers' `claim.log` began with `CLAIM` of the same class. That class's file was in only one of the two workers' `claim/` folders. The other worker's `claim/` folder held none of the classes it ran first.
+  - That shared first class was the one that ran twice: `alpha.A1`, `alpha.A3` and `beta.BetaFail` in 31 or 32 of the runs. In 2 runs a class claimed later from the queue also ran twice (`beta.BetaOk` once, `alpha.A2` once).
+  - Mill's process claims each worker's first class before it spawns the worker, from that worker's thread (`TestModuleUtil.runTestFuture`, `startingTestClass`), through `TestRunnerUtils.claimFile`. `claimFile` treats an `os.move(…, atomicMove = true)` that does not throw as a claim.
+
+  *Inference:* on Windows, two concurrent atomic moves of one queue file to two workers' `claim/` folders both returned without throwing, so both workers took the class as claimed while only one move placed the file.
 
 ## 3. Events from every worker, live
 
@@ -160,7 +185,23 @@ Each cell gives the command lines shown intact out of those written, then the st
 - **Linux, under the daemon.** The terminal showed nothing more after Ctrl-C: no `execute-returned`, summary or `body-end` line. The client exited with status 130.
 - **Linux, under `--no-daemon`.** The readers printed end of stream for both workers, with `TestStarting` as each connection's last event, and the command printed the progress lines those ends triggered, then nothing more; status 130.
 - **Windows, both modes.** `cmd.exe` asked "Terminate batch job (Y/N)?", and the client had exited 0.1 s after Ctrl-C, with status `0xC000013A`. Both readers recorded `Connection reset` with `TestStarting` as the last event. Those connection-end lines and the progress lines they triggered were the last the command wrote; it never wrote `execute-returned` or `body-end`.
-- **Afterwards.** On both platforms, in both modes, no test-worker JVM and no `mill.daemon.MillDaemonMain` process was running 20 s after Ctrl-C. On Windows none was running right after the client exited either.
+- **MinTTY, both modes.** After `WM_CHAR` `0x03`, the MinTTY window closed 0.2 s (daemon) and 0.6 s (`--no-daemon`) later. `bash` did not reach its `echo` of the exit status. Both readers recorded `Connection reset` with `TestStarting` as the last event, and as under ConPTY the command wrote nothing after the connection-end lines and the progress lines they triggered.
+- **Afterwards.** On every platform and terminal, in both modes, no test-worker JVM and no `mill.daemon.MillDaemonMain` process was running 20 s after Ctrl-C. On Windows none was running right after the client exited either.
+
+### 8.4 Git Bash MinTTY
+
+`./mill` with `MILL_VERSION=1.1.10-jvm`, `spike.test alpha.test beta.test`, counted as in § 8.2:
+
+| Case | Default, daemon | Default, `--no-daemon` | `disable_pcon`, daemon | `disable_pcon`, `--no-daemon` |
+|---|---|---|---|---|
+| raw, a line per event | 22 of 78 intact; 40 stale | 32 of 92; 44 | 77 of 77; 0 | 92 of 92; 0 |
+| log, a line per event | 77 of 78; 0 | 92 of 92; 0 | 76 of 76; 0 | 92 of 92; 0 |
+| raw, `\r` rewrite | 22 of 78; 21 | 37 of 96; 18 | 56 of 77; 0 | 67 of 91; 0 |
+| log, `\r` rewrite | 40 of 77; 0 | 42 of 92; 0 | 43 of 78; 0 | 42 of 96; 0 |
+
+- **Default.** Mill's prompt was live in every run, and the raw and log cases behaved as under ConPTY (§ 8.2). The log line not shown under the daemon was `SPIKE nested execute values`, rendered as a blank line, as in one ConPTY run.
+- **`MSYS=disable_pcon`.** Mill printed no prompt in any run. Its output was as with output redirected to files (§ 8.1): prefixed worker lines, then Mill's final status line. Lines were neither erased nor overwritten, except that a `\r` rewrite overwrites earlier updates by design. In the `--no-daemon` raw run with a line per event, three of the command's lines landed inside Mill's prefixed lines, as in § 8.1.
+- **The exit status** bash printed after `./mill` was 1 in every run whose end MinTTY's log recorded. In the first `disable_pcon` run the log ended at Mill's last line, without bash's line.
 
 ## 9. Against the source reading
 
@@ -170,11 +211,11 @@ Each cell gives the command lines shown intact out of those written, then the st
 ## 10. What was not run or not determined
 
 - anything on macOS, or on Scala.js or Native;
-- a terminal emulator's own rendering: the pseudo-terminal output was rendered by `pyte` on Windows and by `render-pty.py` on Linux, not by Windows Terminal, conhost or a Linux terminal emulator;
-- Ctrl-C answered `Y` at `cmd.exe`'s prompt;
-- why a `Task.log` line was erased under ConPTY (§ 8.2);
+- a terminal emulator's own rendering: the pseudo-terminal output was rendered by `pyte` on Windows and by `render-pty.py` on Linux, not by Windows Terminal, conhost, MinTTY's own window or a Linux terminal emulator. MinTTY's `--log` records the bytes it received, not what it drew;
+- Ctrl-C as a hardware keypress in MinTTY: it was delivered as a posted `WM_CHAR`; Ctrl-C with `MSYS=disable_pcon`; Ctrl-C answered `Y` at `cmd.exe`'s prompt;
+- why a `Task.log` line was erased under ConPTY and MinTTY (§ 8.2, § 8.4);
 - a killed worker that had further classes queued, and a reader that was not paused when an external kill came;
-- why a class ran on two workers on Windows (§ 2), and how often;
+- whether two atomic moves of one file both succeed on Windows, which the inference in § 2 rests on; why a class ran twice in every `--no-daemon` run and in only some daemon runs; and whether it happens on macOS (§ 2);
 - whether the Windows reset depends on the JDK's socket implementation or on the reader pausing for the lengths used here;
 - a command line holding the plugin together with other non-test goals, and `--watch`;
 - `.planning/event-stream-reporting/SPECIFICATION.md` R-040 for the whole of a module's run under the plugin: the spike ran `testForked` unchanged, so worker output reached the console in every `spike.test` run;
