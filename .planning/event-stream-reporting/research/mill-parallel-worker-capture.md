@@ -1,17 +1,17 @@
-# Taking a JVM worker's stdout and stderr under Mill's parallel test workers
+# Taking each JVM test worker's stdout and stderr when Mill runs tests in parallel
 
-What was observed when plugin code took each test-worker JVM's stdout and stderr while Mill ran a module's tests in several fork groups with `testParallelism` on, by two routes: a `TaskCtx` the plugin supplies to `TestModuleUtil.runTests()`, and plugin code driving `callTestRunnerSubprocess` and the test queue itself. Answers [Can the plugin take a JVM worker's stdout and stderr when Mill runs a module's tests in parallel workers?](https://github.com/jamesgorman2/scalatest/issues/42). Observations only; no design is chosen.
+What was observed when plugin code took each test-worker JVM's stdout and stderr while Mill ran a module's tests in several fork groups with `testParallelism` on. Two routes were run: a `TaskCtx` the plugin supplies to `TestModuleUtil.runTests()`, and plugin code driving `callTestRunnerSubprocess` and the test queue itself. Answers [Can the plugin take a JVM worker's stdout and stderr when Mill runs a module's tests in parallel workers?](https://github.com/jamesgorman2/scalatest/issues/42). Observations only; no design is chosen.
 
 Two notes hold what this one builds on and does not repeat: `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`, and `.planning/event-stream-reporting/research/emitter-plugin-spike.md`, cited as `EPS`.
 
 ## Short answer
 
-- **Route A, a `TaskCtx` the plugin supplies,** can be built. A `TaskCtx` that delegates every member to the task's own except `fork`, whose `async` calls Mill's own `fork.async` and sets `os.Inherit.out` and `os.Inherit.err` inside the body, did all three checks on Windows and Linux, under the daemon and `--no-daemon`:
-  1. No worker output reached the console in any of 24 runs, including Mill's runner lines, a child process's writes and a JVM warning (§ 3).
+- **Route A, a `TaskCtx` the plugin supplies,** can be built. A `TaskCtx` that delegates every member to the task's own except `fork`, whose `async` calls Mill's own `fork.async` and sets `os.Inherit.out` and `os.Inherit.err` inside the body, gave these results on Windows and Linux, under the daemon and `--no-daemon`:
+  1. No worker output, including Mill's runner lines, a child process's writes and a JVM warning, reached the console in any of its 24 runs (§ 3).
   2. The plugin received every worker's stdout and stderr, each in order, tied to its worker label and folder (§ 4).
-  3. Per fork group, the classes run, each worker's JVM arguments, environment and working directory, the exit status, the failure message, and the task's results and JUnit XML report as sets matched Mill's own `testForked`. The worker count matched except in one Linux run. On Windows, classes run on two workers in both, at different rates (§ 5).
+  3. Per fork group, these matched Mill's own `testForked`: the classes run; each worker's JVM arguments, environment and working directory; the exit status and failure message; and, as sets, the task's results and JUnit XML report. The worker count matched except in one Linux run. On Windows, a class sometimes ran on two workers under both, at different rates (§ 5).
 - **Route A with a plugin-supplied `log` instead** cannot be built from build code: the `Logger` it would need must define `prompt`, which is `private[mill]` (§ 2.2).
-- **Route B, the plugin driving the scheduler,** did the same three checks with the same results. Its worker count differed once on Windows, and under the daemon on Windows a class ran on two workers in 5 of 6 runs against 2 of 6 for `testForked` (§ 3–5). Most of its 100 lines of command mirror Mill's scheduling and reporting code, and it calls Mill's discovery through an internal API (§ 6).
+- **Route B, the plugin driving the scheduler,** gave the same results, except that its worker count differed in one Windows run, and under the daemon on Windows a class ran on two workers in 5 of 6 runs against 2 of 6 for `testForked` (§ 3–5). Most of its roughly 100 lines mirror Mill's scheduling and reporting code, and it calls Mill's discovery through an internal API (§ 6).
 - **Not run:** a pseudo-terminal, the sequential path, class globs, several modules in one exclusive command, a killed worker, macOS (§ 8).
 
 ## Sources
@@ -21,7 +21,7 @@ Two notes hold what this one builds on and does not repeat: `.planning/event-str
 | `[mill]` | <https://github.com/com-lihaoyi/mill> | tag `1.1.10` (`92d51b79bc2243fd2e82a022c924b03b822b2d7b`) |
 | `[spike]` | this repo, branch `prototype/emitter-plugin-spike`, `.planning/event-stream-reporting/prototype-emitter-plugin-spike/` | `639342e85` |
 
-A `[mill]` path `P` is at `https://github.com/com-lihaoyi/mill/blob/92d51b79bc2243fd2e82a022c924b03b822b2d7b/P`. Abbreviations, as in `MWC`, plus two:
+A `[mill]` path `P` is at `https://github.com/com-lihaoyi/mill/blob/92d51b79bc2243fd2e82a022c924b03b822b2d7b/P`. Abbreviations; `TCX` and `LOG` are new, the rest are as in `MWC`:
 
 - `TM` is `libs/javalib/src/mill/javalib/TestModule.scala`.
 - `TMU` is `libs/javalib/src/mill/javalib/TestModuleUtil.scala`.
@@ -34,14 +34,20 @@ A statement marked *inference* follows from the code read or the runs and was no
 
 ## 1. What was run
 
-- **The fixture,** `gamma.test`: ten ScalaTest suites `gamma.G01`–`G10` of three tests, in two fork groups of five (`testForkGrouping`), `testParallelism` on, run with `-j 3`. Mill then starts up to three workers per group, two at a time; each group's five classes are shared among two or three workers through the queue. `forkArgs` adds `-Xverify:none`.
+- **The fixture,** `gamma.test`: ten ScalaTest suites, `gamma.G01`–`G10`, of three tests each, in two fork groups of five (`testForkGrouping`), `testParallelism` on, run with `-j 3`. Mill then starts up to three workers per group, two at a time, and the queue shares each group's five classes among two or three workers. `forkArgs` adds `-Xverify:none`, so HotSpot writes `OpenJDK 64-Bit Server VM warning: Options -Xverify:none and -noverify were deprecated …` to descriptor 2 at start-up.
   - Each test writes ten lines to `System.out` and ten to `System.err`, each carrying the JVM's PID and a sequence number per stream (`SEQ-OUT pid=… n=…`, `SEQ-ERR …`).
-  - Each suite's first test starts a child process with `ProcessBuilder.inheritIO()` (`cmd.exe /c echo …` on Windows, `/bin/sh -c echo …` on Linux) that writes one line to each inherited descriptor (`CHILD-OUT`, `CHILD-ERR`). HotSpot writes `OpenJDK 64-Bit Server VM warning: Options -Xverify:none and -noverify were deprecated …` to descriptor 2 at start-up.
+  - Each suite's first test starts a child process with `ProcessBuilder.inheritIO()` (`cmd.exe /c echo …` on Windows, `/bin/sh -c echo …` on Linux) that writes one line to each inherited descriptor (`CHILD-OUT`, `CHILD-ERR`).
   - Each JVM writes `worker-info-<pid>.txt` in its working directory: `ProcessHandle.current().info()` (command, arguments, command line), `RuntimeMXBean.getInputArguments`, `System.getenv` and `user.dir`.
   - With `SPIKE_FAIL` in the environment, `gamma.G03` `t2` fails.
 - **Mill's own run,** `gamma.test.testForked`.
-- **Route A,** `gamma.test.routeCtx`. It builds the `TestModuleUtil` exactly as `TestModule.testTask` does for `testForked` (TM lines 312–341), but with `using` a `CaptureCtx`: every `TaskCtx` member delegates to the task's own `Task.ctx()` except `fork`, a `CaptureFork`. `CaptureFork.async(dest, key, message, priority)(t)` calls the real `fork.async` with the same arguments and the real ctx, and its body runs `t(logger)` inside `os.Inherit.out.withValue` and `os.Inherit.err.withValue`, each an `os.ProcessOutput.ReadBytes` into a buffer for worker `key`. `blocking`, `await` and `awaitAll` delegate. It then calls `runTests()` and returns its result.
-- **Route B,** `gamma.test.routeQueue`. It gets the classes as `runTests()` does, by sending `ZincOp.GetTestTasks` to `jvmWorker().internalWorker()` (TMU lines 71–95), lays out the group and worker folders and prepares each queue as `prepareTestGroups`, `jobsProcessLength` and `runTestFuture` do (TMU lines 193–196, 241–288), and runs the workers on a fixed pool of `jobs` threads, submitted in Mill's priority order (TMU lines 299–303). Each worker claims its first class as `runTestFuture` does (TMU lines 320–328) and calls `callTestRunnerSubprocess` with `Right((startingClass, queueFolder, claimFolder))` inside its own `os.Inherit.out`/`err.withValue`. It then merges results as `TestModuleUtil.processTestResults` does (TMU lines 553–587) and calls `TestModule.handleResults(doneMsg, results, ctx, testReportXml())` (TM lines 749–755).
+- **Route A,** `gamma.test.routeCtx`, builds the `TestModuleUtil` exactly as `TestModule.testTask` does for `testForked` (TM lines 312–341), but passes a `CaptureCtx` as its `using` argument. It then calls `runTests()` and returns its result.
+  - `CaptureCtx` delegates every `TaskCtx` member to the task's own `Task.ctx()` except `fork`, which is a `CaptureFork`.
+  - `CaptureFork.async(dest, key, message, priority)(t)` calls the real `fork.async` with the same arguments and the real ctx. The body it passes runs `t(logger)` inside `os.Inherit.out.withValue` and `os.Inherit.err.withValue`, each set to an `os.ProcessOutput.ReadBytes` that fills a buffer for worker `key`. `blocking`, `await` and `awaitAll` delegate.
+- **Route B,** `gamma.test.routeQueue`:
+  1. gets the classes as `runTests()` does, by sending `ZincOp.GetTestTasks` to `jvmWorker().internalWorker()` (TMU lines 71–95);
+  2. lays out the group and worker folders and prepares each queue as `prepareTestGroups`, `jobsProcessLength` and `runTestFuture` do (TMU lines 193–196, 241–288);
+  3. runs the workers on a fixed pool of `jobs` threads, submitted in Mill's priority order (TMU lines 299–303); each worker claims its first class as `runTestFuture` does (TMU lines 320–328) and calls `callTestRunnerSubprocess` with `Right((startingClass, queueFolder, claimFolder))` inside its own `os.Inherit.out`/`err.withValue`;
+  4. merges results as `TestModuleUtil.processTestResults` does (TMU lines 553–587) and calls `TestModule.handleResults(doneMsg, results, ctx, testReportXml())` (TM lines 749–755).
 - **Neither route prints worker output.** Each saves every worker's raw stdout and stderr bytes to `Task.dest/captured/<label>.out` and `.err`, with an index of label, worker folder and thread, and prints one line of its own, `SPIKE-ROUTE …`, with byte counts.
 - **The matrix.** `run-capture.ps1` (Windows) and `run-capture.sh` (Linux) run the three commands in turn, passing and with `SPIKE_FAIL`, under the daemon and `--no-daemon`, three rounds each: 36 runs per platform, 12 per command. Each `mill` command's stdout and stderr went to files. After each run the script kept the command's `Task.dest`, its `<command>.json` and its exit status. `analyse-capture.py` makes the checks of §§ 3–5 and writes `summary.txt`. On Linux the matrix ran in a copy of the prototype in the WSL file system, as the `EPS` runs did.
 - **A compile probe,** `log-probe/build.mill`: a build-code `Logger` for the `log` variant of Route A (§ 2.2).
@@ -90,7 +96,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`. Every worker JVM was
 
 - A worker line is a console line, ANSI codes and Mill's prefix removed, holding any of `SEQ-OUT`, `SEQ-ERR`, `CHILD-OUT`, `CHILD-ERR`, the JVM warning, `Running Test Class`, ScalaTest's suite, test, failure or `Run completed` lines, or equal to any line a route captured.
 - Under `testForked` all of them reached the console with Mill's per-worker prefix, for example `191-0-1] CHILD-OUT G01 pid=34128`.
-- Under either route the console held only Mill's own lines and the route's: the task's header line, `SPIKE-ROUTE …`, the launcher line and Mill's final status line, and when `G03` failed, Mill's `[error] gamma.test.<command> 1 tests failed:` followed by `  gamma.G03 t2`, as under `testForked`.
+- Under either route the console held only Mill's own lines and the route's: the task's header line, `SPIKE-ROUTE …`, the launcher line and Mill's final status line. When `G03` failed it also held Mill's `[error] gamma.test.<command> 1 tests failed:` followed by `  gamma.G03 t2`, as under `testForked`.
 - **The per-worker log file.** Under Route A, Mill still wrote `worker-<i>.log` beside each worker folder; it held only Mill's ticker lines, the class name repeated (`gamma.G01`), and no worker output. `MultiLogger.ticker` passes the ticker to the `FileLogger`, which prints it (`core/internal/src/mill/internal/MultiLogger.scala` lines 37–39; `core/internal/src/mill/internal/FileLogger.scala` line 49). Under `testForked` the same file held the ticker lines and the worker's output. Route B does not call `fork.async`, and no `worker-<i>.log` was written.
 - All output was redirected to files; what Mill's live prompt shows under a terminal was not looked at (§ 8).
 
@@ -140,7 +146,7 @@ Every difference between a route and `testForked` was one of these: the worker c
 
 | | Route A, `routeCtx` | Route B, `routeQueue` |
 |---|---|---|
-| Plugin code | about 30 lines: `CaptureCtx`, 13 delegating members and `fork`; `CaptureFork`, 4 | about 100 lines in the command |
+| Plugin code | about 30 lines: `CaptureCtx` (13 delegating members and `fork`) and `CaptureFork` (4) | about 100 lines in the command |
 | Mill code copied | none; Mill's own `runTests()` runs | `prepareTestGroups`, `jobsProcessLength`, `runTestFuture`'s folder layout, labels, priorities and first claim, `TestRunnerUtils.claimFile` (TR/TestRunnerUtils.scala lines 357–365) and `processTestResults`: most of the command. `processTestResults`, `waitForFutures` and `TestModuleUtil.handleResults` cannot be called: `object TestModuleUtil` is `private[mill]` (TMU line 372) |
 | Not reproduced | nothing | the `poll` callback's ticker and profile entries (TMU lines 341–361), the completion ticker (TMU lines 597–623), the selector error (TMU lines 65–68, 97, 104), Mill's shared task thread pool (approximated by `jobs` threads in Mill's priority order), the worker's prompt line and `worker-<i>.log` |
 | `@experimental` | `TestModuleUtil` constructor and `runTests()` (TMU line 30); `TaskCtx.Fork.Api` (TCX line 193) | `TestModuleUtil` constructor, `prepareTestClassesFolder` and `callTestRunnerSubprocess` (TMU lines 30, 112, 183) |

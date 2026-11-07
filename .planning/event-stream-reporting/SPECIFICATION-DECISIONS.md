@@ -108,7 +108,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests through Mill API marked `@experimental` and `@internal` instead of calling Mill's test task, so it may need a release for each Mill release. Taking a JVM parallel worker's streams and a Native run's stdout and stderr has each been observed on Windows and Linux only, the JVM's never with class globs, with test parallelism off, with a killed worker or in a command running several modules, and Native's launcher must be compiled where an emulator cannot load a script.
+**Costs** The plugin must run each module's tests through Mill API marked `@experimental` and `@internal` instead of calling Mill's test task, so it may need a release for each Mill release, and on Native its launcher must be compiled where an emulator cannot load a script. Taking a JVM parallel worker's streams and a Native run's stdout and stderr have each been observed only on Windows and Linux, and the JVM's never with class globs, with test parallelism off, with a killed worker or in a command running several modules.
 
 **Settled by**
 
