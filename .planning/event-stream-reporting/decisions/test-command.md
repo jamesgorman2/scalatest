@@ -71,15 +71,28 @@ Decisions behind `../SPECIFICATION.md` on which modules and JS environments the 
 
 ---
 
-## Each selected test module's tests start once that module compiles, without waiting for other selected modules to compile.
+## Each selected test module's tests start once that module compiles, even without `--keep-going`, through Mill internals.
 
-**Alternatives** Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
+**Alternatives**
 
-**Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`../SPECIFICATION.md` R-056).
+- Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
+- Re-executing the goals fail-fast skipped, with public API only, starts a skipped module's tests only once its round ends (57.0 s against 16.4 s), reruns `Task.Input`s each round, and drops the console summary between rounds, each being its own `execute` call (`capture-and-console.md`, entry "On the console, progress output is a one-line summary…").
+- Falling back to rounds when the reflection fails adds a second path that runs only once Mill has changed, when the other internals the test command relies on have likely broken too.
+- Requiring `--keep-going`, on the command line or in the build's `mill-opts`, adds a flag to every run and leaves a run without it to let scheduling decide which modules report, which the entry "The test command runs every selected test module by default…" rejects.
 
-**Costs** Only one route examined both starts each module's tests on its own compile and runs every selected module without `--keep-going`: a single `execute` call with one goal per selected test module, on an evaluator whose `Execution` has fail-fast off, observed only with each module's own `testForked` as the goals. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`../research/mill-nested-keep-going.md` § 3, § 5).
+**Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`../SPECIFICATION.md` R-056). Every route meeting R-044 and R-092 already shares the fail-fast-off copy of `mill.exec.Execution` that holds R-056 (`../research/mill-runner-progress-without-trait.md` § 7), and R-089 and R-092 already rest on other Mill internals that a Mill change can break at run time (`capture-and-console.md`, entry "On the console, progress output is a one-line summary…"; entry "A test module needs no change to its definition…"). Holding R-056 adds one member to that set, not a new kind of risk.
 
-**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+**Costs** The route reaches `EvaluatorImpl.execution`, a `private val`, by reflection and copies `mill.exec.Execution`, which lies outside Mill's compatibility policy and is not MiMa-checked, so a Mill upgrade breaks it at run time, not compile time.
+
+**Settled by**
+
+- [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+- [Does the test command hold R-056 through Mill internals, or does R-056 accept a later start for modules fail-fast skipped?](https://github.com/jamesgorman2/scalatest/issues/44).
+
+**See**
+
+- `../research/mill-nested-keep-going.md` § 3, § 4.1, § 4.4, § 5.
+- `../research/mill-runner-progress-without-trait.md` § 7.
 
 ---
 
