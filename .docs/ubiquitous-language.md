@@ -59,11 +59,11 @@ The reporter configuration characters `N C X E H L O P Q R M`, each of which dro
 _Avoid_: Filter flags, suppression characters
 
 **Test output**:
-The stdout and stderr written on a thread while one of a run's nodes, or the run's own code, is running on it.
+Output written from within a suite, scope or test, such as logging, other than the test framework's own reporting and other than I/O that is the behaviour under test or that the test itself captures. What it is does not depend on the thread, stream or code that writes it, nor on whether it can be captured.
 _Avoid_: Logs, console output, captured output
 
 **Worker output**:
-The stdout and stderr of the processes executing a run that is not test output, such as a JVM warning or a write from native code. It belongs to the run as a whole, never to a node within it.
+Output from the test harness executing a run, such as a JVM warning or what the build tool's test runner writes, other than the test framework's own reporting. It comes from no suite, scope or test. What it is does not depend on whether it can be captured or attributed.
 _Avoid_: Other output, raw output, leftover output
 
 ## Consolidation
@@ -73,19 +73,15 @@ Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
 **Event stream**:
-One run's events, test structure and test output, in the order the run produced them, independent of how they are carried.
+One run's events, test structure and the test output it captures, in the order the run produced them, independent of how they are carried.
 _Avoid_: Event log, event feed
-
-**Channel**:
-An ordered stream that carries a run's event stream out of the processes executing the run.
-_Avoid_: Transport, connection, pipe
 
 **Test run label**:
 A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag
 
 **Run record**:
-One run's own state in consolidated JSON output, such as its outcome, timings, summary counts and worker output, held in a list on the run's test run label. Each of the run's suites names its run record.
+One run's own state in consolidated JSON output, such as its outcome, timings, summary counts and the output captured against the run, held in a list on the run's test run label. Each of the run's suites names its run record.
 _Avoid_: Run node, worker record
 
 **Test command**:

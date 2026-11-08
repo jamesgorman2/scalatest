@@ -2,13 +2,39 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## Test output and worker output are told apart by their source, not by the route or thread of the write that captures them.
+
+**Alternatives** Structured test reporting's definition by write route and thread (`../structured-test-reporting/SPECIFICATION.md` § Test output) would make `SPECIFICATION.md` R-010 require descriptor-level capture on Native, `dup2` on descriptors 1 and 2, switched and flushed at every node boundary and POSIX only, to put a C `printf` or `FileDescriptor.out` write on the channel.
+
+**Reasoning** A definition by capture route makes what test output means change with the runtime and the implementation, while a reader means by it what the suite, scope or test wrote. Routes and thread rules then decide only which node output is captured against (`SPECIFICATION.md` R-012).
+
+**Costs** A C `printf` in a Native test, and the output of concurrent async tests on Scala.js, are test output yet land on a broader node than the one that wrote them.
+
+**Settled by** [What do the capture requirements hold where a write cannot be caught, tied to one node, or kept off the console?](https://github.com/jamesgorman2/scalatest/issues/33).
+
+**See** `../structured-test-reporting/research/js-native-structure-and-capture.md` § 4.2.
+
+---
+
+## The consolidated output shows each piece of captured output on the narrowest node it was captured against, and does not claim the source of output captured only against the run.
+
+**Alternatives** Labelling run-level output as test output or worker output asserts what no capture route can tell: on Native, the process's descriptors carry a test's C write, a crash message and the code under test's own stdout alike.
+
+**Reasoning** The output never asserts what it cannot know, and a reader still sees every piece of it on the narrowest node the runtime allowed (`SPECIFICATION.md` R-012, R-086, R-087).
+
+**Costs** A JSON reader cannot separate worker output from test output captured only against the run.
+
+**Settled by** [What do the capture requirements hold where a write cannot be caught, tied to one node, or kept off the console?](https://github.com/jamesgorman2/scalatest/issues/33).
+
+---
+
 ## In consolidated output a run is not a node: its own state is a run record on its test run label, named by each of its suites.
 
 **Alternatives**
 
 - A run node between each label and its suites, as in the single-run layout, splits one module's suites across one node per worker Mill's test queue started, a split that changes from one test command to the next.
 - Inlining the run's state on every suite duplicates it and leaves no place for a run with no suites (`SPECIFICATION.md` R-071).
-- Rolling the runs' state up onto their label loses which worker died and which process wrote which worker output.
+- Rolling the runs' state up onto their label loses which worker died and which process wrote which output.
 
 **Reasoning** The hierarchy then describes what the user configured (modules and their suites), while how the tests were scheduled is held in properties, as a suite's thread name already is (`SPECIFICATION.md` R-078, R-080). Each suite naming its run record keeps which worker ran it.
 
@@ -23,7 +49,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 **Alternatives**
 
 - Leaving runs to the JSON output lets a test command fail with no visible cause, as when a worker given no task dies.
-- Showing only how a run ended abnormally drops worker output, often the only explanation of that end, from the human-readable output.
+- Showing only how a run ended abnormally drops the output captured against the run, often the only explanation of that end, from the human-readable output.
 
 **Reasoning** A reader at the console needs every cause of failure and the message that explains it, but which worker ran which suites is scheduling they did not choose (`SPECIFICATION.md` R-082). One block for each run keeps each run's stdout and stderr in order (R-043).
 
@@ -263,7 +289,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives**
 
-- Running it as Mill does, showing only its worker output and whether it passed, supports mixed builds, but every requirement on test structure, failures and test output would need an exemption for it.
+- Running it as Mill does, showing only what its processes wrote to stdout and stderr and whether it passed, supports mixed builds, but every requirement on test structure, failures and test output would need an exemption for it.
 - Skipping it with a warning yields a report that looks complete when it is not.
 
 **Reasoning** Every requirement then holds for every run in the consolidated output, and the failure comes before any time is spent on tests (`SPECIFICATION.md` R-059).
@@ -339,17 +365,17 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## Worker output is captured and shown with its run's results.
+## What a run's processes write to stdout and stderr is captured and shown with the run's results.
 
 **Alternatives**
 
-- Streaming it to the console as `../structured-test-reporting/SPECIFICATION.md` § Test output does keeps the two epics alike, but it interleaves across runs, which is the problem this epic addresses.
+- Streaming it to the console, as `../structured-test-reporting/SPECIFICATION.md` § Test output does with output that is not test output, keeps the two epics alike, but it interleaves across runs, which is the problem this epic addresses.
 - Writing it to a file for each run keeps the consolidated output to what came over the channel, but separates a crash message from the run it explains.
 - Discarding it loses the only account of some runs that did not complete.
 
 **Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's results are where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
-**Costs** Worker output arrives apart from the channel, so its place among the run's events is approximate (`SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
+**Costs** This output arrives apart from the channel, so its place among the run's events is not kept (`SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
