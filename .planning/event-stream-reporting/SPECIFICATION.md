@@ -12,7 +12,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 
 ## Spec documents
 
-- [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document.
+- [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
 - [../structured-test-reporting/SPECIFICATION.md](../structured-test-reporting/SPECIFICATION.md) — the test structure and what each output shows, which this epic takes by default.
 - [../structured-test-reporting/runner-json/SPECIFICATION.md](../structured-test-reporting/runner-json/SPECIFICATION.md) — the layout of one run's JSON object, which this epic takes.
 - [../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md](../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md) — every key of that object, which this epic takes.
@@ -139,7 +139,7 @@ Output is *captured against* a suite, scope or test when the means that captured
   - messages attached to the run rather than to a suite;
   - how the run ended, where it aborted, stopped or did not finish.
 - R-083 A test run label has an outcome only as R-058 gives it.
-- R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run, except as R-045 allows and what the layouts this document takes (R-028, R-030) leave out.
+- R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run, except what R-045 excludes and what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no suite, scope, test, run record or human-readable block (R-082) of one run holds an event or captured output of another run.
 - R-012 Each piece of captured output is shown on the narrowest suite, scope or test it was captured against, else on its run (R-080, R-082), or, for a process in which no run existed, as R-076 gives. Each is shown with its stream, stdout or stderr, where that is known. In the human-readable output, output captured against a suite, scope or test keeps its position among that node's events.
 - R-088 In each of the human-readable and JSON output, each piece of output a process wrote appears at most once, even where it was captured both against a node and off the process's stdout or stderr.
@@ -172,8 +172,8 @@ These hold for every run a test command starts.
 - R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured.
 - R-042 Output captured off the stdout and stderr of the run's processes is captured against the run.
 - R-043 Output captured off the run's processes' stdout keeps its order, as does output captured off their stderr, whatever its source. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
-- R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, Mill's own progress for the tests of the run's module, or ScalaTest's end-of-run summary for the run.
-- R-045 The plugin may show what Mill's own test runner writes for the run as output captured against the run. It does not show Mill's list of failed tests or ScalaTest's end-of-run summary.
+- R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, the progress Mill's test runner shows for the tests of the run's module (such as each worker's current test class and the count of classes completed), or ScalaTest's end-of-run summary for the run. Mill's prompt lines for the test command and the tasks it runs are not that progress; a Mill test task named as another goal on the same `mill` command line shows its own (R-050).
+- R-045 The consolidated output does not show Mill's list of failed tests or ScalaTest's end-of-run summary for the run.
 - R-046 The test command fails if:
   - any run reports a failure or does not complete: it ends aborted or stopped, or does not finish (§ A run that does not finish);
   - a process started to execute tests ends before any run exists in it (R-076); or
@@ -185,8 +185,9 @@ These hold for every run a test command starts.
 Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each on unless a test-command argument turns it off (R-055), and each is written to the console.
-- R-089 On the console, progress output shows a current summary of the test command, rewritten in place on one line, and writes as whole lines the progress the summary cannot hold, such as failures. Unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output, it streams no single characters. Neither the summary nor the lines erase Mill's console output, and Mill's console output erases neither.
-- R-090 Where Mill does not redraw its prompt (the status lines at the foot of the console) in place, as under Mill's `--ticker false` or on a console that is not interactive, the lines carry progress output without relying on the summary.
+- R-090 On the console, progress output is written as whole lines, never as the single characters `../structured-test-reporting/SPECIFICATION.md` § Progress output streams. Whether or not the summary (R-089) is shown, the lines show every failure a run reports and each other cause of failure R-046 lists, including each run that aborts or does not finish (R-067).
+- R-089 Where Mill redraws its prompt (the status lines at the foot of the console) in place, progress output also shows on the console a current summary of the test command, rewritten in place on one line.
+- R-091 Neither progress output's lines nor its summary erase Mill's console output, and Mill's console output erases neither.
 - R-085 JSON output is off unless a test-command argument turns it on (R-055).
 - R-049 JSON output is written to a file in the test command's task folder (`Task.dest`), or to the path a test-command argument gives, never to the console.
 - R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
