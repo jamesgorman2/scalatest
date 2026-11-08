@@ -98,11 +98,11 @@ A channel's format, the consolidation library's API and the switch by which the 
   - optional class globs and framework arguments, as Mill's `testOnly` takes them, applying alike to every selected test module;
   - `--halt-on-failure` (R-057);
   - an argument that turns progress output off, and one that turns human-readable output off (R-048);
-  - an argument that turns JSON output on (R-085), and an argument that gives the JSON file's path, which may be the same argument (R-049).
+  - an argument that turns JSON output on (R-085) and one that gives the JSON file's path (R-049), which may be the same argument.
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the processes Mill's fork grouping, test parallelism and test queue start;
   - the same working directory, arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
-  - except that a path inside the task folder (`Task.dest`) of `testOnly` or `testForked` is instead at the same relative path inside a folder the test command owns for that test module alone, not in the test command's own task folder (R-049);
+  - except that a path inside the task folder (`Task.dest`) of `testOnly` or `testForked` is instead at the same relative path inside a folder the test command owns for that test module alone, outside the test command's own task folder (R-049);
   - except that environment variables Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the `mill` command line that started the test command.
 - R-071 A run given no task, including one whose process dies before its first task, has a run record in the JSON output (R-080) and, where R-082 gives it one, a block in the human-readable output.
 - R-072 A runner that is not a run, such as Mill's discovery runner, does not appear in the consolidated output and does not affect whether the test command fails.
@@ -110,7 +110,9 @@ A channel's format, the consolidation library's API and the switch by which the 
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
 - R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. The JSON file stays as R-077 left it.
-- R-058 The consolidated output shows the test run label of each selected test module whose tests did not run as aborted: with reason *not run* where `--halt-on-failure` skipped them (R-057), or with reason *could not start* and the failure that stopped them where they could not start.
+- R-058 The consolidated output shows the test run label of each selected test module whose tests did not run as aborted, with:
+  - reason *not run* where `--halt-on-failure` skipped them (R-057);
+  - reason *could not start*, and the failure that stopped them, where they could not start.
 - R-068 The consolidated output shows as not run each test class left in a fork group's queue when the group's last worker ended. It may also show as not run any other test class the Mill plugin knows was to run but that no run reported.
 - R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON, not even a placeholder; its progress output may show runs the interrupt ended. The JSON file stays as R-077 left it.
 
@@ -124,11 +126,14 @@ WHERE `--halt-on-failure` is given:
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
 - R-027 Unless the test command is interrupted (R-069), the human-readable and JSON output are written together, once every run's event stream has ended.
 - R-078 In the human-readable and JSON output, the consolidation is the root, one for each test command under Mill. Its children are its test run labels, and each label's children are the top-level suites of its runs. No run and no module selector is a node.
-- R-079 In the human-readable and JSON output, test run labels appear in ascending lexicographic order of label, and the top-level suites under each label in ascending lexicographic order of name, unlike the order `../structured-test-reporting/SPECIFICATION.md` § Human-readable output gives. This covers only labels and top-level suites; below a top-level suite, nodes keep the order R-028 and R-030 give them.
+- R-079 In the human-readable and JSON output, test run labels appear in ascending lexicographic order, as do the top-level suites under each label by name, unlike the order `../structured-test-reporting/SPECIFICATION.md` § Human-readable output gives. Below a top-level suite, nodes keep the order R-028 and R-030 give them.
 - R-028 The JSON output is one object for the consolidation. Each suite, and every node below it, takes the layout that `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object and `../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` § APIs give one run, key names included, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them.
-- R-080 In the JSON output, each test run label holds a run record for every run under it, including a run with no suites (R-071). A run record holds what the layout R-028 cites gives the run node, key names included, except its suites, ScalaTest version and event-filter characters, and adds the run's identifier, unique within its label, and its worker output. Each suite a run reported names that run's record.
+- R-080 In the JSON output, each test run label holds a run record for every run under it, including a run with no suites (R-071). A run record holds what the layout R-028 cites gives the run node, key names included, except its suites, ScalaTest version and event-filter characters. It adds the run's identifier, unique within its label, and the run's worker output. Each suite a run reported names that run's record.
 - R-081 The JSON output's root records the ScalaTest version, which every run shares (R-059), and each module selector with the test modules it resolved to. The human-readable output does not show module selectors.
-- R-082 The human-readable output shows no run. On each test run label it shows one block for each run that has any of the following, without naming the run: the run's worker output, the test output and messages attached to the run rather than to a suite, and, where the run aborted, stopped or did not finish, how it ended.
+- R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
+  - the run's worker output;
+  - the test output and messages attached to the run rather than to a suite;
+  - how the run ended, where it aborted, stopped or did not finish.
 - R-083 A test run label has an outcome only as R-058 gives it.
 - R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of test output of every run, except what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no suite, scope, test, run record or human-readable block (R-082) of one run holds an event, test output or worker output of another run.
@@ -149,7 +154,7 @@ A run *does not finish* when its event stream ends without how the run ended (R-
 
 A process started to execute tests may end before any run exists in it, as when it dies before its runner is constructed:
 
-- R-076 The human-readable and JSON output show on its module's test run label that such a process ended before any run existed, with the process's stdout and stderr. That stdout and stderr appear in no run record, no human-readable block of a run (R-082) and nowhere else.
+- R-076 On its module's test run label, the human-readable and JSON output show that such a process ended before any run existed, with the process's stdout and stderr. That stdout and stderr appear nowhere else, neither in a run record nor in a run's human-readable block (R-082).
 
 ## Each run's own output under the test command
 
@@ -173,6 +178,6 @@ Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each on unless a test-command argument turns it off (R-055), and each is written to the console.
 - R-085 JSON output is off unless a test-command argument turns it on (R-055).
-- R-049 JSON output is written to a file in the test command's task folder (`Task.dest`), or at the path a test-command argument gives instead, and never to the console.
+- R-049 JSON output is written to a file in the test command's task folder (`Task.dest`), or to the path a test-command argument gives, never to the console.
 - R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
 - R-050 Output written by other tasks named on the same `mill` command line, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed. On the console it may interleave with the consolidated output.

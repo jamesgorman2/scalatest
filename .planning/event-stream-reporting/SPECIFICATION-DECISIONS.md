@@ -6,13 +6,13 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives**
 
-- A run node between each label and its suites, as in the single-run layout, splits one module's suites across as many nodes as Mill's test queue started workers, a split that changes from one test command to the next.
+- A run node between each label and its suites, as in the single-run layout, splits one module's suites across one node per worker Mill's test queue started, a split that changes from one test command to the next.
 - Inlining the run's state on every suite duplicates it and leaves no place for a run with no suites (`SPECIFICATION.md` R-071).
 - Rolling the runs' state up onto their label loses which worker died and which process wrote which worker output.
 
-**Reasoning** The hierarchy then describes what the user configured, modules and their suites, while how the tests were scheduled is held in properties, as a suite's thread name already is (`SPECIFICATION.md` R-078, R-080). Each suite naming its run record keeps which worker ran it.
+**Reasoning** The hierarchy then describes what the user configured (modules and their suites), while how the tests were scheduled is held in properties, as a suite's thread name already is (`SPECIFICATION.md` R-078, R-080). Each suite naming its run record keeps which worker ran it.
 
-**Costs** The consolidated JSON departs from the single-run layout above the suites, so a tool reading both handles two layouts, and listing one run's suites means filtering its label's suites by run record.
+**Costs** The consolidated JSON output departs from the single-run layout above the suites, so a tool reading both handles two layouts, and listing one run's suites means filtering its label's suites by run record.
 
 **Settled by** [How do modules, module selectors and runs appear in the consolidated output?](https://github.com/jamesgorman2/scalatest/issues/29).
 

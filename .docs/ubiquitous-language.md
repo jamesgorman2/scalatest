@@ -27,7 +27,7 @@ The tree of nodes a run reports: the run at its root, containing suites, which c
 _Avoid_: Test tree, hierarchy, nesting
 
 **Node**:
-A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, the consolidation is the root and a test run label is also a node, while a run is not: the run's top-level suites sit directly under its test run label.
+A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, the consolidation is the root, a test run label is also a node, and a run is not: its top-level suites sit directly under its test run label.
 _Avoid_: Element, item, entry, test case
 
 **Name**:
@@ -85,7 +85,7 @@ A node in consolidated output that wraps the suites of the runs its caller names
 _Avoid_: Module, module name, group, tag
 
 **Run record**:
-One run's own state in consolidated JSON, such as its outcome, timings, summary counts and worker output, held in a list on the run's test run label. Each of the run's suites names its run record.
+One run's own state in consolidated JSON output, such as its outcome, timings, summary counts and worker output, held in a list on the run's test run label. Each of the run's suites names its run record.
 _Avoid_: Run node, worker record
 
 **Test command**:
