@@ -8,11 +8,17 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 **Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait. It kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
 
-**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM no such route has been observed to meet R-044, and the nested evaluation's fail-fast-off behaviour and prompt have been observed only with each module's own `testForked` as goals, not with goals the plugin builds.
+**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"), and goals the plugin builds have run in the nested evaluation only one module at a time, so its fail-fast-off behaviour has been observed only with each module's own `testForked` as goals.
 
-**Settled by** [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
+**Settled by**
 
-**See** `../research/mill-test-without-module-trait.md` § 3.4, § 4, § 6.
+- [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
+- [Can the test command hold R-044 on the JVM when the module mixes in no plugin trait?](https://github.com/jamesgorman2/scalatest/issues/48).
+
+**See**
+
+- `../research/mill-test-without-module-trait.md` § 3.4, § 4, § 6.
+- `../research/mill-runner-progress-without-trait.md` § 3–5, § 7.
 
 ---
 

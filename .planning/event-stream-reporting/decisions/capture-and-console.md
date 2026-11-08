@@ -61,16 +61,17 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 - Holding only what Mill's stable API allows survives Mill releases, but its one route into a JVM worker's streams, a shim `testFramework`, takes only writes made through `System.out` and `System.err`, so JVM warnings, native code and child processes still write to the console.
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
-- Supplying a `TaskCtx` to Mill's own JVM test runner takes each worker's streams but, as observed, still shows that runner's progress, so it does not meet R-044.
+- Supplying a `TaskCtx` to Mill's own JVM test runner takes each worker's streams, but with Mill's own logger it still shows that runner's progress (R-044), and with the public `Logger.DummyLogger` it starts workers uncoloured (R-053).
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM, no route that leaves the module unchanged (R-092) has been observed to meet R-044; with the module unchanged, a run's stdout and stderr have been taken only on Windows and Linux (on Native only on Windows), and never with a killed worker.
+**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM with the module unchanged (R-092), meeting R-044 also needs either Mill's test-queue scheduling copied, or a logger compiled inside package `mill` that implements `private[mill]` members and relies on prompt keying in `mill.internal`; with the module unchanged, a run's stdout and stderr have been taken only on Windows and Linux (on Native only on Windows), and never with a killed worker.
 
 **Settled by**
 
 - [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 - [Can the plugin take a JVM worker's stdout and stderr when Mill runs a module's tests in parallel workers?](https://github.com/jamesgorman2/scalatest/issues/42).
+- [Can the test command hold R-044 on the JVM when the module mixes in no plugin trait?](https://github.com/jamesgorman2/scalatest/issues/48).
 
 **See**
 
@@ -80,6 +81,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - `../research/js-native-channels.md` § 5, § 6.
 - `../research/native-stdio-wrapper.md` § 3, § 5.
 - `../research/mill-test-without-module-trait.md` § 5–6.
+- `../research/mill-runner-progress-without-trait.md` § 3–7.
 
 ---
 
