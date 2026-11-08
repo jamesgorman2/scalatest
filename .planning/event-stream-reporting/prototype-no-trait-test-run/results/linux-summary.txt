@@ -1,0 +1,326 @@
+== daemon-fail-jvm-command: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=command result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=command result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in daemon-fail-jvm-command-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== daemon-fail-jvm-control: exit=1
+   console markers: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   console failure lines: ['[error] <task> 1 tests failed: ']
+== daemon-fail-jvm-hook: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=hook result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=hook result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in daemon-fail-jvm-hook-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=5 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=5
+   order (keys, out-of-order keys): {'seqOut': (5, []), 'seqErr': (5, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 3 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (3 vs 2 distinct)
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-2/sandbox
+== daemon-fail-jvm-member: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=member result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=member result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in daemon-fail-jvm-member-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== daemon-fail-jvm-public: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=public result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=public result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in daemon-fail-jvm-public-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== daemon-pass-all-command: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=command result=Success
+   NOTRAIT module=zinc.test route=command result=Success
+   NOTRAIT module=js.test route=command result=Success
+   captured in daemon-pass-all-command-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=6 Running Test Class=11 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1 Z-ERR=1 Z-OUT=1
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (2, []), 'xErr': (2, [])}
+== daemon-pass-glob-command: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=command result=Success
+   captured in daemon-pass-glob-command-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== daemon-pass-glob-control: exit=0
+   console markers: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+== daemon-pass-glob-hook: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=hook result=Success
+   captured in daemon-pass-glob-hook-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== daemon-pass-glob-member: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=member result=Success
+   captured in daemon-pass-glob-member-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== daemon-pass-glob-public: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=public result=Success
+   captured in daemon-pass-glob-public-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== daemon-pass-jvm-command: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=command result=Success
+   captured in daemon-pass-jvm-command-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== daemon-pass-jvm-control: exit=0
+   console markers: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+== daemon-pass-jvm-hook: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=hook result=Success
+   captured in daemon-pass-jvm-hook-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=5 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=5
+   order (keys, out-of-order keys): {'seqOut': (5, []), 'seqErr': (5, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 3 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (3 vs 2 distinct)
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-2/sandbox
+== daemon-pass-jvm-member: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=member result=Success
+   captured in daemon-pass-jvm-member-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== daemon-pass-jvm-public: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=public result=Success
+   captured in daemon-pass-jvm-public-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs daemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== daemon-pass-x-command: exit=0
+   console markers: none
+   NOTRAIT module=js.test route=command result=Success
+   captured in daemon-pass-x-command-dest0: Run completed in=1 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1
+   order (keys, out-of-order keys): {'seqOut': (0, []), 'seqErr': (0, []), 'xOut': (2, []), 'xErr': (2, [])}
+   vs daemon-pass-x-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+== daemon-pass-x-control: exit=0
+   console markers: Run completed in=1 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1
+== daemon-pass-x-hook: exit=0
+   console markers: none
+   NOTRAIT module=js.test route=hook result=Success
+   captured in daemon-pass-x-hook-dest0: Run completed in=1 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1
+   order (keys, out-of-order keys): {'seqOut': (0, []), 'seqErr': (0, []), 'xOut': (2, []), 'xErr': (2, [])}
+   vs daemon-pass-x-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+== nodaemon-fail-jvm-command: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=command result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=command result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in nodaemon-fail-jvm-command-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-fail-jvm-control: exit=1
+   console markers: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   console failure lines: ['[error] <task> 1 tests failed: ']
+== nodaemon-fail-jvm-hook: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=hook result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=hook result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in nodaemon-fail-jvm-hook-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-fail-jvm-member: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=member result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=member result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in nodaemon-fail-jvm-member-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-fail-jvm-public: exit=1
+   console markers: none
+   console failure lines: ['NOTRAIT module=jvm.test route=public result=Failure: 1 tests failed:  /   gamma.G03 t2', 'NOTRAIT failing <task> 1 tests failed:  /   gamma.G03 t2']
+   NOTRAIT module=jvm.test route=public result=Failure: 1 tests failed:  /   gamma.G03 t2
+   captured in nodaemon-fail-jvm-public-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-fail-jvm-control: exit same; failure line DIFFERS (['[error] <task> 1 tests failed: '])
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-pass-all-command: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=command result=Success
+   NOTRAIT module=zinc.test route=command result=Success
+   NOTRAIT module=js.test route=command result=Success
+   captured in nodaemon-pass-all-command-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=7 Running Test Class=11 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=5 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1 Z-ERR=1 Z-OUT=1
+   order (keys, out-of-order keys): {'seqOut': (5, []), 'seqErr': (5, []), 'xOut': (2, []), 'xErr': (2, [])}
+== nodaemon-pass-glob-command: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=command result=Success
+   captured in nodaemon-pass-glob-command-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== nodaemon-pass-glob-control: exit=0
+   console markers: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+== nodaemon-pass-glob-hook: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=hook result=Success
+   captured in nodaemon-pass-glob-hook-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== nodaemon-pass-glob-member: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=member result=Success
+   captured in nodaemon-pass-glob-member-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== nodaemon-pass-glob-public: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=public result=Success
+   captured in nodaemon-pass-glob-public-dest0: CHILD-ERR=9 CHILD-OUT=9 Run completed in=4 Running Test Class=9 SEQ-ERR=270 SEQ-OUT=270 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-glob-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+   group group-1-gamma.G06: workers 2 vs 2; classes same (4); duplicate runs 0 vs 0; normalised JVM info DIFFERS (2 vs 2 distinct)
+      route only:   env	NOTRAIT_GLOBS=gamma.G0*
+== nodaemon-pass-jvm-command: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=command result=Success
+   captured in nodaemon-pass-jvm-command-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-pass-jvm-control: exit=0
+   console markers: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+== nodaemon-pass-jvm-hook: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=hook result=Success
+   captured in nodaemon-pass-jvm-hook-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-pass-jvm-member: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=member result=Success
+   captured in nodaemon-pass-jvm-member-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-pass-jvm-public: exit=0
+   console markers: none
+   NOTRAIT module=jvm.test route=public result=Success
+   captured in nodaemon-pass-jvm-public-dest0: CHILD-ERR=10 CHILD-OUT=10 Run completed in=4 Running Test Class=10 SEQ-ERR=300 SEQ-OUT=300 Server VM warning=4
+   order (keys, out-of-order keys): {'seqOut': (4, []), 'seqErr': (4, []), 'xOut': (0, []), 'xErr': (0, [])}
+   vs nodaemon-pass-jvm-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+   groups route=['group-0-gamma.G01', 'group-1-gamma.G06'] control=['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+   group group-1-gamma.G06: workers 2 vs 2; classes same (5); duplicate runs 0 vs 0; normalised JVM info same (2 vs 2 distinct)
+== nodaemon-pass-x-command: exit=0
+   console markers: none
+   NOTRAIT module=js.test route=command result=Success
+   captured in nodaemon-pass-x-command-dest0: Run completed in=1 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1
+   order (keys, out-of-order keys): {'seqOut': (0, []), 'seqErr': (0, []), 'xOut': (2, []), 'xErr': (2, [])}
+   vs nodaemon-pass-x-control: exit same; failure line same
+   JUnit XML dest0: same test cases
+== nodaemon-pass-x-control: exit=0
+   console markers: Run completed in=1 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1
+== nodaemon-pass-x-hook: exit=0
+   console markers: none
+   NOTRAIT module=js.test route=hook result=Success
+   captured in nodaemon-pass-x-hook-dest0: Run completed in=1 X-ERR=40 X-OUT=40 Y-ERR=1 Y-OUT=1
+   order (keys, out-of-order keys): {'seqOut': (0, []), 'seqErr': (0, []), 'xOut': (2, []), 'xErr': (2, [])}
+   vs nodaemon-pass-x-control: exit same; failure line same
+   JUnit XML dest0: same test cases

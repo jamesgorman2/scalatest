@@ -1,0 +1,388 @@
+//| mill-version: 1.1.10
+//| mvnDeps:
+//| - org.scala-native:test-runner_2.13:0.5.12
+
+// PROTOTYPE - throwaway. Question: can an exclusive command run a selected test module's tests,
+// taking each run's stdout and stderr, when the module mixes in no trait the plugin provides?
+// (https://github.com/jamesgorman2/scalatest/issues/45)
+//
+// No fixture module below mixes in anything of the prototype's. `notrait.run <route> <selector>...`
+// resolves the selectors and, for each test module, builds one goal by <route>, executes them all
+// in one nested `Evaluator.execute`, and prints one NOTRAIT line per module. Each goal captures
+// its run's output into `out/notrait/modules/<route>/<module>/captured/`; nothing is printed raw.
+// Class globs come from NOTRAIT_GLOBS (space separated), as testOnly takes them.
+//
+// Routes:
+// - public:  JVM. A TestModuleUtil built from the module's public tasks, discoveredClassesOpt None.
+// - member:  JVM. The same, with discoveredClassesOpt from the protected
+//            aheadOfTimeDiscoveredTestClassesIfNeeded, called by reflection.
+// - hook:    any runtime. The protected testTask(args, globs), called by reflection; the task it
+//            returns is evaluated by the plugin itself (below).
+// - command: any runtime. The public testForked / testOnly command; the plugin evaluates its
+//            anonymous upstream tasks and the command body itself, Mill evaluating only the named
+//            tasks below them.
+// - adapter: Native. Scala Native's TestAdapter built from the module's public tasks.
+// For hook and command the plugin calls Task.evaluate itself with its own TaskCtx and streams; on
+// Native it also substitutes a launcher for the value of nativeLink.
+package build
+
+import mill.*
+import mill.scalalib.*
+import mill.scalajslib.*
+import mill.scalanativelib.*
+import mill.javalib.TestModuleUtil
+import mill.api.{BuildCtx, Evaluator, PathRef, SelectMode, SystemStreamsUtils, TaskCtx}
+import mill.api.daemon.{DummyInputStream, ExecResult, SystemStreams}
+import mill.javalib.testrunner.{TestResult, TestRunner, TestRunnerUtils}
+import scala.scalanative.build.Logger
+import scala.scalanative.testinterface.adapter.TestAdapter
+
+import java.io.{ByteArrayOutputStream, OutputStream, PrintStream}
+import java.util.IdentityHashMap
+import scala.collection.mutable
+import scala.concurrent.Future
+
+// ---------------------------------------------------------------- fixtures (no plugin trait)
+
+trait S3 extends ScalaModule { def scalaVersion = "3.3.6" }
+
+/** Ten suites in two fork groups of five, testParallelism on; run with `-j 3`. */
+object jvm extends S3 {
+  object test extends ScalaTests with TestModule.ScalaTest {
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "jvmsrc")
+    def mvnDeps = Seq(mvn"org.scalatest::scalatest:3.2.19")
+    def testForkGrouping = Task { discoveredTestClasses().sorted.grouped(5).toSeq }
+    def testParallelism = Task { true }
+    def forkArgs = Task { super.forkArgs() ++ Seq("-Xverify:none") }
+  }
+}
+
+/** One suite; the module turns on Zinc discovery, a user's own override of a protected member. */
+object zinc extends S3 {
+  object test extends ScalaTests with TestModule.ScalaTest {
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "zincsrc")
+    def mvnDeps = Seq(mvn"org.scalatest::scalatest:3.2.19")
+    override protected def discoverTestsWithZinc = true
+  }
+}
+
+object js extends ScalaJSModule with S3 {
+  def scalaJSVersion = "1.20.2"
+  object test extends ScalaJSTests with TestModule.ScalaTest {
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "xsrc")
+    def mvnDeps = Seq(mvn"org.scalatest::scalatest::3.2.19")
+  }
+}
+
+object native extends ScalaNativeModule with S3 {
+  def scalaNativeVersion = "0.5.12"
+  object test extends ScalaNativeTests with TestModule.ScalaTest {
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "xsrc")
+    def mvnDeps = Seq(mvn"org.scalatest::scalatest::3.2.19")
+  }
+}
+
+// ---------------------------------------------------------------- capture
+
+/** Each key's bytes, in arrival order. */
+final class Sink {
+  private val bufs = mutable.LinkedHashMap[String, ByteArrayOutputStream]()
+  private def buf(k: String) = synchronized(bufs.getOrElseUpdate(k, new ByteArrayOutputStream))
+  def readBytes(k: String): os.ProcessOutput = {
+    val b = buf(k)
+    os.ProcessOutput.ReadBytes((bytes, n) => b.synchronized(b.write(bytes, 0, n)))
+  }
+  def printStream(k: String): PrintStream = {
+    val b = buf(k)
+    new PrintStream(
+      new OutputStream {
+        def write(i: Int): Unit = b.synchronized(b.write(i))
+        override def write(a: Array[Byte], o: Int, n: Int): Unit = b.synchronized(b.write(a, o, n))
+      },
+      true,
+      "UTF-8"
+    )
+  }
+  def addFile(k: String, f: os.Path): Unit = { val b = buf(k); b.synchronized(b.write(os.read.bytes(f))) }
+  def save(dir: os.Path): String = synchronized {
+    os.makeDir.all(dir)
+    for ((k, b) <- bufs) os.write.over(dir / k, b.synchronized(b.toByteArray))
+    bufs.map((k, b) => s"$k=${b.size}B").mkString(" ")
+  }
+  /** Runs `t` with the thread's System.out, System.err, Console and os.Inherit going to this sink. */
+  def around[T](t: => T): T =
+    SystemStreamsUtils.withStreams(new SystemStreams(printStream("main.out"), printStream("main.err"), DummyInputStream))(t)
+}
+
+/** Mill's own fork.async, with os.Inherit.out/err set to the sink inside each worker's body. */
+final class CaptureFork(real: TaskCtx.Fork.Api, sink: Sink) extends TaskCtx.Fork.Api {
+  def blocking[T](t: => T): T = real.blocking(t)
+  def await[T](f: Future[T]): T = real.await(f)
+  def awaitAll[T](f: Seq[Future[T]]): Seq[T] = real.awaitAll(f)
+  def async[T](dest: os.Path, key: String, message: String, priority: Int)(
+      t: mill.api.daemon.Logger => T
+  )(using ctx: TaskCtx): Future[T] =
+    real.async(dest, key, message, priority) { logger =>
+      os.Inherit.out.withValue(sink.readBytes(s"worker-$key.out")) {
+        os.Inherit.err.withValue(sink.readBytes(s"worker-$key.err")) { t(logger) }
+      }
+    }(using ctx)
+}
+
+/** The goal's own TaskCtx, except dest (a folder per module), args and fork. */
+final class PluginCtx(real: TaskCtx, dest0: os.Path, args0: IndexedSeq[?], fork0: TaskCtx.Fork.Api) extends TaskCtx {
+  def dest: os.Path = { os.makeDir.all(dest0); dest0 }
+  def log: mill.api.daemon.Logger = real.log
+  def args: IndexedSeq[?] = args0
+  def arg[T](index: Int): T = args0(index).asInstanceOf[T]
+  def env: Map[String, String] = real.env
+  def workspace: os.Path = real.workspace
+  def fork: TaskCtx.Fork.Api = fork0
+  def jobs: Int = real.jobs
+  def offline: Boolean = real.offline
+  override def useFileLocks: Boolean = real.useFileLocks
+  def fail(msg: String): Nothing = real.fail(msg)
+  def reporter = real.reporter
+  def testReporter = real.testReporter
+  override def systemExitWithReason(reason: String, exitCode: Int): Nothing =
+    real.systemExitWithReason(reason, exitCode)
+}
+
+object Launcher {
+  val isWindows = System.getProperty("os.name").toLowerCase.contains("win")
+
+  /** A script run as `<launcher> <port>` that starts `binary` with stdout and stderr to files. */
+  def write(dir: os.Path, binary: os.Path): os.Path = {
+    os.makeDir.all(dir)
+    if (isWindows) {
+      val f = dir / "launcher.cmd"
+      os.write.over(f, s"""@echo off\r\n"$binary" %* 1>"$dir\\stdout-%1.bin" 2>"$dir\\stderr-%1.bin"\r\nexit /b %ERRORLEVEL%\r\n""")
+      f
+    } else {
+      val f = dir / "launcher.sh"
+      os.write.over(f, s"""#!/bin/sh\nexec '$binary' "$$@" >'$dir'/stdout-"$$1".bin 2>'$dir'/stderr-"$$1".bin\n""", perms = "rwxr-xr-x")
+      f
+    }
+  }
+
+  /** Waits until no file in `dir` has grown for 300 ms, at most 5 s, then adds the .bin files to the sink. */
+  def collect(dir: os.Path, sink: Sink): Unit = if (os.exists(dir)) {
+    def sizes = os.list(dir).map(f => f.last -> os.size(f)).toMap
+    var last = sizes
+    var quietSince = System.currentTimeMillis()
+    val deadline = quietSince + 5000
+    while (System.currentTimeMillis() - quietSince < 300 && System.currentTimeMillis() < deadline) {
+      Thread.sleep(50)
+      val now = sizes
+      if (now != last) { last = now; quietSince = System.currentTimeMillis() }
+    }
+    for (f <- os.list(dir).sorted if f.ext == "bin") sink.addFile("native-" + f.last, f)
+  }
+}
+
+// ---------------------------------------------------------------- the plugin side
+
+object notrait extends Module {
+
+  final class Abort(val failure: mill.api.Result.Failure) extends Exception(failure.error)
+
+  /** The protected member, called by reflection. Scala's `protected` is public in bytecode. */
+  def reflectMember(m: TestModule, name: String, types: Class[?]*)(args: AnyRef*): AnyRef = {
+    val meth = m.getClass.getMethod(name, types*)
+    meth.invoke(m, args*)
+  }
+
+  def describeMember(m: TestModule, name: String, types: Class[?]*): String = {
+    val meth = m.getClass.getMethod(name, types*)
+    s"${java.lang.reflect.Modifier.toString(meth.getModifiers)} ${meth.getDeclaringClass.getName}.${meth.getName}"
+  }
+
+  /** Route public / member: TestModuleUtil as TestModule.testTask builds it, from outside the module. */
+  def utilGoal(
+      m: TestModule,
+      globs: Seq[String],
+      disc: Task[Option[Seq[(String, Int)]]],
+      dir: os.Path,
+      sink: Sink
+  ): Task[Any] = Task.Anon {
+    val real = Task.ctx()
+    val ctx = new PluginCtx(real, dir, IndexedSeq.empty, new CaptureFork(real.fork, sink))
+    val d = disc()
+    println(s"NOTRAIT disc ${m} ${d.map(s => s"Some(${s.size} classes)").getOrElse("None")}")
+    val util = new TestModuleUtil(
+      m.testUseArgsFile(), m.forkArgs(), globs, m.jvmWorker().scalalibClasspath(), m.resources(),
+      m.testFramework(), m.runClasspath(), m.testClasspath(), m.testArgsDefault(), m.testForkGrouping(),
+      m.jvmWorker().testrunnerEntrypointClasspath(), m.allForkEnv(), m.testSandboxWorkingDir(),
+      m.forkWorkingDir(), m.testReportXml(), m.javaHome().map(_.path), m.testParallelism(),
+      m.testLogLevel(), m.propagateEnv(), m.jvmWorker().internalWorker(), discoveredClassesOpt = d
+    )(using ctx)
+    BuildCtx.withFilesystemCheckerDisabled {
+      os.dynamicPwdFunction.withValue(() => ctx.dest) { sink.around(util.runTests()) }
+    }
+  }.asInstanceOf[Task[Any]]
+
+  /** The named tasks reached from `root` through anonymous tasks only: what Mill must evaluate. */
+  def namedLeaves(root: Task[?]): Seq[Task[?]] = {
+    val seen = new IdentityHashMap[Task[?], Unit]
+    val out = mutable.ArrayBuffer[Task[?]]()
+    def rec(t: Task[?]): Unit = t.inputs.foreach { i =>
+      if (!seen.containsKey(i)) {
+        seen.put(i, ())
+        i match {
+          case n: Task.Named[?] => out += n
+          case a => rec(a)
+        }
+      }
+    }
+    rec(root)
+    out.toSeq
+  }
+
+  /** Route hook / command: Mill evaluates `leaves`; the plugin evaluates everything between them and `root`. */
+  def graphGoal(
+      m: TestModule,
+      root: Task[?],
+      leaves: Seq[Task[?]],
+      dir: os.Path,
+      sink: Sink
+  ): Task[Any] = Task.Anon {
+    val vals = Task.sequence(leaves.asInstanceOf[Seq[Task[Any]]])()
+    val real = Task.ctx()
+    val fork = new CaptureFork(real.fork, sink)
+    val known = new IdentityHashMap[Task[?], Any]
+    val launcherDir = dir / "launcher"
+    for ((t, v) <- leaves.zip(vals)) {
+      val v2 = m match {
+        case n: TestScalaNativeModule if t eq n.nativeLink =>
+          val l = BuildCtx.withFilesystemCheckerDisabled(Launcher.write(launcherDir, v.asInstanceOf[PathRef].path))
+          println(s"NOTRAIT ${m} nativeLink value replaced by ${l}")
+          BuildCtx.withFilesystemCheckerDisabled(PathRef(l))
+        case _ => v
+      }
+      known.put(t, v2)
+    }
+    var evaluated = 0
+    def eval(t: Task[?]): Any =
+      if (known.containsKey(t)) known.get(t)
+      else {
+        val args = t.inputs.map(eval).toIndexedSeq
+        evaluated += 1
+        val v = t.evaluate(new PluginCtx(real, dir, args, fork)) match {
+          case mill.api.Result.Success(v) => v
+          case f: mill.api.Result.Failure => throw new Abort(f)
+        }
+        known.put(t, v)
+        v
+      }
+    val res: mill.api.Result[Any] =
+      try {
+        BuildCtx.withFilesystemCheckerDisabled {
+          os.dynamicPwdFunction.withValue(() => { os.makeDir.all(dir); dir }) {
+            sink.around(mill.api.Result.Success(eval(root)))
+          }
+        }
+      } catch { case a: Abort => a.failure }
+    BuildCtx.withFilesystemCheckerDisabled(Launcher.collect(launcherDir, sink))
+    println(s"NOTRAIT ${m} plugin evaluated ${evaluated} tasks itself; Mill evaluated ${leaves.size} named: ${leaves.mkString(",")}")
+    res
+  }.asInstanceOf[Task[Any]]
+
+  /** Route adapter: Scala Native's TestAdapter from the module's public tasks, with a launcher. */
+  def adapterGoal(m: TestScalaNativeModule, globs: Seq[String], dir: os.Path, sink: Sink): Task[Any] = Task.Anon {
+    BuildCtx.withFilesystemCheckerDisabled(adapterBody(m, globs, dir, sink, Task.ctx(), m.nativeLink().path, m.allForkEnv(),
+      m.runClasspath().map(_.path), m.compile().classes.path, m.testArgsDefault(), m.testFramework(), m.testReportXml()))
+  }.asInstanceOf[Task[Any]]
+
+  def adapterBody(m: TestScalaNativeModule, globs: Seq[String], dir: os.Path, sink: Sink, real: TaskCtx, binary: os.Path,
+      env: Map[String, String], runCp: Seq[os.Path], classes: os.Path, args: Seq[String], framework: String,
+      reportXml: Option[String]) = {
+    val ctx = new PluginCtx(real, dir, IndexedSeq.empty, real.fork)
+    val launcherDir = dir / "launcher"
+    val launcher = Launcher.write(launcherDir, binary)
+    val err = sink.printStream("adapter.log")
+    val logger = Logger(
+      traceFn = _ => (), debugFn = _ => (),
+      infoFn = s => err.println(s"[info] $s"), warnFn = s => err.println(s"[warn] $s"),
+      errorFn = s => err.println(s"[error] $s")
+    )
+    val adapter = new TestAdapter(
+      TestAdapter.Config().withBinaryFile(launcher.toIO).withEnvVars(env).withLogger(logger)
+    )
+    val res =
+      try {
+        sink.around {
+          val fw = adapter.loadFrameworks(List(List(framework))).flatten.headOption
+            .getOrElse(throw new RuntimeException("framework not found"))
+          val (doneMsg, results) = TestRunner.runTestFramework(
+            _ => fw, runCp, Seq(classes), args, real.testReporter, None,
+            cls => TestRunnerUtils.globFilter(globs)(cls.getName)
+          )
+          TestModule.handleResults(doneMsg, results, ctx, reportXml)
+        }
+      } finally adapter.close()
+    Launcher.collect(launcherDir, sink)
+    res
+  }
+
+  def argsTask(m: TestModule): Task[Seq[String]] = Task.Anon { m.testArgsDefault() }
+  def globsTask(globs: Seq[String]): Task[Seq[String]] = Task.Anon { globs }
+
+  def run(ev: Evaluator, route: String, selectors: String*) = Task.Command(exclusive = true) {
+    val globs = Task.env.get("NOTRAIT_GLOBS").toSeq.flatMap(_.split(" ").toSeq).filter(_.nonEmpty)
+    val mods: Seq[TestModule] = selectors.flatMap { s =>
+      ev.resolveModulesOrTasks(Seq(s), SelectMode.Separated) match {
+        case mill.api.Result.Success(list) => list.collect { case Left(m: TestModule) => m }
+        case f => println(s"NOTRAIT resolve-failed $s $f"); Nil
+      }
+    }
+    val base = Task.dest / os.up / "modules" / route
+    os.remove.all(base)
+    val taskCls = classOf[Task[?]]
+    val plans = mods.map { m =>
+      val dir = base / m.moduleSegments.render
+      val sink = new Sink
+      val goal: Task[Any] = route match {
+        case "public" => utilGoal(m, globs, Task.Anon(Option.empty[Seq[(String, Int)]]), dir, sink)
+        case "member" =>
+          val t1 = reflectMember(m, "aheadOfTimeDiscoveredTestClassesIfNeeded")()
+          val t2 = reflectMember(m, "aheadOfTimeDiscoveredTestClassesIfNeeded")()
+          println(s"NOTRAIT ${m} member ${describeMember(m, "aheadOfTimeDiscoveredTestClassesIfNeeded")} returned ${t1}; second call eq first: ${t1 eq t2}; forkArgs eq forkArgs: ${m.forkArgs eq m.forkArgs}")
+          utilGoal(m, globs, t1.asInstanceOf[Task[Option[Seq[(String, Int)]]]], dir, sink)
+        case "hook" =>
+          val root = reflectMember(m, "testTask", taskCls, taskCls)(argsTask(m), globsTask(globs)).asInstanceOf[Task[?]]
+          println(s"NOTRAIT ${m} hook ${describeMember(m, "testTask", taskCls, taskCls)} returned ${root}")
+          graphGoal(m, root, namedLeaves(root), dir, sink)
+        case "command" =>
+          val root: Task[?] = if (globs.isEmpty) m.testForked() else m.testOnly(globs*)
+          println(s"NOTRAIT ${m} command root ${root} (${root.getClass.getName})")
+          graphGoal(m, root, namedLeaves(root), dir, sink)
+        case "adapter" => m match {
+            case n: TestScalaNativeModule => adapterGoal(n, globs, dir, sink)
+            case _ => Task.Anon[Any](mill.api.Result.Failure(s"$m is not a Native test module"))
+          }
+      }
+      (m, dir, sink, goal)
+    }
+    val res = ev.execute(plans.map(_._4))
+    var failed = false
+    for ((m, dir, sink, goal) <- plans) {
+      val r = res.executionResults.transitiveResults.get(goal) match {
+        case Some(ExecResult.Success(_)) => "Success"
+        case Some(ExecResult.Failure(msg, _)) => failed = true; s"Failure: ${msg.linesIterator.mkString(" / ")}"
+        case Some(ExecResult.Exception(e, _)) => failed = true; s"Exception: $e"
+        case other => failed = true; s"$other"
+      }
+      val saved = sink.save(dir / "captured")
+      println(s"NOTRAIT module=${m} route=${route} result=${r}")
+      println(s"NOTRAIT module=${m} captured ${saved}")
+    }
+    for ((k, v) <- res.executionResults.transitiveFailing.toSeq.sortBy(_._1.toString)) {
+      val msg = v match {
+        case ExecResult.Failure(m, _) => m.linesIterator.take(3).mkString(" / ")
+        case ExecResult.Exception(e, _) => e.toString + " " + e.getStackTrace.take(6).mkString(" < ")
+      }
+      println(s"NOTRAIT failing $k: $msg")
+    }
+    if (failed) Task.fail("notrait.run: a module failed") else "ok"
+  }
+}
