@@ -1,0 +1,36 @@
+ms_from_execute_start	state	shown	info
+-1000	noprompt		
+-750	noprompt		
+-500	noprompt		
+-250	noprompt		
+0	noprompt		
+250	absent		0/1+] C:\Users\james\StudioProjects\scalatest\.claude\worktr
+500	other-text		1] nt.sleeper SLEEPER-DETAIL
+750	other-text		1] nt.sleeper NTS#0002 tiny
+1000	other-text		1] nt.sleeper NTS#0002 tiny
+1250	other-text		1] nt.sleeper 1s NTS#0003 tiny
+1500	other-text		1] nt.sleeper 1s NTS#0003 tiny
+1750	other-text		1] nt.sleeper 1s NTS#0004 tiny
+2000	other-text		1] nt.sleeper 1s NTS#0004 tiny
+2250	other-text		1] nt.sleeper 2s NTS#0005 tiny
+2500	other-text		1] nt.sleeper 2s NTS#0005 tiny
+2750	other-text		1] nt.sleeper 2s NTS#0006 tiny
+3000	other-text		1] nt.sleeper 2s NTS#0006 tiny
+3250	other-text		1] nt.sleeper 3s NTS#0007 tiny
+3500	other-text		1] nt.sleeper 3s NTS#0007 tiny
+3750	other-text		1] nt.sleeper 3s NTS#0008 tiny
+4000	other-text		1] nt.sleeper 3s NTS#0008 tiny
+4250	noprompt		
+4500	noprompt		
+4750	noprompt		
+5000	noprompt		
+5250	noprompt		
+5500	noprompt		
+5750	noprompt		
+6000	noprompt		
+6250	absent		1/1, SUCCESS] C:\Users\james\StudioProjects\scalatest\.claud
+6500	absent		1/1, SUCCESS] C:\Users\james\StudioProjects\scalatest\.claud
+6750	absent		1/1, SUCCESS] C:\Users\james\StudioProjects\scalatest\.claud
+7000	absent		1/1, SUCCESS] C:\Users\james\StudioProjects\scalatest\.claud
+7250	absent		1/1, SUCCESS] C:\Users\james\StudioProjects\scalatest\.claud
+7500	absent		1/1, SUCCESS] C:\Users\james\StudioProjects\scalatest\.claud

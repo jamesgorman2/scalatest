@@ -1,0 +1,272 @@
+//| mill-version: 1.1.10
+
+// PROTOTYPE - throwaway. Question: under the nested-evaluation route, does `Task.log.ticker` keep the
+// test command's summary on its own prompt line for the whole nested evaluation, and do `Task.log`
+// lines all reach the console intact? (https://github.com/jamesgorman2/scalatest/issues/47)
+//
+// `nt.test <selector> ...` is an exclusive command taking the Evaluator. It makes ONE `execute` call
+// on an evaluator built over a reflective copy of the command's `mill.exec.Execution` with
+// `failFast = false` (.planning/event-stream-reporting/research/mill-nested-keep-going.md § 3.1),
+// over each selected module's `testForked` with `-C spike.SocketEmitter`. On every event it reads it
+// sets a summary through `Task.log.ticker` and writes whole lines through `Task.log.streams.out`;
+// each call is also appended, with its epoch time, to `ticker.tsv` and `console.tsv` in `Task.dest`.
+//
+// NT_ROUTE picks how the nested evaluation is built:
+//   copy         the copy, `execute(tasks)` (the settled route)
+//   copy-logger  the copy, `execute(tasks, logger = Task.log)`: nested keys become `1-<n>`
+//   copy-base    the copy, then the public `Evaluator.withBaseLogger(Task.log)`, `execute(tasks)`
+// NT_HOLD_MS (default 3000): how long the command waits after `execute` returns before it ends.
+//
+// `nt.tiny` runs one nested evaluation of a single task, so its key is `1`, as the command's is.
+package build
+
+import mill.*
+import mill.scalalib.*
+import mill.api.{Evaluator, EvaluatorProxy, SelectMode}
+import mill.api.daemon.ExecResult
+
+import java.io.{BufferedReader, IOException, InputStreamReader, PrintStream}
+import java.net.{InetAddress, ServerSocket, Socket}
+import java.nio.charset.StandardCharsets.UTF_8
+import scala.collection.mutable
+
+object emitter extends ScalaModule {
+  def scalaVersion = "3.3.6"
+  def mvnDeps = Seq(mvn"org.scalatest::scalatest:3.2.19", mvn"org.scala-sbt:test-interface:1.0")
+}
+
+trait Fixture extends ScalaModule {
+  def scalaVersion = "3.3.6"
+  /** Seconds this module's tests wait before they can start, through an input that sleeps. */
+  def delaySeconds: Int = 0
+  def delay = Task.Input { Thread.sleep(delaySeconds * 1000L); delaySeconds }
+
+  trait NtTests extends ScalaTests with TestModule.ScalaTest {
+    def moduleDeps = super.moduleDeps ++ Seq(build.emitter)
+    def mvnDeps = super.mvnDeps() ++ Seq(mvn"org.scalatest::scalatest:3.2.19")
+    def testParallelism = Task { true }
+    def forkArgs = Task { Fixture.this.delay(); super.forkArgs() }
+  }
+}
+
+/**
+ * Modules a to e: the three shared suites each, starting 0, 4, 8, 12 and 16 s in. Selecting these with
+ * `failing.test` and `broken.test` gives the nested evaluation fewer than 1000 tasks (three-digit keys);
+ * adding g and h (starting 2 and 10 s in) gives it more than 1000 (four-digit keys).
+ */
+trait Shared extends Fixture {
+  object test extends NtTests {
+    def sources = Task.Sources(mill.api.BuildCtx.workspaceRoot / "common" / "src")
+  }
+}
+object a extends Shared { override def delaySeconds = 0 }
+object b extends Shared { override def delaySeconds = 4 }
+object c extends Shared { override def delaySeconds = 8 }
+object d extends Shared { override def delaySeconds = 12 }
+object e extends Shared { override def delaySeconds = 16 }
+object g extends Shared { override def delaySeconds = 2 }
+object h extends Shared { override def delaySeconds = 10 }
+
+/** One failing test among eight passing ones; starts 6 s in. */
+object failing extends Fixture {
+  override def delaySeconds = 6
+  object test extends NtTests
+}
+
+/** Test sources do not compile. */
+object broken extends Fixture {
+  object test extends NtTests
+}
+
+object nt extends Module {
+
+  /** An evaluator over a copy of the command's Execution with failFast off. */
+  def keepGoingEvaluator(ev: Evaluator): Evaluator = {
+    def unwrap(e: Evaluator): Evaluator = e match {
+      case p: EvaluatorProxy => unwrap(p.delegate0()); case x => x
+    }
+    val impl = unwrap(ev)
+    val f = impl.getClass.getDeclaredField("execution"); f.setAccessible(true)
+    val exec = f.get(impl).asInstanceOf[Product]
+    val names = exec.productElementNames.toIndexedSeq
+    val elems = exec.productIterator.toArray.map(_.asInstanceOf[AnyRef])
+    elems(names.indexOf("failFast")) = java.lang.Boolean.FALSE
+    val execCopy = exec.getClass.getConstructors.maxBy(_.getParameterCount).newInstance(elems*)
+    def field(name: String) = { val g = impl.getClass.getDeclaredField(name); g.setAccessible(true); g.get(impl) }
+    impl.getClass.getConstructors.minBy(_.getParameterCount)
+      .newInstance(field("allowPositionalCommandArgs"), field("selectiveExecution"), execCopy)
+      .asInstanceOf[Evaluator]
+  }
+
+  final class Conn(val id: Int) { var module = "?"; var end = "open"; var runCompleted = false }
+  final class Counts { var ok = 0; var failed = 0; var suites = 0 }
+
+  def test(evaluator: Evaluator, selectors: String*) = Task.Command(exclusive = true) {
+    val t0 = System.currentTimeMillis
+    val route = Task.env.getOrElse("NT_ROUTE", "copy")
+    val holdMs = Task.env.get("NT_HOLD_MS").map(_.toLong).getOrElse(3000L)
+    val log = Task.log
+    val con: PrintStream = log.streams.out
+    val lock = new Object
+    for (f <- Seq("ticker.tsv", "console.tsv", "console.txt", "markers.tsv", "keys.tsv")) os.remove(Task.dest / f)
+    def append(f: String, s: String) = os.write.append(Task.dest / f, s + "\n")
+    def marker(name: String) = append("markers.tsv", s"${System.currentTimeMillis}\t$name")
+
+    var lineSeq = 0
+    /** A whole line through Task.log.streams.out, also appended to console.tsv and console.txt. */
+    def say(s: String): Unit = lock.synchronized {
+      lineSeq += 1
+      val l = f"NTL $lineSeq%04d $s"
+      con.println(l); con.flush()
+      append("console.tsv", s"${System.currentTimeMillis}\t$l"); append("console.txt", l)
+    }
+
+    val server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress)
+    val addr = s"127.0.0.1:${server.getLocalPort}"
+    val mods: Seq[(String, TestModule)] = selectors.flatMap { s =>
+      evaluator.resolveModulesOrTasks(Seq(s), SelectMode.Separated) match {
+        case mill.api.Result.Success(list) => list.collect { case Left(m: TestModule) => m.toString -> m }
+        case f => say(s"resolve-failed $s $f"); Nil
+      }
+    }
+    val counts = mods.map(_._1 -> new Counts).toMap
+    val conns = mutable.ArrayBuffer[Conn]()
+
+    var tickSeq = 0
+    /** The summary through Task.log.ticker; every call is also appended to ticker.tsv. */
+    def tick(): Unit = lock.synchronized {
+      tickSeq += 1
+      val ok = counts.values.map(_.ok).sum; val failed = counts.values.map(_.failed).sum
+      val suites = counts.values.map(_.suites).sum
+      val per = counts.toSeq.sortBy(_._1).map((m, c) => s"${m.takeWhile(_ != '.')}=${c.ok + c.failed}").mkString(" ")
+      val open = conns.count(_.end == "open")
+      val v = f"NTS#$tickSeq%04d ok=$ok fail=$failed suites=$suites workers=$open | $per"
+      log.ticker(v)
+      append("ticker.tsv", s"${System.currentTimeMillis}\t$tickSeq\t$v")
+    }
+
+    marker("body-start")
+    say(s"body-start route=$route selectors=${selectors.mkString(",")} epochMs=$t0")
+    tick()
+
+    def handle(c: Conn, line: String): Unit = {
+      val f = line.split("\t", -1)
+      f(0) match {
+        case "HELLO" => lock.synchronized(c.module = f(3))
+        case "EV" =>
+          val cnt = counts.getOrElse(c.module, new Counts)
+          val kind = f(4)
+          val changed = lock.synchronized {
+            kind match {
+              case "TestSucceeded" => cnt.ok += 1; true
+              case "TestFailed" => cnt.failed += 1; true
+              case "SuiteCompleted" => cnt.suites += 1; true
+              case "RunCompleted" => c.runCompleted = true; false
+              case _ => false
+            }
+          }
+          if (changed) {
+            say(s"${c.module} $kind ${f(5)}${if (f(6).nonEmpty) " " + f(6) else ""}")
+            tick()
+          }
+        case _ => ()
+      }
+    }
+
+    val acceptor = new Thread(() => {
+      try {
+        while (true) {
+          val s: Socket = server.accept()
+          val c = lock.synchronized { val c = new Conn(conns.size + 1); conns += c; c }
+          new Thread(() => {
+            val r = new BufferedReader(new InputStreamReader(s.getInputStream, UTF_8))
+            var end = ""
+            try {
+              var l = r.readLine()
+              while (l != null) { handle(c, l); l = r.readLine() }
+              end = "EOF"
+            } catch { case e: IOException => end = s"IOException: ${e.getMessage}" }
+            lock.synchronized(c.end = end)
+            tick()
+          }, s"nt-reader-${c.id}").start()
+        }
+      } catch { case _: IOException => () }
+    }, "nt-acceptor")
+    acceptor.setDaemon(true)
+    acceptor.start()
+
+    val tasks = mods.map { (label, m) =>
+      label -> m.testForked("-C", "spike.SocketEmitter", s"-Dspike.addr=$addr", s"-Dspike.module=$label")
+    }
+    // copy-base: the public Evaluator.withBaseLogger copies the Execution again, with baseLogger = Task.log.
+    val ev2 = if (route == "copy-base") keepGoingEvaluator(evaluator).withBaseLogger(log) else keepGoingEvaluator(evaluator)
+    say(s"before-execute tasks=${tasks.map(_._2.toString).mkString(",")}")
+    marker("execute-start")
+    val res =
+      if (route == "copy-logger") ev2.execute(tasks.map(_._2), logger = log)
+      else ev2.execute(tasks.map(_._2))
+    marker("execute-returned")
+    say("after-execute")
+
+    // Let readers reach the end of every connection, at most 5 s, then hold so the console can be observed.
+    val deadline = System.currentTimeMillis + 5000
+    while (lock.synchronized(conns.exists(_.end == "open")) && System.currentTimeMillis < deadline) Thread.sleep(20)
+    server.close()
+    tick()
+    marker("hold-start")
+    Thread.sleep(holdMs)
+    tick()
+
+    // Nested task keys, for the source reading of how they are allocated.
+    val prefixes = res.executionResults.transitivePrefixes
+    for ((t, k) <- prefixes.toSeq.sortBy(_._2.mkString("-"))) append("keys.tsv", s"${k.mkString("-")}\t$t")
+    for ((label, t) <- tasks) {
+      val r = res.executionResults.transitiveResults.get(t) match {
+        case Some(ExecResult.Success(_)) => "Success"
+        case Some(ExecResult.Failure(m, _)) => "Failure"
+        case Some(other) => other.toString.take(40)
+        case None => "none"
+      }
+      val c = counts(label)
+      say(s"result $label task=$r ok=${c.ok} fail=${c.failed} suites=${c.suites}")
+    }
+    say(s"nested keys=${prefixes.size} widths=${prefixes.values.map(_.last.length).toSeq.distinct.sorted.mkString(",")} " +
+      s"equal-to-command=${prefixes.values.count(_ == Seq("1"))} connections=${conns.size}")
+    marker("command-end")
+    say("command-end")
+    "ok"
+  }
+
+  /** A nested evaluation of one task, whose key is therefore `1`, as the command's is. */
+  def sleeper = Task.Input {
+    Task.log.ticker("SLEEPER-DETAIL")
+    Thread.sleep(4000)
+    System.currentTimeMillis
+  }
+
+  def tiny(evaluator: Evaluator) = Task.Command(exclusive = true) {
+    val log = Task.log
+    for (f <- Seq("ticker.tsv", "console.tsv", "console.txt", "markers.tsv", "keys.tsv")) os.remove(Task.dest / f)
+    def append(f: String, s: String) = os.write.append(Task.dest / f, s + "\n")
+    def marker(name: String) = append("markers.tsv", s"${System.currentTimeMillis}\t$name")
+    def tick(n: Int) = { val v = f"NTS#$n%04d tiny"; log.ticker(v); append("ticker.tsv", s"${System.currentTimeMillis}\t$n\t$v") }
+    def say(s: String) = { log.streams.out.println(s); log.streams.out.flush(); append("console.txt", s); append("console.tsv", s"${System.currentTimeMillis}\t$s") }
+    marker("body-start")
+    tick(1)
+    say("NTL tiny before-execute")
+    val route = Task.env.getOrElse("NT_ROUTE", "copy")
+    val ev2 = if (route == "copy-base") keepGoingEvaluator(evaluator).withBaseLogger(log) else keepGoingEvaluator(evaluator)
+    val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
+    val ticker = new Thread(() => { var n = 2; while (!stop.get) { Thread.sleep(500); tick(n); n += 1 } })
+    marker("execute-start")
+    ticker.start()
+    val res = if (route == "copy-logger") ev2.execute(Seq(sleeper), logger = log) else ev2.execute(Seq(sleeper))
+    marker("execute-returned")
+    Thread.sleep(2000)
+    stop.set(true); ticker.join()
+    for ((t, k) <- res.executionResults.transitivePrefixes) append("keys.tsv", s"${k.mkString("-")}\t$t")
+    say(s"NTL tiny after-execute keys=${res.executionResults.transitivePrefixes.values.map(_.mkString("-")).mkString(",")}")
+    marker("command-end")
+    "ok"
+  }
+}

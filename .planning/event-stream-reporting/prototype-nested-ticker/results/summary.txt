@@ -1,0 +1,435 @@
+conpty-daemon-copy-1: conpty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 92 of 93 snapshots (99%); ticker calls 334
+  nested states: current=92, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at +0.02s from execute-returned, -3.21s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.27s from execute-returned, +0.04s from command-end
+  Task.log lines written=323 shown intact=323 stale prompt rows=0
+conpty-daemon-copy-2: conpty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.7 s; summary current in 93 of 95 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=93, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1121/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.27s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-3: conpty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.03s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-4: conpty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-base-1: conpty 160x40 NT_ROUTE=copy-base nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.3 s; summary current in 92 of 94 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=92, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-base-rows24: conpty 160x24 NT_ROUTE=copy-base nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-base-tiny: conpty 160x40 NT_ROUTE=copy-base nt.tiny
+  nested evaluation 4.0 s; summary current in 15 of 17 snapshots (88%); ticker calls 13
+  nested states: absent=1, current=15, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] C:\Users\james\StudioProjects\scalatest\.claude\worktr
+  after execute returned (2.0 s to command end): noprompt=8
+  final header "1/1, SUCCESS]" in stream at +2.01s from execute-returned, +0.01s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+conpty-daemon-copy-logger-1: conpty 160x40 NT_ROUTE=copy-logger nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.25s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-logger-rows24: conpty 160x24 NT_ROUTE=copy-logger nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.00s from execute-returned, -3.22s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.05s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-logger-tiny: conpty 160x40 NT_ROUTE=copy-logger nt.tiny
+  nested evaluation 4.0 s; summary current in 15 of 17 snapshots (88%); ticker calls 13
+  nested states: absent=1, current=15, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] C:\Users\james\StudioProjects\scalatest\.claude\worktr
+  after execute returned (2.0 s to command end): noprompt=8
+  final header "1/1, SUCCESS]" in stream at +2.01s from execute-returned, +0.01s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+conpty-daemon-copy-rows24: conpty 160x24 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 76 of 93 snapshots (82%); ticker calls 308
+  nested states: absent=1, current=76, hidden=15, noprompt=1
+  non-current intervals: 3, of which lasting 2 or more snapshots: 1
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] C:\Users\james\StudioProjects\scalatest\.claude\
+    hidden       0.50s..  4.00s  ... and 10 more threads
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at +0.06s from execute-returned, -3.16s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+conpty-daemon-copy-tiny: conpty 160x40 NT_ROUTE=copy nt.tiny
+  nested evaluation 4.0 s; summary current in 0 of 17 snapshots (0%); ticker calls 13
+  nested states: absent=1, noprompt=1, other-text=15
+  non-current intervals: 3, of which lasting 2 or more snapshots: 1
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] C:\Users\james\StudioProjects\scalatest\.claude\worktr
+    other-text   0.50s..  4.00s  1] nt.sleeper SLEEPER-DETAIL
+  after execute returned (2.0 s to command end): noprompt=8
+  final header "1/1, SUCCESS]" in stream at +2.02s from execute-returned, +0.01s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+conpty-nodaemon-copy-1: conpty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.5 s; summary current in 93 of 94 snapshots (99%); ticker calls 334
+  nested states: current=93, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.08s from execute-returned, -3.30s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.04s from command-end
+  Task.log lines written=323 shown intact=323 stale prompt rows=0
+conpty-nodaemon-copy-2: conpty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.5 s; summary current in 93 of 95 snapshots (98%); ticker calls 334
+  nested states: current=93, noprompt=2
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    noprompt    23.50s.. 23.50s  
+  after execute returned (3.2 s to command end): noprompt=12
+  final header "1240/1240+, 2 FAILED]" in stream at -0.03s from execute-returned, -3.26s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.27s from execute-returned, +0.04s from command-end
+  Task.log lines written=323 shown intact=323 stale prompt rows=0
+conpty-nodaemon-copy-3: conpty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.4 s; summary current in 93 of 94 snapshots (99%); ticker calls 347
+  nested states: current=93, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.09s from execute-returned, -3.32s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.26s from execute-returned, +0.04s from command-end
+  Task.log lines written=336 shown intact=336 stale prompt rows=0
+conpty-nodaemon-copy-4: conpty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.4 s; summary current in 93 of 94 snapshots (99%); ticker calls 334
+  nested states: current=93, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.06s from execute-returned, -3.29s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.27s from execute-returned, +0.04s from command-end
+  Task.log lines written=323 shown intact=323 stale prompt rows=0
+mintty-daemon-copy-1: mintty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.3 s; summary current in 92 of 94 snapshots (98%); ticker calls 347
+  nested states: current=92, hidden=1, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    hidden      14.75s.. 14.75s  ... and 3 more threads
+  after execute returned (3.2 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.34s from execute-returned, +0.11s from command-end
+  Task.log lines written=336 shown intact=336 stale prompt rows=0
+mintty-daemon-copy-2: mintty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 90 of 93 snapshots (97%); ticker calls 308
+  nested states: absent=2, current=90, noprompt=1
+  non-current intervals: 3, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1198/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+    absent      18.50s.. 18.50s  1238/1240+, 2 failing] ./mill nt.test a.test b.test c.test d
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.33s from execute-returned, +0.10s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-3: mintty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.35s from execute-returned, +0.10s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-4: mintty 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.3 s; summary current in 92 of 94 snapshots (98%); ticker calls 347
+  nested states: absent=1, current=92, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.3 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.39s from execute-returned, +0.10s from command-end
+  Task.log lines written=336 shown intact=336 stale prompt rows=0
+mintty-daemon-copy-base-1: mintty 160x40 NT_ROUTE=copy-base nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.30s from execute-returned, +0.09s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-base-rows24: mintty 160x24 NT_ROUTE=copy-base nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 89 of 93 snapshots (96%); ticker calls 308
+  nested states: absent=2, current=89, hidden=1, noprompt=1
+  non-current intervals: 4, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1028/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+    hidden      13.00s.. 13.00s  ... and 8 more threads
+    absent      20.00s.. 20.00s  1239/1240+, 2 failing] ./mill nt.test a.test b.test c.test d
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.32s from execute-returned, +0.11s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-base-tiny: mintty 160x40 NT_ROUTE=copy-base nt.tiny
+  nested evaluation 4.0 s; summary current in 15 of 17 snapshots (88%); ticker calls 13
+  nested states: absent=1, current=15, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] ./mill nt.tiny
+  after execute returned (2.0 s to command end): noprompt=8
+  final header "1/1, SUCCESS]" in stream at +2.04s from execute-returned, +0.03s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+mintty-daemon-copy-logger-1: mintty 160x40 NT_ROUTE=copy-logger nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.32s from execute-returned, +0.11s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-logger-rows24: mintty 160x24 NT_ROUTE=copy-logger nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 90 of 93 snapshots (97%); ticker calls 308
+  nested states: absent=1, current=90, hidden=1, noprompt=1
+  non-current intervals: 3, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0585/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+    hidden      10.50s.. 10.50s  ... and 10 more threads
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.30s from execute-returned, +0.09s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-logger-tiny: mintty 160x40 NT_ROUTE=copy-logger nt.tiny
+  nested evaluation 4.0 s; summary current in 15 of 17 snapshots (88%); ticker calls 13
+  nested states: absent=1, current=15, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] ./mill nt.tiny
+  after execute returned (2.0 s to command end): noprompt=8
+  final header "1/1, SUCCESS]" in stream at +2.04s from execute-returned, +0.03s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+mintty-daemon-copy-rows24: mintty 160x24 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 74 of 93 snapshots (80%); ticker calls 308
+  nested states: absent=1, current=74, hidden=16, noprompt=2
+  non-current intervals: 5, of which lasting 2 or more snapshots: 1
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+    hidden       0.50s..  4.00s  ... and 4 more threads
+    noprompt     7.75s..  7.75s  
+    hidden      18.50s.. 18.50s  ... and 3 more threads
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.32s from execute-returned, +0.10s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+mintty-daemon-copy-tiny: mintty 160x40 NT_ROUTE=copy nt.tiny
+  nested evaluation 4.0 s; summary current in 0 of 17 snapshots (0%); ticker calls 14
+  nested states: absent=1, noprompt=1, other-text=15
+  non-current intervals: 3, of which lasting 2 or more snapshots: 1
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] ./mill nt.tiny
+    other-text   0.50s..  4.00s  1] nt.sleeper SLEEPER-DETAIL
+  after execute returned (2.5 s to command end): noprompt=10
+  final header "1/1, SUCCESS]" in stream at +2.55s from execute-returned, +0.05s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+mintty-nodaemon-copy-1: mintty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.5 s; summary current in 92 of 95 snapshots (97%); ticker calls 347
+  nested states: current=92, hidden=2, noprompt=1
+  non-current intervals: 3, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    hidden      12.75s.. 12.75s  ... and 8 more threads
+    hidden      13.25s.. 13.25s  ... and 8 more threads
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.03s from execute-returned, -3.26s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.33s from execute-returned, +0.10s from command-end
+  Task.log lines written=336 shown intact=336 stale prompt rows=0
+mintty-nodaemon-copy-2: mintty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.4 s; summary current in 92 of 94 snapshots (98%); ticker calls 334
+  nested states: current=92, hidden=1, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    hidden       0.50s..  0.50s  ... and 6 more threads
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.05s from execute-returned, -3.27s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.32s from execute-returned, +0.10s from command-end
+  Task.log lines written=323 shown intact=323 stale prompt rows=0
+mintty-nodaemon-copy-3: mintty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.5 s; summary current in 91 of 95 snapshots (96%); ticker calls 347
+  nested states: absent=2, current=91, hidden=1, noprompt=1
+  non-current intervals: 4, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    hidden      17.25s.. 17.25s  ... and 2 more threads
+    absent      17.75s.. 17.75s  1238/1240+, 2 failing] ./mill nt.test a.test b.test c.test d
+    absent      23.50s.. 23.50s  1240/1240+, 2 FAILED] ./mill nt.test a.test b.test c.test d.
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.04s from execute-returned, -3.29s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.28s from execute-returned, +0.04s from command-end
+  Task.log lines written=336 shown intact=336 stale prompt rows=0
+mintty-nodaemon-copy-4: mintty 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.8 s; summary current in 95 of 96 snapshots (99%); ticker calls 334
+  nested states: current=95, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.2 s to command end): noprompt=13
+  final header "1240/1240+, 2 FAILED]" in stream at -0.00s from execute-returned, -3.24s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.33s from execute-returned, +0.10s from command-end
+  Task.log lines written=323 shown intact=323 stale prompt rows=0
+linux-daemon-copy-1: linux script 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.0 s; summary current in 91 of 93 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=91, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0385/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.06s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-2: linux script 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 22.9 s; summary current in 90 of 92 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=90, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.02s from execute-returned, +0.00s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-3: linux script 160x40 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 22.9 s; summary current in 90 of 92 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=90, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.01s from execute-returned, +0.00s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-base-1: linux script 160x40 NT_ROUTE=copy-base nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 22.9 s; summary current in 90 of 92 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=90, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.05s from execute-returned, +0.04s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-base-rows24: linux script 160x24 NT_ROUTE=copy-base nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.0 s; summary current in 90 of 92 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=90, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=13
+  final header "1/1, SUCCESS]" in stream at +3.06s from execute-returned, +0.05s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-base-tiny: linux script 160x40 NT_ROUTE=copy-base nt.tiny
+  nested evaluation 4.0 s; summary current in 15 of 17 snapshots (88%); ticker calls 14
+  nested states: absent=1, current=15, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] ./mill nt.tiny
+  after execute returned (2.5 s to command end): noprompt=10
+  final header "1/1, SUCCESS]" in stream at +2.50s from execute-returned, +0.00s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+linux-daemon-copy-logger-1: linux script 160x40 NT_ROUTE=copy-logger nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 22.8 s; summary current in 90 of 92 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=90, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.01s from execute-returned, +0.00s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-logger-rows24: linux script 160x24 NT_ROUTE=copy-logger nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 22.8 s; summary current in 90 of 92 snapshots (98%); ticker calls 308
+  nested states: absent=1, current=90, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.01s from execute-returned, +0.00s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-logger-tiny: linux script 160x40 NT_ROUTE=copy-logger nt.tiny
+  nested evaluation 4.0 s; summary current in 15 of 17 snapshots (88%); ticker calls 14
+  nested states: absent=1, current=15, noprompt=1
+  non-current intervals: 2, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] ./mill nt.tiny
+  after execute returned (2.5 s to command end): noprompt=10
+  final header "1/1, SUCCESS]" in stream at +2.50s from execute-returned, +0.00s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+linux-daemon-copy-rows24: linux script 160x24 NT_ROUTE=copy nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 22.9 s; summary current in 75 of 92 snapshots (82%); ticker calls 308
+  nested states: absent=1, current=75, hidden=15, noprompt=1
+  non-current intervals: 3, of which lasting 2 or more snapshots: 1
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  1210/1240+] ./mill nt.test a.test b.test c.test d.test e.tes
+    hidden       0.50s..  4.00s  ... and 7 more threads
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1/1, SUCCESS]" in stream at +3.01s from execute-returned, +0.00s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-daemon-copy-tiny: linux script 160x40 NT_ROUTE=copy nt.tiny
+  nested evaluation 4.0 s; summary current in 0 of 17 snapshots (0%); ticker calls 14
+  nested states: absent=1, noprompt=1, other-text=15
+  non-current intervals: 3, of which lasting 2 or more snapshots: 1
+    noprompt     0.00s..  0.00s  
+    absent       0.25s..  0.25s  0/1+] ./mill nt.tiny
+    other-text   0.50s..  4.00s  1] nt.sleeper SLEEPER-DETAIL
+  after execute returned (2.5 s to command end): noprompt=10
+  final header "1/1, SUCCESS]" in stream at +2.50s from execute-returned, +0.00s from command-end
+  Task.log lines written=2 shown intact=2 stale prompt rows=0
+linux-nodaemon-copy-1: linux script 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.1 s; summary current in 92 of 93 snapshots (99%); ticker calls 308
+  nested states: current=92, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1240/1240+, 2 FAILED]" in stream at -0.01s from execute-returned, -3.03s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.02s from execute-returned, +0.01s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-nodaemon-copy-2: linux script 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 92 of 93 snapshots (99%); ticker calls 308
+  nested states: current=92, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1240/1240+, 2 FAILED]" in stream at -0.03s from execute-returned, -3.06s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.04s from execute-returned, +0.01s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
+linux-nodaemon-copy-3: linux script 160x40 NT_ROUTE=copy --no-daemon nt.test a.test b.test c.test d.test e.test g.test h.test failing.test broken.test
+  nested evaluation 23.2 s; summary current in 92 of 93 snapshots (99%); ticker calls 308
+  nested states: current=92, noprompt=1
+  non-current intervals: 1, of which lasting 2 or more snapshots: 0
+    noprompt     0.00s..  0.00s  
+  after execute returned (3.0 s to command end): noprompt=12
+  final header "1240/1240+, 2 FAILED]" in stream at -0.06s from execute-returned, -3.08s from command-end
+  final header "1/1, SUCCESS]" in stream at +3.03s from execute-returned, +0.01s from command-end
+  Task.log lines written=297 shown intact=297 stale prompt rows=0
