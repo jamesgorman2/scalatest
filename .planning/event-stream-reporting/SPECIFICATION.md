@@ -33,7 +33,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - An emitter in ScalaTest that sends one run's events, test structure and the output it captures over a single channel.
 - A consolidation library that takes the following and writes each consolidated output to a file, pipe or writer its caller supplies:
-  - many runs' event streams, each with the output *captured off* its run's processes' stdout and stderr, that is, taken from those streams outside the processes;
+  - many runs' event streams, each with the output *captured off* the stdout and stderr of its run's processes, that is, read from those streams from outside the processes;
   - each process that ended before any run existed in it (R-076), with its test run label and the output captured off its stdout and stderr;
   - each module whose tests did not start, with its test run label and, where a failure stopped them, that failure;
   - each test class its caller knows was to run but that no run reported;
@@ -124,14 +124,14 @@ WHERE `--halt-on-failure` is given:
 
 ## Consolidation
 
-Output is *captured against* a suite, scope or test, or against the run, when the means that captured it ties it to that node, or only to the run.
+Output is *captured against* a suite, scope or test when the means that captured it ties it to that node, and *captured against* the run when it ties it only to the run.
 
 - R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output, and any combination can be on together, including progress output with JSON output, unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
 - R-027 Unless the test command is interrupted (R-069), the human-readable and JSON output are written together, once every run's event stream has ended.
 - R-078 In the human-readable and JSON output, the consolidation is the root, one for each test command under Mill. Its children are its test run labels, and each label's children are the top-level suites of its runs. No run and no module selector is a node.
 - R-079 In the human-readable and JSON output, test run labels appear in ascending lexicographic order, as do the top-level suites under each label by name, unlike the order `../structured-test-reporting/SPECIFICATION.md` § Human-readable output gives. Below a top-level suite, nodes keep the order R-028 and R-030 give them.
-- R-028 The JSON output is one object for the consolidation. Each suite, and every node below it, takes the layout that `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object and `../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` § APIs give one run, key names included, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them, and the `output` of each node and run record holds the output captured against it (R-012), whatever its source or whether its stream is known, not only test output.
+- R-028 The JSON output is one object for the consolidation. Each suite, and every node below it, takes the layout that `../structured-test-reporting/runner-json/SPECIFICATION.md` § The JSON object and `../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md` § APIs give one run, key names included, each node holding its final state. Unlike that layout, the JSON output records no event-filter characters and filters no value by them. The `output` of each node and run record holds the output captured against it (R-012), not only test output, whatever its source and whether or not its stream is known.
 - R-080 In the JSON output, each test run label holds a run record for every run under it, including a run with no suites (R-071). A run record holds what the layout R-028 cites gives the run node, key names included, except its suites, ScalaTest version and event-filter characters, and adds the run's identifier, unique within its label. Each suite a run reported names that run's record.
 - R-081 The JSON output's root records the ScalaTest version, which every run shares (R-059), and each module selector with the test modules it resolved to. The human-readable output does not show module selectors.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
@@ -142,7 +142,7 @@ Output is *captured against* a suite, scope or test, or against the run, when th
 - R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run, except as R-045 allows and what the layouts this document takes (R-028, R-030) leave out.
 - R-022 In the human-readable and JSON output, no suite, scope, test, run record or human-readable block (R-082) of one run holds an event or captured output of another run.
 - R-012 Each piece of captured output is shown on the narrowest suite, scope or test it was captured against, else on its run (R-080, R-082), or, for a process in which no run existed, as R-076 gives. Each is shown with its stream, stdout or stderr, where that is known. In the human-readable output, output captured against a suite, scope or test keeps its position among that node's events.
-- R-088 In each of the human-readable and JSON output, each piece of output a process wrote appears at most once, even where it was captured more than once, as against a node and off the process's stdout or stderr.
+- R-088 In each of the human-readable and JSON output, each piece of output a process wrote appears at most once, even where it was captured both against a node and off the process's stdout or stderr.
 - R-086 Output captured only against the run is shown without claiming that it is test output or worker output.
 - R-087 Worker output is never captured against a suite, scope or test.
 - R-084 The JSON output is documented for third-party readers and carries the compatibility promise `../structured-test-reporting/SPECIFICATION.md` § JSON output gives the single-run JSON. The human-readable and progress output carry no compatibility promise.

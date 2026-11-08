@@ -59,11 +59,11 @@ The reporter configuration characters `N C X E H L O P Q R M`, each of which dro
 _Avoid_: Filter flags, suppression characters
 
 **Test output**:
-Output written from within a suite, scope or test, such as logging, other than the test framework's own reporting and other than I/O that is the behaviour under test or that the test itself captures. What it is does not depend on the thread, stream or code that writes it, nor on whether it can be captured.
+Output written from within a suite, scope or test, such as logging. It excludes the test framework's own reporting and I/O that is the behaviour under test or that the test itself captures. It does not depend on the thread, stream or code that writes it, or on whether it can be captured.
 _Avoid_: Logs, console output
 
 **Worker output**:
-Output from the test harness executing a run, such as a JVM warning or what the build tool's test runner writes, other than the test framework's own reporting. It comes from no suite, scope or test. What it is does not depend on whether it can be captured or attributed.
+Output from the test harness executing a run, such as a JVM warning or what the build tool's test runner writes. It excludes the test framework's own reporting and comes from no suite, scope or test. It does not depend on whether it can be captured or attributed.
 _Avoid_: Other output, raw output, leftover output
 
 ## Consolidation

@@ -4,7 +4,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ## Test output and worker output are told apart by their source, not by the route or thread of the write that captures them.
 
-**Alternatives** Structured test reporting's definition by write route and thread (`../structured-test-reporting/SPECIFICATION.md` § Test output) classes the same logging as test output or not by how and on which thread it was written: a test's `println` is test output, but the same line from a pool thread the test uses, or through a C `printf` on Native, is not.
+**Alternatives** Structured test reporting defines test output by write route and thread (`../structured-test-reporting/SPECIFICATION.md` § Test output): a test's `println` is test output, but the same line from a pool thread the test uses, or through a C `printf` on Native, is not.
 
 **Reasoning** A reader means by test output what the suite, scope or test wrote, however it was written. Routes and thread rules then decide only which node output is captured against (`SPECIFICATION.md` R-012).
 
@@ -20,7 +20,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Alternatives** Labelling run-level output as test output or worker output asserts what no capture route can tell: on Native, the process's descriptors carry a test's C write, a crash message and the code under test's own stdout alike.
 
-**Reasoning** The output never asserts what it cannot know. Worker output is never captured against a suite, scope or test, so only output captured against the run is of uncertain source (`SPECIFICATION.md` R-086, R-087).
+**Reasoning** Worker output is never captured against a suite, scope or test, so only output captured against the run is of uncertain source (`SPECIFICATION.md` R-086, R-087).
 
 **Costs** A JSON reader cannot separate worker output from test output captured only against the run.
 
