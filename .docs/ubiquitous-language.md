@@ -60,7 +60,7 @@ _Avoid_: Filter flags, suppression characters
 
 **Test output**:
 Output written from within a suite, scope or test, such as logging, other than the test framework's own reporting and other than I/O that is the behaviour under test or that the test itself captures. What it is does not depend on the thread, stream or code that writes it, nor on whether it can be captured.
-_Avoid_: Logs, console output, captured output
+_Avoid_: Logs, console output
 
 **Worker output**:
 Output from the test harness executing a run, such as a JVM warning or what the build tool's test runner writes, other than the test framework's own reporting. It comes from no suite, scope or test. What it is does not depend on whether it can be captured or attributed.
@@ -73,7 +73,7 @@ Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
 **Event stream**:
-One run's events, test structure and the test output it captures, in the order the run produced them, independent of how they are carried.
+One run's events, test structure and the output it captures, in the order the run produced them, independent of how they are carried.
 _Avoid_: Event log, event feed
 
 **Test run label**:

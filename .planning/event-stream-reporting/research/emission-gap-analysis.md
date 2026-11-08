@@ -2,7 +2,7 @@
 
 For each need of the consolidated progress, human-readable and JSON output: what ScalaTest's events carry in memory on the JVM, Scala.js and Native, what `Event.toJson` keeps of it, and whether new code is needed at the point of emission. Facts only; no design is chosen or recommended.
 
-The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from the parts of the structured-test-reporting epic and its `runner-json` feature that its R-012, R-028 and R-030 take.
+The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from the parts of the structured-test-reporting epic and its `runner-json` feature that its R-028 and R-030 take.
 
 `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`, already lists what serialisation loses; this note does not repeat it.
 
@@ -160,7 +160,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 6. Test output
 
-**Need.** Each piece of test output is attributed to the node running when it was written, and keeps its position among that node's events (`ESR` R-010, R-012; `STR` § Test output; `TD` § Nodes, `output`).
+**Need.** The output a run captures is sent on its channel and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-010, R-012; `TD` § Nodes, `output`).
 
 - No event type carries output (`EV/Event.scala`), and ScalaTest captures none (`EMC` § 4; the search was re-run for this note).
 - **Absent** on every runtime. Capture mechanisms per runtime: `JSN` § 4.

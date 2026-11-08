@@ -4,9 +4,9 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ## Test output and worker output are told apart by their source, not by the route or thread of the write that captures them.
 
-**Alternatives** Structured test reporting's definition by write route and thread (`../structured-test-reporting/SPECIFICATION.md` § Test output) would make `SPECIFICATION.md` R-010 require descriptor-level capture on Native, `dup2` on descriptors 1 and 2, switched and flushed at every node boundary and POSIX only, to put a C `printf` or `FileDescriptor.out` write on the channel.
+**Alternatives** Structured test reporting's definition by write route and thread (`../structured-test-reporting/SPECIFICATION.md` § Test output) classes the same logging as test output or not by how and on which thread it was written: a test's `println` is test output, but the same line from a pool thread the test uses, or through a C `printf` on Native, is not.
 
-**Reasoning** A definition by capture route makes what test output means change with the runtime and the implementation, while a reader means by it what the suite, scope or test wrote. Routes and thread rules then decide only which node output is captured against (`SPECIFICATION.md` R-012).
+**Reasoning** A reader means by test output what the suite, scope or test wrote, however it was written. Routes and thread rules then decide only which node output is captured against (`SPECIFICATION.md` R-012).
 
 **Costs** A C `printf` in a Native test, and the output of concurrent async tests on Scala.js, are test output yet land on a broader node than the one that wrote them.
 
@@ -16,11 +16,11 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 ---
 
-## The consolidated output shows each piece of captured output on the narrowest node it was captured against, and does not claim the source of output captured only against the run.
+## Output captured only against the run is shown without claiming its source.
 
 **Alternatives** Labelling run-level output as test output or worker output asserts what no capture route can tell: on Native, the process's descriptors carry a test's C write, a crash message and the code under test's own stdout alike.
 
-**Reasoning** The output never asserts what it cannot know, and a reader still sees every piece of it on the narrowest node the runtime allowed (`SPECIFICATION.md` R-012, R-086, R-087).
+**Reasoning** The output never asserts what it cannot know. Worker output is never captured against a suite, scope or test, so only output captured against the run is of uncertain source (`SPECIFICATION.md` R-086, R-087).
 
 **Costs** A JSON reader cannot separate worker output from test output captured only against the run.
 
@@ -110,7 +110,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 - A placeholder JSON file written when the test command starts exists in structured test reporting solely so each ScalaTest invocation can list its tests for its consolidator. The test command is the only consolidator and already knows its runs.
 - A JVM shutdown hook writing partial results would tell a user who pressed Ctrl-C only what they already know: they killed the tests.
 
-**Reasoning** A user who interrupts the tests knows they killed them (`SPECIFICATION.md` R-069, R-046). After Ctrl-C, Mill gives the test command's body no further control (`research/mill-command-lifetime.md` § 5.1, § 5.2).
+**Reasoning** After Ctrl-C, Mill gives the test command's body no further control (`SPECIFICATION.md` R-069; `research/mill-command-lifetime.md` § 5.1, § 5.2).
 
 **Costs** A CI timeout that sends SIGTERM gets no partial results.
 
