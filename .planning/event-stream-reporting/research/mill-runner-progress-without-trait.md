@@ -203,7 +203,7 @@ All routes share the nested evaluation and the capture: `MNK` § 5's fail-fast-o
 | | relies on | the queue protocol and Mill's scheduling, copied (`MPC` § 6) |
 | `command` | as `MTW` § 6 `command`: `testForked`, `testOnly`, `Task.inputs`, `Task.evaluate`, `Task.Named`, `Task.sequence`; `CaptureFork` implementing `TaskCtx.Fork.Api` | public, unmarked; `Fork` `@experimental` |
 | `command-quiet` | as `command`, plus `Logger` and `Logger.Prompt` implemented with their `private[mill]` members | `private[mill]` (`LOG` lines 21–98, 180–211); compiled in package `mill.ntp`, which nothing marks |
-| | relies on | worker keys below `ctx.log`'s (`EC` line 113, `PFX` line 37), in `mill.internal`, outside the policy |
+| | relies on | worker keys below `ctx.log`'s (`EC` line 113, `PFX` line 37), in `mill.exec` and `mill.internal`, outside the policy |
 | `member-quiet` | `MPC` § 6 Route A's API from outside the module (`TestModuleUtil` `@experimental`, `internalWorker` and `TestResult` `@internal`), the reflected discovery member, and `command-quiet`'s logger | as listed above |
 | `command-dummy` | as `command`, plus `Logger.DummyLogger` | public object, unmarked (`LOG` line 106); breaks R-053 (§ 5.3) |
 

@@ -10,7 +10,7 @@ Two notes hold what this one builds on and does not repeat: `.planning/event-str
   1. No worker output, including Mill's runner lines, a child process's writes and a JVM warning, reached the console in any of its 24 runs (§ 3).
   2. The plugin received every worker's stdout and stderr, each in order, tied to its worker label and folder (§ 4).
   3. Per fork group, these matched Mill's own `testForked`: the classes run; each worker's JVM arguments, environment and working directory; the exit status and failure message; and, as sets, the task's results and JUnit XML report. The worker count matched except in one Linux run. On Windows, a class sometimes ran on two workers under both, at different rates (§ 5).
-- **Route A with a plugin-supplied `log` instead** cannot be built from build code: the `Logger` it would need must define `prompt`, which is `private[mill]` (§ 2.2).
+- **Route A with a plugin-supplied `log` instead** cannot be built in package `build`: the `Logger` it would need must define `prompt`, which is `private[mill]`; a package inside `mill` was not tried here (§ 2.2).
 - **Route B, the plugin driving the scheduler,** gave the same results, except that its worker count differed in one Windows run, and under the daemon on Windows a class ran on two workers in 5 of 6 runs against 2 of 6 for `testForked` (§ 3–5). Most of its roughly 100 lines mirror Mill's scheduling and reporting code, and it calls Mill's discovery through an internal API (§ 6).
 - **Not run:** a pseudo-terminal, the sequential path, class globs, several modules in one exclusive command, a killed worker, macOS (§ 8).
 

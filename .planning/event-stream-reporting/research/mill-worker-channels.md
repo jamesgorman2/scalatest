@@ -20,7 +20,7 @@ Other notes hold facts this one relies on and does not repeat:
 - **Plugin code in Mill's process can take the raw streams by calling `TestModuleUtil` or by evaluating the test task itself** (§ 2):
   - A `testTask` override that calls `super.testTask` cannot.
   - A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. Observed (`EPS` § 6).
-  - A direct `runTests()` call does so on its sequential path, observed (`MTW` § 5). On its parallel path it does so when given a plugin-built `TaskCtx` whose `fork.async` sets them inside the body, observed (`MPC` § 2–4); a plugin-supplied `log` cannot be built from build code.
+  - A direct `runTests()` call does so on its sequential path, observed (`MTW` § 5). On its parallel path it does so when given a plugin-built `TaskCtx` whose `fork.async` sets them inside the body, observed (`MPC` § 2–4); a plugin-supplied `log` can be built only as a meta-build source in a package inside `mill` (§ 2.2).
   - Plugin code that evaluates the module's `testForked`, `testOnly` or `testTask` itself, with such a `TaskCtx` and inside its own `withStreams`, takes them with no `TestModuleUtil` call of its own. Observed (`MTW` § 3.3–3.4, § 5).
   - Inside the worker, a shim `testFramework` can replace `System.out` and `System.err` before Mill's runner captures `System.out`. Observed (`EPS` § 6).
 - **Sandbox file.** Found by a relative path, only while `testSandboxWorkingDir` is on. It sits under `Task.dest`, where Mill itself polls two files every 10 ms. On Windows, whether it can be read while the worker appends to it depends on the share mode of the worker's writer (§ 3.1). The discovery runner resolves the same relative path against Mill's own working directory (§ 3.1).
@@ -129,7 +129,7 @@ Besides what tests and ScalaTest write:
 - **Parallel path.** Each worker is spawned inside `Task.fork.async`, which calls `withStreams(logger.streams)` on a pool thread (EC lines 129–137) and so sets `os.Inherit.out` and `os.Inherit.err` again (SSU lines 47–49). The caller's values are not seen. The logger is built from `ctx.log` of the `TaskCtx` given to `TestModuleUtil` (TMU lines 54, 200; EC lines 112–116).
   - A plugin can pass `TestModuleUtil` a `TaskCtx` of its own (`MPC` § 2.2). Observed: one whose `fork.async` sets `os.Inherit.out` and `os.Inherit.err` inside the body took every worker's raw streams (`MPC` § 3–4).
   - Under that `TaskCtx`, `worker-<i>.log` of § 1.4 was still written but held only Mill's ticker lines (`MPC` § 3).
-  - A plugin-supplied `log` cannot be built from build code: `Logger.prompt` is `private[mill]` (`MPC` § 2.2).
+  - A plugin-supplied `log` cannot be built in package `build`: `Logger.prompt` is `private[mill]` (`MPC` § 2.2). It can be built as a meta-build source in a package inside `mill` (`.planning/event-stream-reporting/research/mill-runner-progress-without-trait.md` § 5.1).
 
 ### 2.3 Through a direct `callTestRunnerSubprocess` call
 
