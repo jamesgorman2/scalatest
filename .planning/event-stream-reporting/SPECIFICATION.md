@@ -21,7 +21,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [research/js-native-channels.md](research/js-native-channels.md) — on Scala.js on Node and on Native under Mill: what a socket, a file and the test-interface `Logger` can each rely on as a channel, where a run's stdout and stderr go, and which hooks let plugin code take them.
 - [research/native-stdio-wrapper.md](research/native-stdio-wrapper.md) — what was observed on Windows and Linux when plugin code gave Scala Native's test adapter a launcher that redirects the test binary's stdout and stderr to files: what reaches the console and the plugin, the exit status, and behaviour under an emulator.
 - [research/js-environment-channels.md](research/js-environment-channels.md) — for each JS environment Mill can select other than Node: whether the test adapter's com channel works, which other transports reach Mill's process, and what console output reaches the run's stdout and stderr.
-- [research/mill-command-lifetime.md](research/mill-command-lifetime.md) — which Mill mechanisms run plugin code before the first test task and after the last, how that code learns what ran and how it ended, what Mill does to its console output and how the command's own output shares the console with Mill's prompt, and how it sets the exit status.
+- [research/mill-command-lifetime.md](research/mill-command-lifetime.md) — which Mill mechanisms run plugin code before the first test task and after the last, how that code learns what ran and how it ended, what Mill does to its console output, how the command's own output shares the console with Mill's prompt, and how it sets the exit status.
 - [research/emitter-plugin-spike.md](research/emitter-plugin-spike.md) — observed on Windows and Linux: a stub socket emitter in each JVM test worker sending events to a minimal exclusive command that executed several modules' test tasks. Covers the command's lifetime and results, live events, a killed worker, worker streams, and what Mill's prompt does to the command's console output.
 - [research/mill-nested-keep-going.md](research/mill-nested-keep-going.md) — at Mill `1.1.10`: which routes let the test command's nested evaluation keep going without `--keep-going`, whether each starts a module's tests on its own compile, and how the Mill API each uses is marked.
 - [research/mill-parallel-worker-capture.md](research/mill-parallel-worker-capture.md) — observed on Windows and Linux: plugin code taking each JVM worker's stdout and stderr under Mill's fork groups and `testParallelism`, by two routes (supplying a `TaskCtx`, and driving the test queue itself). Covers what reached the console, what the plugin received, how each route matched Mill's own `testForked`, and the Mill API each relies on.
@@ -172,7 +172,12 @@ These hold for every run a test command starts.
 - R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured.
 - R-042 Output captured off the stdout and stderr of the run's processes is captured against the run.
 - R-043 Output captured off the run's processes' stdout keeps its order, as does output captured off their stderr, whatever its source. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
-- R-044 Outside the consolidated output, the console does not show Mill's list of failed tests, the progress Mill's test runner shows for the tests of the run's module (such as each worker's current test class and the count of classes completed), or ScalaTest's end-of-run summary for the run. Mill's prompt lines for the test command and the tasks it runs are not that progress; a Mill test task named as another goal on the same `mill` command line shows its own (R-050).
+- R-044 Outside the consolidated output, the console does not show:
+  - Mill's list of failed tests;
+  - the progress Mill's test runner shows for the tests of the run's module, such as each worker's current test class and the count of classes completed;
+  - ScalaTest's end-of-run summary for the run.
+
+  Mill's prompt may still show a line for the test command and for each task it runs, without that progress. A Mill test task named as another goal on the same `mill` command line shows its own progress (R-050).
 - R-045 The consolidated output does not show Mill's list of failed tests or ScalaTest's end-of-run summary for the run.
 - R-046 The test command fails if:
   - any run reports a failure or does not complete: it ends aborted or stopped, or does not finish (§ A run that does not finish);
@@ -186,7 +191,7 @@ Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each on unless a test-command argument turns it off (R-055), and each is written to the console.
 - R-090 On the console, progress output is written as whole lines, never as the single characters `../structured-test-reporting/SPECIFICATION.md` § Progress output streams. Whether or not the summary (R-089) is shown, the lines show every failure a run reports and each other cause of failure R-046 lists, including each run that aborts or does not finish (R-067).
-- R-089 Where Mill redraws its prompt (the status lines at the foot of the console) in place, progress output also shows on the console a current summary of the test command, rewritten in place on one line.
+- R-089 Where Mill redraws in place its prompt (the status lines at the foot of the console), progress output also shows on the console a current summary of the test command, on one line rewritten in place.
 - R-091 Neither progress output's lines nor its summary erase Mill's console output, and Mill's console output erases neither.
 - R-085 JSON output is off unless a test-command argument turns it on (R-055).
 - R-049 JSON output is written to a file in the test command's task folder (`Task.dest`), or to the path a test-command argument gives, never to the console.
