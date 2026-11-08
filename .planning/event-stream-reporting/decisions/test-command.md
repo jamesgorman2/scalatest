@@ -38,7 +38,7 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 **Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`../SPECIFICATION.md` R-056).
 
-**Costs** Of the routes examined, only one, a single `execute` call over every selected module's test tasks on an evaluator whose `Execution` has fail-fast off, both starts each module's tests on its own compile and runs every selected module without `--keep-going`. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`../research/mill-nested-keep-going.md` § 3, § 5).
+**Costs** Only one route examined both starts each module's tests on its own compile and runs every selected module without `--keep-going`: a single `execute` call over every selected module's test tasks, on an evaluator whose `Execution` has fail-fast off. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`../research/mill-nested-keep-going.md` § 3, § 5).
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
