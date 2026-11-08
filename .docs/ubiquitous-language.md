@@ -12,6 +12,10 @@ _Avoid_: Build, test session, invocation
 The platform a run executes on: the JVM, Scala.js or Native.
 _Avoid_: Platform, target, backend
 
+**JS environment**:
+The JavaScript host a Scala.js run executes in, such as Node, jsdom or a browser; under Mill, the one a module's `jsEnvConfig` selects.
+_Avoid_: JS env, JS runtime
+
 **Execution mode**:
 How a run schedules its suites and tests: *sequential*, one after another on one thread, or *concurrent*, on several threads at once; under `Runner`, a concurrent run may also sort its events by suite.
 _Avoid_: Parallelism level, run mode

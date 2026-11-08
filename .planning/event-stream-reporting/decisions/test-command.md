@@ -2,6 +2,24 @@
 
 Decisions behind `../SPECIFICATION.md` on which modules the test command runs, how, and when it fails, newest first.
 
+## On Scala.js, the epic covers the Node and `JsDom` JS environments only.
+
+**Alternatives**
+
+- Node alone leaves jsdom, the usual host for testing Scala.js DOM code, with no consolidated output.
+- Adding the browsers `Selenium` and `Playwright` drive needs R-011, R-042 and R-043 restated for them: both poll the page every 100 ms, capture only `console.log` and `console.error`, and drop what the page buffered after the last poll when the run closes.
+- `Phantom` and `ExoegoJsDomNodeJs` are inferred not to start under Mill as configured: `Phantom` for want of Jetty, `ExoegoJsDomNodeJs` with jsdom 27 or later.
+
+**Reasoning** `JsDom` runs the page in a Node process and uses Node's com channel, `Logger` and process pipes, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
+
+**Costs** Test code in a jsdom window has no `require`, so the emitter's channel on Scala.js cannot be a Node socket or file. Modules tested in a browser get no consolidated output and cannot be selected (R-059).
+
+**Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
+
+**See** `../research/js-environment-channels.md` § 2, § 3.1, § 4.
+
+---
+
 ## A test module needs no change to its definition for the test command to run it.
 
 **Alternatives** A plugin trait mixed into each test module, exposing the protected `testTask` and `aheadOfTimeDiscoveredTestClassesIfNeeded`, needs every module definition changed; a selected module without it would be neither run, as `../SPECIFICATION.md` § Scope requires, nor failed by R-059.
@@ -80,18 +98,22 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 ---
 
-## A selected test module that does not test with the release of this fork whose channels the Mill plugin reads fails the test command before any test starts.
+## A selected test module that does not test with the release of this fork whose channels the Mill plugin reads, or runs on Scala.js in a JS environment the epic does not cover, fails the test command before any test starts.
 
 **Alternatives**
 
 - Running it as Mill does, showing only what its processes wrote to stdout and stderr and whether it passed, supports mixed builds, but every requirement on test structure, failures and test output would need an exemption for it.
 - Skipping it with a warning yields a report that looks complete when it is not.
+- Showing it as *could not start* (R-058) lets the other modules run, but spends a whole test run on a command already bound to fail.
 
 **Reasoning** Every requirement then holds for every run in the consolidated output, and the failure comes before any time is spent on tests (`../SPECIFICATION.md` R-059).
 
-**Costs** A build mixing test frameworks cannot use a bare `__.test` and must narrow its module selectors.
+**Costs** A build mixing test frameworks, or testing Scala.js modules in a browser, cannot use a bare `__.test` and must narrow its module selectors.
 
-**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+**Settled by**
+
+- [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+- [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 
 ---
 

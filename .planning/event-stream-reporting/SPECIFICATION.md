@@ -43,7 +43,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
   - each module selector, with the test modules it resolved to.
 - A Mill plugin that hosts the consolidation library, turns the channel of each run it starts into that run's event stream, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
-All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. Every requirement below, including those taken from structured test reporting, holds on each runtime; none is best effort on Scala.js or Native.
+All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js they cover runs in the Node and `JsDom` JS environments. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each of those JS environments; none is best effort on Scala.js or Native.
 
 A channel's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them.
 
@@ -57,6 +57,7 @@ A channel's format, the consolidation library's API and the switch by which the 
 - Consolidated JUnit XML.
 - A consolidated CTRF (Common Test Report Format) report; a possible later feature.
 - Build tools other than Mill.
+- Scala.js runs in any JS environment other than Node and `JsDom`: `ExoegoJsDomNodeJs`, `Phantom`, and the browsers `Selenium` and `Playwright` drive; browsers are a possible later feature.
 - A `--local` option on the test command, running each module as `testLocal` does, in Mill's JVM.
 - A `--cached` option on the test command, returning cached test results, each flagged as cached (newer than the last edit) or missing.
 - A dry-run option on the test command, listing each module selector's test structure without running tests; a possible later feature.
@@ -115,7 +116,7 @@ Unlike `../structured-test-reporting/SPECIFICATION.md` § Test output, what test
 - R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs and whether or not Mill's `--keep-going` is given. Tests start without waiting for every selected test module to compile.
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
-- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. The JSON file stays as R-077 left it.
+- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, or to a Scala.js test module whose JS environment is not Node or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. The JSON file stays as R-077 left it.
 - R-058 The consolidated output shows the test run label of each selected test module whose tests did not run as aborted, with:
   - reason *not run* where `--halt-on-failure` skipped them (R-057);
   - reason *could not start*, and the failure that stopped them, where they could not start.
