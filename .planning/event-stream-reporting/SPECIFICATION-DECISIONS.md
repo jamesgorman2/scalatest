@@ -42,7 +42,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** The two call for different remedies: a skipped module needs a rerun, one that could not start needs a fix (`SPECIFICATION.md` R-058). Aborted with a reason is how the test structure already shows a node that never ran.
 
-**Costs** A label carries an outcome even though it is not rolled up from its runs (`SPECIFICATION.md` R-083), so a label whose runs all failed shows none.
+**Costs** A label carries an outcome only where its module's tests did not run (`SPECIFICATION.md` R-083), so a label whose runs all failed shows none.
 
 **Settled by** [How do modules, module selectors and runs appear in the consolidated output?](https://github.com/jamesgorman2/scalatest/issues/29).
 
@@ -183,10 +183,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** The emitter and its reader ship in the same release, so the format can change in any release without any reader decoding more than one.
 
-**Costs**
-
-- A test module on another release of the fork fails the test command (`SPECIFICATION.md` R-059).
-- The Mill plugin needs a release for each pairing of fork release and Mill release that it supports.
+**Costs** A test module on another release of the fork fails the test command (`SPECIFICATION.md` R-059), and the Mill plugin needs a release for each pairing of fork release and Mill release that it supports.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 
@@ -213,18 +210,13 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Of the Mill mechanisms examined, only an exclusive command that takes the `Evaluator` has a start, an end and the failure path (`research/mill-command-lifetime.md` § 2, § 3). Confining the plugin's replacement of a module's test task to that command keeps `SPECIFICATION.md` R-003 and R-060 without the replacement having to stand aside for other launches.
 
-**Costs**
-
-- Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental.
-- No consolidated output appears when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-062).
-- `+` cannot join module selectors, and one set of class globs and framework arguments applies to every module (`SPECIFICATION.md` R-055).
-- Nothing covers `testLocal` or `testCached`.
+**Costs** Users run a command other than `mill __.test`, built on evaluator commands that Mill documents as experimental, and get no consolidated output when an earlier goal on the command line fails without `--keep-going` (`SPECIFICATION.md` R-062). `+` cannot join module selectors, one set of class globs and framework arguments applies to every module (R-055), and nothing covers `testLocal` or `testCached`.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
 ---
 
-## A selected test module whose tests cannot start is a failed run: shown with the failure that stopped it, failing the test command and triggering `--halt-on-failure`.
+## A selected test module whose tests cannot start counts as a failure: shown with the failure that stopped it, failing the test command and triggering `--halt-on-failure`.
 
 **Alternatives**
 
@@ -315,11 +307,7 @@ Decisions behind `SPECIFICATION.md`, newest first.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs**
-
-- The plugin must run each module's tests through Mill API marked `@experimental` and `@internal` instead of calling Mill's test task, so it may need a release for each Mill release.
-- On Native, the launcher must be compiled where an emulator cannot load a script.
-- Taking a JVM parallel worker's streams and a Native run's stdout and stderr have each been observed only on Windows and Linux. The JVM's have never been observed with class globs, with test parallelism off, with a killed worker or in a command running several modules.
+**Costs** The plugin must run each module's tests through Mill API marked `@experimental` and `@internal`, so it may need a release for each Mill release, and on Native must compile its launcher where an emulator cannot load a script. Taking a JVM parallel worker's or a Native run's stdout and stderr has been observed only on Windows and Linux, and the JVM's never with class globs, test parallelism off, a killed worker or several modules in one command.
 
 **Settled by**
 
