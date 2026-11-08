@@ -7,13 +7,13 @@ Decisions behind `../SPECIFICATION.md` on which modules and JS environments the 
 **Alternatives**
 
 - `NodeJs` alone leaves jsdom, the usual host for testing Scala.js DOM code, with no consolidated output.
-- Adding the browsers `Selenium` and `Playwright` drive would need R-011, R-042 and R-043 relaxed, because they capture only part of the page's console output and drop what it buffered at close.
-- `ExoegoJsDomNodeJs` works only with jsdom before 27, which the env behind `JsDom` has moved past.
-- `Phantom` works only once a module adds Jetty itself, and PhantomJS is no longer maintained.
+- Adding the browsers that `Selenium` and `Playwright` drive would need R-011, R-042 and R-043 relaxed, because those JS environments capture only part of the page's console output and drop what it buffered at close.
+- `ExoegoJsDomNodeJs` works only with jsdom before version 27, which `JsDom` has moved past.
+- `Phantom` works only if the module adds Jetty itself, and PhantomJS is no longer maintained.
 
 **Reasoning** `JsDom` runs the page in a Node process and uses Node's com channel, `Logger` and process pipes, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
 
-**Costs** Test code in a `JsDom` window has no `require`, so its channel cannot be a Node socket or file: covering both environments needs a channel that does not rely on `require`, or one for each. Modules tested in any other JS environment, browsers included, get no consolidated output.
+**Costs** Test code in a `JsDom` window has no `require`, so its channel cannot be a Node socket or file: covering both environments needs a channel that does not rely on `require`, or one channel per environment. Modules tested in any other JS environment, browsers included, get no consolidated output.
 
 **Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 
@@ -27,7 +27,7 @@ Decisions behind `../SPECIFICATION.md` on which modules and JS environments the 
 
 **Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait. It kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
 
-**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"); the nested evaluation has run goals the plugin builds only one module at a time.
+**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"); so far, the nested evaluation has run the goals the plugin builds for only one module at a time.
 
 **Settled by**
 

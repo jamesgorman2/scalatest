@@ -43,7 +43,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
   - each module selector, with the test modules it resolved to.
 - A Mill plugin that hosts the consolidation library, turns the channel of each run it starts into that run's event stream, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
-All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, while the emitter, the consolidated output and the test command cover runs in the `NodeJs` and `JsDom` JS environments only; R-059 covers a module set to any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
+All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, while the emitter, the consolidated output and the test command cover runs in the `NodeJs` and `JsDom` JS environments only; R-059 covers a module configured for any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
 
 A channel's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them.
 
@@ -57,7 +57,7 @@ A channel's format, the consolidation library's API and the switch by which the 
 - Consolidated JUnit XML.
 - A consolidated CTRF (Common Test Report Format) report; a possible later feature.
 - Build tools other than Mill.
-- Consolidated output for Scala.js runs in any other JS environment: `ExoegoJsDomNodeJs`, `Phantom`, and the browsers `Selenium` and `Playwright` drive; browsers are a possible later feature.
+- Consolidated output for Scala.js runs in a JS environment other than `NodeJs` and `JsDom`: `ExoegoJsDomNodeJs`, `Phantom`, and the browsers that `Selenium` and `Playwright` drive; browsers are a possible later feature.
 - A `--local` option on the test command, running each module as `testLocal` does, in Mill's JVM.
 - A `--cached` option on the test command, returning cached test results, each flagged as cached (newer than the last edit) or missing.
 - A dry-run option on the test command, listing each module selector's test structure without running tests; a possible later feature.
