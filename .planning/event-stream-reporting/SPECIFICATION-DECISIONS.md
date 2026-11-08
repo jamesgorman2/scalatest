@@ -2,6 +2,28 @@
 
 Decisions behind `SPECIFICATION.md`, newest first.
 
+## On the console, progress output's summary is the detail on the test command's own prompt line, set through `Task.log.ticker`, and its lines go through `Task.log`.
+
+**Alternatives**
+
+- Raw writes to the command's streams are overwritten by the prompt's redraws (`research/emitter-plugin-spike.md` § 8.2, § 8.4).
+- Pausing the prompt for the nested `execute` and writing raw needs the `private[mill]` `withPromptPaused`, and nothing reads Mill's other output while the prompt is paused.
+- Requiring Mill's `--ticker false` makes the user pass it on every command, since the plugin cannot set it.
+- Whole lines alone give no live sense of a long run's progress.
+
+**Reasoning** Both paths are public API with no annotation, and both are coordinated with Mill's prompt, so neither erases Mill's output nor is erased by it (`SPECIFICATION.md` R-089). Progress output carries no compatibility promise (R-084), so a change in how Mill draws its prompt changes only how the summary looks.
+
+**Costs** Progress output streams no single characters, and its summary is one line cut to the console width, absent without a prompt and seen only in Mill's 60-second snapshots on a console that is not interactive (`SPECIFICATION.md` R-090). Whether a nested task's prompt key can equal the command's, overwriting or clearing the summary, is inferred from source and not run.
+
+**Settled by** [How do the consolidated progress output and Mill's own prompt share the console?](https://github.com/jamesgorman2/scalatest/issues/36).
+
+**See**
+
+- `research/mill-command-lifetime.md` § 4.2.
+- `research/emitter-plugin-spike.md` § 8.2, § 8.4.
+
+---
+
 ## Test output and worker output are told apart by their source, not by the route or thread of the write that captures them.
 
 **Alternatives** Structured test reporting defines test output by write route and thread (`../structured-test-reporting/SPECIFICATION.md` § Test output): a test's `println` is test output, but the same line from a pool thread the test uses, or through a C `printf` on Native, is not.

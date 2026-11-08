@@ -4,7 +4,7 @@ This note covers:
 
 - which Mill mechanisms let plugin code run once for a Mill command, before the first test task and after the last;
 - how that code learns the modules and selectors, and that the command ended;
-- what Mill does to its terminal output;
+- what Mill does to its terminal output, and how the command's own output can share it with Mill's prompt;
 - whether it can set the exit status;
 - how stable the APIs are.
 
@@ -31,7 +31,7 @@ In this note and the notes citing it, *Mill command* and *selector* have Mill's 
   - A JVM shutdown hook runs once per Mill command under `--no-daemon`, and under the daemon only when the daemon exits.
   - No evaluator or runner hook exists.
   - Mill has no cross-module test report.
-- **Terminal output.** Tasks run by the nested `execute` write through Mill's prompt, prefixed per task. The command's own `System.out` is the raw streams, which bypass the prompt; its `Task.log.streams` go through the prompt. A raw write during a nested `execute` can interleave with Mill's prefixed output (§ 4; `EPS` § 8).
+- **Terminal output.** Tasks run by the nested `execute` write through Mill's prompt, prefixed per task. The command's own `System.out` is the raw streams, which bypass the prompt; its `Task.log.streams` go through the prompt. A raw write during a nested `execute` can interleave with Mill's prefixed output (§ 4; `EPS` § 8). `Task.log.ticker`, public with no annotation, sets a detail on the command's own prompt line, redrawn in place; nothing is drawn under `--ticker false`, and where the console width is unknown the prompt is printed as plain lines every 60 s (§ 4.2).
 - **Under the daemon, a user interrupt exits the JVM without interrupting the command's thread** (§ 5.1). Under the daemon and `--no-daemon`, the command body does not regain control (`EPS` § 8.3). *Inferred:* only a JVM shutdown hook observes the interrupt (§ 5.1, § 5.2).
 - **Exit status is 0 or 1 from the command's result**; any other code needs `systemExitWithReason`, which stops the daemon (§ 6).
 - **API stability.** `Task.Command(exclusive = true)`, `mill.api.Evaluator` and `Evaluator.Result` are public in `mill.api`, which Mill's binary-compatibility policy covers. `TestModuleUtil` and the API `Task.fork` returns are `@experimental`, `Logger.prompt` is `private[mill]`, and `mill.exec` and `mill.internal` are outside the policy (§ 7).
@@ -61,6 +61,7 @@ Permalink base: `https://github.com/com-lihaoyi/mill/blob/92d51b79bc2243fd2e82a0
 - `DSRV` is `runner/server/src/mill/server/MillDaemonServer.scala`.
 - `SRV` is `libs/daemon/server/src/mill/server/Server.scala`.
 - `PL` is `core/internal/src/mill/internal/PromptLogger.scala`.
+- `PLU` is `core/internal/src/mill/internal/PromptLoggerUtil.scala`.
 - `TM` and `TMU` are as in `MILL`.
 
 Statements marked *inferred* follow from the cited source and were not observed. § 8 lists what was not determined.
@@ -177,10 +178,19 @@ Statements marked *inferred* follow from the cited source and were not observed.
 - Mill prints the command's key once, then pauses the prompt for the body (`GE` lines 885–891). The pause first drains pending output, because the raw streams bypass the pipe (`PL` lines 288–294).
 - **A nested `execute` unpauses the prompt** for its duration (`EX` line 137; `PL` lines 296–297). Nested tasks then write through the pipe with prefixes and prompt redraws, as in § 4.1.
 - While a nested `execute` runs, a write from the command's own thread to `System.out` goes to the raw streams and is not coordinated with the prompt, so the two can interleave (`EPS` § 8.1, § 8.2).
-- `Task.log` inside the command is the command's `PrefixLogger` teed to its log file (`GE` lines 503, 516–519). Writes through `Task.log.streams` take the § 4.1 path: line-buffered, prefixed with the command's key, non-colour ANSI stripped, coordinated with the prompt.
+- `Task.log` inside the command is a `MultiLogger` over the command's `PrefixLogger` and a `FileLogger` on its log file (`GE` lines 503, 516–519). Writes through `Task.log.streams` take the § 4.1 path: line-buffered, prefixed with the command's key, non-colour ANSI stripped, coordinated with the prompt.
 - `SystemStreams.original` is public and documented as not to be used: its streams "do not get captured properly by Mill's stdout/err redirection, and thus only get picked up from the Mill server log files asynchronously", so logs "may appear out of order" (`core/api/daemon/src/mill/api/daemon/SystemStreams.scala` lines 20–28). How the daemon's `stdout` and `stderr` files reach the console: `JNC` § 5.3.
 - `Logger.prompt`, with `withPromptPaused`, `setPromptLine` and `logPrefixedLine`, is `private[mill]` (`Logger.scala` lines 83–89).
-- `--ticker false` turns the prompt and the prefixes off for the whole command (`MAIN` lines 216–221; `PL` line 273).
+- `--ticker false` turns the prompt and the prefixes off for the whole command; nothing of the prompt is drawn (`MAIN` lines 216–221; `PL` lines 73, 75, 273).
+- **`Task.log.ticker`.** `ticker(s: String): Unit` is declared on `Logger.Actions`: public, with no `@internal`, `@experimental`, `@deprecated` or `private[mill]` (`Logger.scala` lines 155–162).
+- `MultiLogger.ticker` calls `ticker` on both its loggers (`core/internal/src/mill/internal/MultiLogger.scala` lines 37–40).
+- `PrefixLogger.ticker` is `prompt.setPromptDetail(logKey, s)` (`core/internal/src/mill/internal/PrefixLogger.scala` line 91). It sets the detail of the prompt status for that key, and does nothing if the key has no status (`PL` lines 155–158, 572–574). The detail is drawn after the key's prompt line text and its seconds suffix, and is rewritten in place (`PLU` lines 120–126).
+- The command's own prompt line exists for the whole command, since `withPromptLine` wraps it (`EX` lines 264–273). While the prompt is paused for the body, a `ticker` call only updates state; the detail is drawn once a nested `execute` unpauses the prompt (`EX` line 137; `PL` line 93).
+- The prompt is redrawn every 100 ms, and only when the rendered bytes change, so `ticker` calls between redraws coalesce (`PLU` line 16). Each line is cut to the console width less one; the detail takes what is left, shortened in the middle with `...` (`PLU` lines 96, 124, 173–186).
+- Where the console width is unknown, as on a console that is not interactive, the prompt is printed as plain lines every 60 s (`PLU` line 26; `PL` lines 87–90). Whether output redirected to a file counts as not interactive was not read.
+- `FileLogger.ticker` appends each call as a line to the command's log file (`core/internal/src/mill/internal/FileLogger.scala` line 49).
+- *Inferred:* a nested `execute` numbers its task keys from a fresh counter (`EX` lines 160, 264–266) and by default logs through the base logger (`EX` line 296), so a nested task's key may equal the command's and overwrite or clear the command's status and detail.
+- Mill's own test tasks use `ticker`: for each worker, the current class with its seconds, and for each task, `N/M completed, K failures.`, counted by class (`TMU` lines 329, 357–359, 615–621).
 
 ### 4.3 What Mill itself prints for a test run
 
@@ -233,13 +243,14 @@ Statements marked *inferred* follow from the cited source and were not observed.
 | `Evaluator.baseLogger`, `outPath`, `workerCache`, `rootModule`, `env` | `private[mill]` (`EV` lines 24–42). |
 | `TestReporter` | Public trait in package `mill.api.daemon.internal`; no annotation (`TestReporter.scala` line 11). |
 | `Logger.streams`, `info`, `error` | Public (`Logger.scala` lines 19, 128–140). |
+| `Logger.Actions.ticker` | Public, no annotation (`Logger.scala` lines 155–162). |
 | `Logger.prompt`, `unprefixedStreams`, `withRedirectOutToErr` | `private[mill]` (`Logger.scala` lines 61, 83–96). |
 | `mill.util.Tasks` | Public, in `mill.util` (`Tasks.scala` line 10). |
 | `Task.Worker` | Public, in `mill.api` (`TASK` line 311). |
 | `Task.ctx().systemExitWithReason` | Public (`CTX` line 33). |
 | `Task.fork` | The accessor carries no annotation (`TASK` line 131). The `TaskCtx.Fork.Api` it returns is declared in `object Fork`, which is `@experimental` (`CTX` lines 193–196). |
 | `mill.exec.Execution`, `GroupExecution` | Package `mill.exec`, not in the policy's list. |
-| `mill.internal.PromptLogger`, `PrefixLogger` | Package `mill.internal`, not in the policy's list. |
+| `mill.internal.PromptLogger`, `PrefixLogger`, `MultiLogger`, `FileLogger` | Package `mill.internal`, not in the policy's list. |
 | `TestModuleUtil` | `@experimental` (`MILL` § 2.2). |
 
 - `mill.api.daemon.internal` as a whole is not excluded from MiMa; only named members are (`MillStableJavaModule.scala` lines 24–27, 52–55, 88). Whether Mill treats `TestReporter` as covered by the policy is not stated.
@@ -247,6 +258,7 @@ Statements marked *inferred* follow from the cited source and were not observed.
 ## 8. What is not known
 
 - Whether the behaviour of § 1 (`--watch`, BSP), § 2.5, § 2.6, § 3.1, § 3.3–3.6 and § 5.3 holds when run; `EPS` § 9 names the sections it ran against.
+- Whether the `ticker` behaviour of § 4.2 holds when run, including whether a nested task's key can equal the command's.
 - How the launcher process itself handles SIGINT; `MillLauncherMain.scala` holds no signal handling, and the native launcher was not read.
 - Whether the daemon's command thread is a daemon thread, and how long `System.exit` takes with test-worker JVMs alive.
 - Whether a plugin compiled into a package under `mill` can implement `Logger` and pass it to `execute` (§ 2.5).
