@@ -13,7 +13,7 @@ The platform a run executes on: the JVM, Scala.js or Native.
 _Avoid_: Platform, target, backend
 
 **JS environment**:
-The JavaScript host a Scala.js run executes in, such as Node, jsdom or a browser; under Mill, the one a module's `jsEnvConfig` selects.
+The JavaScript host a Scala.js run executes in, such as Node, jsdom or a browser; under Mill, the `JsEnvConfig` case, such as `NodeJs` or `JsDom`, that a module's `jsEnvConfig` selects.
 _Avoid_: JS env, JS runtime
 
 **Execution mode**:

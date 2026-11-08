@@ -1,18 +1,19 @@
 # Decisions: the test command and running modules
 
-Decisions behind `../SPECIFICATION.md` on which modules the test command runs, how, and when it fails, newest first.
+Decisions behind `../SPECIFICATION.md` on which modules and JS environments the test command runs, how, and when it fails, newest first.
 
-## On Scala.js, the epic covers the Node and `JsDom` JS environments only.
+## On Scala.js, the epic covers the `NodeJs` and `JsDom` JS environments only.
 
 **Alternatives**
 
-- Node alone leaves jsdom, the usual host for testing Scala.js DOM code, with no consolidated output.
-- Adding the browsers `Selenium` and `Playwright` drive needs R-011, R-042 and R-043 restated for them: both poll the page every 100 ms, capture only `console.log` and `console.error`, and drop what the page buffered after the last poll when the run closes.
-- `Phantom` and `ExoegoJsDomNodeJs` are inferred not to start under Mill as configured: `Phantom` for want of Jetty, `ExoegoJsDomNodeJs` with jsdom 27 or later.
+- `NodeJs` alone leaves jsdom, the usual host for testing Scala.js DOM code, with no consolidated output.
+- Adding the browsers `Selenium` and `Playwright` drive would need R-011, R-042 and R-043 relaxed, because they capture only part of the page's console output and drop what it buffered at close.
+- `ExoegoJsDomNodeJs` works only with jsdom before 27, which the env behind `JsDom` has moved past.
+- `Phantom` works only once a module adds Jetty itself, and PhantomJS is no longer maintained.
 
 **Reasoning** `JsDom` runs the page in a Node process and uses Node's com channel, `Logger` and process pipes, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
 
-**Costs** Test code in a jsdom window has no `require`, so the emitter's channel on Scala.js cannot be a Node socket or file. Modules tested in a browser get no consolidated output and cannot be selected (R-059).
+**Costs** Test code in a `JsDom` window has no `require`, so its channel cannot be a Node socket or file: covering both environments needs a channel that does not rely on `require`, or one for each. Modules tested in any other JS environment, browsers included, get no consolidated output.
 
 **Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 
@@ -26,7 +27,7 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 **Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait. It kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
 
-**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"); the nested evaluation has run goals the plugin builds only one module at a time, so its fail-fast-off behaviour has been observed only with each module's own `testForked` as goals.
+**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"); the nested evaluation has run goals the plugin builds only one module at a time.
 
 **Settled by**
 
@@ -108,7 +109,7 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 **Reasoning** Every requirement then holds for every run in the consolidated output, and the failure comes before any time is spent on tests (`../SPECIFICATION.md` R-059).
 
-**Costs** A build mixing test frameworks, or testing Scala.js modules in a browser, cannot use a bare `__.test` and must narrow its module selectors.
+**Costs** A build mixing test frameworks, or testing Scala.js modules in a JS environment other than `NodeJs` or `JsDom`, cannot use a bare `__.test` and must narrow its module selectors.
 
 **Settled by**
 
