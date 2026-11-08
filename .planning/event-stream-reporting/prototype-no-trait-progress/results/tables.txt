@@ -1,0 +1,85 @@
+Runs with each finding, per route (all terminals, modes and outcomes)
+route	runs	worker_line	worker_ticker	completion	stream_classes	stream_completed	failed_list	summary	worker_output	capture_ok	r053_same	r053_variation	r053_differs	snapshots: total/worker/ticker/completion
+control	18	18	18	18	18	18	6	18	18	0	0	0	0	581/398/409/397
+queue	18	0	0	0	0	0	0	0	0	18	11	7	0	592/0/0/0
+command	18	18	18	18	18	18	0	0	0	18	14	4	0	581/402/402/402
+command-quiet	18	0	0	0	0	0	0	0	0	18	11	7	0	584/0/0/0
+member-quiet	18	0	0	0	0	0	0	0	0	18	12	6	0	579/0/0/0
+command-dummy	12	0	0	0	0	0	0	0	0	12	6	2	4	393/0/0/0
+
+Per route and terminal: runs; runs with a worker line / ticker / completion line (snapshots)
+control	conpty	6	6/6/6	snapshots 207/147/149/146
+control	mintty	6	6/6/6	snapshots 220/133/140/133
+control	linux	6	6/6/6	snapshots 154/118/120/118
+queue	conpty	6	0/0/0	snapshots 211/0/0/0
+queue	mintty	6	0/0/0	snapshots 227/0/0/0
+queue	linux	6	0/0/0	snapshots 154/0/0/0
+command	conpty	6	6/6/6	snapshots 201/140/140/140
+command	mintty	6	6/6/6	snapshots 223/141/141/141
+command	linux	6	6/6/6	snapshots 157/121/121/121
+command-quiet	conpty	6	0/0/0	snapshots 204/0/0/0
+command-quiet	mintty	6	0/0/0	snapshots 226/0/0/0
+command-quiet	linux	6	0/0/0	snapshots 154/0/0/0
+member-quiet	conpty	6	0/0/0	snapshots 197/0/0/0
+member-quiet	mintty	6	0/0/0	snapshots 224/0/0/0
+member-quiet	linux	6	0/0/0	snapshots 158/0/0/0
+command-dummy	conpty	4	0/0/0	snapshots 138/0/0/0
+command-dummy	mintty	4	0/0/0	snapshots 149/0/0/0
+command-dummy	linux	4	0/0/0	snapshots 106/0/0/0
+
+R-053 differences
+conpty-daemon-fail-jvm-queue	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0
+conpty-daemon-pass-glob-command-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+conpty-daemon-pass-glob-member-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-glob-queue	same except: JUnit XML case counts (class run twice)
+conpty-daemon-pass-jvm-command	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-command-dummy	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-command-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-member-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-queue	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 3; worker folder on one side; workers 2 vs 1
+conpty-nodaemon-fail-jvm-command-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+conpty-nodaemon-pass-glob-queue	same except: JUnit XML case counts (class run twice); duplicate runs 5 vs 1
+conpty-nodaemon-pass-jvm-member-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+conpty-nodaemon-pass-jvm-queue	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+linux-daemon-fail-jvm-command-dummy	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-daemon-pass-jvm-command-dummy	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-daemon-pass-jvm-member-quiet	same except: worker folder on one side; workers 3 vs 2
+linux-nodaemon-fail-jvm-command-dummy	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-nodaemon-pass-jvm-command-dummy	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+mintty-daemon-fail-jvm-queue	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0
+mintty-daemon-pass-glob-command	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-glob-command-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-glob-member-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-glob-queue	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-jvm-command	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1
+mintty-daemon-pass-jvm-command-dummy	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1
+mintty-daemon-pass-jvm-command-quiet	same except: JUnit XML case counts (class run twice)
+mintty-daemon-pass-jvm-member-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1
+mintty-nodaemon-fail-jvm-command-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+mintty-nodaemon-pass-glob-command	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+mintty-nodaemon-pass-glob-command-quiet	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+
+command	JUnit XML case counts (class run twice)	4
+command	duplicate runs N vs M	4
+command	worker folder on one side	2
+command	workers N vs M	2
+command-dummy	JUnit XML case counts (class run twice)	2
+command-dummy	duplicate runs N vs M	2
+command-dummy	group-0-gamma.G01 testargs	4
+command-dummy	group-1-gamma.G06 testargs	4
+command-dummy	worker folder on one side	1
+command-dummy	workers N vs M	1
+command-quiet	JUnit XML case counts (class run twice)	7
+command-quiet	duplicate runs N vs M	6
+command-quiet	worker folder on one side	2
+command-quiet	workers N vs M	2
+member-quiet	JUnit XML case counts (class run twice)	5
+member-quiet	duplicate runs N vs M	5
+member-quiet	worker folder on one side	4
+member-quiet	workers N vs M	4
+queue	JUnit XML case counts (class run twice)	7
+queue	duplicate runs N vs M	6
+queue	worker folder on one side	2
+queue	workers N vs M	2
+
+Capture problems

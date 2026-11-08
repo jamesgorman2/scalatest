@@ -1,0 +1,17 @@
+pass	jvm	control	-j 3 jvm.test.testForked
+pass	jvm	queue	-j 3 ntp.run --route queue jvm.test
+pass	jvm	command	-j 3 ntp.run --route command jvm.test
+pass	jvm	command-quiet	-j 3 ntp.run --route command-quiet jvm.test
+pass	jvm	member-quiet	-j 3 ntp.run --route member-quiet jvm.test
+pass	jvm	command-dummy	-j 3 ntp.run --route command-dummy jvm.test
+fail	jvm	control	-j 3 jvm.test.testForked
+fail	jvm	queue	-j 3 ntp.run --route queue jvm.test
+fail	jvm	command	-j 3 ntp.run --route command jvm.test
+fail	jvm	command-quiet	-j 3 ntp.run --route command-quiet jvm.test
+fail	jvm	member-quiet	-j 3 ntp.run --route member-quiet jvm.test
+fail	jvm	command-dummy	-j 3 ntp.run --route command-dummy jvm.test
+pass	glob	control	-j 3 jvm.test.testOnly gamma.G0*
+pass	glob	queue	-j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+pass	glob	command	-j 3 ntp.run --route command --globs gamma.G0* jvm.test
+pass	glob	command-quiet	-j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+pass	glob	member-quiet	-j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test

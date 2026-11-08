@@ -1,0 +1,103 @@
+run	exit	snapshots	worker_line_snaps	worker_ticker_snaps	completion_snaps	stream_class_names	stream_completed	failed_list	scalatest_summary	worker_output_lines	capture_ok	r053
+conpty-daemon-fail-jvm-command	1	28	23	23	23	88	33	0	0	0	ok	same
+conpty-daemon-fail-jvm-command-dummy	1	28	0	0	0	0	0	0	0	0	ok	same
+conpty-daemon-fail-jvm-command-quiet	1	28	0	0	0	0	0	0	0	0	ok	same
+conpty-daemon-fail-jvm-control	1	28	23	24	23	571	196	2	20	671	-	-
+conpty-daemon-fail-jvm-member-quiet	1	27	0	0	0	0	0	0	0	0	ok	same
+conpty-daemon-fail-jvm-queue	1	30	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0
+conpty-daemon-pass-glob-command	0	28	23	23	23	66	25	0	0	0	ok	same
+conpty-daemon-pass-glob-command-quiet	0	28	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+conpty-daemon-pass-glob-control	0	27	22	22	22	507	178	0	15	668	-	-
+conpty-daemon-pass-glob-member-quiet	0	25	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-glob-queue	0	28	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice)
+conpty-daemon-pass-jvm-command	0	28	23	23	23	90	35	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-command-dummy	0	30	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-command-quiet	0	30	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-control	0	35	28	28	28	525	182	0	15	868	-	-
+conpty-daemon-pass-jvm-member-quiet	0	28	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 3; worker folder on one side; workers 2 vs 1
+conpty-daemon-pass-jvm-queue	0	30	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 3; worker folder on one side; workers 2 vs 1
+conpty-nodaemon-fail-jvm-command	1	40	25	25	25	77	30	0	0	0	ok	same
+conpty-nodaemon-fail-jvm-command-dummy	1	40	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-fail-jvm-command-quiet	1	40	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+conpty-nodaemon-fail-jvm-control	1	40	26	27	25	549	197	2	20	738	-	-
+conpty-nodaemon-fail-jvm-member-quiet	1	40	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-fail-jvm-queue	1	40	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-pass-glob-command	0	37	22	22	22	70	27	0	0	0	ok	same
+conpty-nodaemon-pass-glob-command-quiet	0	38	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-pass-glob-control	0	37	22	22	22	439	156	0	15	669	-	-
+conpty-nodaemon-pass-glob-member-quiet	0	37	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-pass-glob-queue	0	43	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 5 vs 1
+conpty-nodaemon-pass-jvm-command	0	40	24	24	24	90	35	0	0	0	ok	same
+conpty-nodaemon-pass-jvm-command-dummy	0	40	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-pass-jvm-command-quiet	0	40	0	0	0	0	0	0	0	0	ok	same
+conpty-nodaemon-pass-jvm-control	0	40	26	26	26	742	267	0	20	738	-	-
+conpty-nodaemon-pass-jvm-member-quiet	0	40	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+conpty-nodaemon-pass-jvm-queue	0	40	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+linux-daemon-fail-jvm-command	1	24	21	21	21	64	25	0	0	0	ok	same
+linux-daemon-fail-jvm-command-dummy	1	24	0	0	0	0	0	0	0	0	ok	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-daemon-fail-jvm-command-quiet	1	24	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-fail-jvm-control	1	24	21	22	21	526	180	2	20	671	-	-
+linux-daemon-fail-jvm-member-quiet	1	24	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-fail-jvm-queue	1	24	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-pass-glob-command	0	21	18	18	18	63	22	0	0	0	ok	same
+linux-daemon-pass-glob-command-quiet	0	21	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-pass-glob-control	0	21	18	18	18	473	157	0	20	604	-	-
+linux-daemon-pass-glob-member-quiet	0	21	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-pass-glob-queue	0	21	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-pass-jvm-command	0	25	22	22	22	99	36	0	0	0	ok	same
+linux-daemon-pass-jvm-command-dummy	0	24	0	0	0	0	0	0	0	0	ok	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-daemon-pass-jvm-command-quiet	0	24	0	0	0	0	0	0	0	0	ok	same
+linux-daemon-pass-jvm-control	0	25	19	19	19	536	184	0	20	671	-	-
+linux-daemon-pass-jvm-member-quiet	0	27	0	0	0	0	0	0	0	0	ok	same except: worker folder on one side; workers 3 vs 2
+linux-daemon-pass-jvm-queue	0	25	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-fail-jvm-command	1	30	21	21	21	82	31	0	0	0	ok	same
+linux-nodaemon-fail-jvm-command-dummy	1	29	0	0	0	0	0	0	0	0	ok	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-nodaemon-fail-jvm-command-quiet	1	30	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-fail-jvm-control	1	29	21	22	21	575	198	2	20	671	-	-
+linux-nodaemon-fail-jvm-member-quiet	1	30	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-fail-jvm-queue	1	29	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-pass-glob-command	0	27	18	18	18	61	22	0	0	0	ok	same
+linux-nodaemon-pass-glob-command-quiet	0	26	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-pass-glob-control	0	26	18	18	18	687	229	0	20	604	-	-
+linux-nodaemon-pass-glob-member-quiet	0	27	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-pass-glob-queue	0	26	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-pass-jvm-command	0	30	21	21	21	70	27	0	0	0	ok	same
+linux-nodaemon-pass-jvm-command-dummy	0	29	0	0	0	0	0	0	0	0	ok	DIFFERS: group-0-gamma.G01 testargs; group-1-gamma.G06 testargs
+linux-nodaemon-pass-jvm-command-quiet	0	29	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-pass-jvm-control	0	29	21	21	21	703	243	0	20	671	-	-
+linux-nodaemon-pass-jvm-member-quiet	0	29	0	0	0	0	0	0	0	0	ok	same
+linux-nodaemon-pass-jvm-queue	0	29	0	0	0	0	0	0	0	0	ok	same
+mintty-daemon-fail-jvm-command	1	32	23	23	23	84	31	0	0	0	ok	same
+mintty-daemon-fail-jvm-command-dummy	1	32	0	0	0	0	0	0	0	0	ok	same
+mintty-daemon-fail-jvm-command-quiet	1	32	0	0	0	0	0	0	0	0	ok	same
+mintty-daemon-fail-jvm-control	1	29	22	24	22	574	198	2	20	671	-	-
+mintty-daemon-fail-jvm-member-quiet	1	32	0	0	0	0	0	0	0	0	ok	same
+mintty-daemon-fail-jvm-queue	1	30	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0
+mintty-daemon-pass-glob-command	0	32	22	22	22	75	27	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-glob-command-quiet	0	32	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-glob-control	0	29	19	19	19	424	142	0	20	604	-	-
+mintty-daemon-pass-glob-member-quiet	0	32	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-glob-queue	0	32	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 1 vs 0; worker folder on one side; workers 1 vs 2
+mintty-daemon-pass-jvm-command	0	28	23	23	23	94	35	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1
+mintty-daemon-pass-jvm-command-dummy	0	28	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1
+mintty-daemon-pass-jvm-command-quiet	0	31	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice)
+mintty-daemon-pass-jvm-control	0	32	24	24	24	653	231	0	20	738	-	-
+mintty-daemon-pass-jvm-member-quiet	0	28	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 0 vs 1
+mintty-daemon-pass-jvm-queue	0	31	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-fail-jvm-command	1	45	25	25	25	84	32	0	0	0	ok	same
+mintty-nodaemon-fail-jvm-command-dummy	1	45	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-fail-jvm-command-quiet	1	45	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+mintty-nodaemon-fail-jvm-control	1	44	23	28	23	597	218	2	20	738	-	-
+mintty-nodaemon-fail-jvm-member-quiet	1	44	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-fail-jvm-queue	1	45	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-pass-glob-command	0	42	23	23	23	77	28	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+mintty-nodaemon-pass-glob-command-quiet	0	42	0	0	0	0	0	0	0	0	ok	same except: JUnit XML case counts (class run twice); duplicate runs 2 vs 1
+mintty-nodaemon-pass-glob-control	0	42	22	22	21	531	190	0	15	669	-	-
+mintty-nodaemon-pass-glob-member-quiet	0	44	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-pass-glob-queue	0	42	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-pass-jvm-command	0	44	25	25	25	78	30	0	0	0	ok	same
+mintty-nodaemon-pass-jvm-command-dummy	0	44	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-pass-jvm-command-quiet	0	44	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-pass-jvm-control	0	44	23	23	24	587	210	0	20	738	-	-
+mintty-nodaemon-pass-jvm-member-quiet	0	44	0	0	0	0	0	0	0	0	ok	same
+mintty-nodaemon-pass-jvm-queue	0	47	0	0	0	0	0	0	0	0	ok	same

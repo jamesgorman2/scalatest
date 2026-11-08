@@ -1,0 +1,14 @@
+# Windows, output redirected to files (no pseudo-terminal), --no-daemon --color true -j 3:
+#   jvm.test.testForked; ntp.run --route command-dummy jvm.test; ntp.run --route command-quiet jvm.test
+# The colored field of each worker's testargs file:
+runs/color/command-dummy-dest/group-0-gamma.G01/worker-0/testargs colored=False
+runs/color/command-dummy-dest/group-0-gamma.G01/worker-1/testargs colored=False
+runs/color/command-dummy-dest/group-1-gamma.G06/worker-0/testargs colored=False
+runs/color/command-quiet-dest/group-0-gamma.G01/worker-0/testargs colored=True
+runs/color/command-quiet-dest/group-0-gamma.G01/worker-1/testargs colored=True
+runs/color/command-quiet-dest/group-1-gamma.G06/worker-0/testargs colored=True
+runs/color/command-quiet-dest/group-1-gamma.G06/worker-1/testargs colored=True
+runs/color/control-dest/group-0-gamma.G01/worker-0/testargs colored=True
+runs/color/control-dest/group-0-gamma.G01/worker-1/testargs colored=True
+runs/color/control-dest/group-1-gamma.G06/worker-0/testargs colored=True
+runs/color/control-dest/group-1-gamma.G06/worker-1/testargs colored=True

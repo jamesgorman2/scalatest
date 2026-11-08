@@ -1,0 +1,1341 @@
+== conpty-daemon-fail-jvm-command: exit=1 terminal=conpty 160x40 -j 3 ntp.run --route command jvm.test
+   snapshots 28 (every 250 ms), with a prompt 24; with a worker prompt line 23; with a worker ticker 23; with a completion line 23
+     first worker line at 1.00s: 1-139-0-0] gamma.G01
+     first worker ticker at 1.00s: 1-139-0-0] gamma.G01
+     first completion at 1.00s: 1-139] Task.Anon@5b2e9e4e(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x20: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@5b2e9e4e(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@5b2e9e4e(build_.package_#ntp.graphGoal) <s> 6/10 completed, 1 failures.
+     task row x4: 1-139] Task.Anon@5b2e9e4e(build_.package_#ntp.graphGoal) 0/10 completed.
+   whole stream: test class names 88; "<n>/<m> completed" 33
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-fail-jvm-command-dummy: exit=1 terminal=conpty 160x40 -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 28 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@1d9421f5(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@1d9421f5(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-fail-jvm-command-quiet: exit=1 terminal=conpty 160x40 -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 28 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@46fd721(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@46fd721(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-fail-jvm-control: exit=1 terminal=conpty 160x40 -j 3 jvm.test.testForked
+   snapshots 28 (every 250 ms), with a prompt 24; with a worker prompt line 23; with a worker ticker 24; with a completion line 23
+     first worker line at 1.00s: 139-0-0] gamma.G01
+     first worker ticker at 1.00s: 139-0-0] gamma.G01
+     first completion at 1.00s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed, 1 failures.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+   whole stream: test class names 571; "<n>/<m> completed" 196
+   final rendering: failed-test list lines 2; ScalaTest summary lines 20; worker output lines 671
+     e.g. 139] [error] jvm.test.testForked 1 tests failed:
+     e.g.   gamma.G03 t2
+     e.g. 139-0-1] Run completed in 2 seconds, 762 milliseconds.
+== conpty-daemon-fail-jvm-member-quiet: exit=1 terminal=conpty 160x40 -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 27 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@4311f56b(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@4311f56b(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-fail-jvm-queue: exit=1 terminal=conpty 160x40 -j 3 ntp.run --route queue jvm.test
+   snapshots 30 (every 250 ms), with a prompt 26; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x21: 1-139] Task.Anon@3835094a(build_.package_#ntp.queueGoal) <s>
+     task row x4: 1-139] Task.Anon@3835094a(build_.package_#ntp.queueGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-fail-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-pass-glob-command: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route command --globs gamma.G0* jvm.test
+   snapshots 28 (every 250 ms), with a prompt 23; with a worker prompt line 23; with a worker ticker 23; with a completion line 23
+     first worker line at 1.00s: 1-139-0-0] gamma.G01
+     first worker ticker at 1.00s: 1-139-0-0] gamma.G01
+     first completion at 1.00s: 1-139] Task.Anon@1206218b(build_.package_#ntp.graphGoal) 0/9 completed.
+     task row x20: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@1206218b(build_.package_#ntp.graphGoal) <s> 0/9 completed.
+     task row x5: 1-139] Task.Anon@1206218b(build_.package_#ntp.graphGoal) <s> 3/9 completed.
+     task row x5: 1-139] Task.Anon@1206218b(build_.package_#ntp.graphGoal) <s> 6/9 completed.
+   whole stream: test class names 66; "<n>/<m> completed" 25
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-daemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-pass-glob-command-quiet: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+   snapshots 28 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@52c97aab(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@52c97aab(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-pass-glob-control: exit=0 terminal=conpty 160x40 -j 3 jvm.test.testOnly gamma.G0*
+   snapshots 27 (every 250 ms), with a prompt 22; with a worker prompt line 22; with a worker ticker 22; with a completion line 22
+     first worker line at 1.00s: 139-0-0] gamma.G01
+     first worker ticker at 1.00s: 139-0-0] gamma.G01
+     first completion at 1.00s: 139] jvm.test.testOnly 0/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 3/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 6/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 9/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 0/9 completed.
+   whole stream: test class names 507; "<n>/<m> completed" 178
+   final rendering: failed-test list lines 0; ScalaTest summary lines 15; worker output lines 668
+     e.g. 139-0-1] Run completed in 4 seconds, 12 milliseconds.
+     e.g. 139-0-1] Total number of tests run: 9
+     e.g. 139-0-1] Suites: completed 3, aborted 0
+== conpty-daemon-pass-glob-member-quiet: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test
+   snapshots 25 (every 250 ms), with a prompt 20; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x17: 1] ntp.run <s>
+     task row x16: 1-139] Task.Anon@1b8c8a75(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1-139] Task.Anon@1b8c8a75(build_.package_#ntp.utilGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 1; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== conpty-daemon-pass-glob-queue: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+   snapshots 28 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@7127a25(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7127a25(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-daemon-pass-jvm-command: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route command jvm.test
+   snapshots 28 (every 250 ms), with a prompt 23; with a worker prompt line 23; with a worker ticker 23; with a completion line 23
+     first worker line at 1.00s: 1-139-0-0] gamma.G01
+     first worker ticker at 1.00s: 1-139-0-0] gamma.G01
+     first completion at 1.00s: 1-139] Task.Anon@3e700e16(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x20: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@3e700e16(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@3e700e16(build_.package_#ntp.graphGoal) <s> 6/10 completed.
+     task row x4: 1-139] Task.Anon@3e700e16(build_.package_#ntp.graphGoal) 0/10 completed.
+   whole stream: test class names 90; "<n>/<m> completed" 35
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 3; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 1; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== conpty-daemon-pass-jvm-command-dummy: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 30 (every 250 ms), with a prompt 25; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x21: 1-139] Task.Anon@3507dc4c(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1-139] Task.Anon@3507dc4c(build_.package_#ntp.graphGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 3; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 1; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== conpty-daemon-pass-jvm-command-quiet: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 30 (every 250 ms), with a prompt 25; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x21: 1-139] Task.Anon@3e675ac2(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1-139] Task.Anon@3e675ac2(build_.package_#ntp.graphGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 3; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 1; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== conpty-daemon-pass-jvm-control: exit=0 terminal=conpty 160x40 -j 3 jvm.test.testForked
+   snapshots 35 (every 250 ms), with a prompt 29; with a worker prompt line 28; with a worker ticker 28; with a completion line 28
+     first worker line at 1.50s: 139-0-0] gamma.G01
+     first worker ticker at 1.50s: 139-0-0] gamma.G01
+     first completion at 1.50s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 9/10 completed.
+   whole stream: test class names 525; "<n>/<m> completed" 182
+   final rendering: failed-test list lines 0; ScalaTest summary lines 15; worker output lines 868
+     e.g. 139-0-0] Run completed in 5 seconds, 242 milliseconds.
+     e.g. 139-0-0] Total number of tests run: 12
+     e.g. 139-0-0] Suites: completed 4, aborted 0
+== conpty-daemon-pass-jvm-member-quiet: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 28 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@334be195(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1-139] Task.Anon@334be195(build_.package_#ntp.utilGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 3; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 1; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== conpty-daemon-pass-jvm-queue: exit=0 terminal=conpty 160x40 -j 3 ntp.run --route queue jvm.test
+   snapshots 30 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x21: 1-139] Task.Anon@49099206(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1-139] Task.Anon@49099206(build_.package_#ntp.queueGoal)
+     task row x2: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 3; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 1; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== conpty-nodaemon-fail-jvm-command: exit=1 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command jvm.test
+   snapshots 40 (every 250 ms), with a prompt 29; with a worker prompt line 25; with a worker ticker 25; with a completion line 25
+     first worker line at 3.50s: 1-139-0-0] gamma.G01
+     first worker ticker at 3.50s: 1-139-0-0] gamma.G01
+     first completion at 3.50s: 1-139] Task.Anon@43fda8d9(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x24: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@43fda8d9(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@43fda8d9(build_.package_#ntp.graphGoal) <s> 6/10 completed, 1 failures.
+     task row x5: 1-139] Task.Anon@43fda8d9(build_.package_#ntp.graphGoal) <s> 9/10 completed, 1 failures.
+   whole stream: test class names 77; "<n>/<m> completed" 30
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-fail-jvm-command-dummy: exit=1 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 40 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@34b9eb03(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@34b9eb03(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-fail-jvm-command-quiet: exit=1 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 40 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1] ntp.run
+     task row x4: 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-fail-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-fail-jvm-control: exit=1 terminal=conpty 160x40 --no-daemon -j 3 jvm.test.testForked
+   snapshots 40 (every 250 ms), with a prompt 29; with a worker prompt line 26; with a worker ticker 27; with a completion line 25
+     first worker line at 3.25s: 139-0-1] gamma.G01
+     first worker ticker at 3.25s: 139-0-1] gamma.G01
+     first completion at 3.50s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed, 1 failures.
+     task row x5: 139] jvm.test.testForked <s> 9/10 completed, 1 failures.
+   whole stream: test class names 549; "<n>/<m> completed" 197
+   final rendering: failed-test list lines 2; ScalaTest summary lines 20; worker output lines 738
+     e.g. 139] [error] jvm.test.testForked 1 tests failed:
+     e.g.   gamma.G03 t2
+     e.g. 139-0-1] Run completed in 3 seconds, 964 milliseconds.
+== conpty-nodaemon-fail-jvm-member-quiet: exit=1 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 40 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@7ab4ae59(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7ab4ae59(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-fail-jvm-queue: exit=1 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route queue jvm.test
+   snapshots 40 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@3ae126d1(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@3ae126d1(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-glob-command: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command --globs gamma.G0* jvm.test
+   snapshots 37 (every 250 ms), with a prompt 25; with a worker prompt line 22; with a worker ticker 22; with a completion line 22
+     first worker line at 3.50s: 1-139-0-0] gamma.G01
+     first worker ticker at 3.50s: 1-139-0-0] gamma.G01
+     first completion at 3.50s: 1-139] Task.Anon@4860827a(build_.package_#ntp.graphGoal) 0/9 completed.
+     task row x21: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@4860827a(build_.package_#ntp.graphGoal) <s> 3/9 completed.
+     task row x5: 1-139] Task.Anon@4860827a(build_.package_#ntp.graphGoal) <s> 6/9 completed.
+     task row x5: 1-139] Task.Anon@4860827a(build_.package_#ntp.graphGoal) <s> 9/9 completed.
+   whole stream: test class names 70; "<n>/<m> completed" 27
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-glob-command-quiet: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+   snapshots 38 (every 250 ms), with a prompt 27; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@4860827a(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@4860827a(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-glob-control: exit=0 terminal=conpty 160x40 --no-daemon -j 3 jvm.test.testOnly gamma.G0*
+   snapshots 37 (every 250 ms), with a prompt 26; with a worker prompt line 22; with a worker ticker 22; with a completion line 22
+     first worker line at 3.50s: 139-0-0] gamma.G01
+     first worker ticker at 3.50s: 139-0-0] gamma.G01
+     first completion at 3.50s: 139] jvm.test.testOnly 0/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 3/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 6/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 9/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 0/9 completed.
+   whole stream: test class names 439; "<n>/<m> completed" 156
+   final rendering: failed-test list lines 0; ScalaTest summary lines 15; worker output lines 669
+     e.g. 139-0-0] Run completed in 3 seconds, 948 milliseconds.
+     e.g. 139-0-0] Total number of tests run: 9
+     e.g. 139-0-0] Suites: completed 3, aborted 0
+== conpty-nodaemon-pass-glob-member-quiet: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test
+   snapshots 37 (every 250 ms), with a prompt 26; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x21: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@56399b9e(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1] ntp.run
+     task row x4: 1-139] Task.Anon@56399b9e(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-glob-queue: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+   snapshots 43 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x26: 1] ntp.run <s>
+     task row x24: 1-139] Task.Anon@306f6f1d(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@306f6f1d(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs conpty-nodaemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 5 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-jvm-command: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command jvm.test
+   snapshots 40 (every 250 ms), with a prompt 28; with a worker prompt line 24; with a worker ticker 24; with a completion line 24
+     first worker line at 3.50s: 1-139-0-0] gamma.G01
+     first worker ticker at 3.50s: 1-139-0-0] gamma.G01
+     first completion at 3.50s: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x23: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal) <s> 6/10 completed.
+     task row x5: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal) <s> 9/10 completed.
+   whole stream: test class names 90; "<n>/<m> completed" 35
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-jvm-command-dummy: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 40 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-jvm-command-quiet: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 40 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7c2dfa2(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-jvm-control: exit=0 terminal=conpty 160x40 --no-daemon -j 3 jvm.test.testForked
+   snapshots 40 (every 250 ms), with a prompt 29; with a worker prompt line 26; with a worker ticker 26; with a completion line 26
+     first worker line at 3.25s: 139-0-0] gamma.G01
+     first worker ticker at 3.25s: 139-0-0] gamma.G01
+     first completion at 3.25s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 9/10 completed.
+   whole stream: test class names 742; "<n>/<m> completed" 267
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 738
+     e.g. 139-0-0] Run completed in 3 seconds, 931 milliseconds.
+     e.g. 139-0-0] Total number of tests run: 9
+     e.g. 139-0-0] Suites: completed 3, aborted 0
+== conpty-nodaemon-pass-jvm-member-quiet: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 40 (every 250 ms), with a prompt 29; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@3ae126d1(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@3ae126d1(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== conpty-nodaemon-pass-jvm-queue: exit=0 terminal=conpty 160x40 --no-daemon -j 3 ntp.run --route queue jvm.test
+   snapshots 40 (every 250 ms), with a prompt 29; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs conpty-nodaemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-fail-jvm-command: exit=1 terminal=linux script 160x40 -j 3 ntp.run --route command jvm.test
+   snapshots 24 (every 250 ms), with a prompt 22; with a worker prompt line 21; with a worker ticker 21; with a completion line 21
+     first worker line at 0.50s: 1-139-0-0] gamma.G04
+     first worker ticker at 0.50s: 1-139-0-0] gamma.G04
+     first completion at 0.50s: 1-139] Task.Anon@40507a1(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x18: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@40507a1(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@40507a1(build_.package_#ntp.graphGoal) <s> 6/10 completed, 1 failures.
+     task row x4: 1-139] Task.Anon@40507a1(build_.package_#ntp.graphGoal) <s> 0/10 completed.
+   whole stream: test class names 64; "<n>/<m> completed" 25
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-fail-jvm-command-dummy: exit=1 terminal=linux script 160x40 -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 24 (every 250 ms), with a prompt 22; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x18: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@4848221d(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@4848221d(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+== linux-daemon-fail-jvm-command-quiet: exit=1 terminal=linux script 160x40 -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 24 (every 250 ms), with a prompt 22; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x18: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@982ba17(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@982ba17(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-fail-jvm-control: exit=1 terminal=linux script 160x40 -j 3 jvm.test.testForked
+   snapshots 24 (every 250 ms), with a prompt 22; with a worker prompt line 21; with a worker ticker 22; with a completion line 21
+     first worker line at 0.50s: 139-0-0] gamma.G04
+     first worker ticker at 0.50s: 139-0-0] gamma.G04
+     first completion at 0.50s: 139] jvm.test.testForked 0/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 6/10 completed, 1 failures.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+   whole stream: test class names 526; "<n>/<m> completed" 180
+   final rendering: failed-test list lines 2; ScalaTest summary lines 20; worker output lines 671
+     e.g. 139] [error] jvm.test.testForked 1 tests failed:
+     e.g.   gamma.G03 t2
+     e.g. 139-0-0] Run completed in 2 seconds, 689 milliseconds.
+== linux-daemon-fail-jvm-member-quiet: exit=1 terminal=linux script 160x40 -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 24 (every 250 ms), with a prompt 22; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x18: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@1f5ebde2(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@1f5ebde2(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-fail-jvm-queue: exit=1 terminal=linux script 160x40 -j 3 ntp.run --route queue jvm.test
+   snapshots 24 (every 250 ms), with a prompt 22; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x18: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@51dfd7d4(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@51dfd7d4(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-glob-command: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route command --globs gamma.G0* jvm.test
+   snapshots 21 (every 250 ms), with a prompt 18; with a worker prompt line 18; with a worker ticker 18; with a completion line 18
+     first worker line at 0.50s: 1-139-0-0] gamma.G04
+     first worker ticker at 0.50s: 1-139-0-0] gamma.G04
+     first completion at 0.50s: 1-139] Task.Anon@e27bd25(build_.package_#ntp.graphGoal) 0/9 completed.
+     task row x15: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@e27bd25(build_.package_#ntp.graphGoal) <s> 6/9 completed.
+     task row x4: 1-139] Task.Anon@e27bd25(build_.package_#ntp.graphGoal) <s> 0/9 completed.
+     task row x4: 1-139] Task.Anon@e27bd25(build_.package_#ntp.graphGoal) <s> 3/9 completed.
+   whole stream: test class names 63; "<n>/<m> completed" 22
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-glob-command-quiet: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+   snapshots 21 (every 250 ms), with a prompt 18; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x15: 1] ntp.run <s>
+     task row x15: 1-139] Task.Anon@44ba490(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@44ba490(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-glob-control: exit=0 terminal=linux script 160x40 -j 3 jvm.test.testOnly gamma.G0*
+   snapshots 21 (every 250 ms), with a prompt 18; with a worker prompt line 18; with a worker ticker 18; with a completion line 18
+     first worker line at 0.50s: 139-0-0] gamma.G04
+     first worker ticker at 0.50s: 139-0-0] gamma.G04
+     first completion at 0.50s: 139] jvm.test.testOnly 0/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 6/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 0/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 3/9 completed.
+     task row x3: 139] jvm.test.testOnly 0/9 completed.
+   whole stream: test class names 473; "<n>/<m> completed" 157
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 604
+     e.g. 139-0-1] Run completed in 2 seconds, 636 milliseconds.
+     e.g. 139-0-1] Total number of tests run: 6
+     e.g. 139-0-1] Suites: completed 2, aborted 0
+== linux-daemon-pass-glob-member-quiet: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test
+   snapshots 21 (every 250 ms), with a prompt 18; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x15: 1] ntp.run <s>
+     task row x15: 1-139] Task.Anon@15f9a042(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@15f9a042(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-glob-queue: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+   snapshots 21 (every 250 ms), with a prompt 18; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x15: 1] ntp.run <s>
+     task row x15: 1-139] Task.Anon@61c0af92(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@61c0af92(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-jvm-command: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route command jvm.test
+   snapshots 25 (every 250 ms), with a prompt 22; with a worker prompt line 22; with a worker ticker 22; with a completion line 22
+     first worker line at 0.50s: 1-139-0-0] gamma.G04
+     first worker ticker at 0.50s: 1-139-0-0] gamma.G04
+     first completion at 0.50s: 1-139] Task.Anon@5ecee14c(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x19: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@5ecee14c(build_.package_#ntp.graphGoal) <s> 0/10 completed.
+     task row x5: 1-139] Task.Anon@5ecee14c(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x4: 1-139] Task.Anon@5ecee14c(build_.package_#ntp.graphGoal) <s> 6/10 completed.
+   whole stream: test class names 99; "<n>/<m> completed" 36
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-jvm-command-dummy: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 24 (every 250 ms), with a prompt 21; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x18: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@f491236(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@f491236(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+== linux-daemon-pass-jvm-command-quiet: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 24 (every 250 ms), with a prompt 21; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x18: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@419022bf(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@419022bf(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-daemon-pass-jvm-control: exit=0 terminal=linux script 160x40 -j 3 jvm.test.testForked
+   snapshots 25 (every 250 ms), with a prompt 20; with a worker prompt line 19; with a worker ticker 19; with a completion line 19
+     first worker line at 0.75s: 139-0-0] gamma.G04
+     first worker ticker at 0.75s: 139-0-0] gamma.G04
+     first completion at 0.75s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+     task row x3: 139] jvm.test.testForked <s> 0/10 completed.
+   whole stream: test class names 536; "<n>/<m> completed" 184
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 671
+     e.g. 139-0-1] Run completed in 2 seconds, 689 milliseconds.
+     e.g. 139-0-1] Total number of tests run: 6
+     e.g. 139-0-1] Suites: completed 2, aborted 0
+== linux-daemon-pass-jvm-member-quiet: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 27 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x21: 1] ntp.run <s>
+     task row x21: 1-139] Task.Anon@24dc2001(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@24dc2001(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 5, 'labels_without_bytes': 1, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 5}
+   vs linux-daemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 3 vs 2; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      route only:   userDir	<DEST>/group-1-gamma.G06/worker-2/sandbox
+== linux-daemon-pass-jvm-queue: exit=0 terminal=linux script 160x40 -j 3 ntp.run --route queue jvm.test
+   snapshots 25 (every 250 ms), with a prompt 22; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@5c52cbb(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@5c52cbb(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-daemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-fail-jvm-command: exit=1 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command jvm.test
+   snapshots 30 (every 250 ms), with a prompt 25; with a worker prompt line 21; with a worker ticker 21; with a completion line 21
+     first worker line at 1.75s: 1-139-0-0] gamma.G02
+     first worker ticker at 1.75s: 1-139-0-0] gamma.G02
+     first completion at 1.75s: 1-139] Task.Anon@20f6f88c(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x19: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@20f6f88c(build_.package_#ntp.graphGoal) <s> 6/10 completed, 1 failures.
+     task row x4: 1-139] Task.Anon@20f6f88c(build_.package_#ntp.graphGoal) <s> 0/10 completed.
+     task row x4: 1-139] Task.Anon@20f6f88c(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+   whole stream: test class names 82; "<n>/<m> completed" 31
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-fail-jvm-command-dummy: exit=1 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 29 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@20f6f88c(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@20f6f88c(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+== linux-nodaemon-fail-jvm-command-quiet: exit=1 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 30 (every 250 ms), with a prompt 25; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@58f437b0(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@58f437b0(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-fail-jvm-control: exit=1 terminal=linux script 160x40 --no-daemon -j 3 jvm.test.testForked
+   snapshots 29 (every 250 ms), with a prompt 25; with a worker prompt line 21; with a worker ticker 22; with a completion line 21
+     first worker line at 1.75s: 139-0-0] gamma.G02
+     first worker ticker at 1.75s: 139-0-0] gamma.G02
+     first completion at 1.75s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 6/10 completed, 1 failures.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+     task row x3: 139] jvm.test.testForked <s> 0/10 completed.
+   whole stream: test class names 575; "<n>/<m> completed" 198
+   final rendering: failed-test list lines 2; ScalaTest summary lines 20; worker output lines 671
+     e.g. 139] [error] jvm.test.testForked 1 tests failed:
+     e.g.   gamma.G03 t2
+     e.g. 139-0-0] Run completed in 2 seconds, 633 milliseconds.
+== linux-nodaemon-fail-jvm-member-quiet: exit=1 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 30 (every 250 ms), with a prompt 26; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@7f1ef916(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7f1ef916(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-fail-jvm-queue: exit=1 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route queue jvm.test
+   snapshots 29 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@20d87335(build_.package_#ntp.queueGoal) <s>
+     task row x4: 1-139] Task.Anon@20d87335(build_.package_#ntp.queueGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-glob-command: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command --globs gamma.G0* jvm.test
+   snapshots 27 (every 250 ms), with a prompt 21; with a worker prompt line 18; with a worker ticker 18; with a completion line 18
+     first worker line at 1.75s: 1-139-0-0] gamma.G02
+     first worker ticker at 1.75s: 1-139-0-0] gamma.G02
+     first completion at 1.75s: 1-139] Task.Anon@6f231ced(build_.package_#ntp.graphGoal) 0/9 completed.
+     task row x16: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@6f231ced(build_.package_#ntp.graphGoal) <s> 3/9 completed.
+     task row x5: 1-139] Task.Anon@6f231ced(build_.package_#ntp.graphGoal) <s> 6/9 completed.
+     task row x4: 1] ntp.run
+   whole stream: test class names 61; "<n>/<m> completed" 22
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-glob-command-quiet: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+   snapshots 26 (every 250 ms), with a prompt 21; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x16: 1] ntp.run <s>
+     task row x15: 1-139] Task.Anon@6f231ced(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1] ntp.run
+     task row x4: 1-139] Task.Anon@6f231ced(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-glob-control: exit=0 terminal=linux script 160x40 --no-daemon -j 3 jvm.test.testOnly gamma.G0*
+   snapshots 26 (every 250 ms), with a prompt 21; with a worker prompt line 18; with a worker ticker 18; with a completion line 18
+     first worker line at 1.75s: 139-0-0] gamma.G02
+     first worker ticker at 1.75s: 139-0-0] gamma.G02
+     first completion at 1.75s: 139] jvm.test.testOnly 0/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 3/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 6/9 completed.
+     task row x3: 139] jvm.test.testOnly 0/9 completed.
+     task row x3: 139] jvm.test.testOnly <s> 0/9 completed.
+   whole stream: test class names 687; "<n>/<m> completed" 229
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 604
+     e.g. 139-0-0] Run completed in 2 seconds, 636 milliseconds.
+     e.g. 139-0-0] Total number of tests run: 6
+     e.g. 139-0-0] Suites: completed 2, aborted 0
+== linux-nodaemon-pass-glob-member-quiet: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test
+   snapshots 27 (every 250 ms), with a prompt 21; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x17: 1] ntp.run <s>
+     task row x16: 1-139] Task.Anon@1d12e953(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1-139] Task.Anon@1d12e953(build_.package_#ntp.utilGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-glob-queue: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+   snapshots 26 (every 250 ms), with a prompt 21; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x16: 1] ntp.run <s>
+     task row x15: 1-139] Task.Anon@5c441290(build_.package_#ntp.queueGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@5c441290(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-jvm-command: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command jvm.test
+   snapshots 30 (every 250 ms), with a prompt 23; with a worker prompt line 21; with a worker ticker 21; with a completion line 21
+     first worker line at 1.75s: 1-139-0-0] gamma.G02
+     first worker ticker at 1.75s: 1-139-0-0] gamma.G02
+     first completion at 1.75s: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x19: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal) <s> 6/10 completed.
+     task row x4: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal) <s> 0/10 completed.
+   whole stream: test class names 70; "<n>/<m> completed" 27
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-jvm-command-dummy: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 29 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal)
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs DIFFER
+      route testargs:   {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+      control testargs: {"arguments": [], "classpath": ["/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.6/scala3-library_3-3.3.6.jar", "/home/james/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scalatest/scalatest_3/3.2.19/scalatest_3-3.2.19.jar", "/home/james/.cache/c
+== linux-nodaemon-pass-jvm-command-quiet: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 29 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7d78f3d5(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-jvm-control: exit=0 terminal=linux script 160x40 --no-daemon -j 3 jvm.test.testForked
+   snapshots 29 (every 250 ms), with a prompt 23; with a worker prompt line 21; with a worker ticker 21; with a completion line 21
+     first worker line at 1.75s: 139-0-0] gamma.G04
+     first worker ticker at 1.75s: 139-0-0] gamma.G04
+     first completion at 1.75s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+   whole stream: test class names 703; "<n>/<m> completed" 243
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 671
+     e.g. 139-0-0] Run completed in 2 seconds, 639 milliseconds.
+     e.g. 139-0-0] Total number of tests run: 6
+     e.g. 139-0-0] Suites: completed 2, aborted 0
+== linux-nodaemon-pass-jvm-member-quiet: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 29 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@20d87335(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@20d87335(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== linux-nodaemon-pass-jvm-queue: exit=0 terminal=linux script 160x40 --no-daemon -j 3 ntp.run --route queue jvm.test
+   snapshots 29 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x18: 1-139] Task.Anon@20d87335(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@20d87335(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs linux-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-fail-jvm-command: exit=1 terminal=mintty 160x40 -j 3 ntp.run --route command jvm.test
+   snapshots 32 (every 250 ms), with a prompt 28; with a worker prompt line 23; with a worker ticker 23; with a completion line 23
+     first worker line at 1.00s: 1-139-0-0] gamma.G01
+     first worker ticker at 1.00s: 1-139-0-0] gamma.G01
+     first completion at 1.00s: 1-139] Task.Anon@4e256256(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x20: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@4e256256(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@4e256256(build_.package_#ntp.graphGoal) <s> 6/10 completed, 1 failures.
+     task row x5: 1] [error] ntp.run ntp.run: a module failed
+   whole stream: test class names 84; "<n>/<m> completed" 31
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-fail-jvm-command-dummy: exit=1 terminal=mintty 160x40 -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 32 (every 250 ms), with a prompt 27; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@1a2a1cbf(build_.package_#ntp.graphGoal) <s>
+     task row x5: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-fail-jvm-command-quiet: exit=1 terminal=mintty 160x40 -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 32 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@731cab92(build_.package_#ntp.graphGoal) <s>
+     task row x5: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-fail-jvm-control: exit=1 terminal=mintty 160x40 -j 3 jvm.test.testForked
+   snapshots 29 (every 250 ms), with a prompt 24; with a worker prompt line 22; with a worker ticker 24; with a completion line 22
+     first worker line at 1.25s: 139-0-0] gamma.G01
+     first worker ticker at 1.25s: 139-0-0] gamma.G01
+     first completion at 1.25s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed, 1 failures.
+     task row x4: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+   whole stream: test class names 574; "<n>/<m> completed" 198
+   final rendering: failed-test list lines 2; ScalaTest summary lines 20; worker output lines 671
+     e.g. 139] [error] jvm.test.testForked 1 tests failed:
+     e.g.   gamma.G03 t2
+     e.g. 139-0-0] Run completed in 2 seconds, 778 milliseconds.
+== mintty-daemon-fail-jvm-member-quiet: exit=1 terminal=mintty 160x40 -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 32 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@73e1f072(build_.package_#ntp.utilGoal) <s>
+     task row x5: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-fail-jvm-queue: exit=1 terminal=mintty 160x40 -j 3 ntp.run --route queue jvm.test
+   snapshots 30 (every 250 ms), with a prompt 26; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@3f89df82(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@3f89df82(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-fail-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-pass-glob-command: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route command --globs gamma.G0* jvm.test
+   snapshots 32 (every 250 ms), with a prompt 23; with a worker prompt line 22; with a worker ticker 22; with a completion line 22
+     first worker line at 1.00s: 1-139-0-0] gamma.G01
+     first worker ticker at 1.00s: 1-139-0-0] gamma.G01
+     first completion at 1.00s: 1-139] Task.Anon@6fabacf8(build_.package_#ntp.graphGoal) 0/9 completed.
+     task row x19: 1] ntp.run <s>
+     task row x6: 1-139] Task.Anon@6fabacf8(build_.package_#ntp.graphGoal) <s> 3/9 completed.
+     task row x5: 1-139] Task.Anon@6fabacf8(build_.package_#ntp.graphGoal) <s> 6/9 completed.
+     task row x4: 1-139] Task.Anon@6fabacf8(build_.package_#ntp.graphGoal) <s> 0/9 completed.
+   whole stream: test class names 75; "<n>/<m> completed" 27
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 2; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      control only: userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== mintty-daemon-pass-glob-command-quiet: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+   snapshots 32 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@30cdc7a5(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@30cdc7a5(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 2; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      control only: userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== mintty-daemon-pass-glob-control: exit=0 terminal=mintty 160x40 -j 3 jvm.test.testOnly gamma.G0*
+   snapshots 29 (every 250 ms), with a prompt 20; with a worker prompt line 19; with a worker ticker 19; with a completion line 19
+     first worker line at 1.00s: 139-0-0] gamma.G01
+     first worker ticker at 1.00s: 139-0-0] gamma.G01
+     first completion at 1.00s: 139] jvm.test.testOnly 0/9 completed.
+     task row x6: 139] jvm.test.testOnly <s> 3/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 0/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 6/9 completed.
+     task row x3: 139] jvm.test.testOnly 0/9 completed.
+   whole stream: test class names 424; "<n>/<m> completed" 142
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 604
+     e.g. 139-0-0] Run completed in 2 seconds, 761 milliseconds.
+     e.g. 139-0-0] Total number of tests run: 6
+     e.g. 139-0-0] Suites: completed 2, aborted 0
+== mintty-daemon-pass-glob-member-quiet: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test
+   snapshots 32 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@668db5ca(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@668db5ca(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 2; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      control only: userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== mintty-daemon-pass-glob-queue: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+   snapshots 32 (every 250 ms), with a prompt 24; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@7961b53b(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7961b53b(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-daemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 0; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 2; duplicate runs 0 vs 0; JVM info DIFFERS; testargs same
+      control only: userDir	<DEST>/group-1-gamma.G06/worker-1/sandbox
+== mintty-daemon-pass-jvm-command: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route command jvm.test
+   snapshots 28 (every 250 ms), with a prompt 24; with a worker prompt line 23; with a worker ticker 23; with a completion line 23
+     first worker line at 1.00s: 1-139-0-0] gamma.G01
+     first worker ticker at 1.00s: 1-139-0-0] gamma.G01
+     first completion at 1.00s: 1-139] Task.Anon@7668e696(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x20: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@7668e696(build_.package_#ntp.graphGoal) <s> 0/10 completed.
+     task row x5: 1-139] Task.Anon@7668e696(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@7668e696(build_.package_#ntp.graphGoal) <s> 6/10 completed.
+   whole stream: test class names 94; "<n>/<m> completed" 35
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-pass-jvm-command-dummy: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 28 (every 250 ms), with a prompt 22; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x19: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@3e42f7(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@3e42f7(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-pass-jvm-command-quiet: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 31 (every 250 ms), with a prompt 26; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x23: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@4550e5fd(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1-139] Task.Anon@4550e5fd(build_.package_#ntp.graphGoal)
+     task row x2: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-pass-jvm-control: exit=0 terminal=mintty 160x40 -j 3 jvm.test.testForked
+   snapshots 32 (every 250 ms), with a prompt 26; with a worker prompt line 24; with a worker ticker 24; with a completion line 24
+     first worker line at 1.25s: 139-0-0] gamma.G01
+     first worker ticker at 1.25s: 139-0-0] gamma.G01
+     first completion at 1.25s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+   whole stream: test class names 653; "<n>/<m> completed" 231
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 738
+     e.g. 139-0-1] Run completed in 4 seconds, 41 milliseconds.
+     e.g. 139-0-1] Total number of tests run: 9
+     e.g. 139-0-1] Suites: completed 3, aborted 0
+== mintty-daemon-pass-jvm-member-quiet: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 28 (every 250 ms), with a prompt 23; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x20: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@5dcd50a2(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@5dcd50a2(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-pass-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-daemon-pass-jvm-queue: exit=0 terminal=mintty 160x40 -j 3 ntp.run --route queue jvm.test
+   snapshots 31 (every 250 ms), with a prompt 26; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@8342580(build_.package_#ntp.queueGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@8342580(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-daemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-fail-jvm-command: exit=1 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command jvm.test
+   snapshots 45 (every 250 ms), with a prompt 29; with a worker prompt line 25; with a worker ticker 25; with a completion line 25
+     first worker line at 3.50s: 1-139-0-0] gamma.G01
+     first worker ticker at 3.50s: 1-139-0-0] gamma.G01
+     first completion at 3.50s: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x24: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.graphGoal) <s> 6/10 completed, 1 failures.
+     task row x5: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.graphGoal) <s> 9/10 completed, 1 failures.
+   whole stream: test class names 84; "<n>/<m> completed" 32
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-fail-jvm-command-dummy: exit=1 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 45 (every 250 ms), with a prompt 35; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@34b9eb03(build_.package_#ntp.graphGoal) <s>
+     task row x6: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-fail-jvm-command-quiet: exit=1 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 45 (every 250 ms), with a prompt 35; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@3ae126d1(build_.package_#ntp.graphGoal) <s>
+     task row x6: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-fail-jvm-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-fail-jvm-control: exit=1 terminal=mintty 160x40 --no-daemon -j 3 jvm.test.testForked
+   snapshots 44 (every 250 ms), with a prompt 32; with a worker prompt line 23; with a worker ticker 28; with a completion line 23
+     first worker line at 3.50s: 139-0-0] gamma.G01
+     first worker ticker at 3.50s: 139-0-0] gamma.G01
+     first completion at 3.50s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] [error] jvm.test.testForked 1 tests failed:
+     task row x4: 139] jvm.test.testForked <s> 0/10 completed.
+     task row x4: 139] jvm.test.testForked <s> 6/10 completed, 1 failures.
+   whole stream: test class names 597; "<n>/<m> completed" 218
+   final rendering: failed-test list lines 2; ScalaTest summary lines 20; worker output lines 738
+     e.g. 139] [error] jvm.test.testForked 1 tests failed:
+     e.g.   gamma.G03 t2
+     e.g. 139-0-1] Run completed in 3 seconds, 983 milliseconds.
+== mintty-nodaemon-fail-jvm-member-quiet: exit=1 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 44 (every 250 ms), with a prompt 33; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@27755487(build_.package_#ntp.utilGoal) <s>
+     task row x5: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-fail-jvm-queue: exit=1 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route queue jvm.test
+   snapshots 45 (every 250 ms), with a prompt 35; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@24841372(build_.package_#ntp.queueGoal) <s>
+     task row x6: 1] [error] ntp.run ntp.run: a module failed
+     task row x3: 1] ntp.run
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-fail-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-glob-command: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command --globs gamma.G0* jvm.test
+   snapshots 42 (every 250 ms), with a prompt 27; with a worker prompt line 23; with a worker ticker 23; with a completion line 23
+     first worker line at 3.50s: 1-139-0-0] gamma.G01
+     first worker ticker at 3.50s: 1-139-0-0] gamma.G01
+     first completion at 3.50s: 1-139] Task.Anon@5cc9d3d0(build_.package_#ntp.graphGoal) 0/9 completed.
+     task row x22: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@5cc9d3d0(build_.package_#ntp.graphGoal) <s> 3/9 completed.
+     task row x5: 1-139] Task.Anon@5cc9d3d0(build_.package_#ntp.graphGoal) <s> 6/9 completed.
+     task row x5: 1-139] Task.Anon@5cc9d3d0(build_.package_#ntp.graphGoal) <s> 9/9 completed.
+   whole stream: test class names 77; "<n>/<m> completed" 28
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-nodaemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-glob-command-quiet: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command-quiet --globs gamma.G0* jvm.test
+   snapshots 42 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x21: 1] ntp.run <s>
+     task row x19: 1-139] Task.Anon@5cc9d3d0(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1] ntp.run
+     task row x4: 1-139] Task.Anon@5cc9d3d0(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-nodaemon-pass-glob-control: exit same; JUnit XML differs; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 2 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-glob-control: exit=0 terminal=mintty 160x40 --no-daemon -j 3 jvm.test.testOnly gamma.G0*
+   snapshots 42 (every 250 ms), with a prompt 26; with a worker prompt line 22; with a worker ticker 22; with a completion line 21
+     first worker line at 3.25s: 139-0-0] gamma.G01
+     first worker ticker at 3.25s: 139-0-0] gamma.G01
+     first completion at 3.50s: 139] jvm.test.testOnly 0/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 3/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 6/9 completed.
+     task row x5: 139] jvm.test.testOnly <s> 9/9 completed.
+     task row x4: 139] jvm.test.testOnly <s> 0/9 completed.
+   whole stream: test class names 531; "<n>/<m> completed" 190
+   final rendering: failed-test list lines 0; ScalaTest summary lines 15; worker output lines 669
+     e.g. 139-0-1] Run completed in 3 seconds, 972 milliseconds.
+     e.g. 139-0-1] Total number of tests run: 9
+     e.g. 139-0-1] Suites: completed 3, aborted 0
+== mintty-nodaemon-pass-glob-member-quiet: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route member-quiet --globs gamma.G0* jvm.test
+   snapshots 44 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x21: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.utilGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@7e7f3cfd(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 3, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-glob-queue: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route queue --globs gamma.G0* jvm.test
+   snapshots 42 (every 250 ms), with a prompt 28; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x22: 1] ntp.run <s>
+     task row x20: 1-139] Task.Anon@fe7b6b0(build_.package_#ntp.queueGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@fe7b6b0(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 3, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 3}
+   vs mintty-nodaemon-pass-glob-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (4 vs 4); workers 1 vs 1; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-jvm-command: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command jvm.test
+   snapshots 44 (every 250 ms), with a prompt 30; with a worker prompt line 25; with a worker ticker 25; with a completion line 25
+     first worker line at 3.50s: 1-139-0-0] gamma.G01
+     first worker ticker at 3.50s: 1-139-0-0] gamma.G01
+     first completion at 3.50s: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal) 0/10 completed.
+     task row x24: 1] ntp.run <s>
+     task row x5: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal) <s> 3/10 completed.
+     task row x5: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal) <s> 6/10 completed.
+     task row x5: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal) <s> 9/10 completed.
+   whole stream: test class names 78; "<n>/<m> completed" 30
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-jvm-command-dummy: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command-dummy jvm.test
+   snapshots 44 (every 250 ms), with a prompt 31; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal) <s>
+     task row x4: 1] ntp.run
+     task row x4: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-jvm-command-quiet: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route command-quiet jvm.test
+   snapshots 44 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@79b2852b(build_.package_#ntp.graphGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-jvm-control: exit=0 terminal=mintty 160x40 --no-daemon -j 3 jvm.test.testForked
+   snapshots 44 (every 250 ms), with a prompt 28; with a worker prompt line 23; with a worker ticker 23; with a completion line 24
+     first worker line at 3.25s: 139-0-0] gamma.G01
+     first worker ticker at 3.25s: 139-0-0] gamma.G01
+     first completion at 3.25s: 139] jvm.test.testForked 0/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 3/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 6/10 completed.
+     task row x5: 139] jvm.test.testForked <s> 9/10 completed.
+     task row x3: 139] jvm.test.testForked 0/10 completed.
+   whole stream: test class names 587; "<n>/<m> completed" 210
+   final rendering: failed-test list lines 0; ScalaTest summary lines 20; worker output lines 738
+     e.g. 139-0-1] Run completed in 4 seconds, 7 milliseconds.
+     e.g. 139-0-1] Total number of tests run: 9
+     e.g. 139-0-1] Suites: completed 3, aborted 0
+== mintty-nodaemon-pass-jvm-member-quiet: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route member-quiet jvm.test
+   snapshots 44 (every 250 ms), with a prompt 29; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@77114efe(build_.package_#ntp.utilGoal) <s>
+     task row x3: 1] ntp.run
+     task row x3: 1-139] Task.Anon@77114efe(build_.package_#ntp.utilGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 2, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same
+== mintty-nodaemon-pass-jvm-queue: exit=0 terminal=mintty 160x40 --no-daemon -j 3 ntp.run --route queue jvm.test
+   snapshots 47 (every 250 ms), with a prompt 30; with a worker prompt line 0; with a worker ticker 0; with a completion line 0
+     task row x24: 1] ntp.run <s>
+     task row x22: 1-139] Task.Anon@24841372(build_.package_#ntp.queueGoal) <s>
+     task row x4: 1] ntp.run
+     task row x3: 1-139] Task.Anon@24841372(build_.package_#ntp.queueGoal)
+   whole stream: test class names 0; "<n>/<m> completed" 0
+   final rendering: failed-test list lines 0; ScalaTest summary lines 0; worker output lines 0
+   capture: {'workers_captured': 4, 'labels_without_bytes': 0, 'out_of_order': [], 'pid_mismatch': [], 'workers_with_info': 4}
+   vs mintty-nodaemon-pass-jvm-control: exit same; JUnit XML same; groups ['group-0-gamma.G01', 'group-1-gamma.G06'] vs ['group-0-gamma.G01', 'group-1-gamma.G06']
+   group group-0-gamma.G01: classes same (5 vs 5); workers 2 vs 2; duplicate runs 1 vs 1; JVM info same; testargs same
+   group group-1-gamma.G06: classes same (5 vs 5); workers 2 vs 2; duplicate runs 0 vs 0; JVM info same; testargs same

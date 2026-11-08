@@ -1,0 +1,41 @@
+ms	prompt	worker_lines	worker_tickers	completion_lines	prompt_rows
+0	0	0	0	0	
+250	0	0	0	0	
+500	0	0	0	0	
+750	0	0	0	0	
+1000	0	0	0	0	
+1250	0	0	0	0	
+1500	0	0	0	0	
+1750	0	0	0	0	
+2000	1	0	0	0	build.mill-01] sources.super.javalib.JavaModule
+2250	0	0	0	0	
+2500	0	0	0	0	
+2750	1	0	0	0	1] ntp.run
+3000	1	0	0	0	1] ntp.run
+3250	1	0	0	0	1] ntp.run | 1-122] mill.javalib.JvmWorkerModule/internalWorker | 1-129] jvm.test.compileClasspath | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal)
+3500	1	0	0	0	1] ntp.run | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal)
+3750	1	0	0	0	1] ntp.run 1s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal)
+4000	1	0	0	0	1] ntp.run 1s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal)
+4250	1	0	0	0	1] ntp.run 1s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 1s
+4500	1	0	0	0	1] ntp.run 1s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 1s
+4750	1	0	0	0	1] ntp.run 2s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 1s
+5000	1	0	0	0	1] ntp.run 2s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 1s
+5250	1	0	0	0	1] ntp.run 2s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 2s
+5500	1	0	0	0	1] ntp.run 2s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 2s
+5750	1	0	0	0	1] ntp.run 3s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 2s
+6000	1	0	0	0	1] ntp.run 3s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 2s
+6250	1	0	0	0	1] ntp.run 3s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 3s
+6500	1	0	0	0	1] ntp.run 4s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 3s
+6750	1	0	0	0	1] ntp.run 4s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 3s
+7000	1	0	0	0	1] ntp.run 4s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 3s
+7250	1	0	0	0	1] ntp.run 4s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 4s
+7500	1	0	0	0	1] ntp.run 5s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 4s
+7750	1	0	0	0	1] ntp.run 5s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 4s
+8000	1	0	0	0	1] ntp.run 5s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 4s
+8250	1	0	0	0	1] ntp.run 5s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 5s
+8500	1	0	0	0	1] ntp.run 5s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 5s
+8750	1	0	0	0	1] ntp.run 6s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 5s
+9000	1	0	0	0	1] ntp.run 6s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 5s
+9250	1	0	0	0	1] ntp.run 6s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 6s
+9500	1	0	0	0	1] ntp.run 6s | 1-139] Task.Anon@56399b9e(build_.package_#ntp.graphGoal) 6s
+9750	1	0	0	0	1] [error] ntp.run ntp.run: a module failed
