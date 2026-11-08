@@ -65,7 +65,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or an evaluation of Mill's own test command that Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM, no route that needs no change to the module (R-092) has been observed to meet R-044, and without that change a run's stdout and stderr have been taken only on Windows and Linux, on Native only on Windows, and never with a killed worker.
+**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM, no route that leaves the module unchanged (R-092) has been observed to meet R-044; with the module unchanged, a run's stdout and stderr have been taken only on Windows and Linux (on Native only on Windows), and never with a killed worker.
 
 **Settled by**
 

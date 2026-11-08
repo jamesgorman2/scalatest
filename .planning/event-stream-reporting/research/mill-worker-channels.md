@@ -17,7 +17,7 @@ Other notes hold facts this one relies on and does not repeat:
 
 - **Worker stdout and stderr are two pipes, not inherited descriptors and not files.** Mill spawns each `MillTestRunnerMain` JVM with `os.Inherit` for both, and inside a non-exclusive Mill task `os.Inherit` resolves to a pipe that a Mill thread pumps into the task's logger streams (§ 1.1–1.3). A stream that is the process's original stream is inherited instead (§ 1.3). An exclusive command runs with `exclusiveSystemStreams` (`MCL` § 4.2); whether a worker spawned under them is piped or inherits under `--no-daemon` was not determined (§ 6).
 - **Mill line-buffers and prefixes that output on its way to the console, and tees it unprefixed to a log file.** On the parallel path the file is per worker, `Task.dest[/<group>]/worker-<i>.log`, holding stdout and stderr together, and under Mill's own `testForked` Mill's ticker lines too (§ 1.4–1.5; `MPC` § 3).
-- **Plugin code in Mill's process can take the raw streams by calling `TestModuleUtil` itself, or by evaluating the test task itself** (§ 2):
+- **Plugin code in Mill's process can take the raw streams by calling `TestModuleUtil` or by evaluating the test task itself** (§ 2):
   - A `testTask` override that calls `super.testTask` cannot.
   - A direct `callTestRunnerSubprocess` call spawns on the caller's thread and honours the caller's `os.Inherit.out` and `os.Inherit.err`. Observed (`EPS` § 6).
   - A direct `runTests()` call does so on its sequential path, observed (`MTW` § 5). On its parallel path it does so when given a plugin-built `TaskCtx` whose `fork.async` sets them inside the body, observed (`MPC` § 2–4); a plugin-supplied `log` cannot be built from build code.
@@ -151,8 +151,8 @@ Besides what tests and ScalaTest write:
 
 ### 2.5 By evaluating the test task in plugin code
 
-- An exclusive command can evaluate a module's public `testForked` or `testOnly`, or the protected `testTask` by reflection, itself: it calls `Task.evaluate` on each anonymous task under the command, with its own `TaskCtx` and inside its own `withStreams` (`MTW` § 2.3). Mill's own `testTask` body then builds the `TestModuleUtil` with the plugin's ctx (`MTW` § 3.3).
-- Observed: with a ctx whose `fork.async` sets `os.Inherit.out` and `os.Inherit.err` inside the body, the plugin took every worker's raw streams on the parallel path, and through its `withStreams` on the sequential path, and nothing reached the console (`MTW` § 5).
+- An exclusive command can itself evaluate a module's public `testForked` or `testOnly`, or the protected `testTask` reached by reflection. It calls `Task.evaluate` on each anonymous task under the command, with its own `TaskCtx` and inside its own `withStreams` (`MTW` § 2.3). Mill's own `testTask` body then builds the `TestModuleUtil` with the plugin's ctx (`MTW` § 3.3).
+- Observed: with a ctx whose `fork.async` sets `os.Inherit.out` and `os.Inherit.err` inside the body, the plugin took every worker's raw streams, through that ctx on the parallel path and through its `withStreams` on the sequential path, and nothing reached the console (`MTW` § 5).
 
 ## 3. The candidates on a JVM worker
 

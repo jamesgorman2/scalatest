@@ -4,9 +4,9 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 ## A test module needs no change to its definition for the test command to run it.
 
-**Alternatives** A plugin trait mixed into each test module, exposing the protected `testTask` and `aheadOfTimeDiscoveredTestClassesIfNeeded`, needs every module definition changed, and a selected module without it would be neither run, as `../SPECIFICATION.md` § Scope requires, nor failed by R-059.
+**Alternatives** A plugin trait mixed into each test module, exposing the protected `testTask` and `aheadOfTimeDiscoveredTestClassesIfNeeded`, needs every module definition changed; a selected module without it would be neither run, as `../SPECIFICATION.md` § Scope requires, nor failed by R-059.
 
-**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait, keeping each run's output off the console and taking it for the plugin (R-040, R-042), and matching Mill's own task (R-053).
+**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait. It kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
 
 **Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM no such route has been observed to meet R-044, and the nested evaluation's fail-fast-off behaviour and prompt have been observed only with each module's own `testForked` as goals, not with goals the plugin builds.
 
