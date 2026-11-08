@@ -197,4 +197,4 @@ Where the consolidated output goes:
 - R-085 JSON output is off unless a test-command argument turns it on (R-055).
 - R-049 JSON output is written to a file in the test command's task folder (`Task.dest`), or to the path a test-command argument gives, never to the console.
 - R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
-- R-050 Output written by other tasks named on the same `mill` command line, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed. On the console it may interleave with the consolidated output.
+- R-050 Output written by other tasks named on the same `mill` command line, and Mill's own output other than what R-044 and R-045 name, is neither captured nor changed, except in the prefix Mill puts on each line of a task the test command runs. On the console it may interleave with the consolidated output.

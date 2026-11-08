@@ -2,35 +2,18 @@
 
 Decisions behind `../SPECIFICATION.md` on what is captured from each run and how the console is shared with Mill, newest first.
 
-## The nested evaluation logs through the test command's `Task.log`, so the command's prompt line, and progress output's summary on it, is always drawn.
-
-**Alternatives**
-
-- Mill's default logger numbers nested tasks from 1 and draws at most a third of the console's rows as task lines, sorted by key. With fewer than ten nested tasks one took the command's key `1` and its line; at 24 rows nested keys beginning `0` hid the summary for seconds.
-- Setting the command's prompt line again as nested tasks start needs `Logger.prompt`'s `private[mill]` `setPromptLine`.
-
-**Reasoning** Passing `Task.log` as `execute`'s `logger` makes Mill key nested tasks `1-<n>` under the command's `1`. That key sorts after the command's own, so the command's line came first in every snapshot at 24 and 40 rows and with one nested task. The `logger` parameter is public `mill.api` with no annotation and is checked by MiMa.
-
-**Costs** That ordering rests on prompt behaviour in `mill.internal`, which has no compatibility promise, and a change to it fails silently, back to the default logger's behaviour. Nested tasks' console lines are prefixed `1-<n>]` instead of `<n>]`.
-
-**Settled by** [Does Task.log.ticker keep the test command's summary, and Task.log its lines, through the nested evaluation?](https://github.com/jamesgorman2/scalatest/issues/47).
-
-**See** `../research/nested-prompt-console.md` § 2, § 3.2, § 3.3, § 6.
-
----
-
 ## On the console, progress output is a one-line summary rewritten in place plus whole lines, both sharing Mill's prompt, rather than streamed single characters or output that needs `--ticker false`.
 
 **Alternatives**
 
 - Streaming single characters, as structured test reporting does, needs raw writes, because `Task.log` passes only whole lines; the prompt's redraws overwrite raw writes.
-- Pausing the prompt for the nested evaluation and writing raw needs the `private[mill]` `withPromptPaused`.
+- Pausing Mill's prompt while the tests run, and writing raw, needs the `private[mill]` `withPromptPaused`.
 - Requiring Mill's `--ticker false` makes the user pass it on every command, since the plugin cannot set it.
 - Whole lines alone give no live sense of a long run's progress.
 
-**Reasoning** `Task.log.ticker` sets a detail on the test command's own prompt line, which Mill rewrites in place, and Mill clears and redraws its prompt around lines written through `Task.log`; both are public with no annotation. Through the nested evaluation, the summary was current in 96–99% of snapshots on Linux, ConPTY and MinTTY, and lines through `Task.log` left no stale prompt, whereas raw writes lost most of theirs. Progress output carries no compatibility promise (`../SPECIFICATION.md` R-084), so a change in how Mill draws its prompt changes only how progress output looks.
+**Reasoning** `Task.log.ticker` sets a detail on the test command's own prompt line, which Mill rewrites in place, and Mill clears and redraws its prompt around lines written through `Task.log`; both are public with no annotation, and lines through `Task.log` left no stale prompt, whereas raw writes lost most of theirs. The nested evaluation is the one `execute` call in which the test command has Mill run every selected module's test tasks, and the summary holds through it at any console height and nested-task count only when that evaluation logs through the command's `Task.log`, which keys every nested task's prompt line to sort after the command's. Logged so, the summary was current from half a second in at 24 and 40 rows and with one nested task, but for single MinTTY snapshots that `pyte` drew garbled. Logged otherwise, nested tasks' lines hid the summary for seconds at 24 rows, and a nested evaluation of fewer than ten tasks took the command's line, against `../SPECIFICATION.md` R-089 and R-091.
 
-**Costs** Progress output streams no single characters, and its summary is one line cut to the console width. The summary is absent where Mill does not redraw its prompt in place. It is gone from the moment the nested evaluation returns, while event streams may still be ending. Under Windows pseudo-consoles, an earlier spike lost one `Task.log` line in some runs, against `../SPECIFICATION.md` R-091. A later 8 085 lines in 34 Windows runs lost none, and the cause is unknown.
+**Costs** Progress output streams no single characters, its summary is cut to the console width and gone once the nested evaluation returns while event streams may still be ending, and Mill has lost a `Task.log` line in some runs under Windows pseudo-consoles, for a cause not found, against `../SPECIFICATION.md` R-091. R-089 rests on prompt ordering in `mill.internal`, which has no compatibility promise and would break silently, and logging the nested evaluation through `Task.log` prefixes its tasks' console lines `1-<n>]` instead of `<n>]` (R-050).
 
 **Settled by**
 
@@ -42,7 +25,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - `../research/mill-command-lifetime.md` § 4.2.
 - `../research/mill-nested-keep-going.md` § 2.1, § 3.3.
 - `../research/emitter-plugin-spike.md` § 8.2, § 8.4.
-- `../research/nested-prompt-console.md` § 3, § 4, § 5.
+- `../research/nested-prompt-console.md` § 2–6.
 
 ---
 
