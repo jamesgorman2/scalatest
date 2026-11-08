@@ -62,11 +62,11 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - Holding only what Mill's stable API allows survives Mill releases, but its one route into a JVM worker's streams, a shim `testFramework`, takes only writes made through `System.out` and `System.err`, so JVM warnings, native code and child processes still write to the console.
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 - Running Mill's JVM test runner under a plugin `TaskCtx` with Mill's own logger takes each worker's streams but still shows that runner's progress (R-044).
-- Passing the public `Logger.DummyLogger` as that `TaskCtx`'s log avoids `private[mill]` members but starts workers uncoloured where Mill's own task colours them (R-053).
+- Passing the public `Logger.DummyLogger` as that `TaskCtx`'s `log` avoids `private[mill]` members but starts workers uncoloured where Mill's own task colours them (R-053).
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM with the module unchanged (R-092), meeting R-044 also needs either Mill's test-queue scheduling copied, or a logger compiled inside package `mill` that implements `private[mill]` members and relies on how `mill.exec`, `mill.internal` and `TestModuleUtil` key and route the runner's progress, so a Mill change there would bring that progress back without a compile error; the logger has run only as a meta-build source, never from the plugin's jar.
+**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM with the module unchanged (R-092), meeting R-044 also needs either a copy of Mill's test-queue scheduling or a logger compiled inside package `mill`; that logger implements `private[mill]` members, has run only as a meta-build source and never from the plugin's jar, and relies on how `mill.exec`, `mill.internal` and `TestModuleUtil` key and route the runner's progress, so a Mill change there would bring that progress back without a compile error.
 
 **Settled by**
 
