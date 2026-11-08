@@ -1,6 +1,6 @@
 # Running a selected module's tests from the test command without a plugin trait
 
-At Mill `1.1.10`: whether an exclusive command can run a selected test module's tests on the JVM, Scala.js and Native, holding `.planning/event-stream-reporting/SPECIFICATION.md` R-053 and taking each run's stdout and stderr (R-040, R-042), when the module mixes in no trait the plugin provides. It covers public equivalents of the protected members Mill's test tasks use, building the inputs without them, calling them by reflection, and evaluating Mill's own test task from plugin code. For each route it gives the runtimes it worked on and how the Mill API it uses is marked. Answers [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45). Facts only; no route is chosen.
+At Mill `1.1.10`: whether an exclusive command can run a selected test module's tests on the JVM, Scala.js and Native, holding `.planning/event-stream-reporting/SPECIFICATION.md` R-053 and taking each run's stdout and stderr (R-040, R-042), when the module mixes in no trait the plugin provides (R-092). It covers public equivalents of the protected members Mill's test tasks use, building the inputs without them, calling them by reflection, and evaluating Mill's own test task from plugin code. For each route it gives the runtimes it worked on and how the Mill API it uses is marked. Answers [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45). Facts only; no route is chosen.
 
 Notes this one builds on and does not repeat:
 
@@ -11,14 +11,14 @@ Notes this one builds on and does not repeat:
 
 ## Short answer
 
-- **Yes, on all three runtimes, with no trait and no reflection** (§ 3.4, § 4, § 5). The plugin takes the module's public `testForked` or `testOnly` command. Mill evaluates the named tasks below it. The plugin itself calls `Task.evaluate` on the anonymous tasks between them and the command, then on the command itself, with its own `TaskCtx` and streams. Mill's own test body therefore runs unchanged for that module. On Native the plugin also replaces the value of `nativeLink` with a launcher (`NSW`).
+- **Yes, with no trait and no reflection** (§ 3.4, § 4, § 5). The tests ran, with their output captured, on the JVM, Scala.js and Native; R-053's working directory, arguments and environment were compared on the JVM only. The plugin takes the module's public `testForked` or `testOnly` command. Mill evaluates the named tasks below it. The plugin itself calls `Task.evaluate` on the anonymous tasks between them and the command, then on the command itself, with its own `TaskCtx` and streams. Mill's own test body therefore runs unchanged for that module. On Native the plugin also replaces the value of `nativeLink` with a launcher (`NSW`).
   - No run's output reached the console, on Windows and Linux, under the daemon and `--no-daemon`. The plugin received each stream in order.
   - Against Mill's own `testForked` and `testOnly`, these matched: the classes run, the test results, the JUnit XML test cases, and each JVM worker's working directory, arguments and environment. The exceptions are the worker-count and duplicate-class variation `MPC` § 5 records, which Mill's own task shows too.
 - **The protected members have no public equivalent of the same value** (§ 2.1). `aheadOfTimeDiscoveredTestClassesIfNeeded` is `None` unless the module sets the protected `discoverTestsWithZinc`. Mill sets it only in `TestScalaJSModule.Junit4ScalaJs`. Building the JVM inputs with `None` from public tasks worked, and matched `testForked` on a module without Zinc discovery (§ 3.1). On Native, Scala Native's `TestAdapter` built from public tasks with a launcher worked (§ 3.5).
 - **Reflection on the protected members works** (§ 2.2, § 3.2, § 3.3). Scala's `protected` is `public` in bytecode, and `Class.getMethod` returned both members. A task-returning member yields a new `Task.Anon` per call. Mill evaluated it as an input of the plugin's task, and the named tasks under it are the module's own memoised instances.
-- **Every route needs `@experimental` API, and the JVM routes that build `TestModuleUtil` also need `@internal` API** (§ 6). The command route needs none of these beyond implementing `TaskCtx`, whose `fork` member's type is `@experimental`. It relies on Mill's public, unmarked `Task.inputs` and `Task.evaluate`, and on Mill's own test body running correctly under a `TaskCtx` it did not build.
+- **Every route needs `@experimental` API. `public` and `member` also need `@internal` `internalWorker`, and `adapter` needs `@internal` `TestRunner` and `TestRunnerUtils`** (§ 6). The command route needs none of these beyond implementing `TaskCtx`, whose `fork` member's type is `@experimental`. It relies on Mill's public, unmarked `Task.inputs` and `Task.evaluate`, and on Mill's own test body running correctly under a `TaskCtx` it did not build.
 - **A task built outside the module gets no `Task.dest` and is under Mill's filesystem checker** (§ 2.4). Every route supplied its own folder per module and turned the checker off around its writes.
-- **Not run:** Native on Linux, macOS, a pseudo-terminal, a killed worker, more than one round per case (§ 8).
+- **Not run:** Native on Linux, macOS, a pseudo-terminal, a killed worker, more than one round per case, R-053's working directory, arguments and environment on Scala.js and Native (§ 8).
 
 ## Sources
 
@@ -41,16 +41,16 @@ A `[mill]` path `P` is at `https://github.com/com-lihaoyi/mill/blob/92d51b79bc22
 - `SNM` is `libs/scalanativelib/src/mill/scalanativelib/ScalaNativeModule.scala`.
 - `B` is `[proto]` `build.mill`.
 
-A statement marked *inference* follows from the code read or the runs and was not observed directly. A statement marked *general* is JVM or Scala behaviour that no source here was opened for.
+A statement marked *inference* follows from the code read or the runs and was not observed directly. A statement marked *general* is JVM or Scala behaviour that no source here was opened for. An unmarked statement with no `[mill]`, `[jar]` or `B` citation was observed in the § 1 runs.
 
 ## 1. What was run
 
 - **Fixtures,** none mixing in anything of the prototype's (`B` lines 47–83):
-  - `jvm.test`: the `MPC` § 1 `gamma` suites (ten suites in two fork groups of five, `testParallelism` on, `-Xverify:none`, `SEQ-*` and `CHILD-*` lines, a `worker-info-<pid>.txt` per JVM, `G03` `t2` failing under `SPIKE_FAIL`).
+  - `jvm.test`: the `MPC` § 1 `gamma` fixture.
   - `zinc.test`: one suite, with `override protected def discoverTestsWithZinc = true` in the module.
-  - `js.test` (Scala.js `1.20.2`, Node) and `native.test` (Scala Native `0.5.12`): two suites writing 40 numbered lines to each of stdout and stderr, and one writing one line to each.
+  - `js.test` (Scala.js `1.20.2`, Node) and `native.test` (Scala Native `0.5.12`): `XSuite`, two tests each writing 20 numbered lines to each of stdout and stderr, and `YSuite`, one line to each.
 - **The command,** `notrait.run --route <route> <selector>...`, is exclusive and takes the `Evaluator` (`B` lines 330–386). It resolves the selectors as `.planning/event-stream-reporting/research/emitter-plugin-spike.md` § 1 does, builds one goal per test module, runs every goal in one `Evaluator.execute`, and prints one result line per module. Class globs come from `NOTRAIT_GLOBS`. Each goal writes into `out/notrait/modules/<route>/<module>`, a folder for that module outside the command's own `Task.dest`, and saves what it captured there.
-- **Capture,** in every route: a `TaskCtx` that delegates to the goal's own ctx except `dest`, `args` and `fork` (`B` lines 133–149). Its `fork` is `MPC`'s `CaptureFork` (`B` lines 118–130). The body also runs inside `SystemStreamsUtils.withStreams` over the plugin's buffers (`B` line 113). On Native a launcher writes the binary's stdout and stderr to files the plugin reads after `close()` (`NSW` § 1; `B` lines 151–183).
+- **Capture,** in every route: a `TaskCtx` that delegates to the goal's own ctx except `dest`, `args` and `fork` (`B` lines 133–149). Its `fork` is `MPC`'s `CaptureFork` (`B` lines 118–130), except in `adapter`, which keeps the goal's own `fork` (`B` line 299). The body also runs inside `SystemStreamsUtils.withStreams` over the plugin's buffers (`B` line 113). On Native a launcher writes the binary's stdout and stderr to files the plugin reads after `close()` (`NSW` § 1; `B` lines 151–183).
 - **Routes:**
 
   | Route | Runtimes | How the goal is built |
@@ -85,10 +85,8 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`, Azul Zulu `21.0.10` 
 | `discoverTestsWithZinc: Boolean` | `TM` line 78 | `protected def`, `false` | `true` only in `TestScalaJSModule.Junit4ScalaJs` (`SJM` line 444) or a user's override |
 | `zincAnalysisFileDiscoveredTestClasses: T[Seq[(String, Int)]]` | `TM` lines 114–130 | `protected def`, a named task | Zinc discovery from `zincAnalysisFile` |
 | `aheadOfTimeDiscoveredTestClassesIfNeeded: Task[Option[Seq[(String, Int)]]]` | `TM` lines 138–144 | `protected def`, returns a new `Task.Anon` per call | `Some(zincAnalysisFileDiscoveredTestClasses())` if `discoverTestsWithZinc`, else `None` |
-| `testTask(args, globSelectors)` | `TM` lines 312–341; `SJM` lines 408–431; `SNM` lines 492–520 | `protected def`, returns a new `Task.Anon` per call | the body shared by `testForked`, `testOnly` and `testCached` (`TM` lines 159–166, 191–193, 223–235) |
-| `testFrameworkInstance` (Scala.js) | `SJM` lines 398–406 | `protected def` | `JNC` § 6.1 |
-| `withScalaNativeBridge`, `toWorkerApi` (Native) | `SNM` lines 158–163, 289 | `private[scalanativelib]` | `JNC` § 6.2 |
 
+- `testTask`, Scala.js's `testFrameworkInstance`, and Native's `withScalaNativeBridge` and `toWorkerApi` are as `JNC` § 6.1–6.2 lists them. `testTask` also returns a new `Task.Anon` per call (`TM` lines 312–341).
 - **No public task yields the value of `aheadOfTimeDiscoveredTestClassesIfNeeded`.** The public `discoveredTestClasses` uses Zinc discovery when `discoverTestsWithZinc` is on, but keeps only the names, not the `Int` of each pair (`TM` lines 90–94). Its inputs are the public `compile().analysisFile` (`[mill]` `libs/javalib/src/mill/javalib/JavaModule.scala` line 142) and `ZincOp.DiscoverTestsZinc` in `mill.javalib.api.internal` (`TM` lines 116–129). Nothing public says whether `discoverTestsWithZinc` is on.
 - **Every other input `testTask` passes to `TestModuleUtil` is a public task** of the module or of `jvmWorker()`, including `testUseArgsFile`, `forkWorkingDir`, `javaHome` and `propagateEnv` (`TM` lines 241, 312–339; `[mill]` `libs/javalib/src/mill/javalib/RunModule.scala` lines 36, 48, 64, 197; `libs/javalib/src/mill/javalib/JavaHomeModule.scala` line 29; `libs/javalib/src/mill/javalib/JvmWorkerModule.scala` lines 36, 42, 156). `internalWorker` is `@internal` (`JvmWorkerModule.scala` line 156).
 - **Named tasks are memoised per module.** A `def` holding `Task { ... }` is wrapped in `cachedTask` (`[mill]` `core/api/src/mill/api/internal/Cacher.scala` lines 11, 67), so plugin code calling `m.forkArgs` gets the instance Mill's own tasks use. Observed: `m.forkArgs eq m.forkArgs` was `true`.
@@ -115,7 +113,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`, Azul Zulu `21.0.10` 
 
 - **No `Task.dest`.** An unnamed goal is executed with `paths = None` (`GE` lines 259–262, 453–470), so `Task.dest` throws "No `dest` folder available here" (`GE` lines 782–792). Every route's ctx supplies `out/notrait/modules/<route>/<module>` instead (`B` line 134).
 - **The filesystem checker.** For a goal that is not a `Task.Command`, a write inside the workspace outside its valid `dest`s fails (`GE` lines 797–827, 849–857). In the trial round, the Native launcher write failed with "Writing to out/notrait/modules/command/native.test/launcher not allowed during execution of `Task.Anon@…(build_.package_#notrait.graphGoal)`". Every route wraps its body in `BuildCtx.withFilesystemCheckerDisabled`, which is public and unmarked (`[mill]` `core/api/java11/src/mill/api/BuildCtx.scala` lines 33–37). `fork.async` carries the submitter's checker into each worker's body (`ECX` lines 127, 133).
-- **Mill's prompt and failure lines.** Mill labelled each goal `Task.Anon@<hash>(build_.package_#notrait.<builder>)` in its line prefix. When `G03` failed, Mill's own `[error] … 1 tests failed:` list, which `testForked` prints, did not appear (§ 5). *Inference:* Mill passes no task label for an unnamed group (`GE` lines 453–461).
+- **Mill's prompt and failure lines.** Mill labelled each goal `Task.Anon@<hash>(build_.package_#notrait.<builder>)` in its line prefix. When `G03` failed, Mill's own `[error] … 1 tests failed:` list, which `testForked` prints, did not appear (§ 4). *Inference:* Mill passes no task label for an unnamed group (`GE` lines 453–461).
 
 ## 3. The routes
 
@@ -161,8 +159,9 @@ Each route run was compared with Mill's own task of the same platform, mode and 
 | Workers that started a JVM | the same except, on Linux, `hook` under the daemon, passing and failing (3 against 2 in `group-1`); on Windows, 4 runs under the daemon (3 against 2 in `group-1` for `command` passing and failing and `member` passing; 1 against 2 for `public` failing) |
 | JVM working directory, input arguments, environment, command; on Linux the full command line | the same in every run, once paths into the task's folder are replaced by a placeholder and `MILL_PARAMS` (the launcher's command line, `MPC` § 5) is set aside, except two artefacts: `NOTRAIT_GLOBS`, the prototype's own variable, which reached the workers through `propagateEnv`; and the folder of a worker present on one side only |
 | Working directory | `<module folder>/<group>/worker-<i>/sandbox`, as under `<Task.dest>` for Mill's task |
-| Failure message | the same text in every failing run, `1 tests failed: gamma.G03 t2`, except Windows `public`, daemon: `2 tests failed`, `G03` having run on two workers |
+| Failure message | the goal's failure message, as the plugin printed it, had the text of Mill's `[error] … tests failed:` line and the list under it, `1 tests failed: gamma.G03 t2`, in every failing run, except Windows `public`, daemon: `2 tests failed`, `G03` having run on two workers |
 
+- **"failure line DIFFERS"** in `[proto]` `results/windows-summary.txt` and `results/linux-summary.txt`, on every failing route run, is not a difference in that message. `analyse.py` compares the console lines holding `tests failed`: a route's console has the plugin's line and not Mill's `[error]` line (§ 2.4).
 - **A class run twice.** No Linux run had one. On Windows, the runs with a class on two workers of one group: under `--no-daemon`, every JVM run, Mill's own tasks included; under the daemon, `testForked` in 1 of 2 runs, `testOnly` in none, the routes in 4 of 8 runs without globs and none of 4 with them. This is the behaviour `MPC` § 5 records for Mill's own task and for both of its routes. With one round per case, these counts do not show whether a route changes the rate.
 - **Scala.js and Native environment and arguments** were not recorded. *Inference:* the `hook` and `command` routes run Mill's own body with Mill's own input values, except Native's binary, which the launcher starts with the arguments and environment it receives (`NSW` § 1).
 - **Folders.** No route wrote into any `out/<module>/test/testForked.*` or `testOnly.*` path it was given. *Inference, not checked:* Mill's own test tasks' cached results and folders are untouched, since Mill never ran those groups (§ 2.3).
@@ -170,18 +169,16 @@ Each route run was compared with Mill's own task of the same platform, mode and 
 ## 5. Against R-040 and R-042
 
 - **Nothing reached the console.** In every route run on both platforms, the console held none of the run's lines: no `SEQ-*`, `CHILD-*`, `X-*`, `Y-*` or `Z-*` line, no JVM warning, no `Running Test Class` and no ScalaTest summary. Under Mill's own tasks all of them did, except Native under the daemon, whose lines went to `out/mill-daemon/stdout` (`NSW` § 2).
-- **The plugin received every stream, in order.** Each JVM worker's stdout and stderr were kept under the worker's `fork.async` key. A single-class JVM run (`zinc.test`), which spawns on the calling thread (`MWC` § 2.2), was captured through `withStreams`' `os.Inherit`. The Scala.js VM's streams and the logger lines came through `withStreams`. The Native binary's streams came from the launcher's files. In every run, each `SEQ-OUT`, `SEQ-ERR`, `X-OUT` and `X-ERR` sequence ran 1 to N without gap or reordering.
+- **The plugin received every stream, in order.** Each JVM worker's stdout and stderr were kept under the worker's `fork.async` key. A single-class JVM run (`zinc.test`), which spawns on the calling thread (`MWC` § 2.2), was captured through `withStreams`' `os.Inherit`. The Scala.js VM's streams and the logger lines came through `withStreams`. The Native binary's streams came from the launcher's files. In every run, each `SEQ-OUT`, `SEQ-ERR`, `X-OUT` and `X-ERR` sequence ran 1 to N without gap or reordering. `[proto]` `results/windows-summary.txt` flags `xOut` and `xErr` out of order in the two Windows all-module `command` runs: there `analyse.py` joins `js.test`'s and `native.test`'s captured files under one key, and each module's own files run 1 to 20.
 - **When bytes arrived** was not measured; the plugin wrote its buffers out after `execute` returned.
 
 ## 6. API marking per route
 
-Mill's compatibility policy and MiMa coverage: `MNK` § 5. `core/api` (`mill.api`, including `Task`, `TaskCtx`, `BuildCtx`) is MiMa-checked.
+Mill's compatibility policy and MiMa coverage: `MNK` § 5. All the `mill.api` types below are in the policy. `Task` (`core/api/src`) is MiMa-checked. `TaskCtx`, `BuildCtx` and `SystemStreamsUtils` are in `core/api/java11`, whose module extends `MillPublishScalaModule` (`[mill]` `core/api/package.mill` line 15), so they are not.
 
 | Route | Runtimes run | Mill API | Marking |
 |---|---|---|---|
-| `public` | JVM | `TestModuleUtil` constructor and `runTests()` | `@experimental` (`TMU` line 30) |
-| | | `jvmWorker().internalWorker()` | `@internal` (`JvmWorkerModule.scala` line 156) |
-| | | `TaskCtx`, implemented in full; `TaskCtx.Fork.Api` | `TaskCtx` unmarked; `object Fork` `@experimental` (`TCX` lines 193–196) |
+| `public` | JVM | the API of `MPC` § 6 Route A, which this route builds from outside the module | as `MPC` § 6 records |
 | | | `BuildCtx.withFilesystemCheckerDisabled`, `SystemStreamsUtils.withStreams`, `Task.Anon` | public, unmarked |
 | | | discovery value | `None`, which equals Mill's only when the protected `discoverTestsWithZinc` is `false` |
 | `member` | JVM | as `public`, plus `aheadOfTimeDiscoveredTestClassesIfNeeded` | `protected def`; `public` in bytecode; reached by `java.lang.reflect` |
@@ -193,19 +190,20 @@ Mill's compatibility policy and MiMa coverage: `MNK` § 5. `core/api` (`mill.api
 | | | everything `hook` uses except reflection | as `hook` |
 | `adapter` | Native | `nativeLink`, `allForkEnv`, `runClasspath`, `compile`, `testArgsDefault`, `testFramework`, `testReportXml` | public tasks |
 | | | `TestRunner.runTestFramework` | `@internal` object (`[mill]` `libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunner.scala` line 6) |
+| | | `TestRunnerUtils.globFilter` | `@internal` object (`[mill]` `libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` line 20) |
 | | | `TestModule.handleResults` | public, unmarked (`TM` lines 749–755) |
+| | | `TaskCtx`, implemented in full, with the goal's own `fork`; `BuildCtx.withFilesystemCheckerDisabled`; `SystemStreamsUtils.withStreams` | as `public` |
 | | | Scala Native `TestAdapter` | public (`JNC` § 6.2), on the build's class path at the build's version |
 
 - **What `hook` and `command` rely on beyond the signatures.** First, that evaluating a group's tasks in order with their input values as `args` is all Mill's evaluation of them needs (§ 2.3). Second, that the tasks under the command read nothing from the parts of `GE`'s `wrap` the plugin does not reproduce. Third, on Native, the use of `nativeLink` noted above. *Inference:* a later Mill that moves work into those parts, or changes how a test task's body reads its inputs, changes the result without failing at compile time.
-- **Routes that build `TestModuleUtil` (`public`, `member`)** are the `MPC` § 6 Route A, built outside the module. `object TestModuleUtil` stays `private[mill]` (`TMU` line 372).
 
 ## 7. Against the specification and the earlier notes
 
 - `MPC` § 6 reached `aheadOfTimeDiscoveredTestClassesIfNeeded` only from a trait mixed into the test module. Reflection reaches it without one (§ 3.2). The `command` route does not need it, because Mill's own body passes it (§ 3.4).
 - `MWC` § 2.1 found that a `testTask` override calling `super.testTask` cannot take the raw streams. Under the `hook` and `command` routes the plugin, not Mill, evaluates that same task, with the plugin's ctx and streams, and does take them (§ 3.3, § 5).
-- `JNC` § 6.2 names `testTask` as Native's only hook. The `command` route runs Native's tests with the launcher without overriding it (§ 3.4).
+- `JNC` § 6.2 names `testTask` as Native's only overridable member. The `command` route runs Native's tests with the launcher without overriding it (§ 3.4).
 - `JNC` § 5.1 infers that the JS VM's `PipeOutputThread` writes to the streams of the thread that started the VM. Observed: with the plugin's `withStreams` around that start, the VM's stdout and stderr reached the plugin and not the console (§ 5).
-- `.planning/event-stream-reporting/SPECIFICATION.md` § Scope, R-059 and R-060, and `.planning/event-stream-reporting/decisions/test-command.md` (entry "Only an explicit test command produces consolidated output…"), assume the user's build needs no change. Nothing here contradicts that assumption.
+- `.planning/event-stream-reporting/SPECIFICATION.md` R-092: every route held it on the runtimes it ran on, since no fixture names anything of the prototype's (§ 1). Only `command` and `hook` held it on all three runtimes, and only `command` without reflection. `public` holds it by passing `None` for discovery. *Inference:* that breaks R-053 wherever class files and Zinc analysis disagree (§ 3.1).
 
 ## 8. What was not run or not determined
 

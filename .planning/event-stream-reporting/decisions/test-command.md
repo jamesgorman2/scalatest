@@ -2,6 +2,20 @@
 
 Decisions behind `../SPECIFICATION.md` on which modules the test command runs, how, and when it fails, newest first.
 
+## A test module needs no change to its definition for the test command to run it.
+
+**Alternatives** A plugin trait mixed into each test module, exposing the protected `testTask` and `aheadOfTimeDiscoveredTestClassesIfNeeded`, needs every module definition changed, and a selected module without it would be neither run, as `../SPECIFICATION.md` § Scope requires, nor failed by R-059.
+
+**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait, keeping each run's output off the console and taking it for the plugin (R-040, R-042), and matching Mill's own task (R-053).
+
+**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM no such route has been observed to meet R-044, and the nested evaluation's fail-fast-off behaviour and prompt have been observed only with each module's own `testForked` as goals, not with goals the plugin builds.
+
+**Settled by** [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
+
+**See** `../research/mill-test-without-module-trait.md` § 3.4, § 4, § 6.
+
+---
+
 ## Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged.
 
 **Alternatives**
@@ -38,7 +52,7 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 **Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`../SPECIFICATION.md` R-056).
 
-**Costs** Only one route examined both starts each module's tests on its own compile and runs every selected module without `--keep-going`: a single `execute` call over every selected module's test tasks, on an evaluator whose `Execution` has fail-fast off. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`../research/mill-nested-keep-going.md` § 3, § 5).
+**Costs** Only one route examined both starts each module's tests on its own compile and runs every selected module without `--keep-going`: a single `execute` call with one goal per selected test module, on an evaluator whose `Execution` has fail-fast off, observed only with each module's own `testForked` as the goals. It reaches Mill internals that carry no compatibility promise, so a Mill change to them breaks it at run time, not compile time (`../research/mill-nested-keep-going.md` § 3, § 5).
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -93,7 +107,7 @@ Decisions behind `../SPECIFICATION.md` on which modules the test command runs, h
 
 **Reasoning** A user who runs the test command in place of Mill's test task expects the output to change and nothing else (`../SPECIFICATION.md` R-053).
 
-**Costs** The plugin must reproduce Mill's fork grouping, parallelism and sandbox working directory, rather than choose processes whose output is easier to take, such as one worker for every module.
+**Costs** The plugin must take each run's output from the processes Mill's fork grouping and parallelism start, in Mill's sandbox working directory, rather than from processes it chooses because their output is easier to take, such as one worker for every module.
 
 **Settled by** [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 

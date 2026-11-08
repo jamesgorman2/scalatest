@@ -11,7 +11,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - Requiring Mill's `--ticker false` makes the user pass it on every command, since the plugin cannot set it.
 - Whole lines alone give no live sense of a long run's progress.
 
-**Reasoning** `Task.log.ticker` and `Task.log` are public with no annotation: Mill rewrites the ticker's detail in place on the test command's own prompt line, and clears and redraws its prompt around `Task.log` lines, which left no stale prompt. The summary holds through the nested evaluation, the test command's one `execute` call over every selected module's test tasks, at any console height and nested-task count only when that evaluation logs through the command's `Task.log`. That logger keys every nested task's prompt line to sort after the command's, and with it the summary was current from half a second in, at 24 and 40 rows and with one nested task, except in single MinTTY snapshots that `pyte` drew garbled. Logged otherwise, nested tasks' lines hid the summary for seconds at 24 rows, and a nested evaluation of fewer than ten tasks took the command's line, against `../SPECIFICATION.md` R-089 and R-091.
+**Reasoning** `Task.log.ticker` and `Task.log` are public with no annotation: Mill rewrites the ticker's detail in place on the test command's own prompt line, and clears and redraws its prompt around `Task.log` lines, which left no stale prompt. The summary holds through the nested evaluation, the test command's one `execute` call with one goal per selected test module, at any console height and nested-task count only when that evaluation logs through the command's `Task.log`. That logger keys every nested task's prompt line to sort after the command's, and with it the summary was current from half a second in, at 24 and 40 rows and with one nested task, except in single MinTTY snapshots that `pyte` drew garbled. Logged otherwise, nested tasks' lines hid the summary for seconds at 24 rows, and a nested evaluation of fewer than ten tasks took the command's line, against `../SPECIFICATION.md` R-089 and R-091.
 
 **Costs** Progress output streams no single characters; its summary is cut to the console width and gone once the nested evaluation returns, while event streams may still be ending; and Mill has lost a `Task.log` line in some runs under Windows pseudo-consoles, for a cause not found, against `../SPECIFICATION.md` R-091. R-089 rests on prompt ordering in `mill.internal`, which has no compatibility promise, so a Mill change there would break it silently; logging the nested evaluation through `Task.log` also prefixes its tasks' console lines `1-<n>]` instead of `<n>]` (R-050).
 
@@ -61,16 +61,16 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 - Holding only what Mill's stable API allows survives Mill releases, but its one route into a JVM worker's streams, a shim `testFramework`, takes only writes made through `System.out` and `System.err`, so JVM warnings, native code and child processes still write to the console.
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
+- Supplying a `TaskCtx` to Mill's own JVM test runner takes each worker's streams but, as observed, still shows that runner's progress, so it does not meet R-044.
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests through Mill API marked `@experimental`, and either through `@internal` API or by evaluating Mill's own test task itself in a way Mill does not document, so it may need a release for each Mill release. On Native it must compile its launcher where an emulator cannot load a script. Supplying a `TaskCtx` to Mill's own test runner, as observed, still shows that runner's progress and so does not meet R-044. Taking a run's stdout and stderr has been observed only on Windows and Linux, and never with a killed worker.
+**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or an evaluation of Mill's own test command that Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM, no route that needs no change to the module (R-092) has been observed to meet R-044, and without that change a run's stdout and stderr have been taken only on Windows and Linux, on Native only on Windows, and never with a killed worker.
 
 **Settled by**
 
 - [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 - [Can the plugin take a JVM worker's stdout and stderr when Mill runs a module's tests in parallel workers?](https://github.com/jamesgorman2/scalatest/issues/42).
-- [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
 
 **See**
 
@@ -79,7 +79,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - `../research/mill-parallel-worker-capture.md` § 3–6, § 8.
 - `../research/js-native-channels.md` § 5, § 6.
 - `../research/native-stdio-wrapper.md` § 3, § 5.
-- `../research/mill-test-without-module-trait.md` § 4–6.
+- `../research/mill-test-without-module-trait.md` § 5–6.
 
 ---
 
