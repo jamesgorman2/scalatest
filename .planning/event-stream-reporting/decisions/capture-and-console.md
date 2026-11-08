@@ -64,12 +64,13 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin must run each module's tests through Mill API marked `@experimental` and `@internal`, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script; and supplying a `TaskCtx` to Mill's own test runner, as observed, still shows that runner's progress and so does not meet R-044. Taking a JVM parallel worker's or a Native run's stdout and stderr has been observed only on Windows and Linux, and the JVM's never with class globs, test parallelism off, a killed worker or several modules in one command.
+**Costs** The plugin must run each module's tests through Mill API marked `@experimental`, and either through `@internal` API or by evaluating Mill's own test task itself in a way Mill does not document, so it may need a release for each Mill release. On Native it must compile its launcher where an emulator cannot load a script. Supplying a `TaskCtx` to Mill's own test runner, as observed, still shows that runner's progress and so does not meet R-044. Taking a run's stdout and stderr has been observed only on Windows and Linux, and never with a killed worker.
 
 **Settled by**
 
 - [May the Mill plugin run a module's tests in place of Mill's test task?](https://github.com/jamesgorman2/scalatest/issues/38).
 - [Can the plugin take a JVM worker's stdout and stderr when Mill runs a module's tests in parallel workers?](https://github.com/jamesgorman2/scalatest/issues/42).
+- [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
 
 **See**
 
@@ -78,6 +79,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - `../research/mill-parallel-worker-capture.md` § 3–6, § 8.
 - `../research/js-native-channels.md` § 5, § 6.
 - `../research/native-stdio-wrapper.md` § 3, § 5.
+- `../research/mill-test-without-module-trait.md` § 4–6.
 
 ---
 
