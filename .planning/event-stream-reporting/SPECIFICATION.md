@@ -13,6 +13,8 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 ## Spec documents
 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — the deployable units, the boundaries between the emitter, the Mill plugin and the consolidation library, and how each run's events reach the consolidated output.
+- [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md) — the decisions behind the architecture.
 - [../structured-test-reporting/SPECIFICATION.md](../structured-test-reporting/SPECIFICATION.md) — the test structure and what each output shows, which this epic takes by default.
 - [../structured-test-reporting/runner-json/SPECIFICATION.md](../structured-test-reporting/runner-json/SPECIFICATION.md) — the layout of one run's JSON object, which this epic takes.
 - [../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md](../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md) — every key of that object, which this epic takes.
@@ -35,13 +37,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 ## Scope
 
 - An emitter in ScalaTest that sends one run's events, test structure and the output it captures over a single channel.
-- A consolidation library that takes the following and writes each consolidated output to a file, pipe or writer its caller supplies:
-  - many runs' event streams, each with the output *captured off* the stdout and stderr of its run's processes, that is, read from those streams from outside the processes;
-  - each process that ended before any run existed in it (R-076), with its test run label and the output captured off its stdout and stderr;
-  - each module whose tests did not start, with its test run label and, where a failure stopped them, that failure;
-  - each test class its caller knows was to run but that no run reported;
-  - each module selector, with the test modules it resolved to;
-  - where its caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
+- A consolidation library, published and depending on no Mill artifact, that produces the consolidated output from many runs' event streams.
 - A Mill plugin that hosts the consolidation library, turns the channel of each run it starts into that run's event stream, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, while the emitter, the consolidated output and the test command cover runs in the `NodeJs` and `JsDom` JS environments only; R-059 covers a module configured for any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native. The next paragraph limits them on an unsupported Mill release.
@@ -86,7 +82,6 @@ A channel's format, the consolidation library's API and the switch by which the 
 - R-010 Each run sends over one channel every event the run reports, the run's test structure and the output the run captures.
 - R-063 What a run sends does not depend on its reporter configuration.
 - R-011 Nothing the consolidated output shows or uses is lost or altered between the run and the channel's reader. This includes failure messages and the order of events within a node.
-- R-013 A channel carries one run.
 - R-074 On every runtime, each run's channel carries how the run ended: completed, aborted or stopped.
 - R-073 When a run's process dies, R-010, R-011, R-021 and R-042 hold for everything the run had handed to the operating system. They do not cover what was still buffered inside the process.
 
@@ -136,7 +131,7 @@ WHERE `--halt-on-failure` is given:
 
 ## Consolidation
 
-Output is *captured against* a suite, scope or test when the means that captured it ties it to that node, and *captured against* the run when it ties it only to the run.
+Output is *captured against* a suite, scope or test when the means that captured it ties it to that node, and *captured against* the run when it ties it only to the run. Output is *captured off* a process's stdout or stderr when it is read from that stream from outside the process.
 
 - R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output, and any combination can be on together, including progress output with JSON output, unlike `../structured-test-reporting/SPECIFICATION.md` § Progress output.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
@@ -161,8 +156,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 - R-086 Output captured only against the run is shown without claiming that it is test output or worker output.
 - R-087 Worker output is never captured against a suite, scope or test.
 - R-084 The JSON output is documented for third-party readers and carries the compatibility promise `../structured-test-reporting/SPECIFICATION.md` § JSON output gives the single-run JSON. The human-readable and progress output carry no compatibility promise.
-- R-023 The consolidation library is published and depends on no Mill artifact. Given the same inputs (§ Scope), it produces the same human-readable and JSON output when called without Mill as when the Mill plugin calls it.
-- R-052 The consolidation library's caller names the test run label for each event stream.
+- R-023 The consolidation library is published and depends on no Mill artifact. Given the same inputs (`ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library), it produces the same human-readable and JSON output when called without Mill as when the Mill plugin calls it.
 - R-025 The Mill plugin gives each selected test module exactly one test run label, named for its module path. Mill keeps module paths unique.
 
 ## A run that does not finish

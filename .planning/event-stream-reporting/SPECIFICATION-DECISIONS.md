@@ -8,5 +8,5 @@ Decisions behind `SPECIFICATION.md`, split by topic, each part newest first.
 - [decisions/test-command.md](decisions/test-command.md) — which modules, JS environments and Mill releases the test command runs on, how it runs them, and when it fails.
 - [decisions/run-that-does-not-finish.md](decisions/run-that-does-not-finish.md) — what counts as a run, and what the output holds when a run's process dies or the test command is interrupted.
 - [decisions/runs-labels-and-selectors.md](decisions/runs-labels-and-selectors.md) — how runs, test run labels and module selectors appear in the consolidated output.
-- [decisions/channel-contract.md](decisions/channel-contract.md) — what a channel carries, who may read it, which release ships the Mill plugin, and the consolidation library's input and API.
+- [decisions/channel-contract.md](decisions/channel-contract.md) — what a channel carries, who may read it, which release ships the Mill plugin, and the consolidation library's API.
 - [decisions/reuse.md](decisions/reuse.md) — what this epic takes from structured test reporting, and its one dropped output, JUnit XML.

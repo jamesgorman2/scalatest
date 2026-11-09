@@ -29,18 +29,6 @@ Decisions behind `../SPECIFICATION.md` on the contract between the emitter and t
 
 ---
 
-## The consolidation library takes each run's event stream, not its channel.
-
-**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and recording a channel outside Mill needs a supported way to turn the emitter on there: new public surface on `Runner` and the `Framework`, bound by `../SPECIFICATION.md` R-001 and R-004.
-
-**Reasoning** Separating decoding from consolidation lets any front end in this fork, live under Mill or reading files, feed the same library, so the library never knows whether a channel was live or recorded.
-
-**Costs** Every front end must turn channels into event streams. This epic gives no way outside Mill to produce a channel, so `../SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
-
-**Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
-
----
-
 ## A channel carries what the consolidated output shows or uses, not the whole event.
 
 **Alternatives**

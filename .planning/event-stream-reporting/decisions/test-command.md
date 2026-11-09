@@ -106,29 +106,6 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 ---
 
-## Without `--keep-going`, the test command holds `../SPECIFICATION.md` R-056 through one `execute` call on a copy of `mill.exec.Execution`, made by reflection, with fail-fast off.
-
-**Alternatives**
-
-- Re-executing the goals fail-fast skipped, in further rounds through public API only, starts a skipped module's tests only after the round that skipped it ends (`late.test` at 57.0 s against 16.4 s under `--keep-going`), and drops the console summary between rounds (`capture-and-console.md`, entry "On the console, progress output is a one-line summary…").
-- Falling back to rounds when reflecting into Mill fails adds a second code path that runs only after a Mill change, by when the other internals the test command relies on have likely broken too.
-- Requiring `--keep-going` on the command line adds a flag to every run, and a run without it lets scheduling decide which modules report, an outcome this document's entry "The test command runs every selected test module by default…" rejects.
-- Setting `--keep-going` in the build's `mill-opts` turns fail-fast off for every Mill command in the project, and the plugin cannot set it.
-
-**Reasoning** R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md`, entries "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…" and "On the console, progress output is a one-line summary…"; this document's entry "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Holding R-056 through the copy adds one more such dependency, not a new kind of risk.
-
-**Costs** The route reaches `EvaluatorImpl.execution`, a `private val`, by reflection and copies `mill.exec.Execution`, which lies outside Mill's compatibility policy and is not checked by MiMa: a Mill release that renames `execution` or `failFast`, or changes `Execution`'s constructor, breaks it at run time, not compile time. The copy draws its own final `N FAILED` header before the command ends, shares a profile logger it therefore cannot close, and leaves fail-fast on in exclusive commands it runs; it has run only Mill's own `testForked` for several JVM modules and the plugin's goals for one, never a Scala.js or Native goal.
-
-**Settled by** [Does the test command hold R-056 through Mill internals, or does R-056 accept a later start for modules fail-fast skipped?](https://github.com/jamesgorman2/scalatest/issues/44).
-
-**See**
-
-- `../research/mill-nested-keep-going.md` § 3, § 4.1, § 4.4, § 5.
-- `../research/mill-runner-progress-without-trait.md` § 1, § 9.
-- `../research/nested-prompt-console.md` § 4.
-
----
-
 ## Each selected test module's tests start once that module compiles, without waiting for other selected modules to compile.
 
 **Alternatives** Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
