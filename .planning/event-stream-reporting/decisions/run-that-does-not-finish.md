@@ -6,7 +6,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Alternatives**
 
-- The plugin's list of classes as the authority gives class names only, with no scopes, tests or tags, and on the JVM lists `@DoNotDiscover` suites that ScalaTest's `Framework` drops unless named explicitly, so they would show falsely as not run.
+- Taking the plugin's list of classes as the authority gives class names only, with no scopes, tests or tags, and on the JVM lists `@DoNotDiscover` suites that ScalaTest's `Framework` drops unless named explicitly, which would then show falsely as not run.
 - Each run sending its whole intended tree before running anything is impossible under Mill's test queue, where no worker knows which suites it will claim.
 
 **Reasoning** Losing the rest of a module needs every worker of its fork group to die. That points at the harness rather than a test, and the user must rerun the module anyway. The test command still fails (`../SPECIFICATION.md` R-046), and the test classes left in the group's queue are still shown (R-068).
@@ -23,7 +23,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Alternatives**
 
-- A placeholder JSON file written when the test command starts, which structured test reporting needs only so each ScalaTest invocation can list its tests for its consolidator, is not needed where the test command is the only consolidator and already knows its runs.
+- A placeholder JSON file written when the test command starts is not needed: structured test reporting needs one only so each run can list its tests for its consolidator, and here the test command is the only consolidator and already knows its runs.
 - A JVM shutdown hook writing partial results would tell a user who pressed Ctrl-C only what they already know: they killed the tests.
 
 **Reasoning** After Ctrl-C, Mill gives the test command's body no further control (`../SPECIFICATION.md` R-069; `../research/mill-command-lifetime.md` § 5.1, § 5.2).
@@ -43,8 +43,8 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Alternatives**
 
-- A run beginning at its first task loses a worker that dies before its first task from the output.
-- Every runner constructed while the test command executes tests also takes in another module's discovery runner (`../SPECIFICATION.md` R-056), which never calls `done()` and so would fail every test command (R-046, R-072).
+- Starting a run at its first task drops from the output a worker that dies before its first task.
+- Counting every runner constructed while the test command executes tests also takes in another module's discovery runner (`../SPECIFICATION.md` R-056), which never calls `done()` and so would fail every test command (R-046, R-072).
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`../SPECIFICATION.md` R-064, R-071), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 
@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A single worker's death more often comes from a test (`System.exit`, running out of memory, a native crash) than from the harness, and that test is the fact the reader needs, so the output shows it (`../SPECIFICATION.md` R-073, R-075). Bytes still buffered inside the dying process are lost whatever the channel.
 
-**Costs** The bound narrows the channel choice: a plain socket on Windows lost unread bytes on `Connection reset`, so it qualifies only if its reader can be shown never to lag.
+**Costs** This narrows the channel choice: a plain socket on Windows lost unread bytes on `Connection reset`, so it qualifies only if its reader can be shown never to lag.
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 

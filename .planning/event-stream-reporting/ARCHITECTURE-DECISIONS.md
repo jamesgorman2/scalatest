@@ -43,7 +43,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ## The consolidation library, not the run, assembles each run's test structure, from each suite's filtered structure and events tagged by node.
 
-**Alternatives** Each run assembling its own test structure, as structured test reporting does, still leaves the library assembling for a run whose process dies, and puts more code on Scala.js and Native.
+**Alternatives** Each run assembling its own test structure, as structured test reporting does, still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
 **Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064–R-066). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A run's expected tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
 
@@ -57,7 +57,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- Re-running, through public API only, the goals fail-fast skipped starts their tests late and drops the console summary between rounds.
+- Re-running the goals that fail-fast skipped, through public API only, starts their tests late and drops the console summary between rounds.
 - Falling back to such rounds when reflection fails adds a code path that runs only after a Mill change has likely broken other internals too.
 - Requiring `--keep-going` on the command line adds a flag to every run, and without it scheduling decides which modules report (`SPECIFICATION.md` R-056).
 - Setting `--keep-going` in the build's `mill-opts` turns fail-fast off for every Mill command in the project.

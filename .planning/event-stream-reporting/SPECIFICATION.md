@@ -24,9 +24,9 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - A consolidation library (R-023) that produces the consolidated output from many runs.
 - A Mill plugin that hosts the consolidation library, reads the channel of each run it starts, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
-All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, while the emitter, the consolidated output and the test command cover runs in the `NodeJs` and `JsDom` JS environments only; R-059 covers a module configured for any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native. The next paragraph limits them on an unsupported Mill release.
+All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments; R-059 covers a module configured for any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native. The next paragraph limits them on an unsupported Mill release.
 
-The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. It lists the Mill releases its integration tests passed on and supports exactly those (*supported Mill releases*). R-060 and R-003 hold on every Mill release the plugin runs on, supported or not. On an unsupported Mill release:
+The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. Each lists the Mill releases its integration tests passed on, and supports exactly those (*supported Mill releases*). R-060 and R-003 hold on every Mill release the plugin runs on, supported or not. On an unsupported Mill release:
 
 - the test command runs, but where a Mill internal it needs is missing, it may instead fail before any test starts, naming the Mill version and producing no consolidated output;
 - no requirement holds for the test command or its output except R-093 and, in any JSON output, the Mill version and support status R-081 records.
@@ -79,7 +79,7 @@ A channel's format, the consolidation library's API and the switch by which the 
   - test output streamed as it is received;
   - a block or file written at the end of each run.
 
-Unlike `../structured-test-reporting/SPECIFICATION.md` § Test output, what test output is does not depend on the route or thread of the write, and none of a run's output is streamed directly to stdout or stderr; R-012 and R-040 replace that section.
+Unlike `../structured-test-reporting/SPECIFICATION.md` § Test output, what counts as test output does not depend on the route or thread of the write, and none of a run's output is streamed directly to stdout or stderr. R-012 and R-040 replace that section.
 
 ## The test command
 
@@ -178,13 +178,13 @@ These hold for every run a test command starts.
   - the tests of any selected test module cannot start, for example because it or a module it depends on fails to compile.
 
   Its failure does not list the failed tests. What R-068 shows is not itself a cause of failure. When the test command is interrupted (R-069), Mill's client and the operating system set its exit status instead.
-- R-047 The test command writes each selected test module's JUnit XML report as Mill's `testOnly` or `testForked`, whichever R-053 names, writes it, at the path R-053 moves it to.
+- R-047 The test command writes each selected test module's JUnit XML report as Mill's `testOnly` or `testForked` (whichever R-053 names) writes it, at the path R-053 moves it to.
 
 Where the consolidated output goes:
 
 - R-048 Progress output and human-readable output are each on unless a test-command argument turns it off (R-055), and each is written to the console.
 - R-090 On the console, progress output is written as whole lines, never as the single characters `../structured-test-reporting/SPECIFICATION.md` § Progress output streams. Whether or not the summary (R-089) is shown, the lines show every failure a run reports and each other cause of failure R-046 lists, including each run that aborts or does not finish (R-067).
-- R-089 Where Mill redraws in place its prompt (the status lines at the foot of the console), progress output also shows on the console a current summary of the test command, on one line rewritten in place.
+- R-089 Where Mill redraws its prompt in place (the status lines at the foot of the console), progress output also shows on the console a current summary of the test command, on one line rewritten in place.
 - R-091 Neither progress output's lines nor its summary erase Mill's console output, and Mill's console output erases neither.
 - R-085 JSON output is off unless a test-command argument turns it on (R-055).
 - R-049 JSON output is written to a file in the test command's task folder (`Task.dest`), or to the path a test-command argument gives, never to the console.

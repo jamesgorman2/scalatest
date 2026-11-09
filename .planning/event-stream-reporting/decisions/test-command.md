@@ -7,7 +7,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 **Alternatives**
 
 - A range such as `1.1.x` promises Mill releases no integration test ran on.
-- Every Mill 1.x release from the one the plugin is built against onward relies on Mill's backward binary compatibility, which covers only its stable API, not the API `../SPECIFICATION.md` R-044 and R-089 rest on.
+- Supporting every Mill 1.x release from the one the plugin is built against onward relies on Mill's backward binary compatibility, which covers only its stable API, not the API `../SPECIFICATION.md` R-044 and R-089 rest on.
 
 **Reasoning** A Mill change can break R-044 and R-089 without a compile error or a runtime failure, so only an integration test on a Mill release shows that they hold there.
 

@@ -4,19 +4,19 @@ Decisions: [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md).
 
 ## Summary
 
-Every run a test command starts must get its events, test structure and captured output out of its process on the JVM, Scala.js and Native, without changing what ScalaTest 3.2.x reporters receive (`SPECIFICATION.md` § Constraints), and one Mill command must consolidate every run's channel while Mill's own test tasks behave as they do without the plugin. scalatest-core gains an emitter that sends each run's structure, events and captured output as they happen. A consolidation library builds the consolidated output from many runs' event streams. A Mill plugin's test command runs each selected module's tests with the emitter on and feeds what each run sends to the library.
+Every run a test command starts must get its events, test structure and captured output out of its process on the JVM, Scala.js and Native, without changing what ScalaTest 3.2.x reporters receive (`SPECIFICATION.md` § Constraints). One Mill command must consolidate every run's channel, while Mill's own test tasks behave as they do without the plugin. scalatest-core gains an emitter that sends each run's structure, events and captured output as they happen. A consolidation library builds the consolidated output from many runs' event streams. A Mill plugin's test command runs each selected module's tests with the emitter on and feeds what each run sends to the library.
 
 ## Modules
 
-Three deployable units, all released together as one release of this fork (`decisions/channel-contract.md` "Every release of the Mill plugin is a release of the fork.").
+Three deployable units, released together as one release of this fork (`decisions/channel-contract.md` "Every release of the Mill plugin is a release of the fork.").
 
 ### ScalaTest core
 
 `scalatest-core`, on every runtime and Scala version `SPECIFICATION.md` § Scope covers. Every part below is internal (`private[scalatest]`).
 
-- **Structure wrapper** — taken from `../structured-test-reporting/ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper), ahead of the sorting reporters, so the emitter receives each event as it is emitted, with its node's ID, parent, declared position and name.
+- **Structure wrapper** — taken from `../structured-test-reporting/ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper) and placed ahead of the sorting reporters, so the emitter receives each event as it is emitted, with its node's ID, parent, declared position and name.
 - **Test output capture** — inside the run's process, captures output it can tie to a suite, scope or test against that node, and hands it to the emitter.
-  - Output it captures against a node is withheld from the process's stdout and stderr; everything else passes through to them. This is forced by `SPECIFICATION.md` R-088: what passes through is captured again off those streams (§ APIs § The emitter and the Mill plugin).
+  - Output it captures against a node is withheld from the process's stdout and stderr; everything else passes through to them. `SPECIFICATION.md` R-088 forces this, because what passes through is captured again off those streams (§ APIs § The emitter and the Mill plugin).
 - **Emitter** — when the runner argument is given, sends what § APIs § The emitter and the Mill plugin lists over the run's channel.
 - **Codec** — the one implementation of the channel's format. The encoder runs in every run with the emitter on; the decoder runs in the Mill plugin's channel reading, in Mill's JVM.
 
@@ -27,7 +27,7 @@ Under Mill, a Scala.js or Native run executes in one process (`../structured-tes
 JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses core's `private[scalatest]` formatting of human-readable output, which is why it sits in core's package.
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
-- **Runs that do not finish** — once a run's event stream ends without how the run ended, marks aborted the run and each node it left open (`SPECIFICATION.md` R-064–R-067).
+- **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064–R-067).
 - **Consolidation** — places every run's suites under the run's test run label, with one run record per run (R-078, R-080), beside the library's other inputs (§ APIs).
 - **Writers** — write progress output as events arrive (R-026), and the human-readable and JSON output once every event stream has ended (R-027).
 
@@ -48,11 +48,13 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 
 - **The runner argument** — one ScalaTest runner argument, appended to the framework arguments the test command passes each selected module. It turns the emitter on and turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-041). It reaches the runner on every runtime and in every JS environment the epic covers.
   - Every run of a module receives the same argument, and each run derives from it a channel of its own.
-  - Mill's discovery runner, which is not a run, receives it too (`../structured-test-reporting/ARCHITECTURE.md` § External systems, Mill). The Mill plugin tells the discovery runner's channel, if it opens one, from a run's (`SPECIFICATION.md` R-072).
+  - Mill's discovery runner, which is not a run, receives it too (`../structured-test-reporting/ARCHITECTURE.md` § External systems, Mill). The Mill plugin tells the discovery runner's channel, if it opens one, apart from a run's (`SPECIFICATION.md` R-072).
 - **The run's channel** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/channel-contract.md`). In order:
   1. when the runner is constructed, that the run exists, with the run-level values its run record holds that are known then (R-071, R-080);
   2. when a suite starts running, once ScalaTest's filter is known, that suite's structure after filtering: its nested suites, scopes and tests, each with its node ID, its parent, its declared position and its name;
-  3. events and captured output, each tagged with its node's ID, a suite's only after that suite's structure; events and messages attached to the run rather than to a suite, tagged as the run's; and what the outputs need that events lack (`research/emission-gap-analysis.md`);
+  3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md`):
+     - each tagged with its node's ID, a suite's only after that suite's structure;
+     - events and messages attached to the run rather than to a suite tagged as the run's;
   4. how the run ended (R-074).
 
   Items 2 and 3 repeat for each suite. A run given no task sends only items 1 and 4, and item 4 only if it ends (R-071). No run sends a whole-run tree before it starts its first suite (`decisions/run-that-does-not-finish.md` "A run's expected tests come from the run, one suite at a time…"). The channel carries only what the consolidated output shows or uses (`decisions/channel-contract.md` "A channel carries what the consolidated output shows or uses, not the whole event.").
@@ -63,7 +65,9 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 The Mill plugin is the library's only caller (`decisions/channel-contract.md` "The consolidation library's API carries no compatibility promise…"). Its operations:
 
 - **Start** a consolidation, given:
-  - where each consolidated output that is on goes: for progress output, one sink for whole lines and one for a one-line summary rewritten in place (`SPECIFICATION.md` R-089, R-090); for human-readable and JSON output, one sink for text each;
+  - a sink for each consolidated output that is on:
+    - progress output: one for whole lines and one for a one-line summary rewritten in place (`SPECIFICATION.md` R-089, R-090);
+    - human-readable and JSON output: one text sink each;
   - each module selector, with the test modules it resolved to;
   - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
 - **Add a run**: its event stream, fed live as the channel is decoded, with the test run label the caller names for it, and the output captured off the stdout and stderr of the run's processes (`SPECIFICATION.md` § Consolidation).
@@ -74,9 +78,9 @@ The Mill plugin is the library's only caller (`decisions/channel-contract.md` "T
 
 ## Data flow
 
-The test command evaluates each selected module's own Mill test task under a task context the test command supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."), adding the runner argument to the framework arguments. It evaluates every selected module's test task in one nested evaluation of its own with fail-fast off (`ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
+The test command evaluates each selected module's own Mill test task under a task context the test command supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."), adding the runner argument to the framework arguments. All these test tasks run in one nested evaluation of the test command's own, with fail-fast off (`ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
 
-Under `--halt-on-failure`, the test command withholds the tests of every selected module not yet started once anything has failed it (`SPECIFICATION.md` R-057). It can, because it supplies each module's task context and, through channel reading, sees every run's failures.
+Under `--halt-on-failure`, once anything has failed the test command, it withholds the tests of every selected module not yet started (`SPECIFICATION.md` R-057). It can do so because it supplies each module's task context and, through channel reading, sees every run's failures.
 
 ```mermaid
 flowchart LR
