@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
 
-**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so it may need a release for each Mill release; on Native it must compile its launcher where an emulator cannot load a script. On the JVM with the module unchanged (R-092), meeting R-044 also needs either a copy of Mill's test-queue scheduling or a logger compiled inside package `mill`; that logger implements `private[mill]` members, has run only as a meta-build source and never from the plugin's jar, and relies on how `mill.exec`, `mill.internal` and `TestModuleUtil` key and route the runner's progress, so a Mill change there would bring that progress back without a compile error.
+**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so each Mill release it supports bears the cost `../SPECIFICATION.md` § Scope states; on Native it must compile its launcher where an emulator cannot load a script. On the JVM with the module unchanged (R-092), meeting R-044 also needs either a copy of Mill's test-queue scheduling or a logger compiled inside package `mill`; that logger implements `private[mill]` members, has run only as a meta-build source and never from the plugin's jar, and relies on how `mill.exec`, `mill.internal` and `TestModuleUtil` key and route the runner's progress, so a Mill change there would bring that progress back without a compile error.
 
 **Settled by**
 

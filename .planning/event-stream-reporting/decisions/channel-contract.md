@@ -50,7 +50,7 @@ Decisions behind `../SPECIFICATION.md` on the contract between the emitter and t
 
 **Reasoning** The emitter and its reader ship in the same release, so the format can change in any release without any reader decoding more than one.
 
-**Costs** A test module on another release of the fork fails the test command (`../SPECIFICATION.md` R-059), and the Mill plugin needs a release for each pairing of fork release and Mill release that it supports.
+**Costs** A test module on another release of the fork fails the test command (`../SPECIFICATION.md` R-059), and each release of the fork needs its own release of the Mill plugin, whose every supported Mill release bears the cost `../SPECIFICATION.md` § Scope states.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 

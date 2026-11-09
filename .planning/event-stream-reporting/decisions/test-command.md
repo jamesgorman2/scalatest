@@ -1,6 +1,23 @@
 # Decisions: the test command and running modules
 
-Decisions behind `../SPECIFICATION.md` on which modules and JS environments the test command runs, how, and when it fails, newest first.
+Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mill releases the test command runs on, how, and when it fails, newest first.
+
+## On a Mill release that is not a supported Mill release, the test command runs and warns.
+
+**Alternatives**
+
+- Failing before any test starts, as `../SPECIFICATION.md` R-059 does for an unsupported test module, blocks every Mill upgrade until a release of the Mill plugin lists the new Mill release.
+- Failing the build's meta-build also fails Mill's own test tasks and IDE and BSP import, so R-060 and R-003 would hold only on supported Mill releases.
+
+**Reasoning** A Mill upgrade is not held back by the plugin, and the warning and recorded Mill version tell every reader of the output that its guarantees do not hold (R-093, R-081). A Mill change can break R-044 and R-089 silently, so no check at run time can tell a Mill release on which they hold from one on which they do not; a guarantee can rest only on the releases the integration tests ran. R-060 and R-003 need only Mill's stable API, so they hold on every Mill 1.x release.
+
+**Costs** On an unsupported Mill release, no requirement on the test command is guaranteed beyond its warning (`../SPECIFICATION.md` § Scope). For R-060 and R-003 to hold there, the Mill plugin may touch `@experimental`, `@internal` or `private[mill]` API only from classes that the test command alone loads.
+
+**Settled by** [Which Mill releases does the Mill plugin support, and what does the test command do on any other?](https://github.com/jamesgorman2/scalatest/issues/49).
+
+**See** `../research/mill-command-lifetime.md` § 7.
+
+---
 
 ## On Scala.js, the epic covers the `NodeJs` and `JsDom` JS environments only.
 

@@ -92,6 +92,10 @@ _Avoid_: Run node, worker record
 One evaluation of the command the Mill plugin adds for consolidated testing, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.
 _Avoid_: Mill command, invocation
 
+**Supported Mill release**:
+A Mill release on which a release of the Mill plugin passed its integration tests, as listed in that plugin release. Any other Mill release is unsupported, even within the same major version.
+_Avoid_: Compatible Mill version, Mill version range
+
 **Module selector**:
 An argument of the test command that names test modules, such as `__.test` or `foo.test`.
 _Avoid_: Selector, task selector
