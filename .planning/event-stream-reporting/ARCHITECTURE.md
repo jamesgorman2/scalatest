@@ -39,7 +39,7 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 - Its integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns.").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), and gives the library each run's event stream and its other inputs.
-- **Channel reading** — reads each run's channel and decodes it with core's codec into that run's event stream, live.
+- **Channel reading** — reads each run's channel live, on the JVM every file in each module's folder, decodes it with core's codec into that run's event stream, and ends the stream once the run's process has exited (§ APIs § The emitter and the Mill plugin).
 - **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-042).
 
 ## APIs
@@ -48,9 +48,9 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 
 - **The runner argument** — one ScalaTest runner argument, appended to the framework arguments the test command passes each selected module. It turns the emitter on and turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-041). It reaches the runner on every runtime and in every JS environment the epic covers.
   - Every run of a module receives the same argument, and each run derives from it a channel of its own.
-  - Mill's discovery runner, which is not a run, receives it too (`../structured-test-reporting/ARCHITECTURE.md` § External systems, Mill). The Mill plugin tells the discovery runner's channel, if it opens one, apart from a run's (`SPECIFICATION.md` R-072).
+  - On the JVM the test command runs the module's test discovery itself without the argument, so Mill's discovery runner, which is not a run, opens no channel (`SPECIFICATION.md` R-072; `ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"). Scala.js and Native have no discovery runner.
 - **The run's channel** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/channel-contract.md`). In order:
-  1. when the runner is constructed, that the run exists, with the run-level values its run record holds that are known then (R-071, R-080);
+  1. when the runner is constructed, that the run exists, with the PID and start time of its process and the run-level values its run record holds that are known then (R-071, R-080);
   2. when a suite starts running, once ScalaTest's filter is known, that suite's structure after filtering: its nested suites, scopes and tests, each with its node ID, its parent, its declared position and its name;
   3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md`):
      - each tagged with its node's ID, a suite's only after that suite's structure;
@@ -58,6 +58,10 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
   4. how the run ended (R-074).
 
   Items 2 and 3 repeat for each suite. A run given no task sends only items 1 and 4, and item 4 only if it ends (R-071). No run sends a whole-run tree before it starts its first suite (`decisions/run-that-does-not-finish.md` "A run's expected tests come from the run, one suite at a time…"). The channel carries only what the consolidated output shows or uses (`decisions/channel-contract.md` "A channel carries what the consolidated output shows or uses, not the whole event.").
+
+  - **On a JVM worker** the channel is a file the run creates when its runner is constructed, with a name unique to the run, in the folder the runner argument names for the module. The run appends each item to it unbuffered as it occurs, and the plugin reads every file live while the run appends (`ARCHITECTURE-DECISIONS.md` "On a JVM worker, a run's channel is one file per run.").
+    - The file exists by the time the runner's construction returns, so that a process dying before its first task still leaves a file for its run (R-071). A file created on the run's first event, on ScalaTest's dispatcher thread, can appear after that.
+  - **The end of a run's event stream** is the exit of the run's process. The plugin finds the process from item 1's PID and start time and watches it with `ProcessHandle`; after the exit it reads the channel to its end, since the exit can be signalled before the reader has caught up (`ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits.").
 - **Each process's stdout and stderr** — carry everything the run's processes write that capture did not take against a node. The plugin captures them against the run.
 
 ### The Mill plugin and the consolidation library
@@ -78,7 +82,12 @@ The Mill plugin is the library's only caller (`decisions/channel-contract.md` "T
 
 ## Data flow
 
-The test command evaluates each selected module's own Mill test task under a task context the test command supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."), adding the runner argument to the framework arguments. All these test tasks run in one nested evaluation of the test command's own, with fail-fast off (`ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
+The test command runs each selected module's tests under a task context it supplies, adding the runner argument to the framework arguments (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."):
+
+- on the JVM, it runs the module's test discovery itself without the runner argument, then drives Mill's test queue, starting each worker through Mill's test-runner subprocess call (`ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…");
+- on Scala.js and Native, it evaluates the module's own Mill test task.
+
+All of this runs in one nested evaluation of the test command's own, with fail-fast off (`ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
 
 Under `--halt-on-failure`, once anything has failed the test command, it withholds the tests of every selected module not yet started (`SPECIFICATION.md` R-057). It can do so because it supplies each module's task context and, through channel reading, sees every run's failures.
 
@@ -92,14 +101,15 @@ flowchart LR
     EM --> ENC[Codec: encoder]
   end
   subgraph MILL["Mill's JVM"]
-    CMD[Test command] -- "module's test task, a task context, runner argument" --> TASK[Mill test task]
+    CMD[Test command] -- "discovered test classes on the JVM, a task context, runner argument" --> TASK["Mill's test queue (JVM) or test task (Scala.js, Native)"]
     DEC["Channel reading (core's decoder)"]
     CAP[Process capture]
     LIB[Consolidation library]
     LOG["Test command's Mill logging"]
   end
   TASK -- starts --> PROC
-  ENC -- "the run's channel" --> DEC
+  ENC -- "the run's channel, a file on the JVM" --> DEC
+  PROC -.->|"process exit"| DEC
   PROC -- "stdout and stderr, less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
@@ -112,13 +122,13 @@ flowchart LR
 
 - Progress output and human-readable output reach the console through the test command's Mill logging, which shares the console with Mill's prompt (`decisions/capture-and-console.md` "On the console, progress output is a one-line summary…").
 - Failure path: a process that dies.
-  - Its channel ends without how the run ended, holding everything the run had handed to the operating system (`SPECIFICATION.md` R-073). The library treats it as a run that does not finish (R-064–R-067), and progress output shows it aborted as soon as the stream ends (R-067).
+  - Once the plugin sees the process exit and has read its channel to the end, the run's event stream ends without how the run ended, holding everything the run had handed to the operating system (`SPECIFICATION.md` R-073). The library treats it as a run that does not finish (R-064–R-067), and progress output shows it aborted as soon as the stream ends (R-067).
   - Because each suite's structure arrives as the suite starts, every scope and test a constructed suite registered is known when the process dies (R-065); a suite the run never constructed sent nothing (R-066).
   - What the process wrote to stdout and stderr still reaches the library through process capture.
   - A process that dies before any run exists in it sends nothing over a channel; the plugin adds it to the library with the output captured off its streams (R-076).
 
 ## External systems
 
-- **Mill** — hosts the plugin in its JVM. Its test tasks start each module's processes under its fork grouping, test parallelism and test queue, which the test command must keep (`SPECIFICATION.md` R-053).
+- **Mill** — hosts the plugin in its JVM. Its fork grouping, test parallelism and test queue decide the processes that run each module's tests, and the test command must keep them, on the JVM too, where it drives the test queue itself (`SPECIFICATION.md` R-053).
 - **Scala.js and Native test adapters** — launch the Node VM or native binary that runs a Scala.js or Native run, and carry the framework arguments to its runner, including in `JsDom` window code (`research/js-environment-channels.md` § 2.2).
 - **Metals, Bloop and IntelliJ** — launch runs without the runner argument, so the emitter stays off and every reporter receives what 3.2.19 sends (`SPECIFICATION.md` R-001, R-003).

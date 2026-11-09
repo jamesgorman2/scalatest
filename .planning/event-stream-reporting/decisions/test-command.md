@@ -60,9 +60,9 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** A plugin trait mixed into each test module, exposing the protected `testTask` and `aheadOfTimeDiscoveredTestClassesIfNeeded`, needs every module definition changed; a selected module without it would be neither run, as `../SPECIFICATION.md` § Scope requires, nor failed by R-059.
 
-**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait. It kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
+**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). With no trait, evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime, and driving Mill's test queue from the plugin did so on the JVM. Each kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
 
-**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…").
+**Costs** On Scala.js and Native the plugin relies on Mill's own test body running correctly under a `TaskCtx` it did not build. On the JVM it drives Mill's test queue itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"), which relies on reflection and `@internal` API and also holds R-044 (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"); a Mill change can break either route at run time, not compile time.
 
 **Settled by**
 

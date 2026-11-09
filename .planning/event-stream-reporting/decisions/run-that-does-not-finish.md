@@ -48,7 +48,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`../SPECIFICATION.md` R-064, R-071), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 
-**Costs** The Mill plugin must tell the discovery runner's channel from a run's (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+**Costs** The Mill plugin must keep the discovery runner from opening a channel, which on the JVM means running discovery itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 
@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A single worker's death more often comes from a test (`System.exit`, running out of memory, a native crash) than from the harness, and that test is the fact the reader needs, so the output shows it (`../SPECIFICATION.md` R-073, R-075). Bytes still buffered inside the dying process are lost whatever the channel.
 
-**Costs** This narrows the channel choice: a plain socket on Windows lost unread bytes on `Connection reset`, so it qualifies only if its reader can be shown never to lag.
+**Costs** This narrows the channel choice: a plain socket on Windows lost unread bytes on `Connection reset`, so a JVM worker's channel is a file (`../ARCHITECTURE-DECISIONS.md` "On a JVM worker, a run's channel is one file per run.").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 

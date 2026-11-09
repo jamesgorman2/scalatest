@@ -2,6 +2,62 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## On a JVM worker, a run's channel is one file per run.
+
+**Alternatives**
+
+- A socket lost every byte not yet read on Windows when the worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
+- The worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string.
+
+**Reasoning** Every byte a JVM worker had written to its file before a halt or a forced kill reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind. Mill's process read every worker's file while the worker appended, with no sharing error on Windows and a median per-file maximum delay of 10–12 ms at a 10 ms poll. Naming the folder through the runner argument puts every run of a module where the plugin looks, whatever the worker's working directory.
+
+**Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again.
+
+**Settled by** [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+
+**See** `research/jvm-file-channel.md` § 2, § 3, § 5.
+
+---
+
+## The plugin learns that a run's stream has ended when the run's process exits.
+
+**Alternatives**
+
+- A lock the run holds beyond end of file, which the operating system releases on death, worked on the JVM, but Node has no file-locking API, so it would not carry to Scala.js, and a lock over the data region blocks reads on Windows.
+- The end of Mill's worker spawn (`fork.async`) never fired for a module with one test class.
+
+**Reasoning** `ProcessHandle.onExit` signalled every JVM worker's end on Windows and on Linux, after a normal exit, a halt and a forced kill alike, without the stream saying how the run ended. It needs from the run only the PID and start time at the head of its channel.
+
+**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID.
+
+**Settled by** [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+
+**See** `research/jvm-file-channel.md` § 4.
+
+---
+
+## The plugin runs a module's test discovery itself, without the runner argument, so Mill's discovery runner opens no channel.
+
+**Alternatives**
+
+- Telling the discovery runner's file from a run's by its PID fails with `javaHome` set, where discovery runs in a JVM-worker subprocess, not Mill's own process.
+- Telling it by its working directory depends on `testSandboxWorkingDir`.
+- Telling it by its missing `done` also matches a run whose process dies.
+- Any such test still leaves the discovery runner's file, which under the daemon on Windows stays open in Mill's process and cannot be deleted, one per module per command.
+
+**Reasoning** `SPECIFICATION.md` R-072 keeps the discovery runner out of the consolidated output. With the argument withheld from discovery there was no discovery file, while the workers received it and ran the same classes with the same results.
+
+**Costs** On the JVM the plugin must drive Mill's test queue itself, since evaluating the module's own test task passes discovery the same arguments as the workers. That route needs reflection on Mill's protected discovery member, `@experimental` `TestModuleUtil` and a copy of Mill's test-queue scheduling.
+
+**Settled by** [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+
+**See**
+
+- `research/jvm-file-channel.md` § 6.
+- `research/mill-runner-progress-without-trait.md` § 3, § 7.
+
+---
+
 ## The Mill plugin is built by its own Mill build in this repo.
 
 **Alternatives** An sbt subproject of the existing build keeps one build, but no known Mill 1.x plugin is built with sbt, and Mill's testkit, its `Task` and `Discover` macros and its plugin artifact naming are untried under sbt.
@@ -35,7 +91,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** Framework arguments are the only route into `JsDom` window code (`research/js-environment-channels.md` § 2.2), and they reach the runner alike on every runtime.
 
-**Costs** The argument is visible beside the user's framework arguments, and Mill's discovery runner receives it too.
+**Costs** The argument is visible beside the user's framework arguments, and Mill's own JVM test task passes it to Mill's discovery runner as well, so the plugin runs discovery itself (entry "The plugin runs a module's test discovery itself…").
 
 **Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
 
