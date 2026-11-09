@@ -26,7 +26,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 - A placeholder JSON file written when the test command starts is not needed: structured test reporting needs one only so each run can list its tests for its consolidator, and here the test command is the only consolidator and already knows its runs.
 - A JVM shutdown hook writing partial results would tell a user who pressed Ctrl-C only what they already know: they killed the tests.
 
-**Reasoning** After Ctrl-C, Mill gives the test command's body no further control (`../SPECIFICATION.md` R-069; `../research/mill-command-lifetime.md` § 5.1, § 5.2).
+**Reasoning** After Ctrl-C, Mill gives the test command's body no further control (`../research/mill-command-lifetime.md` § 5.1, § 5.2).
 
 **Costs** A CI timeout that sends SIGTERM gets no partial results.
 
@@ -44,7 +44,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 **Alternatives**
 
 - Starting a run at its first task drops from the output a worker that dies before its first task.
-- Counting every runner constructed while the test command executes tests also takes in another module's discovery runner (`../SPECIFICATION.md` R-056), which never calls `done()` and so would fail every test command (R-046, R-072).
+- Counting every runner constructed while the test command executes tests also takes in another module's discovery runner (`../SPECIFICATION.md` R-056), which never calls `done()` and so would fail every test command (R-046), against R-072.
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`../SPECIFICATION.md` R-064, R-071), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 
@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A single worker's death more often comes from a test (`System.exit`, running out of memory, a native crash) than from the harness, and that test is the fact the reader needs, so the output shows it (`../SPECIFICATION.md` R-073, R-075). Bytes still buffered inside the dying process are lost whatever the channel.
 
-**Costs** This narrows the channel choice to one that keeps what its reader has not yet received: on the JVM, on Scala.js under `NodeJs` and on Native, a file (`../ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's channel is one file per run.").
+**Costs** This narrows every run's channel, `JsDom`'s included, to one that keeps what its reader has not yet received (`../ARCHITECTURE-DECISIONS.md` "…a run's channel is one file per run.").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 

@@ -48,7 +48,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Reasoning** `JsDom` runs the page in a Node process and uses Node's com channel, `Logger` and process pipes, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
 
-**Costs** Test code in a `JsDom` window has no `require`, so its channel cannot be a Node socket or file: covering both environments needs a channel that does not rely on `require`, or one channel per environment. Modules tested in any other JS environment, browsers included, get no consolidated output.
+**Costs** Test code in a `JsDom` window has no `require`, so it can neither open a Node socket nor write the file that carries a run's channel under `NodeJs` (`../ARCHITECTURE-DECISIONS.md` "…a run's channel is one file per run."). Modules tested in any other JS environment, browsers included, get no consolidated output.
 
 **Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 

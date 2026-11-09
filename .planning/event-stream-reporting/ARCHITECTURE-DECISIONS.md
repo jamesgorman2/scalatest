@@ -2,17 +2,16 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
-## On Node, the plugin, not the run, finds the start time of the run's process, from `ProcessHandle` when it first reads the run's header.
+## Under `NodeJs`, the plugin, not the run, finds the start time of the run's process, from `ProcessHandle` when it first reads the run's first item.
 
 **Alternatives**
 
-- The run writing its own start time, as on the JVM and Native, finds no Node API for it: on Windows it needs PowerShell, which took 178–756 ms per run, and up to 1.8 s with 18 runs starting together.
-- On Linux that run must read `/proc` assuming `CLK_TCK` is 100, since Node does not expose it.
+- The run writing its own start time, as on the JVM and Native, has no Node API for it: on Windows it must run PowerShell, 178–756 ms per run and up to 1.8 s with 18 starting together, and on Linux read `/proc` assuming `CLK_TCK` is 100.
 - The run writing `Date.now()` less `process.uptime()` as its start time never matched `ProcessHandle`'s.
 
-**Reasoning** The start time serves only to tell the run's process from a later one that reuses its PID, and when the plugin first reads the header the PID still names the run's process unless that process has already died and its PID been reused. On the JVM and Native the run writes its own start time, at no measurable cost, so only Node differs.
+**Reasoning** The start time serves only to tell the run's process from a later one that reuses its PID, and when the plugin first reads the run's first item the PID still names the run's process unless that process has already died and its PID been reused. On the JVM and Native the run writes its own start time, at no measurable cost, so only `NodeJs` differs.
 
-**Costs** A process that dies and whose PID is reused before the plugin first reads its header is mistaken for the run's, so the run's stream does not end until that other process exits. The header's content differs by runtime.
+**Costs** A process that dies and whose PID is reused before the plugin first reads the run's first item is mistaken for the run's, so the run's stream does not end until that other process exits. The run's first item carries a start time on the JVM and Native but not under `NodeJs`.
 
 **Settled by** [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
 
@@ -26,9 +25,8 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - A socket lost every byte not yet read on Windows when the JVM worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
 - A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the channel's items (`research/mill-worker-channels.md` § 3.3).
-- A file a `-C` reporter creates on `RunStarting` appears on the JVM on ScalaTest's dispatcher thread, possibly after the runner's construction returns, leaving no file for a process that dies straight after (`research/jvm-file-channel.md` § 5), against `SPECIFICATION.md` R-071; on Scala.js and Native such a reporter is never opened (`research/node-native-file-channel.md` § 1).
 
-**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind, and Node lost nothing when it exited as the adapter's com channel closed. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least the header. Naming the folder through the runner argument puts every run of a module where the plugin looks, though every Scala.js and Native run's working directory is Mill's own.
+**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind, and Node lost nothing when it exited on the test adapter closing its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first item. Naming the folder through the runner argument puts every run of a module where the plugin looks, though every Scala.js and Native run's working directory is Mill's own.
 
 **Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again.
 
@@ -53,9 +51,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - The end of a Scala.js or Native module's Mill test task comes before its process has exited, while lines are still to come, and marks a module, not a run.
 - The run's own last line ends only a run that finishes.
 
-**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended. Where that PID was already gone when the plugin read the header, the process had ended. Under Mill's test task each Node VM or native binary carries exactly one run and exits shortly after it, so its exit is the end of that run.
+**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended. Where that PID was already gone when the plugin first read the run's first item, the process had ended. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
 
-**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill does this, but if one did, process exit would not end the stream of a run killed mid-run.
+**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill does this, but if one did, a run's stream would end only when that process exits, after every run it hosts.
 
 **Settled by**
 
