@@ -10,7 +10,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - The worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the channel's items (`research/mill-worker-channels.md` § 3.3).
 - A file the emitter creates on the run's first event, on ScalaTest's dispatcher thread, can appear after the runner's construction returns, leaving no file for a process that dies straight after (`research/jvm-file-channel.md` § 5), against `SPECIFICATION.md` R-071.
 
-**Reasoning** Every byte a JVM worker had written to its file before a halt or a forced kill reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind. Mill's process read each worker's file while the worker appended wherever the worker outlived the plugin's first read, with no sharing error on Windows and a median per-file maximum delay of 10–12 ms at a 10 ms poll; the files of workers that ended sooner were read whole afterwards. Naming the folder through the runner argument puts every run of a module where the plugin looks, whatever the worker's working directory.
+**Reasoning** Every byte a JVM worker had written to its file before a halt or a forced kill reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind. Wherever a worker outlived the plugin's first read, Mill's process read the worker's file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–12 ms at a 10 ms poll. Files of workers that ended sooner were read whole afterwards. Naming the folder through the runner argument puts every run of a module where the plugin looks, whatever the worker's working directory.
 
 **Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again.
 
@@ -25,9 +25,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A lock the run holds beyond end of file, which the operating system releases on death, worked, but needs the emitter to hold an exclusive lock for its process's life and the plugin to try it on every file at every poll.
-- The return of the plugin's own `callTestRunnerSubprocess` call, by which it starts each worker when it drives Mill's test queue, ties the end signal to an `@experimental` Mill call, where `ProcessHandle` is plain JDK, and still needs each file matched to its worker.
+- The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each worker, ties the end signal to Mill API where `ProcessHandle` is plain JDK, and still needs each file matched to its worker.
 
-**Reasoning** `ProcessHandle.onExit` signalled every JVM worker's end on Windows and on Linux, after a normal exit, a halt and a forced kill alike, without the stream saying how the run ended. It needs from the run only the PID and start time at the head of its channel. Where that PID was already gone when the plugin read the header, the worker had ended.
+**Reasoning** `ProcessHandle.onExit` signalled every JVM worker's end on Windows and on Linux, after a normal exit, a halt and a forced kill alike. It needs from the run only the PID and start time at the head of its channel, not how the run ended. Where that PID was already gone when the plugin read the header, the worker had ended.
 
 **Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID.
 
@@ -47,10 +47,10 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - Telling the discovery runner's file from a run's by comparing its PID with Mill's own fails with `javaHome` set, where discovery runs in a JVM-worker subprocess, not Mill's own process.
 - Telling it by its working directory depends on `testSandboxWorkingDir`, which the module may turn off.
 - Telling it by its missing `done` also matches a run whose process dies.
-- Any such test still leaves the discovery runner's file, one per module per command, which under the daemon on Windows, written through `FileOutputStream`, stays open after the command and cannot be deleted.
+- Any such test still leaves the discovery runner's file, one per module per command; on Windows under the daemon, written through `FileOutputStream`, it stays open after the command and cannot be deleted.
 - Mill's own JVM test task, with a logger compiled in package `mill`, keeps the runner's progress off the console, but passes discovery the runner argument.
 
-**Reasoning** `SPECIFICATION.md` R-072 keeps the discovery runner out of the consolidated output. With the argument withheld from discovery there was no discovery file, while the workers received it and ran the same classes with the same results.
+**Reasoning** `SPECIFICATION.md` R-072 keeps the discovery runner out of the consolidated output. With the argument withheld from discovery, no discovery file appeared, while the workers received it and ran the same classes with the same results.
 
 **Costs** On the JVM the plugin must drive Mill's test queue itself, since evaluating the module's own test task passes discovery the same arguments as the workers. That route needs reflection on Mill's protected discovery member, `@experimental` `TestModuleUtil`, `@internal` `internalWorker`, `TestResult` and `TestRunnerUtils.globFilter`, `mill.javalib.api.internal.ZincOp` and a copy of Mill's test-queue scheduling, any of which a Mill release can break at run time, not compile time.
 

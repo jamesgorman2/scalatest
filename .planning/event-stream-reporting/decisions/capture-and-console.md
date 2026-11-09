@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace. On the JVM with the module unchanged (R-092), the plugin drives Mill's test queue itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"), so none of Mill's code that draws the runner's progress runs (R-044).
 
-**Costs** The plugin needs Mill API marked `@experimental`, with `@internal` API and reflection on the JVM, and on Scala.js and Native Mill's test task evaluated under a `TaskCtx` Mill did not build, so a new Mill release may break the plugin without a compile error and need a code change and a release of the fork. On Native it must compile its launcher where an emulator cannot load a script.
+**Costs** The plugin needs Mill API marked `@experimental`, with `@internal` API and reflection on the JVM, and on Scala.js and Native evaluates Mill's test task under a `TaskCtx` Mill did not build; a new Mill release may break it without a compile error and need a code change and a release of the fork. On Native it must compile its launcher where an emulator cannot load a script.
 
 **Settled by**
 

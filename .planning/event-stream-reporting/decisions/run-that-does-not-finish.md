@@ -48,7 +48,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`../SPECIFICATION.md` R-064, R-071), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 
-**Costs** The Mill plugin must keep Mill's JVM discovery runner from opening a channel, by running discovery itself without the runner argument (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
+**Costs** The Mill plugin must keep Mill's JVM discovery runner from opening a channel by running discovery itself without the runner argument (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 
