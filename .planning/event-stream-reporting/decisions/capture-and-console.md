@@ -63,11 +63,10 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 - Running Mill's JVM test runner under a plugin `TaskCtx` with Mill's own logger takes each worker's streams but still shows that runner's progress (R-044).
 - Passing the public `Logger.DummyLogger` as that `TaskCtx`'s `log` avoids `private[mill]` members but starts workers uncoloured where Mill's own task colours them (R-053).
-- Passing a logger compiled inside package `mill` as that `TaskCtx`'s `log` keeps the runner's progress off the console, but leaves Mill's runner passing the runner argument to its discovery runner (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
 
-**Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace.
+**Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace. On the JVM with the module unchanged (R-092), the plugin drives Mill's test queue itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"), so none of Mill's code that draws the runner's progress runs (R-044).
 
-**Costs** The plugin needs Mill API marked `@experimental`, and either `@internal` API or evaluating Mill's own test command in a way Mill does not document, so a new Mill release may break the plugin without a compile error and need a code change and a release of the fork; on Native it must compile its launcher where an emulator cannot load a script. On the JVM with the module unchanged (R-092), the plugin drives Mill's test queue itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"), so none of Mill's code that draws the runner's progress runs (R-044), but its copy of Mill's test-queue scheduling breaks at run time, not compile time, when a Mill release changes the queue protocol.
+**Costs** The plugin needs Mill API marked `@experimental`, with `@internal` API and reflection on the JVM, and on Scala.js and Native Mill's test task evaluated under a `TaskCtx` Mill did not build, so a new Mill release may break the plugin without a compile error and need a code change and a release of the fork. On Native it must compile its launcher where an emulator cannot load a script.
 
 **Settled by**
 
