@@ -15,30 +15,14 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the deployable units, the boundaries between the emitter, the Mill plugin and the consolidation library, and how each run's events reach the consolidated output.
 - [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md) — the decisions behind the architecture.
-- [../structured-test-reporting/SPECIFICATION.md](../structured-test-reporting/SPECIFICATION.md) — the test structure and what each output shows, which this epic takes by default.
-- [../structured-test-reporting/runner-json/SPECIFICATION.md](../structured-test-reporting/runner-json/SPECIFICATION.md) — the layout of one run's JSON object, which this epic takes.
-- [../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md](../structured-test-reporting/runner-json/TECHNICAL-DESIGN.md) — every key of that object, which this epic takes.
-- [research/emitter-and-mill-channel.md](research/emitter-and-mill-channel.md) — what ScalaTest's events carry and lose, how events already leave a process, where a reporter attaches, and what attributing test output needs.
-- [research/mill-worker-channels.md](research/mill-worker-channels.md) — on the JVM under Mill: how Mill wires a test worker's stdout and stderr, whether plugin code can take them, what a sandbox file, a socket and stdout can each rely on as a channel, and which APIs run plugin code in the test task after tests fail.
-- [research/js-native-channels.md](research/js-native-channels.md) — on Scala.js on Node and on Native under Mill: what a socket, a file and the test-interface `Logger` can each rely on as a channel, where a run's stdout and stderr go, and which hooks let plugin code take them.
-- [research/native-stdio-wrapper.md](research/native-stdio-wrapper.md) — what was observed on Windows and Linux when plugin code gave Scala Native's test adapter a launcher that redirects the test binary's stdout and stderr to files: what reaches the console and the plugin, the exit status, and behaviour under an emulator.
-- [research/js-environment-channels.md](research/js-environment-channels.md) — for each JS environment Mill can select other than Node: whether the test adapter's com channel works, which other transports reach Mill's process, and what console output reaches the run's stdout and stderr.
-- [research/mill-command-lifetime.md](research/mill-command-lifetime.md) — which Mill mechanisms run plugin code before the first test task and after the last, how that code learns what ran and how it ended, what Mill does to its console output, how the command's own output shares the console with Mill's prompt, and how it sets the exit status.
-- [research/emitter-plugin-spike.md](research/emitter-plugin-spike.md) — observed on Windows and Linux: a stub socket emitter in each JVM test worker sending events to a minimal exclusive command that executed several modules' test tasks. Covers the command's lifetime and results, live events, a killed worker, worker streams, and what Mill's prompt does to the command's console output.
-- [research/mill-nested-keep-going.md](research/mill-nested-keep-going.md) — at Mill `1.1.10`: which routes let the test command's nested evaluation keep going without `--keep-going`, whether each starts a module's tests on its own compile, and how the Mill API each uses is marked.
-- [research/nested-prompt-console.md](research/nested-prompt-console.md) — observed on Windows and Linux under a pseudo-terminal: whether the test command's summary (through `Task.log.ticker`) and lines (through `Task.log`) stay on the console while its nested evaluation runs with fail-fast off, and which logger keeps the command's prompt line shown.
-- [research/mill-parallel-worker-capture.md](research/mill-parallel-worker-capture.md) — observed on Windows and Linux: plugin code taking each JVM worker's stdout and stderr under Mill's fork groups and `testParallelism`, by two routes (supplying a `TaskCtx`, and driving the test queue itself). Covers what reached the console, what the plugin received, how each route matched Mill's own `testForked`, and the Mill API each relies on.
-- [research/mill-test-without-module-trait.md](research/mill-test-without-module-trait.md) — at Mill `1.1.10`, observed on Windows and Linux: routes by which the test command runs a module's tests on each runtime when the module mixes in no plugin trait, how each compares with Mill's own `testForked` and `testOnly`, and how the Mill API each uses is marked.
-- [research/mill-runner-progress-without-trait.md](research/mill-runner-progress-without-trait.md) — at Mill `1.1.10`, observed on Windows and Linux under a pseudo-terminal: whether routes that leave a JVM test module unchanged keep Mill's test-runner progress off the console inside the test command's nested evaluation, how each compares with Mill's own `testForked` and `testOnly`, and how the Mill API each uses is marked.
-- [research/emission-gap-analysis.md](research/emission-gap-analysis.md) — for each need of the consolidated output, whether a run's events already provide it on each runtime, lose it when serialised, leave it derivable, or need new code at the point of emission.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
 ## Scope
 
 - An emitter in ScalaTest that sends one run's events, test structure and the output it captures over a single channel.
-- A consolidation library, published and depending on no Mill artifact, that produces the consolidated output from many runs' event streams.
-- A Mill plugin that hosts the consolidation library, turns the channel of each run it starts into that run's event stream, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
+- A consolidation library (R-023) that produces the consolidated output from many runs.
+- A Mill plugin that hosts the consolidation library, reads the channel of each run it starts, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, while the emitter, the consolidated output and the test command cover runs in the `NodeJs` and `JsDom` JS environments only; R-059 covers a module configured for any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native. The next paragraph limits them on an unsupported Mill release.
 
@@ -122,7 +106,7 @@ Unlike `../structured-test-reporting/SPECIFICATION.md` § Test output, what test
 - R-058 The consolidated output shows the test run label of each selected test module whose tests did not run as aborted, with:
   - reason *not run* where `--halt-on-failure` skipped them (R-057);
   - reason *could not start*, and the failure that stopped them, where they could not start.
-- R-068 The consolidated output shows as not run each test class left in a fork group's queue when the group's last worker ended. It may also show as not run any other test class the Mill plugin knows was to run but that no run reported.
+- R-068 The consolidated output shows as not run each test class left in a fork group's queue when the group's last worker ended.
 - R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON, not even a placeholder; its progress output may show runs the interrupt ended. The JSON file stays as R-077 left it.
 
 WHERE `--halt-on-failure` is given:
@@ -143,7 +127,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 - R-081 The JSON output's root records the following; the human-readable output does not show module selectors:
   - the ScalaTest version, which every run shares (R-059);
   - each module selector, with the test modules it resolved to;
-  - where the consolidation library's caller gives them, the build tool's name and version and whether that version is supported. Under the test command, these are Mill, the running Mill version and whether it is a supported Mill release.
+  - the build tool's name and version and whether that version is supported: under the test command, Mill, the running Mill version and whether it is a supported Mill release.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
   - output captured against the run;
   - messages attached to the run rather than to a suite;
@@ -156,7 +140,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 - R-086 Output captured only against the run is shown without claiming that it is test output or worker output.
 - R-087 Worker output is never captured against a suite, scope or test.
 - R-084 The JSON output is documented for third-party readers and carries the compatibility promise `../structured-test-reporting/SPECIFICATION.md` § JSON output gives the single-run JSON. The human-readable and progress output carry no compatibility promise.
-- R-023 The consolidation library is published and depends on no Mill artifact. Given the same inputs (`ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library), it produces the same human-readable and JSON output when called without Mill as when the Mill plugin calls it.
+- R-023 The consolidation library is published and depends on no Mill artifact. Given the same runs and inputs, it produces the same human-readable and JSON output when called without Mill as when the Mill plugin calls it.
 - R-025 The Mill plugin gives each selected test module exactly one test run label, named for its module path. Mill keeps module paths unique.
 
 ## A run that does not finish
@@ -165,7 +149,7 @@ A run *does not finish* when its event stream ends without how the run ended (R-
 
 - R-064 The run, and each suite, scope and test that started in it without an event ending it, are aborted.
 - R-065 Every scope and test registered in a suite the run constructed appears, even where the run's process died before the scope or test started.
-- R-066 A suite the run did not construct does not appear in the consolidated output, even where the run was given a task for it.
+- R-066 A suite the run did not construct does not appear in the consolidated output, even where the run was given a task for it, unlike `../structured-test-reporting/SPECIFICATION.md` § Test structure.
 - R-075 Where a test ended the run's process, as a call to `System.exit` does, the consolidated output shows that test and every event the run reported before the test started.
 - R-067 Progress output shows that the run aborted as soon as its event stream ends.
 
@@ -194,7 +178,7 @@ These hold for every run a test command starts.
   - the tests of any selected test module cannot start, for example because it or a module it depends on fails to compile.
 
   Its failure does not list the failed tests. What R-068 shows is not itself a cause of failure. When the test command is interrupted (R-069), Mill's client and the operating system set its exit status instead.
-- R-047 The test command writes each selected test module's JUnit XML report as Mill's `testOnly` or `testForked`, whichever R-053 names, writes it.
+- R-047 The test command writes each selected test module's JUnit XML report as Mill's `testOnly` or `testForked`, whichever R-053 names, writes it, at the path R-053 moves it to.
 
 Where the consolidated output goes:
 

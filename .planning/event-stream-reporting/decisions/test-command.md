@@ -29,7 +29,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Reasoning** The warning and the recorded Mill version tell every reader of the output that its guarantees do not hold there (R-093, R-081). No requirement can be guaranteed there: any of them, R-046 and R-077 included, may fail silently or loudly when a Mill internal it depends on changes, and no integration test has run on that release. R-060 and R-003 still hold on every Mill 1.x release no older than the one the plugin is built against. Mill keeps its stable API backward binary compatible within a major version, and only classes that the test command alone loads use API beyond it.
 
-**Costs** On an unsupported Mill release the test command guarantees only R-093 and what R-081 records; below the release the plugin is built against, nothing holds, and a failure is whatever the JVM throws, possibly a linkage error as the meta-build loads. The plugin may use `@experimental`, `@internal` or `private[mill]` API only from classes that the test command alone loads.
+**Costs** On an unsupported Mill release the test command guarantees only R-093 and what R-081 records; below the release the plugin is built against, nothing holds, and a failure is whatever the JVM throws, possibly a linkage error as the meta-build loads.
 
 **Settled by** [Which Mill releases does the Mill plugin support, and what does the test command do on any other?](https://github.com/jamesgorman2/scalatest/issues/49).
 
@@ -62,7 +62,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). Evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime with no trait. It kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053).
 
-**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…"); so far, the nested evaluation has run the goals the plugin builds for only one module at a time.
+**Costs** Every route found relies on reflection, on `@internal` API, or on Mill's own test body running correctly under a `TaskCtx` it did not build; a Mill change can break the first and the last at run time, not compile time. On the JVM, meeting R-044 as well needs further Mill internals (`capture-and-console.md`, entry "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…").
 
 **Settled by**
 
@@ -118,17 +118,28 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 ---
 
-## The test command runs every selected test module by default; `--halt-on-failure` opts into skipping modules not yet started.
+## `--halt-on-failure` opts into starting no further selected module's tests once the test command has failed.
+
+**Alternatives** Always running every module, with no opt-in, loses fast feedback on a large build.
+
+**Reasoning** Where the user trades coverage for speed, the output still shows which modules did not run (`../SPECIFICATION.md` R-057, R-058).
+
+**Costs** Under it, which modules report depends on timing again, as under Mill's fail-fast, because modules run unordered and in parallel.
+
+**Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
+
+---
+
+## The test command runs every selected test module by default.
 
 **Alternatives**
 
 - Failing fast unless `--keep-going` is given, as Mill does, suits a build; but modules run unordered and in parallel, so which modules report depends on timing.
 - Showing only the runs that started, as Mill does, hides that modules were skipped.
-- Always running every module, with no opt-in, loses fast feedback on a large build.
 
-**Reasoning** A test report's coverage should not vary with scheduling (`../SPECIFICATION.md` R-056). Where the user trades coverage for speed, the output still shows which modules did not run (R-057, R-058).
+**Reasoning** A test report's coverage should not vary with scheduling (`../SPECIFICATION.md` R-056).
 
-**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run. Unless the user opts in, a failing build takes as long as a passing one.
+**Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run. Unless the user opts into `--halt-on-failure`, a failing build takes as long as a passing one.
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 

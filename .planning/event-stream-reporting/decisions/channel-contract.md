@@ -1,6 +1,6 @@
 # Decisions: the channel contract
 
-Decisions behind `../SPECIFICATION.md` on the contract between the emitter and the consolidation library, newest first.
+Decisions behind `../SPECIFICATION.md` on what a channel carries, who may read it, which release ships the Mill plugin, and the consolidation library's API, newest first.
 
 ## Every release of the Mill plugin is a release of the fork.
 

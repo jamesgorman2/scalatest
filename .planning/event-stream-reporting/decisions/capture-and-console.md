@@ -11,9 +11,9 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - Requiring Mill's `--ticker false` makes the user pass it on every command, since the plugin cannot set it.
 - Whole lines alone give no live sense of a long run's progress.
 
-**Reasoning** `Task.log.ticker` and `Task.log` are public with no annotation: Mill rewrites the ticker's detail in place on the test command's own prompt line, and clears and redraws its prompt around `Task.log` lines, which left no stale prompt. The nested evaluation is the test command's one `execute` call, with one goal per selected test module. The summary holds through it only when it logs through the command's `Task.log`, which keys every nested task's prompt line to sort after the command's. Logged otherwise, nested tasks' lines hide the summary or take the command's prompt line, against `../SPECIFICATION.md` R-089 and R-091.
+**Reasoning** `Task.log.ticker` and `Task.log` are public with no annotation: Mill rewrites the ticker's detail in place on the test command's own prompt line, and clears and redraws its prompt around `Task.log` lines, which left no stale prompt. The test command runs every selected module's tests in one evaluation nested inside it, and the summary holds through that evaluation only when it logs through the command's `Task.log`, which keys every nested task's prompt line to sort after the command's. Logged otherwise, nested tasks' lines hide the summary or take the command's prompt line, against `../SPECIFICATION.md` R-089 and R-091.
 
-**Costs** Progress output streams no single characters; its summary is cut to the console width and gone once the nested evaluation returns, while event streams may still be ending; and Mill has lost a `Task.log` line in some runs under Windows pseudo-consoles, for a cause not found, against `../SPECIFICATION.md` R-091. R-089 rests on prompt ordering in `mill.internal`, which has no compatibility promise, so a Mill change there would break it silently; logging the nested evaluation through `Task.log` also prefixes its tasks' console lines `1-<n>]` instead of `<n>]` (R-050).
+**Costs** Progress output streams no single characters; its summary is cut to the console width and gone once that evaluation returns, while event streams may still be ending; and Mill has lost a `Task.log` line in some runs under Windows pseudo-consoles, for a cause not found, against `../SPECIFICATION.md` R-091. R-089 rests on prompt ordering in `mill.internal`, which has no compatibility promise, so a Mill change there would break it silently; logging that evaluation through `Task.log` also prefixes its tasks' console lines `1-<n>]` instead of `<n>]` (R-050).
 
 **Settled by**
 
@@ -95,7 +95,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`../SPECIFICATION.md` R-044).
 
-**Costs** The test command's result does not list the failed tests (`../SPECIFICATION.md` R-046), so a tool reading Mill's failure report sees only that the test command failed. Mill's XML report omits failures outside tests, so a tool reading it sees less than the console shows.
+**Costs** The test command's result does not list the failed tests (`../SPECIFICATION.md` R-046), so a tool reading Mill's failure report sees only that the test command failed. A tool reading Mill's XML report sees less than the console shows, since it omits failures outside tests, and finds no report, or an earlier one, at Mill's usual path, since R-053 moves it.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
