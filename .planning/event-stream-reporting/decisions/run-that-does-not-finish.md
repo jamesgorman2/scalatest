@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A single worker's death more often comes from a test (`System.exit`, running out of memory, a native crash) than from the harness, and that test is the fact the reader needs, so the output shows it (`../SPECIFICATION.md` R-073, R-075). Bytes still buffered inside the dying process are lost whatever the channel.
 
-**Costs** This narrows the channel choice to one that keeps what its reader has not yet received: on a JVM worker, a file (`../ARCHITECTURE-DECISIONS.md` "On a JVM worker, a run's channel is one file per run.").
+**Costs** This narrows the channel choice to one that keeps what its reader has not yet received: on the JVM, on Scala.js under `NodeJs` and on Native, a file (`../ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's channel is one file per run.").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 

@@ -2,41 +2,71 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
-## On a JVM worker, a run's channel is one file per run.
+## On Node, the plugin, not the run, finds the start time of the run's process, from `ProcessHandle` when it first reads the run's header.
 
 **Alternatives**
 
-- A socket lost every byte not yet read on Windows when the worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
-- The worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the channel's items (`research/mill-worker-channels.md` § 3.3).
-- A file the emitter creates on the run's first event, on ScalaTest's dispatcher thread, can appear after the runner's construction returns, leaving no file for a process that dies straight after (`research/jvm-file-channel.md` § 5), against `SPECIFICATION.md` R-071.
+- The run writing its own start time, as on the JVM and Native, finds no Node API for it: on Windows it needs PowerShell, which took 178–756 ms per run, and up to 1.8 s with 18 runs starting together.
+- On Linux that run must read `/proc` assuming `CLK_TCK` is 100, since Node does not expose it.
+- The run writing `Date.now()` less `process.uptime()` as its start time never matched `ProcessHandle`'s.
 
-**Reasoning** Every byte a JVM worker had written to its file before a halt or a forced kill reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind. Wherever a worker outlived the plugin's first read, Mill's process read the worker's file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–12 ms at a 10 ms poll. Files of workers that ended sooner were read whole afterwards. Naming the folder through the runner argument puts every run of a module where the plugin looks, whatever the worker's working directory.
+**Reasoning** The start time serves only to tell the run's process from a later one that reuses its PID, and when the plugin first reads the header the PID still names the run's process unless that process has already died and its PID been reused. On the JVM and Native the run writes its own start time, at no measurable cost, so only Node differs.
 
-**Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again.
+**Costs** A process that dies and whose PID is reused before the plugin first reads its header is mistaken for the run's, so the run's stream does not end until that other process exits. The header's content differs by runtime.
 
-**Settled by** [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+**Settled by** [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
 
-**See** `research/jvm-file-channel.md` § 2, § 3, § 5.
+**See** `research/node-native-file-channel.md` § 5.1.
 
 ---
 
-## On a JVM worker, the plugin learns that a run's stream has ended when the run's process exits.
+## On the JVM, on Scala.js under `NodeJs` and on Native, a run's channel is one file per run.
 
 **Alternatives**
 
-- A lock the run holds beyond end of file, which the operating system releases on death, worked, but needs the emitter to hold an exclusive lock for its process's life and the plugin to try it on every file at every poll.
-- The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each worker, ties the end signal to Mill API where `ProcessHandle` is plain JDK, and still needs each file matched to its worker.
+- A socket lost every byte not yet read on Windows when the JVM worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
+- A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the channel's items (`research/mill-worker-channels.md` § 3.3).
+- A file a `-C` reporter creates on `RunStarting` appears on the JVM on ScalaTest's dispatcher thread, possibly after the runner's construction returns, leaving no file for a process that dies straight after (`research/jvm-file-channel.md` § 5), against `SPECIFICATION.md` R-071; on Scala.js and Native such a reporter is never opened (`research/node-native-file-channel.md` § 1).
 
-**Reasoning** `ProcessHandle.onExit` signalled every JVM worker's end on Windows and on Linux, after a normal exit, a halt and a forced kill alike. It needs from the run only the PID and start time at the head of its channel, not how the run ended. Where that PID was already gone when the plugin read the header, the worker had ended.
+**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind, and Node lost nothing when it exited as the adapter's com channel closed. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least the header. Naming the folder through the runner argument puts every run of a module where the plugin looks, though every Scala.js and Native run's working directory is Mill's own.
 
-**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID.
+**Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again.
 
-**Settled by** [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+**Settled by**
+
+- [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+- [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
+
+**See**
+
+- `research/jvm-file-channel.md` § 2, § 3, § 5.
+- `research/node-native-file-channel.md` § 2, § 3, § 4, § 6, § 7.
+
+---
+
+## On the JVM, on Scala.js under `NodeJs` and on Native, the plugin learns that a run's stream has ended when the run's process exits.
+
+**Alternatives**
+
+- A lock the run holds beyond end of file, which the operating system releases on death, worked on the JVM, but needs the emitter to hold an exclusive lock for its process's life and the plugin to try it on every file at every poll.
+- The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each JVM worker, ties the end signal to Mill API where `ProcessHandle` is plain JDK, and still needs each file matched to its worker.
+- The end of a Scala.js or Native module's Mill test task comes before its process has exited, while lines are still to come, and marks a module, not a run.
+- The run's own last line ends only a run that finishes.
+
+**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended. Where that PID was already gone when the plugin read the header, the process had ended. Under Mill's test task each Node VM or native binary carries exactly one run and exits shortly after it, so its exit is the end of that run.
+
+**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill does this, but if one did, process exit would not end the stream of a run killed mid-run.
+
+**Settled by**
+
+- [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
+- [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
 
 **See**
 
 - `research/jvm-file-channel.md` § 4.
 - `research/mill-runner-progress-without-trait.md` § 7.
+- `research/node-native-file-channel.md` § 5.
 
 ---
 
