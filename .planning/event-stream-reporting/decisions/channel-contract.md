@@ -2,13 +2,13 @@
 
 Decisions behind `../SPECIFICATION.md` on the contract between the emitter and the consolidation library, newest first.
 
-## Every release of the Mill plugin is a release of the fork; there is no release of the plugin alone.
+## Every release of the Mill plugin is a release of the fork.
 
-**Alternatives** A release of the plugin alone, reading the channels of the fork release it extends, gives the fork a second version line and ships a reader apart from its emitter.
+**Alternatives** A separate plugin release, reading the channels of the fork release it extends, adds a second version line and ships the reader apart from its emitter.
 
-**Reasoning** The emitter then always ships with the reader of its channels, under one version, so a test module needs only the fork release that holds the plugin (`../SPECIFICATION.md` R-059).
+**Reasoning** The emitter always ships with its channels' reader, under one version, so a test module needs only the fork release that holds the plugin (`../SPECIFICATION.md` R-059).
 
-**Costs** Each Mill release added to the supported Mill releases moves every test module's ScalaTest dependency to a new fork release.
+**Costs** Supporting each new Mill release moves every test module's ScalaTest dependency to a new fork release.
 
 **Settled by** [Which Mill releases does the Mill plugin support, and what does the test command do on any other?](https://github.com/jamesgorman2/scalatest/issues/49).
 
