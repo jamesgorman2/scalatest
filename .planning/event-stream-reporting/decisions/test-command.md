@@ -2,16 +2,34 @@
 
 Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mill releases the test command runs on, how, and when it fails, newest first.
 
+## A release of the Mill plugin supports exactly the Mill releases its integration tests passed on, not a range.
+
+**Alternatives**
+
+- A range such as `1.1.x` promises Mill releases no integration test ran on.
+- Every Mill 1.x release no older than the one the plugin is built against, as Mill's backward binary compatibility allows, covers only Mill's stable API, not the API `../SPECIFICATION.md` R-044 and R-089 rest on.
+
+**Reasoning** A Mill change can break R-044 and R-089 without a compile error or a failure at run time, so only an integration test run on a Mill release shows that they hold there.
+
+**Costs** Each Mill release added costs a CI run and a release of the fork, even where no code changes.
+
+**Settled by** [Which Mill releases does the Mill plugin support, and what does the test command do on any other?](https://github.com/jamesgorman2/scalatest/issues/49).
+
+**See** `../research/mill-command-lifetime.md` § 7.
+
+---
+
 ## On a Mill release that is not a supported Mill release, the test command runs and warns.
 
 **Alternatives**
 
-- Failing before any test starts, as `../SPECIFICATION.md` R-059 does for an unsupported test module, blocks every Mill upgrade until a release of the Mill plugin lists the new Mill release.
+- Failing before any test starts on every unsupported Mill release, as `../SPECIFICATION.md` R-059 does for an unsupported test module, blocks every Mill upgrade until a release of the fork lists the new Mill release.
 - Failing the build's meta-build also fails Mill's own test tasks and IDE and BSP import, so R-060 and R-003 would hold only on supported Mill releases.
+- A check at run time for the Mill internals the test command needs cannot tell a release on which R-044 and R-089 hold, since a Mill change can break them without a failure at run time.
 
-**Reasoning** A Mill upgrade is not held back by the plugin, and the warning and recorded Mill version tell every reader of the output that its guarantees do not hold (R-093, R-081). A Mill change can break R-044 and R-089 silently, so no check at run time can tell a Mill release on which they hold from one on which they do not; a guarantee can rest only on the releases the integration tests ran. R-060 and R-003 need only Mill's stable API, so they hold on every Mill 1.x release.
+**Reasoning** The warning and the recorded Mill version tell every reader of the output that its guarantees do not hold there (R-093, R-081). No requirement can be guaranteed there: any, R-046 and R-077 included, may fail silently or loudly when a Mill internal it depends on changes, and no tested evidence backs it on that release. R-060 and R-003 still hold on every Mill 1.x release no older than the one the plugin is built against, because Mill keeps its stable API backward binary compatible within a major version and nothing outside the classes only the test command loads touches API beyond it.
 
-**Costs** On an unsupported Mill release, no requirement on the test command is guaranteed beyond its warning (`../SPECIFICATION.md` § Scope). For R-060 and R-003 to hold there, the Mill plugin may touch `@experimental`, `@internal` or `private[mill]` API only from classes that the test command alone loads.
+**Costs** On an unsupported Mill release nothing is guaranteed beyond R-093 and what R-081 records, and below the Mill release the plugin is built against nothing at all: failure there is whatever the JVM throws, possibly a linkage error while the meta-build loads. The Mill plugin may touch `@experimental`, `@internal` or `private[mill]` API only from classes that the test command alone loads.
 
 **Settled by** [Which Mill releases does the Mill plugin support, and what does the test command do on any other?](https://github.com/jamesgorman2/scalatest/issues/49).
 

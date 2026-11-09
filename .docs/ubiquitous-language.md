@@ -93,7 +93,7 @@ One evaluation of the command the Mill plugin adds for consolidated testing, cov
 _Avoid_: Mill command, invocation
 
 **Supported Mill release**:
-A Mill release on which a release of the Mill plugin passed its integration tests, as listed in that plugin release. Any other Mill release is unsupported, even within the same major version.
+A Mill release that the running release of this fork lists as one on which its Mill plugin's integration tests passed. Any other Mill release is unsupported, even within the same major version.
 _Avoid_: Compatible Mill version, Mill version range
 
 **Module selector**:
