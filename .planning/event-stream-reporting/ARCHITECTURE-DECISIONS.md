@@ -7,9 +7,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - Leaving the binary on the stdio it inherits from Mill passes none of its output through Mill's JVM, so the output reaches the console or the Mill daemon's files, never the plugin.
-- A script launcher fails under `qemu-user`, which cannot load a script, wherever `CROSSCOMPILING_EMULATOR` names it.
+- A script launcher fails wherever `CROSSCOMPILING_EMULATOR` names `qemu-user`, which cannot load a script.
 
-**Reasoning** With a launcher in the binary's place, nothing the binary wrote reached the console, on Windows and Linux, whether it was written from Scala, through C `stdio`, by a child process sharing the binary's stdio, or before `abort()`, and the plugin read it from the files, each stream in order. Mill's exit status, test results and adapter warnings matched Mill's own Native test task. A launcher compiled with the module's `nativeClang`, which starts `<emulator words> <binary> <port>` itself, did the same under `qemu-user`.
+**Reasoning** With a launcher in the binary's place, on Windows and Linux, nothing the binary wrote reached the console, whether written from Scala, through C `stdio`, by a child process sharing the binary's stdio, or before `abort()`. The plugin read that output from the files, each stream in order. Mill's exit status, test results and adapter warnings matched Mill's own Native test task. A launcher compiled with the module's `nativeClang`, which starts `<emulator words> <binary> <port>` itself, did the same under `qemu-user`.
 
 **Costs** The test command compiles a launcher for every Native module it runs. The compiled launcher has run only on Linux, under `--no-daemon` and for the host's architecture, never on Windows or macOS.
 
@@ -32,7 +32,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - A plugin-built `TestAdapter` re-implements Mill's discovery and task loop, and puts adapter versions on the build's class path in place of the module's.
 - Overriding `jsEnvConfig` or `testTask` in the module changes the module's definition, against `SPECIFICATION.md` R-092.
 
-**Reasoning** Both are named tasks Mill evaluates for the plugin below the tasks the plugin evaluates itself, so the plugin can put its own value in their place while the module's definition stays unchanged (R-092). Mill's own test body then runs, with its results and JUnit XML: tests ran under the launcher in 112 of 112 Scala.js module runs, and on Native the exit status and JUnit XML test cases matched Mill's own task.
+**Reasoning** Both are named tasks upstream of the tasks the plugin evaluates, so the plugin can put its own value in their place while the module's definition stays unchanged (R-092). Mill's own test body then runs, producing its results and JUnit XML. Tests ran under the launcher in 112 of 112 Scala.js module runs, and on Native the exit status and JUnit XML test cases matched Mill's own task.
 
 **Costs** The swap relies on Mill's test task using each value only as `ARCHITECTURE.md` § External systems describes, so a Mill change there breaks it at run time, not compile time.
 
@@ -52,13 +52,13 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- Reading the VM's stdout and stderr through Mill's pipes lost 64 417 handed bytes on Linux when the adapter's `destroyForcibly()` closed the pipe, and would have meant narrowing `SPECIFICATION.md` R-073.
+- Reading the VM's stdout and stderr through Mill's pipes lost 64 417 bytes already handed to the operating system on Linux when the adapter's `destroyForcibly()` closed the pipe, and would have meant narrowing `SPECIFICATION.md` R-073.
 - A Node `--require` preload that sends `process.stdout` and `process.stderr` to files misses Node's fatal-error report, which bypasses `process.stderr`.
-- A `.cmd` or PowerShell launcher on Windows cannot hold the VM in a job object without compiled code, so a kill of it would orphan the VM, as a kill of the C launcher without one did.
+- A `.cmd` or PowerShell launcher on Windows cannot hold the VM in a job object without compiled code, so killing it would orphan the VM, as killing the C launcher without a job object did.
 
-**Reasoning** Node writes to a file synchronously, so it queued nothing at any exit, no byte reached a launcher's file after the VM's exit, and every byte the VM had handed to the operating system was read, under `NodeJs` and `JsDom`, on Windows and Linux, whether the VM exited, died or was killed, and whether the reader kept up or paused. The launcher's header gives every VM's PID, which `JsDom` window code cannot learn, and on Windows and Linux its start time, which matched `ProcessHandle`'s for 112 of 112 VMs.
+**Reasoning** Node writes to a file synchronously, so under `NodeJs` and `JsDom`, on Windows and Linux, it queued nothing at any exit, no byte reached a launcher's file after the VM's exit, and every byte the VM had handed to the operating system was read. This held whether the VM exited, died or was killed, and whether the reader kept up or paused. The launcher's header gives every VM's PID, which `JsDom` window code cannot learn. On Windows and Linux it also gives the VM's start time, which matched `ProcessHandle`'s for 112 of 112 VMs.
 
-**Costs** The plugin ships a Windows launcher binary, which Windows on ARM64 runs under emulation, and Windows start-up rises about 12 ms per VM. The launcher has not run on macOS.
+**Costs** The plugin ships a Windows launcher binary, which Windows on ARM64 runs under emulation, and it adds about 12 ms to each VM's start-up on Windows. The launcher has not run on macOS.
 
 **Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
@@ -125,7 +125,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - The exit of a Scala.js VM's launcher on Windows was signalled up to 16 ms before the VM's.
 - The run's own last line ends only a run that finishes.
 
-**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; on Scala.js they come from the launcher's header, written before the VM runs. The reader was still behind at the exit in 24 Scala.js runs, though no byte reached a file after it, so the plugin then reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
+**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; on Scala.js they come from the launcher's header, written before the VM runs. In 24 Scala.js runs the reader was still behind at the exit, though no byte reached a file after it, so after the exit the plugin reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
 
 **Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
 
