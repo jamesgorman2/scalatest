@@ -46,9 +46,9 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 - `ExoegoJsDomNodeJs` works only with jsdom before version 27, which `JsDom` has moved past.
 - `Phantom` works only if the module adds Jetty itself, and PhantomJS is no longer maintained.
 
-**Reasoning** `JsDom` runs the page in a Node process and uses Node's com channel, `Logger` and process pipes, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
+**Reasoning** `JsDom` runs the page in a Node process and uses Node's com channel, `Logger`, stdout and stderr, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
 
-**Costs** Test code in a `JsDom` window has no `require`, so it can neither open a Node socket nor write the file that carries a run's channel under `NodeJs` (`../ARCHITECTURE-DECISIONS.md` "…a run's channel is one file per run."). Modules tested in any other JS environment, browsers included, get no consolidated output.
+**Costs** Test code in a `JsDom` window has no `require` or `process`, so a run's channel there shares the VM's stdout with test output and depends on framing (`../ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's channel is framed lines…"). Modules tested in any other JS environment, browsers included, get no consolidated output.
 
 **Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 

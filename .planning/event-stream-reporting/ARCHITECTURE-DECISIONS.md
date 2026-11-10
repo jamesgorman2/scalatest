@@ -2,20 +2,45 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
-## Under `NodeJs`, the plugin, not the run, finds the start time of the run's process, from `ProcessHandle` when it first reads the run's first item.
+## Every Scala.js VM starts through a launcher the plugin supplies, which writes the VM's stdout and stderr to files of its own.
 
 **Alternatives**
 
-- The run writing its own start time, as on the JVM and Native, has no Node API for it: on Windows it must run PowerShell, at 178–756 ms per run and up to 1.8 s with 18 starting together; on Linux it must read `/proc` and assume `CLK_TCK` is 100.
-- The run writing `Date.now()` less `process.uptime()` as its start time never matched `ProcessHandle`'s.
+- Reading the VM's stdout and stderr through Mill's pipes lost 64 417 handed bytes on Linux when the adapter's `destroyForcibly()` closed the pipe, and would have meant narrowing `SPECIFICATION.md` R-073.
+- A plugin-built `TestAdapter` re-implements Mill's discovery and task loop, puts adapter versions on the build's class path in place of the module's, and gives Mill no results or JUnit XML.
+- A Node `--require` preload that sends `process.stdout` and `process.stderr` to files misses Node's fatal-error report, which bypasses `process.stderr`.
 
-**Reasoning** The start time serves only to tell the run's process from a later one that reuses its PID, and when the plugin first reads the run's first item the PID still names the run's process unless that process has already died and its PID been reused. On the JVM and Native the run writes its own start time, at no measurable cost, so only `NodeJs` differs.
+**Reasoning** Node writes to a file synchronously, so it queued nothing at any exit, no byte reached a launcher's file after the VM's exit, and every byte the VM had handed to the operating system was read, under `NodeJs` and `JsDom`, on Windows and Linux, whether the VM exited, died or was killed, and whether the reader kept up or paused. The launcher's header gives every VM's PID and start time, which `JsDom` window code cannot learn, and its start time matched `ProcessHandle`'s for 112 of 112 VMs. Swapping `jsEnvConfig`'s value only in the plugin's own evaluation of the module's test task leaves the module's definition unchanged (`SPECIFICATION.md` R-092) and Mill's own test body, results and JUnit XML in place.
 
-**Costs** If the run's process dies and its PID is reused before the plugin first reads the run's first item, the new process is mistaken for the run's, so the run's stream does not end until that process exits. The run's first item carries a start time on the JVM and Native but not under `NodeJs`.
+**Costs** The plugin ships a Windows launcher binary, neither launcher has run on macOS, Windows start-up rises about 12 ms per VM, and without its job object a killed launcher would orphan the VM. The swap relies on `testFrameworkInstance` using `jsEnvConfig` only to build the JS environment, so a Mill change there breaks it at run time, not compile time.
 
-**Settled by** [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
+**Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
-**See** `research/node-native-file-channel.md` § 5.1.
+**See**
+
+- `research/js-stdout-launcher.md` § 2, § 3, § 5, § 7.
+- `research/jsdom-channel.md` § 4.
+
+---
+
+## Under `JsDom`, a run's channel is framed lines the run writes with the window's `console.log`, read from the launcher's stdout file.
+
+**Alternatives**
+
+- jsdom's `WebSocket` lost item 1 whenever the VM died before `open`, 11–59 ms after the runner's construction (`SPECIFICATION.md` R-071), sent items only when window code yielded, up to 850 ms late, and on Windows lost unread bytes when the connection reset.
+- A synchronous `XMLHttpRequest` costs a `spawnSync` child Node process per request, plus a CORS preflight.
+- The test-interface `Logger` is owned by Mill's test task and usable only during `execute`.
+
+**Reasoning** jsdom forwards the window's `console.log` synchronously to Node's stdout, which the launcher sends to a file, so each item leaves the VM as it is written. Item 1 arrived for every run that died at its runner's construction, and no item was lost, corrupted or found among the other lines, including lines forged with the prefix and a wrong nonce. Items reached the plugin with a median delay of 5–6 ms.
+
+**Costs** The channel shares the VM's stdout with test output, so it holds only while every item is one whole framed line, and a `JsDom` run's item 1 carries no PID or start time.
+
+**Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
+
+**See**
+
+- `research/jsdom-channel.md` § 2, § 3, § 4, § 7.
+- `research/js-stdout-launcher.md` § 5, § 6, § 8, § 9.
 
 ---
 
@@ -25,6 +50,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - A socket lost every byte not yet read on Windows when the JVM worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
 - A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the channel's items (`research/mill-worker-channels.md` § 3.3).
+- Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and hold only while every item is one whole framed line.
 
 **Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first item. Naming the folder through the runner argument puts every run of a module where the plugin looks, even though every Scala.js and Native run shares Mill's working directory.
 
@@ -34,6 +60,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
 - [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
+- [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
 **See**
 
@@ -42,16 +69,17 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## On the JVM, on Scala.js under `NodeJs` and on Native, the plugin learns that a run's stream has ended when the run's process exits.
+## The plugin learns that a run's stream has ended when the run's process exits.
 
 **Alternatives**
 
 - A lock the run holds beyond end of file, which the operating system releases on death, worked on the JVM, but needs the emitter to hold an exclusive lock for its process's life and the plugin to try it on every file at every poll.
 - The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each JVM worker, ties the end signal to Mill API where `ProcessHandle` is plain JDK, and still needs each file matched to its worker.
 - The end of a Scala.js or Native module's Mill test task comes before its process has exited, while lines are still to come, and marks a module, not a run.
+- The exit of a Scala.js VM's launcher on Windows was signalled up to 16 ms before the VM's.
 - The run's own last line ends only a run that finishes.
 
-**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended. Where that PID was already gone when the plugin first read the run's first item, the process had ended. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
+**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; on Scala.js the launcher's header gives both before the VM runs. The reader was still behind at the exit in 24 Scala.js runs, though no byte reached a file after it, so the plugin then reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
 
 **Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
 
@@ -59,12 +87,14 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - [Does a file per run carry a JVM worker's event stream to the Mill plugin live, and keep every byte written when the worker dies?](https://github.com/jamesgorman2/scalatest/issues/50).
 - [Does a file per run carry a Node or Native run's event stream to the Mill plugin live, and keep every byte written when its process dies?](https://github.com/jamesgorman2/scalatest/issues/51).
+- [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
 **See**
 
 - `research/jvm-file-channel.md` § 4.
 - `research/mill-runner-progress-without-trait.md` § 7.
 - `research/node-native-file-channel.md` § 5.
+- `research/js-stdout-launcher.md` § 7.
 
 ---
 

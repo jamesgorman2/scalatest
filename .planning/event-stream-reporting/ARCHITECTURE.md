@@ -38,8 +38,11 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 - Its integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns.").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), and gives the library each run's event stream and its other inputs.
-- **Channel reading** — reads each run's channel live and decodes it with core's codec into that run's event stream. On the JVM, under `NodeJs` and on Native, it reads every file in each module's folder and ends each stream as § APIs § The emitter and the Mill plugin describes.
-- **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-042).
+- **Channel reading** — reads each run's channel live and decodes it with core's codec into that run's event stream. It reads every file in each module's folder and ends each stream as § APIs § The emitter and the Mill plugin describes.
+- **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-042). On Scala.js it reads them from the launcher's files, not from Mill's pipes, so that R-042 and R-073 hold on Linux (`ARCHITECTURE-DECISIONS.md` "Every Scala.js VM starts through a launcher…").
+- **Launcher** — starts every Scala.js VM, under `NodeJs` and `JsDom` alike, in place of Node. It writes the VM's stdout and stderr to a file pair of its own in the module's folder. The first line of the stdout file is the VM's PID and start time, which match `ProcessHandle`'s.
+  - On Windows it is a small C program that runs Node in a job object, so a kill of the launcher kills the VM. On Linux it is a `/bin/sh` script that `exec`s Node, so the launcher is the VM.
+  - The test command writes one launcher per module per test command, with the module's folder baked in, and puts it in the module's `jsEnvConfig` (§ Data flow).
 
 ## APIs
 
@@ -49,7 +52,7 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
   - Every run of a module receives the same argument, and each run derives from it a channel of its own.
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no channel (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
 - **The run's channel** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/channel-contract.md`). In order:
-  1. before the runner's construction returns, that the run exists, with the run-level values of its run record known then, its process's PID and, on the JVM and Native, its process's start time (R-071, R-080);
+  1. before the runner's construction returns, that the run exists, with the run-level values of its run record known then, its process's PID on the JVM, under `NodeJs` and on Native, and its process's start time on the JVM and Native (R-071, R-080);
   2. when a suite starts running, once ScalaTest's filter is known, that suite's structure after filtering: its nested suites, scopes and tests, each with its node ID, its parent, its declared position and its name;
   3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md`):
      - each tagged with its node's ID, a suite's only after that suite's structure;
@@ -61,8 +64,11 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the channel is a file with a name unique to the run, in the folder the runner argument names for the module. The run appends each item to it unbuffered as it occurs, and the plugin reads every file while the run appends (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's channel is one file per run.").
     - The test command creates that folder, new for each test command and module, so no earlier command's file is read as a run (`SPECIFICATION.md` R-022, R-077).
     - A file never exists in the folder without its complete item 1.
-  - **The end of a run's event stream** on the JVM, under `NodeJs` and on Native is the exit of the run's process. The plugin finds the process from item 1's PID and watches it with `ProcessHandle`. It takes the process's start time from item 1 on the JVM and Native, and under `NodeJs` from `ProcessHandle` when it first reads item 1 (`ARCHITECTURE-DECISIONS.md` "Under `NodeJs`, the plugin, not the run, finds the start time of the run's process…"). A PID counts as exited if it is already gone or has no start time, or if, on the JVM and Native, its process's start time differs from item 1's. After the exit the plugin reads the channel to its end, since the exit can be signalled before the reader has caught up (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, the plugin learns that a run's stream has ended when the run's process exits.").
-- **Each process's stdout and stderr** — carry everything the run's processes write that capture did not take against a node. The plugin captures them against the run.
+  - **Under `JsDom`,** the channel is framed lines in the launcher's stdout file (`ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's channel is framed lines…"). The run writes each item as one line with the window's `console.log`, which jsdom forwards to Node's stdout.
+    - A line is an item only if it carries the framing prefix, this test command's nonce and the run's ID, all given by the runner argument. Every other line is ordinary output of the process (below).
+    - The plugin assembles lines per file, so no other writer's bytes land inside an item.
+  - **The end of a run's event stream** is the exit of the run's process. The plugin watches the process with `ProcessHandle`, given its PID and start time: on the JVM and Native from item 1, and on Scala.js from the launcher's header, which under `NodeJs` the plugin matches to the run by item 1's PID. A PID counts as exited if it is already gone, has no start time, or its process's start time differs from the one given. After the exit the plugin reads the channel to its end, since the exit can be signalled before the reader has caught up (`ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits.").
+- **Each process's stdout and stderr** — carry everything the run's processes write that capture did not take against a node. The plugin captures them against the run. On Scala.js they are the launcher's file pair, less the header and, under `JsDom`, the channel's items.
 
 ### The Mill plugin and the consolidation library
 
@@ -85,7 +91,7 @@ The Mill plugin is the library's only caller (`decisions/channel-contract.md` "T
 The test command runs each selected module's tests under a task context it supplies, adding the runner argument to the framework arguments (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."):
 
 - on the JVM, it runs the module's test discovery itself without the runner argument, then drives Mill's test queue, starting each worker through Mill's test-runner subprocess call (`ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…");
-- on Scala.js and Native, it evaluates the module's own Mill test task.
+- on Scala.js and Native, it evaluates the module's own Mill test task. On Scala.js, in that evaluation only, it swaps the value of the module's `jsEnvConfig` for a copy whose `executable` is the module's launcher; the module's definition is unchanged.
 
 All of this runs in one nested evaluation of the test command's own, with fail-fast off (`ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
 
@@ -107,10 +113,16 @@ flowchart LR
     LIB[Consolidation library]
     LOG["Test command's Mill logging"]
   end
-  TASK -- starts --> PROC
+  TASK -- "starts (JVM, Native)" --> PROC
+  TASK -- "starts (Scala.js)" --> LCH["Launcher"] -- starts --> PROC
+  LCH -- "header: PID, start time" --> LF["Launcher's stdout and stderr files"]
   ENC -- "the run's channel, a file on the JVM, NodeJs and Native" --> DEC
-  PROC -.->|"process exit (JVM, NodeJs, Native)"| DEC
-  PROC -- "stdout and stderr, less output captured against a node" --> CAP
+  ENC -- "the run's channel, framed lines on stdout (JsDom)" --> LF
+  PROC -- "stdout and stderr (Scala.js), less output captured against a node" --> LF
+  LF -- "header; items (JsDom)" --> DEC
+  LF -- "other lines" --> CAP
+  PROC -.->|process exit| DEC
+  PROC -- "stdout and stderr (JVM, Native), less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
   CMD -- "labels, selectors, modules not started, test classes, processes with no run, Mill version" --> LIB
@@ -122,13 +134,16 @@ flowchart LR
 
 - Progress output and human-readable output reach the console through the test command's Mill logging, which shares the console with Mill's prompt (`decisions/capture-and-console.md` "On the console, progress output is a one-line summary…").
 - Failure path: a process that dies.
-  - The run's event stream ends without how the run ended (on the JVM, under `NodeJs` and on Native, as § APIs § The emitter and the Mill plugin describes), holding everything the run had handed to the operating system (`SPECIFICATION.md` R-073). The library treats it as a run that does not finish (R-064–R-067), and progress output shows it aborted as soon as the stream ends (R-067).
+  - The run's event stream ends without how the run ended (§ APIs § The emitter and the Mill plugin), holding everything the run had handed to the operating system (`SPECIFICATION.md` R-073). The library treats it as a run that does not finish (R-064–R-067), and progress output shows it aborted as soon as the stream ends (R-067).
   - Because each suite's structure arrives as the suite starts, every scope and test a constructed suite registered is known when the process dies (R-065); a suite the run never constructed sent nothing (R-066).
-  - What the process wrote to stdout and stderr still reaches the library through process capture.
+  - What the process wrote to stdout and stderr still reaches the library through process capture. On Scala.js the launcher's files keep it, though the adapter closes Mill's pipes to the process (§ External systems).
+  - A killed launcher takes its VM with it: on Windows through its job object, and on Linux because it is the VM.
   - A process that dies before any run exists in it sends nothing over a channel; the plugin adds it to the library with the output captured off its streams (R-076).
 
 ## External systems
 
-- **Mill** — hosts the plugin in its JVM. Its fork grouping, test parallelism and test queue decide which processes run each module's tests. The test command must keep them, including on the JVM, where it drives the test queue itself (`SPECIFICATION.md` R-053).
+- **Mill** — hosts the plugin in its JVM. Its fork grouping, test parallelism and test queue decide which processes run each module's tests. The test command must keep them, including on the JVM, where it drives the test queue itself (`SPECIFICATION.md` R-053). `ScalaJSModule.testFrameworkInstance` uses the module's `jsEnvConfig` only to build the JS environment, which is what lets the test command swap in the launcher (`research/js-stdout-launcher.md` § 2.1).
 - **Scala.js and Native test adapters** — launch the Node VM or native binary that runs a Scala.js or Native run, in Mill's own working directory, and carry the framework arguments to its runner unchanged, including in `JsDom` window code (`research/js-environment-channels.md` § 2.2; `research/node-native-file-channel.md` § 7). Under Mill's test task each run executes in one Node VM or native binary, which carries no other run and exits shortly after it (`../structured-test-reporting/ARCHITECTURE.md` § External systems, Scala.js and Native test interface; `research/node-native-file-channel.md` § 4, § 5.2).
+  - The Scala.js adapter runs the `jsEnvConfig`'s `executable` with its `args` and `env`. When it closes a run it calls `destroyForcibly()` on that process, which on Linux closes Mill's pipes to it and discards what Mill had not read (`research/jsdom-channel.md` § 4).
+  - `JsDom` window code has no `require` and no `process`, so a `JsDom` run can write no file, open no Node socket, and learn neither its PID nor its start time (`research/jsdom-channel.md` § 1).
 - **Metals, Bloop and IntelliJ** — launch runs without the runner argument, so the emitter stays off and every reporter receives what 3.2.19 sends (`SPECIFICATION.md` R-001, R-003).
