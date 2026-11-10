@@ -4,7 +4,7 @@ Scale: epic.
 
 ## Summary
 
-Testing a Mill build can start many runs: several modules, parallel runs within a module, and the same suites on several runtimes. Each run prints for itself, so the output interleaves, loses the test structure, and cannot be read as one whole by people or by tools. This epic has each run send what the consolidated output needs over one channel, and adds a Mill plugin whose test command consolidates the channels of every run it started into one set of output.
+Testing a Mill build can start many runs: several modules, parallel runs within a module, and the same suites on several runtimes. Each run prints for itself, so the output interleaves, loses the test structure, and cannot be read as one whole by people or by tools. This epic has each run send what the consolidated output needs in one test event log, and adds a Mill plugin whose test command consolidates the event logs of every run it started into one set of output.
 
 ## Plan
 
@@ -20,9 +20,9 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 ## Scope
 
-- An emitter in ScalaTest that sends one run's events, test structure and the output it captures over a single channel.
+- An emitter in ScalaTest that sends one run's events, test structure and the output it captures in a single test event log.
 - A consolidation library (R-023) that produces the consolidated output from many runs.
-- A Mill plugin that hosts the consolidation library, reads the channel of each run it starts, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
+- A Mill plugin that hosts the consolidation library, reads the test event log of each run it starts, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
 
 All three cover runs on the JVM, Scala.js and Native, on the Scala versions `../structured-test-reporting/SPECIFICATION.md` § Scope lists for each. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments; R-059 covers a module configured for any other. Every requirement below, including those taken from structured test reporting, holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native. The next paragraph limits them on an unsupported Mill release.
 
@@ -31,7 +31,7 @@ The Mill plugin runs on Mill 1.x releases no older than the one it is built agai
 - the test command runs, but where a Mill internal it needs is missing, it may instead fail before any test starts, naming the Mill version and producing no consolidated output;
 - no requirement holds for the test command or its output except R-093 and, in any JSON output, the Mill version and support status R-081 records.
 
-A channel's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them.
+A test event log's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them.
 
 ### Out of scope
 
@@ -63,10 +63,10 @@ A channel's format, the consolidation library's API and the switch by which the 
 
 ## The emitter
 
-- R-010 Each run sends over one channel every event the run reports, the run's test structure and the output the run captures.
+- R-010 Each run writes to one test event log every event the run reports, the run's test structure and the output the run captures.
 - R-063 What a run sends does not depend on its reporter configuration.
-- R-011 Nothing the consolidated output shows or uses is lost or altered between the run and the channel's reader. This includes failure messages and the order of events within a node.
-- R-074 On every runtime, each run's channel carries how the run ended: completed, aborted or stopped.
+- R-011 Nothing the consolidated output shows or uses is lost or altered between the run and the test event log's reader. This includes failure messages and the order of events within a node.
+- R-074 On every runtime, each run's test event log carries how the run ended: completed, aborted or stopped.
 - R-073 When a run's process dies, R-010, R-011, R-021 and R-042 hold for everything the run had handed to the operating system. They do not cover what was still buffered inside the process.
 
 ## Behaviour taken from structured test reporting
@@ -92,7 +92,7 @@ Unlike `../structured-test-reporting/SPECIFICATION.md` § Test output, what coun
   - an argument that turns JSON output on (R-085) and one that gives the JSON file's path (R-049), which may be the same argument.
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the processes Mill's fork grouping, test parallelism and test queue start;
-  - the same working directory, arguments and environment, plus only what turning the emitter on (with its channel) and turning off the reporter R-041 names require;
+  - the same working directory, arguments and environment, plus only what turning the emitter on (with its test event log) and turning off the reporter R-041 names require;
   - except that a path inside the task folder (`Task.dest`) of `testOnly` or `testForked` is instead at the same relative path inside a folder the test command owns for that test module alone, outside the test command's own task folder (R-049);
   - except that environment variables Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the `mill` command line that started the test command.
 - R-092 The test command runs a selected test module's tests without the module's definition naming anything the Mill plugin provides, such as a trait to mix in.
@@ -101,7 +101,7 @@ Unlike `../structured-test-reporting/SPECIFICATION.md` § Test output, what coun
 - R-056 By default, the test command runs the tests of every selected test module, whatever happens to other modules' runs and whether or not Mill's `--keep-going` is given. Unless R-057 stops them, each selected test module's tests start once that module has compiled and the other tasks they need have finished. They do not wait for any other selected test module to compile or run, even after another module has failed.
 - R-061 IF a task Mill must complete before starting the test command fails, THEN the test command does not run and produces no consolidated output. A selected test module's compile and test tasks are not among them; R-046 and R-058 cover their failure.
 - R-062 IF another goal on the same `mill` command line fails before the test command starts and Mill's `--keep-going` is not given, THEN the test command does not run and produces no consolidated output.
-- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose channels the Mill plugin reads, or to a Scala.js test module whose JS environment is not `NodeJs` or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. The JSON file stays as R-077 left it.
+- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose test event logs the Mill plugin reads, or to a Scala.js test module whose JS environment is not `NodeJs` or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. The JSON file stays as R-077 left it.
 - R-093 IF the running Mill release is not a supported Mill release, THEN before any test starts the test command warns on the console, naming the running Mill version, and any human-readable output repeats the warning.
 - R-058 The consolidated output shows the test run label of each selected test module whose tests did not run as aborted, with:
   - reason *not run* where `--halt-on-failure` skipped them (R-057);

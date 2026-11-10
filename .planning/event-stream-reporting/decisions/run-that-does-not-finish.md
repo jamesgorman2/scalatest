@@ -48,7 +48,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`../SPECIFICATION.md` R-064, R-071), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 
-**Costs** The Mill plugin must keep Mill's JVM discovery runner from opening a channel by running discovery itself without the runner argument (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
+**Costs** The Mill plugin must keep Mill's JVM discovery runner from opening a test event log by running discovery itself without the runner argument (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 
@@ -66,7 +66,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A single worker's death more often comes from a test (`System.exit`, running out of memory, a native crash) than from the harness, and that test is the fact the reader needs, so the output shows it (`../SPECIFICATION.md` R-073, R-075). Bytes still buffered inside the dying process are lost whatever the channel.
 
-**Costs** This narrows every run's channel, and the capture of every Scala.js VM's stdout and stderr, to routes that keep what their reader has not yet received (`../ARCHITECTURE-DECISIONS.md` "…a run's channel is one file per run." and "Every Scala.js VM starts through a launcher…").
+**Costs** This narrows every run's test event log, and the capture of every Scala.js VM's stdout and stderr, to routes that keep what their reader has not yet received (`../ARCHITECTURE-DECISIONS.md` "…a run's test event log is one file per run." and "Every Scala.js VM starts through a launcher…").
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
 

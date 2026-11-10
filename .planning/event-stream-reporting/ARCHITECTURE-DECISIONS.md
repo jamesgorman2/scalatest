@@ -9,7 +9,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - Leaving the binary on the stdio it inherits from Mill passes none of its output through Mill's JVM, so the output reaches the console or the Mill daemon's files, never the plugin.
 - A script launcher fails wherever `CROSSCOMPILING_EMULATOR` names `qemu-user`, which cannot load a script.
 
-**Reasoning** With a launcher in the binary's place, on Windows and Linux, nothing the binary wrote reached the console, whether written from Scala, through C `stdio`, by a child process sharing the binary's stdio, or before `abort()`, and the plugin read that output from the files, each stream in order. Mill's exit status, test results and adapter warnings matched Mill's own Native test task. A launcher compiled with the module's `nativeClang`, which starts `<emulator words> <binary> <port>` itself, did the same under `qemu-user`. Its header gives the PID and start time of a binary that dies before any run exists in it, which no channel carries.
+**Reasoning** With a launcher in the binary's place, on Windows and Linux, nothing the binary wrote reached the console, whether written from Scala, through C `stdio`, by a child process sharing the binary's stdio, or before `abort()`, and the plugin read that output from the files, each stream in order. Mill's exit status, test results and adapter warnings matched Mill's own Native test task. A launcher compiled with the module's `nativeClang`, which starts `<emulator words> <binary> <port>` itself, did the same under `qemu-user`. Its header gives the PID and start time of a binary that dies before any run exists in it, which no test event log carries.
 
 **Costs** The test command compiles a launcher for every Native module it runs. The compiled launcher has run only on Linux, under `--no-daemon` and for the host's architecture, never on Windows or macOS, and none has yet run with a header or with its paths compiled in.
 
@@ -69,7 +69,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## Under `JsDom`, a run's channel is framed lines the run writes with the window's `console.log`, read from the launcher's stdout file.
+## Under `JsDom`, a run's test event log is framed lines the run writes with the window's `console.log`, read from the launcher's stdout file.
 
 **Alternatives**
 
@@ -79,7 +79,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** jsdom forwards the window's `console.log` synchronously to Node's stdout, which the launcher sends to a file, so each item leaves the VM as it is written. Item 1 arrived for every run that died at its runner's construction, and no item was lost or corrupted. Lines forged with the prefix and a wrong nonce passed through as ordinary output, never taken as items, and no item appeared among the passed-through lines. Items reached the plugin with a median delay of 5–6 ms.
 
-**Costs** The channel shares the VM's stdout with test output, so it holds only while every item is one whole framed line.
+**Costs** The event log shares the VM's stdout with test output, so it holds only while every item is one whole framed line.
 
 **Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
@@ -90,12 +90,12 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## On the JVM, on Scala.js under `NodeJs` and on Native, a run's channel is one file per run.
+## On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.
 
 **Alternatives**
 
 - A socket lost every byte not yet read on Windows when the JVM worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
-- A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the channel's items (`research/mill-worker-channels.md` § 3.3).
+- A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the event log's items (`research/mill-worker-channels.md` § 3.3).
 - Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and hold only while every item is one whole framed line.
 
 **Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first item. Naming the folder through the runner argument puts every run of a module where the plugin looks, even though every Scala.js and Native run shares Mill's working directory.
@@ -144,7 +144,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## The plugin runs a module's test discovery itself, without the runner argument, so Mill's discovery runner opens no channel.
+## The plugin runs a module's test discovery itself, without the runner argument, so Mill's discovery runner opens no test event log.
 
 **Alternatives**
 
@@ -184,7 +184,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from what `SPECIFICATION.md` R-030 takes.
 
-**Reasoning** A channel is read only by the release that wrote it (`decisions/channel-contract.md` "A channel is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's channel reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output what R-030 takes.
+**Reasoning** A test event log is read only by the release that wrote it (`decisions/event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output what R-030 takes.
 
 **Costs** Core's internals carry the library's needs, and the plugin loads scalatest-core for Scala 3 into Mill's JVM.
 
@@ -213,7 +213,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064–R-066). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A run's expected tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
 
-**Costs** The channel carries more, and this assembly does not reuse structured test reporting's in-run assembly.
+**Costs** The test event log carries more, and this assembly does not reuse structured test reporting's in-run assembly.
 
 **Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
 
@@ -242,13 +242,13 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## The consolidation library takes each run's event stream, not its channel.
+## The consolidation library takes each run's event stream, not its test event log.
 
-**Alternatives** Reading channels, live or as recorded files, ties the library to the transport, and recording a channel outside Mill needs a supported way to turn the emitter on there: new public surface on `Runner` and the `Framework`, bound by `SPECIFICATION.md` R-001 and R-004.
+**Alternatives** Reading test event logs, live or as recorded files, ties the library to the transport, and recording an event log outside Mill needs a supported way to turn the emitter on there: new public surface on `Runner` and the `Framework`, bound by `SPECIFICATION.md` R-001 and R-004.
 
-**Reasoning** Separating decoding from consolidation lets any front end in this fork, live under Mill or reading files, feed the same library, so the library never knows whether a channel was live or recorded.
+**Reasoning** Separating decoding from consolidation lets any front end in this fork, live under Mill or reading files, feed the same library, so the library never knows whether an event log was live or recorded.
 
-**Costs** Every front end must turn channels into event streams. This epic gives no way outside Mill to produce a channel, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
+**Costs** Every front end must turn event logs into event streams. This epic gives no way outside Mill to produce an event log, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 

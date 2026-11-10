@@ -6,8 +6,8 @@ Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), i
 
 A test command, given one module selector that resolves to one JVM test module, runs its tests in one worker and writes consolidated human-readable output to the console once the run's event stream ends:
 
-- core's structure wrapper, emitter and codec on the JVM: the runner argument turns the emitter on and the default reporter off; items 1–4 go to a file per run in the module's channel folder, item 1 before the runner's construction returns;
-- the Mill plugin, in its own Mill build with testkit integration tests: runs discovery without the runner argument, drives Mill's test queue, reads the channel live, ends the stream on the worker's exit, and captures the worker's stdout and stderr against the run;
+- core's structure wrapper, emitter and codec on the JVM: the runner argument turns the emitter on and the default reporter off; items 1–4 go to a file per run in the module's event log folder, item 1 before the runner's construction returns;
+- the Mill plugin, in its own Mill build with testkit integration tests: runs discovery without the runner argument, drives Mill's test queue, reads the test event log live, ends the stream on the worker's exit, and captures the worker's stdout and stderr against the run;
 - the consolidation library, published with no Mill dependency: assembly, one test run label, and the human-readable writer, including the run's block (R-082);
 - Mill's failed-test list, runner progress and ScalaTest's summary stay off the console; the test command fails when the run reports a failure, aborts or stops.
 
@@ -15,14 +15,14 @@ Until later features, the test command runs one worker as Mill does with `testPa
 
 Enables:
 
-- `SPECIFICATION.md` R-001, R-002, R-051, R-003, R-060, R-004, R-010, R-063, R-011, R-074, R-030 and R-031 (human-readable output), R-054, R-055 (one module selector; human-readable off), R-053 (working directory, environment, for one worker), R-092, R-072, R-020, R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086, R-023 (human-readable), R-025, R-040, R-041, R-042, R-043, R-044, R-045, R-046 (first bullet: failure, aborted, stopped), R-048 (human-readable), R-050; § Scope (JVM Scala versions; no compatibility promise on the channel's format, the library's API or the switch)
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec, on the JVM), § Modules § Consolidation library (Assembly, Consolidation, Writers: human-readable), § Modules § Mill plugin (own Mill build, Scala 3 loading, testkit, `@experimental`/`@internal` API confined to classes the test command alone loads; Test command; Channel reading and Process capture on the JVM), § APIs § The emitter and the Mill plugin (runner argument; the run's channel, items 1–4; file channel and channel folder on the JVM; end of the event stream on the JVM; what counts as exited), § APIs § The Mill plugin and the consolidation library (Start, Add a run, End), § Data flow (JVM bullet; console through the test command's Mill logging), § External systems (Mill; Metals, Bloop and IntelliJ)
+- `SPECIFICATION.md` R-001, R-002, R-051, R-003, R-060, R-004, R-010, R-063, R-011, R-074, R-030 and R-031 (human-readable output), R-054, R-055 (one module selector; human-readable off), R-053 (working directory, environment, for one worker), R-092, R-072, R-020, R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086, R-023 (human-readable), R-025, R-040, R-041, R-042, R-043, R-044, R-045, R-046 (first bullet: failure, aborted, stopped), R-048 (human-readable), R-050; § Scope (JVM Scala versions; no compatibility promise on the test event log's format, the library's API or the switch)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec, on the JVM), § Modules § Consolidation library (Assembly, Consolidation, Writers: human-readable), § Modules § Mill plugin (own Mill build, Scala 3 loading, testkit, `@experimental`/`@internal` API confined to classes the test command alone loads; Test command; Event log reading and Process capture on the JVM), § APIs § The emitter and the Mill plugin (runner argument; the run's test event log, items 1–4; event log file and event log folder on the JVM; end of the event stream on the JVM; what counts as exited), § APIs § The Mill plugin and the consolidation library (Start, Add a run, End), § Data flow (JVM bullet; console through the test command's Mill logging), § External systems (Mill; Metals, Bloop and IntelliJ)
 
 Settles:
 
 - The test command's name and the spelling of the argument that turns human-readable output off (R-055 gives its effect only).
-- The runner argument's spelling, and how each run derives a channel file name unique to it (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
-- Where each module's channel folder sits (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin: "in the channel folder the runner argument names"), and the poll interval of channel reading (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's channel is one file per run." Costs).
+- The runner argument's spelling, and how each run derives an event log file name unique to it (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+- Where each module's event log folder sits (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin: "in the event log folder the runner argument names"), and the poll interval of event log reading (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run." Costs).
 - The library's and plugin's artifact names, the Scala versions the library is published for, and how a build adds the plugin (R-023).
 - The layout of a run's block on its test run label (R-082 gives its content only).
 
@@ -72,11 +72,11 @@ The test command runs a JVM module in the processes Mill's fork grouping, test p
 Enables:
 
 - `SPECIFICATION.md` R-053 (fork grouping, test parallelism, test queue), R-071 (a run given no task), R-022, R-043, R-080 and R-082 (several runs on a label)
-- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (every run receives the same argument and derives its own channel), § Data flow (JVM bullet: drives Mill's test queue), § External systems (Mill: fork grouping, test parallelism, test queue)
+- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (every run receives the same argument and derives its own test event log), § Data flow (JVM bullet: drives Mill's test queue), § External systems (Mill: fork grouping, test parallelism, test queue)
 
 Settles:
 
-- How a JVM worker's piped stdout and stderr are tied to its run's channel (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "Each process's stdout and stderr", states the rule for Scala.js and Native only).
+- How a JVM worker's piped stdout and stderr are tied to its run's event log (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "Each process's stdout and stderr", states the rule for Scala.js and Native only).
 - The order of a label's run blocks and run records (R-079 orders labels and suites only).
 
 Risks:
@@ -147,7 +147,7 @@ Settles:
 Risks:
 
 - `decisions/test-command.md` "A release of the Mill plugin supports exactly the Mill releases its integration tests passed on, not a range." (Costs) and "On an unsupported Mill release, the test command runs and warns." (Costs: a linkage error below the built-against release)
-- `decisions/channel-contract.md` "Every release of the Mill plugin is a release of the fork." (Costs)
+- `decisions/event-log-contract.md` "Every release of the Mill plugin is a release of the fork." (Costs)
 - `research/mill-command-lifetime.md` § 7
 
 ## 7. `--halt-on-failure`
@@ -212,7 +212,7 @@ Risks:
 
 ## 10. Test output captured against nodes on the JVM
 
-Inside each JVM run, output that capture can tie to a suite, scope or test is captured against the narrowest such node, sent over the channel in its place among that node's events, and withheld from the process's stdout and stderr, so it appears once. Everything else still reaches the run through process capture. Builds on features 1 and 2.
+Inside each JVM run, output that capture can tie to a suite, scope or test is captured against the narrowest such node, written to the test event log in its place among that node's events, and withheld from the process's stdout and stderr, so it appears once. Everything else still reaches the run through process capture. Builds on features 1 and 2.
 
 Enables:
 
@@ -231,7 +231,7 @@ Risks:
 
 The test command runs Scala.js modules whose JS environment is `NodeJs`, and fails before any test starts on any JS environment other than `NodeJs` and `JsDom` (`JsDom` until feature 12 too):
 
-- core's structure wrapper, emitter and encoder on Scala.js; item 1 carries the VM's PID; the channel is a file per run written with Node's synchronous `fs`;
+- core's structure wrapper, emitter and encoder on Scala.js; item 1 carries the VM's PID; the test event log is a file per run written with Node's synchronous `fs`;
 - the plugin's Scala.js launcher (a C program in a job object on Windows, built by the plugin's Mill build and shipped in its jar; a `/bin/sh` script that `exec`s on Linux and macOS) swapped into `jsEnvConfig` in the plugin's own evaluation of the module's test task;
 - the launcher's header gives each VM's PID and start time, ending the run's stream on the VM's exit and tying its stdout and stderr files to the run; a VM that dies before any run exists in it is shown as R-076 states.
 
@@ -240,7 +240,7 @@ Builds on features 5 and 8.
 Enables:
 
 - `SPECIFICATION.md` R-059 (JS environment), § Scope (Scala.js Scala versions), and on Scala.js under `NodeJs`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-076, R-022, R-040, R-041 (the default reporter off), R-042, R-043 (order in the launcher's files), R-044, R-053, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Channel reading and Process capture from launchers' files), § APIs § The emitter and the Mill plugin (item 1 under `NodeJs`; file channel under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § Data flow (Scala.js and Native bullet: `jsEnvConfig`), § External systems (Scala.js test adapter; `destroyForcibly()`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files), § APIs § The emitter and the Mill plugin (item 1 under `NodeJs`; event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § Data flow (Scala.js and Native bullet: `jsEnvConfig`), § External systems (Scala.js test adapter; `destroyForcibly()`)
 
 Settles:
 
@@ -259,12 +259,12 @@ Risks:
 
 ## 12. Scala.js under `JsDom`
 
-The test command also runs Scala.js modules whose JS environment is `JsDom`. Each run writes its channel's items as framed lines with the window's `console.log`, each carrying the framing prefix, the test command's nonce from the runner argument and the run's own ID from item 1; channel reading takes them from the launcher's stdout file, and every other line is the process's ordinary output, captured against the run whose items the file holds. Builds on feature 11.
+The test command also runs Scala.js modules whose JS environment is `JsDom`. Each run writes its test event log's items as framed lines with the window's `console.log`, each carrying the framing prefix, the test command's nonce from the runner argument and the run's own ID from item 1; event log reading takes them from the launcher's stdout file, and every other line is the process's ordinary output, captured against the run whose items the file holds. Builds on feature 11.
 
 Enables:
 
 - `SPECIFICATION.md` R-059 (`JsDom` accepted), and under `JsDom`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-076, R-022, R-040, R-041 (the default reporter off), R-042, R-043 (order in the launcher's files), R-044, R-053, R-047
-- `ARCHITECTURE.md` § Modules § Mill plugin (Channel reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; item 1 under `JsDom`; framed lines; a pair tied to its run by its items), § External systems (`JsDom` window code has no `require` or `process`)
+- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; item 1 under `JsDom`; framed lines; a pair tied to its run by its items), § External systems (`JsDom` window code has no `require` or `process`)
 
 Settles:
 
@@ -272,14 +272,14 @@ Settles:
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's channel is framed lines…" (Costs: holds only while every item is one whole line)
+- `ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: holds only while every item is one whole line)
 - `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted items), § 11 (jsdom other than `27.4.0` not run)
 
 ## 13. Scala Native
 
 The test command runs Native modules:
 
-- core's structure wrapper, emitter and encoder on Native; item 1 carries the binary's PID and start time; the channel is a file per run written through `FileOutputStream`;
+- core's structure wrapper, emitter and encoder on Native; item 1 carries the binary's PID and start time; the test event log is a file per run written through `FileOutputStream`;
 - a Native launcher per module, compiled with the module's `nativeClang` with the launcher folder and real binary's path compiled in, swapped into `nativeLink`; it starts `<CROSSCOMPILING_EMULATOR words> <binary> <port>` and writes the binary's stdout and stderr to its own files, headed with the binary's PID and start time;
 - a binary that crashes fails the test command, though Mill's own task passes it.
 
@@ -288,7 +288,7 @@ Builds on features 8 and 11.
 Enables:
 
 - `SPECIFICATION.md` § Scope (Native Scala versions), and on Native: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-076, R-022, R-040, R-041 (the default reporter off), R-042, R-043 (order in the launcher's files), R-044, R-046, R-053, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in), § APIs § The emitter and the Mill plugin (item 1 on Native; file channel on Native; header and item 1 carrying the same PID and start time), § Data flow (Scala.js and Native bullet: `nativeLink`), § External systems (Native test adapter; `inheritIO()`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in), § APIs § The emitter and the Mill plugin (item 1 on Native; event log file on Native; header and item 1 carrying the same PID and start time), § Data flow (Scala.js and Native bullet: `nativeLink`), § External systems (Native test adapter; `inheritIO()`)
 
 Settles:
 
@@ -303,7 +303,7 @@ Risks:
 
 ## 14. Test output captured against nodes on Scala.js
 
-As feature 10, on Scala.js under `NodeJs` and `JsDom`: writes through `console` and, on Node, `process.stdout` and `process.stderr` are captured against the narrowest node they can be tied to and withheld from the VM's streams. Under `JsDom`, the channel's own framed lines are never captured. Builds on features 10 and 12.
+As feature 10, on Scala.js under `NodeJs` and `JsDom`: writes through `console` and, on Node, `process.stdout` and `process.stderr` are captured against the narrowest node they can be tied to and withheld from the VM's streams. Under `JsDom`, the test event log's own framed lines are never captured. Builds on features 10 and 12.
 
 Enables:
 

@@ -110,7 +110,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 2. Identity
 
-**Need.** No node holds another run's events (`ESR` R-022). A channel carries one run (`ESR` R-013), and the consolidation library's caller names its test run label (`ESR` R-052), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`STR` § Test structure, Durations and names).
+**Need.** No node holds another run's events (`ESR` R-022). A test event log carries one run (`ESR` R-013), and the consolidation library's caller names its test run label (`ESR` R-052), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`STR` § Test structure, Durations and names).
 
 **In memory and `toJson`.**
 
@@ -146,7 +146,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 - **Run outcome.** The JVM `Framework` sends `RunCompleted` in `done()` and forwards a fork's `RunAborted` and `RunStopped` (`TOOLS/Framework.scala` lines 794, 921–924, 941). Scala.js and Native send no run-level event (`EMC` § 5). **Provided** on the JVM; **absent** on Scala.js and Native.
 - **Reasons.** No event has a reason field; `ADR` § An aborted node may carry an explicit reason holds it in the structure, never in an `Event`. **Absent.**
 - **Throwable.** The event holds the `Throwable` itself. Of it, `toJson` keeps class, message and stack, which are **provided**, and drops the cause chain and suppressed exceptions, which are **lost** (`EMC` § 1.1). Also lost is a `StackDepthException`'s `failedCodeFilePathname`, which `TD` § Throwables needs as `filePath`.
-- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The baseline keeps neither (`RJ` R-004), and the channel does not carry the payload (`ESR` § Out of scope).
+- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The baseline keeps neither (`RJ` R-004), and the test event log does not carry the payload (`ESR` § Out of scope).
 
 ## 5. Duration
 
@@ -160,7 +160,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 6. Test output
 
-**Need.** The output a run captures is sent on its channel and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-010, R-012; `TD` § Nodes, `output`).
+**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-010, R-012; `TD` § Nodes, `output`).
 
 - No event type carries output (`EV/Event.scala`), and ScalaTest captures none (`EMC` § 4; the search was re-run for this note).
 - **Absent** on every runtime. Capture mechanisms per runtime: `JSN` § 4.

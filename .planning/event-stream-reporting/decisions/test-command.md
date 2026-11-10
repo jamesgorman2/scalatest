@@ -46,9 +46,9 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 - `ExoegoJsDomNodeJs` works only with jsdom before version 27, which `JsDom` has moved past.
 - `Phantom` works only if the module adds Jetty itself, and PhantomJS is no longer maintained.
 
-**Reasoning** `JsDom` runs the page in a Node process, and a run's channel and its captured stdout and stderr there all come from the launcher's files, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
+**Reasoning** `JsDom` runs the page in a Node process, and a run's test event log and its captured stdout and stderr there all come from the launcher's files, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
 
-**Costs** Test code in a `JsDom` window has no `require`, so a run's channel there shares the VM's stdout with test output and depends on framing (`../ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's channel is framed lines…"). Modules tested in any other JS environment, browsers included, get no consolidated output.
+**Costs** Test code in a `JsDom` window has no `require`, so a run's event log there shares the VM's stdout with test output and depends on framing (`../ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…"). Modules tested in any other JS environment, browsers included, get no consolidated output.
 
 **Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 
@@ -149,7 +149,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 ---
 
-## A selected test module that does not test with the release of this fork whose channels the Mill plugin reads, or runs on Scala.js in a JS environment the epic does not cover, fails the test command before any test starts.
+## A selected test module that does not test with the release of this fork whose test event logs the Mill plugin reads, or runs on Scala.js in a JS environment the epic does not cover, fails the test command before any test starts.
 
 **Alternatives**
 

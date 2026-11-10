@@ -80,6 +80,10 @@ _Avoid_: Aggregation, merging, report generation
 One run's events, test structure and the output it captures, in the order the run produced them, independent of how they are carried.
 _Avoid_: Event log, event feed
 
+**Test event log**:
+The written record of one run's event stream, as the run wrote it and before it is read back into an event stream. Shortened to "event log" where nothing else could be meant.
+_Avoid_: Channel, event stream, event file
+
 **Test run label**:
 A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
 _Avoid_: Module, module name, group, tag

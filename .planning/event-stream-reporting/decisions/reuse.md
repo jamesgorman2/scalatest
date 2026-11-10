@@ -21,7 +21,7 @@ Decisions behind `../SPECIFICATION.md` on what this epic takes from structured t
 
 **Alternatives** Designing the test structure and the JSON, human-readable and progress output afresh frees this epic from choices shaped by reporting inside one run, but the two epics' outcomes would then differ in ways their architectures do not force.
 
-**Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Keeping the reported behaviour the same leaves two kinds of difference to compare: the architecture (reporting inside each run, or in a plugin reading every run's channel) and the departures `../SPECIFICATION.md` states. Of what is reused, only the JSON layout, key names included, is designed in depth, so this epic takes it whole for suites and every node below them (`../SPECIFICATION.md` R-028).
+**Reasoning** The two epics are to be compared for ease of implementation, maintenance and appropriateness of outcome. Keeping the reported behaviour the same leaves two kinds of difference to compare: the architecture (reporting inside each run, or in a plugin reading every run's test event log) and the departures `../SPECIFICATION.md` states. Of what is reused, only the JSON layout, key names included, is designed in depth, so this epic takes it whole for suites and every node below them (`../SPECIFICATION.md` R-028).
 
 **Costs** A flaw found in the reused documents, which this plan may not edit, is carried here as a stated difference. Because each JSON node holds its final state, a tool that reads only the JSON cannot recover the order of events across nodes.
 

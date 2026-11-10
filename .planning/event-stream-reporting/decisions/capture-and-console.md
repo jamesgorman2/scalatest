@@ -106,12 +106,12 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 **Alternatives**
 
 - Streaming it to the console, as `../../structured-test-reporting/SPECIFICATION.md` § Test output does with output that is not test output, keeps the two epics alike, but it interleaves across runs, which is the problem this epic addresses.
-- Writing it to a file for each run keeps the consolidated output to what came over the channel, but separates a crash message from the run it explains.
+- Writing it to a file for each run keeps the consolidated output to what came in the test event log, but separates a crash message from the run it explains.
 - Discarding it loses the only account of some runs that did not complete.
 
 **Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's results are where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
-**Costs** This output arrives apart from the channel, so its place among the run's events is not kept (`../SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
+**Costs** This output arrives apart from the test event log, so its place among the run's events is not kept (`../SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
