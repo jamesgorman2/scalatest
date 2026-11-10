@@ -39,12 +39,14 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns.").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), and gives the library each run's event stream and its other inputs.
 - **Channel reading** — reads each run's channel live and decodes it with core's codec into that run's event stream. It reads every file in each module's channel folder and, under `JsDom`, the launchers' stdout files, and ends each stream as § APIs § The emitter and the Mill plugin describes.
-- **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-042). On Scala.js and Native it takes them from launchers, so that R-040, R-042 and R-073 hold there (`ARCHITECTURE-DECISIONS.md` "Every Scala.js VM starts through a launcher…" and "Every Native test binary starts through a launcher…").
+- **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-042). On Scala.js and Native it takes them from launchers' files, each tied to its run by its header (§ APIs § The emitter and the Mill plugin), so that R-040, R-042 and R-073 hold there (`ARCHITECTURE-DECISIONS.md` "Every Scala.js VM starts through a launcher…" and "Every Native test binary starts through a launcher…").
 - **Scala.js launcher** — starts every Scala.js VM, under `NodeJs` and `JsDom` alike, in place of the `executable` in the module's `jsEnvConfig`. It carries the module's launcher folder and the original `executable`, which it starts with the arguments and environment it receives: the config's `args` and `env`.
   - It writes the VM's stdout and stderr to its own pair of files in the module's launcher folder. The stdout file's first line is a header holding the VM's PID and a start time that matches `ProcessHandle`'s.
   - On Windows it is a small C program that runs the executable in a job object, so killing the launcher kills the VM. The plugin's own Mill build compiles it for x86-64 and ships it as a resource in the plugin jar; Windows on ARM64 runs it under emulation.
   - On POSIX (Linux and macOS) it is a `/bin/sh` script that `exec`s the executable, so the launcher becomes the VM. On Linux the header's start time comes from `/proc`. macOS has no `/proc`, so there the header carries the PID only, and the plugin takes the start time from `ProcessHandle` when it first reads the header.
-- **Native launcher** — stands in for every Native test binary. It carries the module's launcher folder and the real binary, starts `<CROSSCOMPILING_EMULATOR words> <binary> <port>` itself, and writes the binary's stdout and stderr to its own pair of files in that folder. It is compiled with the module's `nativeClang`, because an emulator such as `qemu-user` cannot load a script.
+- **Native launcher** — stands in for every Native test binary. It starts `<CROSSCOMPILING_EMULATOR words> <binary> <port>` itself, and writes the binary's stdout and stderr to its own pair of files in the module's launcher folder.
+  - It is compiled with the module's `nativeClang`, because an emulator such as `qemu-user` cannot load a script. The launcher folder and the real binary's path are compiled into it, not passed through the environment, so the binary's environment is unchanged (`SPECIFICATION.md` R-053).
+  - The stdout file's first line is a header holding the binary's PID and a start time that matches `ProcessHandle`'s.
 - The test command writes each module's launcher into its launcher folder once per command, and swaps it into the module's test task (§ Data flow).
 
 ## APIs
@@ -73,8 +75,11 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
     - A file never exists in the channel folder without its complete item 1.
   - **Under `JsDom`,** the channel is framed lines in the launcher's stdout file (`ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's channel is framed lines…"). The run writes each item as one line with the window's `console.log`, which jsdom forwards to Node's stdout.
     - A line is an item only if it carries the framing prefix and this test command's nonce, both given by the runner argument, and the run's ID from item 1. Every other line is ordinary output of the process (below).
-  - **The end of a run's event stream** is the exit of the run's process. The plugin watches the process with `ProcessHandle`, given its PID and start time. On the JVM and Native these come from item 1. On Scala.js they come from the launcher's header (§ Modules § Mill plugin), which under `NodeJs` the plugin matches to the run by item 1's PID. A PID counts as exited if it is already gone, has no start time, or its process's start time differs from the one given. After the exit the plugin reads the channel to its end, since the exit can be signalled before the reader has caught up (`ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits.").
-- **Each process's stdout and stderr** — carry everything the run's processes write that capture did not take against a node. The plugin captures them against the run. On Scala.js and Native they are the launcher's pair of files, without the header on Scala.js and without the channel's items under `JsDom`.
+  - **The end of a run's event stream** is the exit of the run's process. The plugin watches the process with `ProcessHandle`, given its PID and start time. On the JVM and Native these come from item 1. On Scala.js they come from the header of the run's launcher (§ Modules § Mill plugin; below). A PID counts as exited if it is already gone, has no start time, or its process's start time differs from the one given. After the exit the plugin reads the channel to its end, since the exit can be signalled before the reader has caught up (`ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits.").
+- **Each process's stdout and stderr** — carry everything the run's processes write that capture did not take against a node. The plugin captures them against the run. On Scala.js and Native they are the launcher's pair of files, without the header and, under `JsDom`, without the channel's items.
+  - A pair belongs to the run whose item 1 carries its header's PID, on Scala.js under `NodeJs` and on Native, and under `JsDom` to the run whose items its stdout file holds.
+  - A pair is complete once the process its header names has exited, so the output of a process that ends before any run exists in it is captured whole (`SPECIFICATION.md` R-076).
+  - On Native the header and item 1 carry the same PID and start time: the plugin ends the run's event stream by item 1's, and the pair by the header's.
 
 ### The Mill plugin and the consolidation library
 
@@ -122,12 +127,12 @@ flowchart LR
   CMD -- "writes (Scala.js, Native)" --> LCH["Launcher"]
   TASK -- "starts (JVM)" --> PROC
   TASK -- "starts (Scala.js, Native)" --> LCH -- starts --> PROC
-  LCH -- "header: PID, start time (Scala.js)" --> LF["Launcher's stdout and stderr files"]
+  LCH -- "header: PID, start time" --> LF["Launcher's stdout and stderr files"]
   ENC -- "the run's channel, a file on the JVM, NodeJs and Native" --> DEC
   ENC -- "the run's channel, framed lines on stdout (JsDom)" --> LF
   PROC -- "stdout and stderr (Scala.js, Native), less output captured against a node" --> LF
-  LF -- "header; items (JsDom)" --> DEC
-  LF -- "other lines" --> CAP
+  LF -- "header (Scala.js); items (JsDom)" --> DEC
+  LF -- "header; other lines" --> CAP
   PROC -.->|process exit| DEC
   PROC -- "stdout and stderr (JVM), less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
