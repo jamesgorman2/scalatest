@@ -2,23 +2,69 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## Every Native test binary starts through a launcher compiled with the module's toolchain, which writes the binary's stdout and stderr to files of its own.
+
+**Alternatives**
+
+- Leaving the binary on the stdio it inherits from Mill passes none of its output through Mill's JVM, so the output reaches the console or the Mill daemon's files, never the plugin.
+- A script launcher fails under `qemu-user`, which cannot load a script, wherever `CROSSCOMPILING_EMULATOR` names it.
+
+**Reasoning** With a launcher in the binary's place, nothing the binary wrote reached the console, on Windows and Linux, whether it was written from Scala, through C `stdio`, by a child process sharing the binary's stdio, or before `abort()`, and the plugin read it from the files, each stream in order. Mill's exit status, test results and adapter warnings matched Mill's own Native test task. A launcher compiled with the module's `nativeClang`, which starts `<emulator words> <binary> <port>` itself, did the same under `qemu-user`.
+
+**Costs** The test command compiles a launcher for every Native module it runs. The compiled launcher has run only on Linux, under `--no-daemon` and for the host's architecture, never on Windows or macOS.
+
+**Settled by**
+
+- [Does a wrapper executable deliver a Native run's stdout and stderr to the plugin and keep them off the console?](https://github.com/jamesgorman2/scalatest/issues/41).
+- [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
+
+**See**
+
+- `research/native-stdio-wrapper.md` § 2, § 3, § 4, § 5.
+- `research/js-native-channels.md` § 5.2.
+
+---
+
+## The plugin installs each launcher by replacing a task's value in its own evaluation of the module's test task: `jsEnvConfig`'s on Scala.js, `nativeLink`'s on Native.
+
+**Alternatives**
+
+- A plugin-built `TestAdapter` re-implements Mill's discovery and task loop, and puts adapter versions on the build's class path in place of the module's.
+- Overriding `jsEnvConfig` or `testTask` in the module changes the module's definition, against `SPECIFICATION.md` R-092.
+
+**Reasoning** Both are named tasks Mill evaluates for the plugin below the tasks the plugin evaluates itself, so the plugin can put its own value in their place while the module's definition stays unchanged (R-092). Mill's own test body then runs, with its results and JUnit XML: tests ran under the launcher in 112 of 112 Scala.js module runs, and on Native the exit status and JUnit XML test cases matched Mill's own task.
+
+**Costs** The swap relies on Mill's test task using each value only as `ARCHITECTURE.md` § External systems describes, so a Mill change there breaks it at run time, not compile time.
+
+**Settled by**
+
+- [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45).
+- [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
+
+**See**
+
+- `research/js-stdout-launcher.md` § 2.
+- `research/mill-test-without-module-trait.md` § 2.3, § 3.3, § 4, § 6.
+
+---
+
 ## Every Scala.js VM starts through a launcher the plugin supplies, which writes the VM's stdout and stderr to files of its own.
 
 **Alternatives**
 
 - Reading the VM's stdout and stderr through Mill's pipes lost 64 417 handed bytes on Linux when the adapter's `destroyForcibly()` closed the pipe, and would have meant narrowing `SPECIFICATION.md` R-073.
-- A plugin-built `TestAdapter` re-implements Mill's discovery and task loop, puts adapter versions on the build's class path in place of the module's, and gives Mill no results or JUnit XML.
 - A Node `--require` preload that sends `process.stdout` and `process.stderr` to files misses Node's fatal-error report, which bypasses `process.stderr`.
+- A `.cmd` or PowerShell launcher on Windows cannot hold the VM in a job object without compiled code, so a kill of it would orphan the VM, as a kill of the C launcher without one did.
 
-**Reasoning** Node writes to a file synchronously, so it queued nothing at any exit, no byte reached a launcher's file after the VM's exit, and every byte the VM had handed to the operating system was read, under `NodeJs` and `JsDom`, on Windows and Linux, whether the VM exited, died or was killed, and whether the reader kept up or paused. The launcher's header gives every VM's PID and start time, which `JsDom` window code cannot learn, and its start time matched `ProcessHandle`'s for 112 of 112 VMs. Swapping `jsEnvConfig`'s value only in the plugin's own evaluation of the module's test task leaves the module's definition unchanged (`SPECIFICATION.md` R-092) and Mill's own test body, results and JUnit XML in place.
+**Reasoning** Node writes to a file synchronously, so it queued nothing at any exit, no byte reached a launcher's file after the VM's exit, and every byte the VM had handed to the operating system was read, under `NodeJs` and `JsDom`, on Windows and Linux, whether the VM exited, died or was killed, and whether the reader kept up or paused. The launcher's header gives every VM's PID, which `JsDom` window code cannot learn, and on Windows and Linux its start time, which matched `ProcessHandle`'s for 112 of 112 VMs.
 
-**Costs** The plugin ships a Windows launcher binary, neither launcher has run on macOS, Windows start-up rises about 12 ms per VM, and without its job object a killed launcher would orphan the VM. The swap relies on `testFrameworkInstance` using `jsEnvConfig` only to build the JS environment, so a Mill change there breaks it at run time, not compile time.
+**Costs** The plugin ships a Windows launcher binary, which Windows on ARM64 runs under emulation, and Windows start-up rises about 12 ms per VM. The launcher has not run on macOS.
 
 **Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
 **See**
 
-- `research/js-stdout-launcher.md` § 2, § 3, § 5, § 7.
+- `research/js-stdout-launcher.md` § 2.3, § 3, § 5, § 7.
 - `research/jsdom-channel.md` § 4.
 
 ---
@@ -33,7 +79,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** jsdom forwards the window's `console.log` synchronously to Node's stdout, which the launcher sends to a file, so each item leaves the VM as it is written. Item 1 arrived for every run that died at its runner's construction, and no item was lost, corrupted or found among the other lines, including lines forged with the prefix and a wrong nonce. Items reached the plugin with a median delay of 5–6 ms.
 
-**Costs** The channel shares the VM's stdout with test output, so it holds only while every item is one whole framed line, and a `JsDom` run's item 1 carries no PID or start time.
+**Costs** The channel shares the VM's stdout with test output, so it holds only while every item is one whole framed line.
 
 **Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
@@ -79,7 +125,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - The exit of a Scala.js VM's launcher on Windows was signalled up to 16 ms before the VM's.
 - The run's own last line ends only a run that finishes.
 
-**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; on Scala.js the launcher's header gives both before the VM runs. The reader was still behind at the exit in 24 Scala.js runs, though no byte reached a file after it, so the plugin then reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
+**Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; on Scala.js they come from the launcher's header, written before the VM runs. The reader was still behind at the exit in 24 Scala.js runs, though no byte reached a file after it, so the plugin then reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
 
 **Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
 
@@ -128,7 +174,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** A Mill build meets the Scala version and testkit needs in `ARCHITECTURE.md` § Modules § Mill plugin the way every known Mill 1.x plugin does.
 
-**Costs** Two builds are kept in step, and a release must publish scalatest-core and the consolidation library before it builds the plugin.
+**Costs** Two builds are kept in step, and a release must publish scalatest-core and the consolidation library before it builds the plugin. The plugin's build also compiles the Windows Scala.js launcher, with a C toolchain that targets Windows, to ship in the plugin jar.
 
 **Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
 
@@ -151,7 +197,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A JVM system property works on the JVM only, and needs the module's `forkArgs`, which the plugin cannot change without a trait (`SPECIFICATION.md` R-092).
-- An environment variable set by the plugin's task-context fork is unverified to reach the Node VM or native binary the test adapters launch.
+- An environment variable set by the plugin's task-context fork cannot be read by `JsDom` window code, which has no `process`.
 
 **Reasoning** Framework arguments are the only route into `JsDom` window code (`research/js-environment-channels.md` § 2.2), and they reach the runner alike on every runtime.
 
