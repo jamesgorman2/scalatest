@@ -1,0 +1,403 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway. Answers "How does the human-readable output look?" (design-loop sub-issue). Open in a browser. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Human-readable layout prototype</title>
+<style>
+  :root { --accent: #2f6fdf; --fg: #1d1d1f; --muted: #666; --line: #ddd; }
+  body { font: 14px/1.45 system-ui, sans-serif; color: var(--fg); margin: 0; background: #fafafa; }
+  header, main { max-width: 1400px; margin: 0 auto; padding: 12px 20px; }
+  h1 { font-size: 20px; margin: 8px 0; }
+  p { margin: 6px 0; }
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+  .knobs fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 10px; padding: 6px 10px 8px; background: #fff; }
+  .knobs legend { font-weight: 600; padding: 0 4px; }
+  .knobs .why { color: var(--muted); font-size: 12px; margin: 0 0 4px; }
+  .knobs label { display: block; cursor: pointer; }
+  .knobs label.rec::after { content: " (chosen)"; color: var(--accent); font-size: 12px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .tabs button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+  .tabs button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .scenario { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
+  .scenario .watch { color: var(--muted); }
+  pre.term { background: #1e1e1e; color: #d4d4d4; padding: 12px 14px; border-radius: 6px; overflow-x: auto; font: 13px/1.4 Consolas, "Cascadia Mono", monospace; margin: 0; }
+  .c-green { color: #6ccf6c; } .c-red { color: #f06b6b; } .c-yellow { color: #e5c55b; } .c-cyan { color: #5fd0e0; } .c-dim { color: #808080; } .c-plain { }
+  .state { margin-top: 10px; }
+  .state summary { cursor: pointer; color: var(--muted); }
+  .state pre { background: #fff; border: 1px solid var(--line); padding: 8px; border-radius: 6px; font-size: 12px; max-height: 360px; overflow: auto; }
+  .choices { font: 12px Consolas, monospace; background: #fff; border: 1px solid var(--line); padding: 6px 8px; border-radius: 6px; margin-top: 8px; white-space: pre-wrap; }
+  .changed { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>How does the human-readable output look?</h1>
+  <p>Each scenario is the consolidated tree a set of fixed event streams gives for one test command (shown under <em>Input</em>). Every scope and test carries its name and its label, the text ScalaTest's formatter gives it in that suite style (control words such as <code>should</code>, <code>when</code>, <code>Scenario:</code>). Labels, failure messages and stack traces are taken from a real ScalaTest 3.2.19 run.</p>
+  <p>Indentation is one rule: every line sits 2 spaces in from the line it belongs to. A label's suites sit under it, a suite's scopes, tests and messages under the suite, a scope's children under the scope, and a test's failure, messages and stack trace under the test.</p>
+</header>
+<main>
+<div class="layout">
+  <form class="knobs" id="knobs"></form>
+  <div>
+    <div class="tabs" id="tabs"></div>
+    <div class="scenario" id="scenario"></div>
+    <pre class="term" id="out"></pre>
+    <div class="choices" id="choices"></div>
+    <details class="state"><summary>Input: the consolidated tree for this scenario</summary><pre id="input"></pre></details>
+  </div>
+</div>
+</main>
+
+<script>
+// ---------- Pure render module: no DOM. ----------
+// Every line is a { depth, segs } pair; depth * 2 spaces is its indentation.
+const Render = (() => {
+  const L = (depth, segs) => ({ depth, segs });
+  const S = (text, color) => ({ text, color });
+  const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+  function notRunNote(o) {
+    if (o.notRun === 'notrun') return { head: ' *** NOT RUN ***', color: 'red', body: null };
+    if (o.notRun === 'aborted') return { head: ' *** ABORTED ***', color: 'red', body: 'not run' };
+    return { head: ' !!! NOT RUN !!!', color: 'yellow', body: null };
+  }
+  const note = (o, reason) => reason === 'not run' ? notRunNote(o) : { head: ' *** ABORTED ***', color: 'red', body: null };
+
+  const isNotRun = n => n.outcome && n.outcome.reason === 'not run';
+  const allNotRun = n => (n.children || []).every(k => k.kind !== 'message' && isNotRun(k) && allNotRun(k));
+  const isCollapsed = n => n.outcome && n.outcome.kind === 'aborted' && allNotRun(n);
+
+  function countLine(node, o, depth, out) {
+    if (o.collapse !== 'count') return;
+    const c = { suite: 0, scope: 0, test: 0 };
+    (function walk(n) { for (const k of n.children || []) { if (c[k.kind] !== undefined) c[k.kind]++; walk(k); } })(node);
+    const parts = ['suite', 'scope', 'test'].filter(k => c[k]).map(k => plural(c[k], k));
+    if (parts.length) out.push(L(depth, [S('(' + parts.join(', ') + ' not run)', notRunNote(o).color)]));
+  }
+
+  // A throwable: its first line, then its frames 2 in.
+  function throwable(lines, depth, color, out) {
+    lines.forEach((ln, i) => out.push(L(i === 0 ? depth : depth + 1, [S(ln, color)])));
+  }
+
+  function message(m, depth, o, out) {
+    const color = m.type === 'alert' ? 'yellow' : 'green';
+    if (o.messages === 'tag') out.push(L(depth, [S('[' + m.type + '] ', 'dim'), S(m.text, color)]));
+    else out.push(L(depth, [S('+ ' + m.text, color)]));
+  }
+
+  function test(t, depth, o, out) {
+    const oc = t.outcome;
+    const line = (suffix, color) => out.push(L(depth, [S(t.label + suffix, color)]));
+    switch (oc.kind) {
+      case 'succeeded': line('', 'green'); break;
+      case 'failed': line(' *** FAILED ***', 'red'); throwable(oc.lines, depth + 1, 'red', out); break;
+      case 'ignored': line(' !!! IGNORED !!!', 'yellow'); break;
+      case 'pending': line(' (pending)', 'yellow'); break;
+      case 'canceled': line(' !!! CANCELED !!!', 'yellow'); throwable(oc.lines, depth + 1, 'yellow', out); break;
+      case 'aborted': {
+        const n = note(o, oc.reason);
+        line(n.head, n.color);
+        if (n.body) out.push(L(depth + 1, [S(n.body, n.color)]));
+        if (oc.lines) throwable(oc.lines, depth + 1, 'red', out);
+      }
+    }
+    for (const m of t.messages || []) message(m, depth + 1, o, out);
+  }
+
+  function scope(sc, depth, o, out) {
+    const oc = sc.outcome;
+    if (oc && oc.kind === 'aborted') {
+      const n = note(o, oc.reason);
+      out.push(L(depth, [S(sc.label, 'green'), S(n.head, n.color)]));
+      if (n.body) out.push(L(depth + 1, [S(n.body, n.color)]));
+      if (isCollapsed(sc)) { countLine(sc, o, depth + 1, out); return; }
+    } else if (oc && oc.kind === 'pending') {
+      out.push(L(depth, [S(sc.label + ' (pending)', 'yellow')])); return;
+    } else out.push(L(depth, [S(sc.label, 'green')]));
+    children(sc.children, depth + 1, o, out);
+  }
+
+  function children(kids, depth, o, out) {
+    for (const k of kids || []) {
+      if (k.kind === 'message') message(k, depth, o, out);
+      else if (k.kind === 'scope') scope(k, depth, o, out);
+      else if (k.kind === 'test') test(k, depth, o, out);
+      else if (k.kind === 'suite') suite(k, depth, o, out);
+    }
+  }
+
+  function suite(su, depth, o, out) {
+    const ownTests = (function own(n) { return (n.children || []).some(k => k.kind === 'test' || (k.kind === 'scope' && own(k))); })(su);
+    const nests = (su.children || []).some(k => k.kind === 'suite');
+    const oc = su.outcome;
+    const header = ownTests || !nests || o.parentLine === 'shown' || oc;
+    if (header) out.push(L(depth, [S(su.name + ':', 'green')]));
+    const inner = header ? depth + 1 : depth;
+    if (oc && (isCollapsed(su) || oc.reason === 'not run')) {
+      const n = note(o, oc.reason);
+      out.push(L(inner, [S(su.className + n.head, n.color)]));
+      if (n.body) out.push(L(inner + 1, [S(n.body, n.color)]));
+      if (oc.lines) throwable(oc.lines, inner + 1, 'red', out);
+      countLine(su, o, inner, out);
+      return;
+    }
+    children(su.children, inner, o, out);
+    if (oc) {
+      out.push(L(inner, [S(su.className + ' *** ABORTED ***', 'red')]));
+      throwable(oc.lines, inner + 1, 'red', out);
+    }
+  }
+
+  function block(run, depth, o, out) {
+    const lines = [];
+    const heading = o.blockHeading !== 'none';
+    const d = heading ? depth + 1 : depth;
+    if (heading) lines.push(L(depth, [S(o.blockHeading === 'output' ? 'Output outside any suite:' : 'Run:', 'cyan')]));
+    const ending = [];
+    if (run.ended === 'aborted') {
+      ending.push(L(d, [S('*** RUN ABORTED ***', 'red')]));
+      if (run.abort.message) ending.push(L(d + 1, [S(run.abort.message, 'red')]));
+      throwable(run.abort.lines, d + 1, 'red', ending);
+    } else if (run.ended === 'stopped') {
+      ending.push(o.stopped === 'red' ? L(d, [S('*** RUN STOPPED ***', 'red')]) : L(d, [S('Run stopped.', 'cyan')]));
+    }
+    if (o.blockOrder === 'end-first') lines.push(...ending);
+    for (const m of run.messages || []) message(m, d, o, lines);
+    const outLines = o.streamOrder === 'grouped' || o.streamMark === 'group'
+      ? [...run.output.filter(x => x.stream === 'stdout'), ...run.output.filter(x => x.stream === 'stderr')]
+      : run.output;
+    let group = null;
+    for (const x of outLines) {
+      const col = x.stream === 'stderr' && o.stderrColour === 'yellow' ? 'yellow' : 'plain';
+      if (o.streamMark === 'tag') lines.push(L(d, [S('[' + x.stream + '] ', 'dim'), S(x.text, col)]));
+      else if (o.streamMark === 'gutter') lines.push(L(d, [S((x.stream === 'stdout' ? 'out' : 'err') + ' | ', 'dim'), S(x.text, col)]));
+      else {
+        if (group !== x.stream) { lines.push(L(d, [S(x.stream + ':', 'cyan')])); group = x.stream; }
+        lines.push(L(d + 1, [S(x.text, col)]));
+      }
+    }
+    if (o.blockOrder !== 'end-first') lines.push(...ending);
+    out.push(...lines);
+  }
+
+  const needsBlock = r => r.output.length > 0 || (r.messages || []).length > 0 || r.ended !== 'completed';
+  const byName = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+
+  function render(scenario, o) {
+    const out = [];
+    let d = 0;
+    if (o.root === 'heading') { out.push(L(0, [S('Test results:', 'cyan')])); d = 1; }
+    for (const label of [...scenario.labels].sort(byName)) {
+      const text = o.label === 'bracket' ? '[' + label.name + ']' : o.label === 'colon' ? label.name + ':' : '── ' + label.name + ' ' + '─'.repeat(Math.max(4, 50 - label.name.length));
+      out.push(L(d, [S(text, 'cyan')]));
+      const blocks = () => { for (const r of label.runs) if (needsBlock(r)) block(r, d + 1, o, out); };
+      if (o.blockPlace === 'before') blocks();
+      for (const s of [...label.suites].sort(byName)) suite(s, d + 1, o, out);
+      if (o.blockPlace === 'after') blocks();
+    }
+    return out;
+  }
+  return { render };
+})();
+
+// ---------- Fixed scenarios. Labels, messages and traces are ScalaTest 3.2.19's. ----------
+const NR = { kind: 'aborted', reason: 'not run' };
+const ok = { kind: 'succeeded' };
+const T = (name, label, outcome, messages) => ({ kind: 'test', name, label, outcome, messages });
+const Sc = (name, label, children, outcome) => ({ kind: 'scope', name, label, children, outcome });
+const Su = (name, children, outcome) => ({ kind: 'suite', name, className: 'samples.' + name, children, outcome });
+const M = (type, text) => ({ kind: 'message', type, text });
+const tr = {
+  badState: ['java.lang.IllegalStateException: bad state',
+    'at samples.CalculatorSuite.$anonfun$new$3(Samples.scala:11)',
+    'at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)',
+    'at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)',
+    'at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)',
+    'at org.scalatest.Transformer.apply(Transformer.scala:22)',
+    'at org.scalatest.Transformer.apply(Transformer.scala:20)',
+    'at org.scalatest.funsuite.AnyFunSuiteLike$$anon$1.apply(AnyFunSuiteLike.scala:226)',
+    'at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)',
+    'at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)',
+    'at org.scalatest.funsuite.AnyFunSuite.withFixture(AnyFunSuite.scala:1564)', '...'],
+  dbDown: ['java.lang.RuntimeException: database unreachable',
+    'at samples.SetupFailsSpec.beforeAll(Samples.scala:36)',
+    'at org.scalatest.BeforeAndAfterAll.liftedTree1$1(BeforeAndAfterAll.scala:212)',
+    'at org.scalatest.BeforeAndAfterAll.run(BeforeAndAfterAll.scala:210)',
+    'at org.scalatest.BeforeAndAfterAll.run$(BeforeAndAfterAll.scala:208)',
+    'at samples.SetupFailsSpec.run(Samples.scala:35)', '...'],
+  oom: ['java.lang.OutOfMemoryError: Java heap space',
+    'at samples.StackFunSpec.$anonfun$new$5(Samples.scala:22)',
+    'at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)', '...'],
+};
+
+const calculator = Su('CalculatorSuite', [
+  T('adds two numbers', '- adds two numbers', ok),
+  T('divides by zero', '- divides by zero', { kind: 'failed', lines: ['2 did not equal 1 (Samples.scala:10)'] }),
+  T('throws unexpectedly', '- throws unexpectedly', { kind: 'failed', lines: tr.badState }),
+  T('rounds half up', '- rounds half up', { kind: 'ignored' }),
+  T('parses hex', '- parses hex', { kind: 'pending' }),
+  T('talks to the network', '- talks to the network', { kind: 'canceled', lines: ['no network (Samples.scala:14)'] }),
+]);
+const flat = Su('StackFlatSpec', [
+  Sc('A Stack', 'A Stack', [
+    T('should pop values in last-in-first-out order', '- should pop values in last-in-first-out order', ok),
+    T('should throw NoSuchElementException if an empty stack is popped', '- should throw NoSuchElementException if an empty stack is popped',
+      { kind: 'failed', lines: ['List() was empty, so it had no head (Styles.scala:13)'] }),
+    T('should grow without bound', '- should grow without bound', { kind: 'ignored' }) ]),
+  Sc('An empty Stack', 'An empty Stack', [
+    T('must have size 0', '- must have size 0', { kind: 'failed', lines: ['List() had size 0 instead of expected size 1 (Styles.scala:16)'] }, [M('info', 'checked')]) ]),
+]);
+const word = Su('SetWordSpec', [
+  Sc('A Set', 'A Set', [
+    Sc('empty', 'when empty', [
+      T('have size 0', '- should have size 0', ok),
+      T('produce NoSuchElementException when head is invoked', '- should produce NoSuchElementException when head is invoked', { kind: 'pending' }) ]),
+    Sc('non-empty', 'when non-empty', [
+      Sc('have a head', 'must have a head which', [ T('is its first element', '- is its first element', ok) ]) ]) ]),
+]);
+const feature = Su('ShopFeatureSpec', [
+  Sc('Checkout', 'Feature: Checkout', [
+    T('paying by card', 'Scenario: paying by card', ok, [M('info', 'Given a basket'), M('info', 'When the card is charged'), M('info', 'Then the order is placed')]),
+    T('paying by voucher', 'Scenario: paying by voucher', { kind: 'canceled', lines: ['voucher service down (Styles.scala:32)'] }) ]),
+]);
+const free = Su('MathFreeSpec', [
+  Sc('Addition', 'Addition', [ T('is commutative', '- is commutative', ok),
+    T('has identity 0', '- has identity 0', { kind: 'failed', lines: ['identity broke (Styles.scala:36)'] }) ]),
+]);
+const prop = Su('SqrtPropSpec', [ T('sqrt of a square is the root', '- sqrt of a square is the root', ok) ]);
+const funSpec = Su('StackFunSpec', [
+  Sc('A Stack', 'A Stack', [
+    M('info', 'an info in a scope'),
+    Sc('when empty', 'when empty', [
+      T('is empty', '- is empty', ok, [M('info', 'checked size'), M('note', 'a note'), M('alert', 'an alert'), M('markup', '*markup*')]),
+      T('throws on pop', '- throws on pop', { kind: 'failed', lines: ['expected NoSuchElementException (Samples.scala:22)'] }) ]),
+    Sc('when full', 'when full', [ T('pops last pushed', '- pops last pushed', ok) ]),
+    Sc('when shared', 'when shared', []) ]),
+]);
+const outer = Su('OuterSuites', [
+  Su('Inner1Suite', [ T('inner one', '- inner one', ok) ]),
+  Su('Inner2Suite', [ T('inner two', '- inner two', ok) ]),
+]);
+const repoScope = outcome => Sc('A repo', 'A repo', [ T('reads', '- should read', outcome), T('writes', '- should write', outcome) ], outcome);
+const setupFails = Su('SetupFailsSpec', [ repoScope(NR) ], { kind: 'aborted', lines: tr.dbDown });
+const setupNeverStarted = Su('SetupFailsSpec', [ repoScope(NR) ], NR);
+
+const scenarios = [
+  { id: 'typical', title: '1. A typical module',
+    text: 'One module, one run that completed, one suite of each style. Tests print to stdout and a library warns on stderr; in this feature all of it is captured against the run, so it lands in the run\'s block. SetupFailsSpec\'s beforeAll throws, so its scope and tests never start and collapse into it (R-107). OuterSuites only nests two suites.',
+    watch: 'Watch: labels with their control words, messages, the block, OuterSuites\' own line, the collapsed SetupFailsSpec.',
+    labels: [{ name: 'core.test', runs: [{ ended: 'completed', messages: [], output: [
+      { stream: 'stderr', text: 'SLF4J: No SLF4J providers were found.' },
+      { stream: 'stdout', text: 'dividing now' },
+      { stream: 'stderr', text: 'warn: about to divide' },
+      { stream: 'stdout', text: 'connecting to localhost:5432' } ] }],
+      suites: [calculator, flat, word, feature, free, prop, funSpec, outer, setupFails] }] },
+  { id: 'silent', title: '2. A silent run',
+    text: 'One module whose tests write nothing and whose run completed. No block (R-082, AC-001).',
+    watch: 'Watch: the output is just the label and its suites.',
+    labels: [{ name: 'core.test', runs: [{ ended: 'completed', messages: [], output: [] }], suites: [word, feature] }] },
+  { id: 'stopped', title: '3. A stopped run',
+    text: 'Fed to the library directly (Mill cannot stop a JVM run). The run stopped during StackFunSpec after "is empty". Each test it skipped and each suite it never started is aborted with reason not run (R-101). "when full", "when shared" and SetupFailsSpec collapse (R-107); "throws on pop" is a lone not-run test.',
+    watch: 'Watch: not run on a test, a scope and a suite; the counts; the stopped line.',
+    labels: [{ name: 'core.test', runs: [{ ended: 'stopped', messages: [], output: [ { stream: 'stdout', text: 'dividing now' } ] }],
+      suites: [calculator, setupNeverStarted, Su('StackFunSpec', [
+        Sc('A Stack', 'A Stack', [
+          M('info', 'an info in a scope'),
+          Sc('when empty', 'when empty', [ T('is empty', '- is empty', ok), T('throws on pop', '- throws on pop', NR) ]),
+          Sc('when full', 'when full', [ T('pops last pushed', '- pops last pushed', NR) ], NR),
+          Sc('when shared', 'when shared', [], NR) ]) ]) ] }] },
+  { id: 'aborted', title: '4. An aborted run, a suite aborted partway',
+    text: 'Fed to the library directly. "throws on pop" runs out of memory: StackFunSpec aborts with the scopes open at the time aborted (R-099), the test that was running aborted, and what never started not run. The run aborts too, and sent one message outside any suite.',
+    watch: 'Watch: the aborted scopes, a started-then-aborted test beside a not-run one, RUN ABORTED in the block.',
+    labels: [{ name: 'core.test', runs: [{ ended: 'aborted', messages: [M('info', 'Using random seed 1234')],
+      abort: { message: 'An exception or error caused a run to abort: Java heap space', lines: tr.oom },
+      output: [ { stream: 'stderr', text: 'OpenJDK 64-Bit Server VM warning: CodeCache is full.' } ] }],
+      suites: [calculator, Su('StackFunSpec', [
+        Sc('A Stack', 'A Stack', [
+          Sc('when empty', 'when empty', [ T('is empty', '- is empty', ok), T('throws on pop', '- throws on pop', { kind: 'aborted' }) ], { kind: 'aborted' }),
+          Sc('when full', 'when full', [ T('pops last pushed', '- pops last pushed', NR) ], NR) ], { kind: 'aborted' }) ],
+        { kind: 'aborted', lines: tr.oom }) ] }] },
+  { id: 'two', title: '5. Two modules (later feature)',
+    text: 'For judging the root and label lines only: two module selectors are a later feature (ROADMAP.md § 5).',
+    watch: 'Watch: whether the labels stand out from suite lines, and whether the root earns a line.',
+    labels: [
+      { name: 'core.test', runs: [{ ended: 'completed', messages: [], output: [ { stream: 'stdout', text: 'dividing now' } ] }], suites: [calculator] },
+      { name: 'api.test', runs: [{ ended: 'completed', messages: [], output: [] }], suites: [outer] } ] },
+];
+
+// ---------- Switches: one per layout question. First option is the current choice. ----------
+const knobs = [
+  { key: 'root', q: 'Consolidation root', why: 'R-078 makes it the root. Does it print a line?',
+    opts: [['none', 'No line; the output is its labels'], ['heading', 'A heading line, labels indented below']] },
+  { key: 'label', q: 'Test run label line (R-025)', why: 'Named for the module path.',
+    opts: [['bracket', '[core.test]'], ['colon', 'core.test:'], ['rule', '── core.test ─────']] },
+  { key: 'parentLine', q: 'A suite that only nests suites', why: '3.2.19 prints no line for it, so its nested suites would hang under nothing.',
+    opts: [['shown', 'Print its name line'], ['suppressed', 'As 3.2.19: no line']] },
+  { key: 'messages', q: 'Messages (info, note, alert, markup)', why: '3.2.19 prints "+ text" for each.',
+    opts: [['tag', '[info] text, like [stdout]'], ['plus', '+ text, as 3.2.19']] },
+  { key: 'blockPlace', q: 'Run block position (R-082)', why: 'Relative to the label\'s suites.',
+    opts: [['after', 'After the label\'s suites'], ['before', 'Before the label\'s suites']] },
+  { key: 'blockHeading', q: 'Run block heading', why: 'Must not name the run (R-082) or claim test or worker output (R-086).',
+    opts: [['output', '"Output outside any suite:"'], ['run', '"Run:"'], ['none', 'No heading']] },
+  { key: 'streamMark', q: 'Stream marking (R-012)', why: 'Each line shown with stdout or stderr.',
+    opts: [['tag', '[stdout] / [stderr] prefix'], ['gutter', 'out | / err | gutter'], ['group', 'stdout: and stderr: sub-headings']] },
+  { key: 'streamOrder', q: 'Order of stdout and stderr (R-043)', why: 'Order between the two streams is not guaranteed.',
+    opts: [['arrival', 'Interleaved, in the order read'], ['grouped', 'All stdout, then all stderr']] },
+  { key: 'stderrColour', q: 'Colour of stderr lines', why: 'Captured output has no 3.2.19 colour.',
+    opts: [['yellow', 'Yellow'], ['plain', 'Uncoloured, like stdout']] },
+  { key: 'blockOrder', q: 'Order inside the block', why: 'Messages, captured output, how the run ended.',
+    opts: [['end-last', 'Messages, output, then how it ended'], ['end-first', 'How it ended first']] },
+  { key: 'notRun', q: 'Not run (R-100, R-101)', why: '3.2.19 never prints it. Applies to tests, scopes and suites.',
+    opts: [['notrun', '*** NOT RUN ***'], ['aborted', '*** ABORTED *** then "not run"'], ['yellow', '!!! NOT RUN !!! (yellow)']] },
+  { key: 'collapse', q: 'Collapsed subtree root (R-107)', why: 'Shown as its root alone.',
+    opts: [['count', 'Plus a count of what never ran'], ['alone', 'Root\'s own lines only']] },
+  { key: 'stopped', q: 'A stopped run (R-082)', why: '3.2.19 says so only in its end-of-run summary, which R-045 drops.',
+    opts: [['red', '*** RUN STOPPED *** (red, like RUN ABORTED)'], ['cyan', 'Run stopped. (cyan)']] },
+  { key: 'prefix', q: 'Mill\'s line prefix', why: 'Task.log.streams.out prefixes each line, e.g. "1] " (emitter-plugin-spike.md § 8.1).',
+    opts: [['shown', 'Show it, as the console will'], ['hidden', 'Hide it, to read the layout alone']] },
+  { key: 'colour', q: 'Colour (R-124)', why: 'Coloured where Mill colours its own output.',
+    opts: [['on', 'On'], ['off', 'Off']] },
+];
+
+// ---------- Page ----------
+const state = { scenario: 'typical', opts: Object.fromEntries(knobs.map(k => [k.key, k.opts[0][0]])), changed: null };
+
+function buildKnobs() {
+  const f = document.getElementById('knobs');
+  for (const k of knobs) {
+    const fs = document.createElement('fieldset'); fs.id = 'k-' + k.key;
+    fs.innerHTML = '<legend>' + k.q + '</legend><p class="why">' + k.why + '</p>' +
+      k.opts.map(([v, t], i) => '<label class="' + (i === 0 ? 'rec' : '') + '"><input type="radio" name="' + k.key + '" value="' + v + '"' + (state.opts[k.key] === v ? ' checked' : '') + '> ' + t + '</label>').join('');
+    fs.addEventListener('change', e => { state.opts[k.key] = e.target.value; state.changed = k.key; draw(); });
+    f.appendChild(fs);
+  }
+}
+function buildTabs() {
+  const t = document.getElementById('tabs');
+  for (const s of scenarios) {
+    const b = document.createElement('button'); b.textContent = s.title; b.type = 'button';
+    b.onclick = () => { state.scenario = s.id; state.changed = null; draw(); };
+    b.dataset.id = s.id; t.appendChild(b);
+  }
+}
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function draw() {
+  const sc = scenarios.find(s => s.id === state.scenario);
+  const o = state.opts;
+  const colour = o.colour === 'on';
+  document.getElementById('out').innerHTML = Render.render(sc, o).map(l =>
+    (o.prefix === 'shown' ? '<span class="c-dim">1] </span>' : '') + '  '.repeat(l.depth) +
+    l.segs.map(s => colour ? '<span class="c-' + s.color + '">' + esc(s.text) + '</span>' : esc(s.text)).join('')).join('\n');
+  document.getElementById('scenario').innerHTML = '<p>' + esc(sc.text) + '</p><p class="watch">' + esc(sc.watch) + '</p>';
+  document.getElementById('input').textContent = JSON.stringify(sc.labels, null, 2);
+  document.getElementById('choices').textContent = 'Choices: ' + knobs.map(k => k.key + '=' + o[k.key]).join('  ');
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.id === state.scenario));
+  document.querySelectorAll('.knobs fieldset').forEach(f => f.classList.toggle('changed', f.id === 'k-' + state.changed));
+}
+buildKnobs(); buildTabs(); draw();
+</script>
+</body>
+</html>
