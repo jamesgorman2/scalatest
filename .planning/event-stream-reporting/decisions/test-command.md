@@ -6,14 +6,14 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives**
 
-- Passing the module's own arguments as Mill's task does lets a reporter the module configures print in each run, and its prints appear in the consolidated output as text repeating the events.
+- Passing the module's own arguments as Mill's task does lets a reporter the module configures print in each run, repeating the events as text in the consolidated output.
 - Withholding only `-o` and `-e` keeps reporters off the console, but still passes the module's other reporters, which write output of their own, and its JUnit and TestNG arguments.
 - A deny-list of every reporter, JUnit and TestNG argument still passes the arguments ScalaTest's `Framework` rejects (`-R`, `-s`, `-i`, `-q`, `-Q`, `-A`); the user named the arguments a run keeps instead.
 - Letting a module's own `-o` format the consolidated output formats one module apart from the rest, which has no meaning in output that consolidates every module.
 
 **Reasoning** Under the test command all console output goes through the plugin, so a reporter in a run only repeats what the event log already carries (`../SPECIFICATION.md` R-041, R-125).
 
-**Costs** Every argument `Framework` honours that the list does not name is withheld, so a module that configures an output of its own, such as a JUnit XML or HTML report with `-u` or `-h` or a file of failed and canceled tests with `-M`, gets none under the test command. The plugin must withhold each argument with its values by ScalaTest's own argument arities, since a flag that takes a value consumes the next argument whatever it is.
+**Costs** Every argument `Framework` honours that the list does not name is withheld, so a module that configures an output of its own, such as a JUnit XML or HTML report (`-u`, `-h`) or a file of failed and canceled tests (`-M`), gets none under the test command. The plugin must withhold each argument with its values by ScalaTest's own argument arities, since a flag that takes a value consumes the next argument whatever it is.
 
 **Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
 

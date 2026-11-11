@@ -12,7 +12,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 - `j` is covered by the `J` output letter.
 - `i`, `t`, `g` and `k` add an end-of-run reminder, and the consolidated output has none.
 
-**Reasoning** A character is kept only where its ScalaTest capital changes formatted output in a way that has meaning in output consolidating every module's tree (`../SPECIFICATION.md` R-127).
+**Reasoning** A character is kept only where its upper-case ScalaTest counterpart changes formatted output in a way that has meaning in output consolidating every module's tree (`../SPECIFICATION.md` R-127).
 
 **Costs** Suite and scope header lines cannot be hidden, and no reminder of failures closes the human-readable output.
 
@@ -22,11 +22,11 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ## Human-readable output on stdout is coloured where Mill colours its own console output.
 
-**Alternatives** Colouring always, as ScalaTest does under Mill's own test tasks, whose worker logger always reports ANSI codes as supported, ignores Mill's `--color` and `NO_COLOR`.
+**Alternatives** Colouring always, as ScalaTest does under Mill's own test tasks (whose worker logger always reports ANSI codes as supported), ignores Mill's `--color` and `NO_COLOR`.
 
 **Reasoning** Mill's own colour decision already weighs `--color`, an interactive console, `FORCE_COLOR`, `NO_COLOR` and BSP mode, so following it colours the test command's output exactly where Mill's output around it is coloured (`../SPECIFICATION.md` R-124).
 
-**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, so there the test command's output is uncoloured unless `--color true` is given, though ScalaTest under Mill's own test tasks colours its output there.
+**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, so there the test command's output is uncoloured unless `--color true` is given. ScalaTest under Mill's own test tasks does colour its output there.
 
 **Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
 
@@ -36,7 +36,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ## Short and full stack traces in the human-readable output leave out a `StackDepthException`'s stack trace, unlike ScalaTest's `S` and `F`.
 
-**Alternatives** Following ScalaTest's `S` and `F` adds a stack trace to every `StackDepthException`, such as a test assertion failure, which is noise to the reader, and needs the test event log to carry frames `../JSON-LAYOUT.md` § Throwables leaves out.
+**Alternatives** Following ScalaTest's `S` and `F` adds a noisy stack trace to every `StackDepthException`, such as a test assertion failure, and needs the test event log to carry frames `../JSON-LAYOUT.md` § Throwables leaves out.
 
 **Reasoning** A `StackDepthException`'s message already carries the file and line it was raised at (`../SPECIFICATION.md` R-128).
 

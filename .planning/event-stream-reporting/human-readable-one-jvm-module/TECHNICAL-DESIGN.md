@@ -2,7 +2,7 @@
 
 ## Summary
 
-The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM the emitter must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must also split a module's own ScalaTest arguments as ScalaTest's parser does, which that parser cannot do for it, and can read Mill's colour decision only through `private[mill]` API.
+The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM the emitter must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must also split a module's own ScalaTest arguments as ScalaTest's parser does, which that parser cannot do for it. It can read Mill's colour decision only through `private[mill]` API.
 
 ## Critical code paths
 
@@ -21,7 +21,7 @@ Item 1's start time must equal `ProcessHandle.of(pid).info().startInstant()` in 
 The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../SPECIFICATION.md` R-125 allows.
 
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
-- The split is core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core), a `private[scalatest]` unit in package `org.scalatest.tools` beside `ArgsParser`. It returns the arguments grouped by flag with their values, and returns an argument whose flag `parseArgs` does not recognise as a value rather than throwing. It shares `parseArgs`'s arities, or is tested against `parseArgs` over every flag.
+- The split is core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core), a `private[scalatest]` unit in package `org.scalatest.tools` beside `ArgsParser`. It returns the arguments grouped by flag with their values. Rather than throwing on an argument whose flag `parseArgs` does not recognise, it returns that argument as a value. It shares `parseArgs`'s arities, or is tested against `parseArgs` over every flag.
 - The plugin reaches the splitter through the consolidation library, which sits in package `org.scalatest`.
 - The test command keeps the groups whose flag R-125 allows. An unrecognised argument fails the test command before any test starts (`SPECIFICATION.md` § Scope).
 

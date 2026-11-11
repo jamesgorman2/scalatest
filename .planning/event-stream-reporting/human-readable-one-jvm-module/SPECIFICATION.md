@@ -28,7 +28,9 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout.
 - The test command's output arguments `-oH` and a bare `-o` (R-048). With no `-o`, stdout holds human-readable output only.
 - The test command fails before any test starts, producing no consolidated output, where:
-  - an `-o` holds an output letter other than `H` or any lowercase character, or an `-f` is given;
+  - an `-o` holds an output letter other than `H`;
+  - an `-o` holds any lowercase character;
+  - an `-f` is given;
   - the module's own ScalaTest arguments hold one whose flag ScalaTest's parser does not recognise. The failure names that argument.
 - The test command fails where:
   - it is given more than one module selector, or one that resolves to anything other than one JVM test module;

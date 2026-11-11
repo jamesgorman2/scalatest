@@ -28,7 +28,7 @@ Three deployable units.
 
 ### Consolidation library
 
-JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses core's `private[scalatest]` formatting of human-readable output and argument splitter, which is why it sits in core's package. The Mill plugin, outside that package, reaches the argument splitter only through the library (§ APIs § The Mill plugin and the consolidation library).
+JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses two `private[scalatest]` parts of core, its formatting of human-readable output and its argument splitter, which is why it sits in core's package. The Mill plugin, outside that package, reaches the argument splitter only through the library (§ APIs § The Mill plugin and the consolidation library).
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
 - **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064).
@@ -106,7 +106,9 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 
 - **Split a module's ScalaTest arguments**: returns them grouped by flag, each with its values, from core's argument splitter (§ Modules § ScalaTest core). The test command calls it before it starts the module's tests.
 - **Start** a consolidation, given:
-  - a sink for each output on stdout and in each file (`SPECIFICATION.md` R-048, R-049): one text sink for each, except progress output on stdout, which has one for whole lines on stdout and one for the summary rewritten in place on Mill's prompt (R-089, R-090);
+  - a sink for each output on stdout and in each file (`SPECIFICATION.md` R-048, R-049):
+    - progress output on stdout: one for whole lines on stdout and one for the summary rewritten in place on Mill's prompt (R-089, R-090);
+    - every other output: one text sink;
   - for each human-readable output, the formatting and filtering characters of the `-o` or `-f` that names it (R-127);
   - for human-readable output on stdout, whether Mill colours its own console output (R-124), which the plugin reads in Mill's JVM as `Task.log.prompt.colored` (`decisions/outputs.md` "Human-readable output on stdout is coloured where Mill colours its own console output.");
   - each module selector, with the test modules it resolved to;
@@ -122,7 +124,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 The test command runs each selected module's tests under a task context it supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."). It gives each run:
 
 - the module's own ScalaTest arguments that `SPECIFICATION.md` R-125 allows, found with the argument splitter;
-- the ScalaTest arguments corresponding to the test command's class globs and framework arguments, transcoded where a ScalaTest argument takes another form (R-053);
+- the test command's class globs and framework arguments as ScalaTest arguments, converted where ScalaTest takes them in another form (R-053);
 - the arguments it adds, the runner argument among them.
 
 It runs the tests:

@@ -105,7 +105,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### The outputs
 
-- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that the test command's stdout or a file holds (R-048, R-049). Each is a separate output, any combination can be on together, including progress output with JSON output, and one output may go to stdout and to files at once.
+- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that the test command's stdout or a file holds (R-048, R-049). Each is a separate output, and any combination can be on together, including progress output with JSON output. One output may go to stdout and to files at once.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
 - R-027 The human-readable and JSON output are written together, once every run's event stream has ended.
 
@@ -118,10 +118,10 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### Human-readable output
 
-- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as its formatting and filtering characters change it (R-127). Except that:
+- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as changed by its formatting and filtering characters (R-127), except that:
   - indentation is added where needed to show the nesting of test run labels and suites;
   - its root is the consolidation, with test run labels below it (R-078), and labels and top-level suites take the order R-079 gives (ascending lexicographic, by name).
-- R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as the ScalaTest 3.2.19 reporter configuration character of the same letter in upper case does:
+- R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.19 reporter configuration character:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.
 
@@ -234,7 +234,7 @@ These hold for every run a test command starts.
 
 ### Where the consolidated output goes
 
-- R-048 With no `-o` argument, the test command's stdout holds progress output and human-readable output. An `-o` names what stdout holds instead by its output letters, `H` for human-readable output and `P` for progress output. A bare `-o`, naming neither, leaves stdout without consolidated output.
+- R-048 With no `-o` argument, the test command's stdout holds progress output and human-readable output. Instead, an `-o` names what stdout holds by its output letters: `H` for human-readable output and `P` for progress output. A bare `-o`, naming neither, leaves stdout without consolidated output.
 - R-049 An `-f`, followed by an output letter and a path, writes that output to the file at that path: `J` JSON output, `H` human-readable output or `P` progress output. More than one `-f` may be given, and none changes what stdout holds (R-048).
 - R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
 
