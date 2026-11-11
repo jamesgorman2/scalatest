@@ -2,7 +2,7 @@
 
 ## Summary
 
-The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM the emitter must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must also split a module's own ScalaTest arguments as ScalaTest's parser does, and can read Mill's colour decision only through `private[mill]` API.
+The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM the emitter must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must also split a module's own ScalaTest arguments as ScalaTest's parser does, which that parser cannot do for it, and can read Mill's colour decision only through `private[mill]` API.
 
 ## Critical code paths
 
@@ -13,26 +13,31 @@ Item 1's start time must equal `ProcessHandle.of(pid).info().startInstant()` in 
 - The emitter reads both from `ProcessHandle.current()` by reflection. The read is in core's JVM sources only; Scala.js and Native are out of scope.
 - It looks each method up on the interfaces `java.lang.ProcessHandle` and `java.lang.ProcessHandle.Info`, never on the handle's runtime class, whose methods are not accessible (`research/jvm-pid-and-start-time.md` § 2).
 - `RuntimeMXBean.getStartTime()` is not a fallback: it records when the JVM finished initialising and never matched (`research/jvm-pid-and-start-time.md` § 3).
-- A runner given the runner argument fails at construction where the JVM has no `ProcessHandle` or `startInstant()` is empty. A run without a start time would be counted as exited at once (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream").
+- A runner given the runner argument fails at construction where the JVM has no `ProcessHandle` or `startInstant()` is empty (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream").
   - Mill 1.x supports user-defined modules down to Java 11 only, and its test worker's entry point is Java 11 bytecode in Mill 1.1.10 and 1.3.1 (`research/jvm-pid-and-start-time.md` § 1). No worker under the test command runs without `ProcessHandle`.
 
 ### A module's own ScalaTest arguments
 
-The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../SPECIFICATION.md` R-125 allows. A flag cannot be told from a value by its leading `-`, so the split follows the arities of `org.scalatest.tools.ArgsParser.parseArgs`:
+The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../SPECIFICATION.md` R-125 allows.
 
-- `-D` and `-P`, and a reporter's configuration characters, are joined to their flag (`-Dkey=value`, `-P4`, `-PC`, `-oD`): match on the prefix.
-- A flag that takes a value consumes the next argument whatever it is: in `-z -o`, `-o` is a test-name substring, passed with `-z`.
-- `-W` takes two values; `-k` and `-K` take up to two; `-h <dir>` may be followed by `-Y <css>`, which is withheld with it.
+- A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
+- The split is core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core), a `private[scalatest]` unit in package `org.scalatest.tools` beside `ArgsParser`. It returns the arguments grouped by flag with their values, and returns an argument whose flag `parseArgs` does not recognise as a value rather than throwing. It shares `parseArgs`'s arities, or is tested against `parseArgs` over every flag.
+- The plugin reaches the splitter through the consolidation library, which sits in package `org.scalatest`.
+- The test command keeps the groups whose flag R-125 allows. An unrecognised argument fails the test command before any test starts (`SPECIFICATION.md` § Scope).
 
-## Colour on stdout
+## Stdout
 
-- Mill passes the framework nothing about colour, and its worker's logger always reports ANSI as supported, so ScalaTest's own colour choice in a worker cannot serve `../SPECIFICATION.md` R-124. The decision is made in Mill's JVM, where the human-readable output is written.
-- Mill's colour decision reaches a task only as `Task.log.prompt.colored` (`core/api/daemon/src/mill/api/daemon/Logger.scala` at Mill tag `1.3.1`), which is `private[mill]`. The read belongs with the plugin's other Mill-internal API use, in classes the test command alone loads (`../ARCHITECTURE.md` § Modules § Mill plugin), and those classes must be in a package inside `mill` to compile (`../research/mill-runner-progress-without-trait.md` § 5.1).
-- Under ConPTY and MinTTY the value was `false`, where ScalaTest under Mill's own test tasks colours its output (`../research/mill-runner-progress-without-trait.md` § 5.3).
+- The test command writes human-readable output through `Task.log.streams.out`, whose lines reach stdout whole, with Mill's prefix (`../research/emitter-plugin-spike.md` § 8.1, § 8.2).
+- Colour is decided in Mill's JVM, not by ScalaTest in the worker (`../decisions/outputs.md` "Human-readable output on stdout is coloured where Mill colours its own console output.").
+- The test command reads Mill's decision from `Task.log.prompt.colored` (`core/api/daemon/src/mill/api/daemon/Logger.scala` at Mill tag `1.3.1`) and gives it to **Start** as the colour of human-readable output on stdout (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library).
+  - The member is `private[mill]`. The read belongs with the plugin's other Mill-internal API use, in classes the test command alone loads (`../ARCHITECTURE.md` § Modules § Mill plugin), and those classes must be in a package inside `mill` to compile (`../research/mill-runner-progress-without-trait.md` § 5.1).
+  - The value was `false` under ConPTY and MinTTY (`../research/mill-runner-progress-without-trait.md` § 5.2), so there human-readable output is uncoloured unless Mill is given `--color true`.
 
 ## The test event log on the JVM
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument beside the module's arguments that `../SPECIFICATION.md` R-125 passes. The argument carries the event log file's absolute path.
-- The file's fixed name must be one Mill does not use in a `processFolder` (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
-- The one worker's `processFolder` is the folder the test command owns for the module, outside the test command's task folder (`../SPECIFICATION.md` R-110), which each test command clears before any test starts.
 - Event log reading polls the file. 10 ms is the only interval tested (`../research/jvm-file-channel.md` § 2, § 8).
+
+## Testing
+
+Under Mill, a JVM `Framework` run ends completed unless its process dies. The aborted and stopped parts of `../SPECIFICATION.md` R-082, and R-101, are therefore tested by feeding event streams to the consolidation library directly.
