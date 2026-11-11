@@ -26,13 +26,16 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - A ScalaTest runner argument on the JVM that turns the emitter on, so the run writes its test event log to a file.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
 - The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to the console.
+- The test command's output arguments `-oH` and a bare `-o` (R-048). With no `-o`, stdout holds human-readable output only.
 - The Mill plugin is built against Mill 1.3.1, which is its one supported Mill release.
 
 ### Out of scope
 
 Each is left to the named feature of `../ROADMAP.md`.
 
-- JSON output (§ 2) and progress output (§ 9).
+- JSON output and `-fJ` (§ 2); progress output, `P` and `-fP` (§ 9).
+- The formatting and filtering characters (R-127, R-128), and `-f` for human-readable output (R-049) (§ 16).
+- A module that presets a test command's arguments (R-126) (§ 17).
 - More than one worker for a module, and a run given no task (R-071) (§ 3).
 - Class globs and framework arguments on the test command, and the module's JUnit XML report (§ 4).
 - More than one module selector, and a module selector that resolves to anything other than one JVM test module: the test command fails on these (§ 5).
@@ -49,13 +52,13 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 - R-001, R-002, R-051, R-003, R-060, R-004.
 - R-010, R-063, R-011, R-074.
-- R-096–R-107 and R-112, for human-readable output.
-- R-054; R-055 (one module selector; the argument that turns human-readable output off); R-053 (working directory and environment, for one worker); R-092, R-072.
-- R-020, R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086.
+- R-096–R-105, R-106 (with no formatting or filtering character), R-107 and R-112, for human-readable output.
+- R-054; R-055 (one module selector; whether stdout holds human-readable output); R-053 (second and third bullets, for one worker), R-125; R-092, R-072.
+- R-020 (human-readable output), R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
 - R-040, R-041, R-042, R-043, R-044, R-045.
 - R-046 (first bullet: a failure, aborted, stopped). The test command also fails where the worker dies and where the module tests with another framework or another release of this fork; what it then shows is out of scope.
-- R-048 (human-readable output), R-050.
+- R-048 (human-readable output on stdout), R-124 (coloured where Mill colours its own console output), R-129, R-050.
 - `../SPECIFICATION.md` § Scope: the JVM's Scala versions, and no compatibility promise on the test event log's format, the consolidation library's API or the switch.
 
 Under Mill, a JVM `Framework` run ends completed unless its process dies. The aborted and stopped parts of R-082 and R-046 are therefore tested by feeding event streams to the consolidation library directly.
