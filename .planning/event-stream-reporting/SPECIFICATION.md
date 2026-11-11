@@ -219,6 +219,7 @@ These hold for every run a test command starts.
 - R-040 Nothing the run writes to stdout or stderr reaches the console except through the consolidated output.
 - R-041 Neither the reporter ScalaTest uses when no reporter is configured, nor a reporter the test module's own ScalaTest arguments configure (R-125), prints the run's events. This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.19 sends).
 - R-042 Output captured from the stdout and stderr of the run's processes is captured against the run.
+- R-129 No line that Mill's test runner writes in the run's processes for a test class it runs, such as `Running Test Class <name>`, is captured. This overrides R-042 (output captured from the run's processes is captured against the run).
 - R-043 Output captured from the run's processes' stdout keeps its order, as does output captured from their stderr, whatever its source. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 
 ### Mill's and ScalaTest's own console output
@@ -230,12 +231,7 @@ These hold for every run a test command starts.
   - ScalaTest's end-of-run summary for the run.
 
   Mill's prompt may still show a line for the test command and for each task it runs, without that progress. A Mill test task named as another goal on the same `mill` command line shows its own progress.
-- R-045 For any run a test command starts, the consolidated output does not show:
-  - Mill's list of failed tests;
-  - ScalaTest's end-of-run summary;
-  - the line Mill's test runner writes for each test class it runs, such as `Running Test Class <name>`.
-
-  This overrides R-021 (every piece of a run's captured output is shown).
+- R-045 The consolidated output does not show Mill's list of failed tests or ScalaTest's end-of-run summary for any run a test command starts. This overrides R-021 (every piece of a run's captured output is shown).
 
 ### Where the consolidated output goes
 

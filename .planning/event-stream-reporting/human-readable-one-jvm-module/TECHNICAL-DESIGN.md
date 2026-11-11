@@ -27,9 +27,9 @@ The test command reads the module's arguments from Mill's `TestModule.testArgsDe
 
 ### Mill's per-class lines
 
-At `testLogLevel` `Debug`, Mill's default, the worker writes `Running Test Class <name>` to stderr for each class it runs (`../research/mill-worker-channels.md` § 1.6), which `../SPECIFICATION.md` R-045 keeps out of the consolidated output.
+At `testLogLevel` `Debug`, Mill's default, the worker writes `Running Test Class <name>` to stderr for each class it runs (`libs/javalib/src/mill/javalib/TestModule.scala` `testLogLevel` and `libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` `runClaimedTestClass`, at Mill tag `1.3.1`). `../SPECIFICATION.md` R-129 keeps the line out of captured output.
 
-- The test command passes the worker `testLogLevel` `Info`, or the module's own level where that is lower. Mill then never writes the line, so no captured line is matched by text, and a test's own identical line is kept.
+- The test command passes the worker the higher of `Info` and the module's own `testLogLevel`, so a module's `Warn` or `Error` is kept. Mill then never writes the line, so no captured line is matched by text, and a test's own identical line is kept.
 - Nothing else is lost: ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which R-041 already silences.
 - The log level is not among what R-053 holds the run to.
 - Cost: under the test command, Debug-level worker lines from a later Mill release are hidden even where the module sets `Debug`.

@@ -65,7 +65,7 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 - R-054; R-055 (one module selector; whether stdout holds human-readable output); R-053 (second and third bullets, for one worker), R-125; R-092, R-072.
 - R-020 (human-readable output), R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021, R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
-- R-040, R-041, R-042, R-043, R-044, R-045.
+- R-040, R-041, R-042, R-129, R-043, R-044, R-045.
 - R-046 (first bullet: a failure, aborted, stopped).
 - R-048 (human-readable output on stdout), R-124 (on stdout), R-050.
 - `../SPECIFICATION.md` § Scope: the JVM's Scala versions, and no compatibility promise on the test event log's format, the consolidation library's API or the switch.
@@ -75,10 +75,10 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 ```gherkin
 Feature: A run's block
 
-  Rule: Mill's per-class lines give a run no block (R-045, R-082)
-    Scenario: AC-001 Only Mill's per-class lines are captured against the run
-      Given a JVM test module whose suites write nothing outside a suite, scope or test, and whose run completes
+  Rule: Mill's per-class lines give a run no block (R-129, R-082)
+    Scenario: AC-001 A silent run at Mill's default test log level shows no block
+      Given a JVM test module at Mill's default `testLogLevel`, whose tests and suites write nothing to stdout or stderr and send no message outside a suite, and whose run completes
       When the test command runs the module
       Then the human-readable output shows no block for the run
-      And no line of the human-readable output reads `Running Test Class <name>`
+      And no line of the human-readable output reads "Running Test Class " followed by one of the module's test class names
 ```
