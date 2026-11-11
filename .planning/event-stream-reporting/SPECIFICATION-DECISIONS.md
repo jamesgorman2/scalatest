@@ -9,4 +9,4 @@ Decisions behind `SPECIFICATION.md`, split by topic, each part newest first.
 - [decisions/run-that-does-not-finish.md](decisions/run-that-does-not-finish.md) — what counts as a run, and what the output holds when a run's process dies or the test command is interrupted.
 - [decisions/runs-labels-and-selectors.md](decisions/runs-labels-and-selectors.md) — how runs, test run labels and module selectors appear in the consolidated output.
 - [decisions/event-log-contract.md](decisions/event-log-contract.md) — what a test event log carries, who may read it, which release ships the Mill plugin, and the consolidation library's API.
-- [decisions/outputs.md](decisions/outputs.md) — which outputs the consolidation produces, how its human-readable output is coloured, formatted and filtered, and what its JSON output holds.
+- [decisions/outputs.md](decisions/outputs.md) — which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, and what its JSON output holds.

@@ -1,6 +1,37 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted and filtered, and what its JSON output holds, newest first.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, and what its JSON output holds, newest first.
+
+## The human-readable output collapses a subtree only where one occurrence aborted every node in it, never where occurrences are merely equal.
+
+**Alternatives**
+
+- Equal class and message, with the cause chain, merges distinct failures that read alike, such as two `assert(x == 1)` failures reading "2 did not equal 1", and hides a real failure.
+- Equal class, message and full stack trace almost never matches failures with one source, because their test-body frames differ, so it acts as identity under a costlier rule.
+- Equal class, message and throw site (a `StackDepthException`'s failed code location, else the top frame) folds tests failing on one broken fixture, which collapsing was never meant to do, and is a heuristic to specify and test against each runtime's stack shapes.
+
+**Reasoning** Collapsing is for where a module or suite failed, not for tests that failed for the same reason (`../SPECIFICATION.md` R-107). An abort is the one occurrence that ends many nodes at once, so identity collapses exactly what it took down and keeps every separately thrown failure on its own line.
+
+**Costs** A suite whose 40 tests each fail on one broken fixture still prints 40 failures.
+
+**Settled by** [What does "share one error" mean for a collapsed subtree?](https://github.com/jamesgorman2/scalatest/issues/56).
+
+---
+
+## A subtree that one occurrence aborted collapses even inside a suite that partly ran.
+
+**Alternatives**
+
+- Collapsing a subtree only when nothing in it ran lists every *not run* descendant, at every depth, of a suite that aborted partway.
+- Hiding every *not run* descendant of an aborted suite loses which nodes did not run.
+
+**Reasoning** One line for each subtree that did not run identifies what was not run without listing every node beneath it (`../SPECIFICATION.md` R-107).
+
+**Costs** Siblings are never merged, so a flat suite that aborts early still prints one *not run* line for each remaining test.
+
+**Settled by** [What does "share one error" mean for a collapsed subtree?](https://github.com/jamesgorman2/scalatest/issues/56).
+
+---
 
 ## The human-readable output takes the formatting and filtering characters `d`, `s`, `f`, `w`, `v`, `c`, `x`, `e`, `o`, `m` and `r`, and no other of ScalaTest's.
 
