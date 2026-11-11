@@ -69,3 +69,16 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 - R-046 (first bullet: a failure, aborted, stopped).
 - R-048 (human-readable output on stdout), R-124 (on stdout), R-050.
 - `../SPECIFICATION.md` § Scope: the JVM's Scala versions, and no compatibility promise on the test event log's format, the consolidation library's API or the switch.
+
+## Acceptance criteria
+
+```gherkin
+Feature: A run's block
+
+  Rule: Mill's per-class lines give a run no block (R-045, R-082)
+    Scenario: AC-001 Only Mill's per-class lines are captured against the run
+      Given a JVM test module whose suites write nothing outside a suite, scope or test, and whose run completes
+      When the test command runs the module
+      Then the human-readable output shows no block for the run
+      And no line of the human-readable output reads `Running Test Class <name>`
+```

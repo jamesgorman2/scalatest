@@ -25,6 +25,15 @@ The test command reads the module's arguments from Mill's `TestModule.testArgsDe
 - The plugin reaches the splitter through the consolidation library, which sits in package `org.scalatest`.
 - The test command keeps the groups whose flag R-125 allows. An unrecognised argument fails the test command before any test starts (`SPECIFICATION.md` § Scope).
 
+### Mill's per-class lines
+
+At `testLogLevel` `Debug`, Mill's default, the worker writes `Running Test Class <name>` to stderr for each class it runs (`../research/mill-worker-channels.md` § 1.6), which `../SPECIFICATION.md` R-045 keeps out of the consolidated output.
+
+- The test command passes the worker `testLogLevel` `Info`, or the module's own level where that is lower. Mill then never writes the line, so no captured line is matched by text, and a test's own identical line is kept.
+- Nothing else is lost: ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which R-041 already silences.
+- The log level is not among what R-053 holds the run to.
+- Cost: under the test command, Debug-level worker lines from a later Mill release are hidden even where the module sets `Debug`.
+
 ## Stdout
 
 - The test command writes human-readable output through `Task.log.streams.out`, whose lines reach stdout whole, with Mill's prefix (`../research/emitter-plugin-spike.md` § 8.1, § 8.2).

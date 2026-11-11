@@ -230,7 +230,12 @@ These hold for every run a test command starts.
   - ScalaTest's end-of-run summary for the run.
 
   Mill's prompt may still show a line for the test command and for each task it runs, without that progress. A Mill test task named as another goal on the same `mill` command line shows its own progress.
-- R-045 The consolidated output does not show Mill's list of failed tests or ScalaTest's end-of-run summary for any run a test command starts. This overrides R-021 (every piece of a run's captured output is shown).
+- R-045 For any run a test command starts, the consolidated output does not show:
+  - Mill's list of failed tests;
+  - ScalaTest's end-of-run summary;
+  - the line Mill's test runner writes for each test class it runs, such as `Running Test Class <name>`.
+
+  This overrides R-021 (every piece of a run's captured output is shown).
 
 ### Where the consolidated output goes
 
