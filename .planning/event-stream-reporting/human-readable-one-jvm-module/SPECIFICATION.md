@@ -75,7 +75,7 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 ```gherkin
 Feature: A run's block
 
-  Rule: Mill's per-class lines give a run no block (R-129, R-082)
+  Rule: Mill's `Running Test Class` lines give a run no block (R-129, R-082)
     Scenario: AC-001 A silent run at Mill's default test log level shows no block
       Given a JVM test module at Mill's default `testLogLevel`, whose tests and suites write nothing to stdout or stderr and send no message outside a suite, and whose run completes
       When the test command runs the module
