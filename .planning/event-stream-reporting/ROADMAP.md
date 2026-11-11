@@ -143,7 +143,7 @@ Builds on features 2 and 3.
 
 Enables:
 
-- `SPECIFICATION.md` R-064, R-065, R-066, R-094, R-095, R-123, R-075, R-073, R-076, R-068, R-071 (a process that dies before its first task), R-082 (third bullet: did not finish), R-046 (does not finish; no run), R-115, R-069, R-116, R-117
+- `SPECIFICATION.md` R-064, R-065, R-066, R-094, R-095, R-123, R-075, R-107 (on a run that does not finish), R-073, R-076, R-068, R-071 (a process that dies before its first task), R-082 (third bullet: did not finish), R-046 (does not finish; no run), R-115, R-069, R-116, R-117
 - `ARCHITECTURE.md` § Modules § Consolidation library (Runs that do not finish), § Modules § Mill plugin (Test command: compiles each module's test manifest; Test manifest, on the JVM), § APIs § The emitter and the Mill plugin (a `processFolder` with no event log file is a worker in which no run existed), § APIs § The Mill plugin and the consolidation library (Add a run and Add a process that ended before any run existed in it: the test classes the process took; Add a test class), § Data flow (the module's test classes, on the JVM; failure path)
 
 Settles:

@@ -2,32 +2,33 @@
 
 Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, and what its JSON output holds, newest first.
 
-## The human-readable output collapses a subtree only where one occurrence aborted every node in it, never where occurrences are merely equal.
+## In the human-readable output only nodes that never started collapse into an ancestor, never a node that started, however much its failure reads like another's.
 
 **Alternatives**
 
 - Equal class and message, with the cause chain, merges distinct failures that read alike, such as two `assert(x == 1)` failures reading "2 did not equal 1", and hides a real failure.
-- Equal class, message and full stack trace almost never matches failures with one source, because their test-body frames differ, so it acts as identity under a costlier rule.
-- Equal class, message and throw site (a `StackDepthException`'s failed code location, else the top frame) folds tests failing on one broken fixture, which collapsing was never meant to do, and is a heuristic to specify and test against each runtime's stack shapes.
+- Equal class, message and full stack trace rarely matches even failures from one source, because their test-body frames differ, and hides a real failure where it does.
+- Equal class, message and throw site (a `StackDepthException`'s failed code location, else the top frame) folds tests failing on one broken fixture, which collapsing is not for.
+- Collapsing every node an abort reached into the collapsed root moves their messages and captured output onto the root in event order, overriding `../SPECIFICATION.md` R-075, R-012 and R-097.
 
-**Reasoning** Collapsing is for where a module or suite failed, not for tests that failed for the same reason (`../SPECIFICATION.md` R-107). An abort is the one occurrence that ends many nodes at once, so identity collapses exactly what it took down and keeps every separately thrown failure on its own line.
+**Reasoning** Collapsing is for the nodes a failed module or suite, a stopped run or `--halt-on-failure` kept from starting, not for tests that failed for the same reason. A node that never started has no failure, message or captured output of its own, so collapsing it hides only its name, while a node that started keeps its failure, messages and output where it produced them.
 
-**Costs** A suite whose 40 tests each fail on one broken fixture still prints 40 failures.
+**Costs** A suite whose 40 tests each fail on one broken fixture still prints 40 failures. A suite that aborts with a scope open before any test started shows two lines, the suite and the collapsed scope, and a process death mid-test shows the whole chain to that test.
 
 **Settled by** [What does "share one error" mean for a collapsed subtree?](https://github.com/jamesgorman2/scalatest/issues/56).
 
 ---
 
-## A subtree that one occurrence aborted collapses even inside a suite that partly ran.
+## A subtree whose nodes below its aborted root never started collapses even inside a suite that partly ran.
 
 **Alternatives**
 
-- Collapsing a subtree only when nothing in it ran lists every *not run* descendant, at every depth, of a suite that aborted partway.
+- Collapsing only a whole suite, and only when nothing in it ran, lists every *not run* node, at every depth, below a suite that aborted partway.
 - Hiding every *not run* descendant of an aborted suite loses which nodes did not run.
 
-**Reasoning** One line for each subtree that did not run identifies what was not run without listing every node beneath it (`../SPECIFICATION.md` R-107).
+**Reasoning** One line for each such subtree shows what did not run without listing every node beneath it.
 
-**Costs** Siblings are never merged, so a flat suite that aborts early still prints one *not run* line for each remaining test.
+**Costs** Inside a suite that partly ran, the human-readable output names a collapsed scope but not the tests in it; only the JSON output lists them.
 
 **Settled by** [What does "share one error" mean for a collapsed subtree?](https://github.com/jamesgorman2/scalatest/issues/56).
 
