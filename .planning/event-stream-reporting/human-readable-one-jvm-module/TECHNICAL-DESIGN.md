@@ -49,4 +49,4 @@ At `testLogLevel` `Debug`, Mill's default, the worker writes `Running Test Class
 
 ## Testing
 
-Under Mill, a JVM `Framework` run ends completed unless its process dies. The aborted and stopped parts of `../SPECIFICATION.md` R-082, and R-101, are therefore tested by feeding event streams to the consolidation library directly.
+Under Mill, a JVM `Framework` run ends completed unless its process dies. The aborted and stopped parts of `../SPECIFICATION.md` R-082, and R-101, are therefore tested by feeding event streams to the consolidation library directly. So is the interleaving of a run's captured stdout and stderr lines, since a test cannot fix the order in which the plugin reads two streams.
