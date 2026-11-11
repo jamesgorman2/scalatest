@@ -2,44 +2,6 @@
 
 Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then every worker, argument and module Mill runs, then supported Mill releases, then `--halt-on-failure`, then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
 
-## 1. Consolidated human-readable output for one JVM module
-
-A test command, given one module selector that resolves to one JVM test module, runs its tests in one worker and writes consolidated human-readable output to the console once the run's event stream ends:
-
-- core's structure wrapper, emitter and codec on the JVM: the runner argument turns the emitter on and the default reporter off; items 1–4 go to the run's event log file in the worker's `processFolder`, which for this one worker is the folder the test command owns for the module, item 1 before the runner's construction returns;
-- the Mill plugin, in its own Mill build with testkit integration tests: runs discovery without the runner argument, drives Mill's test queue, reads the test event log live, ends the stream on the worker's exit, and captures the worker's stdout and stderr against the run;
-- the consolidation library, published with no Mill dependency: assembly, one test run label, and the human-readable writer, including the run's block (R-082);
-- Mill's failed-test list, runner progress and ScalaTest's summary stay off the console; the test command fails when the run reports a failure, aborts or stops.
-
-Until later features, the test command runs one worker as Mill does with `testParallelism` off (feature 3), takes no class globs or framework arguments (feature 4), and fails on any other module selector (feature 5).
-
-Enables:
-
-- `SPECIFICATION.md` R-001, R-002, R-051, R-003, R-060, R-004, R-010, R-063, R-011, R-074, R-096–R-107 and R-112 (human-readable output), R-054, R-055 (one module selector; human-readable off), R-053 (working directory, environment, for one worker), R-092, R-072, R-020, R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086, R-023, R-113 (human-readable), R-025, R-040, R-041, R-042, R-043, R-044, R-045, R-046 (first bullet: failure, aborted, stopped), R-048 (human-readable), R-050; § Scope (JVM Scala versions; no compatibility promise on the test event log's format, the library's API or the switch)
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec, on the JVM), § Modules § Consolidation library (Assembly, Consolidation, Writers: human-readable), § Modules § Mill plugin (own Mill build, Scala 3 loading, testkit, `@experimental`/`@internal` API confined to classes the test command alone loads; Test command; Event log reading and Process capture on the JVM), § APIs § The emitter and the Mill plugin (runner argument; the run's test event log, items 1–4; the runner argument on the JVM: the absolute path of the file in the worker's `processFolder`; the event log file in the worker's `processFolder`; the module's folder cleared at the start of the test command; end of the event stream on the JVM; what counts as exited), § APIs § The Mill plugin and the consolidation library (Start, Add a run, End), § Data flow (JVM bullet; console through the test command's Mill logging), § External systems (Mill; Metals, Bloop and IntelliJ)
-
-Settles:
-
-- The test command's name and the spelling of the argument that turns human-readable output off (R-055 gives its effect only).
-- The runner argument's spelling, and the event log file's fixed name in a worker's `processFolder` (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin requires only a name Mill does not use).
-- The poll interval of event log reading (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run." Costs).
-- The library's and plugin's artifact names, the Scala versions the library is published for, and how a build adds the plugin (R-023).
-- The layout of a run's block on its test run label (R-082 gives its content only).
-
-Risks:
-
-- `ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…" (Costs: reflection, `@experimental` and `@internal` API, a copy of Mill's test-queue scheduling)
-- `ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: same machine; PID reuse)
-- `ARCHITECTURE-DECISIONS.md` "The Mill plugin is built by its own Mill build in this repo." and "The consolidation library builds on scalatest-core…" (Costs)
-- `ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run." (Costs: live reading tested only in a folder of the plugin's own, while Mill polls `claim.log` and `result.log` in a `processFolder` every 10 ms; `research/mill-worker-channels.md` § 3.1)
-- `ARCHITECTURE.md` § Modules § ScalaTest core, Emitter (a `-C` reporter opens too late for item 1; `research/jvm-file-channel.md` § 5)
-- `research/emission-gap-analysis.md` § Short answer, § 1, § 3, § 4 (what emission must add, and what `toJson` loses), § 11 (async suite event order; suites not built on `Engine`)
-- `research/mill-test-without-module-trait.md` § 2.4 (no `Task.dest`; Mill's filesystem checker)
-- `research/mill-worker-channels.md` § 6 (whether a worker spawned under `exclusiveSystemStreams` is piped under `--no-daemon`)
-- `research/emitter-plugin-spike.md` § 8 (raw writes break Mill's prefixed lines)
-- `research/jvm-file-channel.md` § 6 (a discovery file left open on Windows under the daemon), § 8 (discovery's subprocess failing after cleanup emptied an earlier folder; the test command clears each module's folder at the start of every test command)
-- `decisions/capture-and-console.md` "What a run's processes write to stdout and stderr is captured and shown with the run's results." (Costs: a configured reporter's prints appear as text)
-
 ## 2. Consolidated JSON output
 
 A test-command argument turns on JSON output, written once every event stream has ended to a file in the test command's task folder or at a path the argument gives. Builds on feature 1.
