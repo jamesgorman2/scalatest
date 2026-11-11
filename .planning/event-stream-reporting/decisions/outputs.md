@@ -1,6 +1,24 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured and formatted, and what its JSON output holds, newest first.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted and filtered, and what its JSON output holds, newest first.
+
+## The human-readable output takes the formatting and filtering characters `d`, `s`, `f`, `w`, `v`, `c`, `x`, `e`, `o`, `m` and `r`, and no other of ScalaTest's.
+
+**Alternatives**
+
+- `h` and `p`, after ScalaTest's `H` and `P`, would drop suite and scope header lines, which hold the tree together.
+- `n`, `l` and `q` would drop events that print nothing in formatted output.
+- `u`, unformatted output, has no tree.
+- `j` is covered by the `J` output letter.
+- `i`, `t`, `g` and `k` add an end-of-run reminder, and the consolidated output has none.
+
+**Reasoning** A character is kept only where its ScalaTest capital changes formatted output in a way that has meaning in output consolidating every module's tree (`../SPECIFICATION.md` R-127).
+
+**Costs** Suite and scope header lines cannot be hidden, and no reminder of failures closes the human-readable output.
+
+**Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
+
+---
 
 ## Human-readable output on stdout is coloured where Mill colours its own console output.
 
@@ -8,7 +26,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 **Reasoning** Mill's own colour decision already weighs `--color`, an interactive console, `FORCE_COLOR`, `NO_COLOR` and BSP mode, so following it colours the test command's output exactly where Mill's output around it is coloured (`../SPECIFICATION.md` R-124).
 
-**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, where ScalaTest under Mill's own test tasks colours its output.
+**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, so there the test command's output is uncoloured unless `--color true` is given, though ScalaTest under Mill's own test tasks colours its output there.
 
 **Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
 
@@ -16,13 +34,13 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ---
 
-## Short and full stack traces in the human-readable output leave out a test assertion failure's stack trace, unlike ScalaTest's `S` and `F`.
+## Short and full stack traces in the human-readable output leave out a `StackDepthException`'s stack trace, unlike ScalaTest's `S` and `F`.
 
-**Alternatives** Following ScalaTest's `S` and `F` adds a stack trace to every assertion failure, which is noise to the reader, and needs the test event log to carry frames `../JSON-LAYOUT.md` § Throwables leaves out.
+**Alternatives** Following ScalaTest's `S` and `F` adds a stack trace to every `StackDepthException`, such as a test assertion failure, which is noise to the reader, and needs the test event log to carry frames `../JSON-LAYOUT.md` § Throwables leaves out.
 
-**Reasoning** An assertion failure's message already carries the file and line it failed at. Leaving its trace out keeps the test event log to what `../JSON-LAYOUT.md` § Throwables records, which gives a `StackDepthException` a location and no stack trace (`../SPECIFICATION.md` R-128).
+**Reasoning** A `StackDepthException`'s message already carries the file and line it was raised at (`../SPECIFICATION.md` R-128).
 
-**Costs** `s` and `f` do not mean exactly what ScalaTest's `S` and `F` mean, and no output shows the frames beneath an assertion failure's file and line.
+**Costs** `s` and `f` do not mean exactly what ScalaTest's `S` and `F` mean, and no output shows the frames beneath a `StackDepthException`'s file and line.
 
 **Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
 

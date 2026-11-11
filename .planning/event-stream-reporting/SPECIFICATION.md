@@ -27,7 +27,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The test command's output arguments: progress and human-readable output on its stdout or in files, JSON output in files, any number of files, and formatting and filtering of human-readable output.
 - A module a build defines to preset a test command's arguments (R-126).
 
-All three cover runs on the JVM, Scala.js and Native, on these Scala versions: the JVM on Scala 2.11, 2.12, 2.13 and 3.3; Scala.js and Native on 2.12, 2.13 and 3.3. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
+The emitter, the consolidation library and the Mill plugin cover runs on the JVM, Scala.js and Native, on these Scala versions: the JVM on Scala 2.11, 2.12, 2.13 and 3.3; Scala.js and Native on 2.12, 2.13 and 3.3. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
 
 The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. Each lists the Mill releases its integration tests passed on, and supports exactly those (*supported Mill releases*).
 
@@ -114,19 +114,19 @@ Output is *captured against* a suite, scope or test when the means that captured
 - R-078 In the human-readable and JSON output, the consolidation is the root, one for each test command under Mill. Its children are its test run labels, and each label's children are the top-level suites of its runs. No run and no module selector is a node.
 - R-079 In the human-readable and JSON output, test run labels appear in ascending lexicographic order, as do the top-level suites under each label, by name.
 - R-083 A test run label has an outcome only where its module's tests did not run.
-- R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run, except the lines a filter hides in the human-readable output (R-127).
+- R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run.
 
 ### Human-readable output
 
-- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as its formatting and filtering characters change it (R-127). With no such character, it shows no durations, no stack trace for a `StackDepthException` and no end-of-run reminder. Except that:
+- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as its formatting and filtering characters change it (R-127). Except that:
   - indentation is added where needed to show the nesting of test run labels and suites;
   - its root is the consolidation, with test run labels below it (R-078), and labels and top-level suites take the order R-079 gives (ascending lexicographic, by name).
 - R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as the ScalaTest 3.2.19 reporter configuration character of the same letter in upper case does:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.
 
-  Each `-o` and `-f` formats only its own output, and its characters apply alike to every module of the test command. A `-f` naming JSON output takes none (R-121). Which of them apply to progress output is left to the feature that builds progress output.
-- R-128 `s` and `f` add no stack trace for a test assertion failure, that is a `TestFailedException` or any other `StackDepthException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.19).
+  Each `-o` and `-f` formats only its own output, and its characters apply alike to every module of the test command. A `-f` naming JSON output takes none (R-121). This overrides R-021, R-097 and R-012 in the human-readable output for the lines a filter hides.
+- R-128 `s` and `f` add no stack trace for a `StackDepthException`, such as a `TestFailedException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.19).
 - R-124 Human-readable output on the test command's stdout is coloured where Mill colours its own console output, and not where `w` is given. A file `-f` writes is never coloured. This overrides R-106 (the format ScalaTest 3.2.19 prints) for colour.
 - R-107 In the human-readable output, a subtree whose nodes all share one error is collapsed to its root. This overrides R-021 (every suite, scope and test is shown) and R-106 (each is shown as ScalaTest 3.2.19 prints it). The JSON output collapses nothing.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
@@ -184,7 +184,7 @@ Output is *captured against* a suite, scope or test when the means that captured
   - whether the test command's stdout holds progress output, human-readable output, both or neither (R-048);
   - one or more files, each holding JSON, progress or human-readable output (R-049);
   - formatting and filtering for that output (R-127).
-- R-126 A build can define a module that presets a test command's arguments, such as module selectors and tags, so that one short `mill` command runs that test command. A test module it selects still needs no change to its definition (R-092).
+- R-126 A build can define a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module runs that test command.
 
 ### Running the tests
 
@@ -193,8 +193,8 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the processes Mill's fork grouping, test parallelism and test queue start;
   - the same working directory and environment;
-  - ScalaTest arguments the test command derives from its own: it turns its arguments into the corresponding ScalaTest arguments, transcoding them where needed, and adds others, among them what turns the emitter on, with its test event log, and turns off the reporter ScalaTest uses when no reporter is configured. Of the module's own ScalaTest arguments, it passes only those R-125 allows.
-- R-125 Each run receives those of its test module's own ScalaTest arguments (Mill's `testArgsDefault`) whose flag is `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, each with its values, ahead of the arguments the test command adds. Every other argument of the module is withheld with its values, among them every reporter argument and the JUnit and TestNG arguments.
+  - the effect of the test command's class globs and framework arguments, though not necessarily as the same ScalaTest arguments: a run may receive them in another form, beside arguments the test command adds.
+- R-125 Each run receives those of its test module's own ScalaTest arguments (Mill's `testArgsDefault`) whose flag is `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, each with its values, ahead of the arguments the test command adds. Every other argument of the module is withheld with its values, among them every reporter argument and the JUnit and TestNG arguments. This overrides R-053 (the tests run as that Mill task runs them).
 - R-110 A path that Mill's `testOnly` or `testForked` puts inside its task folder is instead at the same relative path inside a folder the test command owns for that test module alone, outside the test command's own task folder. This overrides R-053 (the tests run as that Mill task runs them).
 - R-111 Environment variables that Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the `mill` command line that started the test command. This overrides R-053 (the same environment as that Mill task gives).
 - R-047 The test command writes each selected test module's JUnit XML report as the Mill task R-053 names (`testOnly`, or `testForked` when no class globs are given) writes it, at the path R-110 moves it to, in the folder the test command owns for that module.
@@ -217,7 +217,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 These hold for every run a test command starts.
 
 - R-040 Nothing the run writes to stdout or stderr reaches the console except through the consolidated output.
-- R-041 No ScalaTest reporter of the run prints its events: neither the reporter ScalaTest uses when no reporter is configured, nor one the test module's own ScalaTest arguments configure (R-125). This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.19 sends).
+- R-041 Neither the reporter ScalaTest uses when no reporter is configured, nor a reporter the test module's own ScalaTest arguments configure (R-125), prints the run's events. This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.19 sends).
 - R-042 Output captured from the stdout and stderr of the run's processes is captured against the run.
 - R-043 Output captured from the run's processes' stdout keeps its order, as does output captured from their stderr, whatever its source. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 
@@ -235,13 +235,16 @@ These hold for every run a test command starts.
 ### Where the consolidated output goes
 
 - R-048 With no `-o` argument, the test command's stdout holds progress output and human-readable output. An `-o` names what stdout holds instead by its output letters, `H` for human-readable output and `P` for progress output. A bare `-o`, naming neither, leaves stdout without consolidated output.
-- R-129 The test command writes no consolidated output to stderr.
-- R-090 On the console, progress output is written as whole lines, never as single characters. Whether or not progress output also shows a summary of the test command rewritten in place, the lines show every failure a run reports and each other cause of failure R-046 lists for the test command, including each run that aborts or does not finish.
-- R-089 Where Mill redraws its prompt in place (the status lines at the foot of the console), progress output also shows on the console a current summary of the test command, on one line rewritten in place.
-- R-091 Neither progress output's lines nor its summary erase Mill's console output, and Mill's console output erases neither.
-- R-049 An `-f`, followed by an output letter and a path, writes that output to the file at that path: `J` JSON output, `H` human-readable output or `P` progress output. More than one `-f` may be given, and none changes what stdout holds (R-048). Whether one `-f` may name more than one output letter is left to the feature that writes files.
-- R-085 JSON output is off unless an `-f` names it.
+- R-049 An `-f`, followed by an output letter and a path, writes that output to the file at that path: `J` JSON output, `H` human-readable output or `P` progress output. More than one `-f` may be given, and none changes what stdout holds (R-048).
 - R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
+
+#### Progress output on stdout
+
+WHERE the test command's stdout holds progress output (R-048):
+
+- R-090 Progress output on stdout is written as whole lines, never as single characters. Whether or not a summary is also shown (R-089), the lines show every failure a run reports and each other cause of failure R-046 lists for the test command, including each run that aborts or does not finish.
+- R-089 Where Mill redraws its prompt in place (the status lines at the foot of the console), progress output also shows a current summary of the test command on the test command's own line of Mill's prompt, rewritten in place.
+- R-091 Neither progress output's lines on stdout nor its summary on Mill's prompt erase Mill's own console output, and Mill's own console output erases neither.
 
 ## A run given no task
 

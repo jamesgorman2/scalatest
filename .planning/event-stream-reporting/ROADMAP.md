@@ -12,7 +12,7 @@ Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), i
 
 Enables:
 
-- `SPECIFICATION.md` R-028, R-121, R-122, R-096–R-105 and R-112 (JSON output), R-108, R-109, R-055 (a JSON file), R-080, R-081 (ScalaTest version; module selectors; Mill name and version), R-084, R-085, R-049 (`-fJ`), R-077, R-020, R-021, R-012 and R-086 (in JSON), R-113 (JSON)
+- `SPECIFICATION.md` R-028, R-121, R-122, R-096–R-105 and R-112 (JSON output), R-108, R-109, R-055 (a JSON file), R-080, R-081 (ScalaTest version; module selectors; Mill name and version), R-084, R-049 (`-fJ`), R-077, R-020, R-021, R-012 and R-086 (in JSON), R-113 (JSON)
 - `ARCHITECTURE.md` § Modules § Consolidation library (Writers: JSON), § APIs § The Mill plugin and the consolidation library (Start: a JSON file's sink; build tool name and version), § Data flow (each output a `-f` names: JSON)
 
 Settles:
@@ -55,7 +55,7 @@ The test command takes class globs and framework arguments as Mill's `testOnly` 
 Enables:
 
 - `SPECIFICATION.md` R-055 (class globs, framework arguments), R-053 (`testOnly` or `testForked`; class globs and framework arguments), R-110, R-111, R-047
-- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument among the arguments the test command adds to each run's)
+- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument among the arguments the test command adds to each run's), § Data flow (the ScalaTest arguments corresponding to the test command's class globs and framework arguments)
 
 Settles:
 
@@ -64,10 +64,9 @@ Settles:
 
 Risks:
 
-- `decisions/test-command.md` "A run receives only those of its module's own ScalaTest arguments on an allow-list…" (Costs: each argument withheld by ScalaTest's own argument parsing)
-
+- `decisions/test-command.md` "A run receives only those of its module's own ScalaTest arguments on an allow-list…" (Costs: what the list withholds, should it also govern the test command's own framework arguments)
 - `decisions/capture-and-console.md` "Under the test command, Mill's own console results for a module's tests are replaced by the consolidated output." (Costs: no report at Mill's usual path)
-- `ARCHITECTURE-DECISIONS.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible beside the user's framework arguments)
+- `ARCHITECTURE-DECISIONS.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible among the ScalaTest arguments each run receives)
 - `research/mill-test-without-module-trait.md` § 4 (R-053 compared on the JVM only)
 
 ## 5. Many modules in one test command
@@ -176,8 +175,8 @@ Enables:
 Settles:
 
 - The content of progress lines and of the summary (R-090 and R-089 fix what they show, not their form).
-- What a progress file holds (R-090 and R-089 cover the console only).
-- Which formatting and filtering characters apply to progress output (R-127 leaves it to this feature).
+- What a progress file holds (R-090 and R-089 cover stdout and Mill's prompt only).
+- Which formatting and filtering characters apply to progress output (R-127 names only the human-readable output).
 
 Risks:
 
@@ -318,20 +317,21 @@ The test command takes the formatting and filtering characters on `-o` and `-f` 
 
 Enables:
 
-- `SPECIFICATION.md` R-127, R-128, R-049 (`-fH`; more than one `-f`), R-055 (human-readable files; formatting and filtering), R-106 (as its characters change it), R-021 (lines a filter hides), R-124 (`w`; a file never coloured), R-020 (human-readable on stdout and in a file), R-077, R-059 and R-069 (a human-readable file), § Scope (the test command's output arguments)
-- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Start: a sink for each place an output goes, with that place's characters), § Data flow (each output a `-f` names: human-readable)
+- `SPECIFICATION.md` R-127, R-128, R-049 (`-fH`; more than one `-f`), R-055 (human-readable files; formatting and filtering), R-106 (as its characters change it), R-124 (`w`; a file never coloured), R-020 (human-readable on stdout and in a file), R-077, R-059 and R-069 (a human-readable file), § Scope (the test command's output arguments)
+- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Start: a sink for each output in a file; each human-readable output's characters), § Data flow (each output a `-f` names: human-readable)
 
 Settles:
 
-- Whether one `-f` may name more than one output letter (R-049 leaves it to the feature that writes files).
+- Whether one `-f` may name more than one output letter (R-049 does not say).
+- What the test command does with a lowercase character outside the set R-127 names.
 
 Risks:
 
-- `decisions/outputs.md` "Short and full stack traces in the human-readable output leave out a test assertion failure's stack trace, unlike ScalaTest's `S` and `F`." (Costs)
+- `decisions/outputs.md` "Short and full stack traces in the human-readable output leave out a `StackDepthException`'s stack trace, unlike ScalaTest's `S` and `F`." (Costs) and "The human-readable output takes the formatting and filtering characters…" (Costs)
 
 ## 17. A module that presets a test command's arguments
 
-A build defines a module that presets a test command's arguments, such as module selectors and tags, so that one short `mill` command, such as `mill tests/performance`, runs that test command (R-126). Builds on features 4 and 5.
+A build defines a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module, such as `mill tests/performance`, runs that test command (R-126). Builds on features 4 and 5.
 
 Enables:
 

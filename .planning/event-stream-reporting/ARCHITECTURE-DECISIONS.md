@@ -13,7 +13,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Costs** The manifest rests on Mill's `@internal` queue and claim layout; on Windows two workers' `claim.log` can record one class, so a class counts as reported if any run reported it. On Scala.js and Native the test command must learn the module's test classes itself, ahead of Mill's test task, which no prototype has tried.
 
-**Settled by** The user, in conversation on 2026-11-11, under no sub-issue of the plan. A review after the epic was broken into features flagged that a test process failing before it writes its test event log left no record of the suites it was to run. The user first asked for a manifest file written per fork, then chose this compiled record once the research showed that Mill's queue and claim files already hold it.
+**Settled by** The user, on 2026-11-11, under no sub-issue of the plan.
 
 **See**
 
@@ -227,7 +227,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** Framework arguments are the only route into `JsDom` window code (`research/js-environment-channels.md` § 2.2), and they reach the runner alike on every runtime.
 
-**Costs** The argument is visible beside the user's framework arguments, and Mill's own JVM test task passes it to Mill's discovery runner as well, so the plugin runs discovery itself (entry "The plugin runs a module's test discovery itself…").
+**Costs** The argument is visible among the ScalaTest arguments each run receives, and Mill's own JVM test task passes it to Mill's discovery runner as well, so the plugin runs discovery itself (entry "The plugin runs a module's test discovery itself…").
 
 **Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
 

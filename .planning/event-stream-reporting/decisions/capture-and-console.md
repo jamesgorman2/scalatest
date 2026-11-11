@@ -62,7 +62,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 - Holding only what Mill's stable API allows survives Mill releases, but its one route into a JVM worker's streams, a shim `testFramework`, takes only writes made through `System.out` and `System.err`, so JVM warnings, native code and child processes still write to the console.
 - Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 - Running Mill's JVM test runner under a plugin `TaskCtx` with Mill's own logger takes each worker's streams but still shows that runner's progress (R-044).
-- Passing the public `Logger.DummyLogger` as that `TaskCtx`'s `log` avoids `private[mill]` members but starts workers uncoloured where Mill's own task colours them (R-053).
+- Passing the public `Logger.DummyLogger` as that `TaskCtx`'s `log` keeps that runner's progress off the console, but still evaluates Mill's own JVM test task, which passes the runner argument to Mill's discovery runner (R-072; `../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…").
 
 **Reasoning** Without them the plugin adds a consolidated report beside the console output it was meant to replace. On the JVM with the module unchanged (R-092), the plugin drives Mill's test queue itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"), so none of Mill's code that draws the runner's progress runs (R-044).
 
@@ -113,9 +113,6 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Costs** This output arrives apart from the test event log, so its place among the run's events is not kept (`../SPECIFICATION.md` R-043).
 
-**Settled by**
-
-- [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
-- [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
+**Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
 ---

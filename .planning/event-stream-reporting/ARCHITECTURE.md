@@ -24,10 +24,11 @@ Three deployable units.
 - **Emitter** — when the runner argument is given, sends what § APIs § The emitter and the Mill plugin lists in the run's test event log.
   - It is not a `-C` reporter opened on `RunStarting`, which could not send item 1 in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
 - **Codec** — the one implementation of the event log's format. The encoder runs in every run with the emitter on; the decoder runs in the Mill plugin's event log reading, in Mill's JVM.
+- **Argument splitter** — in package `org.scalatest.tools`, beside `ArgsParser`: takes ScalaTest arguments and returns them grouped by flag, each with its values. It shares `ArgsParser.parseArgs`'s arities, or is tested against `parseArgs` over every flag, so that a flag's values are never read as flags. It runs in Mill's JVM (§ Data flow).
 
 ### Consolidation library
 
-JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses core's `private[scalatest]` formatting of human-readable output, which is why it sits in core's package.
+JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses core's `private[scalatest]` formatting of human-readable output and argument splitter, which is why it sits in core's package. The Mill plugin, outside that package, reaches the argument splitter only through the library (§ APIs § The Mill plugin and the consolidation library).
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
 - **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064).
@@ -103,10 +104,11 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 
 The Mill plugin is the library's only caller (`decisions/event-log-contract.md` "The consolidation library's API carries no compatibility promise…"). Its operations:
 
+- **Split a module's ScalaTest arguments**: returns them grouped by flag, each with its values, from core's argument splitter (§ Modules § ScalaTest core). The test command calls it before it starts the module's tests.
 - **Start** a consolidation, given:
-  - a sink for each place a consolidated output goes, stdout or a file (`SPECIFICATION.md` R-048, R-049), with that place's formatting and filtering characters (R-127):
-    - progress output on stdout: one for whole lines and one for a one-line summary rewritten in place (R-089, R-090);
-    - any other: one text sink;
+  - a sink for each output on stdout and in each file (`SPECIFICATION.md` R-048, R-049): one text sink for each, except progress output on stdout, which has one for whole lines on stdout and one for the summary rewritten in place on Mill's prompt (R-089, R-090);
+  - for each human-readable output, the formatting and filtering characters of the `-o` or `-f` that names it (R-127);
+  - for human-readable output on stdout, whether Mill colours its own console output (R-124), which the plugin reads in Mill's JVM as `Task.log.prompt.colored` (`decisions/outputs.md` "Human-readable output on stdout is coloured where Mill colours its own console output.");
   - each module selector, with the test modules it resolved to;
   - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
 - **Add a run**: its event stream, fed live as the test event log is decoded, with the test run label the caller names for it, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-042). Once the run's process has ended, the caller adds the test classes that process took, from the module's test manifest (§ Modules § Mill plugin).
@@ -117,7 +119,13 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 
 ## Data flow
 
-The test command runs each selected module's tests under a task context it supplies, giving each run the ScalaTest arguments `SPECIFICATION.md` R-053 and R-125 state, the runner argument among them (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."):
+The test command runs each selected module's tests under a task context it supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."). It gives each run:
+
+- the module's own ScalaTest arguments that `SPECIFICATION.md` R-125 allows, found with the argument splitter;
+- the ScalaTest arguments corresponding to the test command's class globs and framework arguments, transcoded where a ScalaTest argument takes another form (R-053);
+- the arguments it adds, the runner argument among them.
+
+It runs the tests:
 
 - on the JVM, it runs the module's test discovery itself without the runner argument, then drives Mill's test queue, starting each worker through Mill's test-runner subprocess call (`ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…");
 - on Scala.js and Native, it evaluates the module's own Mill test task. In that evaluation only, it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher (`ARCHITECTURE-DECISIONS.md` "The plugin installs each launcher by replacing a task's value…").
@@ -125,7 +133,7 @@ The test command runs each selected module's tests under a task context it suppl
 Before it starts any of a module's test processes, the test command holds the module's test classes, from which it later compiles the test manifest (§ Modules § Mill plugin):
 
 - on the JVM, as the queue it lays out for each fork group from its own discovery, which starts no test;
-- on Scala.js and Native, from test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4). How it learns them is left to the feature that implements each runtime (`ROADMAP.md` § 11, § 13); it is unproven, and if no way is found, `SPECIFICATION.md` R-066 and R-094 cannot hold on that runtime.
+- on Scala.js and Native, from test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
 
 All of this runs in one nested evaluation of the test command's own, with fail-fast off (`ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
 
