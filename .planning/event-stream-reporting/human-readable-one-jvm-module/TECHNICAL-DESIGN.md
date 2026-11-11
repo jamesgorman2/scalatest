@@ -2,7 +2,7 @@
 
 ## Summary
 
-The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM it must give the Mill plugin a PID and start time that match what Mill's JVM reads from `ProcessHandle`.
+The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM the emitter must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`.
 
 ## Critical code paths
 
@@ -13,7 +13,7 @@ Item 1's start time must equal `ProcessHandle.of(pid).info().startInstant()` in 
 - The emitter reads both from `ProcessHandle.current()` by reflection. The read is in core's JVM sources only; Scala.js and Native are out of scope.
 - It looks each method up on the interfaces `java.lang.ProcessHandle` and `java.lang.ProcessHandle.Info`, never on the handle's runtime class, whose methods are not accessible (`research/jvm-pid-and-start-time.md` § 2).
 - `RuntimeMXBean.getStartTime()` is not a fallback: it records when the JVM finished initialising and never matched (`research/jvm-pid-and-start-time.md` § 3).
-- A runner given the runner argument fails its construction where the JVM has no `ProcessHandle` or `startInstant()` is empty. A run without a start time would be counted as exited at once (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream").
+- A runner given the runner argument fails at construction where the JVM has no `ProcessHandle` or `startInstant()` is empty. A run without a start time would be counted as exited at once (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream").
   - Mill 1.x supports user-defined modules down to Java 11 only, and its test worker's entry point is Java 11 bytecode in Mill 1.1.10 and 1.3.1 (`research/jvm-pid-and-start-time.md` § 1). No worker under the test command runs without `ProcessHandle`.
 
 ## The test event log on the JVM

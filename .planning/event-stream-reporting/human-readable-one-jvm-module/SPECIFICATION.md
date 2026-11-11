@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-Nothing yet turns a run's events into consolidated output: ScalaTest has no emitter, there is no consolidation library, and Mill has no test command. This feature builds the thinnest whole path through all three, so that one JVM test module's tests, run in one worker, are shown as consolidated human-readable output on the console.
+Nothing yet turns a run's events into consolidated output: ScalaTest has no emitter, there is no consolidation library, and Mill has no test command. This feature builds the thinnest end-to-end path through all three, so that one JVM test module's tests, run in one worker, are shown as consolidated human-readable output on the console.
 
 ## Plan
 
@@ -23,7 +23,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 ## Scope
 
-- A ScalaTest runner argument, on the JVM, that turns the emitter on, so that the run writes its test event log to a file.
+- A ScalaTest runner argument on the JVM that turns the emitter on, so the run writes its test event log to a file.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
 - The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to the console.
 
@@ -44,7 +44,7 @@ Each is left to the named feature of `../ROADMAP.md`.
 
 ## Epic requirements met
 
-Each holds for one module selector, one JVM test module and one worker. A qualifier names the only part that holds.
+Each holds for one module selector, one JVM test module and one worker. Where a requirement carries a qualifier, only the part it names holds.
 
 - R-001, R-002, R-051, R-003, R-060, R-004.
 - R-010, R-063, R-011, R-074.
