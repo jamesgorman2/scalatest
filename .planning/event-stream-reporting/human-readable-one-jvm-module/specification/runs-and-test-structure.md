@@ -44,7 +44,7 @@ Feature: Outcomes
 
   Rule: No line shows an outcome rolled up from the nodes below it (R-098)
     Scenario: AC-067 A failed test leaves its scope, suite and label without a suffix
-      Given in suite `StackFunSpec`, scope `A Stack` holds test `- is empty`, which fails, and test `- pops`, which succeeds
+      Given in suite `StackFunSpec`, scope `A Stack` holds test `is empty`, which fails, and test `pops`, which succeeds
       When the test command runs the module
       Then the test run label's line is `[core.test]`, the suite's name line `StackFunSpec:` and the scope's line `A Stack`
       And the test's line is `- is empty *** FAILED ***`
@@ -70,7 +70,7 @@ Feature: Nodes that share a name
 
   Rule: Nodes that share a name are never merged (R-104)
     Scenario: AC-069 Two scopes share a name
-      Given suite `DupFunSpec`, an `AnyFunSpec` declaring two scopes named `A Stack`, the first holding test `- is empty` and the second test `- pops`, each succeeding
+      Given suite `DupFunSpec`, an `AnyFunSpec` declaring two scopes named `A Stack`, the first holding test `is empty` and the second test `pops`, each succeeding
       When the test command runs the module
       Then the lines for `DupFunSpec` are:
         """
@@ -125,9 +125,9 @@ Feature: Failures
   Rule: Every suite, scope, test and failure ScalaTest 3.2.19 prints is shown (R-021)
     Scenario: AC-073 The compatibility fixture
       Given the module's suites are the compatibility fixture
-      And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites, run through `Runner`
+      And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
-      Then each line of that file from its first suite's name line up to, but not including, the line that begins `Run completed in`, other than a line that begins `+ ` (a message), is a line of the human-readable output, compared with leading spaces removed
+      Then each line of that file from its first suite's name line, and before any line that begins `Run completed in`, other than a line that begins `+ ` (a message), is a line of the human-readable output, compared with leading spaces removed
       And each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the human-readable output
 ```
 
@@ -184,7 +184,7 @@ Feature: Output captured against the run
       And the module's `forkArgs` hold `-XX:+UseSerialGC -Xlog:gc:stdout`, so the worker's JVM writes a line of its own ending `Using Serial` to stdout
       When the test command runs the module
       Then the run's block holds `[stdout] dividing now` and a line `[stdout] <text>` whose text ends `Using Serial`
-      And no line of the block marks either line as test output or as worker output
+      And each of those two lines is `[stdout] ` followed by nothing but the line written
 
   Rule: Each stream's captured lines keep their order (R-043)
     Scenario: AC-075 Many lines on both streams
@@ -201,9 +201,9 @@ Feature: Runs that abort or stop
 
   Rule: An aborted run shows its aborted and not-run nodes, then `*** RUN ABORTED ***` last in its block (R-082, R-099, R-100)
     Scenario: AC-037 A test's fatal error aborts its suite and the run
-      Given a run, fed to the consolidation library directly, holding suite `StackFunSpec`, class `samples.StackFunSpec`, whose scope `A Stack` holds scope `when empty`, with tests `- is empty`, `- throws on pop` and `- has size 0`, and then scope `when full`, with test `- pops last pushed`
+      Given a run, fed to the consolidation library directly, holding suite `StackFunSpec`, class `samples.StackFunSpec`, whose scope `A Stack` holds scope `when empty`, with tests `is empty`, `throws on pop` and `has size 0`, and then scope `when full`, with test `pops last pushed`
       And the info message `Using random seed 1234` is attached to the run, and the run's captured stderr held `OpenJDK 64-Bit Server VM warning: CodeCache is full.`
-      And `- is empty` succeeded, then `- throws on pop` threw `OutOfMemoryError("Java heap space")`, which aborted `StackFunSpec` while `A Stack` and `when empty` were open and aborted the run with message `An exception or error caused a run to abort: Java heap space`
+      And `is empty` succeeded, then `throws on pop` threw `OutOfMemoryError("Java heap space")`, which aborted `StackFunSpec` while `A Stack` and `when empty` were open and aborted the run with message `An exception or error caused a run to abort: Java heap space`
       When the library writes human-readable output
       Then, with every stack frame left out, the human-readable output is:
         """
@@ -228,8 +228,8 @@ Feature: Runs that abort or stop
 
   Rule: A stopped run shows its not-run nodes, and `*** RUN STOPPED ***` in its block (R-082, R-101)
     Scenario: AC-038 A run stops between two nested suites
-      Given a run, fed to the consolidation library directly, holding suite `OuterSuites`, with no tests, nesting `Inner1Suite`, with test `- inner one`, and `Inner2Suite`, class `samples.Inner2Suite`, with test `- inner two`
-      And `- inner one` succeeded, then the run stopped before `Inner2Suite` started
+      Given a run, fed to the consolidation library directly, holding suite `OuterSuites`, with no tests, nesting `Inner1Suite`, with test `inner one`, and `Inner2Suite`, class `samples.Inner2Suite`, with test `inner two`
+      And `inner one` succeeded, then the run stopped before `Inner2Suite` started
       When the library writes human-readable output
       Then the human-readable output is:
         """

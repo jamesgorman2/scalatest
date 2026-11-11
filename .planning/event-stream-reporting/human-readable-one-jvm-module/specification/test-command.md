@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: the test command
 
-Acceptance criteria for the test command: its arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks beside it. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
+Acceptance criteria for the test command: its arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks and BSP server beside it. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
 
 ## Output arguments
 
@@ -20,7 +20,7 @@ Feature: The test command's output arguments
         | `-oH`     | the human-readable output AC-035 gives, and no other line the test command's own task writes |
         | `-o`      | no line of human-readable output, and no line holding `dividing now`                         |
 
-  Rule: An output argument this feature does not take fails the test command before any test starts, with no consolidated output
+  Rule: An output argument this feature does not take fails the test command before any test starts, with no consolidated output (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-077 <arguments>
       Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
       When the test command runs the module with <arguments>, which hold <what>
@@ -44,7 +44,7 @@ Feature: The test command's output arguments
 ```gherkin
 Feature: The module's own ScalaTest arguments
 
-  Rule: An argument whose flag ScalaTest's parser does not recognise fails the test command before any test starts, naming it (R-125)
+  Rule: An argument whose flag the runner R-125 names does not recognise fails the test command before any test starts, naming it (R-125)
     Scenario: AC-078 An unrecognised flag
       Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
       And the module's own ScalaTest arguments are `-l samples.Slow -y`
@@ -84,11 +84,12 @@ Feature: The module's own ScalaTest arguments
 ```gherkin
 Feature: Module selectors
 
-  Rule: The test command fails unless it is given one module selector that resolves to one JVM test module (R-055)
+  Rule: The test command fails unless it is given one module selector that resolves to one JVM test module (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-081 <selectors>
       Given the build's test modules are `core.test` and `util.test`, both JVM test modules, and `coreJS.test`, a Scala.js test module
       When the test command is given <selectors>, which are <what>
-      Then the test command fails
+      Then the test command fails before any test starts
+      And the console holds no line of human-readable output
 
       Examples:
         | selectors                   | what                                                |
@@ -112,11 +113,18 @@ Feature: Running the module
       Then the run's block holds `[stdout] env=from-forkEnv`
       And the `cwd=` line it holds is the one `testForked` wrote
 
-  Rule: The test command runs a module whose definition names nothing from the plugin (R-092)
-    Scenario: AC-083 The plugin is added to a build
-      Given a build without the plugin, whose module `core.test` holds suite `SqrtPropSpec` of `layout.md` AC-002
+  Rule: The test command runs a module whose definition names nothing from the plugin, on each of the JVM's Scala versions (R-092, `../../SPECIFICATION.md` § Scope)
+    Scenario Outline: AC-083 The plugin is added to a build on Scala <version>
+      Given a build without the plugin, whose module `core.test`, built with Scala <version>, holds suite `SqrtPropSpec` of `layout.md` AC-002
       When the plugin is added to the build, with no module's definition changed, and the test command runs the module
       Then the human-readable output is the one `layout.md` AC-002 gives
+
+      Examples:
+        | version |
+        | 2.11    |
+        | 2.12    |
+        | 2.13    |
+        | 3.3     |
 ```
 
 ## The test command's result
@@ -124,7 +132,7 @@ Feature: Running the module
 ```gherkin
 Feature: The test command's result
 
-  Rule: The test command fails where a run reports a failure, and not otherwise (R-046)
+  Rule: Of runs that complete, the test command fails where one reports a failure, and not otherwise (R-046)
     Scenario Outline: AC-084 <tests>
       Given suite `ResultSuite`, an `AnyFunSuite` in which <tests>
       When the test command runs the module
@@ -155,7 +163,7 @@ Feature: The test command's result
       Then the test command fails
       And no line on the console outside the human-readable output holds `must have size 0`
 
-  Rule: A module that tests with another framework, or with another release of this fork, fails the test command (§ Scope)
+  Rule: A module that tests with another framework, or with another release of this fork, fails the test command (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-087 <framework>
       Given the module tests with <framework>
       When the test command runs the module
@@ -211,10 +219,10 @@ Feature: What else reaches the console
       And the second test command succeeds
 ```
 
-## Mill's own test tasks
+## Mill's own test tasks and BSP server
 
 ```gherkin
-Feature: Mill's own test tasks
+Feature: Mill's own test tasks and BSP server
 
   Rule: In a build that adds the plugin, Mill's test tasks behave as they do without it, and produce no consolidated output (R-060, R-054)
     Scenario Outline: AC-092 `mill <task>`
@@ -232,4 +240,18 @@ Feature: Mill's own test tasks
         | `core.test.testCached`                       |
         | `core.test.testLocal`                        |
         | `__.test`                                    |
+
+  Rule: In a build that adds the plugin, Mill's BSP server answers an IDE's requests as it does without it (R-003)
+    Scenario Outline: AC-093 <request>
+      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, and suite `StackFlatSpec` of AC-086
+      When a BSP client connected to Mill's BSP server sends <request>, in a build that adds the plugin, and in the same build without it
+      Then the client receives the same response and notifications under both, apart from durations, timestamps and task IDs
+      And no notification under either holds `[core.test]` or `Output outside any suite:`
+
+      Examples:
+        | request                                          |
+        | `workspace/buildTargets`                         |
+        | `buildTarget/scalaTestClasses` for `core.test`   |
+        | `buildTarget/jvmTestEnvironment` for `core.test` |
+        | `buildTarget/test` for `core.test`               |
 ```

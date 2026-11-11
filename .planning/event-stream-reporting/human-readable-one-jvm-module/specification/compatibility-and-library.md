@@ -6,7 +6,7 @@ Acceptance criteria for what holds outside the test command: compatibility with 
 
 AC-056 and AC-057 hold with the compatibility fixture compiled for, and run on this fork's and 3.2.19's builds for, each of Scala 2.11, 2.12, 2.13 and 3.3.
 
-IntelliJ's *forked* mode is AC-056's `Runner.run` rows with the emitter off, its *BSP* mode, as Metals and Bloop launch runs, AC-056's `Framework` rows with the emitter off, and its *sbt shell* mode AC-057 (R-003).
+IntelliJ's *forked* mode is AC-056's `Runner.run` rows with the emitter off, its *BSP* mode, as Metals and Bloop launch runs, AC-056's `Framework` rows with the emitter off, and its *sbt shell* mode AC-057's row with the emitter off (R-003). In a build that adds the plugin, what an IDE asks of Mill's BSP server is [test-command.md](test-command.md) AC-093.
 
 ```gherkin
 Feature: Compatibility with ScalaTest 3.2.19
@@ -18,7 +18,7 @@ Feature: Compatibility with ScalaTest 3.2.19
   Rule: Reporters and the build tool receive what 3.2.19 sends them, with the emitter off or on (R-001, R-002, R-051, R-003)
     Scenario Outline: AC-056 <launch>, emitter <emitter>
       When each run is launched through <launch>, the fork's run given the runner argument only where the emitter is on
-      Then the events <receiver> receives on this fork are those it receives on 3.2.19, in the same sequence and with the same field values, apart from timestamps, durations and thread names
+      Then <receiver> receives on this fork what 3.2.19 sends it (`../../SPECIFICATION.md` § Constraints § Compatibility with ScalaTest 3.2.x)
 
       Examples:
         | launch                                                                           | emitter | receiver                         |
@@ -27,16 +27,20 @@ Feature: Compatibility with ScalaTest 3.2.19
         | `Framework`, its runner given no other argument                                  | off     | the test-interface event handler |
         | `Framework`, its runner given no other argument                                  | on      | the test-interface event handler |
 
-  Rule: The text ScalaTest prints for IntelliJ's sbt shell mode is 3.2.19's (R-001, R-003)
-    Scenario: AC-057 `-oDU` through `Framework`
-      When each run is launched through `Framework`, its runner given `-oDU` and not the runner argument
+  Rule: The text ScalaTest's standard-output reporter prints, as IntelliJ's sbt shell mode reads it, is 3.2.19's, with the emitter off or on (R-001, R-002, R-003)
+    Scenario Outline: AC-057 `-oDU` through `Framework`, emitter <emitter>
+      When each run is launched through `Framework`, its runner given `-oDU`, the fork's run given the runner argument only where the emitter is on
       Then the lines the runner's test-interface loggers receive on this fork are those they receive on 3.2.19, apart from the durations they show
+
+      Examples:
+        | emitter |
+        | off     |
+        | on      |
 
   Rule: The fork stays binary compatible with ScalaTest 3.2.x (R-004)
     Scenario: AC-058 MiMa against 3.2.19
       When MiMa checks each artifact this fork publishes that ScalaTest 3.2.19 also publishes against 3.2.19's
       Then it reports no binary incompatibility
-      And this feature adds no MiMa problem filter
 ```
 
 ## The test event log

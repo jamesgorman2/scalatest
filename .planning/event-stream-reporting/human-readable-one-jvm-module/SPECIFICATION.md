@@ -14,7 +14,7 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 
 - [specification/layout.md](specification/layout.md) — acceptance criteria for the human-readable output's layout: its tree, where each line sits, each line's text and colour, messages, collapsed subtrees, and Mill's prefix.
 - [specification/runs-and-test-structure.md](specification/runs-and-test-structure.md) — acceptance criteria for which suites, scopes, tests, failures and captured output the human-readable output shows, in what order, and a run's block.
-- [specification/test-command.md](specification/test-command.md) — acceptance criteria for the test command's arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks.
+- [specification/test-command.md](specification/test-command.md) — acceptance criteria for the test command's arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks and BSP server.
 - [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.19, the test event log a run writes, and the consolidation library without Mill.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against. `R-nnn` IDs in this specification are the epic's.
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts, their parts (§ Modules), and the boundaries between them.
@@ -31,8 +31,9 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
 - The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
+- Unlike R-048, R-049 and R-055 allow, the test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module.
 - The test command supports Mill 1.3.1 only.
-- Unlike R-059 requires, a module that tests with another framework or another release of this fork fails the test command without the failure coming before any test starts or naming the module, and consolidated output may still be written.
+- A module that tests with another framework or another release of this fork fails the test command. Unlike R-059, the failure need not come before any test starts or name the module, and consolidated output may still be written.
 
 ### Out of scope
 

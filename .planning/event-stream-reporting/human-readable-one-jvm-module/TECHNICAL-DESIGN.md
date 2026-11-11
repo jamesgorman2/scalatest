@@ -2,7 +2,7 @@
 
 ## Summary
 
-The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer), yet on the JVM it must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must split a module's own ScalaTest arguments as ScalaTest's parser does, which that parser cannot do for it, turn a worker's stdout and stderr, which arrive as byte chunks, into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting, which reads a live `Throwable` that the decoded event stream cannot rebuild and returns lines already indented and coloured, without changing what `StringReporter` prints.
+The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer), yet on the JVM it must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it, turn a worker's stdout and stderr, which arrive as byte chunks, into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting, which reads a live `Throwable` that the decoded event stream cannot rebuild and returns lines already indented and coloured, without changing what `StringReporter` prints.
 
 ## Critical code paths
 
@@ -42,7 +42,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 - The test command makes Mill's test-runner subprocess call with `os.Inherit.out` and `os.Inherit.err` each set to an `os.ProcessOutput.ReadBytes`. os-lib then reads each pipe on its own thread, in chunks that ignore line ends (`../research/mill-worker-channels.md` § 1.2, § 2.3; `../research/mill-parallel-worker-capture.md` § 4).
   - Not `os.ProcessOutput.Readlines`: it decodes with the default charset of Mill's JVM and ends a line at a lone `\r`.
 - Each stream has its own line splitter, fed only by that stream's reader thread. It holds bytes up to a `\n` byte, drops one `\r` directly before it, decodes the held bytes, and appends the line, tagged with its stream, to the run's one sequence under a lock.
-  - A `\n` byte is never part of a multi-byte character in UTF-8 or in any single-byte charset, so splitting before decoding never cuts a character.
+  - Splitting before decoding never cuts a character in an ASCII-compatible charset whose multi-byte sequences never hold byte `0x0A`. That covers every encoding `native.encoding` names, among them UTF-8, the single-byte charsets, MS932, GBK, MS949 and Big5.
   - A lone `\r` stays in the line's text.
   - Lines of the two streams enter the sequence in the order their splitters completed them. `../SPECIFICATION.md` R-043 asks no more.
 - When its stream ends, a splitter appends the line it still holds, if it holds any bytes. Mill's call returns only once both reader threads have finished (`../research/mill-worker-channels.md` § 2.3), so the sequence is complete before the test command adds the test classes the worker took.
@@ -51,32 +51,30 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 
 ### A message among its node's children
 
-`specification/layout.md` AC-034 places a scope's message among the scope's children, which otherwise appear in declared order (`../SPECIFICATION.md` R-105).
+This serves `specification/layout.md` AC-034.
 
 - Assembly records, with each message attached to a suite or scope, which of that node's children had sent their first event when the message arrived.
-- The human-readable writer puts the message after the last of those children in declared order and before the next, as `../SPECIFICATION.md` R-109 places it in JSON output. Messages placed between the same two children keep the order they arrived in.
+- The human-readable writer puts the message after the last of those children in declared order and before the next. A child declared before that one but not yet reached, as under concurrent tests, therefore also comes before the message. Messages placed between the same two children keep the order they arrived in.
 
 ### The human-readable writer's reuse of `StringReporter`'s formatting
 
 The `org.scalatest.tools.StringReporter` companion builds each line from a live `Throwable` (`getClass.getName`, `isInstanceOf[StackDepth]`, `isInstanceOf[PropertyCheckFailedException]`, `getCause`, `getStackTrace`), and returns whole lines, indented and in one colour.
 
-- Its line-building takes a throwable view in place of a `Throwable`: the error lines (`stringsToPrintOnError`, its nested `getStackTrace`, and `withPossibleLineNumber`), the no-error lines (`stringToPrintWhenNoError`), and the text of info, alert, note and markup messages. The functions stay in the companion, which is already `private[scalatest]`.
+- Its line-building takes a throwable view in place of a `Throwable`: the error lines (`stringsToPrintOnError`, its nested `getStackTrace`, and `withPossibleLineNumber`), `Reporter.messageOrThrowablesDetailMessage` (`object Reporter` in `org/scalatest/Reporter.scala`, which `stringsToPrintOnError` calls for a blank message), and the text of info, alert, note and markup messages. The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
 - The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds:
   - the class name, and the message, absent where `getMessage` is `null`;
   - whether the throwable is a `StackDepth`, with the failed code's file name, file pathname and line number, each where defined;
+  - the failed code's stack depth, filled only by the live wrapper, for a `StackDepth`;
   - whether it is a `PropertyCheckFailedException`, whose message already holds its line number;
   - its frames, each as the text `StackTraceElement.toString` gives, which on JDK 9 and later can hold a module and a class loader name;
   - its cause.
 - The functions return text without indentation or colour. An event's first line is the text its caller passes. The stack-trace function returns each throwable of the cause chain as its first line, `Cause: ` included for a cause, with its frame lines, `...` included.
-- `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, puts every frame and `Cause:` line at that one indentation, and colours each line with its event's colour.
+- `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, and colours each line with its event's colour.
   - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent`. `../SPECIFICATION.md` § Scope § Out of scope excludes changing any existing ScalaTest reporter, and in IntelliJ's sbt-shell mode the IDE parses 3.2.19's text (R-003).
-- The writer passes a label's text without the formatter's leading indentation, and indents each line by its depth in the tree: frame lines under their throwable's first line, and a `Cause:` line level with the first line of the throwable it causes (`specification/layout.md` AC-009 to AC-011).
-  - It composes a line from pieces of different colours, such as an aborted scope's green label and red suffix (AC-026, AC-027).
-  - It adds what 3.2.19 never prints: the suffixes and lines `../SPECIFICATION.md` R-106 adds, such as a scope's `*** NOT RUN ***`, and each message's kind mark, such as `[info]`.
-- A `StackDepth` throwable gets no frame or cause lines from the writer, as `getStackTrace` gives it none without `S` or `F` (`../SPECIFICATION.md` R-128). The decoded throwable therefore carries no `failedCodeStackDepth`: only `StringReporter`'s `S` path, which drops the frames above the failed code, reads it, from the live view.
-- A non-`StackDepth` throwable's frames are cut as `getStackTrace` cuts them without `S` or `F`: its first ten frames, then `...`. Each cause follows by the same rule, so a `StackDepth` cause adds no line, nor does any cause after it.
+- The writer passes a label's text without the formatter's leading indentation, indents each line by its depth in the tree (`specification/layout.md` AC-009 to AC-011), and composes multi-colour lines (AC-026, AC-027). It adds the suffixes, lines and marks `../SPECIFICATION.md` R-106 adds to 3.2.19's text.
+- The writer calls the stack-trace function with `S` and `F` off (`../SPECIFICATION.md` R-106). The decoded throwable therefore leaves the failed code's stack depth absent: only `StringReporter`'s `S` path reads it, and `s` will never need it (`../SPECIFICATION.md` R-128).
 - A characterisation test proves `StringReporter` byte-identical. It is written and passes before the change, and passes unchanged after it.
-  - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, with each of `D`, `S`, `F` and `v` on and off, against text recorded from the code before the change.
+  - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, against text recorded from the code before the change. It turns each of `D`, `S`, `F` and `V` on and off, and for the end-of-run summary, which formats a throwable only in its reminders, each of `I`, `T`, `G` and `K`.
   - Its throwables have frames fixed with `setStackTrace`, and its `StackDepth` exceptions a fixed `source.Position`: a non-`StackDepth` throwable of more than ten frames with a non-`StackDepth` cause, a `StackDepth` exception with a cause, and a `PropertyCheckFailedException`. One failure carries analysis lines.
   - The existing `StringReporterSuite`, `StringReporterAlertSpec` and `StringReporterSummarySpec` stay. They print no non-`StackDepth` frames, no `Cause:` line and no `PropertyCheckFailedException`, so they cannot prove the change alone.
 
@@ -99,13 +97,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 
 ### Runs the criteria describe
 
-The criteria that feed the consolidation library a run they describe, not one a suite ran (`specification/runs-and-test-structure.md` AC-036, AC-037, AC-038 and AC-054; `specification/compatibility-and-library.md` AC-064), are tested that way, without Mill:
-
-- Under Mill, a JVM `Framework` run ends completed unless its process dies, so the test command cannot produce an aborted or stopped run. A test aborted after it started, and a scope aborted while open, come only from a fatal error, which aborts the run too.
-- A test cannot fix the order in which the plugin reads a worker's two streams, nor where it reads a line among the run's events.
-- Only the library's caller can hold a run's event stream open after the run has reported that it completed.
-
-Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
+The criteria that feed the consolidation library a run they describe (`specification/runs-and-test-structure.md` AC-036, AC-037, AC-038 and AC-054; `specification/compatibility-and-library.md` AC-064) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
 
 - A test declares the run's tree once: its suites with their class names, and their nested suites, scopes and tests in declared order. The builder derives each node's ID, its parent's ID and its declared position, and emits each suite's structure item before that suite's first event.
 - The test scripts the run by node name: each node's events, messages attached to a node or to the run, captured lines tagged with their stream, and how the run ended. The builder emits each in the form core's decoder yields, tagged with its node's ID or as the run's.
@@ -116,10 +108,16 @@ Each test compares the whole output, written with colour on, against expected te
 
 ### Comparison with ScalaTest 3.2.19
 
-`specification/compatibility-and-library.md` AC-056 and AC-057 compare a run on this fork with the same run on 3.2.19, and `specification/runs-and-test-structure.md` AC-073 compares the human-readable output with 3.2.19's `-f` file.
+This serves `specification/compatibility-and-library.md` AC-056 and AC-057, and `specification/runs-and-test-structure.md` AC-073.
 
-- AC-056 and AC-057 run in a test project of the fork's sbt build, cross-built for each JVM Scala version. It compiles the compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) once, against `org.scalatest:scalatest` 3.2.19, so both runs load the same compiled classes. `../SPECIFICATION.md` R-004 lets the fork run them.
-- 3.2.19's jars are resolved in an sbt configuration of the project's own, never on its test classpath: they share the fork's organisation, module names and packages, so on one classpath sbt evicts one build or the other.
-- The test forks one JVM for each run, on the fixture's and recorders' classes plus either 3.2.19's jars or the fork's, as IntelliJ's forked mode and a build tool's test worker each start a JVM of their own. No JVM-wide state, such as `System.out` or a system property, then passes from one run to the other.
+- AC-056 and AC-057 run in a test project of the fork's sbt build.
+  - The compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) are the sources of an sbt configuration of the project's own that extends neither `Compile` nor `Test` and whose one library dependency is `org.scalatest:scalatest` 3.2.19. They compile there once, so both runs load the same compiled classes. `../SPECIFICATION.md` R-004 lets the fork run them.
+  - 3.2.19 is on no classpath that also holds the fork: the two share organisation, module names and packages, so on one classpath sbt evicts one or the other. The test itself, in `Test`, is given three classpaths: that configuration's compiled classes, its resolved classpath (3.2.19 and its dependencies), and the runtime classpath of the fork's `scalatest` and `scalactic` projects (`project/scalatest.scala`) for the same Scala version.
+  - For Scala 2.11, 2.12 and 2.13 the project is cross-built over `crossScalaVersions` (`project/BuildCommons.scala` `scalaVersionsSettings`). Scala 3 artefacts come only from `project/DottyBuild.scala`, so for Scala 3.3 a twin project there builds the same sources, its fork classpath from `scalatestDotty` and `scalacticDotty`.
+- The test forks one JVM for each run, on the fixture's compiled classes plus either 3.2.19's resolved classpath or the fork's, as IntelliJ's forked mode and a build tool's test worker each start a JVM of their own. No JVM-wide state, such as `System.out` or a system property, then passes from one run to the other.
 - In each JVM the recorders write each event to a file as one line, holding every field but timestamps, durations and thread names. The test compares the two runs' files line by line.
-- AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.19 and passes `-f` in its own ScalaTest arguments; Mill's own test task on that module writes the file the criterion compares with.
+- AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.19 and passes `-f` in its own ScalaTest arguments; Mill's `testForked` on that module writes the file the criterion compares with.
+
+### MiMa
+
+`specification/compatibility-and-library.md` AC-058 runs the build's MiMa check. Review rejects any MiMa problem filter this feature adds, since a filter would let the check pass without the compatibility it proves.

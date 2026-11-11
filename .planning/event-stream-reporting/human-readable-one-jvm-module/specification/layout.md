@@ -110,9 +110,9 @@ Feature: Where messages sit
 
   Rule: A message sits under the node it attaches to (R-097), after its test's failure or cancel lines, in the order the run emitted it
     Scenario: AC-032 A test's messages sit under it, notes and alerts included
-      Given in suite `StackFunSpec`, test `- is empty` calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then succeeds
+      Given in suite `StackFunSpec`, test `is empty` calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then succeeds
       When the test command runs the module
-      Then the lines for `- is empty` are:
+      Then the lines for test `is empty` are:
         """
         - is empty
           [info] checked size
@@ -123,9 +123,9 @@ Feature: Where messages sit
       And no line before `- is empty` holds `a note` or `an alert`
 
     Scenario: AC-033 A failed test's messages follow its failure
-      Given in suite `StackFlatSpec`, test `- must have size 0` calls `info("checked")`, `note("a note")` and `alert("an alert")` in that order, then fails
+      Given in suite `StackFlatSpec`, test `must have size 0` calls `info("checked")`, `note("a note")` and `alert("an alert")` in that order, then fails
       When the test command runs the module
-      Then the last three of the lines for `- must have size 0 *** FAILED ***` are:
+      Then the last three of the lines for test `must have size 0` are:
         """
         [info] checked
         [note] a note
@@ -160,7 +160,7 @@ Feature: Collapsed subtrees
 
   Rule: A suite whose tests never started collapses into its abort (R-100, R-107)
     Scenario: AC-039 A suite's `beforeAll` throws
-      Given suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, an `AnyWordSpec` whose scope `A repo` holds tests `- should read` and `- should write`
+      Given suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, an `AnyWordSpec` whose scope `A repo` holds tests `should read` and `should write`
       And its `beforeAll` throws `RuntimeException("database unreachable")`
       When the test command runs the module
       Then, with every stack frame left out, the lines for `SetupFailsSpec` are:
