@@ -9,7 +9,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 - Equal class and message, with the cause chain, merges distinct failures that read alike, such as two `assert(x == 1)` failures reading "2 did not equal 1", and hides a real failure.
 - Equal class, message and full stack trace rarely matches even failures from one source, because their test-body frames differ, and hides a real failure where it does.
 - Equal class, message and throw site (a `StackDepthException`'s failed code location, else the top frame) folds tests failing on one broken fixture, which collapsing is not for.
-- Collapsing every node an abort reached into the collapsed root moves their messages and captured output onto the root in event order, overriding `../SPECIFICATION.md` R-075, R-012 and R-097.
+- Collapsing every node an abort reached moves their messages and captured output onto the root, overriding `../SPECIFICATION.md` R-075, R-012 and R-097.
 
 **Reasoning** Collapsing is for the nodes a failed module or suite, a stopped run or `--halt-on-failure` kept from starting, not for tests that failed for the same reason. A node that never started has no failure, message or captured output of its own, so collapsing it hides only its name, while a node that started keeps its failure, messages and output where it produced them.
 
