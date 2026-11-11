@@ -15,7 +15,7 @@ Until later features, the test command runs one worker as Mill does with `testPa
 
 Enables:
 
-- `SPECIFICATION.md` R-001, R-002, R-051, R-003, R-060, R-004, R-010, R-063, R-011, R-074, R-030 and R-031 (human-readable output), R-054, R-055 (one module selector; human-readable off), R-053 (working directory, environment, for one worker), R-092, R-072, R-020, R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086, R-023 (human-readable), R-025, R-040, R-041, R-042, R-043, R-044, R-045, R-046 (first bullet: failure, aborted, stopped), R-048 (human-readable), R-050; § Scope (JVM Scala versions; no compatibility promise on the test event log's format, the library's API or the switch)
+- `SPECIFICATION.md` R-001, R-002, R-051, R-003, R-060, R-004, R-010, R-063, R-011, R-074, R-096–R-107 (human-readable output), R-054, R-055 (one module selector; human-readable off), R-053 (working directory, environment, for one worker), R-092, R-072, R-020, R-027, R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-021, R-012 (on the run), R-086, R-023 (human-readable), R-025, R-040, R-041, R-042, R-043, R-044, R-045, R-046 (first bullet: failure, aborted, stopped), R-048 (human-readable), R-050; § Scope (JVM Scala versions; no compatibility promise on the test event log's format, the library's API or the switch)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec, on the JVM), § Modules § Consolidation library (Assembly, Consolidation, Writers: human-readable), § Modules § Mill plugin (own Mill build, Scala 3 loading, testkit, `@experimental`/`@internal` API confined to classes the test command alone loads; Test command; Event log reading and Process capture on the JVM), § APIs § The emitter and the Mill plugin (runner argument; the run's test event log, items 1–4; the runner argument on the JVM: the absolute path of the file in the worker's `processFolder`; the event log file in the worker's `processFolder`; the module's folder cleared at the start of the test command; end of the event stream on the JVM; what counts as exited), § APIs § The Mill plugin and the consolidation library (Start, Add a run, End), § Data flow (JVM bullet; console through the test command's Mill logging), § External systems (Mill; Metals, Bloop and IntelliJ)
 
 Settles:
@@ -44,13 +44,13 @@ Risks:
 
 A test-command argument turns on JSON output, written once every event stream has ended to a file in the test command's task folder or at a path the argument gives. Builds on feature 1.
 
-- The consolidation root records the ScalaTest version, the module selector with its module, and Mill's name and version; test run labels, run records and suites below it, each suite and node in the runner-json layout (R-028).
+- The consolidation root records the ScalaTest version, the module selector with its module, and Mill's name and version; test run labels, run records and suites below it, each suite and node in the layout `JSON-LAYOUT.md` gives (R-028).
 - The test command deletes or empties the file before any test starts.
 - The format is documented for third-party readers.
 
 Enables:
 
-- `SPECIFICATION.md` R-028, R-030 and R-031 (JSON output), R-055 (JSON on; JSON path), R-080, R-081 (ScalaTest version; module selectors; Mill name and version), R-084, R-085, R-049, R-077, R-020, R-021, R-012 and R-086 (in JSON), R-023 (JSON)
+- `SPECIFICATION.md` R-028, R-096–R-105 (JSON output), R-108, R-109, R-055 (JSON on; JSON path), R-080, R-081 (ScalaTest version; module selectors; Mill name and version), R-084, R-085, R-049, R-077, R-020, R-021, R-012 and R-086 (in JSON), R-023 (JSON)
 - `ARCHITECTURE.md` § Modules § Consolidation library (Writers: JSON), § APIs § The Mill plugin and the consolidation library (Start: JSON sink; build tool name and version), § Data flow (JSON to the file the test command supplies)
 
 Settles:
@@ -63,7 +63,7 @@ Settles:
 Risks:
 
 - `decisions/runs-labels-and-selectors.md` "In consolidated output a run is not a node…" (Costs: two layouts)
-- `decisions/reuse.md` "This epic's test structure and outputs behave as structured test reporting's by default…" (Costs)
+- `decisions/outputs.md` "Each JSON node holds its final state, with nothing per event." (Costs)
 - `research/emission-gap-analysis.md` § 9 (run-level facts needing new code)
 
 ## 3. Every worker of a JVM module
@@ -84,7 +84,7 @@ Risks:
 - `research/mill-parallel-worker-capture.md` § 5 and `research/mill-runner-progress-without-trait.md` § 6 (on Windows a class sometimes runs on two workers; worker counts vary, under Mill's own task too)
 - `research/emission-gap-analysis.md` § 11 (whether a JVM worker executes its tasks one at a time)
 - `research/jvm-file-channel.md` § 5 (a module with no test class spawns one worker)
-- `../structured-test-reporting/research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
+- `research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
 - `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after item 1; paths with spaces untried)
 
 ## 4. Class globs, framework arguments and JUnit XML
@@ -185,7 +185,7 @@ Enables:
 
 Settles:
 
-- The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-064 is silent; through R-030, `../structured-test-reporting/SPECIFICATION.md` § Test structure already gives the run *process failed* and registered tests never run *not run*).
+- The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-064 aborts them and states no reason; R-102 gives the run *process failed*, and R-100 gives registered scopes and tests that never started *not run*).
 
 Risks:
 
@@ -201,7 +201,7 @@ Progress output is on by default and written while the runs execute: whole lines
 
 Enables:
 
-- `SPECIFICATION.md` R-026, R-030 (progress output), R-048 (progress), R-055 (progress off), R-090, R-089, R-091, R-067, R-020 (progress with JSON), R-050 (the nested tasks' prefix)
+- `SPECIFICATION.md` R-026, R-048 (progress), R-055 (progress off), R-090, R-089, R-091, R-067, R-020 (progress with JSON), R-050 (the nested tasks' prefix)
 - `ARCHITECTURE.md` § Modules § Consolidation library (Writers: progress), § APIs § The Mill plugin and the consolidation library (Start: line and summary sinks), § Data flow (progress output through the test command's Mill logging)
 
 Settles:
@@ -336,4 +336,4 @@ Enables:
 
 Risks:
 
-- `decisions/capture-and-console.md` "Test output and worker output are told apart by their source…" (Costs: a C `printf` lands on a broader node; `../structured-test-reporting/research/js-native-structure-and-capture.md` § 4.2)
+- `decisions/capture-and-console.md` "Test output and worker output are told apart by their source…" (Costs: a C `printf` lands on a broader node; `research/js-native-structure-and-capture.md` § 4.2)

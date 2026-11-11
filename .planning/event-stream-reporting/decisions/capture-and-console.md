@@ -6,7 +6,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Alternatives**
 
-- Streaming single characters, as structured test reporting does, needs raw writes, because `Task.log` passes only whole lines; the prompt's redraws overwrite raw writes.
+- Streaming a single character for each test result or suite failure needs raw writes, because `Task.log` passes only whole lines; the prompt's redraws overwrite raw writes.
 - Pausing Mill's prompt while the tests run, and writing raw, needs the `private[mill]` `withPromptPaused`.
 - Requiring Mill's `--ticker false` makes the user pass it on every command, since the plugin cannot set it.
 - Whole lines alone give no live sense of a long run's progress.
@@ -31,7 +31,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 ## Test output and worker output are told apart by their source, not by the route or thread of the write that captures them.
 
-**Alternatives** Structured test reporting defines test output by write route and thread (`../../structured-test-reporting/SPECIFICATION.md` § Test output): a test's `println` is test output, but the same line from a pool thread the test uses, or through a C `printf` on Native, is not.
+**Alternatives** Defining test output by write route and thread makes a test's `println` test output, but not the same line from a pool thread the test uses, or through a C `printf` on Native.
 
 **Reasoning** A reader means by test output what the suite, scope or test wrote, however it was written. Routes and thread rules then decide only which node output is captured against (`../SPECIFICATION.md` R-012).
 
@@ -39,7 +39,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Settled by** [What do the capture requirements hold where a write cannot be caught, tied to one node, or kept off the console?](https://github.com/jamesgorman2/scalatest/issues/33).
 
-**See** `../../structured-test-reporting/research/js-native-structure-and-capture.md` § 4.2.
+**See** `../research/js-native-structure-and-capture.md` § 4.2.
 
 ---
 
@@ -105,7 +105,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Alternatives**
 
-- Streaming it to the console, as `../../structured-test-reporting/SPECIFICATION.md` § Test output does with output that is not test output, keeps the two epics alike, but it interleaves across runs, which is the problem this epic addresses.
+- Streaming it to the console shows it as it is written, but it interleaves across runs, which is the problem this epic addresses.
 - Writing it to a file for each run keeps the consolidated output to what came in the test event log, but separates a crash message from the run it explains.
 - Discarding it loses the only account of some runs that did not complete.
 

@@ -12,7 +12,7 @@ Question: [What gives plugin code one lifetime spanning a whole Mill command?](h
 
 Four other notes hold facts this one relies on and does not repeat:
 
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: Mill's test tasks and test-worker JVMs.
+- `.planning/event-stream-reporting/research/mill-test-worker-args.md`, cited as `MILL`: Mill's test tasks and test-worker JVMs.
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: how Mill wires a test-worker JVM's streams and what it does to a task's output.
 - `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the channels, stdout and stderr, and hooks of a Scala.js run on Node or a Native run under Mill.
 - `.planning/event-stream-reporting/research/emitter-plugin-spike.md`, cited as `EPS`: what was observed when an exclusive command executed several modules' test tasks.
@@ -43,7 +43,7 @@ In this note and the notes citing it, *Mill command* and *selector* have Mill's 
 | Tag | Source | Version |
 |---|---|---|
 | `[mill]` | <https://github.com/com-lihaoyi/mill> | tag `1.1.10` (`92d51b79bc2243fd2e82a022c924b03b822b2d7b`), the version `MILL` pins |
-| `MILL` | `.planning/structured-test-reporting/research/mill-test-worker-args.md` | as committed |
+| `MILL` | `.planning/event-stream-reporting/research/mill-test-worker-args.md` | as committed |
 | `MWC` | `.planning/event-stream-reporting/research/mill-worker-channels.md` | as committed |
 | `JNC` | `.planning/event-stream-reporting/research/js-native-channels.md` | as committed |
 | `EPS` | `.planning/event-stream-reporting/research/emitter-plugin-spike.md` | as committed |

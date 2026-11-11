@@ -21,7 +21,7 @@ Decisions behind `../SPECIFICATION.md` on what a test event log carries, who may
 - A public API with a compatibility promise, checked by MiMa as `../SPECIFICATION.md` R-004 checks the fork, serves callers the goal does not name.
 - A documented API marked experimental invites outside callers but gives them no more to rely on.
 
-**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a test event log outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release. Any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, as in structured test reporting (`../../structured-test-reporting/SPECIFICATION.md` § Scope § Out of scope).
+**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a test event log outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release. Any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, whose format is documented for them (`../SPECIFICATION.md` R-084).
 
 **Costs** A third party that builds on the library, such as another build tool's plugin, may break on any release of the fork.
 

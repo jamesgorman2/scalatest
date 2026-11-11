@@ -5,7 +5,7 @@ On Scala.js on Node and on Scala Native under Mill: which channels can carry a r
 Other notes hold facts this one relies on and does not repeat:
 
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: the JVM answer (§§ 1–3), how Mill passes a Scala.js or Native run its framework arguments (§ 4), and the APIs for running plugin code after tests fail (§ 5).
-- `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
+- `.planning/event-stream-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
 - `.planning/event-stream-reporting/research/mill-command-lifetime.md`, cited as `MCL`: what hosts plugin code across a Mill command, and what Mill does to its console output.
 - `.planning/event-stream-reporting/research/native-stdio-wrapper.md`, cited as `NSW`: what was observed when a prototype ran Native tests through a launcher.
 - `.planning/event-stream-reporting/research/mill-test-without-module-trait.md`, cited as `MTW`: what was observed when plugin code evaluated a Scala.js or Native module's test task itself.

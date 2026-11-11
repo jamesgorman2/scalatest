@@ -111,7 +111,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`.
   **The worker folders** under `out/<module>/test/testForked.dest/`, kept after every run:
   - In 94 of the 96 fork groups, both workers' `claim.log` began with `CLAIM` of the same class. That class's file was in only one of the two workers' `claim/` folders. The other worker's `claim/` folder held none of the classes it ran first.
   - That shared first class was the one that ran twice: `beta.BetaFail` in all 32 runs, and `alpha.A1` and `alpha.A3` in the 31 other than `gitbash-direct-1`. In 2 runs a class claimed later from the queue also ran twice (`beta.BetaOk` once, `alpha.A2` once).
-  - Mill's process claims each worker's first class on that worker's thread (`TestModuleUtil.runTestFuture`, `startingTestClass`; `.planning/structured-test-reporting/research/mill-test-worker-args.md` § 1.2). `TestRunnerUtils.claimFile` treats an `os.move(…, atomicMove = true)` that does not throw as a claim.
+  - Mill's process claims each worker's first class on that worker's thread (`TestModuleUtil.runTestFuture`, `startingTestClass`; `.planning/event-stream-reporting/research/mill-test-worker-args.md` § 1.2). `TestRunnerUtils.claimFile` treats an `os.move(…, atomicMove = true)` that does not throw as a claim.
 
   *Inference:* on Windows, two concurrent atomic moves of one queue file to two workers' `claim/` folders both returned without throwing, so both workers took the class as claimed while only one move placed the file.
 
@@ -213,7 +213,7 @@ Each cell gives the command lines shown intact out of those written, then the st
 
 - `MCL` § 2.2, § 2.3, § 2.4, § 4.2, § 5.1, § 5.2 and § 6, and `MWC` § 2.2, § 2.3 and § 2.4, held as observed in §§ 2–8. `MCL` § 4.2's interleaving also occurred with output redirected to files under the daemon (§ 8.1), and under `--no-daemon` in MinTTY without its pseudo-console (§ 8.4).
 - `MWC` § 1.5's lock on each destination stream did not keep lines whole where a worker's stdout and stderr reached one terminal (§ 8.2).
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md` § 1.2 describes a class as claimed by one worker through an atomic move. On Windows two workers ran the same class (§ 2).
+- `.planning/event-stream-reporting/research/mill-test-worker-args.md` § 1.2 describes a class as claimed by one worker through an atomic move. On Windows two workers ran the same class (§ 2).
 
 ## 10. What was not run or not determined
 

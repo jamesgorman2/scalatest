@@ -9,4 +9,4 @@ Decisions behind `SPECIFICATION.md`, split by topic, each part newest first.
 - [decisions/run-that-does-not-finish.md](decisions/run-that-does-not-finish.md) — what counts as a run, and what the output holds when a run's process dies or the test command is interrupted.
 - [decisions/runs-labels-and-selectors.md](decisions/runs-labels-and-selectors.md) — how runs, test run labels and module selectors appear in the consolidated output.
 - [decisions/event-log-contract.md](decisions/event-log-contract.md) — what a test event log carries, who may read it, which release ships the Mill plugin, and the consolidation library's API.
-- [decisions/reuse.md](decisions/reuse.md) — what this epic takes from structured test reporting, and its one dropped output, JUnit XML.
+- [decisions/outputs.md](decisions/outputs.md) — which outputs the consolidation produces and what its JSON output holds: no JUnit XML, and each node's final state.

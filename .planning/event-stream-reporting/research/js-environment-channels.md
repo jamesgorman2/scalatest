@@ -5,7 +5,7 @@ On Scala.js under Mill, for each JS environment other than Node: whether the tes
 Other notes hold facts this one relies on and does not repeat:
 
 - `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the Node answer.
-- `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js.
+- `.planning/event-stream-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js.
 
 ## Short answer
 

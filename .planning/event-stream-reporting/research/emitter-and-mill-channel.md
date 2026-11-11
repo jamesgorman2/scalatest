@@ -11,8 +11,8 @@ Four later notes take the Mill questions further:
 
 Two earlier notes hold facts this one relies on and does not repeat:
 
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches test-worker JVMs.
-- `.planning/structured-test-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
+- `.planning/event-stream-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches test-worker JVMs.
+- `.planning/event-stream-reporting/research/js-native-structure-and-capture.md`, cited as `JSN`: runs, channels and capture on Scala.js and Scala Native.
 
 ## Short answer
 
@@ -28,8 +28,8 @@ Two earlier notes hold facts this one relies on and does not repeat:
 | Tag | Source | Version |
 |---|---|---|
 | `[this]` | this repo | `f3a9c910a` |
-| `MILL` | `.planning/structured-test-reporting/research/mill-test-worker-args.md` | read from Mill tag `1.1.10` (`92d51b7`) |
-| `JSN` | `.planning/structured-test-reporting/research/js-native-structure-and-capture.md` | read from the sources its § Sources lists |
+| `MILL` | `.planning/event-stream-reporting/research/mill-test-worker-args.md` | read from Mill tag `1.1.10` (`92d51b7`) |
+| `JSN` | `.planning/event-stream-reporting/research/js-native-structure-and-capture.md` | read from the sources its § Sources lists |
 | `MWC` | `.planning/event-stream-reporting/research/mill-worker-channels.md` | read from the sources its § Sources lists |
 | `MCL` | `.planning/event-stream-reporting/research/mill-command-lifetime.md` | read from Mill tag `1.1.10` (`92d51b7`) |
 | `JNC` | `.planning/event-stream-reporting/research/js-native-channels.md` | read from the sources its § Sources lists |
@@ -109,10 +109,10 @@ Every event has `private[scalatest] def toJson` (`EV/Event.scala` line 82), buil
 
 ## 5. What events alone do not carry
 
-- **No hierarchy.** No event names a suite's parent. Nested suites are related only by `suiteId` strings, and scopes only by the order of `ScopeOpened` and `ScopeClosed`, which parallel runs interleave (`.planning/structured-test-reporting/ARCHITECTURE-DECISIONS.md` § Structure is attached where each event is emitted, not reconstructed after the merge).
+- **No hierarchy.** No event names a suite's parent. Nested suites are related only by `suiteId` strings, and scopes only by the order of `ScopeOpened` and `ScopeClosed`, which parallel runs interleave. Parents cannot be inferred from `Ordinal` prefixes under sbt, where every task shares one linear ordinal tracker. Events from one emitter arrive in a reliable order even under `-P` and `ParallelTestExecution`; structure is lost only where emitters' events merge.
 - **No run identity.** Every `Framework` runner creates `new Tracker` (`TOOLS/Framework.scala` line 672), whose default first ordinal is `new Ordinal(0)` (`jvm/core/src/main/scala/org/scalatest/Tracker.scala` line 48). Every Mill test-worker JVM and sbt fork therefore issues the same ordinals. JS and Native: `JSN` § 1.4.
 - **Recorded events arrive late.** Information and markup recorded during a test travel in the test-completion event's `recordedEvents` (`EV/Event.scala` line 358), not as they happen.
-- **Filtering precedes reporters.** A `FilterReporter` in front of a reporter removes whole events (§ 3.2). `.planning/structured-test-reporting/runner-json/prototype-json-layout/06-filtered-fCJ.notes.md` shows `-fCJ` losing a test's outcome and duration.
+- **Filtering precedes reporters.** A `FilterReporter` in front of a reporter removes whole events (§ 3.2). `-fCJ` sets `filterCharacters: "C"`, and 3.2.19's `FilterReporter` then drops `TestSucceeded`, so a reporter behind it loses a passing test's outcome, end time, duration and recorded `info`. `TestFailed` and `TestStarting` are not dropped.
 - **The reminder text is outside the reporter chain under the JVM `Framework`.** `done()` builds the `Summary` from `SummaryCounter` and returns the summary and reminder text as its result string (`TOOLS/Framework.scala` lines 790–812). `RunCompleted` carries the same `Summary` to reporters (line 794); the reminder text reaches no reporter.
 - **Scala.js and Native send no run-level event.** `JS/` and `native/core/src/main/scala/org/scalatest/tools/` create no `RunStarting`, `RunCompleted`, `RunAborted` or `RunStopped`, so no event carries a summary there.
 - **A run that never ends.** An emitter attached to Mill's discovery runner sees `RunStarting` and nothing after it (`MILL` § 1.4, I-5).

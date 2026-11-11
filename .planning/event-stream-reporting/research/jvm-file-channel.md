@@ -7,7 +7,7 @@ Notes this one builds on and does not repeat:
 - `.planning/event-stream-reporting/research/emitter-plugin-spike.md`, cited as `EPS`: the socket spike whose fixtures and kill method this one reuses.
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`, and `.planning/event-stream-reporting/research/js-native-channels.md`, cited as `JNC`: the source reading this note tests (§ 7).
 - `.planning/event-stream-reporting/research/mill-test-without-module-trait.md`, cited as `MTW`, and `.planning/event-stream-reporting/research/mill-runner-progress-without-trait.md`, cited as `MRP`: the two routes by which the plugin ran the tests.
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: where Mill's discovery runner runs.
+- `.planning/event-stream-reporting/research/mill-test-worker-args.md`, cited as `MILL`: where Mill's discovery runner runs.
 
 A statement marked *Inference:* follows from the runs or the cited source and was not observed directly. `TMU` is `[mill]` `libs/javalib/src/mill/javalib/TestModuleUtil.scala` at tag `1.1.10` (`92d51b79bc2243fd2e82a022c924b03b822b2d7b`). `B` is the prototype's `build.mill`, `FE` its `emitter/src/spike/FileEmitter.scala`, `NF` its `emitter/src/spike/NotingFramework.scala`, and `R/` its `runs/`.
 

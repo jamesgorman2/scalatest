@@ -9,7 +9,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 - A separate list on the label, outside the suite hierarchy, needs a new JSON shape and ordering rule, and tools that count suites miss its classes.
 - Leaving the placement to the feature that implements it leaves to a feature the shape of the JSON output, which carries a compatibility promise (`../SPECIFICATION.md` R-084).
 
-**Reasoning** `../../structured-test-reporting/SPECIFICATION.md` § Test structure already shows a top-level suite that never started as aborted, *not run*, so a reader of either output sees one shape. Classes left in a queue and classes a dead process took are shown alike (`../SPECIFICATION.md` R-095).
+**Reasoning** A nested suite that never started is a suite node aborted with reason *not run* (`../SPECIFICATION.md` R-100), so a test class that never started takes the same shape and a reader meets one form for both. Classes left in a queue and classes a dead process took are shown alike (`../SPECIFICATION.md` R-095).
 
 **Costs** A suite that names no run record is a new case for readers of the JSON output. Progress output need not show these classes, which `../SPECIFICATION.md` R-068 had required of classes left in a queue.
 
@@ -31,7 +31,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26), which settled that structure comes from the run and showed nothing for a suite no run constructed. The user, in conversation on 2026-11-11 and under no sub-issue of the plan, added the test classes no run reported, after a review flagged that a test process failing before it writes its test event log left no record of the suites it was to run.
 
-**See** `../../structured-test-reporting/research/mill-test-worker-args.md` § 1.2.
+**See** `../research/mill-test-worker-args.md` § 1.2.
 
 ---
 
@@ -39,7 +39,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Alternatives**
 
-- A placeholder JSON file written when the test command starts is not needed: structured test reporting needs one only so each run can list its tests for its consolidator, and here the test command is the only consolidator and already knows its runs.
+- A placeholder JSON file written when the test command starts is not needed: nothing but the test command consolidates its runs, and it already knows them.
 - A JVM shutdown hook writing partial results would tell a user who pressed Ctrl-C only what they already know: they killed the tests.
 
 **Reasoning** After Ctrl-C, Mill gives the test command's body no further control (`../research/mill-command-lifetime.md` § 5.1, § 5.2).
@@ -70,7 +70,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **See**
 
-- `../../structured-test-reporting/research/mill-test-worker-args.md` § 1.4.
+- `../research/mill-test-worker-args.md` § 1.4.
 - `../research/mill-worker-channels.md` § 3.2.
 - `../research/emitter-plugin-spike.md` § 3.
 

@@ -4,7 +4,7 @@ At Mill `1.1.10`, with `testSandboxWorkingDir` off, every test worker of a modul
 
 Notes this one builds on and does not repeat:
 
-- `.planning/structured-test-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches workers, and each `processFolder`.
+- `.planning/event-stream-reporting/research/mill-test-worker-args.md`, cited as `MILL`: how Mill launches workers, and each `processFolder`.
 - `.planning/event-stream-reporting/research/mill-parallel-worker-capture.md`, cited as `MPC`: Route B, the plugin driving the queue through `callTestRunnerSubprocess`.
 - `.planning/event-stream-reporting/research/jvm-file-channel.md`, cited as `JFC`: the file-per-run spike whose prototype this note's spike patches.
 - `.planning/event-stream-reporting/research/mill-worker-channels.md`, cited as `MWC`: `callTestRunnerSubprocess` and worker streams.

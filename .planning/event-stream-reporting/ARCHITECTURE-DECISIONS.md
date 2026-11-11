@@ -17,7 +17,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **See**
 
-- `../structured-test-reporting/research/mill-test-worker-args.md` § 1.2, § 2.2, § 2.3.
+- `research/mill-test-worker-args.md` § 1.2, § 2.2, § 2.3.
 - `research/mill-worker-channels.md` § 3.1, § 4.
 - `research/mill-parallel-worker-capture.md` § 5, § 6.
 - `research/emitter-plugin-spike.md` § 2.
@@ -136,7 +136,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - `research/jvm-file-channel.md` § 2, § 3, § 5.
 - `research/node-native-file-channel.md` § 2, § 3, § 4, § 5.2, § 6, § 7.
-- `../structured-test-reporting/research/mill-test-worker-args.md` § 2.3.
+- `research/mill-test-worker-args.md` § 2.3.
 - `research/mill-worker-channels.md` § 3.1.
 
 ---
@@ -190,7 +190,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - `research/jvm-file-channel.md` § 6.
 - `research/mill-runner-progress-without-trait.md` § Short answer, § 3, § 5, § 7.
-- `../structured-test-reporting/research/mill-test-worker-args.md` § 2.3.
+- `research/mill-test-worker-args.md` § 2.3.
 
 ---
 
@@ -208,9 +208,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ## The consolidation library builds on scalatest-core, taking event streams in the form core's decoder yields them and sharing core's formatting.
 
-**Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from what `SPECIFICATION.md` R-030 takes.
+**Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from the ScalaTest 3.2.19 format `SPECIFICATION.md` R-106 requires.
 
-**Reasoning** A test event log is read only by the release that wrote it (`decisions/event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output what R-030 takes.
+**Reasoning** A test event log is read only by the release that wrote it (`decisions/event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output in the format R-106 requires.
 
 **Costs** Core's internals carry the library's needs, and the plugin loads scalatest-core for Scala 3 into Mill's JVM.
 
@@ -235,11 +235,26 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ## The consolidation library, not the run, assembles each run's test structure, from each suite's filtered structure and events tagged by node.
 
-**Alternatives** Each run assembling its own test structure, as structured test reporting does, still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
+**Alternatives** Each run assembling its own test structure still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
 **Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064, R-065). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
 
-**Costs** The test event log carries more, and this assembly does not reuse structured test reporting's in-run assembly.
+**Costs** The test event log carries more.
+
+**Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
+
+---
+
+## Structure is attached where each event is emitted, not reconstructed from the run's merged events.
+
+**Alternatives**
+
+- A tree of the whole run built before the run starts cannot be built under the test-interface, which gives a runner one task per top-level class and no run-wide view; a JVM worker under Mill claims its classes one at a time (`research/mill-test-worker-args.md` § 1.2).
+- Inferring each node's parent from `Ordinal` prefixes, as IntelliJ's reporter does (`SPECIFICATION.md` R-003), fails under the `Framework`, where every task of a run shares one linear ordinal tracker.
+
+**Reasoning** Events from one emitter arrive in a reliable order even under `-P` and `ParallelTestExecution`; structure is lost only where emitters' events merge. A structure wrapper on each suite, nested suite and test tags each event with its node before that merge, which keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
+
+**Costs** Every path that builds `Args` for a suite or test must install a wrapper.
 
 **Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
 
