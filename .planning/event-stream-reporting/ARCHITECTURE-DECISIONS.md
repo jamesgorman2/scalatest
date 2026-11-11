@@ -2,6 +2,29 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## The test manifest is compiled from Mill's test queue and claim files on the JVM, and no manifest file is written.
+
+**Alternatives**
+
+- Each run writing the classes it is given into its own test event log records nothing for a process that dies before its runner is constructed.
+- A manifest file the test command writes before any test process starts, with an entry per fork group, repeats what the queue already holds and cannot say which worker of the group took a class.
+
+**Reasoning** On the JVM the test command lays out each fork group's queue before it starts any worker, and each claim a worker makes is a file in the `processFolder` the test command started it in. Those files are on disk whatever the worker then does, so a class no run reported is tied to the worker that claimed it, and a class no worker claimed is still in its queue. On Scala.js and Native, Mill's test task gives a module one run in one process, so the test classes the test command holds are that process's.
+
+**Costs** The manifest rests on Mill's `@internal` queue and claim layout; on Windows two workers' `claim.log` can record one class, so a class counts as reported if any run reported it. On Scala.js and Native the test command must learn the module's test classes itself, ahead of Mill's test task, which no prototype has tried.
+
+**Settled by** The user, in conversation on 2026-11-11, under no sub-issue of the plan. A review after the epic was broken into features flagged that a test process failing before it writes its test event log left no record of the suites it was to run. The user first asked for a manifest file written per fork, then chose this compiled record once the research showed that Mill's queue and claim files already hold it.
+
+**See**
+
+- `../structured-test-reporting/research/mill-test-worker-args.md` § 1.2, § 2.2, § 2.3.
+- `research/mill-worker-channels.md` § 3.1, § 4.
+- `research/mill-parallel-worker-capture.md` § 5, § 6.
+- `research/emitter-plugin-spike.md` § 2.
+- `research/node-native-file-channel.md` § 5.2.
+
+---
+
 ## Every Native test binary starts through a launcher compiled with the module's toolchain, which writes the binary's stdout and stderr to files of its own.
 
 **Alternatives**
@@ -97,10 +120,11 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - A socket lost every byte not yet read on Windows when the JVM worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
 - A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the event log's items (`research/mill-worker-channels.md` § 3.3).
 - Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and hold only while every item is one whole framed line.
+- On the JVM, a folder per module holding every run's file, each named by its run, leaves the test command unable to tie a file, or the lack of one, to the worker it started.
 
-**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first item. Naming the folder through the runner argument puts every run of a module where the plugin looks, even though every Scala.js and Native run shares Mill's working directory.
+**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first item. On the JVM the file has one fixed name in the worker's `processFolder`, which the test command chose and in which Mill starts at most one JVM, so the folder ties the file to its worker, and a folder without one is a worker in which no run existed.
 
-**Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again.
+**Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again. On the JVM, live reading was tested only in a folder of the plugin's own, not in a `processFolder`, where Mill polls `claim.log` and `result.log` every 10 ms; each worker needs its own argument, so the arguments of a module's workers differ from each other by the event log path.
 
 **Settled by**
 
@@ -111,7 +135,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **See**
 
 - `research/jvm-file-channel.md` § 2, § 3, § 5.
-- `research/node-native-file-channel.md` § 2, § 3, § 4, § 6, § 7.
+- `research/node-native-file-channel.md` § 2, § 3, § 4, § 5.2, § 6, § 7.
+- `../structured-test-reporting/research/mill-test-worker-args.md` § 2.3.
+- `research/mill-worker-channels.md` § 3.1.
 
 ---
 
@@ -120,14 +146,14 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A lock the run holds beyond end of file, which the operating system releases on death, worked on the JVM, but needs the emitter to hold an exclusive lock for its process's life and the plugin to try it on every file at every poll.
-- The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each JVM worker, ties the end signal to Mill API where `ProcessHandle` is plain JDK, and still needs each file matched to its worker.
+- The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each JVM worker, as the end of every JVM run ties the signal to Mill API where `ProcessHandle` is plain JDK, and leaves Scala.js and Native on `ProcessHandle` anyway.
 - The end of a Scala.js or Native module's Mill test task comes before its process has exited, while lines are still to come, and marks a module, not a run.
 - The exit of a Scala.js VM's launcher on Windows was signalled up to 16 ms before the VM's.
 - The run's own last line ends only a run that finishes.
 
 **Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; the launcher's header, written before the VM or binary runs, gives them on Scala.js and for a Native binary that dies before any run exists in it. In 24 Scala.js runs the reader was still behind at the exit, though no byte reached a file after it, so after the exit the plugin reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
 
-**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
+**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID; a JVM worker that dies before item 1 gives no PID, so the plugin takes that worker's end from the return of `callTestRunnerSubprocess`, a second signal on the JVM. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
 
 **Settled by**
 
@@ -211,7 +237,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** Each run assembling its own test structure, as structured test reporting does, still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
-**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064–R-066). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A run's expected tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
+**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064, R-065). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
 
 **Costs** The test event log carries more, and this assembly does not reuse structured test reporting's in-run assembly.
 

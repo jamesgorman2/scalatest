@@ -2,18 +2,34 @@
 
 Decisions behind `../SPECIFICATION.md` on what the consolidated output shows when a run or the test command does not finish, newest first.
 
-## A run's expected tests come from the run, one suite at a time as it constructs each, not from the Mill plugin's list of classes.
+## A test class no run reported is a suite node on its test run label, aborted with reason *not run*.
 
 **Alternatives**
 
-- Taking the plugin's list of classes as the authority gives class names only, with no scopes, tests or tags.
+- A separate list on the label, outside the suite hierarchy, needs a new JSON shape and ordering rule, and tools that count suites miss its classes.
+- Leaving the placement to the feature that implements it leaves to a feature the shape of the JSON output, which carries a compatibility promise (`../SPECIFICATION.md` R-084).
+
+**Reasoning** `../../structured-test-reporting/SPECIFICATION.md` § Test structure already shows a top-level suite that never started as aborted, *not run*, so a reader of either output sees one shape. Classes left in a queue and classes a dead process took are shown alike (`../SPECIFICATION.md` R-095).
+
+**Costs** A suite that names no run record is a new case for readers of the JSON output. Progress output need not show these classes, which `../SPECIFICATION.md` R-068 had required of classes left in a queue.
+
+**Settled by** The user, in conversation on 2026-11-11, under no sub-issue of the plan. The spec review of that day's test manifest amendment found that `../SPECIFICATION.md` R-078 gave a test run label only the top-level suites of its runs as children, so a test class shown as not run had no stated place, order or JSON shape.
+
+---
+
+## A suite's scopes and tests come from the run, one suite at a time as it constructs each, and the test manifest supplies only the test classes no run reported.
+
+**Alternatives**
+
+- Taking the test manifest as the only authority gives class names only, with no scopes, tests or tags.
 - Each run sending its whole intended tree before running anything is impossible under Mill's test queue, where no worker knows which suites it will claim.
+- Showing nothing for a suite no run constructed leaves no record of the classes a process was to run when it dies before reporting them.
 
-**Reasoning** Losing the rest of a module needs every worker of its fork group to die. That points at the harness rather than a test, and the user must rerun the module anyway.
+**Reasoning** Only a run knows a suite's scopes and tests, and only once it constructs the suite; the test command knows every test class before any test starts. A test class no run reported is therefore shown by name, as not run (`../SPECIFICATION.md` R-066, R-094). The user must rerun it anyway, so its structure would tell them little.
 
-**Costs** A suite a dead worker was given but never constructed does not appear (`../SPECIFICATION.md` R-066), so a reader cannot tell from the output how much of a module is missing beyond the classes left in its queue.
+**Costs** A test class no run reported shows no nested suites, scopes or tests, so a reader cannot tell from the output how many tests were not run. The test command must compile a test manifest to supply those classes (`../ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
 
-**Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
+**Settled by** [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26), which settled that structure comes from the run and showed nothing for a suite no run constructed. The user, in conversation on 2026-11-11 and under no sub-issue of the plan, added the test classes no run reported, after a review flagged that a test process failing before it writes its test event log left no record of the suites it was to run.
 
 **See** `../../structured-test-reporting/research/mill-test-worker-args.md` § 1.2.
 
