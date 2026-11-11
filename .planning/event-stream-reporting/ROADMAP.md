@@ -33,7 +33,7 @@ The test command runs a JVM module in the processes Mill's fork grouping, test p
 
 Enables:
 
-- `SPECIFICATION.md` R-053 (fork grouping, test parallelism, test queue), R-071 (a run given no task), R-022, R-043, R-080 and R-082 (several runs on a label)
+- `SPECIFICATION.md` R-053 (fork grouping, test parallelism, test queue), R-071 (a run given no task), R-022, R-043, R-080 and R-082 (several runs on a label), R-046 (first and second bullets, for every worker)
 - `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument: each worker given the absolute path of the file in its own `processFolder`; the event log file read in every `processFolder`; a JVM worker's stdout and stderr tied to its run by its `processFolder`), § Data flow (JVM bullet: drives Mill's test queue), § External systems (Mill: fork grouping, test parallelism, test queue)
 
 Settles:
@@ -324,6 +324,7 @@ Settles:
 
 - Whether one `-f` may name more than one output letter (R-049 does not say).
 - What the test command does with a lowercase character outside the set R-127 names.
+- What the test command does with an `-o` output letter other than `H` and `P`, such as `J` (R-048 names only those two).
 
 Risks:
 
