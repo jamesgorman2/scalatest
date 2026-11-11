@@ -14,6 +14,7 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against. Requirement IDs of the form `R-nnn` are the epic's.
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts and the boundaries between them.
+- [research/mill-plugin-conventions.md](research/mill-plugin-conventions.md) — how Mill 1.x plugins are named, loaded and tested under testkit, and how the Mill internals the plugin drives differ between Mill 1.1.10 and 1.3.1.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
