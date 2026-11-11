@@ -95,7 +95,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`../SPECIFICATION.md` R-044).
 
-**Costs** The test command's result does not list the failed tests (`../SPECIFICATION.md` R-046), so a tool reading Mill's failure report sees only that the test command failed. A tool reading Mill's XML report sees less than the console shows, since it omits failures outside tests, and finds no report, or an earlier one, at Mill's usual path, since R-053 moves it.
+**Costs** The test command's result does not list the failed tests (`../SPECIFICATION.md` R-046), so a tool reading Mill's failure report sees only that the test command failed. A tool reading Mill's XML report sees less than the console shows, since it omits failures outside tests, and finds no report, or an earlier one, at Mill's usual path, since R-110 moves it.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 

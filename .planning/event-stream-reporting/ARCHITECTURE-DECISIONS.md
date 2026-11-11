@@ -250,7 +250,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A tree of the whole run built before the run starts cannot be built under the test-interface, which gives a runner one task per top-level class and no run-wide view; a JVM worker under Mill claims its classes one at a time (`research/mill-test-worker-args.md` § 1.2).
-- Inferring each node's parent from `Ordinal` prefixes, as IntelliJ's reporter does (`SPECIFICATION.md` R-003), fails under the `Framework`, where every task of a run shares one linear ordinal tracker.
+- Inferring each node's parent from `Ordinal` prefixes, as IntelliJ's reporter does (`ARCHITECTURE.md` § External systems), fails under the `Framework`, where every task of a run shares one linear ordinal tracker.
 
 **Reasoning** Events from one emitter arrive in a reliable order even under `-P` and `ParallelTestExecution`; structure is lost only where emitters' events merge. A structure wrapper on each suite, nested suite and test tags each event with its node before that merge, which keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
 
@@ -289,7 +289,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** Separating decoding from consolidation lets any front end in this fork, live under Mill or reading files, feed the same library, so the library never knows whether an event log was live or recorded.
 
-**Costs** Every front end must turn event logs into event streams. This epic gives no way outside Mill to produce an event log, so `SPECIFICATION.md` R-023 is exercised only by feeding event streams directly.
+**Costs** Every front end must turn event logs into event streams. This epic gives no way outside Mill to produce an event log, so `SPECIFICATION.md` R-113 is exercised only by feeding event streams directly.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 

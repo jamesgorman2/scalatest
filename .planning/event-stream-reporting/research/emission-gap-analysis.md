@@ -133,7 +133,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 4. Outcome
 
-**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`ESR` R-098 to R-102; `JL` § Nodes and § Run records, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`ESR` R-011, R-028; `JL` § Throwables).
+**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`ESR` R-098 to R-102, R-123; `JL` § Nodes and § Run records, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`ESR` R-011, R-028; `JL` § Throwables).
 
 **In memory and `toJson`.**
 

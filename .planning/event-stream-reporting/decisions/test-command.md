@@ -24,10 +24,10 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 **Alternatives**
 
 - Failing before any test starts on every unsupported Mill release, as `../SPECIFICATION.md` R-059 does for an unsupported test module, blocks every Mill upgrade until a release of the fork lists the new one.
-- Failing the meta-build also breaks Mill's own test tasks and IDE and BSP import, so R-060 and R-003 would hold only on supported Mill releases.
+- Failing the meta-build also breaks Mill's own test tasks and IDE and BSP import, so R-060 and R-003 would hold only on supported Mill releases, against R-120.
 - A runtime check for the Mill internals the test command needs cannot show that R-044 and R-089 hold, since a Mill change can break them without a runtime failure.
 
-**Reasoning** The warning and the recorded Mill version tell every reader of the output that its guarantees do not hold there (R-093, R-081). No requirement can be guaranteed there: any of them, R-046 and R-077 included, may fail silently or loudly when a Mill internal it depends on changes, and no integration test has run on that release. R-060 and R-003 still hold on every Mill 1.x release no older than the one the plugin is built against. Mill keeps its stable API backward binary compatible within a major version, and only classes that the test command alone loads use API beyond it.
+**Reasoning** The warning and the recorded Mill version tell every reader of the output that its guarantees do not hold there (R-093, R-081). No requirement can be guaranteed there: any of them, R-046 and R-077 included, may fail silently or loudly when a Mill internal it depends on changes, and no integration test has run on that release. R-060 and R-003 still hold on every Mill 1.x release no older than the one the plugin is built against (R-120). Mill keeps its stable API backward binary compatible within a major version, and only classes that the test command alone loads use API beyond it.
 
 **Costs** On an unsupported Mill release the test command guarantees only R-093 and what R-081 records; below the release the plugin is built against, nothing holds, and a failure is whatever the JVM throws, possibly a linkage error as the meta-build loads.
 
@@ -126,7 +126,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Always running every module, with no opt-in, loses fast feedback on a large build.
 
-**Reasoning** Where the user trades coverage for speed, the output still shows which modules did not run (`../SPECIFICATION.md` R-057, R-058).
+**Reasoning** Where the user trades coverage for speed, the output still shows which modules did not run (`../SPECIFICATION.md` R-057, R-114).
 
 **Costs** Under it, which modules report depends on timing again, as under Mill's fail-fast, because modules run unordered and in parallel.
 

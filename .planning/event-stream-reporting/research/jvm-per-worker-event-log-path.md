@@ -118,7 +118,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`; workers on Azul Zulu
 - Within each module, the top-level keys of a worker's `testargs` that differed from the first started worker's were `arguments`, `outputPath`, `resultPath` and `globSelectors`, in every run, and no others. The last three hold the worker's own `processFolder`, queue and claim paths, and differ per worker under Mill's own task (`MILL` § 2.1). `arguments` differed only in the per-worker argument, by construction (§ 2.1).
 - *Inference:* the JVM arguments, environment, class path and working directory of the spawn come from instance fields that are equal across the instances (§ 1.2), so they are as under one instance.
 - Route B against Mill's own `testForked`: `MPC` § 5, with sandboxing on. It was not repeated here with sandboxing off (§ 6).
-- `SPECIFICATION.md` R-053 allows the arguments "plus only what turning the emitter on (with its test event log) … require". *Inference:* an argument that differs per worker only in the event log path is within that; the files land in the folder the test command owns for the module, not in the working directory.
+- `SPECIFICATION.md` R-053 allows the arguments "plus only what is required to turn the emitter on, with its test event log, …". *Inference:* an argument that differs per worker only in the event log path is within that; the files land in the folder the test command owns for the module (R-110), not in the working directory.
 
 ## 3. What else differs per worker inside the worker JVM
 

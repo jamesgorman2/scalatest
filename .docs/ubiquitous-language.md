@@ -70,6 +70,12 @@ _Avoid_: Logs, console output
 Output from the test harness executing a run, such as a JVM warning or what the build tool's test runner writes. It excludes the test framework's own reporting and comes from no suite, scope or test. It does not depend on whether it can be captured or attributed.
 _Avoid_: Other output, raw output, leftover output
 
+**Captured against**:
+How captured output relates to a node: output is captured against a suite, scope or test when the means that captured it ties it to that node, and against the run when that means ties it only to the run.
+
+**Captured from**:
+How captured output relates to a process's stdout or stderr: output is captured from that stream when it is read from the stream from outside the process.
+
 ## Consolidation
 
 **Consolidation**:
@@ -84,9 +90,19 @@ _Avoid_: Event log, event feed
 The written record of one run's event stream, as the run wrote it and before it is read back into an event stream. Shortened to "event log" where nothing else could be meant.
 _Avoid_: Channel, event stream, event file
 
+**Does not finish**:
+Said of a run whose event stream ends without recording how the run ended, completed, aborted or stopped, as when its process dies.
+
 **Test manifest**:
 The test classes one test command is to run for one module, each either taken by one or more of the module's test processes or not yet taken by any. It names classes only, not their nested suites, scopes or tests. Shortened to "manifest" where nothing else could be meant.
 _Avoid_: Test plan, class list, expected tests
+
+**Take**:
+A process's claim on a test class of its module's test manifest. On the JVM, a process takes each class it picks up from those of its fork group still waiting to run; on Scala.js and Native, it takes every test class the test command was to run for its module.
+_Context_: A test process and a test class
+
+**Not-run test class**:
+A test class the test command was to run that the human-readable and JSON output show as not run, because no run reported it as a suite: a suite node named by its class name, aborted with reason *not run*, with no children, that names no run record.
 
 **Test run label**:
 A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
@@ -99,6 +115,9 @@ _Avoid_: Run node, worker record
 **Test command**:
 One evaluation of the command the Mill plugin adds for consolidated testing, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.
 _Avoid_: Mill command, invocation
+
+**Task folder**:
+The folder Mill gives a task to write its files in.
 
 **Supported Mill release**:
 A Mill release on which the Mill plugin's integration tests passed, as listed by the running release of this fork. Any other Mill release is unsupported, even within the same major version.

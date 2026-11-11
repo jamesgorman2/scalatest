@@ -30,7 +30,7 @@ Three deployable units.
 JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses core's `private[scalatest]` formatting of human-readable output, which is why it sits in core's package.
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
-- **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064–R-067).
+- **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064).
   - For each run that did not finish, and each process that ended before any run existed in it, it reports by class name each test class the process took (§ Modules § Mill plugin, Test manifest) that no run reported as a suite (R-066, R-094). A class is shown once, however many processes took it.
 - **Consolidation** — places every run's suites under the run's test run label, with one run record per run (R-078, R-080), beside the library's other inputs (§ APIs).
 - **Writers** — write progress output as events arrive (R-026), and the human-readable and JSON output once every event stream has ended (R-027).
@@ -86,8 +86,8 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the event log is one file per run, at the path the runner argument gives. The run appends each item to it unbuffered as it occurs, and the plugin reads it while the run appends (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.").
     - On the JVM the file has one fixed name, which Mill does not use, in the worker's `processFolder`. It is not in the worker's `sandbox`, so the tests' working directory holds nothing new (`SPECIFICATION.md` R-053). Mill writes a `processFolder`'s `testargs` with `CREATE_NEW`, so it starts at most one JVM there in one test command and the name cannot collide (`research/mill-test-worker-args.md` § 2.3). The plugin reads the file in each `processFolder` it starts a worker in.
-    - On Scala.js and Native the file is in the folder the test command owns for the module (R-053). Mill's test task gives the module one run in one process (§ External systems), so the module has one event log file.
-    - Before any test starts, each test command clears the folder it owns for each selected module, which holds every `processFolder`, and creates the module's launcher folder afresh. No earlier command's file is then read as a run (R-022, R-077), and Mill's `CREATE_NEW` write of `testargs` succeeds. The launcher folder holds the module's launcher and the file pairs it writes.
+    - On Scala.js and Native the file is in the folder the test command owns for the module (R-110). Mill's test task gives the module one run in one process (§ External systems), so the module has one event log file.
+    - Before any test starts, each test command clears the folder it owns for each selected module, which holds every `processFolder`, and creates the module's launcher folder afresh. No earlier command's file is then read as a run (R-022, R-077), and Mill's `CREATE_NEW` write of `testargs` succeeds. The launcher folder holds the module's launcher and the file pairs it writes. Each task folder R-049 and R-110 name is that task's Mill `Task.dest`.
     - The event log file never exists under its name without its complete item 1. On the JVM a `processFolder` that holds no event log file once its worker has ended is therefore a worker in which no run existed.
       - Such a worker gives no PID to watch (below). It has ended when Mill's test-runner subprocess call that started it returns. The plugin uses that return only where no event log file appeared; its captured output is then complete and its claims final.
   - **Under `JsDom`,** the event log is framed lines in the launcher's stdout file (`ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…"). The run writes each item as one line with the window's `console.log`, which jsdom forwards to Node's stdout.
@@ -109,9 +109,9 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
     - human-readable and JSON output: one text sink each;
   - each module selector, with the test modules it resolved to;
   - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
-- **Add a run**: its event stream, fed live as the test event log is decoded, with the test run label the caller names for it, and the output captured off the stdout and stderr of the run's processes (`SPECIFICATION.md` § Consolidation). Once the run's process has ended, the caller adds the test classes that process took, from the module's test manifest (§ Modules § Mill plugin).
-- **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its test run label, the test classes it took, and the output captured off its stdout and stderr.
-- **Add a module whose tests did not start**, with its test run label and, where a failure stopped them, that failure (R-058).
+- **Add a run**: its event stream, fed live as the test event log is decoded, with the test run label the caller names for it, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-042). Once the run's process has ended, the caller adds the test classes that process took, from the module's test manifest (§ Modules § Mill plugin).
+- **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its test run label, the test classes it took, and the output captured from its stdout and stderr.
+- **Add a module whose tests did not start** (R-058, R-114), with its test run label and, where a failure stopped them, that failure.
 - **Add a test class** left in a fork group's queue when the group's last worker ended (R-068).
 - **End**, once every event stream has ended: the library writes the human-readable and JSON output.
 
@@ -173,7 +173,7 @@ flowchart LR
   - The run's event stream ends without how the run ended (§ APIs § The emitter and the Mill plugin), holding everything the run had handed to the operating system (`SPECIFICATION.md` R-073). The library treats it as a run that does not finish (R-064–R-067), and progress output shows it aborted as soon as the stream ends (R-067).
   - Because each suite's structure arrives as the suite starts, every scope and test a constructed suite registered is known when the process dies (R-065). A suite the run never constructed sent nothing, so only its class is known, from the module's test manifest.
   - What the process wrote to stdout and stderr still reaches the library through process capture.
-  - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured off its streams (R-076) and the test classes it took.
+  - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it took.
   - On the JVM the library still reports each class the dead worker took that no run reported, from the worker's claims (§ Modules § Mill plugin, Test manifest). A worker claims one class at a time, so that is at most the class it held when it died. Classes no worker claimed stay in the queue (R-068).
 
 ## External systems
@@ -184,3 +184,5 @@ flowchart LR
   - The Native adapter runs `<CROSSCOMPILING_EMULATOR words> <binaryFile> <port>` on Mill's own stdin, stdout and stderr (`inheritIO()`), so no byte the binary writes passes through Mill's JVM (`research/js-native-channels.md` § 1.2, § 5.2).
   - `JsDom` window code has no `require` and no `process`, so a `JsDom` run can write no file, open no Node socket, and learn neither its PID nor its start time (`research/jsdom-channel.md` § 1).
 - **Metals, Bloop and IntelliJ** — launch runs without the runner argument, so the emitter stays off and every reporter receives what 3.2.19 sends (`SPECIFICATION.md` R-001, R-003).
+  - In IntelliJ's *forked* mode, its reporter writes TeamCity service messages (`##teamcity[…]`) to stdout, inferring each node's parent from `Ordinal` prefixes and `suiteId`. It needs each `SuiteStarting` and `ScopeOpened` before the tests inside it and every open closed, and silently drops event types it does not know.
+  - In *sbt shell* mode, IntelliJ parses the text ScalaTest prints with regular expressions.

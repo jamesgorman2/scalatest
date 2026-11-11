@@ -40,7 +40,7 @@ Decisions behind `../SPECIFICATION.md` on how runs, test run labels and module s
 - One reason for both leaves the reader to infer from the presence of a failure whether the module was skipped or broken.
 - A status of the label's own, beside the outcome every other node uses, adds a second way to say how a node ended.
 
-**Reasoning** The two call for different remedies: a skipped module needs a rerun, one that could not start needs a fix (`../SPECIFICATION.md` R-058). Aborted with a reason is how the test structure already shows a node that never ran.
+**Reasoning** The two call for different remedies: a skipped module needs a rerun, one that could not start needs a fix (`../SPECIFICATION.md` R-058, R-114). Aborted with a reason is how the test structure already shows a node that never ran.
 
 **Costs** A label carries an outcome only where its module's tests did not run (`../SPECIFICATION.md` R-083), so a label whose runs all failed shows none.
 
