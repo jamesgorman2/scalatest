@@ -44,7 +44,7 @@ Feature: The test command's output arguments
 ```gherkin
 Feature: The module's own ScalaTest arguments
 
-  Rule: An argument whose flag the runner R-125 names does not recognise fails the test command before any test starts, naming it (R-125)
+  Rule: An argument whose flag R-125's runner does not recognise fails the test command before any test starts, naming it (R-125)
     Scenario: AC-078 An unrecognised flag
       Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
       And the module's own ScalaTest arguments are `-l samples.Slow -y`

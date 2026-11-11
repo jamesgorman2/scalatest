@@ -4,9 +4,15 @@ Acceptance criteria for what holds outside the test command: compatibility with 
 
 ## Compatibility with ScalaTest 3.2.19
 
-AC-056 and AC-057 hold with the compatibility fixture compiled for, and run on this fork's and 3.2.19's builds for, each of Scala 2.11, 2.12, 2.13 and 3.3.
+AC-056 and AC-057 hold on each of Scala 2.11, 2.12, 2.13 and 3.3, with the compatibility fixture compiled for that version and run on this fork's and 3.2.19's builds for it.
 
-IntelliJ's *forked* mode is AC-056's `Runner.run` rows with the emitter off, its *BSP* mode, as Metals and Bloop launch runs, AC-056's `Framework` rows with the emitter off, and its *sbt shell* mode AC-057's row with the emitter off (R-003). In a build that adds the plugin, what an IDE asks of Mill's BSP server is [test-command.md](test-command.md) AC-093.
+Each IntelliJ run mode is a case of these criteria with the emitter off (R-003):
+
+- *forked* mode: AC-056's `Runner.run` rows;
+- *BSP* mode, as Metals and Bloop launch runs: AC-056's `Framework` rows;
+- *sbt shell* mode: AC-057's row.
+
+In a build that adds the plugin, what an IDE asks of Mill's BSP server is [test-command.md](test-command.md) AC-093.
 
 ```gherkin
 Feature: Compatibility with ScalaTest 3.2.19
@@ -39,7 +45,7 @@ Feature: Compatibility with ScalaTest 3.2.19
 
   Rule: The fork stays binary compatible with ScalaTest 3.2.x (R-004)
     Scenario: AC-058 MiMa against 3.2.19
-      When MiMa checks each artifact this fork publishes that ScalaTest 3.2.19 also publishes against 3.2.19's
+      When MiMa checks each artifact that both this fork and ScalaTest 3.2.19 publish against 3.2.19's
       Then it reports no binary incompatibility
 ```
 

@@ -31,7 +31,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
 - The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
-- Unlike R-048, R-049 and R-055 allow, the test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module.
+- The test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module. This narrows what R-048, R-049 and R-055 allow.
 - The test command supports Mill 1.3.1 only.
 - A module that tests with another framework or another release of this fork fails the test command. Unlike R-059, the failure need not come before any test starts or name the module, and consolidated output may still be written.
 
@@ -45,7 +45,8 @@ Each is left to the named feature of `../ROADMAP.md`.
 - More than one worker for a module, and a run given no task (R-071) (§ 3).
 - Class globs and framework arguments on the test command, the module's JUnit XML report, the paths Mill's test tasks put in their task folders (R-110), and the launcher's environment variables (R-111) (§ 4).
 - Running more than one module selector, or a module selector that resolves to anything other than one JVM test module (§ 5).
-- A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet), and failing a module that tests with another framework or another release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
+- A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet) (§ 5).
+- Failing a module that tests with another framework or another release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
 - An unsupported Mill release (R-093, R-118) (§ 6).
 - `--halt-on-failure` (§ 7).
 - What the consolidated output shows for a run that does not finish, or for a process that ends before any run exists in it (§ 8).
@@ -69,7 +70,7 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 ## Acceptance criteria
 
-The criteria are in the four `specification/` documents § Spec documents lists. In them:
+The criteria are in the four `specification/` documents listed in § Spec documents. In them:
 
 - The module is a JVM test module at module path `core.test`, in a build that adds the Mill plugin without changing the module's definition (R-092), and the test command runs it. Some criteria instead feed a run to the consolidation library directly, without Mill; the run's test run label is then `core.test`.
 - *The runner argument* is the ScalaTest runner argument that turns the emitter on (§ Scope). A run given it outside Mill writes its test event log to a file it names.
@@ -77,4 +78,10 @@ The criteria are in the four `specification/` documents § Spec documents lists.
 - A line is given without Mill's prefix (`specification/layout.md` AC-044). A line *sits under* another when it follows it, indented 2 spaces more, with no line between them indented as little as the other. *The lines for* a node are its own lines and every line under them.
 - Text and colours the criteria do not fix are ScalaTest 3.2.19's (R-106). Colour is on (R-124).
 - "With every stack frame left out" drops each line under a throwable's first line or `Cause:` line.
-- *The compatibility fixture* is a set of suites, at least one of each ScalaTest style, holding between them nested suites; scopes, one of them pending; tests that succeed, fail, are ignored, are pending and are cancelled; `info`, `note`, `alert` and `markup` messages from suites, scopes and tests; a suite whose `beforeAll` throws; and a test that writes to stdout and to stderr.
+- *The compatibility fixture* is a set of suites, at least one of each ScalaTest style, holding between them:
+  - nested suites;
+  - scopes, one of them pending;
+  - tests that succeed, fail, are ignored, are pending and are cancelled;
+  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests;
+  - a suite whose `beforeAll` throws;
+  - a test that writes to stdout and to stderr.

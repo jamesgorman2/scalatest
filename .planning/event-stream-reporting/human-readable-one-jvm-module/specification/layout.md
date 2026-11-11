@@ -53,7 +53,7 @@ Feature: The tree of the human-readable output
 
 ## Where a node's lines sit
 
-Every line sits under the line it belongs to (R-106), with *sits under* as defined above. Where that leaves a line's place open, it sits as follows.
+Every line sits under the line it belongs to (R-106). Where that leaves a line's place open, it sits as follows.
 
 | ID     | Line                                                                                                      | Sits under                                                         |
 |--------|-----------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
@@ -148,7 +148,7 @@ Feature: Where messages sit
 
 A collapsed subtree (R-107) shows its root's lines, then its count line (AC-016).
 
-- AC-055 A count line reads `(<counts> not run)`. `<counts>` gives how many suites, then scopes, then tests sit at any depth below the root, each as `<n> suite`, `<n> scope` or `<n> test` with `s` added where `<n>` is not 1, joined by `, `, leaving out a kind with none.
+- AC-055 A count line reads `(<counts> not run)`. `<counts>` gives how many suites, scopes and tests, in that order, sit at any depth below the root. Each count reads `<n> suite`, `<n> scope` or `<n> test`, with `s` added where `<n>` is not 1. Counts are joined by `, `, and a kind with none is left out.
 
 | ID     | Below the collapsed root    | Count line                             |
 |--------|-----------------------------|----------------------------------------|

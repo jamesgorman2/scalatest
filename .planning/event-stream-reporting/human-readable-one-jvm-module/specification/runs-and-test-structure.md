@@ -127,7 +127,7 @@ Feature: Failures
       Given the module's suites are the compatibility fixture
       And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
-      Then each line of that file from its first suite's name line, and before any line that begins `Run completed in`, other than a line that begins `+ ` (a message), is a line of the human-readable output, compared with leading spaces removed
+      Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, other than a line that begins `+ ` (a message), is a line of the human-readable output, compared with leading spaces removed
       And each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the human-readable output
 ```
 

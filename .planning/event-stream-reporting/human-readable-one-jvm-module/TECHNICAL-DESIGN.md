@@ -2,7 +2,12 @@
 
 ## Summary
 
-The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer), yet on the JVM it must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`. The test command must split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it, turn a worker's stdout and stderr, which arrive as byte chunks, into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting, which reads a live `Throwable` that the decoded event stream cannot rebuild and returns lines already indented and coloured, without changing what `StringReporter` prints.
+- The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM it must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`.
+- The test command must:
+  - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it;
+  - turn a worker's stdout and stderr, which arrive as byte chunks, into lines;
+  - read Mill's colour decision through `private[mill]` API.
+- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
 
 ## Critical code paths
 
@@ -60,7 +65,12 @@ This serves `specification/layout.md` AC-034.
 
 The `org.scalatest.tools.StringReporter` companion builds each line from a live `Throwable` (`getClass.getName`, `isInstanceOf[StackDepth]`, `isInstanceOf[PropertyCheckFailedException]`, `getCause`, `getStackTrace`), and returns whole lines, indented and in one colour.
 
-- Its line-building takes a throwable view in place of a `Throwable`: the error lines (`stringsToPrintOnError`, its nested `getStackTrace`, and `withPossibleLineNumber`), `Reporter.messageOrThrowablesDetailMessage` (`object Reporter` in `org/scalatest/Reporter.scala`, which `stringsToPrintOnError` calls for a blank message), and the text of info, alert, note and markup messages. The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
+- Its line-building functions take a throwable view in place of a `Throwable`:
+  - the error lines (`stringsToPrintOnError`, its nested `getStackTrace`, and `withPossibleLineNumber`);
+  - `Reporter.messageOrThrowablesDetailMessage` (`object Reporter` in `org/scalatest/Reporter.scala`, which `stringsToPrintOnError` calls for a blank message);
+  - the text of info, alert, note and markup messages.
+
+  The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
 - The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds:
   - the class name, and the message, absent where `getMessage` is `null`;
   - whether the throwable is a `StackDepth`, with the failed code's file name, file pathname and line number, each where defined;
@@ -75,7 +85,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 - The writer calls the stack-trace function with `S` and `F` off (`../SPECIFICATION.md` R-106). The decoded throwable therefore leaves the failed code's stack depth absent: only `StringReporter`'s `S` path reads it, and `s` will never need it (`../SPECIFICATION.md` R-128).
 - A characterisation test proves `StringReporter` byte-identical. It is written and passes before the change, and passes unchanged after it.
   - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, against text recorded from the code before the change. It turns each of `D`, `S`, `F` and `V` on and off, and for the end-of-run summary, which formats a throwable only in its reminders, each of `I`, `T`, `G` and `K`.
-  - Its throwables have frames fixed with `setStackTrace`, and its `StackDepth` exceptions a fixed `source.Position`: a non-`StackDepth` throwable of more than ten frames with a non-`StackDepth` cause, a `StackDepth` exception with a cause, and a `PropertyCheckFailedException`. One failure carries analysis lines.
+  - Its throwables are a non-`StackDepth` throwable of more than ten frames with a non-`StackDepth` cause, a `StackDepth` exception with a cause, and a `PropertyCheckFailedException`. Their frames are fixed with `setStackTrace`, and each `StackDepth` exception's `source.Position` is fixed. One failure carries analysis lines.
   - The existing `StringReporterSuite`, `StringReporterAlertSpec` and `StringReporterSummarySpec` stay. They print no non-`StackDepth` frames, no `Cause:` line and no `PropertyCheckFailedException`, so they cannot prove the change alone.
 
 ## Stdout
