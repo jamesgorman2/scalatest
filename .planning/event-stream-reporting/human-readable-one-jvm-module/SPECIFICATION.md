@@ -26,6 +26,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - A ScalaTest runner argument on the JVM that turns the emitter on, so the run writes its test event log to a file.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
 - The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to the console.
+- The Mill plugin is built against Mill 1.3.1, which is its one supported Mill release.
 
 ### Out of scope
 
