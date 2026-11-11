@@ -1,6 +1,32 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces and what its JSON output holds, newest first.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured and formatted, and what its JSON output holds, newest first.
+
+## Human-readable output on stdout is coloured where Mill colours its own console output.
+
+**Alternatives** Colouring always, as ScalaTest does under Mill's own test tasks, whose worker logger always reports ANSI codes as supported, ignores Mill's `--color` and `NO_COLOR`.
+
+**Reasoning** Mill's own colour decision already weighs `--color`, an interactive console, `FORCE_COLOR`, `NO_COLOR` and BSP mode, so following it colours the test command's output exactly where Mill's output around it is coloured (`../SPECIFICATION.md` R-124).
+
+**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, where ScalaTest under Mill's own test tasks colours its output.
+
+**Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
+
+**See** `../research/mill-runner-progress-without-trait.md` § 5.3.
+
+---
+
+## Short and full stack traces in the human-readable output leave out a test assertion failure's stack trace, unlike ScalaTest's `S` and `F`.
+
+**Alternatives** Following ScalaTest's `S` and `F` adds a stack trace to every assertion failure, which is noise to the reader, and needs the test event log to carry frames `../JSON-LAYOUT.md` § Throwables leaves out.
+
+**Reasoning** An assertion failure's message already carries the file and line it failed at. Leaving its trace out keeps the test event log to what `../JSON-LAYOUT.md` § Throwables records, which gives a `StackDepthException` a location and no stack trace (`../SPECIFICATION.md` R-128).
+
+**Costs** `s` and `f` do not mean exactly what ScalaTest's `S` and `F` mean, and no output shows the frames beneath an assertion failure's file and line.
+
+**Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
+
+---
 
 ## The consolidation produces no JUnit XML.
 

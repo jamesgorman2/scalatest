@@ -2,6 +2,22 @@
 
 Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mill releases the test command runs on, how, and when it fails, newest first.
 
+## A run receives only those of its module's own ScalaTest arguments on an allow-list that holds no reporter, JUnit or TestNG argument.
+
+**Alternatives**
+
+- Passing the module's own arguments as Mill's task does lets a reporter the module configures print in each run, and its prints appear in the consolidated output as text repeating the events.
+- Withholding only `-o` and `-e` keeps reporters off the console, but still passes the module's other reporters, which write output of their own, and its JUnit and TestNG arguments.
+- Letting a module's own `-o` format the consolidated output formats one module apart from the rest, which has no meaning in output that consolidates every module.
+
+**Reasoning** Under the test command all console output goes through the plugin, so a reporter in a run only repeats what the event log already carries (`../SPECIFICATION.md` R-041). The allow-list keeps the arguments ScalaTest's `Framework` honours that choose, tag, time and parallelise tests, and drops every reporter, the JUnit and TestNG arguments and those `Framework` rejects (R-125).
+
+**Costs** A module that configures a reporter of its own, such as a JUnit XML or HTML reporter with `-u` or `-h`, gets no such report under the test command. The plugin must withhold each argument with its values by ScalaTest's own argument parsing, since a flag that takes a value consumes the next argument whatever it is.
+
+**Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
+
+---
+
 ## A release of the Mill plugin supports exactly the Mill releases its integration tests passed on, not a range.
 
 **Alternatives**

@@ -24,6 +24,8 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - An emitter in ScalaTest that sends one run's events, test structure and the output it captures in a single test event log.
 - A consolidation library that produces the consolidated output from many runs.
 - A Mill plugin that hosts the consolidation library, reads the test event log of each run it starts, and adds the test command, which runs the tests of every test module its module selectors name, with the emitter on.
+- The test command's output arguments: progress and human-readable output on its stdout or in files, JSON output in files, any number of files, and formatting and filtering of human-readable output.
+- A module a build defines to preset a test command's arguments (R-126).
 
 All three cover runs on the JVM, Scala.js and Native, on these Scala versions: the JVM on Scala 2.11, 2.12, 2.13 and 3.3; Scala.js and Native on 2.12, 2.13 and 3.3. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
 
@@ -37,6 +39,7 @@ A test event log's format, the consolidation library's API and the switch by whi
 - A supported way to turn the emitter on outside Mill.
 - Carrying an event's payload, or any other part of an event or throwable that the consolidated output neither shows nor uses.
 - Changing any existing ScalaTest reporter.
+- New or changed ScalaTest runner arguments, beyond the switch by which the Mill plugin turns the emitter on. `-o`, `-f` and their characters (R-048, R-049, R-127) are the test command's own arguments.
 - A consolidated HTML report; a follow-up epic.
 - Consolidated JUnit XML.
 - A consolidated CTRF (Common Test Report Format) report; a possible later feature.
@@ -102,7 +105,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### The outputs
 
-- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that is turned on. Each is a separate output, and any combination can be on together, including progress output with JSON output.
+- R-020 For one test command, the Mill plugin produces one set of consolidated output covering every run the test command started: each of progress output, human-readable output and JSON output that the test command's stdout or a file holds (R-048, R-049). Each is a separate output, any combination can be on together, including progress output with JSON output, and one output may go to stdout and to files at once.
 - R-026 Progress output is written while the runs execute, from the events received so far. It is not held until a run or the test command completes.
 - R-027 The human-readable and JSON output are written together, once every run's event stream has ended.
 
@@ -111,13 +114,20 @@ Output is *captured against* a suite, scope or test when the means that captured
 - R-078 In the human-readable and JSON output, the consolidation is the root, one for each test command under Mill. Its children are its test run labels, and each label's children are the top-level suites of its runs. No run and no module selector is a node.
 - R-079 In the human-readable and JSON output, test run labels appear in ascending lexicographic order, as do the top-level suites under each label, by name.
 - R-083 A test run label has an outcome only where its module's tests did not run.
-- R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run.
+- R-021 The human-readable and JSON output show every suite, scope and test, every failure and every piece of captured output of every run, except the lines a filter hides in the human-readable output (R-127).
 
 ### Human-readable output
 
-- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it, except that:
+- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as its formatting and filtering characters change it (R-127). With no such character, it shows no durations, no stack trace for a `StackDepthException` and no end-of-run reminder. Except that:
   - indentation is added where needed to show the nesting of test run labels and suites;
   - its root is the consolidation, with test run labels below it (R-078), and labels and top-level suites take the order R-079 gives (ascending lexicographic, by name).
+- R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as the ScalaTest 3.2.19 reporter configuration character of the same letter in upper case does:
+  - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
+  - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.
+
+  Each `-o` and `-f` formats only its own output, and its characters apply alike to every module of the test command. A `-f` naming JSON output takes none (R-121). Which of them apply to progress output is left to the feature that builds progress output.
+- R-128 `s` and `f` add no stack trace for a test assertion failure, that is a `TestFailedException` or any other `StackDepthException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.19).
+- R-124 Human-readable output on the test command's stdout is coloured where Mill colours its own console output, and not where `w` is given. A file `-f` writes is never coloured. This overrides R-106 (the format ScalaTest 3.2.19 prints) for colour.
 - R-107 In the human-readable output, a subtree whose nodes all share one error is collapsed to its root. This overrides R-021 (every suite, scope and test is shown) and R-106 (each is shown as ScalaTest 3.2.19 prints it). The JSON output collapses nothing.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
   - output captured against the run;
@@ -167,12 +177,14 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### Arguments
 
-- R-055 The test command's arguments include:
+- R-055 The test command's arguments let the user, or a module that runs the test command over other modules (R-126), specify:
   - one or more module selectors, each a separate argument; `+` cannot join them, because Mill consumes it before the test command runs;
   - optional class globs and framework arguments, as Mill's `testOnly` takes them, applying alike to every selected test module;
-  - `--halt-on-failure`;
-  - an argument that turns progress output off, and one that turns human-readable output off;
-  - an argument that turns JSON output on and one that gives the JSON file's path, which may be the same argument.
+  - whether the test command halts on the first failure (`--halt-on-failure`) or runs every selected test module (R-056);
+  - whether the test command's stdout holds progress output, human-readable output, both or neither (R-048);
+  - one or more files, each holding JSON, progress or human-readable output (R-049);
+  - formatting and filtering for that output (R-127).
+- R-126 A build can define a module that presets a test command's arguments, such as module selectors and tags, so that one short `mill` command runs that test command. A test module it selects still needs no change to its definition (R-092).
 
 ### Running the tests
 
@@ -180,7 +192,9 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 - R-053 The test command runs each selected test module's tests as Mill's `testOnly` runs them with the test command's class globs and framework arguments, or as `testForked` runs them when no class globs are given:
   - the same tests, in the processes Mill's fork grouping, test parallelism and test queue start;
-  - the same working directory, arguments and environment, plus only what is required to turn the emitter on, with its test event log, and to turn off the reporter ScalaTest uses when no reporter is configured.
+  - the same working directory and environment;
+  - ScalaTest arguments the test command derives from its own: it turns its arguments into the corresponding ScalaTest arguments, transcoding them where needed, and adds others, among them what turns the emitter on, with its test event log, and turns off the reporter ScalaTest uses when no reporter is configured. Of the module's own ScalaTest arguments, it passes only those R-125 allows.
+- R-125 Each run receives those of its test module's own ScalaTest arguments (Mill's `testArgsDefault`) whose flag is `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, each with its values, ahead of the arguments the test command adds. Every other argument of the module is withheld with its values, among them every reporter argument and the JUnit and TestNG arguments.
 - R-110 A path that Mill's `testOnly` or `testForked` puts inside its task folder is instead at the same relative path inside a folder the test command owns for that test module alone, outside the test command's own task folder. This overrides R-053 (the tests run as that Mill task runs them).
 - R-111 Environment variables that Mill's launcher sets from its own command line, such as `MILL_PARAMS` from `mill.bat`, hold the `mill` command line that started the test command. This overrides R-053 (the same environment as that Mill task gives).
 - R-047 The test command writes each selected test module's JUnit XML report as the Mill task R-053 names (`testOnly`, or `testForked` when no class globs are given) writes it, at the path R-110 moves it to, in the folder the test command owns for that module.
@@ -203,7 +217,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 These hold for every run a test command starts.
 
 - R-040 Nothing the run writes to stdout or stderr reaches the console except through the consolidated output.
-- R-041 The run's events are not printed by the reporter ScalaTest uses when no reporter is configured. This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.19 sends).
+- R-041 No ScalaTest reporter of the run prints its events: neither the reporter ScalaTest uses when no reporter is configured, nor one the test module's own ScalaTest arguments configure (R-125). This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.19 sends).
 - R-042 Output captured from the stdout and stderr of the run's processes is captured against the run.
 - R-043 Output captured from the run's processes' stdout keeps its order, as does output captured from their stderr, whatever its source. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
 
@@ -220,12 +234,13 @@ These hold for every run a test command starts.
 
 ### Where the consolidated output goes
 
-- R-048 Progress output and human-readable output are each on unless a test-command argument turns it off, and each is written to the console.
+- R-048 With no `-o` argument, the test command's stdout holds progress output and human-readable output. An `-o` names what stdout holds instead by its output letters, `H` for human-readable output and `P` for progress output. A bare `-o`, naming neither, leaves stdout without consolidated output.
+- R-129 The test command writes no consolidated output to stderr.
 - R-090 On the console, progress output is written as whole lines, never as single characters. Whether or not progress output also shows a summary of the test command rewritten in place, the lines show every failure a run reports and each other cause of failure R-046 lists for the test command, including each run that aborts or does not finish.
 - R-089 Where Mill redraws its prompt in place (the status lines at the foot of the console), progress output also shows on the console a current summary of the test command, on one line rewritten in place.
 - R-091 Neither progress output's lines nor its summary erase Mill's console output, and Mill's console output erases neither.
-- R-085 JSON output is off unless a test-command argument turns it on.
-- R-049 JSON output is written to a file in the test command's task folder, or to the path a test-command argument gives, never to the console.
+- R-049 An `-f`, followed by an output letter and a path, writes that output to the file at that path: `J` JSON output, `H` human-readable output or `P` progress output. More than one `-f` may be given, and none changes what stdout holds (R-048). Whether one `-f` may name more than one output letter is left to the feature that writes files.
+- R-085 JSON output is off unless an `-f` names it.
 - R-077 When the test command starts, before any test starts, it deletes or empties each file it will write consolidated output to that already exists. However the test command ends, no such file holds the result of an earlier test command.
 
 ## A run given no task
@@ -286,7 +301,7 @@ A process *takes* a test class as follows:
 
 ### A test module the test command cannot run
 
-- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose test event logs the Mill plugin reads, or to a Scala.js test module whose JS environment is not `NodeJs` or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. The JSON file stays deleted or emptied, as R-077 left it when the test command started.
+- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose test event logs the Mill plugin reads, or to a Scala.js test module whose JS environment is not `NodeJs` or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. Each file it was to write stays deleted or emptied, as R-077 left it when the test command started.
 
 ### A test module whose tests cannot start
 
@@ -301,7 +316,7 @@ WHERE `--halt-on-failure` is given:
 
 ## An interrupted test command
 
-- R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON, not even a placeholder; its progress output may show runs the interrupt ended. This overrides R-027 (both are written once every run's event stream has ended). The JSON file stays deleted or emptied, as R-077 left it when the test command started.
+- R-069 IF the test command is interrupted, as by Ctrl-C, THEN it writes no human-readable output and no JSON, not even a placeholder; its progress output may show runs the interrupt ended. This overrides R-027 (both are written once every run's event stream has ended). Each file of human-readable or JSON output stays deleted or emptied, as R-077 left it when the test command started.
 - R-116 When the test command is interrupted, Mill's client and the operating system set its exit status. This overrides R-046 (the causes for which the test command fails).
 - R-117 When the test command is interrupted, the requirements on a run that does not finish do not hold: R-064, R-065, R-075 and R-067 (what is aborted, what appears, and when progress output shows it) and R-066 (its not-run test classes).
 

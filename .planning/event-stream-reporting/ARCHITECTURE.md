@@ -66,7 +66,7 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 
 ### The emitter and the Mill plugin
 
-- **The runner argument** — one ScalaTest runner argument, appended to the framework arguments the test command passes each selected module. It turns the emitter on and turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-041). It reaches the runner on every runtime and in every JS environment the epic covers.
+- **The runner argument** — one ScalaTest runner argument, among those the test command adds to each run's arguments (`SPECIFICATION.md` R-053, R-125). It turns the emitter on and turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-041). It reaches the runner on every runtime and in every JS environment the epic covers.
   - Where the test event log is a file (below), the argument carries its path. On Scala.js under `NodeJs` and on Native that is the absolute path of the module's one event log file.
   - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's framework arguments are those of the `TestModuleUtil` its subprocess call is made on, so the test command makes each worker's call on one built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no test event log (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
@@ -87,7 +87,7 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the event log is one file per run, at the path the runner argument gives. The run appends each item to it unbuffered as it occurs, and the plugin reads it while the run appends (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.").
     - On the JVM the file has one fixed name, which Mill does not use, in the worker's `processFolder`. It is not in the worker's `sandbox`, so the tests' working directory holds nothing new (`SPECIFICATION.md` R-053). Mill writes a `processFolder`'s `testargs` with `CREATE_NEW`, so it starts at most one JVM there in one test command and the name cannot collide (`research/mill-test-worker-args.md` § 2.3). The plugin reads the file in each `processFolder` it starts a worker in.
     - On Scala.js and Native the file is in the folder the test command owns for the module (R-110). Mill's test task gives the module one run in one process (§ External systems), so the module has one event log file.
-    - Before any test starts, each test command clears the folder it owns for each selected module, which holds every `processFolder`, and creates the module's launcher folder afresh. No earlier command's file is then read as a run (R-022, R-077), and Mill's `CREATE_NEW` write of `testargs` succeeds. The launcher folder holds the module's launcher and the file pairs it writes. Each task folder R-049 and R-110 name is that task's Mill `Task.dest`.
+    - Before any test starts, each test command clears the folder it owns for each selected module, which holds every `processFolder`, and creates the module's launcher folder afresh. No earlier command's file is then read as a run (R-022, R-077), and Mill's `CREATE_NEW` write of `testargs` succeeds. The launcher folder holds the module's launcher and the file pairs it writes. Each task folder R-110 names is that task's Mill `Task.dest`.
     - The event log file never exists under its name without its complete item 1. On the JVM a `processFolder` that holds no event log file once its worker has ended is therefore a worker in which no run existed.
       - Such a worker gives no PID to watch (below). It has ended when Mill's test-runner subprocess call that started it returns. The plugin uses that return only where no event log file appeared; its captured output is then complete and its claims final.
   - **Under `JsDom`,** the event log is framed lines in the launcher's stdout file (`ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…"). The run writes each item as one line with the window's `console.log`, which jsdom forwards to Node's stdout.
@@ -104,9 +104,9 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
 The Mill plugin is the library's only caller (`decisions/event-log-contract.md` "The consolidation library's API carries no compatibility promise…"). Its operations:
 
 - **Start** a consolidation, given:
-  - a sink for each consolidated output that is on:
-    - progress output: one for whole lines and one for a one-line summary rewritten in place (`SPECIFICATION.md` R-089, R-090);
-    - human-readable and JSON output: one text sink each;
+  - a sink for each place a consolidated output goes, stdout or a file (`SPECIFICATION.md` R-048, R-049), with that place's formatting and filtering characters (R-127):
+    - progress output on stdout: one for whole lines and one for a one-line summary rewritten in place (R-089, R-090);
+    - any other: one text sink;
   - each module selector, with the test modules it resolved to;
   - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
 - **Add a run**: its event stream, fed live as the test event log is decoded, with the test run label the caller names for it, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-042). Once the run's process has ended, the caller adds the test classes that process took, from the module's test manifest (§ Modules § Mill plugin).
@@ -117,7 +117,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 
 ## Data flow
 
-The test command runs each selected module's tests under a task context it supplies, adding the runner argument to the framework arguments (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."):
+The test command runs each selected module's tests under a task context it supplies, giving each run the ScalaTest arguments `SPECIFICATION.md` R-053 and R-125 state, the runner argument among them (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."):
 
 - on the JVM, it runs the module's test discovery itself without the runner argument, then drives Mill's test queue, starting each worker through Mill's test-runner subprocess call (`ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…");
 - on Scala.js and Native, it evaluates the module's own Mill test task. In that evaluation only, it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher (`ARCHITECTURE-DECISIONS.md` "The plugin installs each launcher by replacing a task's value…").
@@ -162,8 +162,8 @@ flowchart LR
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
   CMD -- "labels, selectors, test classes each process took, modules not started, test classes left in a queue, processes with no run, Mill version" --> LIB
-  LIB -- "progress lines and summary, as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
-  LIB -- "JSON, once every stream has ended" --> OUT["File the test command supplies"]
+  LIB -- "on stdout: progress lines and summary, as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
+  LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]
 ```
 
 *A run never writes to the console: what it reports reaches the console only through the consolidation library.*

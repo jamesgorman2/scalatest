@@ -111,8 +111,11 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's results are where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
-**Costs** This output arrives apart from the test event log, so its place among the run's events is not kept (`../SPECIFICATION.md` R-043). What a reporter the user configured prints appears in the consolidated output as text repeating the events.
+**Costs** This output arrives apart from the test event log, so its place among the run's events is not kept (`../SPECIFICATION.md` R-043).
 
-**Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
+**Settled by**
+
+- [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
+- [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
 
 ---
