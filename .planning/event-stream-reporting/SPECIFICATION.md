@@ -94,7 +94,7 @@ These hold for each run's test structure and for how the human-readable and JSON
 ### Outcomes and durations
 
 - R-098 Every test has an outcome. A scope has one only when it is pending or aborted, a suite only when it is aborted, and a run only when it is aborted or stopped. No node is given an outcome rolled up from its children; readers roll them up.
-- R-099 A suite that aborts, including one whose constructor throws, is shown as aborted on every runtime. The scopes open inside it when it aborts are aborted.
+- R-099 A suite that aborts, including one whose constructor throws, is shown as aborted on every runtime. The scopes and tests open inside it when it aborts are aborted.
 - R-100 Each nested suite, scope and test a run was to execute that never started is aborted with reason *not run*.
 - R-112 A suite, scope or test that a filter excludes, as by tag or test name, is not aborted as R-100 aborts a node that never started. It is shown only as the events ScalaTest 3.2.19 reports for it give.
 - R-103 A node that ran has a duration, except where the events that time it carry none. A node that never ran has none.
@@ -120,11 +120,11 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 - R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as changed by its formatting and filtering characters (R-127), except that:
   - its root is the consolidation, with test run labels below it (R-078), and labels and top-level suites take the order R-079 gives (ascending lexicographic, by name);
-  - every line is indented under the line it belongs to, in place of 3.2.19's indentation: a suite under its test run label or the suite that nests it, and a node's children, messages and failure under the node's own line;
-  - each message is shown under the node it attaches to (R-097), marked with its kind (info, note, alert or markup) as captured output is shown with its stream (R-012);
-  - a suite with no tests that nests suites shows its name line;
-  - an outcome 3.2.19 never prints, such as aborted with reason *not run*, is shown with its node;
-  - on stdout, each line carries the prefix Mill puts on each line of the test command's task (R-050).
+  - every line is indented under the line it belongs to, in place of 3.2.19's indentation;
+  - each message is marked with its kind (R-097);
+  - every suite shows its name line, including one for which 3.2.19 prints none;
+  - each outcome R-098 gives a node, and each reason R-100, R-101, R-102, R-058 and R-114 give, is shown with its node, including where 3.2.19 prints no line for it;
+  - on stdout, each line carries the prefix Mill puts on every line the test command's own task writes.
 - R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.19 reporter configuration character:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.
@@ -132,7 +132,7 @@ Output is *captured against* a suite, scope or test when the means that captured
   Each `-o` and `-f` formats only its own output, and its characters apply alike to every module of the test command. A `-f` naming JSON output takes none (R-121). This overrides R-021, R-097 and R-012 in the human-readable output for the lines a filter hides.
 - R-128 `s` and `f` add no stack trace for a `StackDepthException`, such as a `TestFailedException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.19).
 - R-124 Human-readable output on the test command's stdout is coloured where Mill colours its own console output, and not where `w` is given. A file `-f` writes is never coloured. This overrides R-106 (the format ScalaTest 3.2.19 prints) for colour.
-- R-107 In the human-readable output, a subtree is *collapsed*, shown as its root alone with a count of the suites, scopes and tests below it, when its root is aborted and every other node in it is aborted with reason *not run* (never started). Nothing else is collapsed: a node that started never collapses into an ancestor, and siblings are never merged. This overrides R-021 (every suite, scope and test is shown). The JSON output collapses nothing.
+- R-107 In the human-readable output, a subtree is *collapsed*, shown as its root alone, with how many nodes it hides where it hides any, when its root is aborted and every other node in it is aborted with reason *not run* (never started). Nothing else is collapsed: a node that started never collapses into an ancestor, and siblings are never merged. This overrides R-021 (every suite, scope and test is shown). The JSON output collapses nothing.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
   - output captured against the run;
   - messages attached to the run rather than to a suite;

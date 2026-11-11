@@ -33,7 +33,7 @@ A node's keys, in order: `kind`, `name`, `label`, `suiteId`, `location`, `outcom
 
   Absent where the node has none (R-098).
 - `reason` — `notRun`, only on a node aborted with reason *not run* (R-095, R-100, R-101).
-- `message`, `throwable` — on a failed, canceled or aborted node: the `message` and `throwable` (§ Throwables) of its closing `TestFailed`, `TestCanceled` or `SuiteAborted`. A test that a `DistributedTestRunnerSuite`'s `SuiteAborted` aborted takes them from that event. A node aborted without a closing event of its own has neither: a scope open when its suite aborted (R-099), a node that never started (R-100), or a node its run left unfinished (R-064).
+- `message`, `throwable` — on a failed, canceled or aborted node: the `message` and `throwable` (§ Throwables) of its closing `TestFailed`, `TestCanceled` or `SuiteAborted`. A test that a `DistributedTestRunnerSuite`'s `SuiteAborted` aborted takes them from that event. A node aborted without a closing event of its own has neither: a scope or test open when its suite aborted (R-099), a node that never started (R-100), or a node its run left unfinished (R-064).
 - `startedAt` — the opening event's: `SuiteStarting`, `ScopeOpened` or `TestStarting`. Absent on a node that never started.
 - `endedAt` — the closing event's. For a node aborted without a closing event of its own, that of the `SuiteAborted` or `RunAborted` that aborted it, and absent where there is none.
 - `duration` — for a suite or test, its closing event's, absent where that event carries none, as `TestIgnored` never does. For a scope, and for a node aborted without a closing event of its own, `endedAt - startedAt`, absent unless both are present. A node that never ran has none (R-103).
