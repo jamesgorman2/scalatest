@@ -143,7 +143,7 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `spe
 - The test forks one JVM for each run, on the fixture's compiled classes plus either 3.2.19's resolved classpath or the fork's, as IntelliJ's forked mode and a build tool's test worker each start a JVM of their own. No JVM-wide state, such as `System.out` or a system property, then passes from one run to the other.
 - In each JVM the recorders write each event to a file as one line, holding every field but timestamps, durations and thread names. The test compares the two runs' files line by line.
 - AC-116 runs in a Scala.js and a Native test project of the fork's sbt build, for each Scala version. The fixture and the recorders compile once against 3.2.19's artefacts for the platform, and the test links them twice, once with 3.2.19's and once with the fork's. There the recorders print each event as one line to stdout, and the test compares the two runs' lines as above.
-- AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.19 and passes `-f` in its own ScalaTest arguments; Mill's `testForked` on that module writes the file the criterion compares with.
+- AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.19 and passes `-f` in its own ScalaTest arguments, configured as `SPECIFICATION.md` § Acceptance criteria requires of every JVM test module of a criterion's build; Mill's `testForked` on that module writes the file the criterion compares with.
 
 ### MiMa
 
