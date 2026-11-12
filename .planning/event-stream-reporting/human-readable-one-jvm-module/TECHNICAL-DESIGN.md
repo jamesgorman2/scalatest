@@ -115,6 +115,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - the events `Framework` relays from a sub-process sbt forks, and the `RunAborted` it sends when it can no longer read them;
   - the run events of the reruns that `Runner`'s `-g` graphical reporter starts through `RunnerJFrame`, `SuiteRerunner` and `TestRerunner`.
 - Event log reading polls each file every 10 ms, the only interval measured (`../research/jvm-file-channel.md` § 2).
+- The handle **Decode** returns (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is a public opaque type in the library over core's decoded item, whose classes are `private[scalatest]`.
 - A suite's structure takes each scope's and test's label from the style's registration tree, before any of them runs. The structure precedes the suite's first event (`specification/test-event-log.md` AC-096), and a test that never starts (AC-097) or never closes (`TestStarting` carries `MotionToSuppress`) has no event giving its label. It builds each as `Engine.runTestImpl` and `runTestsInBranch` do, in `Engine` and `AsyncEngine`, and drops the leading indentation:
   - a test's from `Suite.getIndentedTextForTest` over its text with its parent's child prefix, with the `includeIcon` its style's `runTest` passes, or `true` for a test the filter ignores, as `TestIgnored`'s formatter has it. That flag is `false` only in `AnyFeatureSpecLike`, `FixtureAnyFeatureSpecLike` and the `FeatureSpecLike` and `FixtureFeatureSpecLike` that `project/GenSafeStyles.scala` generates from them (AC-103);
   - a scope's from `getIndentedTextForInfo` over its text with its parent's child prefix, with no icon.
@@ -142,23 +143,31 @@ Each item is a JSON object (`TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run'
 Each item's first key is `item`, naming its kind. The items are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and their keys, in order, are:
 
 1. `item` `runStarted`; `pid`; `startTime`, the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
-2. `item` `structure`; `nodes`, an array of the suite's nodes, the suite first and every other node after its parent and its earlier siblings. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes item 2 gives it. A node's `id` is an integer.
+2. `item` `structure`; `nodes`, an array of the suite's nodes in depth-first pre-order, each node's children in declared order. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes item 2 gives it. A node's `id` is an integer.
 3. `item` `event`; `node`, the `id` of the node the event is tagged with, absent where it is tagged as the run's; `event`, its `org.scalatest.events` class's simple name; then the event's fields.
 4. `item` `runEnded`; `outcome`: `completed`, `aborted` or `stopped`.
 
 An event's fields:
 
+- A decoded class holds every field of its `org.scalatest.events` class except:
+  - `ordinal`, `formatter`, `rerunner` and `payload`;
+  - `recordedEvents` (§ The test event log on the JVM);
+  - the event's copy of its node's names and IDs: `suiteName`, `suiteId`, `suiteClassName`, `testName`, `testText`, `nameInfo`, and a `ScopeOpened`'s, `ScopeClosed`'s or `ScopePending`'s `message`, since names, IDs, class names and labels come from item 2 through the node the event is tagged with;
+  - `DiscoveryStarting`'s `configMap`, since the run record's comes from `RunStarting`.
 - Its keys are the field names of its decoded class, in that class's declaration order. Each decoded class names and orders the fields it holds as its `org.scalatest.events` class does.
+- A field whose `org.scalatest.events` type is not an `Option` is required, except that an empty sequence omits its key and decodes as empty.
 - A `String` is a JSON string, an `Int` or `Long` a number and a `Boolean` `true` or `false`. A sequence is an array, and `None` omits its key.
 - A case class, such as a `Summary`, is an object of its fields under the same rules. A member of a sealed family, such as a `Location`, is that object with first key `kind` holding its class's simple name: `{"kind":"SeeStackDepthException"}`.
-- A `ConfigMap` is an object of each value's `toString`.
-- A throwable is an object with these keys, in order, written in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one:
-  - `id`, numbered from 1 in the order the item writes its throwables. A throwable already written in the item is `{"ref": <id>}`. Identity is per item, so a torn item breaks no other.
-  - `className`; `message`.
+- A `ConfigMap` is an object of each value's `toString`, its keys in ascending `String.compareTo` order.
+- A throwable is an object with these keys, in order:
+  - `id`, numbered from 1 in the order the item writes its throwables. A throwable the item has already written, the same object and never merely an `equals` one, is `{"ref": <id>}`. Identity is per item, so a torn item breaks no other.
+  - `className`; `message`, absent where `getMessage` is `null`.
   - `stackDepth`, only on a `StackDepth`: an object of `fileName`, `filePathname` and `lineNumber`, the failed code's, each present where defined.
   - `propertyCheck`, `true`, only on a `PropertyCheckFailedException`, whose message already holds its line number.
-  - `stackTrace`, its frames, a `StackDepth`'s included, each a frame of `../JSON-LAYOUT.md` § Throwables followed by `text`, its `StackTraceElement.toString`, which on JDK 9 and later can hold a module and a class loader name.
+  - `stackTrace`, its frames, a `StackDepth`'s included, each a frame with the keys `../JSON-LAYOUT.md` § Throwables gives a frame, each absent where that section says, followed by `text`, its `StackTraceElement.toString`, which on JDK 9 and later can hold a module and a class loader name.
   - `cause`; `suppressed`, in order.
+
+A line cannot be decoded where it is not one JSON object, holds a key this section does not give its object, lacks a required key, or holds an `item`, `event`, `kind` or `outcome` value this section does not give.
 
 ## Publishing
 
