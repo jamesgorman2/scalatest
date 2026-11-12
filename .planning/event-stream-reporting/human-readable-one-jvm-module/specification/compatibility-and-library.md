@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: compatibility, the emitter and the library
 
-Acceptance criteria for what holds outside the test command: compatibility with ScalaTest 3.2.19, the test event log a run writes, and the consolidation library without Mill. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
+Acceptance criteria for what holds outside the test command: compatibility with ScalaTest 3.2.19, the emitter on each of the JVM's Scala versions, and the consolidation library without Mill. [test-event-log.md](test-event-log.md) gives what the test event log holds. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
 
 ## Compatibility with ScalaTest 3.2.19
 
@@ -49,35 +49,10 @@ Feature: Compatibility with ScalaTest 3.2.19
       Then it reports no binary incompatibility
 ```
 
-## The test event log
+## The emitter on each Scala version
 
 ```gherkin
-Feature: The test event log a run writes
-
-  Rule: What a run sends does not depend on its reporters (R-063)
-    Scenario Outline: AC-059 <reporters>
-      Given the compatibility fixture
-      When `Runner.run` runs it sequentially with the runner argument, once with no reporter argument and once with <reporters>
-      Then the two runs' test event logs hold the same items, apart from timestamps, durations and thread names
-
-      Examples:
-        | reporters                                                        |
-        | `-oDF`                                                           |
-        | `-oNCXEHLOPQRM`, whose event-filter characters drop every event  |
-        | `-e` and a `-C` recording reporter                               |
-
-  Rule: A run's test event log records how the run ended (R-074)
-    Scenario Outline: AC-060 A run that ends <ended>
-      Given <the run>
-      When <launch> runs it with the runner argument
-      Then the run's test event log records that the run ended <ended>
-
-      Examples:
-        | the run                                                                                         | launch       | ended     |
-        | suite `SqrtPropSpec` of `layout.md` AC-002                                                      | `Framework`  | completed |
-        | suite `SqrtPropSpec` of `layout.md` AC-002                                                      | `Runner.run` | completed |
-        | suite `StackFunSpec`, whose test `throws on pop` throws `OutOfMemoryError("Java heap space")`   | `Runner.run` | aborted   |
-        | suite `StopSuite`, which mixes in `StopOnFailure` and whose first test fails                    | `Runner.run` | stopped   |
+Feature: The emitter on each of the JVM's Scala versions
 
   Rule: The emitter covers the JVM on each of its Scala versions (`../../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-061 Scala <version>

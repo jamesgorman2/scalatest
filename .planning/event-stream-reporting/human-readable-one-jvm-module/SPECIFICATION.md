@@ -15,7 +15,8 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 - [specification/layout.md](specification/layout.md) — acceptance criteria for the human-readable output's layout: its tree, where each line sits, each line's text and colour, messages, collapsed subtrees, and Mill's prefix.
 - [specification/runs-and-test-structure.md](specification/runs-and-test-structure.md) — acceptance criteria for which suites, scopes, tests, failures and captured output the human-readable output shows, in what order, and a run's block.
 - [specification/test-command.md](specification/test-command.md) — acceptance criteria for the test command's arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks and BSP server.
-- [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.19, the test event log a run writes, and the consolidation library without Mill.
+- [specification/test-event-log.md](specification/test-event-log.md) — acceptance criteria for what a run's test event log holds on the JVM, and for the ScalaTest behaviour that stays unchanged.
+- [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.19, the emitter on each of the JVM's Scala versions, and the consolidation library without Mill.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against. `R-nnn` IDs in this specification are the epic's.
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts, their parts (§ Modules), and the boundaries between them.
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
@@ -70,10 +71,17 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 ## Acceptance criteria
 
-The criteria are in the four `specification/` documents listed in § Spec documents. In them:
+The criteria are in the five `specification/` documents listed in § Spec documents. In them:
 
 - The module is a JVM test module at module path `core.test`, in a build that adds the Mill plugin without changing the module's definition (R-092), and the test command runs it. Some criteria instead feed a run to the consolidation library directly, without Mill; the run's test run label is then `core.test`.
 - *The runner argument* is the ScalaTest runner argument that turns the emitter on (§ Scope). A run given it outside Mill writes its test event log to a file it names.
+- *An event log holding* items is, in a `Given`, a run fed to the consolidation library directly whose test event log, decoded with core's codec, yields those items in that order, and in a `Then`, what the run's test event log yields so decoded. A criterion states an event log as its items, never as bytes (`../decisions/event-log-contract.md`). The items are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, items 1–4, one per line:
+  - `run started`: item 1.
+  - `structure`: item 2, with the suite's tree beneath it, one node to a line, each indented 2 spaces under its parent and in declared order: `suite "<name>", class "<class name>"`, `scope "<name>", label "<label>"` or `test "<name>", label "<label>"`. Each node's ID, parent and declared position follow from the tree.
+  - `<node>: <event>`: item 3, an `org.scalatest.events` event tagged with the node, named by kind and name as `test "is empty"`, or with `run` where it is the run's. The event is its class, followed in parentheses by the fields the criterion fixes, a throwable written as its class name and message: `TestFailed(throwable: java.lang.IllegalStateException "outer")`.
+  - `run ended <how>`: item 4, where `<how>` is `completed`, `aborted` or `stopped`.
+
+  An event log *is* the items given, and no others. It *holds* items *in this order* when it holds each, in that order, with any others between them.
 - *The console* is what the `mill` command writes to its stdout and stderr. A line of it is *outside the human-readable output* when it is not a line of the human-readable output.
 - A line is given without Mill's prefix (`specification/layout.md` AC-044). A line *sits under* another when it follows it, indented 2 spaces more, with no line between them indented as little as the other. *The lines for* a node are its own lines and every line under them.
 - Text and colours the criteria do not fix are ScalaTest 3.2.19's (R-106). Colour is on (R-124).
