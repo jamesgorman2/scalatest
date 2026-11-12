@@ -2,7 +2,12 @@
 
 ## Summary
 
-The emitter, in a scalatest-core that compiles on JDK 8 without `java.lang.ProcessHandle`, must give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`, and must give each label before any test runs and each test's messages in the order the test called them, though no event carries either. The test command must split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it, turn a worker's stdout and stderr byte chunks into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting, which reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured, without changing what `StringReporter` prints.
+- The emitter lives in a scalatest-core that compiles on JDK 8, without `java.lang.ProcessHandle`. It must still give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`. It must give each label before any test runs, and each test's messages in the order the test called them, though no event carries either.
+- The test command must:
+  - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it;
+  - turn a worker's stdout and stderr byte chunks into lines;
+  - read Mill's colour decision through `private[mill]` API.
+- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
 
 ## Critical code paths
 
