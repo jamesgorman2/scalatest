@@ -139,7 +139,7 @@ Feature: Each suite's structure
       And each line of its test event log decodes to one item
 
     Scenario: AC-128 A suite wraps its reporter in its own
-      Given suite `ForwardingSuite`, class `samples.ForwardingSuite`, an `AnyFunSuite` whose tests `a` and `b`, labelled `- a` and `- b`, succeed, and which overrides `run` to pass `super.run` its `args` with `args.reporter` wrapped in a `Reporter` whose `apply` passes each event unchanged to `args.reporter`
+      Given suite `ForwardingSuite`, class `samples.ForwardingSuite`, an `AnyFunSuite` whose tests `a` and `b`, labelled `- a` and `- b`, succeed, and which overrides `run` to pass `super.run` its `args` with `args.reporter` wrapped in a `Reporter` that passes each event to it unchanged
       When `Framework` runs it with the runner argument
       Then the event log holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
 
@@ -274,7 +274,7 @@ Feature: Messages
         scope "when full": ScopeOpened
         """
 
-  Rule: A message a test sends directly to a reporter an ancestor was given, rather than through the reporter the test was given, attaches to that ancestor (R-097)
+  Rule: A message a test sends straight to a reporter an ancestor was given, bypassing the test's own, attaches to that ancestor (R-097)
     Scenario: AC-107 A test reports to its suite's reporter
       Given suite `DirectSuite`, an `AnyFunSuite` that overrides `run` to keep `args.reporter`, whose test `t`, labelled `- t`, sends that reporter an `InfoProvided` with message `direct`, then succeeds
       When `Framework` runs it with the runner argument

@@ -7,13 +7,13 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 **Alternatives**
 
 - Keying by `suiteId` and test name is ambiguous where two distinct instances of one class run at once, as when the class is nested twice under `-P`.
-- Unwrapping known reporter chains fails outright for `RandomTestOrder`, which runs each deferred per-test instance with the suite-level `Args`, discarding the `Args` given to `runTest`, and an unknown reporter silently falls back to the suite's tag.
+- Unwrapping known reporter chains fails outright for `RandomTestOrder`, which runs each deferred per-test instance with the suite-level `Args` rather than those given to `runTest`, and on an unknown reporter silently falls back to the suite's tag.
 - A thread-local fails where the distributor runs the test on another thread.
 - Carrying the node ID in `Args.configMap` shows it to user code, risking `../SPECIFICATION.md` R-002.
 
 **Reasoning** No reporter chain reliably carries the test's wrapper, since core and user code replace `args.reporter` before a test runs (`TECHNICAL-DESIGN.md` § The test event log on the JVM). The suite instance reaches every site that runs a test, and core creates each instance it runs at a known site, which registers it.
 
-**Costs** Each site that creates a suite instance core runs must register it and remove it. A suite instance a user creates and runs, or one instance nested twice, is not found, so its tests' events take the tag of the innermost wrapper they reach (`TECHNICAL-DESIGN.md` § The test event log on the JVM).
+**Costs** Each site that creates a suite instance core runs must register it and later remove it. A suite instance a user creates and runs, or one instance nested twice, is not found, so its tests' events take the tag of the innermost wrapper they reach (`TECHNICAL-DESIGN.md` § The test event log on the JVM).
 
 **Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
 
