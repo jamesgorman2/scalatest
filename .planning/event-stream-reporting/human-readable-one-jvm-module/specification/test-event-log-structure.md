@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: the run and each suite's structure
 
-Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM about the run itself and each suite's structure: the run's start and end, each suite's nodes, their labels and the suite's class name. Part of [test-event-log.md](test-event-log.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
+Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM about the run and its suites: the run's start and end, and each suite's structure, labels and class name. Part of [test-event-log.md](test-event-log.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
 
 Each run below is launched outside Mill.
 
@@ -170,7 +170,7 @@ Feature: Each suite's structure
 
   Rule: A suite run through `ConfigMapWrapperSuite` has the structure its class registers with an empty config map, and a test only the run's config map registers is tagged with the suite (R-096)
     Scenario: AC-131 What the suite registers depends on its config map
-      Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `remote`, labelled `- remote`, where its config map holds key `db`, and otherwise test `local`, labelled `- local`, each succeeding
+      Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `remote`, labelled `- remote`, when its config map holds key `db`, and test `local`, labelled `- local`, when it does not, each succeeding
       When `Framework` runs it with the runner argument and `-Ddb=on`
       Then the event log's `structure` for `ConfigSpec` is:
         """
@@ -254,7 +254,7 @@ Feature: Labels
 
 ## A suite's class name
 
-A suite's class name is the name `Class.getName` gives the runtime class of the suite instance that runs, such as `samples.Specs$` for an `object` `samples.Specs`, or the wrapper's class for a suite annotated `@WrapWith` with a wrapper other than `ConfigMapWrapperSuite`. Two suites take another class:
+A suite's class name is the name `Class.getName` gives the runtime class of the suite instance that runs. For an `object` `samples.Specs` it is `samples.Specs$`; for a suite annotated `@WrapWith` with any wrapper but `ConfigMapWrapperSuite`, it is the wrapper's class. Two kinds of suite take another class:
 
 - a suite whose constructor throws takes the class that failed to construct;
 - a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` takes the annotated class (`../SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` carries the class name…").

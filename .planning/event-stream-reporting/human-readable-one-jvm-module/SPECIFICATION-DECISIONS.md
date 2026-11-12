@@ -6,7 +6,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Alternatives**
 
-- Constructing the running instance from the run's config map before `SuiteStarting`, and reusing it to run, moves the user's constructor and its side effects before `SuiteStarting`; a throwing constructor, caught and rethrown when the suite runs, still aborts with stack frames that differ from 3.2.19's, risking `specification/compatibility-and-library.md` AC-056 and `../SPECIFICATION.md` R-002.
+- Constructing the running instance from the run's config map before `SuiteStarting`, and reusing it to run, moves the user's constructor and its side effects before `SuiteStarting`. A throwing constructor, caught and rethrown when the suite runs, still aborts with stack frames that differ from 3.2.19's, risking `specification/compatibility-and-library.md` AC-056 and `../SPECIFICATION.md` R-002.
 - Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.19 does, before `SuiteStarting`.
 - A structure of the suite's test names alone, as for a suite with no registration tree, drops a wrapped style's scopes and labels, against `specification/test-event-log-structure.md` AC-103's Rule.
 

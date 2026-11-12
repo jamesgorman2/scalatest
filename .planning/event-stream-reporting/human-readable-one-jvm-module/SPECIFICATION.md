@@ -59,7 +59,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 - The emitter, consolidated output and the test command on Scala.js and Native (§ 11–15).
 - Adding the plugin through `mvnDeps` on `mill-build/build.mill`'s `MillBuildRootModule`.
 - Writing these to the test event log: `Runner`'s `-A` rerun alerts, the events of the reruns that `Runner`'s `-g` graphical reporter starts, and the events `Framework` relays from a process sbt forks.
-- For a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` whose tests depend on its config map, a structure holding the tests it runs: it holds those its class registers with an empty config map (`SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` has the structure its class registers…").
+- A structure matching the tests that run, for a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` whose tests depend on its config map. Its structure holds the tests its class registers with an empty config map (`SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` has the structure its class registers…").
 
 ## Epic requirements met
 
