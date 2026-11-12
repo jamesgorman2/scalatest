@@ -23,11 +23,23 @@ Feature: The run in its test event log
       Then the event log's last item is `run ended <ended>`
 
       Examples:
-        | the run                                                                                                                                                                       | launch       | ended     |
-        | suite `SqrtPropSpec`, class `samples.SqrtPropSpec`, an `AnyPropSpec` whose one property, `sqrt of a square is the root`, labelled `- sqrt of a square is the root`, succeeds | `Framework`  | completed |
-        | suite `SqrtPropSpec` of the row above                                                                                                                                         | `Runner.run` | completed |
-        | suite `AbortSuite`, class `samples.AbortSuite`, an `AnyFunSuite` whose one test, `throws on pop`, labelled `- throws on pop`, throws `OutOfMemoryError("Java heap space")`  | `Runner.run` | aborted   |
+        | the run                                                                                                                                                                      | launch       | ended     |
+        | suite `SqrtPropSpec` of `layout.md` AC-002                                                                                                                                   | `Framework`  | completed |
+        | suite `SqrtPropSpec` of `layout.md` AC-002                                                                                                                                   | `Runner.run` | completed |
+        | suite `AbortSuite`, class `samples.AbortSuite`, an `AnyFunSuite` whose one test, `throws on pop`, labelled `- throws on pop`, throws `OutOfMemoryError("Java heap space")`   | `Runner.run` | aborted   |
         | suite `StopSuite`, class `samples.StopSuite`, an `AnyFunSuite` mixing in `StopOnFailure`, whose tests `a` and `b`, labelled `- a` and `- b`, run in that order and `a` fails | `Runner.run` | stopped   |
+
+  Rule: A run that a test's fatal error aborts records the abort against the run, and no abort of the test's suite (R-074)
+    Scenario: AC-120 `Runner.run` aborts on an `OutOfMemoryError`
+      Given suite `AbortSuite` of AC-060
+      When `Runner.run` runs it with the runner argument
+      Then the event log holds, in this order:
+        """
+        test "throws on pop": TestStarting
+        run: RunAborted(throwable: java.lang.OutOfMemoryError "Java heap space")
+        run ended aborted
+        """
+      And it holds no `SuiteAborted` and no closing event tagged with `throws on pop`
 ```
 
 ## Each suite's structure
@@ -89,16 +101,18 @@ Feature: Each suite's structure
               test "inner two", label "- inner two"
         suite "OuterSuites": SuiteStarting
         suite "Inner1Suite": SuiteStarting
+        test "inner one": TestStarting
         test "inner one": TestSucceeded
         suite "Inner1Suite": SuiteCompleted
         suite "Inner2Suite": SuiteStarting
+        test "inner two": TestStarting
         test "inner two": TestSucceeded
         suite "Inner2Suite": SuiteCompleted
         suite "OuterSuites": SuiteCompleted
         """
 
     Scenario: AC-099 Suites `Runner` discovers are top-level
-      Given suite `AddSuite`, class `samples.AddSuite`, an `AnyFunSuite` whose one test, `adds`, labelled `- adds`, succeeds, and suite `SqrtPropSpec` of AC-060, both on the runpath
+      Given suite `AddSuite`, class `samples.AddSuite`, an `AnyFunSuite` whose one test, `adds`, labelled `- adds`, succeeds, and suite `SqrtPropSpec` of `layout.md` AC-002, both on the runpath
       When `Runner.run` runs with the runner argument, the runpath given with `-R` and no `-s`, so that a `DiscoverySuite` runs them
       Then each of `AddSuite` and `SqrtPropSpec` has its own `structure`, whose root is that suite
       And no `structure` holds a `DiscoverySuite`, and its `SuiteStarting` and `SuiteCompleted` are tagged with `run`
@@ -111,12 +125,12 @@ Feature: Each suite's structure
 
   Rule: A suite's structure holds only what the filter keeps, in declared order (R-105, R-112)
     Scenario: AC-101 A tag excluded, a test ignored
-      Given suite `SpeedSuite`, class `samples.SpeedSuite`, an `AnyFunSuite` declaring tests `fast`, `slow` and `later`, labelled `- fast`, `- slow` and `- later`, of which `slow` is tagged `samples.Slow` and `later` is declared with `ignore`
+      Given suite `FilteredSuite`, class `samples.FilteredSuite`, an `AnyFunSuite` declaring tests `fast`, `slow` and `later`, labelled `- fast`, `- slow` and `- later`, of which `slow` is tagged `samples.Slow` and `later` is declared with `ignore`
       When `Framework` runs it with the runner argument and `-l samples.Slow`
-      Then the event log's `structure` for `SpeedSuite` is:
+      Then the event log's `structure` for `FilteredSuite` is:
         """
         structure
-          suite "SpeedSuite", class "samples.SpeedSuite"
+          suite "FilteredSuite", class "samples.FilteredSuite"
             test "fast", label "- fast"
             test "later", label "- later"
         """
@@ -169,10 +183,10 @@ Feature: A suite's class name
       Then the event log holds a `structure` holding `suite "<name>", class "<class>"`, and later `suite "<name>": SuiteAborted(throwable: <throwable>)`
 
       Examples:
-        | case                                     | suite                                                                                                                                                  | launch                                        | name             | class                    | throwable                                                                      |
-        | a nested suite's `beforeAll` throws      | suite `OuterSuites`, class `samples.OuterSuites`, a `Suites` with no tests nesting suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, of AC-097  | `Framework`                                   | `SetupFailsSpec` | `samples.SetupFailsSpec` | `java.lang.RuntimeException "database unreachable"`                            |
-        | its constructor throws                   | suite class `samples.BrokenCtorSpec`, an `AnyFunSuite` whose constructor throws `IllegalStateException("no config")`                                   | `Framework`                                   | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.IllegalStateException "no config"`                                  |
-        | its constructor throws under discovery   | suite class `samples.BrokenCtorSpec` of the row above, on the runpath                                                                                   | `Runner.run`, with `-R` and no `-s`           | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | a `java.lang.RuntimeException` whose cause is `java.lang.IllegalStateException "no config"` |
+        | case                                   | suite                                                                                                                         | launch                              | name             | class                    | throwable                                                                          |
+        | a nested suite's `beforeAll` throws    | suite `SetupFailsSuites`, class `samples.SetupFailsSuites`, a `Suites` with no tests nesting suite `SetupFailsSpec` of AC-097 | `Framework`                         | `SetupFailsSpec` | `samples.SetupFailsSpec` | `java.lang.RuntimeException "database unreachable"`                                |
+        | its constructor throws                 | suite class `samples.BrokenCtorSpec` of `runs-and-test-structure.md` AC-068                                                   | `Framework`                         | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.IllegalStateException "no config"`                                      |
+        | its constructor throws under discovery | suite class `samples.BrokenCtorSpec` of the row above, on the runpath                                                         | `Runner.run`, with `-R` and no `-s` | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.RuntimeException caused by java.lang.IllegalStateException "no config"` |
 ```
 
 ## Messages
@@ -247,7 +261,7 @@ Feature: What the event log keeps of each event
     Scenario: AC-110 A cause chain with a suppressed throwable
       Given suite `ThrowSuite`, an `AnyFunSuite` whose test `throws`, labelled `- throws`, throws `IllegalStateException("outer")`, whose cause is `java.io.IOException("inner")` and which suppresses `RuntimeException("closing")`
       When `Framework` runs it with the runner argument
-      Then the throwable of `test "throws": TestFailed` is `java.lang.IllegalStateException "outer"`, with cause `java.io.IOException "inner"` and suppressed `java.lang.RuntimeException "closing"`
+      Then the throwable of `test "throws": TestFailed` is `java.lang.IllegalStateException "outer" caused by java.io.IOException "inner"`, suppressing `java.lang.RuntimeException "closing"`
       And each of the three holds every frame of the thrown object, each with its class name, method name, file name, line number and whether it is native, and the text `StackTraceElement.toString` gives it
 
     Scenario Outline: AC-111 <throwable>
@@ -270,7 +284,7 @@ Feature: Captured output
 
   Rule: The event log holds no captured output; what a test writes reaches its process's stdout and stderr (R-010, R-012)
     Scenario: AC-112 A test writes to both streams
-      Given suite `CalculatorSuite`, an `AnyFunSuite` whose test `adds two numbers`, labelled `- adds two numbers`, writes `dividing now` to stdout and `warn: careful` to stderr, then succeeds
+      Given suite `BothStreamsSuite`, class `samples.BothStreamsSuite`, an `AnyFunSuite` whose test `writes`, labelled `- writes`, writes `dividing now` to stdout and `warn: careful` to stderr, then succeeds
       When `Framework` runs it with the runner argument, in a JVM of its own
       Then the event log holds no captured output
       And the JVM's stdout holds `dividing now` and its stderr `warn: careful`

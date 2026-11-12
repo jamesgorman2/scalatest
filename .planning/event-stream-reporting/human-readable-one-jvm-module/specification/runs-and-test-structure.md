@@ -16,18 +16,21 @@ Feature: The order of suites, scopes and tests
           suite "ZetaSuite", class "a.ZetaSuite"
             test "zeta", label "- zeta"
         suite "ZetaSuite": SuiteStarting
+        test "zeta": TestStarting
         test "zeta": TestSucceeded
         suite "ZetaSuite": SuiteCompleted
         structure
           suite "MidSuite", class "m.MidSuite"
             test "mid", label "- mid"
         suite "MidSuite": SuiteStarting
+        test "mid": TestStarting
         test "mid": TestSucceeded
         suite "MidSuite": SuiteCompleted
         structure
           suite "AlphaSuite", class "z.AlphaSuite"
             test "alpha", label "- alpha"
         suite "AlphaSuite": SuiteStarting
+        test "alpha": TestStarting
         test "alpha": TestSucceeded
         suite "AlphaSuite": SuiteCompleted
         run ended completed
@@ -45,7 +48,7 @@ Feature: The order of suites, scopes and tests
         """
 
   Rule: Below a top-level suite, a node's children appear in declared order (R-105)
-    Scenario: AC-066 Scopes and tests declared out of name order
+    Scenario: AC-066 Scopes and tests declared out of name order and run out of declared order
       Given an event log holding:
         """
         run started
@@ -58,10 +61,13 @@ Feature: The order of suites, scopes and tests
               test "m", label "- m"
         suite "OrderFunSpec": SuiteStarting
         scope "B": ScopeOpened
-        test "z": TestSucceeded
+        test "a": TestStarting
         test "a": TestSucceeded
+        test "z": TestStarting
+        test "z": TestSucceeded
         scope "B": ScopeClosed
         scope "A": ScopeOpened
+        test "m": TestStarting
         test "m": TestSucceeded
         scope "A": ScopeClosed
         suite "OrderFunSpec": SuiteCompleted
@@ -90,20 +96,22 @@ Feature: Outcomes
         """
         run started
         structure
-          suite "StackFunSpec", class "samples.StackFunSpec"
+          suite "FailingFunSpec", class "samples.FailingFunSpec"
             scope "A Stack", label "A Stack"
               test "is empty", label "- is empty"
               test "pops", label "- pops"
-        suite "StackFunSpec": SuiteStarting
+        suite "FailingFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
+        test "is empty": TestStarting
         test "is empty": TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        test "pops": TestStarting
         test "pops": TestSucceeded
         scope "A Stack": ScopeClosed
-        suite "StackFunSpec": SuiteCompleted
+        suite "FailingFunSpec": SuiteCompleted
         run ended completed
         """
       When the library consolidates it
-      Then the test run label's line is `[core.test]`, the suite's name line `StackFunSpec:` and the scope's line `A Stack`
+      Then the test run label's line is `[core.test]`, the suite's name line `FailingFunSpec:` and the scope's line `A Stack`
       And the test's line is `- is empty *** FAILED ***`
 
   Rule: A suite whose constructor throws is aborted, and the module's other suites still run (R-099)
@@ -138,9 +146,11 @@ Feature: Nodes that share a name
               test "pops", label "- pops"
         suite "DupFunSpec": SuiteStarting
         scope "A Stack" #1: ScopeOpened
+        test "is empty": TestStarting
         test "is empty": TestSucceeded
         scope "A Stack" #1: ScopeClosed
         scope "A Stack" #2: ScopeOpened
+        test "pops": TestStarting
         test "pops": TestSucceeded
         scope "A Stack" #2: ScopeClosed
         suite "DupFunSpec": SuiteCompleted
@@ -164,12 +174,14 @@ Feature: Nodes that share a name
           suite "SameSuite", class "a.SameSuite"
             test "in a", label "- in a"
         suite "SameSuite" #1: SuiteStarting
+        test "in a": TestStarting
         test "in a": TestSucceeded
         suite "SameSuite" #1: SuiteCompleted
         structure
           suite "SameSuite", class "b.SameSuite"
             test "in b", label "- in b"
         suite "SameSuite" #2: SuiteStarting
+        test "in b": TestStarting
         test "in b": TestSucceeded
         suite "SameSuite" #2: SuiteCompleted
         run ended completed
@@ -187,6 +199,7 @@ Feature: Filtered tests
   Rule: A test a filter excludes is shown only as ScalaTest 3.2.19 reports it (R-112)
     Scenario: AC-071 A tag the module's own arguments exclude
       Given suite `SpeedSuite`, class `samples.SpeedSuite`, an `AnyFunSuite` with tests `fast` and `slow`, labelled `- fast` and `- slow`, each succeeding where it runs, of which `slow` is tagged `samples.Slow` and writes `slow ran` to stdout
+      And nothing else in the run writes to stdout or stderr or sends a message outside a suite
       And the module's own ScalaTest arguments are `-l samples.Slow`
       When the test command runs the module
       Then the human-readable output is:
@@ -218,7 +231,7 @@ Feature: Failures
       Given the module's suites are the compatibility fixture
       And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
-      Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, other than a line that begins `+ ` (a message), is a line of the human-readable output, compared with leading spaces removed
+      Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, with leading spaces removed, is a line of the human-readable output with leading spaces removed, unless it then begins `+ ` (a message)
       And each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the human-readable output
 ```
 
@@ -227,7 +240,7 @@ Feature: Failures
 ```gherkin
 Feature: A run's block
 
-  Rule: A run's block follows its label's suites, and holds the run's messages, then its captured output, then how the run ended (R-012, R-082)
+  Rule: A run's block follows its label's suites, and holds the run's messages, then its captured output, then, for a run that aborted or stopped, how it ended (R-012, R-082)
     Scenario: AC-035 A test's stdout line is shown in the block
       Given suite `CalculatorSuite`, class `samples.CalculatorSuite`, an `AnyFunSuite` whose one test, `adds two numbers`, labelled `- adds two numbers`, writes `dividing now` to stdout and succeeds
       And nothing else in the run writes to stdout or stderr or sends a message outside a suite
@@ -248,7 +261,10 @@ Feature: A run's block
         run: InfoProvided(message: "Using random seed 1234")
         run ended completed
         """
-      And the run's captured output is the stdout line `dividing now`, added before the library receives the `InfoProvided`
+      And the run's captured output is:
+        | stream | line           |
+        | stdout | `dividing now` |
+      And its line is fed before the `InfoProvided`
       When the library consolidates it
       Then the run's block is:
         """
@@ -260,7 +276,7 @@ Feature: A run's block
   Rule: Captured stdout and stderr lines interleave in the order they were read
     Scenario: AC-036 Lines of both streams in one sequence
       Given an event log holding `run started`, then `run ended completed`
-      And the run's captured output is, in the order it was read:
+      And the run's captured output is:
         | stream | line                                    |
         | stderr | `SLF4J: No SLF4J providers were found.` |
         | stdout | `dividing now`                          |
@@ -291,6 +307,7 @@ Feature: Output captured against the run
   Rule: Each stream's captured lines keep their order (R-043)
     Scenario: AC-075 Many lines on both streams
       Given suite `ChattySuite`, class `samples.ChattySuite`, an `AnyFunSuite` whose one test, `chats`, labelled `- chats`, writes `out 1` to `out 2000` to stdout and `err 1` to `err 2000` to stderr, alternating between the streams, then succeeds
+      And nothing else in the run writes to stdout or stderr
       When the test command runs the module
       Then the run's block's `[stdout]` lines are `out 1` to `out 2000`, in that order
       And its `[stderr]` lines are `err 1` to `err 2000`, in that order
@@ -301,14 +318,14 @@ Feature: Output captured against the run
 ```gherkin
 Feature: Runs that abort or stop
 
-  Rule: An aborted run shows its aborted and not-run nodes, then `*** RUN ABORTED ***` last in its block (R-082, R-099, R-100)
-    Scenario: AC-037 A test's fatal error aborts its suite and the run
+  Rule: An aborted run shows the nodes open when it aborted as aborted, its not-run nodes, then `*** RUN ABORTED ***` last in its block (R-082, R-100; `../../JSON-LAYOUT.md` § Nodes)
+    Scenario: AC-037 A test's fatal error aborts the run
       Given an event log holding:
         """
         run started
         run: InfoProvided(message: "Using random seed 1234")
         structure
-          suite "StackFunSpec", class "samples.StackFunSpec"
+          suite "AbortingFunSpec", class "samples.AbortingFunSpec"
             scope "A Stack", label "A Stack"
               scope "when empty", label "when empty"
                 test "is empty", label "- is empty"
@@ -316,21 +333,23 @@ Feature: Runs that abort or stop
                 test "has size 0", label "- has size 0"
               scope "when full", label "when full"
                 test "pops last pushed", label "- pops last pushed"
-        suite "StackFunSpec": SuiteStarting
+        suite "AbortingFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
         scope "when empty": ScopeOpened
+        test "is empty": TestStarting
         test "is empty": TestSucceeded
         test "throws on pop": TestStarting
-        suite "StackFunSpec": SuiteAborted(throwable: java.lang.OutOfMemoryError "Java heap space")
         run: RunAborted(message: "An exception or error caused a run to abort: Java heap space", throwable: java.lang.OutOfMemoryError "Java heap space")
         run ended aborted
         """
-      And the run's captured output is the stderr line `OpenJDK 64-Bit Server VM warning: CodeCache is full.`
+      And the run's captured output is:
+        | stream | line                                                   |
+        | stderr | `OpenJDK 64-Bit Server VM warning: CodeCache is full.` |
       When the library consolidates it
       Then, with every stack frame left out, the human-readable output is:
         """
         [core.test]
-          StackFunSpec:
+          AbortingFunSpec:
             A Stack *** ABORTED ***
               when empty *** ABORTED ***
                 - is empty
@@ -338,8 +357,7 @@ Feature: Runs that abort or stop
                 - has size 0 *** NOT RUN ***
               when full *** NOT RUN ***
                 (1 test not run)
-            samples.StackFunSpec *** ABORTED ***
-              java.lang.OutOfMemoryError: Java heap space
+            samples.AbortingFunSpec *** ABORTED ***
           Output outside any suite:
             [info] Using random seed 1234
             [stderr] OpenJDK 64-Bit Server VM warning: CodeCache is full.
@@ -361,6 +379,7 @@ Feature: Runs that abort or stop
               test "inner two", label "- inner two"
         suite "OuterSuites": SuiteStarting
         suite "Inner1Suite": SuiteStarting
+        test "inner one": TestStarting
         test "inner one": TestSucceeded
         suite "Inner1Suite": SuiteCompleted
         suite "OuterSuites": SuiteCompleted

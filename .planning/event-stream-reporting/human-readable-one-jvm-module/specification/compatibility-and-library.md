@@ -86,13 +86,33 @@ Feature: The consolidation library without Mill
       Then the library's human-readable output is the test command's, with Mill's prefix removed from each line
 
   Rule: The library writes human-readable output only once every run's event stream has ended (R-027)
-    Scenario: AC-064 A completed run whose event stream has not ended
-      Given an event log holding `run started`, then `run ended completed`
-      When its event stream has not yet ended
-      Then the library has written no human-readable output
+    A run's event stream ends when the caller ends it, not at its `run ended` item.
+
+    Background:
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "SqrtPropSpec", class "samples.SqrtPropSpec"
+            test "sqrt of a square is the root", label "- sqrt of a square is the root"
+        suite "SqrtPropSpec": SuiteStarting
+        test "sqrt of a square is the root": TestStarting
+        test "sqrt of a square is the root": TestSucceeded
+        suite "SqrtPropSpec": SuiteCompleted
+        run ended completed
+        """
+
+    Scenario: AC-064 A completed run whose event stream is held open
+      When every item has been fed and the event stream is held open
+      Then, before the stream ends, the library has written no human-readable output
 
     Scenario: AC-118 A completed run whose event stream has ended
-      Given an event log holding `run started`, then `run ended completed`
-      When its event stream ends and the caller ends the consolidation
-      Then the library writes the human-readable output
+      Given every item has been fed and the event stream has ended
+      When the caller ends the consolidation
+      Then the library writes the human-readable output:
+        """
+        [core.test]
+          SqrtPropSpec:
+            - sqrt of a square is the root
+        """
 ```

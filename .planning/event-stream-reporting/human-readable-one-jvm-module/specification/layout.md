@@ -35,9 +35,11 @@ Feature: The tree of the human-readable output
               test "inner two", label "- inner two"
         suite "OuterSuites": SuiteStarting
         suite "Inner1Suite": SuiteStarting
+        test "inner one": TestStarting
         test "inner one": TestSucceeded
         suite "Inner1Suite": SuiteCompleted
         suite "Inner2Suite": SuiteStarting
+        test "inner two": TestStarting
         test "inner two": TestSucceeded
         suite "Inner2Suite": SuiteCompleted
         suite "OuterSuites": SuiteCompleted
@@ -66,6 +68,7 @@ Feature: The tree of the human-readable output
         suite "SetWordSpec": SuiteStarting
         scope "A Set": ScopeOpened
         scope "empty": ScopeOpened
+        test "have size 0": TestStarting
         test "have size 0": TestSucceeded
         scope "empty": ScopeClosed
         scope "A Set": ScopeClosed
@@ -76,6 +79,7 @@ Feature: The tree of the human-readable output
               test "paying by card", label "Scenario: paying by card"
         suite "ShopFeatureSpec": SuiteStarting
         scope "Checkout": ScopeOpened
+        test "paying by card": TestStarting
         test "paying by card": TestSucceeded
         scope "Checkout": ScopeClosed
         suite "ShopFeatureSpec": SuiteCompleted
@@ -93,22 +97,23 @@ Feature: The tree of the human-readable output
             Scenario: paying by card
         """
 
-  Rule: Each ScalaTest style's scopes and tests show the labels ScalaTest 3.2.19 prints for them (R-106)
+  Rule: The scopes and tests of each `Any` style, `AsyncFeatureSpec` and `RefSpec` show the labels ScalaTest 3.2.19 prints for them (R-106)
     Scenario Outline: AC-119 <style>
       Given suite `<suite>`, class `samples.<suite>`, of style `<style>`, declaring <declaration>, whose one test succeeds
       When the test command runs the module
       Then the lines for `<suite>` are `<suite>:` and, under it, <lines>
 
       Examples:
-        | style            | suite             | declaration                                                    | lines                                                              |
-        | AnyFunSuite      | CalcFunSuite      | `test("adds")`                                                 | `- adds`                                                           |
-        | AnyPropSpec      | CalcPropSpec      | `property("adds")`                                             | `- adds`                                                           |
-        | AnyFunSpec       | CalcFunSpec       | `describe("A calculator") { it("adds") }`                      | `A calculator`, with `- adds` under it                             |
-        | AnyFreeSpec      | CalcFreeSpec      | `"A calculator" - { "adds" in }`                               | `A calculator`, with `- adds` under it                             |
-        | AnyWordSpec      | CalcWordSpec      | `"A calculator" when { "empty" should { "add" in } }`          | `A calculator`, with `when empty` under it and `- should add` under that |
-        | AnyFlatSpec      | CalcFlatSpec      | `"A calculator" should "add" in`                               | `A calculator`, with `- should add` under it                       |
-        | AnyFeatureSpec   | CalcFeatureSpec   | `Feature("Addition") { Scenario("adds") }`                     | `Feature: Addition`, with `Scenario: adds` under it                |
-        | RefSpec          | CalcRefSpec       | ``object `A calculator` { def `adds two`: Unit = () }``        | `A calculator`, with `- adds two` under it                         |
+        | style            | suite                | declaration                                             | lines                                                                    |
+        | AnyFunSuite      | CalcFunSuite         | `test("adds")`                                          | `- adds`                                                                 |
+        | AnyPropSpec      | CalcPropSpec         | `property("adds")`                                      | `- adds`                                                                 |
+        | AnyFunSpec       | CalcFunSpec          | `describe("A calculator") { it("adds") }`               | `A calculator`, with `- adds` under it                                   |
+        | AnyFreeSpec      | CalcFreeSpec         | `"A calculator" - { "adds" in }`                        | `A calculator`, with `- adds` under it                                   |
+        | AnyWordSpec      | CalcWordSpec         | `"A calculator" when { "empty" should { "add" in } }`   | `A calculator`, with `when empty` under it and `- should add` under that |
+        | AnyFlatSpec      | CalcFlatSpec         | `"A calculator" should "add" in`                        | `A calculator`, with `- should add` under it                             |
+        | AnyFeatureSpec   | CalcFeatureSpec      | `Feature("Addition") { Scenario("adds") }`              | `Feature: Addition`, with `Scenario: adds` under it                      |
+        | AsyncFeatureSpec | CalcAsyncFeatureSpec | `Feature("Addition") { Scenario("adds") }`              | `Feature: Addition`, with `- Scenario: adds` under it                    |
+        | RefSpec          | CalcRefSpec          | ``object `A calculator` { def `adds two`: Unit = () }`` | `A calculator`, with `- adds two` under it                               |
 ```
 
 ## Where a node's lines sit
@@ -124,25 +129,25 @@ Every line sits under the line it belongs to (R-106). Where that leaves a line's
 
 ## Scope and test lines
 
-A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose `structure` gives the node the label `<label>`, whether or not that label begins `- `, and whose items give the node the row's outcome (`../../SPECIFICATION.md` R-098 to R-101). A node has started once the event log holds an event tagged with it.
+A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose `structure` gives the node the label `<label>`, whether or not that label begins `- `, and whose items give the node the row's outcome (R-098 to R-101). A node has started once the event log holds an event tagged with it.
 
-| ID     | Node and outcome                                                   | Line                       | Colour                  |
-|--------|--------------------------------------------------------------------|----------------------------|-------------------------|
-| AC-017 | test, succeeded                                                    | `<label>`                  | green                   |
-| AC-018 | test, failed                                                       | `<label> *** FAILED ***`   | red                     |
-| AC-019 | test, ignored                                                      | `<label> !!! IGNORED !!!`  | yellow                  |
-| AC-020 | test, pending                                                      | `<label> (pending)`        | yellow                  |
-| AC-021 | test, cancelled                                                    | `<label> !!! CANCELED !!!` | yellow                  |
-| AC-022 | test, aborted with reason *not run*                                | `<label> *** NOT RUN ***`  | red                     |
-| AC-023 | test, aborted after it started                                     | `<label> *** ABORTED ***`  | red                     |
-| AC-024 | scope, no outcome                                                  | `<label>`                  | green                   |
-| AC-025 | scope, pending                                                     | `<label> (pending)`        | yellow                  |
-| AC-026 | scope, aborted with reason *not run*                               | `<label> *** NOT RUN ***`  | label green, suffix red |
-| AC-027 | scope, aborted because its suite aborted while it was open (R-099) | `<label> *** ABORTED ***`  | label green, suffix red |
+| ID     | Node and outcome                                                                                              | Line                       | Colour                  |
+|--------|---------------------------------------------------------------------------------------------------------------|----------------------------|-------------------------|
+| AC-017 | test, succeeded                                                                                               | `<label>`                  | green                   |
+| AC-018 | test, failed                                                                                                  | `<label> *** FAILED ***`   | red                     |
+| AC-019 | test, ignored                                                                                                 | `<label> !!! IGNORED !!!`  | yellow                  |
+| AC-020 | test, pending                                                                                                 | `<label> (pending)`        | yellow                  |
+| AC-021 | test, cancelled                                                                                               | `<label> !!! CANCELED !!!` | yellow                  |
+| AC-022 | test, aborted with reason *not run*                                                                           | `<label> *** NOT RUN ***`  | red                     |
+| AC-023 | test, aborted after it started                                                                                | `<label> *** ABORTED ***`  | red                     |
+| AC-024 | scope, no outcome                                                                                             | `<label>`                  | green                   |
+| AC-025 | scope, pending                                                                                                | `<label> (pending)`        | yellow                  |
+| AC-026 | scope, aborted with reason *not run*                                                                          | `<label> *** NOT RUN ***`  | label green, suffix red |
+| AC-027 | scope, aborted because its suite or its run aborted while it was open (R-099; `../../JSON-LAYOUT.md` § Nodes) | `<label> *** ABORTED ***`  | label green, suffix red |
 
 ## Lines that are not a node's
 
-Each row holds when the library consolidates an event log holding the row's node or event, with, for AC-047 and AC-048, the line in the run's captured output. `<class name>` is the class the suite's `structure` gives it, and `<module path>` is the test run label the run is fed with.
+Each row holds when the library consolidates an event log holding the row's node or event, or, for AC-047 and AC-048, when the run's captured output holds the row's line. `<class name>` is the class the suite's `structure` gives it, and `<module path>` is `core.test`, the module path the run is fed with.
 
 | ID     | Line                                                         | Text                                                                                                     | Sits under                                             | Colour             |
 |--------|--------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|--------------------------------------------------------|--------------------|
@@ -172,7 +177,7 @@ Each row holds when the library consolidates an event log holding the message's 
 ```gherkin
 Feature: Where messages sit
 
-  Rule: Messages sit under the node they attach to (R-097), after its test's failure or cancel lines, in the order the test event log holds them
+  Rule: Messages sit under the node they attach to (R-097), after its test's failure or cancel lines, in the order the event log holds them
     Scenario: AC-032 A test's messages sit under it, notes and alerts included
       Given an event log holding:
         """
@@ -243,9 +248,11 @@ Feature: Where messages sit
                 test "pops", label "- pops"
         suite "ScopeInfoFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
+        test "is empty": TestStarting
         test "is empty": TestSucceeded
         scope "A Stack": InfoProvided(message: "an info in a scope")
         scope "when full": ScopeOpened
+        test "pops": TestStarting
         test "pops": TestSucceeded
         scope "when full": ScopeClosed
         scope "A Stack": ScopeClosed
@@ -310,7 +317,8 @@ Feature: Mill's prefix and colour
 
   Rule: On stdout, each line carries Mill's prefix (R-106)
     Scenario: AC-044 Every line of the human-readable output is prefixed
-      When the test command runs the module
+      Given the module of AC-002
+      When the test command runs it
       Then each line of the human-readable output on stdout begins with the prefix Mill puts on every line the test command's own task writes, such as `1] `, ahead of the line's indentation
 
   Rule: Colour changes no text (R-124)

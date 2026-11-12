@@ -9,7 +9,7 @@ Feature: The test command's output arguments
 
   Rule: With no `-o`, or with `-oH`, stdout holds human-readable output and no other consolidated output; a bare `-o` leaves it without consolidated output (R-048, R-055)
     Scenario Outline: AC-076 <arguments>
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
+      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, whose test `adds two numbers` writes `dividing now` to stdout
       When the test command runs the module with <arguments>
       Then the console holds <consolidated output>
       And the test command succeeds
@@ -44,7 +44,7 @@ Feature: The test command's output arguments
 ```gherkin
 Feature: The module's own ScalaTest arguments
 
-  Rule: An argument whose flag R-125's runner does not recognise fails the test command before any test starts, naming it (R-125)
+  Rule: An argument whose flag the JVM `org.scalatest.tools.Runner` does not recognise fails the test command before any test starts, naming it (R-125)
     Scenario: AC-078 An unrecognised flag
       Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
       And the module's own ScalaTest arguments are `-l samples.Slow -y`
@@ -55,6 +55,7 @@ Feature: The module's own ScalaTest arguments
   Rule: An argument R-125 allows reaches the run with its values, even a value that looks like a flag (R-125)
     Scenario: AC-079 A test-name substring that begins with `-`
       Given suite `FlagSuite`, class `samples.FlagSuite`, an `AnyFunSuite` with tests `parses -y` and `parses -x`, labelled `- parses -y` and `- parses -x`, each succeeding where it runs
+      And nothing else in the run writes to stdout or stderr or sends a message outside a suite
       And the module's own ScalaTest arguments are `-z -y`
       When the test command runs the module
       Then the human-readable output is:
@@ -66,7 +67,7 @@ Feature: The module's own ScalaTest arguments
 
   Rule: Every other argument is withheld with its values (R-125, R-041)
     Scenario Outline: AC-080 <arguments> has no effect
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, and suite `OtherSuite`, class `samples.OtherSuite`, an `AnyFunSuite` whose one test, `other`, labelled `- other`, succeeds
+      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, whose test `adds two numbers` writes `dividing now` to stdout, and suite `OtherSuite`, class `samples.OtherSuite`, an `AnyFunSuite` whose one test, `other`, labelled `- other`, succeeds
       And the module's own ScalaTest arguments are <arguments>
       When the test command runs the module
       Then the human-readable output is the one the test command writes for these suites when the module has no ScalaTest arguments of its own
@@ -87,6 +88,7 @@ Feature: Module selectors
   Rule: The test command fails unless it is given one module selector that resolves to one JVM test module (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-081 <selectors>
       Given the build's test modules are `core.test` and `util.test`, both JVM test modules, and `coreJS.test`, a Scala.js test module
+      And each holds suite `AddSuite` of `test-event-log.md` AC-099
       When the test command is given <selectors>, which are <what>
       Then the test command fails before any test starts
       And the console holds no line of human-readable output
@@ -134,16 +136,16 @@ Feature: The test command's result
 
   Rule: Of runs that complete, the test command fails where one reports a failure, and not otherwise (R-046)
     Scenario Outline: AC-084 <tests>
-      Given suite `ResultSuite`, class `samples.ResultSuite`, an `AnyFunSuite` in which <tests>
+      Given suite `ResultSuite`, class `samples.ResultSuite`, an `AnyFunSuite` mixing in `BeforeAndAfterAll`, in which <tests>
       When the test command runs the module
       Then the test command <result>
 
       Examples:
-        | tests                                                                                                                                                                     | result   |
-        | every test succeeds                                                                                                                                                       | succeeds |
-        | test `ignored`, labelled `- ignored`, is ignored, `pending`, labelled `- pending`, is pending and `cancelled`, labelled `- cancelled`, is cancelled, and the rest succeed | succeeds |
-        | test `fails`, labelled `- fails`, fails                                                                                                                                   | fails    |
-        | `beforeAll` throws                                                                                                                                                        | fails    |
+        | tests                                                                                                                                                                                             | result   |
+        | test `succeeds`, labelled `- succeeds`, succeeds                                                                                                                                                  | succeeds |
+        | test `ignored`, labelled `- ignored`, is ignored, `pending`, labelled `- pending`, is pending, `cancelled`, labelled `- cancelled`, is cancelled, and `succeeds`, labelled `- succeeds`, succeeds | succeeds |
+        | test `fails`, labelled `- fails`, fails, and `succeeds`, labelled `- succeeds`, succeeds                                                                                                          | fails    |
+        | test `succeeds`, labelled `- succeeds`, succeeds, and `beforeAll` throws                                                                                                                          | fails    |
 
   Rule: A worker that dies fails the test command, whether or not a run existed in it (R-046)
     Scenario Outline: AC-085 <how the worker dies>
@@ -152,9 +154,9 @@ Feature: The test command's result
       Then the test command fails
 
       Examples:
-        | how the worker dies                                                                                                         |
-        | test `exits`, labelled `- exits`, of suite `ExitSuite`, class `samples.ExitSuite`, an `AnyFunSuite`, calls `System.exit(0)` |
-        | the module's `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it                     |
+        | how the worker dies                                                                                                                                                 |
+        | test `exits`, labelled `- exits`, of suite `ExitSuite`, class `samples.ExitSuite`, an `AnyFunSuite`, calls `System.exit(0)`                                         |
+        | the module holds suite `AddSuite` of `test-event-log.md` AC-099, and its `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it |
 
   Rule: The test command's failure lists no test (R-046)
     Scenario: AC-086 A failed test is not named outside the human-readable output
@@ -166,6 +168,7 @@ Feature: The test command's result
   Rule: A module that tests with another framework, or with another release of this fork, fails the test command (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-087 <framework>
       Given the module tests with <framework>
+      And its one suite, `samples.FrameworkSuite`, written for <framework>, has one test, `runs`, which succeeds
       When the test command runs the module
       Then the test command fails
 
@@ -191,7 +194,6 @@ Feature: What else reaches the console
         | what                           | such as                                                         |
         | ScalaTest's end-of-run summary | `Run completed in`, `Tests: succeeded`, `*** 1 TEST FAILED ***` |
         | Mill's list of failed tests    | `1 tests failed:`                                               |
-        | Mill's per-class test result   | `Test result:`                                                  |
       And no line on the console outside the human-readable output holds any of:
         | what                                                   | such as                                  |
         | a line a ScalaTest reporter prints for a suite or test | `QueueFlatSpec:`, `- should be empty`    |
@@ -207,15 +209,17 @@ Feature: What else reaches the console
 
   Rule: Output of another goal on the same `mill` command line is neither captured nor changed (R-050)
     Scenario: AC-090 A task named before the test command
-      Given the build's task `banner` writes `building banner` to stdout
+      Given the module holds suite `AddSuite` of `test-event-log.md` AC-099
+      And the build's task `banner` writes `building banner` to stdout
       When one `mill` command runs `banner` and then the test command over the module
       Then the console holds `building banner` outside the human-readable output, with the prefix Mill gives `banner`'s lines
       And no line of the human-readable output holds `building banner`
 
   Rule: The human-readable output shows only the runs its test command started (R-020)
     Scenario: AC-091 A second test command after a test is fixed
-      Given the test command has run the module while the test of suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035 failed
-      When the test is changed to succeed, and the test command runs the module again
+      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, whose test `adds two numbers`, labelled `- adds two numbers`, has been changed to fail
+      And the test command has run the module
+      When the test is changed back to succeed, and the test command runs the module again
       Then the second human-readable output is the one AC-035 gives
       And the second test command succeeds
 ```

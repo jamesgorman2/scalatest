@@ -2,13 +2,7 @@
 
 ## Summary
 
-- The emitter lives in scalatest-core, which must compile on JDK 8, where `java.lang.ProcessHandle` does not exist (`research/jvm-pid-and-start-time.md` § Short answer). Yet on the JVM it must give the Mill plugin a PID and start time matching those Mill's JVM reads from `ProcessHandle`.
-- The test command must:
-  - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it;
-  - turn a worker's stdout and stderr, which arrive as byte chunks, into lines;
-  - read Mill's colour decision through `private[mill]` API.
-- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
-- The emitter must give each scope's and test's label before any test runs, and each test's messages in the order the test called them, though no event carries either.
+The emitter, in a scalatest-core that compiles on JDK 8 without `java.lang.ProcessHandle`, must give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`, and must give each label before any test runs and each test's messages in the order the test called them, though no event carries either. The test command must split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it, turn a worker's stdout and stderr byte chunks into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting, which reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured, without changing what `StringReporter` prints.
 
 ## Critical code paths
 
@@ -81,7 +75,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - its cause.
 - The functions return text without indentation or colour. An event's first line is the text its caller passes. The stack-trace function returns each throwable of the cause chain as its first line, `Cause: ` included for a cause, with its frame lines, `...` included.
 - `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, and colours each line with its event's colour.
-  - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent`. `../SPECIFICATION.md` § Scope § Out of scope excludes changing any existing ScalaTest reporter, and in IntelliJ's sbt-shell mode the IDE parses 3.2.19's text (R-003).
+  - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent` (`../SPECIFICATION.md` § Scope § Out of scope, R-003).
 - The writer passes a label's text without the formatter's leading indentation, indents each line by its depth in the tree (`specification/layout.md` AC-009 to AC-011), and composes multi-colour lines (AC-026, AC-027). It adds the suffixes, lines and marks `../SPECIFICATION.md` R-106 adds to 3.2.19's text.
 - The writer calls the stack-trace function with `S` and `F` off (`../SPECIFICATION.md` R-106). The decoded throwable therefore leaves the failed code's stack depth absent: only `StringReporter`'s `S` path reads it, and `s` will never need it (`../SPECIFICATION.md` R-128).
 - A characterisation test proves `StringReporter` byte-identical. It is written and passes before the change, and passes unchanged after it.
@@ -119,12 +113,12 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 
 The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
 
-- A test declares the run's tree once, in the form `SPECIFICATION.md` § Acceptance criteria gives a `structure`: its suites with their class names, and their nested suites, scopes and tests in declared order, each scope and test with its label. The builder derives each node's ID, its parent's ID and its declared position, and emits each top-level suite's structure item before that suite's first event.
-- The test scripts the run by node name, with `#<n>` where nodes share one: each node's events, messages attached to a node or to the run, captured lines tagged with their stream, and how the run ended. The builder emits each in the form core's decoder yields, tagged with its node's ID or as the run's.
+- A test gives the run as one ordered list: the criterion's items, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
+- The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` items, and resolves each node an item names to its ID. It emits every item and captured line in the order given, in the form core's decoder yields, so a test can place a structure item, an event or a captured line anywhere the criterion puts it.
 - It adds the test classes the run's process took after the event stream ends, as the test command does.
 - Cost: the builder must yield what the decoder yields.
 
-The criteria of `specification/test-event-log.md` run real suites with the runner argument and decode each test event log with core's codec. Where a criterion states items, its test builds them with the same builder from the criterion's tree and script, and compares the decoded items with them:
+The criteria of `specification/test-event-log.md` run real suites with the runner argument and decode each test event log with core's codec. Where a criterion states items, its test builds them with the same builder from the criterion's item list, and compares the decoded items with them:
 
 - Each item is compared only on what the criterion fixes: a `structure` on its whole tree, an event on its node, its class and the fields the criterion names.
 - Where the criterion says the event log *is* the items, the decoded items must be exactly those built. Where it says the log *holds* them *in this order*, the built items must be a subsequence of the decoded ones.
