@@ -305,7 +305,7 @@ Feature: Output captured against the run
 
   Rule: Output captured against the run is shown without claiming that it is test output or worker output (R-086)
     Scenario: AC-074 A test's line and the JVM's own line take one form
-      Given suite `CalculatorSuite` of AC-035, whose test writes `dividing now` to stdout
+      Given suite `CalculatorSuite` of AC-035
       And the module's `forkArgs` hold `-XX:+UseSerialGC -Xlog:gc:stdout`, so the worker's JVM writes a line of its own ending `Using Serial` to stdout
       When the test command runs the module
       Then the run's block holds `[stdout] dividing now` and a line `[stdout] <text>` whose text ends `Using Serial`
@@ -346,14 +346,14 @@ Feature: Runs that abort or stop
         test "is empty": TestSucceeded
         test "throws on pop": TestStarting
         run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.")
-        run: RunAborted(message: "An exception or error caused a run to abort: Java heap space", throwable: java.lang.OutOfMemoryError "Java heap space")
+        run: RunAborted(message: "An exception or error caused a run to abort: Java heap space ", throwable: java.lang.OutOfMemoryError "Java heap space")
         run ended aborted
         """
       And the run's captured output is:
         | stream | line                                                   |
         | stderr | `OpenJDK 64-Bit Server VM warning: CodeCache is full.` |
       When the library consolidates it
-      Then, with every stack frame left out, the human-readable output is:
+      Then, with every stack frame left out, the human-readable output is, its line `An exception or error caused a run to abort: Java heap space` ending in the message's trailing space:
         """
         [core.test]
           AbortingFunSpec:
@@ -369,7 +369,7 @@ Feature: Runs that abort or stop
             [alert] Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.
             [stderr] OpenJDK 64-Bit Server VM warning: CodeCache is full.
             *** RUN ABORTED ***
-              An exception or error caused a run to abort: Java heap space
+              An exception or error caused a run to abort: Java heap space 
               java.lang.OutOfMemoryError: Java heap space
         """
 

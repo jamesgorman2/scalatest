@@ -6,12 +6,12 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- A tap in `DispatchReporter.apply` that tags as the run's every event no wrapper handed off needs a per-run set of the wrapped events' identities to recognise them, since `SPECIFICATION.md` R-002 forbids marking them.
-- A run-level root structure wrapper misses the slowpoke alert, which starts inside `DispatchReporter`, below it, and leaves the runner's direct `dispatch` calls to be listed anyway.
+- A tap in `DispatchReporter.apply`, tagging as the run's every event no wrapper handed off, runs a second deduplication path beside the wrappers': it must recognise each wrapped event by a per-run set of identities, since `SPECIFICATION.md` R-002 forbids marking it.
+- A run-level root structure wrapper does not receive the slowpoke alert, which `DispatchReporter` raises behind every wrapper, nor the events the runner passes straight to `dispatch`, so those send sites need a hand-off anyway.
 
-**Reasoning** The senders outside every wrapper are a known, short list in ScalaTest core. Each route to the emitter is then visible where the event is sent, and no path beside the wrappers' has to deduplicate events.
+**Reasoning** The senders outside every wrapper in a run the test command starts are a known, short list in ScalaTest core, so a hand-off at each keeps every route to the emitter visible where the event is sent. For so short a list, the risk that a missed or future site loses its events is accepted over running an identity-based deduplication path beside the wrappers' on every event.
 
-**Costs** A send site missed now, or added by an upstream merge, silently loses its events (R-097), and no acceptance test finds an unknown site. `Runner`'s `-A` rerun alerts and the events `Framework` relays from a process sbt forks are not in the event log.
+**Costs** A send site missed now, or added by an upstream merge, silently loses its events (`SPECIFICATION.md` R-010, R-097), and no acceptance test finds an unknown site.
 
 **Settled by** [How does the emitter receive and tag events sent outside every structure wrapper?](https://github.com/jamesgorman2/scalatest/issues/66).
 

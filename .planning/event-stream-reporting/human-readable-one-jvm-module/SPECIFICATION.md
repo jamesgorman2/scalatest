@@ -58,6 +58,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 - Test output captured against a suite, scope or test (§ 10).
 - The emitter, consolidated output and the test command on Scala.js and Native (§ 11–15).
 - Adding the plugin through `mvnDeps` on `mill-build/build.mill`'s `MillBuildRootModule`.
+- Writing to the test event log `Runner`'s `-A` rerun alerts, the events of the reruns `Runner`'s `-g` graphical reporter starts, and the events `Framework` relays from a process sbt forks. No run the test command starts sends them: `Framework` rejects `-A` and `-g`, and Mill's test worker never calls `remoteArgs`, which starts the relay.
 
 ## Epic requirements met
 

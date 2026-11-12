@@ -8,7 +8,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 - Encoding each run with core's codec and feeding the library its decoded items makes every library test depend on the event log's format.
 
-**Reasoning** The criteria state an event log as its items, never as bytes (`../decisions/event-log-contract.md`), so the library's tests need only those items. The criteria of `specification/test-event-log.md` compare what core's codec decodes from real runs with the builder's items, so a drift between builder and decoder in what a criterion fixes still fails a test.
+**Reasoning** The criteria state an event log as its items, never as bytes (`../decisions/event-log-contract.md`), so the library's tests need only those items. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
 
 **Costs** The builder must yield what the decoder yields, and only those comparisons keep the two in step.
 
@@ -38,7 +38,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 - Sharing `parseArgs`'s arities means rewriting its inline `if` chain as a table, in the parser every run goes through, emitter off included (`../SPECIFICATION.md` R-001).
 
-**Reasoning** A flag cannot be told from a value by its leading `-`, so the split needs each flag's arity. A table of the splitter's own leaves the parser every run uses as it is, apart from the one branch that accepts the runner argument.
+**Reasoning** The split needs each flag's arity (`TECHNICAL-DESIGN.md` § Critical code paths § A module's own ScalaTest arguments). A table of the splitter's own leaves the parser every run uses as it is, apart from the one branch that accepts the runner argument.
 
 **Costs** A second arity table, kept in step with `parseArgs` only by that test.
 

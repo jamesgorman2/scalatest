@@ -41,17 +41,18 @@ Feature: The run in its test event log
         """
       And it holds no `SuiteAborted` and no closing event tagged with `throws on pop`
 
-  Rule: A message sent outside every suite attaches to the run (R-097, R-082)
+  Rule: A message no suite, scope or test sends attaches to the run (R-097)
     Scenario: AC-121 A slowpoke alert
       Given suite `SlowSuite`, class `samples.SlowSuite`, an `AnyFunSuite` whose one test, `sleeps`, labelled `- sleeps`, sleeps 3 seconds, then succeeds
-      When `Framework` runs it with the runner argument and `-W 1 1`
+      When `Framework` runs it with the runner argument, `-W 1 1` and a `-C` recording reporter
       Then the event log holds, in this order:
         """
         test "sleeps": TestStarting
         run: AlertProvided
         test "sleeps": TestSucceeded
         """
-      And each `run: AlertProvided`'s message is `Test still running after <duration>: suite name: SlowSuite, test name: sleeps.`, where `<duration>` is any duration in the form ScalaTest 3.2.19's `-o` reporter writes one, such as `1 second, 4 milliseconds`
+      And it holds a `run: AlertProvided` for each `AlertProvided` the reporter receives, in the same order and with the same message, such as `Test still running after 1 second, 4 milliseconds: suite name: SlowSuite, test name: sleeps.`
+      And no `AlertProvided` is tagged with test `sleeps` or suite `SlowSuite`
 ```
 
 ## Each suite's structure
@@ -255,14 +256,19 @@ Feature: Messages
 ```gherkin
 Feature: What the event log keeps of each event
 
-  Rule: Every event a run reports, and all of it that the consolidated output shows or uses, reaches the event log unaltered, except the alerts `Runner` reports for `-A` and the events `Framework` relays from a sub-process sbt forks (R-010, R-011)
-    Scenario: AC-108 The compatibility fixture
+  Rule: Every event a run reports, and all of it that the consolidated output shows or uses, reaches the event log unaltered (R-010, R-011)
+    Scenario Outline: AC-108 The compatibility fixture under <launch>
       Given the compatibility fixture
-      When `Runner.run` runs it sequentially with the runner argument and a `-C` recording reporter
+      When <launch> runs it sequentially with the runner argument and a `-C` recording reporter
       Then for every event the reporter receives, and every event recorded in one, the event log holds that event
       And each field of it that the consolidated output shows or uses equals the reporter's: each field `../../JSON-LAYOUT.md` folds into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
       And the one exception is the timestamp of a message recorded in a test's closing event, which AC-105 sets
       And the events the reporter receives that are not recorded in another are in the event log in the order the reporter received them
+
+      Examples:
+        | launch       |
+        | `Runner.run` |
+        | `Framework`  |
 
     Scenario Outline: AC-109 Text <text>
       Given suite `TextSuite`, an `AnyFunSuite` whose test `reports`, labelled `- reports`, calls `info(<text>)` and then `fail(<text>)`
