@@ -2,7 +2,7 @@
 
 Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM, item by item, and for the ScalaTest behaviour that stays unchanged. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
 
-Each run below is launched outside Mill.
+Each run below is launched outside Mill, and its test event log is decoded with core's codec (`../TECHNICAL-DESIGN.md` § Testing). Each criterion that states items is therefore a criterion of the emitter and of the decoder together, against the event log's format: the run writes those items, and the decoder yields them from its bytes. Among them, AC-109 decodes lone surrogates, and AC-100 and AC-121 decode items appended from concurrent threads.
 
 ## The run
 
@@ -135,6 +135,13 @@ Feature: Each suite's structure
       When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParFunSuite`
       Then the event log holds one `structure` holding `ParFunSuite`, and none holds a `DistributedTestRunnerSuite`
       And each of `a` and `b` has its `TestStarting` and `TestSucceeded` tagged with its own node
+
+  Rule: A `DistributedTestRunnerSuite`'s abort is tagged with the one test it ran (R-096, R-097)
+    Scenario: AC-126 The suite running one test in parallel throws
+      Given suite `ParAbortSuite`, class `samples.ParAbortSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose one test is `a`, labelled `- a`, and which overrides `run` to throw `RuntimeException("no fixture")` when given a test name, as the `DistributedTestRunnerSuite` running `a` gives it
+      When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParAbortSuite`
+      Then the event log holds `test "a": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - no fixture", throwable: java.lang.RuntimeException "no fixture")`
+      And no `SuiteAborted` is tagged with suite `ParAbortSuite` or with `run`
 
   Rule: A suite's structure holds only what the filter keeps, in declared order (R-105, R-112)
     Scenario: AC-101 A tag excluded, a test ignored

@@ -81,20 +81,19 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - Where the test event log is a file (below), the argument carries its path. On Scala.js under `NodeJs` and on Native that is the absolute path of the module's one event log file.
   - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's framework arguments are those of the `TestModuleUtil` its subprocess call is made on, so the test command makes each worker's call on one built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no test event log (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
-- **The run's test event log** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/event-log-contract.md` "The test event log's format is private to this fork." and "A test event log is read only by the release of this fork that wrote it."). In order:
+- **The run's test event log** — carries exactly one run, in the codec's format, which is fixed within a release, private, and read only by the release that wrote it (`decisions/event-log-contract.md` "Within a release, the test event log's format is a fixed contract…", "The test event log's format is private to this fork." and "A test event log is read only by the release of this fork that wrote it."). In order:
   1. before the runner's construction returns, that the run exists (R-071, R-080), with:
-     - the run-level values of its run record known then;
      - on the JVM, under `NodeJs` and on Native, its process's PID;
      - on the JVM and Native, its process's start time;
      - under `JsDom`, the ID the run gives itself at construction;
   2. when a top-level suite starts running, once ScalaTest's filter is known, that suite's structure after filtering:
-     - the suite, with its node ID and class name;
-     - its nested suites, scopes and tests, each with its node ID, parent, declared position and name, plus a class name for a nested suite and a label for a scope or test;
+     - the suite, with its node ID, name, `suiteId` and class name;
+     - its nested suites, scopes and tests, each with its node ID, parent, declared position and name, plus a `suiteId` and class name for a nested suite and a label for a scope or test;
   3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
      - each tagged with its node's ID, a node's only after the structure holding it;
      - events and messages attached to the run rather than to a suite, tagged as the run's. Among them are the run events (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`), which carry the run record's fields (`JSON-LAYOUT.md` § Run records; `ARCHITECTURE-DECISIONS.md` "The run's own state travels in the test event log as run events among item 3's events.");
   4. how the run ended (R-074), written once. The emitter derives it:
-     - where the runner sends a closing run event, from that event alone: `RunCompleted` as completed, `RunStopped` as stopped and `RunAborted` as aborted. On the JVM `Framework`'s `done` sends `RunCompleted`;
+     - where the runner sends a closing run event, from that event alone, and writes it after that event: `RunCompleted` as completed, `RunStopped` as stopped and `RunAborted` as aborted. On the JVM `Framework`'s `done` sends `RunCompleted`;
      - otherwise from the runner's `done`, as completed.
 
   What the run sends:

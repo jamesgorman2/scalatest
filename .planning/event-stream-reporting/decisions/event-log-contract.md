@@ -1,6 +1,21 @@
 # Decisions: the test event log contract
 
-Decisions behind `../SPECIFICATION.md` on what a test event log carries, who may read it, which release ships the Mill plugin, and the consolidation library's API, newest first.
+Decisions behind `../SPECIFICATION.md` on what a test event log carries, how its format is held, who may read it, which release ships the Mill plugin, and the consolidation library's API, newest first.
+
+## Within a release, the test event log's format is a fixed contract that each side of the codec is tested against on its own.
+
+**Alternatives**
+
+- Round-trip tests in one build pass even where the builds of core that write and read an event log disagree, and never feed the decoder a torn or interleaved line.
+- End-to-end tests alone cannot produce a torn last line on demand, and a failure does not say which side drifted.
+
+**Reasoning** The encoder runs in the run's JVM on core's build for the module's Scala version, and the decoder in Mill's JVM on core's Scala 3 build (`../ARCHITECTURE.md` § Modules § Mill plugin), so within one release they are separate components whose only interface is the format. Testing each side against expected text in that format covers every pairing of those builds, and lets the decoder's tests feed it what a dying or concurrent run leaves.
+
+**Costs** The format must be written down, and every change to it updates the expected text of both sides' tests.
+
+**Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
+
+---
 
 ## Every release of the Mill plugin is a release of the fork.
 

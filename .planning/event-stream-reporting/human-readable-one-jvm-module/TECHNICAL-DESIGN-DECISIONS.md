@@ -20,7 +20,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 - Encoding each run with core's codec and feeding the library its decoded items makes every library test depend on the event log's format.
 
-**Reasoning** The criteria state an event log as its items, never as bytes (`../decisions/event-log-contract.md`), so the library's tests need only those items. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
+**Reasoning** The library takes decoded items, not an event log (`../ARCHITECTURE-DECISIONS.md` "The consolidation library takes each run's event stream, not its test event log."), and the codec is tested against the format on each side, so the library's tests need only the items. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
 
 **Costs** The builder must yield what the decoder yields, and only those comparisons keep the two in step.
 

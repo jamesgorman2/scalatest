@@ -268,6 +268,22 @@ Feature: Where messages sit
           when full
             - pops
         """
+
+  Rule: A message's throwable sits under the message, in 3.2.19's text (R-106)
+    Scenario: AC-122 An info with a throwable and its cause
+      Given the event log of AC-032, with its `InfoProvided` replaced by:
+        """
+        test "is empty": InfoProvided(message: "checked size", throwable: java.lang.IllegalStateException "size unknown" caused by java.io.IOException "closed")
+        """
+      When the library consolidates it
+      Then, with every stack frame left out, the lines for test `is empty` begin:
+        """
+        - is empty
+          [info] checked size
+            java.lang.IllegalStateException: size unknown
+            Cause: java.io.IOException: closed
+          [note] a note
+        """
 ```
 
 ## Collapsed subtrees
@@ -306,6 +322,58 @@ Feature: Collapsed subtrees
         SetupFailsSpec:
           samples.SetupFailsSpec *** ABORTED ***
             java.lang.RuntimeException: database unreachable
+          (1 scope, 2 tests not run)
+        """
+```
+
+## Failure, cancel and abort messages
+
+```gherkin
+Feature: Failure, cancel and abort messages
+
+  Rule: A test's cancel or failure message and its analysis show 3.2.19's text under the test's line, before its messages (R-106)
+    Scenario: AC-123 A cancelled test's message
+      Given the event log of AC-033, with its `TestFailed` replaced by:
+        """
+        test "have size 0": TestCanceled(message: "no stack", throwable: org.scalatest.exceptions.TestCanceledException "no stack" at StackFlatSpec.scala:7)
+        """
+      When the library consolidates it
+      Then the lines for test `have size 0` are:
+        """
+        - must have size 0 !!! CANCELED !!!
+          no stack (StackFlatSpec.scala:7)
+          [info] checked
+          [note] a note
+          [alert] an alert
+        """
+
+    Scenario: AC-124 A failure with analysis
+      Given the event log of AC-033, with its `TestFailed` replaced by:
+        """
+        test "have size 0": TestFailed(message: "Stack(1) did not equal Stack(0)", throwable: org.scalatest.exceptions.TestFailedException "Stack(1) did not equal Stack(0)" at StackFlatSpec.scala:9, analysis: ["Stack(size: 1 -> 0)"])
+        """
+      When the library consolidates it
+      Then the lines for test `have size 0` begin:
+        """
+        - must have size 0 *** FAILED ***
+          Stack(1) did not equal Stack(0) (StackFlatSpec.scala:9)
+          Analysis:
+          Stack(size: 1 -> 0)
+          [info] checked
+        """
+
+  Rule: An aborted suite's message shows 3.2.19's text under its abort line (R-099, R-106)
+    Scenario: AC-125 A suite aborted with a `StackDepth` throwable
+      Given the event log of AC-039, with its `SuiteAborted` replaced by:
+        """
+        suite "SetupFailsSpec": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - database unreachable", throwable: org.scalatest.exceptions.TestFailedException "database unreachable" at SetupFailsSpec.scala:5)
+        """
+      When the library consolidates it
+      Then the lines for `SetupFailsSpec` are:
+        """
+        SetupFailsSpec:
+          samples.SetupFailsSpec *** ABORTED ***
+            Exception encountered when invoking run on a nested suite - database unreachable (SetupFailsSpec.scala:5)
           (1 scope, 2 tests not run)
         """
 ```
