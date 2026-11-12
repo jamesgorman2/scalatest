@@ -2,6 +2,8 @@
 
 Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then formatting, filtering and human-readable output to a file (feature 16), then every worker, argument and module Mill runs, then supported Mill releases, then `--halt-on-failure`, then a module that presets a test command's arguments (feature 17), then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
 
+No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that feature, and a feature specifies it only where its own acceptance criteria need it.
+
 ## 2. Consolidated JSON output
 
 `-fJ <path>` writes JSON output to the file at that path once every event stream has ended. Builds on feature 1.
@@ -45,6 +47,7 @@ Risks:
 - `research/mill-parallel-worker-capture.md` § 5 and `research/mill-runner-progress-without-trait.md` § 6 (on Windows a class sometimes runs on two workers; worker counts vary, under Mill's own task too)
 - `research/emission-gap-analysis.md` § 11 (whether a JVM worker executes its tasks one at a time)
 - `research/jvm-file-channel.md` § 5 (a module with no test class spawns one worker)
+- `human-readable-one-jvm-module/research/mill-plugin-conventions.md` § 5 (at Mill 1.3.1 a module that sets `testBatchFrameworkTasks` runs one worker per fork group with its whole class list and no queue or claim files; one worker per fork group with test parallelism off or one class selected)
 - `research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
 - `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after item 1; paths with spaces untried)
 
