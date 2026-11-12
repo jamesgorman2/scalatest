@@ -71,7 +71,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - the text of info, alert, note and markup messages.
 
   The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
-- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec) but its frames' fields and its suppressed throwables, and, for a `StackDepth`, the failed code's stack depth, which only the live wrapper fills.
+- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec), except its frames' fields and its suppressed throwables. For a `StackDepth` it also holds the failed code's stack depth, which only the live wrapper fills.
 - The functions return text without indentation or colour. An event's first line is the text its caller passes. The stack-trace function returns each throwable of the cause chain as its first line, `Cause: ` included for a cause, with its frame lines, `...` included.
 - `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, and colours each line with its event's colour.
   - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent` (`../SPECIFICATION.md` § Scope § Out of scope, R-003).
@@ -95,11 +95,11 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
 - `org.scalatest.tools.Runner.run` writes item 1 once it has parsed the runner argument, before `RunStarting`.
-- Each item is a JSON object whose first key holds the item's kind, encoded as `../JSON-LAYOUT.md` § Encoding encodes the JSON output (`TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."). Escaping control characters in strings keeps the item to one line.
+- Each item is a JSON object whose first key holds the item's kind, encoded as the JSON output is (`../JSON-LAYOUT.md` § Encoding; `TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."). Escaping control characters in strings keeps each item to one line.
   - A lone surrogate's `\uXXXX` escape decodes back to the same `char`.
   - Integers are JSON numbers, read as `Long`, never through `Double`.
   - Item 1's process start time is the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
-  - A throwable carries what the decoded throwable holds (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec), in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one. Within one item, each throwable carries an `id`, and one already written in that item is a `ref`. Identity is per item, so a torn item breaks no other.
+  - A throwable carries what the decoded throwable holds (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec), in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one. Each throwable in an item carries an `id`, and a repeat within that item is written as a `ref` to it. Identity is per item, so a torn item breaks no other.
 - The places that hand off an event sent outside every structure wrapper (`../ARCHITECTURE.md` § Modules § ScalaTest core, Emitter):
   - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction, after item 1 is written (`specification/test-event-log.md` AC-094); and `RunCompleted` in `done`.
   - `org.scalatest.DispatchReporter`'s slowpoke timer under `-W`: its `AlertProvided`, which has `nameInfo = None` (AC-121). The timer also passes that same event to the `SuiteSortingReporter` that `Framework` registers with `registerSlowpokeReporter`. From there it reaches at most a task's `SbtLogInfoReporter`, through no wrapper, and is not handed off again.

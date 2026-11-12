@@ -26,14 +26,14 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - Events sent outside every structure wrapper, such as the runner's own run events, reach it by an explicit hand-off where they are sent, tagged as the run's (`ARCHITECTURE-DECISIONS.md` "Events sent outside every structure wrapper reach the emitter by an explicit hand-off at each send site.").
   - It is not a `-C` reporter opened on `RunStarting`, which could not send item 1 in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
 - **Codec** — the one implementation of the event log's format (§ APIs § The emitter and the Mill plugin). The encoder runs in every run with the emitter on; the decoder runs in the Mill plugin's event log reading, in Mill's JVM.
-  - It writes and reads the format by hand: core builds for Scala 2.11 to 3 on the JVM, Scala.js and Native, and takes no serialisation library.
+  - It encodes and decodes the format by hand, since core builds for Scala 2.11 to 3 on the JVM, Scala.js and Native and takes no serialisation library.
   - The decoder yields each item 3 event as a member of the decoded event family, one class per `org.scalatest.events` class, holding what the event log carries of that event (`decisions/event-log-contract.md` "A test event log carries what the consolidated output shows or uses, not the whole event."; `ARCHITECTURE-DECISIONS.md` "Core's decoder yields each event of item 3 as a member of a decoded event family…").
   - An event's throwable decodes to core's decoded throwable, which holds:
     - its class name, and its message, absent where `getMessage` is `null`;
     - whether it is a `StackDepth`, and for one, the failed code's file name, file pathname and line number, each where defined;
     - whether it is a `PropertyCheckFailedException`, whose message already holds its line number;
-    - its frames, a `StackDepth`'s included, each as the fields `JSON-LAYOUT.md` § Throwables gives a frame and as the text `StackTraceElement.toString` gives, which on JDK 9 and later can hold a module and a class loader name;
-    - its cause, and its suppressed throwables in order, each a decoded throwable, one met twice within an item decoding to the same object, so a cycle decodes as a cycle.
+    - its frames, a `StackDepth`'s included, each both as the fields `JSON-LAYOUT.md` § Throwables gives a frame and as its `StackTraceElement.toString` text, which on JDK 9 and later can hold a module and a class loader name;
+    - its cause, and its suppressed throwables in order, each a decoded throwable. A throwable met twice within one item decodes to the same object, so a cycle decodes as a cycle.
 - **Argument splitter** — in package `org.scalatest.tools`, beside `ArgsParser`: takes ScalaTest arguments and returns them grouped by flag, each with its values. Its arities match `ArgsParser.parseArgs`'s, so that a flag's values are never read as flags. It runs in Mill's JVM (§ Data flow).
 
 ### Consolidation library
@@ -92,24 +92,26 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
      - its nested suites, scopes and tests, each with its node ID, parent, declared position and name, plus a class name for a nested suite and a label for a scope or test;
   3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
      - each tagged with its node's ID, a node's only after the structure holding it;
-     - events and messages attached to the run rather than to a suite, tagged as the run's. Among them are the run events, `RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`, which carry the run record's fields (`JSON-LAYOUT.md` § Run records; `ARCHITECTURE-DECISIONS.md` "The run's own state travels in the test event log as run events among item 3's events.");
-  4. how the run ended (R-074), written once. Wherever the runner sends a closing run event, the emitter derives item 4 from it alone: `RunCompleted` as completed, `RunStopped` as stopped and `RunAborted` as aborted. On the JVM `Framework`'s `done` sends `RunCompleted`. Where the runner sends none, the emitter derives item 4 from the runner's `done`, as completed.
+     - events and messages attached to the run rather than to a suite, tagged as the run's. Among them are the run events (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`), which carry the run record's fields (`JSON-LAYOUT.md` § Run records; `ARCHITECTURE-DECISIONS.md` "The run's own state travels in the test event log as run events among item 3's events.");
+  4. how the run ended (R-074), written once. The emitter derives it:
+     - where the runner sends a closing run event, from that event alone: `RunCompleted` as completed, `RunStopped` as stopped and `RunAborted` as aborted. On the JVM `Framework`'s `done` sends `RunCompleted`;
+     - otherwise from the runner's `done`, as completed.
 
   What the run sends:
 
   - Items 2 and 3 repeat for each top-level suite. No run sends a whole-run tree before it starts its first suite (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…").
-  - A run given no task sends no item 2 and no item 3 but the run's own, and item 4 only if it ends (R-071).
+  - A run given no task sends no item 2, of item 3 only what is tagged as the run's, and item 4 only if it ends (R-071).
   - The event log carries only what the consolidated output shows or uses (`decisions/event-log-contract.md` "A test event log carries what the consolidated output shows or uses, not the whole event.").
 
   What the library takes:
 
-  - How the run ended, from item 4 alone. A run whose event stream ends without item 4 does not finish (`SPECIFICATION.md` R-064), even where its closing run event arrived, as when item 4 is torn or the process dies between the two writes.
-  - The run record's fields, from whichever run events arrived. A stream with item 4 and no run events is valid, from a runner that sends none, and its run record lacks those fields.
+  - How the run ended, from item 4 alone. A run whose event stream ends without item 4 does not finish (`SPECIFICATION.md` R-064), even where its closing run event arrived, as when item 4 is torn (only partly written) or the process dies between the two writes.
+  - The run record's fields, from whichever run events arrived. A stream with item 4 but no run events, from a runner that sends none, is valid; its run record lacks those fields.
 
   How the event log carries items:
 
   - **Each item** is one line ending in `\n`, which the `JsDom` channel (below) forces on every runtime, since one codec serves them all. The line's first field names the item's kind.
-    - The emitter writes each item under one lock as one write, so items written from different threads never interleave: the run's own, the dispatcher's, test threads, including messages a test's informers hand straight to the emitter, and the `-W` slowpoke timer's.
+    - The emitter writes each item as one write under one lock, so items written from different threads never interleave. Those threads are the run's own, the dispatcher's, test threads (including for messages a test's informers hand straight to the emitter) and the `-W` slowpoke timer's.
     - Event log reading decodes only whole lines, holding back unterminated bytes until more arrive.
     - A whole line that cannot be decoded ends the run's event stream there, so the run does not finish.
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the event log is one file per run, at the path the runner argument gives. The run appends each item to it unbuffered as it occurs, and the plugin reads it while the run appends (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.").
@@ -120,7 +122,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
       - Such a worker gives no PID to watch (below). It has ended when Mill's test-runner subprocess call that started it returns. The plugin uses that return only where no event log file appeared; its captured output is then complete and its claims final.
   - **Under `JsDom`,** the event log is framed lines in the launcher's stdout file (`ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…"). The run writes each item as one line with the window's `console.log`, which jsdom forwards to Node's stdout.
     - A line is an item only if it begins with the frame: the framing prefix and this test command's nonce, both given by the runner argument, and the run's ID from item 1. The item follows the frame. Every other line is ordinary output of the process (below).
-    - An unterminated last line of the launcher's stdout file that begins with the framing prefix is a torn item. Any other is the process's last line of output (`SPECIFICATION.md` R-073).
+    - An unterminated last line of the launcher's stdout file that begins with the framing prefix is a torn item. Any other unterminated last line is the process's last line of output (`SPECIFICATION.md` R-073).
   - **The end of a run's event stream** is the exit of the run's process (`ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits.").
     - The plugin watches the process with `ProcessHandle`, given its PID and start time. On the JVM and Native these come from item 1. On Scala.js they come from the header of the run's launcher (§ Modules § Mill plugin; below).
     - A PID counts as exited if it is already gone, has no start time, or its process's start time differs from the one given.

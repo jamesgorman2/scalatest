@@ -6,9 +6,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which every runner sends after item 1.
 
-**Reasoning** The run events reach the emitter by the hand-off every event sent outside a structure wrapper takes (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them as it writes any other event tagged as the run's. Item 4 needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+**Reasoning** The run events already reach the emitter by the hand-off for events sent outside every structure wrapper (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them like any other event tagged as the run's. Item 4 needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-**Costs** A run whose event stream holds its closing run event but no item 4, because item 4 is torn or the process dies between the two writes, does not finish, though the closing run event says how it ended.
+**Costs** A run whose event stream holds its closing run event but no item 4 does not finish, though that event says how it ended. This happens when item 4 is torn or the process dies between the two writes.
 
 **Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
 
@@ -19,7 +19,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A generic record of a kind and a field map makes every reader cast, and fails only at run time on a field the emitter stops sending.
-- Real `org.scalatest.events` instances need a stand-in `Throwable`, which cannot pass `StringReporter`'s `StackDepth` and `PropertyCheckFailedException` tests, and default ordinals and formatters that read as real data.
+- Real `org.scalatest.events` instances need default ordinals and formatters that read as real data, and a stand-in `Throwable`, which cannot pass `StringReporter`'s `StackDepth` and `PropertyCheckFailedException` tests.
 
 **Reasoning** A class per event gives each reader the event log's fields by name, checked at compile time, so a field the emitter stops sending breaks the reader's build rather than a run.
 

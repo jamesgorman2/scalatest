@@ -4,9 +4,9 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ## Each item of a run's test event log is a JSON object.
 
-**Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs escaping rules of its own, specified and tested apart, and is unreadable where a field is absent.
+**Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs its own escaping rules, specified and tested separately, and is unreadable where a field is absent.
 
-**Reasoning** JSON's escaping is already specified, and the event log then follows the JSON output's encoding (`../JSON-LAYOUT.md` § Encoding). Lossless round-tripping of every Java string is core's codec's own: receivers of a lone surrogate's `\uXXXX` escape behave unpredictably (RFC 8259 § 8.2, https://www.rfc-editor.org/rfc/rfc8259#section-8.2), so core's reader decodes it back to the same `char` itself.
+**Reasoning** JSON's escaping is already specified, and the event log then shares the JSON output's encoding (`../JSON-LAYOUT.md` § Encoding). JSON leaves lossless round-tripping of every Java string to core's codec: receivers of a lone surrogate's `\uXXXX` escape behave unpredictably (RFC 8259 § 8.2, https://www.rfc-editor.org/rfc/rfc8259#section-8.2), so core's reader decodes it back to the same `char` itself.
 
 **Costs** Core carries a hand-written JSON reader and writer, and keys repeated on every line lengthen the event log.
 
