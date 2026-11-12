@@ -19,7 +19,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ## The run's own state travels in the test event log as run events among item 3's events.
 
-**Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which a runner that sends it sends after item 1.
+**Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which, where a runner sends it, follows item 1.
 
 **Reasoning** The run events already reach the emitter by the hand-off for events sent outside every structure wrapper (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them like any other event tagged as the run's. Item 4 needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
