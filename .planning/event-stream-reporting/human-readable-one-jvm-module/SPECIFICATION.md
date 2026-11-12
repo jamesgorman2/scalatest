@@ -37,7 +37,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
 - The test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module. This narrows what R-048, R-049 and R-055 allow.
 - The test command supports Mill 1.3.1 only.
-- A module that does not test with the plugin's release of this fork, such as one testing with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork, fails the test command. Unlike R-059, the failure need not come before any test starts or name the module, and consolidated output may still be written.
+- A module that does not test with the plugin's release of this fork, such as one testing with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork, fails the test command.
 
 ### Out of scope
 
@@ -46,10 +46,10 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 - JSON output and `-fJ` (§ 2); progress output, `P` and `-fP` (§ 9).
 - The formatting and filtering characters (R-127, R-128), and `-f` for human-readable output (R-049) (§ 16).
 - A module that presets a test command's arguments (R-126) (§ 17).
-- A module that sets `testBatchFrameworkTasks`, whatever its worker count, and a module for which Mill's `testForked` starts more than one worker: it can with test parallelism on and more than one test class, and does with several fork groups. The test command's behaviour for either is unspecified, and no criterion asserts it (§ 3).
+- A module that sets `testBatchFrameworkTasks`, whatever its worker count, and a module for which Mill's `testForked` starts more than one worker: it can with test parallelism on and more than one test class, and does with several fork groups (§ 3).
 - A run given no task (R-071) (§ 3).
 - Class globs and framework arguments on the test command, the module's JUnit XML report, the paths Mill's test tasks put in their task folders (R-110), and the launcher's environment variables (R-111) (§ 4).
-- Running the tests of more than one module selector, or of a module selector that resolves to anything other than one JVM test module, on which this feature's test command fails (§ 5).
+- Running the tests of more than one module selector, or of a module selector that resolves to anything other than one JVM test module (§ 5).
 - A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet) (§ 5).
 - Failing a module that does not test with the plugin's release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
 - An unsupported Mill release (R-093, R-118) (§ 6).
@@ -70,7 +70,7 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 - R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021, R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
-- R-046 (first and second bullets; for a run that does not finish and a process in which no run existed, only that the test command fails).
+- R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails).
 - R-048 (human-readable output on stdout), R-124 (on stdout), R-050.
 - `../SPECIFICATION.md` § Scope: the JVM's Scala versions.
 
@@ -99,6 +99,6 @@ The criteria are in the five `specification/` documents listed in § Spec docume
   - nested suites;
   - scopes, one of them pending;
   - tests that succeed, fail, are ignored, are pending and are cancelled;
-  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a test of each path style;
+  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a test of each of `PathAnyFunSpec` and `PathAnyFreeSpec`;
   - a suite whose `beforeAll` throws;
   - a test that writes to stdout and to stderr.

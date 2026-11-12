@@ -1,15 +1,10 @@
 # Consolidated human-readable output for one JVM module: technical design
 
+Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.md).
+
 ## Summary
 
-- The emitter lives in a scalatest-core that compiles on JDK 8, without `java.lang.ProcessHandle`. It must still give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`. It must give each label before any test runs, and each test's messages in the order the test called them, though no event carries either.
-- The test command must:
-  - be reached as `mill scalatest/test`, with nothing in the build referring to it;
-  - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it;
-  - turn a worker's stdout and stderr byte chunks into lines;
-  - read Mill's colour decision through `private[mill]` API.
-- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
-- Every artifact must move to group `com.edc` while the build's MiMa check still compares against upstream's.
+The emitter, in a scalatest-core that compiles on JDK 8, without `java.lang.ProcessHandle`, must give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`, each label before any test runs, and each test's messages in the order the test called them, neither of which any event carries. The test command must be reached as `mill scalatest/test` with nothing in the build referring to it, split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, turn a worker's stdout and stderr byte chunks into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting, which reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured, without changing what `StringReporter` prints. Every artifact must move to group `com.edc` while the build's MiMa check still compares against upstream's.
 
 ## Critical code paths
 
@@ -37,31 +32,24 @@ The test command reads the module's arguments from Mill's `TestModule.testArgsDe
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
 - Core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core) does not throw. It returns an argument whose flag `parseArgs` does not recognise ungrouped, under no flag. The test command fails on the first such argument and names it.
 - The splitter keeps its own table of each flag's arity. A test runs `parseArgs` and the splitter over every flag `parseArgs` recognises, each followed by values that look like flags, and requires the same split.
-  - Sharing `parseArgs`'s arities instead would mean rewriting its inline `if` chain as a table. Every run goes through that parser, emitter off included (`../SPECIFICATION.md` R-001), and accepting the runner argument adds only one branch.
-  - Cost: a second arity table, kept in step with `parseArgs` only by that test.
 
 ### Mill's `Running Test Class` lines
 
 At `testLogLevel` `Debug`, Mill's default, the worker writes `Running Test Class <name>` to stderr for each class it runs (`libs/javalib/src/mill/javalib/TestModule.scala` `testLogLevel` and `libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` `runClaimedTestClass`, at Mill tag `1.3.1`). `../SPECIFICATION.md` R-129 keeps the line out of captured output.
 
 - The test command passes the worker the higher of `Info` and the module's own `testLogLevel`, so a module's `Warn` or `Error` is kept. Mill then never writes the line. No captured line is matched by text, so a test that writes the same line keeps it.
-- Raising the level loses nothing else: ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which R-041 already silences.
-- R-053 does not require the worker to run at the module's own log level.
-- Cost: under the test command, Debug-level worker lines from a later Mill release are hidden even where the module sets `Debug`.
 
 ### Capturing a JVM worker's stdout and stderr
 
 The worker's stdout and stderr become the tagged lines **Add a run** takes (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library).
 
 - The test command makes Mill's test-runner subprocess call with `os.Inherit.out` and `os.Inherit.err` each set to an `os.ProcessOutput.ReadBytes`. os-lib then reads each pipe on its own thread, in chunks that ignore line ends (`../research/mill-worker-channels.md` § 1.2, § 2.3; `../research/mill-parallel-worker-capture.md` § 4).
-  - Not `os.ProcessOutput.Readlines`: it decodes with the default charset of Mill's JVM and ends a line at a lone `\r`.
 - Each stream has its own line splitter, fed only by that stream's reader thread. It holds bytes up to a `\n` byte, drops one `\r` directly before it, decodes the held bytes, and appends the line, tagged with its stream, to the run's one sequence under a lock.
   - Splitting before decoding never cuts a character in an ASCII-compatible charset whose multi-byte sequences never hold byte `0x0A`. That covers every encoding `native.encoding` names, among them UTF-8, the single-byte charsets, MS932, GBK, MS949 and Big5.
   - A lone `\r` stays in the line's text.
   - Lines of the two streams enter the sequence in the order their splitters completed them. `../SPECIFICATION.md` R-043 asks no more.
 - When its stream ends, a splitter appends the line it still holds, if it holds any bytes. Mill's call returns only once both reader threads have finished (`../research/mill-worker-channels.md` § 2.3), so the sequence is complete before the test command adds the test classes the worker took.
 - A worker writes a piped stdout and stderr in the platform's native encoding unless its `forkArgs` set `file.encoding`, `stdout.encoding` or `stderr.encoding`. The splitter decodes with the charset Mill's JVM names in its `native.encoding` system property, or `Charset.defaultCharset()` where that property is absent, and replaces malformed bytes with U+FFFD rather than dropping them.
-  - Cost: where a module's `forkArgs` set another encoding, its non-ASCII output is mis-decoded.
 
 ### A message among its node's children
 
@@ -121,9 +109,9 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - The hand-off takes no ordinal from `tracker`, so every event reporters receive keeps its 3.2.19 ordinal (`specification/compatibility-and-library.md` AC-056). The event log carries no ordinal, since no output shows or uses one.
   - The message's timestamp is the time of the call (AC-105).
 - The messages of a path-style test, one of `PathAnyFunSpec` or `PathAnyFreeSpec`, never pass through that hand-off. `PathEngine.handleTest` runs the test's body while its suite is constructed, before the suite's `structure` and `SuiteStarting`, and gives the messages to four recorders (`PathMessageRecordingInformer`, `PathMessageRecordingNotifier`, `PathMessageRecordingAlerter` and `PathMessageRecordingDocumenter` in `org/scalatest/ConcurrentInformer.scala`), each its own queue, with no order across them and no call time. Only the informer reaches `TestLeaf.recordedMessages`, and `Engine.runTestImpl`, replaying the stored outcome, adds only its events to the closing event's `recordedEvents`.
-  - The four recorders of one test append to one shared call sequence, each entry with the time of its call. `registerTest` takes, and `TestLeaf` holds, all four recorders in place of the informer alone.
-  - With the emitter on, `Engine.runTestImpl` replaying a path-style test hands the sequence's messages, in order, to the test's structure wrapper after `TestStarting` and before the closing event. Each is built by its recorder's event function, as the informer's recorded events are, and carries its call time as its timestamp. The wrapper treats them as the call-time hand-off's messages, and the emitter still leaves the closing event's recorded events out.
-  - The closing event's `recordedEvents` still holds only the informer's events, emitter on or off, so the test's notes, alerts and markup still reach no reporter (`specification/compatibility-and-library.md` AC-056).
+  - The four recorders of one test also append each call to one shared call sequence. An entry holds what its recorder stores of the call, the recorder's event function and the time of the call. `registerTest` takes, and `TestLeaf` holds, that sequence beside the informer.
+  - With the emitter on, `Engine.runTestImpl` replaying a path-style test hands the sequence's messages, in order, to the test's structure wrapper after `TestStarting` and before the closing event, and the wrapper treats them as the call-time hand-off's messages. Each is built by its entry's event function given a fresh `Tracker` in place of `tracker`, so it takes no ordinal from the run's, and its `timeStamp` is then set to the entry's call time.
+  - The closing event's `recordedEvents` are built from `tracker` as in 3.2.19, emitter on or off, so the test's notes, alerts and markup still reach no reporter (`specification/compatibility-and-library.md` AC-056).
 
 ## Publishing
 
@@ -138,12 +126,11 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 
 ### Runs the criteria describe
 
-The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
+The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill. Those tests build each run with a test-only builder in the library's tests:
 
 - A test gives the run as one ordered list: the criterion's items, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
 - The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` items, and resolves each node an item names to its ID. It emits every item and captured line in the order given, in the form core's decoder yields, so a test can place a structure item, an event or a captured line anywhere the criterion puts it.
 - It adds the test classes the run's process took after the event stream ends, as the test command does.
-- Cost: the builder must yield what the decoder yields.
 
 The criteria of `specification/test-event-log.md` run real suites with the runner argument and decode each test event log with core's codec. Where a criterion states items, its test builds them with the same builder from the criterion's item list, and compares the decoded items with them:
 
