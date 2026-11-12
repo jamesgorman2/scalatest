@@ -390,6 +390,7 @@ Feature: Runs that abort or stop
         test "inner one": TestSucceeded
         suite "Inner1Suite": SuiteCompleted
         suite "OuterSuites": SuiteCompleted
+        run: RunStopped
         run ended stopped
         """
       When the library consolidates it
