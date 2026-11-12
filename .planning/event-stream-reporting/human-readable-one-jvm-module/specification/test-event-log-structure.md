@@ -41,6 +41,23 @@ Feature: The run in its test event log
         """
       And it holds no `SuiteAborted` and no closing event tagged with `throws on pop`
 
+  Rule: A run that aborts before `RunStarting` records the abort against the run, and holds no `structure` (R-074)
+    Scenario Outline: AC-133 A wrapped suite's constructor throws given an empty config map, by <launch>
+      Given suite `ConfigSpec` of AC-132
+      When <launch> runs it with the runner argument
+      Then the event log holds, in this order:
+        """
+        run started
+        run: RunAborted(throwable: java.lang.reflect.InvocationTargetException caused by java.lang.IllegalStateException "no db")
+        run ended aborted
+        """
+      And it holds no `structure` and no `SuiteAborted`
+
+      Examples:
+        | launch                                                     |
+        | `Runner.run`, with `-s samples.ConfigSpec`                 |
+        | `Runner.run`, with the runpath given with `-R` and no `-s` |
+
   Rule: A message no suite, scope or test sends attaches to the run (R-097)
     Scenario: AC-121 A slowpoke alert
       Given suite `SlowSuite`, class `samples.SlowSuite`, an `AnyFunSuite` whose one test, `sleeps`, labelled `- sleeps`, sleeps 3 seconds, then succeeds
@@ -275,4 +292,18 @@ Feature: A suite's class name
         | its constructor throws under discovery                          | suite class `samples.BrokenCtorSpec` of the row above, on the runpath                                                                 | `Runner.run`, with `-R` and no `-s` | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.RuntimeException caused by java.lang.IllegalStateException "no config"`              |
         | a wrapped suite's `beforeAll` throws                            | suite `ConfigSpec` of AC-130, also mixing in `BeforeAndAfterAll`, whose `beforeAll` throws `RuntimeException("database unreachable")` | `Framework`                         | `ConfigSpec`     | `samples.ConfigSpec`     | `java.lang.RuntimeException "database unreachable"`                                             |
         | a wrapped suite's constructor throws given the run's config map | suite `ConfigSpec` of AC-130, whose constructor throws `IllegalStateException("no db")` where its config map holds key `db`           | `Framework`, with `-Ddb=on`         | `ConfigSpec`     | `samples.ConfigSpec`     | `java.lang.reflect.InvocationTargetException caused by java.lang.IllegalStateException "no db"` |
+
+  Rule: A suite run through `ConfigMapWrapperSuite` whose class throws when constructed with an empty config map is aborted in the test event log alone (R-002, R-099)
+    Scenario: AC-132 A wrapped suite's constructor throws given an empty config map
+      Given suite `ConfigSpec` of AC-130, whose constructor throws `IllegalStateException("no db")` where its config map lacks key `db`
+      When `Framework` runs it with the runner argument
+      Then its task's `execute` throws a `java.lang.reflect.InvocationTargetException` caused by that `IllegalStateException`, and no reporter receives an event for `ConfigSpec`
+      And the event log holds, in this order:
+        """
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+        suite "ConfigSpec": SuiteStarting
+        suite "ConfigSpec": SuiteAborted(throwable: java.lang.reflect.InvocationTargetException caused by java.lang.IllegalStateException "no db")
+        run ended completed
+        """
 ```
