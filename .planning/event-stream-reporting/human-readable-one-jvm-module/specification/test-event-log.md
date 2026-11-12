@@ -194,22 +194,29 @@ Feature: A suite's class name
 ```gherkin
 Feature: Messages
 
-  Rule: A test's messages keep the order the test called them, whichever its outcome (R-011, R-097)
-    Scenario Outline: AC-105 A test that <outcome>
-      Given in suite `MessagesFunSpec`, an `AnyFunSpec`, test `is empty`, labelled `- is empty`, calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then <outcome>
+  Rule: A test's messages sit between its start and its close, in the order the test called them, whatever its style or outcome (R-011, R-097)
+    Scenario Outline: AC-105 <style>: a test that <outcome>
+      Given suite `MessagesSpec`, of style <style>, whose test `is empty`, labelled `- is empty`, calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then <outcome>
       When `Framework` runs it with the runner argument
       Then the event log holds, in this order:
         """
+        test "is empty": TestStarting
         test "is empty": InfoProvided(message: "checked size")
         test "is empty": NoteProvided(message: "a note")
         test "is empty": AlertProvided(message: "an alert")
         test "is empty": MarkupProvided(text: "*markup*")
+        test "is empty": <closing event>
         """
+      And each message's timestamp is the time the test called it
 
       Examples:
-        | outcome  |
-        | succeeds |
-        | fails    |
+        | style             | outcome  | closing event |
+        | `AnyFunSpec`      | succeeds | TestSucceeded |
+        | `AnyFunSpec`      | fails    | TestFailed    |
+        | `PathAnyFunSpec`  | succeeds | TestSucceeded |
+        | `PathAnyFunSpec`  | fails    | TestFailed    |
+        | `PathAnyFreeSpec` | succeeds | TestSucceeded |
+        | `PathAnyFreeSpec` | fails    | TestFailed    |
 
   Rule: A scope's message keeps its place among the scope's children (R-097, R-105)
     Scenario: AC-106 An info between two children of a scope
@@ -241,7 +248,7 @@ Feature: What the event log keeps of each event
       When `Runner.run` runs it sequentially with the runner argument and a `-C` recording reporter
       Then for every event the reporter receives, and every event recorded in one, the event log holds that event
       And each field of it that the consolidated output shows or uses equals the reporter's: each field `../../JSON-LAYOUT.md` folds into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
-      And the one exception is the timestamp of a message recorded in a test's closing event, which in the event log is the time the test called it
+      And the one exception is the timestamp of a message recorded in a test's closing event, which AC-105 sets
       And the events the reporter receives that are not recorded in another are in the event log in the order the reporter received them
 
     Scenario Outline: AC-109 Text <text>

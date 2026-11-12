@@ -99,6 +99,6 @@ The criteria are in the five `specification/` documents listed in § Spec docume
   - nested suites;
   - scopes, one of them pending;
   - tests that succeed, fail, are ignored, are pending and are cancelled;
-  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests;
+  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a test of each path style;
   - a suite whose `beforeAll` throws;
   - a test that writes to stdout and to stderr.
