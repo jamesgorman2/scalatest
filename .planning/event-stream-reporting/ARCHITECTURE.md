@@ -25,15 +25,10 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - **Emitter** — when the runner argument is given, sends what § APIs § The emitter and the Mill plugin lists in the run's test event log.
   - Events sent outside every structure wrapper, such as the runner's own run events, reach it by an explicit hand-off where they are sent, tagged as the run's (`ARCHITECTURE-DECISIONS.md` "Events sent outside every structure wrapper reach the emitter by an explicit hand-off at each send site.").
   - It is not a `-C` reporter opened on `RunStarting`, which could not send item 1 in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
-- **Codec** — the one implementation of the event log's format (§ APIs § The emitter and the Mill plugin). The encoder runs in every run with the emitter on; the decoder runs in the Mill plugin's event log reading, in Mill's JVM.
+- **Codec** — the one implementation of the event log's format (§ APIs § The emitter and the Mill plugin). The encoder runs in every run with the emitter on; the decoder runs in the Mill plugin's event log reading, in Mill's JVM. Each side is tested on its own against the format (`ARCHITECTURE-DECISIONS.md` "Each side of core's codec is tested on its own…").
   - It encodes and decodes the format by hand, since core builds for Scala 2.11 to 3 on the JVM, Scala.js and Native and takes no serialisation library.
-  - The decoder yields each item 3 event as a member of the decoded event family, one class per `org.scalatest.events` class, holding what the event log carries of that event (`decisions/event-log-contract.md` "A test event log carries what the consolidated output shows or uses, not the whole event."; `ARCHITECTURE-DECISIONS.md` "Core's decoder yields each event of item 3 as a member of a decoded event family…").
-  - An event's throwable decodes to core's decoded throwable, which holds:
-    - its class name, and its message, absent where `getMessage` is `null`;
-    - whether it is a `StackDepth`, and for one, the failed code's file name, file pathname and line number, each where defined;
-    - whether it is a `PropertyCheckFailedException`, whose message already holds its line number;
-    - its frames, a `StackDepth`'s included, each both as the fields `JSON-LAYOUT.md` § Throwables gives a frame and as its `StackTraceElement.toString` text, which on JDK 9 and later can hold a module and a class loader name;
-    - its cause, and its suppressed throwables in order, each a decoded throwable. A throwable met twice within one item decodes to the same object, so a cycle decodes as a cycle.
+  - The decoder yields each item 3 event as a member of the decoded event family, one class per `org.scalatest.events` class, holding what the event log carries of that event (`ARCHITECTURE-DECISIONS.md` "Core's decoder yields each event of item 3 as a member of a decoded event family…").
+  - An event's throwable decodes to core's decoded throwable, its cause and suppressed throwables included. A throwable met twice within one item decodes to the same object, so a cycle decodes as a cycle.
 - **Argument splitter** — in package `org.scalatest.tools`, beside `ArgsParser`: takes ScalaTest arguments and returns them grouped by flag, each with its values. Its arities match `ArgsParser.parseArgs`'s, so that a flag's values are never read as flags. It runs in Mill's JVM (§ Data flow).
 
 ### Consolidation library
@@ -81,14 +76,14 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - Where the test event log is a file (below), the argument carries its path. On Scala.js under `NodeJs` and on Native that is the absolute path of the module's one event log file.
   - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's framework arguments are those of the `TestModuleUtil` its subprocess call is made on, so the test command makes each worker's call on one built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no test event log (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
-- **The run's test event log** — carries exactly one run, in the codec's format, which is fixed within a release, private, and read only by the release that wrote it (`decisions/event-log-contract.md` "Within a release, the test event log's format is a fixed contract…", "The test event log's format is private to this fork." and "A test event log is read only by the release of this fork that wrote it."). In order:
+- **The run's test event log** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/event-log-contract.md` "The test event log's format is private to this fork." and "A test event log is read only by the release of this fork that wrote it."). In order:
   1. before the runner's construction returns, that the run exists (R-071, R-080), with:
      - on the JVM, under `NodeJs` and on Native, its process's PID;
      - on the JVM and Native, its process's start time;
      - under `JsDom`, the ID the run gives itself at construction;
   2. when a top-level suite starts running, once ScalaTest's filter is known, that suite's structure after filtering:
      - the suite, with its node ID, name, `suiteId` and class name;
-     - its nested suites, scopes and tests, each with its node ID, parent, declared position and name, plus a `suiteId` and class name for a nested suite and a label for a scope or test;
+     - its nested suites, scopes and tests, each with its node ID, parent, declared position (its place among its siblings in declared order) and name, plus a `suiteId` and class name for a nested suite and a label for a scope or test;
   3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
      - each tagged with its node's ID, a node's only after the structure holding it;
      - events and messages attached to the run rather than to a suite, tagged as the run's. Among them are the run events (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`), which carry the run record's fields (`JSON-LAYOUT.md` § Run records; `ARCHITECTURE-DECISIONS.md` "The run's own state travels in the test event log as run events among item 3's events.");
@@ -110,7 +105,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   How the event log carries items:
 
   - **Each item** is one line ending in `\n`, which the `JsDom` channel (below) forces on every runtime, since one codec serves them all. The line's first field names the item's kind.
-    - The emitter writes each item as one write under one lock, so items written from different threads never interleave. Those threads are the run's own, the dispatcher's, test threads (including for messages a test's informers hand straight to the emitter) and the `-W` slowpoke timer's.
+    - The emitter writes each item as one write under one lock, so items written from different threads never interleave.
     - Event log reading decodes only whole lines, holding back unterminated bytes until more arrive.
     - A whole line that cannot be decoded ends the run's event stream there, so the run does not finish.
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the event log is one file per run, at the path the runner argument gives. The run appends each item to it unbuffered as it occurs, and the plugin reads it while the run appends (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.").

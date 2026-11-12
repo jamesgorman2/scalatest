@@ -71,7 +71,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - the text of info, alert, note and markup messages.
 
   The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
-- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec), except its frames' fields and its suppressed throwables. For a `StackDepth` it also holds the failed code's stack depth, which only the live wrapper fills.
+- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (§ The test event log on the JVM), except its frames' fields and its suppressed throwables. For a `StackDepth` it also holds the failed code's stack depth, which only the live wrapper fills.
 - The functions return text without indentation or colour. An event's first line is the text its caller passes. The stack-trace function returns each throwable of the cause chain as its first line, `Cause: ` included for a cause, with its frame lines, `...` included.
 - `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, and colours each line with its event's colour.
   - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent` (`../SPECIFICATION.md` § Scope § Out of scope, R-003).
@@ -94,23 +94,31 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 ## The test event log on the JVM
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
-- `org.scalatest.tools.Runner.run` writes item 1 once it has parsed the runner argument, before `RunStarting`.
-- The emitter writes item 1 to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later item. So the event log file never exists under its name without its complete item 1 (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+- `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each write item 1 once they have parsed the runner argument, before `RunStarting` (`specification/test-event-log.md` AC-094).
+- The emitter writes item 1 to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later item (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
   - Event log reading never reads the other name, so a worker that dies before the move holds no event log file.
   - In the same folder, the move is one rename within one file system.
   - Item 1 precedes every other item, so nothing is appended between the move and the reopening.
-- Each item is a JSON object whose first key holds the item's kind, encoded as the JSON output is (`../JSON-LAYOUT.md` § Encoding; `TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."). Escaping control characters in strings keeps each item to one line.
+- Each item is a JSON object, encoded as the JSON output is (`../JSON-LAYOUT.md` § Encoding; `TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."). Escaping control characters in strings keeps each item to one line.
   - A lone surrogate's `\uXXXX` escape decodes back to the same `char`.
   - Integers are JSON numbers, read as `Long`, never through `Double`.
   - Item 1's process start time is the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
-  - A throwable carries what the decoded throwable holds (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec), in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one. Each throwable in an item carries an `id`, and a repeat within that item is written as a `ref` to it. Identity is per item, so a torn item breaks no other.
+  - A throwable carries what core's decoded throwable holds, in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one:
+    - its class name, and its message, absent where `getMessage` is `null`;
+    - whether it is a `StackDepth`, and for one, the failed code's file name, file pathname and line number, each where defined;
+    - whether it is a `PropertyCheckFailedException`, whose message already holds its line number;
+    - its frames, a `StackDepth`'s included, each both as the fields `../JSON-LAYOUT.md` § Throwables gives a frame and as its `StackTraceElement.toString` text, which on JDK 9 and later can hold a module and a class loader name;
+    - its cause, and its suppressed throwables in order, each written as a throwable.
+
+    Each throwable in an item carries an `id`, and a repeat within that item is written as a `ref` to it. Identity is per item, so a torn item breaks no other.
+- The emitter's one write lock (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin) is taken by the run's own thread, the dispatcher's, test threads, including for messages a test's informers hand straight to the emitter, and the `-W` slowpoke timer's.
 - The places that hand off an event sent outside every structure wrapper (`../ARCHITECTURE.md` § Modules § ScalaTest core, Emitter):
-  - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction, after item 1 is written (`specification/test-event-log.md` AC-094); and `RunCompleted` in `done`.
-  - `org.scalatest.DispatchReporter`'s slowpoke timer under `-W`: its `AlertProvided`, which has `nameInfo = None` (AC-121). The timer also passes that same event to the `SuiteSortingReporter` that `Framework` registers with `registerSlowpokeReporter`. From there it reaches at most a task's `SbtLogInfoReporter`, through no wrapper, and is not handed off again.
+  - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction, and `RunCompleted` in `done`.
+  - `org.scalatest.DispatchReporter`'s slowpoke timer under `-W`: its `AlertProvided`, which has `nameInfo = None` (`specification/test-event-log.md` AC-121). The timer also passes that same event to the `SuiteSortingReporter` that `Framework` registers with `registerSlowpokeReporter`. From there it reaches at most a task's `SbtLogInfoReporter`, through no wrapper, and is not handed off again.
   - `org.scalatest.tools.Runner.doRunRunRunDaDoRunRun` and its catches: `RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`.
   - `org.scalatest.tools.SuiteRunner` running each `DiscoverySuite` that `Runner.genDiscoSuites` builds: that suite's `SuiteStarting`, its `SuiteCompleted`, and the `SuiteAborted` it sends in its `Failure(ue)` branch and its `NotAllowedException` and `RuntimeException` catches.
     - Where `thisSuite` is a `DiscoverySuite`, `Suite.runNestedSuites` installs each nested suite's top-level wrapper (AC-099) before that suite's `SuiteStarting`, in both branches. In the sequential branch, `callExecuteOnSuite` sends the nested suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` through the `DiscoverySuite`'s reporter, and builds the nested suite's `Args` only after `SuiteStarting`, so the wrapper takes that reporter's place for those events and in the `Args`. In the `-P` branch, the wrapper goes in the `Args` given to the distributor, whose `SuiteRunner` sends those events.
-- Not handed off, since no run the test command starts sends them (`SPECIFICATION.md` § Scope § Out of scope):
+- Not handed off (`SPECIFICATION.md` § Scope § Out of scope):
   - the `AlertProvided`s that `Runner.readMemoryFiles` sends for `-A`;
   - the events `Framework` relays from a sub-process sbt forks, and the `RunAborted` it sends when it can no longer read them;
   - the run events of the reruns that `Runner`'s `-g` graphical reporter starts through `RunnerJFrame`, `SuiteRerunner` and `TestRerunner`.
@@ -144,16 +152,16 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 
 ### Runs the criteria describe
 
-The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec, since the library takes decoded items, not an event log (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder in the library's tests:
+The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder in the library's tests:
 
 - A test gives the run as one ordered list: the criterion's items, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
 - The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` items, and resolves each node an item names to its ID. It emits every item and captured line in the order given, in the form core's decoder yields, so a test can place a structure item, an event or a captured line anywhere the criterion puts it.
 - It adds the test classes the run's process took after the event stream ends, as the test command does.
 
-The emitter's and the decoder's criteria are the criteria of `specification/test-event-log.md` that state items, AC-100, AC-109 and AC-121 among them (that document's opening paragraph). Each side of the codec is tested against the format on its own (`../decisions/event-log-contract.md` "Within a release, the test event log's format is a fixed contract…"), so each such criterion has two tests, and both build the criterion's items with the same builder from its item list:
+The emitter's and the decoder's criteria are the criteria of `specification/test-event-log.md` that state items. Among them, AC-109 writes lone surrogates, and AC-100 and AC-121 write items from concurrent threads. Each side of the codec is tested against the format on its own (`../ARCHITECTURE-DECISIONS.md` "Each side of core's codec is tested on its own…"), so each such criterion has two tests. Both build the criterion's items with the same builder from its item list, and share expected text in the format, written by hand in the test: a whole line for each item the criterion states, with any value where the criterion fixes none.
 
-- The emitter's test runs the criterion's suites with the runner argument, on every Scala version core builds for on the JVM. It compares the lines the run writes with the criterion's expected text in the format, then decodes them with core's codec and compares the decoded items with the built ones.
-- The decoder's test feeds core's decoder that expected text and compares the items it yields with the built ones.
+- The emitter's test runs the criterion's suites with the runner argument, on every Scala version core builds for on the JVM. It compares the lines the run writes with the expected text only on the keys holding what the criterion fixes, under the same *is* and *holds in order* rules as items (below), comparing node IDs through the structures that mint them. It then decodes the lines with core's codec and compares the decoded items with the built ones.
+- The decoder's test feeds core's decoder the expected text and compares the items it yields with the built ones.
 
 One further decoder test, of no criterion, feeds it text whose last line is torn, from which it yields no item (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin). Each comparison of items:
 

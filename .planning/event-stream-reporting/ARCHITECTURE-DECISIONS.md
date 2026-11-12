@@ -2,9 +2,24 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## Each side of core's codec is tested on its own against the test event log's written format, not by round trip.
+
+**Alternatives**
+
+- Round-trip tests in one build pass even where the builds of core that write and read an event log disagree, and never feed the decoder a torn last line.
+- End-to-end tests alone cannot produce a torn last line on demand, and a failure does not say which side drifted.
+
+**Reasoning** The encoder runs in the run's process, on core's build for the module's runtime and Scala version, and the decoder in Mill's JVM on core's Scala 3 build (`ARCHITECTURE.md` § Modules § Mill plugin), so within one release they are separate components whose only interface is the format. Testing each side against expected text in that format covers every pairing of those builds, and lets the decoder's tests feed it what a dying run leaves.
+
+**Costs** The format must be written down, and every change to it updates the expected text of both sides' tests.
+
+**Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
+
+---
+
 ## The run's own state travels in the test event log as run events among item 3's events.
 
-**Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which every runner sends after item 1.
+**Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which a runner that sends it sends after item 1.
 
 **Reasoning** The run events already reach the emitter by the hand-off for events sent outside every structure wrapper (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them like any other event tagged as the run's. Item 4 needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 

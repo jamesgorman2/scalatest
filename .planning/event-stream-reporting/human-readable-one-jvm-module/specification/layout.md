@@ -269,7 +269,7 @@ Feature: Where messages sit
             - pops
         """
 
-  Rule: A message's throwable sits under the message, in 3.2.19's text (R-106)
+  Rule: A message's throwable sits under the message (R-106)
     Scenario: AC-122 An info with a throwable and its cause
       Given the event log of AC-032, with its `InfoProvided` replaced by:
         """
@@ -331,11 +331,11 @@ Feature: Collapsed subtrees
 ```gherkin
 Feature: Failure, cancel and abort messages
 
-  Rule: A test's cancel or failure message and its analysis show 3.2.19's text under the test's line, before its messages (R-106)
+  Rule: A message whose throwable is a `StackDepth` ends with the failed code's file and line, and the throwable shows no line of its own (R-106)
     Scenario: AC-123 A cancelled test's message
       Given the event log of AC-033, with its `TestFailed` replaced by:
         """
-        test "have size 0": TestCanceled(message: "no stack", throwable: org.scalatest.exceptions.TestCanceledException "no stack" at StackFlatSpec.scala:7)
+        test "have size 0": TestCanceled(throwable: org.scalatest.exceptions.TestCanceledException "no stack" at StackFlatSpec.scala:7)
         """
       When the library consolidates it
       Then the lines for test `have size 0` are:
@@ -347,22 +347,6 @@ Feature: Failure, cancel and abort messages
           [alert] an alert
         """
 
-    Scenario: AC-124 A failure with analysis
-      Given the event log of AC-033, with its `TestFailed` replaced by:
-        """
-        test "have size 0": TestFailed(message: "Stack(1) did not equal Stack(0)", throwable: org.scalatest.exceptions.TestFailedException "Stack(1) did not equal Stack(0)" at StackFlatSpec.scala:9, analysis: ["Stack(size: 1 -> 0)"])
-        """
-      When the library consolidates it
-      Then the lines for test `have size 0` begin:
-        """
-        - must have size 0 *** FAILED ***
-          Stack(1) did not equal Stack(0) (StackFlatSpec.scala:9)
-          Analysis:
-          Stack(size: 1 -> 0)
-          [info] checked
-        """
-
-  Rule: An aborted suite's message shows 3.2.19's text under its abort line (R-099, R-106)
     Scenario: AC-125 A suite aborted with a `StackDepth` throwable
       Given the event log of AC-039, with its `SuiteAborted` replaced by:
         """
@@ -375,6 +359,22 @@ Feature: Failure, cancel and abort messages
           samples.SetupFailsSpec *** ABORTED ***
             Exception encountered when invoking run on a nested suite - database unreachable (SetupFailsSpec.scala:5)
           (1 scope, 2 tests not run)
+        """
+
+  Rule: A failure's analysis follows its message under an `Analysis:` line (R-106)
+    Scenario: AC-124 A failure with analysis
+      Given the event log of AC-033, with its `TestFailed` replaced by:
+        """
+        test "have size 0": TestFailed(throwable: org.scalatest.exceptions.TestFailedException "Stack(1) did not equal Stack(0)" at StackFlatSpec.scala:9, analysis: ["Stack(size: 1 -> 0)"])
+        """
+      When the library consolidates it
+      Then the lines for test `have size 0` begin:
+        """
+        - must have size 0 *** FAILED ***
+          Stack(1) did not equal Stack(0) (StackFlatSpec.scala:9)
+          Analysis:
+          Stack(size: 1 -> 0)
+          [info] checked
         """
 ```
 

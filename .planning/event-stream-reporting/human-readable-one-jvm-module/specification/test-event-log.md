@@ -2,7 +2,7 @@
 
 Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM, item by item, and for the ScalaTest behaviour that stays unchanged. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
 
-Each run below is launched outside Mill, and its test event log is decoded with core's codec (`../TECHNICAL-DESIGN.md` § Testing). Each criterion that states items is therefore a criterion of the emitter and of the decoder together, against the event log's format: the run writes those items, and the decoder yields them from its bytes. Among them, AC-109 decodes lone surrogates, and AC-100 and AC-121 decode items appended from concurrent threads.
+Each run below is launched outside Mill.
 
 ## The run
 
@@ -53,6 +53,7 @@ Feature: The run in its test event log
         """
       And it holds a `run: AlertProvided` for each `AlertProvided` the reporter receives, in the same order and with the same message, such as `Test still running after 1 second, 4 milliseconds: suite name: SlowSuite, test name: sleeps.`
       And no `AlertProvided` is tagged with test `sleeps` or suite `SlowSuite`
+      And each line of its test event log decodes to one item
 ```
 
 ## Each suite's structure
@@ -135,6 +136,7 @@ Feature: Each suite's structure
       When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParFunSuite`
       Then the event log holds one `structure` holding `ParFunSuite`, and none holds a `DistributedTestRunnerSuite`
       And each of `a` and `b` has its `TestStarting` and `TestSucceeded` tagged with its own node
+      And each line of its test event log decodes to one item
 
   Rule: A `DistributedTestRunnerSuite`'s abort is tagged with the one test it ran (R-096, R-097)
     Scenario: AC-126 The suite running one test in parallel throws
@@ -160,6 +162,17 @@ Feature: Each suite's structure
       Given suite `ShuffledSuite`, class `samples.ShuffledSuite`, an `AnyFunSuite` mixing in `RandomTestOrder`, registering tests `a`, `b` and `c`, labelled `- a`, `- b` and `- c`, in that order
       When `Framework` runs it with the runner argument
       Then its `structure` holds `a`, `b` and `c` in that order, whatever order the tests ran in
+
+    Scenario: AC-127 A suite with no registration tree
+      Given suite `PlainSuite`, class `samples.PlainSuite`, a `Suite` that overrides `testNames` as `Seq("b", "a", "c")`, `tags` to tag `c` with `samples.Slow`, and `runTest` to report `TestStarting` and `TestSucceeded` for the test it is given
+      When `Framework` runs it with the runner argument and `-l samples.Slow`
+      Then the event log's `structure` for `PlainSuite` is:
+        """
+        structure
+          suite "PlainSuite", class "samples.PlainSuite"
+            test "b", label "- b"
+            test "a", label "- a"
+        """
 ```
 
 ## Labels
@@ -268,7 +281,7 @@ Feature: What the event log keeps of each event
       Given the compatibility fixture
       When <launch> runs it sequentially with the runner argument and a `-C` recording reporter
       Then for every event the reporter receives, and every event recorded in one, the event log holds that event
-      And each field of it that the consolidated output shows or uses equals the reporter's: each field `../../JSON-LAYOUT.md` folds into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
+      And each field of it that the consolidated output shows or uses equals the reporter's: each field `../../JSON-LAYOUT.md` § Nodes, § Messages, § Throwables, § Locations and § Run records fold into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
       And the one exception is the timestamp of a message recorded in a test's closing event, which AC-105 sets
       And the events the reporter receives that are not recorded in another are in the event log in the order the reporter received them
 
@@ -294,7 +307,7 @@ Feature: What the event log keeps of each event
     Scenario: AC-110 A cause chain with a suppressed throwable
       Given suite `ThrowSuite`, an `AnyFunSuite` whose test `throws`, labelled `- throws`, throws `IllegalStateException("outer")`, whose cause is `java.io.IOException("inner")` and which suppresses `RuntimeException("closing")`
       When `Framework` runs it with the runner argument
-      Then the throwable of `test "throws": TestFailed` is `java.lang.IllegalStateException "outer" caused by java.io.IOException "inner"`, suppressing `java.lang.RuntimeException "closing"`
+      Then the throwable of `test "throws": TestFailed` is `java.lang.IllegalStateException "outer" suppressing [java.lang.RuntimeException "closing"] caused by java.io.IOException "inner"`
       And each of the three holds every frame of the thrown object, each with the text `StackTraceElement.toString` gives it
 
     Scenario Outline: AC-111 <throwable>
@@ -304,9 +317,9 @@ Feature: What the event log keeps of each event
 
       Examples:
         | throwable                                 | does                                                                         | holds                                                                                                                                                       |
-        | a `StackDepth` exception                  | calls `fail("boom")` at line 7                                               | the throwable `org.scalatest.exceptions.TestFailedException "boom"`, marked as a `StackDepth`, with failed code file name `FailSuite.scala`, the file's pathname and line number 7 |
-        | a property check failure                  | runs a `forAll` from `TableDrivenPropertyChecks` whose property fails         | a throwable marked as a `PropertyCheckFailedException`                                                                                                     |
-        | a throwable whose message is `null`       | throws `new RuntimeException()`                                              | the throwable `java.lang.RuntimeException`, with no message                                                                                                |
+        | a `StackDepth` exception                  | calls `fail("boom")` at line 7                                               | the throwable `org.scalatest.exceptions.TestFailedException "boom" at FailSuite.scala:7`, which also holds the pathname of `FailSuite.scala` |
+        | a property check failure                  | runs a `forAll` from `TableDrivenPropertyChecks` whose property fails         | a throwable marked `property check`                                                                                                                         |
+        | a throwable whose message is `null`       | throws `new RuntimeException()`                                              | the throwable `java.lang.RuntimeException null`                                                                                                            |
         | an assertion with analysis                | calls `assert(Point(1, 2) == Point(1, 3))`, `Point` being a case class, for which 3.2.19's `TestFailed` carries an analysis | the `analysis` that a `-C` recording reporter in the same run receives on the test's `TestFailed`                                                         |
 ```
 
@@ -345,7 +358,7 @@ Feature: The event log and reporters
 
 These hold on this fork against ScalaTest 3.2.19, with the emitter off and on (R-001, R-002, R-051).
 
-- AC-113 No class of `org.scalatest.events` gains, loses or changes a field or constructor parameter, and no event class is added or removed. Any such change violates it, even an added field MiMa (`compatibility-and-library.md` AC-058) accepts.
+- AC-113 No class of `org.scalatest.events` gains, loses or changes a field or constructor parameter, and no event class is added or removed. Any such change violates it, even an added field MiMa accepts.
 - AC-114 Every `-o`, `-e` and `-f` reporter the run's arguments configure, `J` reporters included, writes what 3.2.19 writes for the same events, through `Framework`'s test-interface loggers where `Framework` runs it. A difference in any character, colour or line violates it. The one exception is the reporter ScalaTest uses when no reporter is configured, which with the emitter on prints nothing (R-041).
 - AC-115 `Runner.run` and `Framework` accept every argument list 3.2.19's accept, and reject every one 3.2.19's reject with 3.2.19's message. The runner argument is the only argument they newly accept.
 - AC-116 On Scala.js and Native, which take no runner argument, for the compatibility fixture compiled for each, every reporter and the build tool's test-interface event handler and loggers receive what 3.2.19 sends them.
