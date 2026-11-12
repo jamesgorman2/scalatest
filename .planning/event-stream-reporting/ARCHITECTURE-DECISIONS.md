@@ -2,6 +2,21 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## Events sent outside every structure wrapper reach the emitter by an explicit hand-off at each send site.
+
+**Alternatives**
+
+- A tap in `DispatchReporter.apply` that tags as the run's every event no wrapper handed off needs a per-run set of the wrapped events' identities to recognise them, since `SPECIFICATION.md` R-002 forbids marking them.
+- A run-level root structure wrapper misses the slowpoke alert, which starts inside `DispatchReporter`, below it, and leaves the runner's direct `dispatch` calls to be listed anyway.
+
+**Reasoning** The senders outside every wrapper are a known, short list in ScalaTest core. Each route to the emitter is then visible where the event is sent, and no path beside the wrappers' has to deduplicate events.
+
+**Costs** A send site missed now, or added by an upstream merge, silently loses its events (R-097), and no acceptance test finds an unknown site. `Runner`'s `-A` rerun alerts and the events `Framework` relays from a process sbt forks are not in the event log.
+
+**Settled by** [How does the emitter receive and tag events sent outside every structure wrapper?](https://github.com/jamesgorman2/scalatest/issues/66).
+
+---
+
 ## Every artifact of this fork is published under Maven group `com.edc`, not upstream's `org.scalatest`.
 
 **Alternatives**

@@ -101,6 +101,13 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
 - A throwable in the test event log carries what the throwable view needs beyond `../JSON-LAYOUT.md` § Throwables: each frame as the text `StackTraceElement.toString` gives, and whether the throwable is a `PropertyCheckFailedException`.
+- An event sent outside every structure wrapper reaches the emitter only by a hand-off, tagged as the run's, at the place that sends it (`../ARCHITECTURE.md` § Modules § ScalaTest core). The places:
+  - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction, after item 1 is written (`specification/test-event-log.md` AC-094); `RunCompleted` in `done`; and the `RunAborted` it sends when it can no longer read a forked sub-process's events.
+  - `org.scalatest.DispatchReporter`'s slowpoke timer under `-W`: its `AlertProvided`, which has `nameInfo = None` (AC-121). The copy `Framework` also passes to `SuiteSortingReporter.slowpokeEvent` reaches only `SbtLogInfoReporter`, no wrapper, and is not handed off again.
+  - `org.scalatest.tools.Runner.doRunRunRunDaDoRunRun` and its catches: `RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`.
+  - `org.scalatest.tools.SuiteRunner` running the `DiscoverySuite` that `Runner` builds for `-R` without `-s`: that suite's `SuiteStarting` and `SuiteCompleted`. Each suite it nests gets a top-level suite's wrapper (AC-099).
+
+  Not handed off: the `AlertProvided`s `Runner.readMemoryFiles` sends for `-A`, and the events `Framework` relays from a sub-process sbt forks (AC-108).
 - Event log reading polls each file every 10 ms, the only interval measured (`../research/jvm-file-channel.md` § 2).
 - A suite's structure takes each scope's and test's label from the style's registration tree, before any of them runs. The structure precedes the suite's first event (`specification/test-event-log.md` AC-096), and a test that never starts (AC-097) or never closes (`TestStarting` carries `MotionToSuppress`) has no event giving its label. It builds each as `Engine.runTestImpl` and `runTestsInBranch` do, in `Engine` and `AsyncEngine`, and drops the leading indentation:
   - a test's from `Suite.getIndentedTextForTest` over its text with its parent's child prefix, with the `includeIcon` its style's `runTest` passes, or `true` for a test the filter ignores, as `TestIgnored`'s formatter has it. That flag is `false` only in `AnyFeatureSpecLike`, `FixtureAnyFeatureSpecLike` and the `FeatureSpecLike` and `FixtureFeatureSpecLike` that `project/GenSafeStyles.scala` generates from them (AC-103);

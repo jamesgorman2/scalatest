@@ -23,6 +23,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - **Test output capture** — inside the run's process, captures output it can tie to a suite, scope or test against that node, and hands it to the emitter.
   - Output it captures against a node is withheld from the process's stdout and stderr; everything else passes through to them. `SPECIFICATION.md` R-088 forces this, because what passes through is captured again off those streams (§ APIs § The emitter and the Mill plugin).
 - **Emitter** — when the runner argument is given, sends what § APIs § The emitter and the Mill plugin lists in the run's test event log.
+  - It receives each event from the structure wrapper that tags it. An event sent outside every wrapper, such as the runner's own run events, reaches it by an explicit hand-off where it is sent, tagged as the run's (`ARCHITECTURE-DECISIONS.md` "Events sent outside every structure wrapper reach the emitter by an explicit hand-off at each send site.").
   - It is not a `-C` reporter opened on `RunStarting`, which could not send item 1 in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
 - **Codec** — the one implementation of the event log's format. The encoder runs in every run with the emitter on; the decoder runs in the Mill plugin's event log reading, in Mill's JVM.
 - **Argument splitter** — in package `org.scalatest.tools`, beside `ArgsParser`: takes ScalaTest arguments and returns them grouped by flag, each with its values. Its arities match `ArgsParser.parseArgs`'s, so that a flag's values are never read as flags. It runs in Mill's JVM (§ Data flow).
@@ -154,6 +155,8 @@ flowchart LR
     N[Suites, scopes, tests] --> W[Structure wrapper]
     W -- bare Event --> X["Sorting and existing reporters, test-interface"]
     W -- "each top-level suite's structure; event, node ID" --> EM[Emitter]
+    RS[Senders outside every wrapper] -- bare Event --> X
+    RS -- "event, as the run's" --> EM
     TC[Test output capture] -- "output captured against a node" --> EM
     EM --> ENC[Codec: encoder]
   end

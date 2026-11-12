@@ -258,18 +258,25 @@ Feature: A run's block
       Given an event log holding:
         """
         run started
-        run: InfoProvided(message: "Using random seed 1234")
+        structure
+          suite "CalculatorSuite", class "samples.CalculatorSuite"
+            test "adds two numbers", label "- adds two numbers"
+        suite "CalculatorSuite": SuiteStarting
+        test "adds two numbers": TestStarting
+        run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: CalculatorSuite, test name: adds two numbers.")
+        test "adds two numbers": TestSucceeded
+        suite "CalculatorSuite": SuiteCompleted
         run ended completed
         """
       And the run's captured output is:
         | stream | line           |
         | stdout | `dividing now` |
-      And its line is fed before the `InfoProvided`
+      And its line is fed before the `AlertProvided`
       When the library consolidates it
       Then the run's block is:
         """
         Output outside any suite:
-          [info] Using random seed 1234
+          [alert] Test still running after 1 minute, 2 seconds: suite name: CalculatorSuite, test name: adds two numbers.
           [stdout] dividing now
         """
 
@@ -323,7 +330,6 @@ Feature: Runs that abort or stop
       Given an event log holding:
         """
         run started
-        run: InfoProvided(message: "Using random seed 1234")
         structure
           suite "AbortingFunSpec", class "samples.AbortingFunSpec"
             scope "A Stack", label "A Stack"
@@ -339,6 +345,7 @@ Feature: Runs that abort or stop
         test "is empty": TestStarting
         test "is empty": TestSucceeded
         test "throws on pop": TestStarting
+        run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.")
         run: RunAborted(message: "An exception or error caused a run to abort: Java heap space", throwable: java.lang.OutOfMemoryError "Java heap space")
         run ended aborted
         """
@@ -359,7 +366,7 @@ Feature: Runs that abort or stop
                 (1 test not run)
             samples.AbortingFunSpec *** ABORTED ***
           Output outside any suite:
-            [info] Using random seed 1234
+            [alert] Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.
             [stderr] OpenJDK 64-Bit Server VM warning: CodeCache is full.
             *** RUN ABORTED ***
               An exception or error caused a run to abort: Java heap space

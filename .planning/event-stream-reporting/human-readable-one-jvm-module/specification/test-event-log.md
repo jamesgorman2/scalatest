@@ -40,6 +40,18 @@ Feature: The run in its test event log
         run ended aborted
         """
       And it holds no `SuiteAborted` and no closing event tagged with `throws on pop`
+
+  Rule: A message sent outside every suite attaches to the run (R-097, R-082)
+    Scenario: AC-121 A slowpoke alert
+      Given suite `SlowSuite`, class `samples.SlowSuite`, an `AnyFunSuite` whose one test, `sleeps`, labelled `- sleeps`, sleeps 3 seconds, then succeeds
+      When `Framework` runs it with the runner argument and `-W 1 1`
+      Then the event log holds, in this order:
+        """
+        test "sleeps": TestStarting
+        run: AlertProvided
+        test "sleeps": TestSucceeded
+        """
+      And each `run: AlertProvided`'s message is `Test still running after <duration>: suite name: SlowSuite, test name: sleeps.`, where `<duration>` is any duration in the form ScalaTest 3.2.19's `-o` reporter writes one, such as `1 second, 4 milliseconds`
 ```
 
 ## Each suite's structure
@@ -243,7 +255,7 @@ Feature: Messages
 ```gherkin
 Feature: What the event log keeps of each event
 
-  Rule: Every event a run reports, and all of it that the consolidated output shows or uses, reaches the event log unaltered (R-010, R-011)
+  Rule: Every event a run reports, and all of it that the consolidated output shows or uses, reaches the event log unaltered, except the alerts `Runner` reports for `-A` and the events `Framework` relays from a sub-process sbt forks (R-010, R-011)
     Scenario: AC-108 The compatibility fixture
       Given the compatibility fixture
       When `Runner.run` runs it sequentially with the runner argument and a `-C` recording reporter
