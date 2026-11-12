@@ -9,30 +9,25 @@ Each run below is launched outside Mill.
 ```gherkin
 Feature: The run in its test event log
 
-  Rule: A run's start is in its test event log before any test starts (R-071, R-080)
+  Rule: A run's start is in its test event log before any test starts (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, item 1)
     Scenario: AC-094 A `Framework` runner is constructed
       When a `Framework` runner is constructed with the runner argument
       Then, before it is given a task, the event log's first item is `run started`
       And that item's PID and process start time are those `ProcessHandle.current()` gives in the run's process
       And the event log holds no `structure`
 
-    Scenario: AC-095 A run given no task
-      When a `Framework` runner is constructed with the runner argument, and its `done` is called without it being given a task
-      Then the event log holds no `structure` and no item tagged with a suite, scope or test
-      And its last item is `run ended completed`
-
   Rule: A run's test event log records how the run ended (R-074)
     Scenario Outline: AC-060 A run that ends <ended>
       Given <the run>
       When <launch> runs it with the runner argument
-      Then the run's test event log records that the run ended <ended>
+      Then the event log's last item is `run ended <ended>`
 
       Examples:
-        | the run                                                                                         | launch       | ended     |
-        | suite `SqrtPropSpec` of `layout.md` AC-002                                                      | `Framework`  | completed |
-        | suite `SqrtPropSpec` of `layout.md` AC-002                                                      | `Runner.run` | completed |
-        | suite `StackFunSpec`, whose test `throws on pop` throws `OutOfMemoryError("Java heap space")`   | `Runner.run` | aborted   |
-        | suite `StopSuite`, which mixes in `StopOnFailure` and whose first test fails                    | `Runner.run` | stopped   |
+        | the run                                                                                                                                                                       | launch       | ended     |
+        | suite `SqrtPropSpec`, class `samples.SqrtPropSpec`, an `AnyPropSpec` whose one property, `sqrt of a square is the root`, labelled `- sqrt of a square is the root`, succeeds | `Framework`  | completed |
+        | suite `SqrtPropSpec` of the row above                                                                                                                                         | `Runner.run` | completed |
+        | suite `AbortSuite`, class `samples.AbortSuite`, an `AnyFunSuite` whose one test, `throws on pop`, labelled `- throws on pop`, throws `OutOfMemoryError("Java heap space")`  | `Runner.run` | aborted   |
+        | suite `StopSuite`, class `samples.StopSuite`, an `AnyFunSuite` mixing in `StopOnFailure`, whose tests `a` and `b`, labelled `- a` and `- b`, run in that order and `a` fails | `Runner.run` | stopped   |
 ```
 
 ## Each suite's structure
@@ -103,9 +98,9 @@ Feature: Each suite's structure
         """
 
     Scenario: AC-099 Suites `Runner` discovers are top-level
-      Given suites `CalculatorSuite`, class `samples.CalculatorSuite`, and `SqrtPropSpec`, class `samples.SqrtPropSpec`, on the runpath
+      Given suite `AddSuite`, class `samples.AddSuite`, an `AnyFunSuite` whose one test, `adds`, labelled `- adds`, succeeds, and suite `SqrtPropSpec` of AC-060, both on the runpath
       When `Runner.run` runs with the runner argument, the runpath given with `-R` and no `-s`, so that a `DiscoverySuite` runs them
-      Then each of `CalculatorSuite` and `SqrtPropSpec` has its own `structure`, whose root is that suite
+      Then each of `AddSuite` and `SqrtPropSpec` has its own `structure`, whose root is that suite
       And no `structure` holds a `DiscoverySuite`, and its `SuiteStarting` and `SuiteCompleted` are tagged with `run`
 
     Scenario: AC-100 Tests run in parallel by `Runner`
@@ -159,7 +154,7 @@ Feature: Labels
         | `AnyFeatureSpec`, `FeatureSpec`, `FixtureAnyFeatureSpec`, `FixtureFeatureSpec`                                                 | `Feature("s") { Scenario("t") }`                                                                    | `scope "s", label "Feature: s"`, holding `test "t", label "Scenario: t"`                            |
         | `AsyncFeatureSpec`, `FixtureAsyncFeatureSpec`                                                                                  | `Feature("s") { Scenario("t") }`                                                                    | `scope "s", label "Feature: s"`, holding `test "t", label "- Scenario: t"`                          |
         | `AnyFeatureSpec`, `FeatureSpec`, `AsyncFeatureSpec`, `FixtureAnyFeatureSpec`, `FixtureFeatureSpec`, `FixtureAsyncFeatureSpec`  | `Feature("s") { ignore("t") }`                                                                      | `scope "s", label "Feature: s"`, holding `test "t", label "- Scenario: t"`                          |
-        | `RefSpec`                                                                                                                      | ``object `s` { def `t u`: Unit = () }``, a test method's name holding a space as `RefSpec` requires | `scope "s", label "s"`, holding `test "t u", label "- t u"`                                         |
+        | `RefSpec`                                                                                                                      | ``object `s v` { def `t u`: Unit = () }``, the scope's object name and the test method's name each holding a space, as `RefSpec` requires of both | `scope "s v", label "s v"`, holding `test "t u", label "- t u"`                                     |
 ```
 
 ## A suite's class name
@@ -175,10 +170,9 @@ Feature: A suite's class name
 
       Examples:
         | case                                     | suite                                                                                                                                                  | launch                                        | name             | class                    | throwable                                                                      |
-        | `beforeAll` throws                       | suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, of AC-097                                                                                       | `Framework`                                   | `SetupFailsSpec` | `samples.SetupFailsSpec` | `java.lang.RuntimeException "database unreachable"`                            |
         | a nested suite's `beforeAll` throws      | suite `OuterSuites`, class `samples.OuterSuites`, a `Suites` with no tests nesting suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, of AC-097  | `Framework`                                   | `SetupFailsSpec` | `samples.SetupFailsSpec` | `java.lang.RuntimeException "database unreachable"`                            |
-        | its constructor throws                   | suite class `samples.BrokenCtorSpec`, whose constructor throws `IllegalStateException("no config")`                                                    | `Framework`                                   | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.IllegalStateException "no config"`                                  |
-        | its constructor throws under discovery   | suite class `samples.BrokenCtorSpec`, whose constructor throws `IllegalStateException("no config")`, on the runpath                                     | `Runner.run`, with `-R` and no `-s`           | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | a `java.lang.RuntimeException` whose cause is `java.lang.IllegalStateException "no config"` |
+        | its constructor throws                   | suite class `samples.BrokenCtorSpec`, an `AnyFunSuite` whose constructor throws `IllegalStateException("no config")`                                   | `Framework`                                   | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.IllegalStateException "no config"`                                  |
+        | its constructor throws under discovery   | suite class `samples.BrokenCtorSpec` of the row above, on the runpath                                                                                   | `Runner.run`, with `-R` and no `-s`           | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | a `java.lang.RuntimeException` whose cause is `java.lang.IllegalStateException "no config"` |
 ```
 
 ## Messages
@@ -205,7 +199,7 @@ Feature: Messages
 
   Rule: A scope's message keeps its place among the scope's children (R-097, R-105)
     Scenario: AC-106 An info between two children of a scope
-      Given suite `StackFunSpec`, an `AnyFunSpec` whose scope `A Stack`, labelled `A Stack`, declares test `is empty`, labelled `- is empty`, which succeeds, then calls `info("an info in a scope")`, then declares scope `when full`, labelled `when full`, holding test `pops`, labelled `- pops`, which succeeds
+      Given suite `ScopeInfoFunSpec`, an `AnyFunSpec` whose scope `A Stack`, labelled `A Stack`, declares test `is empty`, labelled `- is empty`, which succeeds, then calls `info("an info in a scope")`, then declares scope `when full`, labelled `when full`, holding test `pops`, labelled `- pops`, which succeeds
       When `Framework` runs it with the runner argument
       Then the event log holds, in this order:
         """
@@ -233,6 +227,7 @@ Feature: What the event log keeps of each event
       When `Runner.run` runs it sequentially with the runner argument and a `-C` recording reporter
       Then for every event the reporter receives, and every event recorded in one, the event log holds that event
       And each field of it that the consolidated output shows or uses equals the reporter's: each field `../../JSON-LAYOUT.md` folds into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
+      And the one exception is the timestamp of a message recorded in a test's closing event, which in the event log is the time the test called it
       And the events the reporter receives that are not recorded in another are in the event log in the order the reporter received them
 
     Scenario Outline: AC-109 Text <text>
@@ -295,7 +290,7 @@ Feature: The event log and reporters
       Examples:
         | reporters                                                        |
         | `-oDF`                                                           |
-        | `-oNCXEHLOPQRM`, whose event-filter characters drop every event  |
+        | `-oNCXEHLOPQRM`, which drops every event a filter character can drop |
         | `-e` and a `-C` recording reporter                               |
 ```
 
@@ -304,7 +299,7 @@ Feature: The event log and reporters
 These hold on this fork against ScalaTest 3.2.19, with the emitter off and on (R-001, R-002, R-051).
 
 - AC-113 No class of `org.scalatest.events` gains, loses or changes a field or constructor parameter, and no event class is added or removed. The structure, labels, class names, node tags and run start this feature adds exist only in the test event log. Any such change violates it, including an added field MiMa (`compatibility-and-library.md` AC-058) accepts.
-- AC-114 For every event and every combination of its configuration characters, the text and colour `StringReporter` formats are 3.2.19's. Every `-o`, `-e` and `-f` reporter, `J` reporters included, and `Framework`'s test-interface loggers write what 3.2.19 writes for the same events. A difference in any character, colour or line violates it.
+- AC-114 For every event and every combination of its configuration characters, the text and colour `StringReporter` formats are 3.2.19's. Every `-o`, `-e` and `-f` reporter the run's arguments configure, `J` reporters included, writes what 3.2.19 writes for the same events, through `Framework`'s test-interface loggers where `Framework` runs it. A difference in any character, colour or line violates it. The one exception is the reporter ScalaTest uses when no reporter is configured, which with the emitter on prints nothing (R-041).
 - AC-115 `Runner.run` and `Framework` accept every argument list 3.2.19's accept, and reject every one 3.2.19's reject with 3.2.19's message. The runner argument is the only argument they newly accept.
-- AC-116 On Scala.js and Native, for the compatibility fixture compiled for each, every reporter and the build tool's test-interface event handler and loggers receive what 3.2.19 sends them.
+- AC-116 On Scala.js and Native, which take no runner argument, for the compatibility fixture compiled for each, every reporter and the build tool's test-interface event handler and loggers receive what 3.2.19 sends them.
 - AC-117 A run not given the runner argument writes no test event log, and creates no file and starts no thread that 3.2.19 does not.

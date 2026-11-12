@@ -54,9 +54,9 @@ Feature: Outcomes
       Given suite class `samples.BrokenCtorSpec`, whose constructor throws `IllegalStateException("no config")`
       And suite `SqrtPropSpec` of `layout.md` AC-002
       When the test command runs the module
-      Then the lines for the suite named `samples.BrokenCtorSpec` begin:
+      Then the lines for the suite named `BrokenCtorSpec` begin:
         """
-        samples.BrokenCtorSpec:
+        BrokenCtorSpec:
           samples.BrokenCtorSpec *** ABORTED ***
         """
       And a line under `samples.BrokenCtorSpec *** ABORTED ***` is `java.lang.IllegalStateException: no config`

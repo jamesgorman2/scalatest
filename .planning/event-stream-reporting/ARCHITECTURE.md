@@ -14,9 +14,10 @@ Three deployable units.
 
 `scalatest-core`, on every runtime and Scala version `SPECIFICATION.md` § Scope covers. Every part below is internal (`private[scalatest]`).
 
-- **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. It hands the emitter each `Event` it receives, tagged with its node's ID, its parent's ID, its declared position among its siblings and its name (`ARCHITECTURE-DECISIONS.md` "Structure is attached where each event is emitted…").
+- **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. It hands the emitter each `Event` it receives, tagged with its node's ID (`ARCHITECTURE-DECISIONS.md` "Structure is attached where each event is emitted…").
   - It sits ahead of the sorting reporters, which hold events back, so the emitter receives each event as it is emitted.
-  - Each suite's wrapper mints the IDs of the suite, its scopes and its tests, unique within the run, and tracks the scopes its node opens and closes.
+  - A top-level suite's wrapper is installed where the suite's `Args` are built, before the suite's `SuiteStarting` is reported. There it reads the suite's structure (§ APIs § The emitter and the Mill plugin, item 2) from the constructed suite, its nested suites and the run's filter, and hands it to the emitter.
+  - That wrapper mints the ID of every node in the structure, nested suites' nodes included, unique within the run. A nested suite's wrapper takes its nodes' IDs from that structure. Each wrapper tracks the scopes its node opens and closes.
   - It passes the bare `Event` on to the reporter it wraps. It adds no event, removes none and changes no field, so every existing reporter receives what it receives without the wrapper (`SPECIFICATION.md` R-002).
   - An event that bypasses its own node's wrapper is tagged by the nearest enclosing wrapper that receives it, which belongs to an ancestor of the emitting node (R-097).
 - **Test output capture** — inside the run's process, captures output it can tie to a suite, scope or test against that node, and hands it to the emitter.
@@ -71,19 +72,19 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
   - Where the test event log is a file (below), the argument carries its path. On Scala.js under `NodeJs` and on Native that is the absolute path of the module's one event log file.
   - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's framework arguments are those of the `TestModuleUtil` its subprocess call is made on, so the test command makes each worker's call on one built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no test event log (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
-- **The run's test event log** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/event-log-contract.md`). In order:
+- **The run's test event log** — carries exactly one run, in the codec's format, which is private and read only by the release that wrote it (`decisions/event-log-contract.md` "The test event log's format is private to this fork." and "A test event log is read only by the release of this fork that wrote it."). In order:
   1. before the runner's construction returns, that the run exists (R-071, R-080), with:
      - the run-level values of its run record known then;
      - on the JVM, under `NodeJs` and on Native, its process's PID;
      - on the JVM and Native, its process's start time;
      - under `JsDom`, the ID the run gives itself at construction;
-  2. when a suite starts running, once ScalaTest's filter is known and before the suite's first event, that suite's structure after filtering: its class name, then its nested suites, scopes and tests, each with its node ID, its parent, its declared position and its name, each nested suite also with its class name and each scope and test with its label;
-  3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md`):
-     - each tagged with its node's ID, a suite's only after that suite's structure;
+  2. when a top-level suite starts running, once ScalaTest's filter is known, that suite's structure after filtering: the suite with its node ID and class name, then its nested suites, scopes and tests, each with its node ID, its parent, its declared position and its name, each nested suite also with its class name and each scope and test with its label;
+  3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
+     - each tagged with its node's ID, a node's only after the structure holding it;
      - events and messages attached to the run rather than to a suite tagged as the run's;
   4. how the run ended (R-074).
 
-  Items 2 and 3 repeat for each suite. A run given no task sends only items 1 and 4, and item 4 only if it ends (R-071). No run sends a whole-run tree before it starts its first suite (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"). The event log carries only what the consolidated output shows or uses (`decisions/event-log-contract.md` "A test event log carries what the consolidated output shows or uses, not the whole event.").
+  Items 2 and 3 repeat for each top-level suite. A run given no task sends only items 1 and 4, and item 4 only if it ends (R-071). No run sends a whole-run tree before it starts its first suite (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"). The event log carries only what the consolidated output shows or uses (`decisions/event-log-contract.md` "A test event log carries what the consolidated output shows or uses, not the whole event.").
 
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the event log is one file per run, at the path the runner argument gives. The run appends each item to it unbuffered as it occurs, and the plugin reads it while the run appends (`ARCHITECTURE-DECISIONS.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.").
     - On the JVM the file has one fixed name, which Mill does not use, in the worker's `processFolder`. It is not in the worker's `sandbox`, so the tests' working directory holds nothing new (`SPECIFICATION.md` R-053). Mill writes a `processFolder`'s `testargs` with `CREATE_NEW`, so it starts at most one JVM there in one test command and the name cannot collide (`research/mill-test-worker-args.md` § 2.3). The plugin reads the file in each `processFolder` it starts a worker in.
@@ -150,7 +151,7 @@ flowchart LR
   subgraph PROC["Each process running a run"]
     N[Suites, scopes, tests] --> W[Structure wrapper]
     W -- bare Event --> X["Sorting and existing reporters, test-interface"]
-    W -- "event, node ID" --> EM[Emitter]
+    W -- "each top-level suite's structure; event, node ID" --> EM[Emitter]
     TC[Test output capture] -- "output captured against a node" --> EM
     EM --> ENC[Codec: encoder]
   end
@@ -185,7 +186,7 @@ flowchart LR
 - Progress output and human-readable output reach the console through the test command's Mill logging, which shares the console with Mill's prompt (`decisions/capture-and-console.md` "On the console, progress output is a one-line summary…").
 - Failure path: a process that dies.
   - The run's event stream ends without how the run ended (§ APIs § The emitter and the Mill plugin), holding everything the run had handed to the operating system (`SPECIFICATION.md` R-073). The library treats it as a run that does not finish (R-064–R-067), and progress output shows it aborted as soon as the stream ends (R-067).
-  - Because each suite's structure arrives as the suite starts, every scope and test a constructed suite registered is known when the process dies (R-065). A suite the run never constructed sent nothing, so only its class is known, from the module's test manifest.
+  - Because each top-level suite's structure, its nested suites included, arrives as the suite starts, every scope and test of a suite that started, and of every suite it nests, is known when the process dies (R-065). A top-level suite the run never started sent nothing, so only its class is known, from the module's test manifest.
   - What the process wrote to stdout and stderr still reaches the library through process capture.
   - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it took.
   - On the JVM the library still reports each class the dead worker took that no run reported, from the worker's claims (§ Modules § Mill plugin, Test manifest). A worker claims one class at a time, so that is at most the class it held when it died. Classes no worker claimed stay in the queue (R-068).

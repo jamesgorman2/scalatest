@@ -90,5 +90,9 @@ Feature: The consolidation library without Mill
       Given a run, fed to the consolidation library directly, that has reported that it completed
       When its event stream has not yet ended
       Then the library has written no human-readable output
-      And once the stream ends and the caller ends the consolidation, the library writes the human-readable output
+
+    Scenario: AC-118 A completed run whose event stream has ended
+      Given a run, fed to the consolidation library directly, that has reported that it completed
+      When its event stream ends and the caller ends the consolidation
+      Then the library writes the human-readable output
 ```

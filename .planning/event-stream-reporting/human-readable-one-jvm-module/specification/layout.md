@@ -108,7 +108,7 @@ A scope's or test's line is its label followed by its outcome's suffix.
 ```gherkin
 Feature: Where messages sit
 
-  Rule: A message sits under the node it attaches to (R-097), after its test's failure or cancel lines, in the order the run emitted it
+  Rule: Messages sit under the node they attach to (R-097), after its test's failure or cancel lines, in the order the test event log holds them
     Scenario: AC-032 A test's messages sit under it, notes and alerts included
       Given in suite `StackFunSpec`, test `is empty` calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then succeeds
       When the test command runs the module

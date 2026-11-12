@@ -8,6 +8,7 @@
   - turn a worker's stdout and stderr, which arrive as byte chunks, into lines;
   - read Mill's colour decision through `private[mill]` API.
 - The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
+- The emitter must give each scope's and test's label before any test runs, and each test's messages in the order the test called them, though no event carries either.
 
 ## Critical code paths
 
@@ -28,7 +29,7 @@ The test command reads the module's arguments from Mill's `TestModule.testArgsDe
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
 - Core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core) does not throw. It returns an argument whose flag `parseArgs` does not recognise ungrouped, under no flag. The test command fails on the first such argument and names it.
 - The splitter keeps its own table of each flag's arity. A test runs `parseArgs` and the splitter over every flag `parseArgs` recognises, each followed by values that look like flags, and requires the same split.
-  - Sharing `parseArgs`'s arities instead would change `ArgsParser`, which every run goes through with the emitter off (`../SPECIFICATION.md` R-001).
+  - Sharing `parseArgs`'s arities instead would mean rewriting its flag-by-flag `if` chain, which reads each flag's values inline, as a table: a rewrite of the parser every run goes through with the emitter off (`../SPECIFICATION.md` R-001), where accepting the runner argument adds one branch.
   - Cost: a second arity table, kept in step with `parseArgs` only by that test.
 
 ### Mill's `Running Test Class` lines
@@ -102,30 +103,39 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
 - A throwable in the test event log carries what the throwable view needs beyond `../JSON-LAYOUT.md` § Throwables: each frame as the text `StackTraceElement.toString` gives, and whether the throwable is a `PropertyCheckFailedException`.
 - Event log reading polls each file every 10 ms, the only interval measured (`../research/jvm-file-channel.md` § 2).
-- A suite's structure takes each scope's and test's label from the style's registration tree, before any of them runs: `TestStarting` carries `MotionToSuppress`, so no event gives the label of a test that never closes (`specification/test-event-log.md` AC-097). It builds each as `Engine.runTestImpl` and `runTestsInBranch` do, in `Engine` and `AsyncEngine`, and drops the leading indentation:
+- A suite's structure takes each scope's and test's label from the style's registration tree, before any of them runs. The structure precedes the suite's first event (`specification/test-event-log.md` AC-096), and a test that never starts (AC-097) or never closes (`TestStarting` carries `MotionToSuppress`) has no event giving its label. It builds each as `Engine.runTestImpl` and `runTestsInBranch` do, in `Engine` and `AsyncEngine`, and drops the leading indentation:
   - a test's from `Suite.getIndentedTextForTest` over its text with its parent's child prefix, with the `includeIcon` its style's `runTest` passes, or `true` for a test the filter ignores, as `TestIgnored`'s formatter has it. That flag is `false` only in `AnyFeatureSpecLike`, `FixtureAnyFeatureSpecLike` and the `FeatureSpecLike` and `FixtureFeatureSpecLike` that `project/GenSafeStyles.scala` generates from them (AC-103);
   - a scope's from `getIndentedTextForInfo` over its text with its parent's child prefix, with no icon.
+- A suite with no registration tree, one that overrides `testNames` and `runTest` itself, yields a test node for each name of `testNames` the filter keeps, in `testNames`'s order, and no scope. Each is labelled as `Suite.runTests` labels a test it ignores, by `getEscapedIndentedTextForTest(testName, 1, true)` without the leading indentation.
 - Each suite's class name is `Suite.getSuiteClassName`'s, which for a `DeferredAbortedSuite` is the class whose construction failed (AC-104). `SuiteAborted.suiteClassName` is never read: `Framework`'s catch around `suite.run` sets it to the suite's name.
 - A test's `info` and `markup` reach reporters only in its closing event's `recordedEvents`, after its `note`s and `alert`s and with ordinals taken at the close (`Engine.runTestImpl`, `AsyncEngine.runTestImpl`). Neither the order events arrive in nor their ordinals give the order the test called them (AC-105). With the emitter on, the test's informer and documenter therefore also hand each message to the emitter when called, and the emitter leaves the closing event's recorded events out of the event log. With the emitter off they behave as in 3.2.19.
+  - They reach the emitter through the test's structure wrapper: `args.reporter` in `runTestImpl`, or the `reporter` of the `WrapperCatchReporter` that holds it. The wrapper tags the message with the test's node and hands it to the emitter only, never to the reporter it wraps (`../SPECIFICATION.md` R-002).
+  - The hand-off takes no ordinal from `tracker`, so every event reporters receive keeps its 3.2.19 ordinal (`specification/compatibility-and-library.md` AC-056). The event log carries no ordinal, since no output shows or uses one.
+  - The message's timestamp is the time of the call (`specification/test-event-log.md` AC-108).
 
 ## Testing
 
 ### Runs the criteria describe
 
-The criteria that feed the consolidation library a run they describe (`specification/runs-and-test-structure.md` AC-036, AC-037, AC-038 and AC-054; `specification/compatibility-and-library.md` AC-064) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
+The criteria that feed the consolidation library a run they describe (`specification/runs-and-test-structure.md` AC-036, AC-037, AC-038 and AC-054; `specification/compatibility-and-library.md` AC-064 and AC-118) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
 
-- A test declares the run's tree once, in the form `SPECIFICATION.md` § Acceptance criteria gives a `structure`: its suites with their class names, and their nested suites, scopes and tests in declared order, each scope and test with its label. The builder derives each node's ID, its parent's ID and its declared position, and emits each suite's structure item before that suite's first event.
+- A test declares the run's tree once, in the form `SPECIFICATION.md` § Acceptance criteria gives a `structure`: its suites with their class names, and their nested suites, scopes and tests in declared order, each scope and test with its label. The builder derives each node's ID, its parent's ID and its declared position, and emits each top-level suite's structure item before that suite's first event.
 - The test scripts the run by node name: each node's events, messages attached to a node or to the run, captured lines tagged with their stream, and how the run ended. The builder emits each in the form core's decoder yields, tagged with its node's ID or as the run's.
 - It adds the test classes the run's process took after the event stream ends, as the test command does.
 - Cost: the builder must yield what the decoder yields.
 
-The criteria of `specification/test-event-log.md` run real suites with the runner argument and decode each test event log with core's codec. Where a criterion states items, its test builds them with the same builder from the criterion's tree and script, and compares the decoded items with them. A drift between builder and decoder then fails those tests, as well as the criteria run under Mill.
+The criteria of `specification/test-event-log.md` run real suites with the runner argument and decode each test event log with core's codec. Where a criterion states items, its test builds them with the same builder from the criterion's tree and script, and compares the decoded items with them:
 
-Each test compares the whole output, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour.
+- Each item is compared only on what the criterion fixes: a `structure` on its whole tree, an event on its node, its class and the fields the criterion names.
+- Where the criterion says the event log *is* the items, the decoded items must be exactly those built. Where it says the log *holds* them *in this order*, the built items must be a subsequence of the decoded ones.
+
+A drift between builder and decoder in what a criterion fixes then fails those tests, as well as the criteria run under Mill.
+
+Each test of human-readable output compares the whole output, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour.
 
 ### Comparison with ScalaTest 3.2.19
 
-This serves `specification/compatibility-and-library.md` AC-056 and AC-057, and `specification/runs-and-test-structure.md` AC-073.
+This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `specification/test-event-log.md` AC-116, and `specification/runs-and-test-structure.md` AC-073.
 
 - AC-056 and AC-057 run in a test project of the fork's sbt build.
   - The compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) are the sources of an sbt configuration of the project's own that extends neither `Compile` nor `Test` and whose one library dependency is `org.scalatest:scalatest` 3.2.19. They compile there once, so both runs load the same compiled classes. `../SPECIFICATION.md` R-004 lets the fork run them.
@@ -133,6 +143,7 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, and 
   - For Scala 2.11, 2.12 and 2.13 the project is cross-built over `crossScalaVersions` (`project/BuildCommons.scala` `scalaVersionsSettings`). Scala 3 artefacts come only from `project/DottyBuild.scala`, so for Scala 3.3 a twin project there builds the same sources, its fork classpath from `scalatestDotty` and `scalacticDotty`.
 - The test forks one JVM for each run, on the fixture's compiled classes plus either 3.2.19's resolved classpath or the fork's, as IntelliJ's forked mode and a build tool's test worker each start a JVM of their own. No JVM-wide state, such as `System.out` or a system property, then passes from one run to the other.
 - In each JVM the recorders write each event to a file as one line, holding every field but timestamps, durations and thread names. The test compares the two runs' files line by line.
+- AC-116 runs in a Scala.js and a Native test project of the fork's sbt build, for each Scala version. The fixture and the recorders compile once against 3.2.19's artefacts for the platform, and the test links them twice, once with 3.2.19's and once with the fork's. There the recorders print each event as one line to stdout, and the test compares the two runs' lines as above.
 - AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.19 and passes `-f` in its own ScalaTest arguments; Mill's `testForked` on that module writes the file the criterion compares with.
 
 ### MiMa
