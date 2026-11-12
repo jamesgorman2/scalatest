@@ -59,6 +59,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 - The emitter, consolidated output and the test command on Scala.js and Native (§ 11–15).
 - Adding the plugin through `mvnDeps` on `mill-build/build.mill`'s `MillBuildRootModule`.
 - Writing these to the test event log: `Runner`'s `-A` rerun alerts, the events of the reruns that `Runner`'s `-g` graphical reporter starts, and the events `Framework` relays from a process sbt forks.
+- For a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` whose tests depend on its config map, a structure holding the tests it runs: it holds those its class registers with an empty config map (`SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` has the structure its class registers…").
 
 ## Epic requirements met
 
@@ -66,9 +67,9 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 - R-001, R-002, R-051, R-003, R-060, R-004.
 - R-010, R-063, R-011, R-074.
-- R-096, R-097, R-098, R-099, R-100, R-104, R-105, R-106 (with no formatting or filtering character), R-107 and R-112, for human-readable output.
+- R-096, R-097, R-098, R-099, R-100 (except as § Out of scope says of a suite run through `ConfigMapWrapperSuite`), R-104, R-105, R-106 (with no formatting or filtering character), R-107 and R-112, for human-readable output.
 - R-054; R-055 (one module selector; whether stdout holds human-readable output); R-053 (second bullet, except where R-110 and R-111 override it), R-125; R-092, R-072.
-- R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021, R-012 (on the run), R-086.
+- R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021 (except as § Out of scope says of a suite run through `ConfigMapWrapperSuite`), R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
 - R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails).
@@ -116,10 +117,11 @@ The criteria are in the five `specification/` documents listed in § Spec docume
 - A line is given without Mill's prefix (`specification/layout.md` AC-044). A line *sits under* another when it follows it, indented 2 spaces more, with no line between them indented as little as the other. *The lines for* a node are its own lines and every line under them.
 - Text and colours the criteria do not fix are ScalaTest 3.2.19's (R-106). Colour is on (R-124).
 - "With every stack frame left out" drops each line under a throwable's first line or `Cause:` line.
-- *The compatibility fixture* is a set of suites, at least one of each style `specification/test-event-log.md` AC-103 names that the build for the fixture's runtime and Scala version ships, holding between them:
+- *The compatibility fixture* is a set of suites, at least one of each style `specification/test-event-log-structure.md` AC-103 names that the build for the fixture's runtime and Scala version ships, holding between them:
   - nested suites;
   - scopes, one of them pending;
   - tests that succeed, fail, are ignored, are pending and are cancelled;
   - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a `PathAnyFunSpec` test and a `PathAnyFreeSpec` test;
   - a suite whose `beforeAll` throws;
+  - on the JVM, a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, with a scope;
   - a test that writes to stdout and to stderr.

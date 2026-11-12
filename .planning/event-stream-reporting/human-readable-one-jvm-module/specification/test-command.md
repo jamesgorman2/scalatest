@@ -88,7 +88,7 @@ Feature: Module selectors
   Rule: The test command fails unless it is given one module selector that resolves to one JVM test module (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-081 <selectors>
       Given the build's test modules are `core.test` and `util.test`, both JVM test modules, and `coreJS.test`, a Scala.js test module
-      And each holds suite `AddSuite` of `test-event-log.md` AC-099
+      And each holds suite `AddSuite` of `test-event-log-structure.md` AC-099
       When the test command is given <selectors>, which are <what>
       Then the test command fails before any test starts
       And the console holds no line of human-readable output
@@ -157,7 +157,7 @@ Feature: The test command's result
       Examples:
         | how the worker dies                                                                                                                                                 |
         | test `exits`, labelled `- exits`, of suite `ExitSuite`, class `samples.ExitSuite`, an `AnyFunSuite`, calls `System.exit(0)`                                         |
-        | the module holds suite `AddSuite` of `test-event-log.md` AC-099, and its `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it |
+        | the module holds suite `AddSuite` of `test-event-log-structure.md` AC-099, and its `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it |
 
   Rule: The test command's failure lists no test (R-046)
     Scenario: AC-086 A failed test is not named outside the human-readable output
@@ -210,7 +210,7 @@ Feature: What else reaches the console
 
   Rule: Output of another goal on the same `mill` command line is neither captured nor changed (R-050)
     Scenario: AC-090 A task named before the test command
-      Given the module holds suite `AddSuite` of `test-event-log.md` AC-099
+      Given the module holds suite `AddSuite` of `test-event-log-structure.md` AC-099
       And the build's task `banner` writes `building banner` to stdout
       When one `mill` command runs `banner` and then the test command over the module
       Then the console holds `building banner` outside the human-readable output, with the prefix Mill gives `banner`'s lines
