@@ -135,14 +135,18 @@ Feature: Each suite's structure
       Given suite `ParFunSuite`, class `samples.ParFunSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose tests `a` and `b`, labelled `- a` and `- b`, succeed
       When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParFunSuite`
       Then the event log holds one `structure` holding `ParFunSuite`, and none holds a `DistributedTestRunnerSuite`
-      And each of `a` and `b` has its `TestStarting` and `TestSucceeded` tagged with its own node
+      And it holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
       And each line of its test event log decodes to one item
 
     Scenario: AC-128 A suite wraps its reporter in its own
-      Given suite `ForwardingSuite`, class `samples.ForwardingSuite`, an `AnyFunSuite` whose tests `a` and `b`, labelled `- a` and `- b`, succeed, and which overrides `run` to pass `super.run` its `args` with `args.reporter` wrapped in a reporter of its own that forwards each event unchanged
+      Given suite `ForwardingSuite`, class `samples.ForwardingSuite`, an `AnyFunSuite` whose tests `a` and `b`, labelled `- a` and `- b`, succeed, and which overrides `run` to pass `super.run` its `args` with `args.reporter` wrapped in a `Reporter` whose `apply` passes each event unchanged to `args.reporter`
       When `Framework` runs it with the runner argument
-      Then each of `a` and `b` has its `TestStarting` and `TestSucceeded` tagged with its own node
-      And the event log holds no other `TestStarting` or `TestSucceeded`
+      Then the event log holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
+
+    Scenario: AC-129 Tests in random order are tagged with their own nodes
+      Given suite `ShuffledSuite` of AC-102
+      When `Framework` runs it with the runner argument
+      Then the event log holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a`, `b` and `c`, and no other `TestStarting` or `TestSucceeded`
 
   Rule: A `DistributedTestRunnerSuite`'s abort is tagged with the one test it ran (R-096, R-097)
     Scenario: AC-126 The suite running one test in parallel throws
@@ -168,7 +172,6 @@ Feature: Each suite's structure
       Given suite `ShuffledSuite`, class `samples.ShuffledSuite`, an `AnyFunSuite` mixing in `RandomTestOrder`, registering tests `a`, `b` and `c`, labelled `- a`, `- b` and `- c`, in that order, each succeeding
       When `Framework` runs it with the runner argument
       Then its `structure` holds `a`, `b` and `c` in that order, whatever order the tests ran in
-      And each of `a`, `b` and `c` has its `TestStarting` and `TestSucceeded` tagged with its own node
 
     Scenario: AC-127 A suite with no registration tree
       Given suite `PlainSuite`, class `samples.PlainSuite`, a `Suite` that overrides `testNames` as `Seq("b", "a", "c")`, `tags` to tag `c` with `samples.Slow`, and `runTest` to report `TestStarting` and `TestSucceeded` for the test it is given
@@ -235,8 +238,8 @@ Feature: A suite's class name
 Feature: Messages
 
   Rule: A test's messages sit between its start and its close, in the order the test called them, whatever its style or outcome (R-011, R-097)
-    Scenario Outline: AC-105 <style>: a test that <outcome>
-      Given suite `MessagesSpec`, of style <style>, whose test `is empty`, labelled `- is empty`, calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then <outcome>
+    Scenario Outline: AC-105 <suite>: a test that <outcome>
+      Given suite `MessagesSpec`, <suite>, whose test `is empty`, labelled `- is empty`, calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then <outcome>
       When `Framework` runs it with the runner argument
       Then the event log holds, in this order:
         """
@@ -251,13 +254,14 @@ Feature: Messages
       And each message's timestamp is the time the test called it
 
       Examples:
-        | style             | outcome  | closing event |
-        | `AnyFunSpec`      | succeeds | TestSucceeded |
-        | `AnyFunSpec`      | fails    | TestFailed    |
-        | `PathAnyFunSpec`  | succeeds | TestSucceeded |
-        | `PathAnyFunSpec`  | fails    | TestFailed    |
-        | `PathAnyFreeSpec` | succeeds | TestSucceeded |
-        | `PathAnyFreeSpec` | fails    | TestFailed    |
+        | suite                                                                                                                                        | outcome  | closing event |
+        | an `AnyFunSpec`                                                                                                                              | succeeds | TestSucceeded |
+        | an `AnyFunSpec`                                                                                                                              | fails    | TestFailed    |
+        | an `AnyFunSpec` that overrides `runTest` to pass `super.runTest` its `args` with `args.reporter` wrapped as `ForwardingSuite`'s is in AC-128 | succeeds | TestSucceeded |
+        | a `PathAnyFunSpec`                                                                                                                           | succeeds | TestSucceeded |
+        | a `PathAnyFunSpec`                                                                                                                           | fails    | TestFailed    |
+        | a `PathAnyFreeSpec`                                                                                                                          | succeeds | TestSucceeded |
+        | a `PathAnyFreeSpec`                                                                                                                          | fails    | TestFailed    |
 
   Rule: A scope's message keeps its place among the scope's children (R-097, R-105)
     Scenario: AC-106 An info between two children of a scope
@@ -270,7 +274,7 @@ Feature: Messages
         scope "when full": ScopeOpened
         """
 
-  Rule: A message sent to an ancestor's reporter attaches to that ancestor (R-097)
+  Rule: A message a test sends directly to a reporter an ancestor was given, rather than through the reporter the test was given, attaches to that ancestor (R-097)
     Scenario: AC-107 A test reports to its suite's reporter
       Given suite `DirectSuite`, an `AnyFunSuite` that overrides `run` to keep `args.reporter`, whose test `t`, labelled `- t`, sends that reporter an `InfoProvided` with message `direct`, then succeeds
       When `Framework` runs it with the runner argument

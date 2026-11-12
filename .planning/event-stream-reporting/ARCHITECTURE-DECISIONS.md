@@ -2,6 +2,21 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## Only the innermost structure wrapper an event reaches hands it to the emitter, recognised by the event's identity in a set the emitter keeps.
+
+**Alternatives**
+
+- A thread-local flag set while a wrapper forwards breaks where a reporter between wrappers holds events back and releases them later, as ScalaTest's `TestSortingReporter` does, and so would a user's buffering reporter.
+- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` sent when a `DistributedTestRunnerSuite` running one test throws, and drops rather than re-tags an event that bypassed its test's wrapper, against `SPECIFICATION.md` R-097.
+
+**Reasoning** `SPECIFICATION.md` R-002 forbids marking an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it. The top-level suite's wrapper, the last any event of its suite reaches, removes the event, so the set holds only events still between wrappers.
+
+**Costs** One insert and one remove per event under the emitter's write lock, and an event handed off that never reaches its top-level suite's wrapper stays in the set until the run ends. A reporter between wrappers that forwards a copy of an event, not the event, has the copy handed off again, a duplicate in the event log.
+
+**Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+
+---
+
 ## Each side of core's codec is tested on its own against the test event log's written format, not by round trip.
 
 **Alternatives**
@@ -48,10 +63,10 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- A tap in `DispatchReporter.apply` that tags every event no wrapper handed off as the run's must recognise each wrapped event by its identity, since `SPECIFICATION.md` R-002 forbids marking it, so the wrappers' identity set (`ARCHITECTURE.md` § Modules § ScalaTest core, Structure wrapper) would hold every wrapped event until it reaches `DispatchReporter`, not only while it is between wrappers.
+- A tap in `DispatchReporter.apply` that tags as the run's every event no wrapper handed off has no place on Scala.js and Native, which build no `DispatchReporter`, so their send sites need a hand-off anyway and the epic would carry two routes to the emitter.
 - A run-level root structure wrapper receives neither the slowpoke alert, which `DispatchReporter` raises behind every wrapper, nor the events the runner passes straight to `dispatch`, so those send sites need a hand-off anyway.
 
-**Reasoning** The senders outside every wrapper in a run the test command starts are a known, short list in ScalaTest core, so a hand-off at each keeps every route to the emitter visible where the event is sent. For so short a list, the risk that a missed or future site loses its events is worth taking to keep a check out of `DispatchReporter.apply`, which every event of the run passes.
+**Reasoning** A hand-off at each send site is one route to the emitter on every runtime, visible where each event is sent. The senders outside every wrapper in a run the test command starts are a known, short list in ScalaTest core, so the risk that a missed or future site loses its events is worth taking for that one route.
 
 **Costs** A send site missed now, or added by an upstream merge, silently loses its events (`SPECIFICATION.md` R-010, R-097), and no acceptance test finds an unknown site.
 
