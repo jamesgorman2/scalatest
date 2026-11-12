@@ -71,7 +71,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - the text of info, alert, note and markup messages.
 
   The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
-- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (§ The test event log on the JVM), except its frames' fields and its suppressed throwables. For a `StackDepth` it also holds the failed code's stack depth, which only the live wrapper fills.
+- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (§ The test event log on the JVM § The format), except its frames' fields and its suppressed throwables. For a `StackDepth` it also holds the failed code's stack depth, which only the live wrapper fills.
 - The functions return text without indentation or colour. An event's first line is the text its caller passes. The stack-trace function returns each throwable of the cause chain as its first line, `Cause: ` included for a cause, with its frame lines, `...` included.
 - `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, and colours each line with its event's colour.
   - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent` (`../SPECIFICATION.md` § Scope § Out of scope, R-003).
@@ -99,18 +99,6 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - Event log reading never reads the other name, so a worker that dies before the move holds no event log file.
   - In the same folder, the move is one rename within one file system.
   - Item 1 precedes every other item, so nothing is appended between the move and the reopening.
-- Each item is a JSON object, encoded as the JSON output is (`../JSON-LAYOUT.md` § Encoding; `TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."). Escaping control characters in strings keeps each item to one line.
-  - A lone surrogate's `\uXXXX` escape decodes back to the same `char`.
-  - Integers are JSON numbers, read as `Long`, never through `Double`.
-  - Item 1's process start time is the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
-  - A throwable carries what core's decoded throwable holds, in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one:
-    - its class name, and its message, absent where `getMessage` is `null`;
-    - whether it is a `StackDepth`, and for one, the failed code's file name, file pathname and line number, each where defined;
-    - whether it is a `PropertyCheckFailedException`, whose message already holds its line number;
-    - its frames, a `StackDepth`'s included, each both as the fields `../JSON-LAYOUT.md` § Throwables gives a frame and as its `StackTraceElement.toString` text, which on JDK 9 and later can hold a module and a class loader name;
-    - its cause, and its suppressed throwables in order, each written as a throwable.
-
-    Each throwable in an item carries an `id`, and a repeat within that item is written as a `ref` to it. Identity is per item, so a torn item breaks no other.
 - The emitter's one write lock (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin) is taken by:
   - the run's own thread;
   - the dispatcher's thread;
@@ -142,6 +130,35 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - The four recorders of one test also append each call to one shared call sequence. An entry holds what its recorder stores of the call, the recorder's event function and the time of the call. `registerTest` takes, and `TestLeaf` holds, that sequence beside the informer.
   - With the emitter on, `Engine.runTestImpl` replaying a path-style test hands the sequence's messages, in order, to the test's structure wrapper after `TestStarting` and before the closing event, and the wrapper treats them as it treats messages handed off at call time. Each message is built by its entry's event function, given a fresh `Tracker` in place of `tracker` so that it takes no ordinal from the run's. Its `timeStamp` is then set to the entry's call time.
   - The closing event's `recordedEvents` are built from `tracker` as in 3.2.19, emitter on or off, so the test's notes, alerts and markup still reach no reporter (`specification/compatibility-and-library.md` AC-056).
+
+### The format
+
+Each item is a JSON object (`TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."), encoded as `../JSON-LAYOUT.md` § Encoding gives, except that keys are written in the order this section gives. Escaping control characters in strings keeps each item to one line.
+
+- A lone surrogate's `\uXXXX` escape decodes back to the same `char`.
+- Integers are JSON numbers, read as `Long`, never through `Double`.
+- An empty array omits its key, as an absent value does.
+
+Each item's first key is `item`, naming its kind. The items are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and their keys, in order, are:
+
+1. `item` `runStarted`; `pid`; `startTime`, the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
+2. `item` `structure`; `nodes`, an array of the suite's nodes, the suite first and every other node after its parent and its earlier siblings. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes item 2 gives it. A node's `id` is an integer.
+3. `item` `event`; `node`, the `id` of the node the event is tagged with, absent where it is tagged as the run's; `event`, its `org.scalatest.events` class's simple name; then the event's fields.
+4. `item` `runEnded`; `outcome`: `completed`, `aborted` or `stopped`.
+
+An event's fields:
+
+- Its keys are the field names of its decoded class, in that class's declaration order. Each decoded class names and orders the fields it holds as its `org.scalatest.events` class does.
+- A `String` is a JSON string, an `Int` or `Long` a number and a `Boolean` `true` or `false`. A sequence is an array, and `None` omits its key.
+- A case class, such as a `Summary`, is an object of its fields under the same rules. A member of a sealed family, such as a `Location`, is that object with first key `kind` holding its class's simple name: `{"kind":"SeeStackDepthException"}`.
+- A `ConfigMap` is an object of each value's `toString`.
+- A throwable is an object with these keys, in order, written in the form `../JSON-LAYOUT.md` § Throwables gives where that section has one:
+  - `id`, numbered from 1 in the order the item writes its throwables. A throwable already written in the item is `{"ref": <id>}`. Identity is per item, so a torn item breaks no other.
+  - `className`; `message`.
+  - `stackDepth`, only on a `StackDepth`: an object of `fileName`, `filePathname` and `lineNumber`, the failed code's, each present where defined.
+  - `propertyCheck`, `true`, only on a `PropertyCheckFailedException`, whose message already holds its line number.
+  - `stackTrace`, its frames, a `StackDepth`'s included, each a frame of `../JSON-LAYOUT.md` § Throwables followed by `text`, its `StackTraceElement.toString`, which on JDK 9 and later can hold a module and a class loader name.
+  - `cause`; `suppressed`, in order.
 
 ## Publishing
 
