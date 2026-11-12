@@ -96,7 +96,7 @@ A run record (R-080) holds one run's own state. It has no `name`, `label`, `suit
 - `contents` — always present, `[]` when empty: the messages attached to the run rather than to a suite (R-097), in the order they were emitted.
 - `output` — the output captured against the run (R-012, R-042, R-122), in the form a node's takes.
 
-A key whose supplying event the run never reported is absent, as on a run given no task (R-071) or a run that does not finish.
+A key whose supplying event the run never reported is absent, as on a run whose runner sends no run events, or a run that does not finish before sending them.
 
 ## Not yet fixed
 

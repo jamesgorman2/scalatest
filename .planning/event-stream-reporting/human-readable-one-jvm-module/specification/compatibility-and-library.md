@@ -58,7 +58,7 @@ Feature: The emitter on each of the JVM's Scala versions
     Scenario Outline: AC-061 Scala <version>
       Given suite `SqrtPropSpec` of `layout.md` AC-002, compiled with Scala <version>
       When it runs through `Framework` on this fork's build for Scala <version>, with the runner argument
-      And its test event log is fed to the consolidation library directly
+      And its test event log, decoded with core's codec, is fed to the consolidation library directly
       Then the human-readable output is the one `layout.md` AC-002 gives
 
       Examples:
@@ -82,7 +82,7 @@ Feature: The consolidation library without Mill
   Rule: The library writes the same human-readable output without Mill as under the test command (R-113)
     Scenario: AC-063 One run, with and without Mill
       Given the test command has run a module holding suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, with Mill's `--color false`
-      When the suite runs through `Framework` outside Mill with the runner argument, and its test event log and the lines it wrote to stdout and stderr are fed to the consolidation library directly, with colour off
+      When the suite runs through `Framework` outside Mill with the runner argument, and its test event log, decoded with core's codec, and the lines it wrote to stdout and stderr are fed to the consolidation library directly, with colour off
       Then the library's human-readable output is the test command's, with Mill's prefix removed from each line
 
   Rule: The library writes human-readable output only once every run's event stream has ended (R-027)

@@ -2,6 +2,18 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
+## Each item of a run's test event log is a JSON object.
+
+**Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs escaping rules of its own, specified and tested apart, and is unreadable where a field is absent.
+
+**Reasoning** JSON's escaping is already specified, and the event log then follows the JSON output's encoding (`../JSON-LAYOUT.md` § Encoding). Lossless round-tripping of every Java string is core's codec's own: receivers of a lone surrogate's `\uXXXX` escape behave unpredictably (RFC 8259 § 8.2, https://www.rfc-editor.org/rfc/rfc8259#section-8.2), so core's reader decodes it back to the same `char` itself.
+
+**Costs** Core carries a hand-written JSON reader and writer, and keys repeated on every line lengthen the event log.
+
+**Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
+
+---
+
 ## The consolidation library's tests build each run with a test-only builder, not through core's codec.
 
 **Alternatives**

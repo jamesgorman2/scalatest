@@ -2,25 +2,13 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
-## Each item of a run's test event log is a JSON object.
-
-**Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs escaping rules of its own, specified and tested apart, and is unreadable where a field is absent.
-
-**Reasoning** JSON's escaping is already specified (RFC 8259, https://www.rfc-editor.org/rfc/rfc8259) and lossless for every Java string, lone surrogates included. The event log then follows the JSON output's conventions (`JSON-LAYOUT.md` § Encoding).
-
-**Costs** Core carries a hand-written JSON reader and writer, and keys repeated on every line lengthen the event log.
-
-**Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
-
----
-
 ## The run's own state travels in the test event log as run events among item 3's events.
 
-**Alternatives** Folding the run events into items 1 and 4 needs new item kinds, since `RunStarting` follows item 1 in `Framework`'s construction and arrives long after it in `Runner.run`, while item 1 must be written before construction returns; and the emitter would handle each run event type as a special case.
+**Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which every runner sends after item 1.
 
-**Reasoning** The run events reach the emitter by the hand-off every event sent outside a structure wrapper takes (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them as it writes any event tagged as the run's. The library takes how the run ended from item 4 alone, so a Scala.js or Native run, whose runner builds no run events, ends as a JVM run does.
+**Reasoning** The run events reach the emitter by the hand-off every event sent outside a structure wrapper takes (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them as it writes any other event tagged as the run's. Item 4 needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-**Costs** How the run ended is stated twice, by the closing run event and by item 4; they cannot disagree only because the emitter derives one from the other.
+**Costs** A run whose event stream holds its closing run event but no item 4, because item 4 is torn or the process dies between the two writes, does not finish, though the closing run event says how it ended.
 
 **Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
 
@@ -33,7 +21,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - A generic record of a kind and a field map makes every reader cast, and fails only at run time on a field the emitter stops sending.
 - Real `org.scalatest.events` instances need a stand-in `Throwable`, which cannot pass `StringReporter`'s `StackDepth` and `PropertyCheckFailedException` tests, and default ordinals and formatters that read as real data.
 
-**Reasoning** A class per event gives each reader the event log's fields by name, checked at compile time, so a field the emitter stops sending breaks the reader's build rather than a run. Its throwable is core's decoded throwable, which supplies the throwable view `StringReporter`'s formatting takes in place of a live `Throwable` (`human-readable-one-jvm-module/TECHNICAL-DESIGN.md` § The human-readable writer's reuse of `StringReporter`'s formatting).
+**Reasoning** A class per event gives each reader the event log's fields by name, checked at compile time, so a field the emitter stops sending breaks the reader's build rather than a run.
 
 **Costs** A second family of about 30 classes runs parallel to `org.scalatest.events`, and changes whenever the event log gains a field.
 
@@ -358,7 +346,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** Separating decoding from consolidation lets any front end in this fork, live under Mill or reading files, feed the same library, so the library never knows whether an event log was live or recorded.
 
-**Costs** Every front end must turn event logs into event streams. This epic gives no way outside Mill to produce an event log, so `SPECIFICATION.md` R-113 is exercised only by feeding event streams directly.
+**Costs** Every front end must turn event logs into event streams. This epic gives no supported way outside Mill to produce an event log.
 
 **Settled by** [What is the contract between the emitter and the consolidation library?](https://github.com/jamesgorman2/scalatest/issues/24).
 

@@ -250,7 +250,7 @@ Enables:
 
 Settles:
 
-- The framing prefix, how the nonce is made, the ID a `JsDom` run gives itself in item 1, and how the codec keeps each item to one line.
+- The framing prefix, how the nonce is made, and the ID a `JsDom` run gives itself in item 1.
 
 Risks:
 

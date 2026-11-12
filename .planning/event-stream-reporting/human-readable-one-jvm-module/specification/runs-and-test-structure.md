@@ -218,7 +218,7 @@ Feature: Failures
   Rule: A failure message reaches the human-readable output unchanged (R-010, R-011)
     Scenario: AC-072 A multi-line, non-ASCII failure message
       Given suite `UnicodeSuite`, class `samples.UnicodeSuite`, an `AnyFunSuite` whose test `reports`, labelled `- reports`, calls `fail("first line\nsecond line: ü ß 日本 ✓")` at line 7 of `UnicodeSuite.scala`
-      And a run of `UnicodeSuite` through `Framework` with the runner argument, whose test event log is fed to the consolidation library directly
+      And a run of `UnicodeSuite` through `Framework` with the runner argument, whose test event log, decoded with core's codec, is fed to the consolidation library directly
       When the library consolidates it
       Then the lines under `- reports *** FAILED ***` begin:
         """
