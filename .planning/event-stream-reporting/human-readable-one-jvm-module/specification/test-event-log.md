@@ -138,6 +138,12 @@ Feature: Each suite's structure
       And each of `a` and `b` has its `TestStarting` and `TestSucceeded` tagged with its own node
       And each line of its test event log decodes to one item
 
+    Scenario: AC-128 A suite wraps its reporter in its own
+      Given suite `ForwardingSuite`, class `samples.ForwardingSuite`, an `AnyFunSuite` whose tests `a` and `b`, labelled `- a` and `- b`, succeed, and which overrides `run` to pass `super.run` its `args` with `args.reporter` wrapped in a reporter of its own that forwards each event unchanged
+      When `Framework` runs it with the runner argument
+      Then each of `a` and `b` has its `TestStarting` and `TestSucceeded` tagged with its own node
+      And the event log holds no other `TestStarting` or `TestSucceeded`
+
   Rule: A `DistributedTestRunnerSuite`'s abort is tagged with the one test it ran (R-096, R-097)
     Scenario: AC-126 The suite running one test in parallel throws
       Given suite `ParAbortSuite`, class `samples.ParAbortSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose one test is `a`, labelled `- a`, and which overrides `run` to throw `RuntimeException("no fixture")` when given a test name, as the `DistributedTestRunnerSuite` running `a` gives it
@@ -159,9 +165,10 @@ Feature: Each suite's structure
       And it holds `test "later": TestIgnored`, and no item is tagged with `slow`
 
     Scenario: AC-102 Tests in random order
-      Given suite `ShuffledSuite`, class `samples.ShuffledSuite`, an `AnyFunSuite` mixing in `RandomTestOrder`, registering tests `a`, `b` and `c`, labelled `- a`, `- b` and `- c`, in that order
+      Given suite `ShuffledSuite`, class `samples.ShuffledSuite`, an `AnyFunSuite` mixing in `RandomTestOrder`, registering tests `a`, `b` and `c`, labelled `- a`, `- b` and `- c`, in that order, each succeeding
       When `Framework` runs it with the runner argument
       Then its `structure` holds `a`, `b` and `c` in that order, whatever order the tests ran in
+      And each of `a`, `b` and `c` has its `TestStarting` and `TestSucceeded` tagged with its own node
 
     Scenario: AC-127 A suite with no registration tree
       Given suite `PlainSuite`, class `samples.PlainSuite`, a `Suite` that overrides `testNames` as `Seq("b", "a", "c")`, `tags` to tag `c` with `samples.Slow`, and `runTest` to report `TestStarting` and `TestSucceeded` for the test it is given

@@ -2,6 +2,38 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
+## A test's structure wrapper finds its test's node by its suite instance, never through `args.reporter`.
+
+**Alternatives**
+
+- Keying by `suiteId` and test name is ambiguous where one class runs twice in a run, as when it is nested twice or runs under `-P`.
+- Unwrapping known reporter chains fails outright for `RandomTestOrder`, which discards the `Args` given to `runTest`, and an unknown reporter silently falls back to the suite's tag.
+- A thread-local fails where the distributor runs the test on another thread.
+- Carrying the node ID in `Args.configMap` shows it to user code, risking `../SPECIFICATION.md` R-002.
+
+**Reasoning** Core's own traits and a user's overrides replace `args.reporter` before a test runs (`TECHNICAL-DESIGN.md` § The test event log on the JVM), so no reporter chain reliably carries the test's wrapper. The suite instance reaches every site that runs a test, and core creates each per-test instance at a known site, which registers it.
+
+**Costs** Each site that creates a per-test instance must register it and remove it, and a suite instance a user creates and runs takes its suite's tag (`../SPECIFICATION.md` R-097).
+
+**Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+
+---
+
+## Only the innermost structure wrapper an event reaches hands it to the emitter, recognised by the event's identity in a set the emitter keeps.
+
+**Alternatives**
+
+- A thread-local flag set while a wrapper forwards breaks where a reporter holds events back and releases them later, as `TestSortingReporter` does under `ParallelTestExecution` and `RandomTestOrder`, and a user's buffering reporter would duplicate events.
+- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of `specification/test-event-log.md` AC-126, and drops rather than re-tags an event that bypassed its test's wrapper, against `../SPECIFICATION.md` R-097.
+
+**Reasoning** An event passes every wrapper between its sender and `DispatchReporter`, with arbitrary reporters between, and `../SPECIFICATION.md` R-002 forbids marking it. Its identity tells it apart whichever reporter holds it back and whichever thread releases it. Removing it at its top-level suite's wrapper keeps the set to events still between wrappers.
+
+**Costs** One insert and one remove per event under the emitter's write lock, and an event an inner wrapper hands off that never reaches its top-level suite's wrapper stays in the set until the run ends.
+
+**Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+
+---
+
 ## Each item of a run's test event log is a JSON object.
 
 **Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs its own escaping rules, specified and tested separately, and is unreadable where a field is absent.
