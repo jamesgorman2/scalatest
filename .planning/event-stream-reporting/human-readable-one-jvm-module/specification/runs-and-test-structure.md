@@ -353,7 +353,7 @@ Feature: Runs that abort or stop
         | stream | line                                                   |
         | stderr | `OpenJDK 64-Bit Server VM warning: CodeCache is full.` |
       When the library consolidates it
-      Then, with every stack frame left out, the human-readable output is, its line `An exception or error caused a run to abort: Java heap space` ending in the message's trailing space:
+      Then, with every stack frame left out and the line `An exception or error caused a run to abort: Java heap space` keeping the message's trailing space, the human-readable output is:
         """
         [core.test]
           AbortingFunSpec:
