@@ -31,7 +31,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - A ScalaTest runner argument on the JVM that turns the emitter on, so the run writes its test event log to a file.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
-- The Mill plugin's test command. Given one module selector that resolves to one JVM test module that does not set `testBatchFrameworkTasks` and for which Mill's `testForked` starts one worker, it runs the module's tests in one worker and writes human-readable output to its stdout.
+- The Mill plugin's test command. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout. The module does not set `testBatchFrameworkTasks`, and Mill's `testForked` starts one worker for it.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
 - The test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module. This narrows what R-048, R-049 and R-055 allow.
 - The test command supports Mill 1.3.1 only.
@@ -44,7 +44,8 @@ Each is left to the named feature of `../ROADMAP.md`.
 - JSON output and `-fJ` (§ 2); progress output, `P` and `-fP` (§ 9).
 - The formatting and filtering characters (R-127, R-128), and `-f` for human-readable output (R-049) (§ 16).
 - A module that presets a test command's arguments (R-126) (§ 17).
-- A module for which Mill's `testForked` starts more than one worker, as it can with test parallelism on and more than one test class, and does with several fork groups; a module that sets `testBatchFrameworkTasks`, which Mill runs without a test queue. The test command's behaviour for either is unspecified, and no criterion asserts it. Also a run given no task (R-071) (§ 3).
+- A module that sets `testBatchFrameworkTasks`, whatever its worker count, and a module for which Mill's `testForked` starts more than one worker: it can with test parallelism on and more than one test class, and does with several fork groups. The test command's behaviour for either is unspecified, and no criterion asserts it (§ 3).
+- A run given no task (R-071) (§ 3).
 - Class globs and framework arguments on the test command, the module's JUnit XML report, the paths Mill's test tasks put in their task folders (R-110), and the launcher's environment variables (R-111) (§ 4).
 - Running more than one module selector, or a module selector that resolves to anything other than one JVM test module (§ 5).
 - A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet) (§ 5).
