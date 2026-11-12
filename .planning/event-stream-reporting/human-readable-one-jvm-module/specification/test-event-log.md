@@ -148,6 +148,20 @@ Feature: Each suite's structure
       When `Framework` runs it with the runner argument
       Then the event log holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a`, `b` and `c`, and no other `TestStarting` or `TestSucceeded`
 
+    Scenario: AC-130 A suite run through `ConfigMapWrapperSuite`
+      Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `reads`, labelled `- reads`, which succeeds
+      When `Framework` runs it with the runner argument
+      Then the event log holds, in this order:
+        """
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+            scope "A config", label "A config"
+              test "reads", label "- reads"
+        suite "ConfigSpec": SuiteStarting
+        test "reads": TestStarting
+        test "reads": TestSucceeded
+        """
+
   Rule: A `DistributedTestRunnerSuite`'s abort is tagged with the one test it ran (R-096, R-097)
     Scenario: AC-126 The suite running one test in parallel throws
       Given suite `ParAbortSuite`, class `samples.ParAbortSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose one test is `a`, labelled `- a`, and which overrides `run` to throw `RuntimeException("no fixture")` when given a test name, as the `DistributedTestRunnerSuite` running `a` gives it
@@ -219,7 +233,7 @@ Feature: Labels
 ```gherkin
 Feature: A suite's class name
 
-  Rule: A suite's class name is the class the run loaded for it, however the suite aborts (R-099)
+  Rule: A suite's class name is the class its own code is declared in, however the suite aborts (R-099)
     Scenario Outline: AC-104 <case>
       Given <suite>
       When <launch> runs it with the runner argument

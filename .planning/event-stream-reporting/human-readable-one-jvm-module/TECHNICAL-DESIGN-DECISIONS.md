@@ -2,6 +2,21 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
+## A `ConfigMapWrapperSuite`'s structure is built from its `wrappedSuite`, the instance of the wrapped class constructed with `Map.empty`, not from the instance that runs.
+
+**Alternatives**
+
+- Constructing the running instance from `args.configMap` before `SuiteStarting` and reusing it in `run` moves the user's constructor, and its side effects, before `SuiteStarting`; a throwing constructor, caught and rethrown from `run`, still aborts with stack frames that differ from 3.2.19's, risking `specification/compatibility-and-library.md` AC-056 and `../SPECIFICATION.md` R-002.
+- Treating the wrapper as a suite with no registration tree drops a wrapped style's scopes and labels, against `specification/test-event-log.md` AC-103's Rule.
+
+**Reasoning** 3.2.19 already constructs `wrappedSuite` before `SuiteStarting`: `Framework`'s task reads its `suiteId` and `nestedSuites`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading its registration tree runs no user code earlier than 3.2.19 does, so nothing a reporter receives changes.
+
+**Costs** A suite whose tests depend on the config map gets, silently, a structure that disagrees with what runs: a test only the running instance registers is tagged with the suite's node, and a test only the structure holds never starts.
+
+**Settled by** [Which instance supplies a ConfigMapWrapperSuite-wrapped suite's structure, and which class name does it carry?](https://github.com/jamesgorman2/scalatest/issues/70).
+
+---
+
 ## A test's structure wrapper finds its test's node by its suite instance, never through `args.reporter`.
 
 **Alternatives**
