@@ -29,7 +29,7 @@ The test command reads the module's arguments from Mill's `TestModule.testArgsDe
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
 - Core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core) does not throw. It returns an argument whose flag `parseArgs` does not recognise ungrouped, under no flag. The test command fails on the first such argument and names it.
 - The splitter keeps its own table of each flag's arity. A test runs `parseArgs` and the splitter over every flag `parseArgs` recognises, each followed by values that look like flags, and requires the same split.
-  - Sharing `parseArgs`'s arities instead would mean rewriting its flag-by-flag `if` chain, which reads each flag's values inline, as a table: a rewrite of the parser every run goes through with the emitter off (`../SPECIFICATION.md` R-001), where accepting the runner argument adds one branch.
+  - Sharing `parseArgs`'s arities instead would mean rewriting its inline `if` chain as a table. Every run goes through that parser, emitter off included (`../SPECIFICATION.md` R-001), and accepting the runner argument adds only one branch.
   - Cost: a second arity table, kept in step with `parseArgs` only by that test.
 
 ### Mill's `Running Test Class` lines

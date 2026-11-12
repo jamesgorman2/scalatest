@@ -78,7 +78,9 @@ Built by its own Mill build inside this repo, not the sbt build, against the loc
      - on the JVM, under `NodeJs` and on Native, its process's PID;
      - on the JVM and Native, its process's start time;
      - under `JsDom`, the ID the run gives itself at construction;
-  2. when a top-level suite starts running, once ScalaTest's filter is known, that suite's structure after filtering: the suite with its node ID and class name, then its nested suites, scopes and tests, each with its node ID, its parent, its declared position and its name, each nested suite also with its class name and each scope and test with its label;
+  2. when a top-level suite starts running, once ScalaTest's filter is known, that suite's structure after filtering:
+     - the suite, with its node ID and class name;
+     - its nested suites, scopes and tests, each with its node ID, parent, declared position and name, plus a class name for a nested suite and a label for a scope or test;
   3. events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
      - each tagged with its node's ID, a node's only after the structure holding it;
      - events and messages attached to the run rather than to a suite tagged as the run's;
