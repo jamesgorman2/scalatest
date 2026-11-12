@@ -2,6 +2,18 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## Every artifact of this fork is published under Maven group `com.edc`, not upstream's `org.scalatest`.
+
+**Alternatives** Keeping `org.scalatest` makes a fork release and upstream `org.scalatest:scalatest` 3.2.19 versions of one artifact, so in a build that also resolves upstream ScalaTest, conflict resolution silently keeps one and evicts the other.
+
+**Reasoning** A test module must test with this fork's release for the test command to run it (`SPECIFICATION.md` R-059). Under upstream's coordinates a library's dependency on upstream ScalaTest could evict the fork from the module without any change to the module's own dependencies.
+
+**Costs** Such a build instead gets both jars on one classpath, and each class of their shared `org.scalatest` packages loads from whichever jar comes first. The sbt build's `organization`, `org.scalatest` in `project/BuildCommons.scala` and `project/DottyBuild.scala`, changes.
+
+**Settled by** [What is the plugin's user-facing surface?](https://github.com/jamesgorman2/scalatest/issues/61).
+
+---
+
 ## The test manifest is compiled from Mill's test queue and claim files on the JVM, and no manifest file is written.
 
 **Alternatives**

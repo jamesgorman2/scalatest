@@ -4,12 +4,22 @@
 
 - The emitter lives in a scalatest-core that compiles on JDK 8, without `java.lang.ProcessHandle`. It must still give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`. It must give each label before any test runs, and each test's messages in the order the test called them, though no event carries either.
 - The test command must:
+  - be reached as `mill scalatest/test` with nothing in the build referring to it, through a Mill alias whose resolution has only been read, not run;
   - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it;
   - turn a worker's stdout and stderr byte chunks into lines;
   - read Mill's colour decision through `private[mill]` API.
 - The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
 
 ## Critical code paths
+
+### The test command's entry point
+
+The test command is invoked as `mill scalatest/test` (`SPECIFICATION.md` § Scope).
+
+- It is the `test` command of a top-level `ExternalModule` object in a named package of the plugin. Beside it, `package object scalatest extends mill.api.ExternalModule.Alias(<that object>)` gives it the prefix `scalatest`. Mill 1.3.1 uses the same pattern for `mill.exec/x` (`core/exec/test/src/mill/exec/ModuleTests.scala`) and for `package object spotless extends ExternalModule.Alias(SpotlessModule)` (`libs/javalib/src/mill/javalib/spotless/package.scala`).
+- Mill's selector parser accepts a single-segment prefix before `/` (`core/api/src/mill/api/internal/ParseArgs.scala` `selector`). It resolves prefix `scalatest` by loading class `scalatest$`, then `scalatest.package$`, the package object, from the meta-build's class loader (`core/resolve/src/mill/resolve/Resolve.scala` `resolveRootModule`, at Mill tag `1.3.1`).
+- That resolution was read from source, not run. An integration test runs `mill scalatest/test core.test` on a fixture build that adds the plugin by its header line, and must pass before anything else depends on the invocation.
+- If the alias does not resolve, the test command is instead `run` on an `ExternalModule` object `Tests` in top-level package `scalatest`, invoked as `mill scalatest.Tests/run`, Mill's documented `foo.Bar/qux` form, and `SPECIFICATION.md` § Scope changes with it.
 
 ### The run's PID and process start time
 
@@ -138,7 +148,7 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `spe
 
 - AC-056 and AC-057 run in a test project of the fork's sbt build.
   - The compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) are the sources of an sbt configuration of the project's own that extends neither `Compile` nor `Test` and whose one library dependency is `org.scalatest:scalatest` 3.2.19. They compile there once, so both runs load the same compiled classes. `../SPECIFICATION.md` R-004 lets the fork run them.
-  - 3.2.19 is on no classpath that also holds the fork: the two share organisation, module names and packages, so on one classpath sbt evicts one or the other. The test itself, in `Test`, is given three classpaths: that configuration's compiled classes, its resolved classpath (3.2.19 and its dependencies), and the runtime classpath of the fork's `scalatest` and `scalactic` projects (`project/scalatest.scala`) for the same Scala version.
+  - 3.2.19 is on no classpath that also holds the fork: the two share packages and class names, so on one classpath each class loads from whichever jar comes first. The test itself, in `Test`, is given three classpaths: that configuration's compiled classes, its resolved classpath (3.2.19 and its dependencies), and the runtime classpath of the fork's `scalatest` and `scalactic` projects (`project/scalatest.scala`) for the same Scala version.
   - For Scala 2.11, 2.12 and 2.13 the project is cross-built over `crossScalaVersions` (`project/BuildCommons.scala` `scalaVersionsSettings`). Scala 3 artefacts come only from `project/DottyBuild.scala`, so for Scala 3.3 a twin project there builds the same sources, its fork classpath from `scalatestDotty` and `scalacticDotty`.
 - The test forks one JVM for each run, on the fixture's compiled classes plus either 3.2.19's resolved classpath or the fork's, as IntelliJ's forked mode and a build tool's test worker each start a JVM of their own. No JVM-wide state, such as `System.out` or a system property, then passes from one run to the other.
 - In each JVM the recorders write each event to a file as one line, holding every field but timestamps, durations and thread names. The test compares the two runs' files line by line.

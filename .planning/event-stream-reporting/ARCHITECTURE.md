@@ -8,7 +8,7 @@ Every run a test command starts must get its events, test structure and captured
 
 ## Modules
 
-Three deployable units.
+Three deployable units. Every artifact of this fork, core's included, is published under Maven group `com.edc` (`ARCHITECTURE-DECISIONS.md` "Every artifact of this fork is published under Maven group `com.edc`…"), to the local Ivy repository (`~/.ivy2/local`) only, which Coursier, and so Mill, searches by default. Core keeps upstream's artifact names.
 
 ### ScalaTest core
 
@@ -29,7 +29,7 @@ Three deployable units.
 
 ### Consolidation library
 
-JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses two `private[scalatest]` parts of core, its formatting of human-readable output and its argument splitter, which is why it sits in core's package. The Mill plugin, outside that package, reaches the argument splitter only through the library (§ APIs § The Mill plugin and the consolidation library).
+`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses two `private[scalatest]` parts of core, its formatting of human-readable output and its argument splitter, which is why it sits in core's package. The Mill plugin, outside that package, reaches the argument splitter only through the library (§ APIs § The Mill plugin and the consolidation library).
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
 - **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064).
@@ -39,9 +39,9 @@ JVM only, in package `org.scalatest`, depending on scalatest-core and meeting `S
 
 ### Mill plugin
 
-Built by its own Mill build inside this repo, not the sbt build, against the locally published scalatest-core and consolidation library. It hosts the consolidation library and adds the test command.
+`scalatest-mill`, published as `scalatest-mill_mill1_3`, Mill 1.x's plugin form. Built by its own Mill build inside this repo, not the sbt build, against the locally published scalatest-core and consolidation library. It hosts the consolidation library and adds the test command.
 
-- Mill fixes the plugin's Scala version: Mill `1.3.1`, the release the plugin is built against, is built on Scala 3.9.0, while core's Scala 3 build is 3.3.8. The plugin loads core's and the library's Scala 3 builds into Mill's JVM.
+- Mill fixes the plugin's Scala version: Mill `1.3.1`, the release the plugin is built against, is built on Scala 3.9.0, while core's Scala 3 build is 3.3.8. The plugin loads core's Scala 3 build and the library into Mill's JVM.
 - Its integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns.").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs.

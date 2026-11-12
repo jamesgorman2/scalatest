@@ -118,7 +118,7 @@ Feature: Running the module
   Rule: The test command runs a module whose definition names nothing from the plugin, on each of the JVM's Scala versions (R-092, `../../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-083 The plugin is added to a build on Scala <version>
       Given a build without the plugin, whose module `core.test`, built with Scala <version>, holds suite `SqrtPropSpec` of `layout.md` AC-002
-      When the plugin is added to the build, with no module's definition changed, and the test command runs the module
+      When the plugin's header line (`../SPECIFICATION.md` § Scope) is added to its `build.mill`, with nothing else in the build changed, and the test command runs the module
       Then the human-readable output is the one `layout.md` AC-002 gives
 
       Examples:
