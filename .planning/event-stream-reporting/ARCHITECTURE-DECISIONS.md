@@ -4,11 +4,14 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ## Every artifact of this fork is published under Maven group `com.edc`, not upstream's `org.scalatest`.
 
-**Alternatives** Keeping `org.scalatest` makes a fork release and upstream `org.scalatest:scalatest` 3.2.19 versions of one artifact, so in a build that also resolves upstream ScalaTest, conflict resolution silently keeps one and evicts the other.
+**Alternatives**
 
-**Reasoning** A test module must test with this fork's release for the test command to run it (`SPECIFICATION.md` R-059). Under upstream's coordinates a library's dependency on upstream ScalaTest could evict the fork from the module without any change to the module's own dependencies.
+- Keeping `org.scalatest` makes a fork release and upstream `org.scalatest:scalatest` 3.2.19 versions of one artifact, so in a build that also resolves upstream ScalaTest, conflict resolution silently keeps one and evicts the other.
+- Renaming the artifacts under `org.scalatest` also separates the coordinates, but publishes under a group this fork does not own, which Maven Central refuses.
 
-**Costs** Such a build instead gets both jars on one classpath, and each class of their shared `org.scalatest` packages loads from whichever jar comes first. The sbt build's `organization`, `org.scalatest` in `project/BuildCommons.scala` and `project/DottyBuild.scala`, changes.
+**Reasoning** A test module must test with this fork's release for the test command to run it (`SPECIFICATION.md` R-059). Under a group of its own, the fork's artifacts stay on a module's resolved classpath whatever else the module resolves, and their coordinates alone tell them from upstream's.
+
+**Costs** A build that also resolves upstream ScalaTest gets both jars on one classpath, and each class of their shared `org.scalatest` packages loads from whichever jar comes first.
 
 **Settled by** [What is the plugin's user-facing surface?](https://github.com/jamesgorman2/scalatest/issues/61).
 
@@ -218,7 +221,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## The consolidation library builds on scalatest-core, taking event streams in the form core's decoder yields them and sharing core's formatting.
+## The consolidation library builds on scalatest-core and shares its formatting.
 
 **Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from the ScalaTest 3.2.19 format `SPECIFICATION.md` R-106 requires.
 

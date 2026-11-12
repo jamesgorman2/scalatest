@@ -32,16 +32,16 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 - A ScalaTest runner argument on the JVM that turns the emitter on, so the run writes its test event log to a file.
 - The consolidation library, producing human-readable output, including each run's block (R-082).
-- The Mill plugin's test command, invoked as `mill scalatest/test <module selector> [arguments]`, such as `mill scalatest/test core.test -oH` (`SPECIFICATION-DECISIONS.md` "The test command is invoked as `mill scalatest/test`…"). Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout. The module does not set `testBatchFrameworkTasks`, and Mill's `testForked` starts one worker for it.
-- A build adds the Mill plugin with one header line in `build.mill`: `//| mvnDeps: ["com.edc::scalatest-mill::<version>"]`. No criterion asserts adding it through `mvnDeps` on `mill-build/build.mill`'s `MillBuildRootModule`.
+- The Mill plugin's test command, invoked as `mill scalatest/test <module selector> [arguments]`, such as `mill scalatest/test core.test -oH`. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout.
+- A build adds the Mill plugin (`../ARCHITECTURE.md` § Modules § Mill plugin) as the entry `com.edc::scalatest-mill::<version>` of its `build.mill` header's `mvnDeps`, `<version>` being the plugin's release. A header without `mvnDeps` gains one line: `//| mvnDeps: ["com.edc::scalatest-mill::<version>"]`.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
 - The test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module. This narrows what R-048, R-049 and R-055 allow.
 - The test command supports Mill 1.3.1 only.
-- A module that tests with another framework or another release of this fork fails the test command. Unlike R-059, the failure need not come before any test starts or name the module, and consolidated output may still be written.
+- A module that does not test with the plugin's release of this fork, such as one testing with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork, fails the test command. Unlike R-059, the failure need not come before any test starts or name the module, and consolidated output may still be written.
 
 ### Out of scope
 
-Each is left to the named feature of `../ROADMAP.md`.
+Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 
 - JSON output and `-fJ` (§ 2); progress output, `P` and `-fP` (§ 9).
 - The formatting and filtering characters (R-127, R-128), and `-f` for human-readable output (R-049) (§ 16).
@@ -49,14 +49,15 @@ Each is left to the named feature of `../ROADMAP.md`.
 - A module that sets `testBatchFrameworkTasks`, whatever its worker count, and a module for which Mill's `testForked` starts more than one worker: it can with test parallelism on and more than one test class, and does with several fork groups. The test command's behaviour for either is unspecified, and no criterion asserts it (§ 3).
 - A run given no task (R-071) (§ 3).
 - Class globs and framework arguments on the test command, the module's JUnit XML report, the paths Mill's test tasks put in their task folders (R-110), and the launcher's environment variables (R-111) (§ 4).
-- Running more than one module selector, or a module selector that resolves to anything other than one JVM test module (§ 5).
+- Running the tests of more than one module selector, or of a module selector that resolves to anything other than one JVM test module, on which this feature's test command fails (§ 5).
 - A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet) (§ 5).
-- Failing a module that tests with another framework or another release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
+- Failing a module that does not test with the plugin's release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
 - An unsupported Mill release (R-093, R-118) (§ 6).
 - `--halt-on-failure` (§ 7).
 - What the consolidated output shows for a run that does not finish, or for a process that ends before any run exists in it (§ 8).
 - Test output captured against a suite, scope or test (§ 10).
 - The emitter, consolidated output and the test command on Scala.js and Native (§ 11–15).
+- Adding the plugin through `mvnDeps` on `mill-build/build.mill`'s `MillBuildRootModule`.
 
 ## Epic requirements met
 
@@ -77,7 +78,7 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 The criteria are in the five `specification/` documents listed in § Spec documents. In them:
 
-- The module is a JVM test module at module path `core.test`, in a build that adds the Mill plugin by its header line (§ Scope) without changing the module's definition (R-092). The test command *given* module selectors and arguments is `mill scalatest/test` followed by them; it *runs the module* when given `core.test`. Every JVM test module of a criterion's build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset. Some criteria instead feed a run to the consolidation library directly, without Mill; the run's test run label is then `core.test`.
+- The module is a JVM test module at module path `core.test`, whose ScalaTest dependency is `com.edc::scalatest` at the release under test, in a build that adds the Mill plugin at that release by its header line (§ Scope) without changing the module's definition (R-092). The test command *given* module selectors and arguments is § Scope's invocation with them; it *runs the module* when given `core.test`. Every JVM test module of a criterion's build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset. Some criteria instead feed a run to the consolidation library directly, without Mill; the run's test run label is then `core.test`.
 - *The runner argument* is the ScalaTest runner argument that turns the emitter on (§ Scope). A run given it outside Mill writes its test event log to a file it names.
 - *An event log holding* items is, in a `Given`, a run fed directly to the consolidation library as core's decoder would yield those items, in that order. In a `Then`, it is what core's codec decodes from the run's test event log. A criterion states an event log as its items, never as bytes (`../decisions/event-log-contract.md`). The items are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, items 1–4, one per line:
   - `run started`: item 1.

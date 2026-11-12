@@ -100,6 +100,7 @@ Feature: Module selectors
         | `core`                      | one resolving to a module that is not a test module |
         | `coreJS.test`               | one resolving to a Scala.js test module             |
         | `nosuch.test`               | one resolving to no module                          |
+        | only `-oH`                  | no module selector                                  |
 ```
 
 ## Running the module
@@ -117,8 +118,8 @@ Feature: Running the module
 
   Rule: The test command runs a module whose definition names nothing from the plugin, on each of the JVM's Scala versions (R-092, `../../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-083 The plugin is added to a build on Scala <version>
-      Given a build without the plugin, whose module `core.test`, built with Scala <version>, holds suite `SqrtPropSpec` of `layout.md` AC-002
-      When the plugin's header line (`../SPECIFICATION.md` § Scope) is added to its `build.mill`, with nothing else in the build changed, and the test command runs the module
+      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala <version>, is the module of `layout.md` AC-002
+      When the plugin's header line (`../SPECIFICATION.md` § Scope), at the release `core.test` tests with, is added to its `build.mill`, with nothing else in the build changed, and the test command runs the module
       Then the human-readable output is the one `layout.md` AC-002 gives
 
       Examples:
@@ -145,7 +146,7 @@ Feature: The test command's result
         | test `succeeds`, labelled `- succeeds`, succeeds                                                                                                                                                  | succeeds |
         | test `ignored`, labelled `- ignored`, is ignored, `pending`, labelled `- pending`, is pending, `cancelled`, labelled `- cancelled`, is cancelled, and `succeeds`, labelled `- succeeds`, succeeds | succeeds |
         | test `fails`, labelled `- fails`, fails, and `succeeds`, labelled `- succeeds`, succeeds                                                                                                          | fails    |
-        | test `succeeds`, labelled `- succeeds`, succeeds, and `beforeAll` throws                                                                                                                          | fails    |
+        | test `succeeds`, labelled `- succeeds`, succeeding where it runs, and `beforeAll` throws                                                                                                          | fails    |
 
   Rule: A worker that dies fails the test command, whether or not a run existed in it (R-046)
     Scenario Outline: AC-085 <how the worker dies>
@@ -165,7 +166,7 @@ Feature: The test command's result
       Then the test command fails
       And no line on the console outside the human-readable output holds `have size 0`
 
-  Rule: A module that tests with another framework, or with another release of this fork, fails the test command (`../SPECIFICATION.md` § Scope)
+  Rule: A module that does not test with the plugin's release of this fork fails the test command (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-087 <framework>
       Given the module tests with <framework>
       And its one suite, `samples.FrameworkSuite`, written for <framework>, has one test, `runs`, which succeeds

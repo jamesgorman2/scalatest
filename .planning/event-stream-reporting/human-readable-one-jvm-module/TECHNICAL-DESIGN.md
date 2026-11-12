@@ -2,23 +2,15 @@
 
 ## Summary
 
-- The emitter lives in a scalatest-core that compiles on JDK 8, without `java.lang.ProcessHandle`. It must still give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`. It must give each label before any test runs, and each test's messages in the order the test called them, though no event carries either.
-- The test command must:
-  - be reached as `mill scalatest/test` with nothing in the build referring to it, through a Mill alias whose resolution has only been read, not run;
-  - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, which that runner's parser cannot do for it;
-  - turn a worker's stdout and stderr byte chunks into lines;
-  - read Mill's colour decision through `private[mill]` API.
-- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints. That formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured.
+The emitter, in a scalatest-core that compiles on JDK 8 without `java.lang.ProcessHandle`, must give the Mill plugin the PID and start time Mill's JVM reads from `ProcessHandle`, each label before any test runs, and each test's messages in the order the test called them, though no event carries either. The test command must be reached as `mill scalatest/test` with nothing in the build referring to it, split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them without that runner's parser, turn a worker's stdout and stderr byte chunks into lines, and read Mill's colour decision through `private[mill]` API. The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints, though that formatting reads a live `Throwable`, which the decoded event stream cannot rebuild, and returns lines already indented and coloured. Every artifact must move to group `com.edc` while the build's MiMa check still compares against upstream's.
 
 ## Critical code paths
 
 ### The test command's entry point
 
-The test command is invoked as `mill scalatest/test` (`SPECIFICATION.md` § Scope).
-
-- It is the `test` command of a top-level `ExternalModule` object in a named package of the plugin. Beside it, `package object scalatest extends mill.api.ExternalModule.Alias(<that object>)` gives it the prefix `scalatest`. Mill 1.3.1 uses the same pattern for `mill.exec/x` (`core/exec/test/src/mill/exec/ModuleTests.scala`) and for `package object spotless extends ExternalModule.Alias(SpotlessModule)` (`libs/javalib/src/mill/javalib/spotless/package.scala`).
+- The test command is the `test` command of a top-level `ExternalModule` object in a named package of the plugin. Beside it, `package object scalatest extends mill.api.ExternalModule.Alias(<that object>)` gives it the prefix `scalatest`, as Mill 1.3.1's `package object spotless extends ExternalModule.Alias(SpotlessModule)` does (`libs/javalib/src/mill/javalib/spotless/package.scala`).
 - Mill's selector parser accepts a single-segment prefix before `/` (`core/api/src/mill/api/internal/ParseArgs.scala` `selector`). It resolves prefix `scalatest` by loading class `scalatest$`, then `scalatest.package$`, the package object, from the meta-build's class loader (`core/resolve/src/mill/resolve/Resolve.scala` `resolveRootModule`, at Mill tag `1.3.1`).
-- That resolution was read from source, not run. An integration test runs `mill scalatest/test core.test` on a fixture build that adds the plugin by its header line, and must pass before anything else depends on the invocation.
+- That resolution was read from source, not run. An integration test runs `mill scalatest/test core.test` on a fixture build that adds the plugin by its header line.
 - If the alias does not resolve, the test command is instead `run` on an `ExternalModule` object `Tests` in top-level package `scalatest`, invoked as `mill scalatest.Tests/run`, Mill's documented `foo.Bar/qux` form, and `SPECIFICATION.md` § Scope changes with it.
 
 ### The run's PID and process start time
@@ -122,6 +114,15 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - The hand-off takes no ordinal from `tracker`, so every event reporters receive keeps its 3.2.19 ordinal (`specification/compatibility-and-library.md` AC-056). The event log carries no ordinal, since no output shows or uses one.
   - The message's timestamp is the time of the call (`specification/test-event-log.md` AC-108).
 
+## Publishing
+
+The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every artifact is published at one version, the fork's release, and the plugin depends on core and the library at its own version.
+
+- The sbt build's `organization` becomes `com.edc` in every project it publishes, its `org.scalatest` and `org.scalactic` projects alike.
+- Each `mimaPreviousArtifacts` under `project/` takes its group from `organization.value`, so it would then name a `com.edc` 3.2.19 that does not exist. Each names its project's upstream group, `org.scalatest` or `org.scalactic`, in place of `organization.value`.
+- The consolidation library is a JVM-only project of `project/DottyBuild.scala`, depending on its Scala 3 scalatest-core project, so the sbt build publishes it with core, before the plugin's Mill build resolves both.
+- The plugin's Mill build publishes `scalatest-mill` under `com.edc` with `publishLocal`.
+
 ## Testing
 
 ### Runs the criteria describe
@@ -157,4 +158,4 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `spe
 
 ### MiMa
 
-`specification/compatibility-and-library.md` AC-058 runs the build's MiMa check. Review rejects any MiMa problem filter this feature adds, since a filter would let the check pass without the compatibility it proves.
+`specification/compatibility-and-library.md` AC-058 runs the build's MiMa check against upstream's groups (§ Publishing). Review rejects any MiMa problem filter this feature adds, since a filter would let the check pass without the compatibility it proves.
