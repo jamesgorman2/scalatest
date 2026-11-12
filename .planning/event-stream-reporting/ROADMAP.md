@@ -335,7 +335,7 @@ Risks:
 
 ## 17. A module that presets a test command's arguments
 
-A build defines a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module, such as `mill tests/performance`, runs that test command (R-126). Builds on features 4 and 5.
+A build defines a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module, such as `mill performanceTests` or `mill integrationTests`, runs that test command (R-126). The build, not the user, then knows which modules and tags make up a kind of test run. Builds on features 4 and 5.
 
 Enables:
 
