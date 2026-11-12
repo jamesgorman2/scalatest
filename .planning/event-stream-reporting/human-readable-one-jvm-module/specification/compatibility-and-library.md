@@ -86,7 +86,7 @@ Feature: The consolidation library without Mill
       Then the library's human-readable output is the test command's, with Mill's prefix removed from each line
 
   Rule: The library writes human-readable output only once every run's event stream has ended (R-027)
-    A run's event stream ends when the caller ends it, not at its `run ended` item.
+    A run's event stream ends when the caller ends it, not at its `runEnded` event.
 
     Background:
       Given an event log holding:
@@ -103,11 +103,11 @@ Feature: The consolidation library without Mill
         """
 
     Scenario: AC-064 A completed run whose event stream is held open
-      When every item has been fed and the event stream is held open
+      When every event has been fed and the event stream is held open
       Then, before the stream ends, the library has written no human-readable output
 
     Scenario: AC-118 A completed run whose event stream has ended
-      Given every item has been fed and the event stream has ended
+      Given every event has been fed and the event stream has ended
       When the caller ends the consolidation
       Then the library writes the human-readable output:
         """

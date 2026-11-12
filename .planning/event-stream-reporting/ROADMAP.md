@@ -49,7 +49,7 @@ Risks:
 - `research/jvm-file-channel.md` § 5 (a module with no test class spawns one worker)
 - `human-readable-one-jvm-module/research/mill-plugin-conventions.md` § 5 (at Mill 1.3.1 a module that sets `testBatchFrameworkTasks` runs one worker per fork group, each with its whole class list and no queue or claim files; a module that does not runs one worker per fork group with test parallelism off or one class selected)
 - `research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
-- `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after item 1; paths with spaces untried)
+- `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after the `runStarted` event; paths with spaces untried)
 
 ## 4. Class globs, framework arguments and JUnit XML
 
@@ -208,7 +208,7 @@ Risks:
 
 The test command runs Scala.js modules whose JS environment is `NodeJs`, and fails before any test starts on any JS environment other than `NodeJs` and `JsDom` (`JsDom` until feature 12 too):
 
-- core's structure wrapper, emitter and encoder on Scala.js; item 1 carries the VM's PID; the test event log is the module's one event log file, named by the runner argument and written with Node's synchronous `fs`;
+- core's structure wrapper, emitter and encoder on Scala.js; the `runStarted` event carries the VM's PID; the test event log is the module's one event log file, named by the runner argument and written with Node's synchronous `fs`;
 - the plugin's Scala.js launcher (a C program in a job object on Windows, built by the plugin's Mill build and shipped in its jar; a `/bin/sh` script that `exec`s on Linux and macOS) swapped into `jsEnvConfig` in the plugin's own evaluation of the module's test task;
 - the launcher's header gives each VM's PID and start time, ending the run's stream on the VM's exit and tying its stdout and stderr files to the run; a VM that dies before any run exists in it is shown as R-076 states;
 - the module's test manifest: the test classes the test command learns before it evaluates the module's test task and holds in memory, all taken by the module's one process and shown as feature 8 shows a JVM worker's.
@@ -218,7 +218,7 @@ Builds on features 5 and 8.
 Enables:
 
 - `SPECIFICATION.md` R-059 (JS environment), § Scope (Scala.js Scala versions), and on Scala.js under `NodeJs`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-066, R-076, R-094, R-022, R-040, R-041, R-124, R-125, R-042, R-043 (order in the launcher's files), R-044, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files; Test manifest, on Scala.js), § APIs § The emitter and the Mill plugin (the runner argument and item 1 under `NodeJs`; the module's one event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § APIs § The Mill plugin and the consolidation library (the test classes the process took, on Scala.js), § Data flow (Scala.js and Native bullet: `jsEnvConfig`; the module's test classes, on Scala.js), § External systems (Scala.js test adapter; `destroyForcibly()`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files; Test manifest, on Scala.js), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event under `NodeJs`; the module's one event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § APIs § The Mill plugin and the consolidation library (the test classes the process took, on Scala.js), § Data flow (Scala.js and Native bullet: `jsEnvConfig`; the module's test classes, on Scala.js), § External systems (Scala.js test adapter; `destroyForcibly()`)
 
 Settles:
 
@@ -241,27 +241,27 @@ Risks:
 
 ## 12. Scala.js under `JsDom`
 
-The test command also runs Scala.js modules whose JS environment is `JsDom`. Each run writes its test event log's items as framed lines with the window's `console.log`, each carrying the framing prefix, the test command's nonce from the runner argument and the run's own ID from item 1; event log reading takes them from the launcher's stdout file, and every other line is the process's ordinary output, captured against the run whose items the file holds. Builds on feature 11.
+The test command also runs Scala.js modules whose JS environment is `JsDom`. Each run writes its test event log's events as framed lines with the window's `console.log`, each carrying the framing prefix, the test command's nonce from the runner argument and the run's own ID from the `runStarted` event; event log reading takes them from the launcher's stdout file, and every other line is the process's ordinary output, captured against the run whose events the file holds. Builds on feature 11.
 
 Enables:
 
 - `SPECIFICATION.md` R-059 (`JsDom` accepted), and under `JsDom`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-076, R-022, R-040, R-041, R-124, R-125, R-042, R-043 (order in the launcher's files), R-044, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; item 1 under `JsDom`; framed lines; a pair tied to its run by its items), § External systems (`JsDom` window code has no `require` or `process`)
+- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; the `runStarted` event under `JsDom`; framed lines; a pair tied to its run by its events), § External systems (`JsDom` window code has no `require` or `process`)
 
 Settles:
 
-- The framing prefix, how the nonce is made, and the ID a `JsDom` run gives itself in item 1.
+- The framing prefix, how the nonce is made, and the ID a `JsDom` run gives itself in the `runStarted` event.
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: holds only while every item is one whole line)
-- `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted items), § 11 (jsdom other than `27.4.0` not run)
+- `ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: holds only while every event is one whole line)
+- `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted events), § 11 (jsdom other than `27.4.0` not run)
 
 ## 13. Scala Native
 
 The test command runs Native modules:
 
-- core's structure wrapper, emitter and encoder on Native; item 1 carries the binary's PID and start time; the test event log is the module's one event log file, named by the runner argument and written through `FileOutputStream`;
+- core's structure wrapper, emitter and encoder on Native; the `runStarted` event carries the binary's PID and start time; the test event log is the module's one event log file, named by the runner argument and written through `FileOutputStream`;
 - a Native launcher per module, compiled with the module's `nativeClang` with the launcher folder and real binary's path compiled in, swapped into `nativeLink`; it starts `<CROSSCOMPILING_EMULATOR words> <binary> <port>` and writes the binary's stdout and stderr to its own files, headed with the binary's PID and start time;
 - the module's test manifest, as feature 11;
 - a binary that crashes fails the test command, though Mill's own task passes it.
@@ -271,7 +271,7 @@ Builds on features 8 and 11.
 Enables:
 
 - `SPECIFICATION.md` § Scope (Native Scala versions), and on Native: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-066, R-076, R-094, R-022, R-040, R-041, R-124, R-125, R-042, R-043 (order in the launcher's files), R-044, R-046, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in; Test manifest, on Native), § APIs § The emitter and the Mill plugin (the runner argument and item 1 on Native; the module's one event log file on Native; header and item 1 carrying the same PID and start time), § APIs § The Mill plugin and the consolidation library (the test classes the process took, on Native), § Data flow (Scala.js and Native bullet: `nativeLink`; the module's test classes, on Native), § External systems (Native test adapter; `inheritIO()`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in; Test manifest, on Native), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event on Native; the module's one event log file on Native; header and the `runStarted` event carrying the same PID and start time), § APIs § The Mill plugin and the consolidation library (the test classes the process took, on Native), § Data flow (Scala.js and Native bullet: `nativeLink`; the module's test classes, on Native), § External systems (Native test adapter; `inheritIO()`)
 
 Settles:
 

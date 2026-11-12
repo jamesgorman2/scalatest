@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: layout
 
-Acceptance criteria for how the human-readable output lays out its lines: its tree, where each line sits, each line's text and colour, and Mill's prefix. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
+Acceptance criteria for how the human-readable output lays out its lines: its tree, where each line sits, each line's text and colour, and Mill's prefix. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them.
 
 Each criterion below feeds the consolidation library an event log, except AC-002, AC-119, AC-044 and AC-053, which run the module with the test command.
 
@@ -129,7 +129,7 @@ Every line sits under the line it belongs to (R-106). Where that leaves a line's
 
 ## Scope and test lines
 
-A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose `structure` gives the node the label `<label>`, whether or not that label begins `- `, and whose items give the node the row's outcome (R-098 to R-101). A node has started once the event log holds an event tagged with it.
+A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose `structure` gives the node the label `<label>`, whether or not that label begins `- `, and whose events give the node the row's outcome (R-098 to R-101). A node has started once the event log holds an event assigned to it.
 
 | ID     | Node and outcome                                                                                              | Line                       | Colour                  |
 |--------|---------------------------------------------------------------------------------------------------------------|----------------------------|-------------------------|

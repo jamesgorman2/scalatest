@@ -7,7 +7,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A thread-local flag, set while a wrapper forwards, breaks where a reporter between wrappers holds events back and releases them later, as ScalaTest's `TestSortingReporter` or a user's buffering reporter does.
-- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting an ancestor's wrapper tag it, as `SPECIFICATION.md` R-097 requires.
+- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting an ancestor's wrapper assign it to its node, as `SPECIFICATION.md` R-097 requires.
 
 **Reasoning** `SPECIFICATION.md` R-002 forbids marking an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it. The top-level suite's wrapper, the last any event of its suite reaches, removes the event, so the set holds only events still between wrappers.
 
@@ -32,19 +32,19 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## The run's own state travels in the test event log as run events among item 3's events.
+## The run's own state travels in the test event log as run events among the ScalaTest events.
 
-**Alternatives** Folding the run events into items 1 and 4 needs a new item kind for `RunStarting`, which, where a runner sends it, follows item 1.
+**Alternatives** Folding the run events into the `runStarted` and `runEnded` events needs a new kind of consolidator event for `RunStarting`, which, where a runner sends it, follows the `runStarted` event.
 
-**Reasoning** The run events already reach the emitter by the hand-off for events sent outside every structure wrapper (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them like any other event tagged as the run's. Item 4 needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+**Reasoning** The run events already reach the emitter by the hand-off for events sent outside every structure wrapper (entry "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them like any other ScalaTest event assigned to the run. The `runEnded` event needs no run event, so a run whose runner sends none still ends (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-**Costs** A run whose event stream holds its closing run event but no item 4 does not finish, though that event says how it ended. This happens when item 4 is torn or the process dies between the two writes.
+**Costs** A run whose event stream holds its closing run event but no `runEnded` event does not finish, though that event says how it ended. This happens when the `runEnded` event is torn or the process dies between the two writes.
 
 **Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
 
 ---
 
-## Core's decoder yields each event of item 3 as a member of a decoded event family, one class per `org.scalatest.events` class.
+## Core's decoder yields each ScalaTest event as a member of a decoded event family, one class per `org.scalatest.events` class.
 
 **Alternatives**
 
@@ -63,7 +63,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- A tap in `DispatchReporter.apply`, tagging as the run's each event no wrapper handed off, cannot exist on Scala.js and Native, which build no `DispatchReporter`; their send sites would need a hand-off anyway, giving the epic two routes to the emitter.
+- A tap in `DispatchReporter.apply`, assigning to the run each event no wrapper handed off, cannot exist on Scala.js and Native, which build no `DispatchReporter`; their send sites would need a hand-off anyway, giving the epic two routes to the emitter.
 - A run-level root structure wrapper receives neither the slowpoke alert, which `DispatchReporter` raises behind every wrapper, nor the events the runner passes straight to `dispatch`, so those send sites need a hand-off anyway.
 
 **Reasoning** A hand-off at each send site is one route to the emitter on every runtime, visible where each event is sent. The senders outside every wrapper in a run the test command starts are a known, short list in ScalaTest core, so the risk that a missed or future site loses its events is worth taking for that one route.
@@ -183,13 +183,13 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives**
 
-- jsdom's `WebSocket` lost item 1 whenever the VM died before the socket's `open`, which came 11–59 ms after the runner's construction (`SPECIFICATION.md` R-071), sent items only when window code yielded, up to 850 ms late, and on Windows lost unread bytes when the connection reset.
+- jsdom's `WebSocket` lost the `runStarted` event whenever the VM died before the socket's `open`, which came 11–59 ms after the runner's construction (`SPECIFICATION.md` R-071), sent events only when window code yielded, up to 850 ms late, and on Windows lost unread bytes when the connection reset.
 - A synchronous `XMLHttpRequest` costs a `spawnSync` child Node process per request, plus a CORS preflight.
 - The test-interface `Logger` is owned by Mill's test task and usable only during `execute`.
 
-**Reasoning** jsdom forwards the window's `console.log` synchronously to Node's stdout, which the launcher sends to a file, so each item leaves the VM as it is written. Item 1 arrived for every run that died at its runner's construction, and no item was lost or corrupted. Lines forged with the prefix and a wrong nonce passed through as ordinary output, never taken as items, and no item appeared among the passed-through lines. Items reached the plugin with a median delay of 5–6 ms.
+**Reasoning** jsdom forwards the window's `console.log` synchronously to Node's stdout, which the launcher sends to a file, so each event leaves the VM as it is written. The `runStarted` event arrived for every run that died at its runner's construction, and no event was lost or corrupted. Lines forged with the prefix and a wrong nonce passed through as ordinary output, never taken as events, and no event appeared among the passed-through lines. Events reached the plugin with a median delay of 5–6 ms.
 
-**Costs** The event log shares the VM's stdout with test output, so it holds only while every item is one whole framed line.
+**Costs** The event log shares the VM's stdout with test output, so it holds only while every event is one whole framed line.
 
 **Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
@@ -205,11 +205,11 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A socket lost every byte not yet read on Windows when the JVM worker died (`research/emitter-plugin-spike.md` § 4), against `SPECIFICATION.md` R-073.
-- A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the event log's items (`research/mill-worker-channels.md` § 3.3).
-- Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and hold only while every item is one whole framed line.
+- A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the event log's events (`research/mill-worker-channels.md` § 3.3).
+- Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and hold only while every event is one whole framed line.
 - On the JVM, a folder per module holding every run's file, each named by its run, leaves the test command unable to tie a file, or the lack of one, to the worker it started.
 
-**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first item. On the JVM the file has one fixed name in the worker's `processFolder`, which the test command chose and in which Mill starts at most one JVM, so the folder ties the file to its worker, and a folder without one is a worker in which no run existed.
+**Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first event. On the JVM the file has one fixed name in the worker's `processFolder`, which the test command chose and in which Mill starts at most one JVM, so the folder ties the file to its worker, and a folder without one is a worker in which no run existed.
 
 **Costs** A file's end is not the end of the run's stream, so the plugin needs a separate end signal, and it sees new bytes only by reading each file again. On the JVM, live reading was tested only in a folder of the plugin's own, not in a `processFolder`, where Mill polls `claim.log` and `result.log` every 10 ms; each worker needs its own argument, so the arguments of a module's workers differ from each other by the event log path.
 
@@ -240,7 +240,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Reasoning** `ProcessHandle.onExit` signalled the end of every JVM worker, Node VM and native binary on Windows and on Linux, under `NodeJs` and `JsDom`, after a normal exit, a halt or self-kill, and a forced kill alike. It needs only the process's PID and start time, not how the run ended; the launcher's header, written before the VM or binary runs, gives them on Scala.js and for a Native binary that dies before any run exists in it. In 24 Scala.js runs the reader was still behind at the exit, though no byte reached a file after it, so after the exit the plugin reads to the end of the file. On Scala.js and Native, Mill's test task gives each process one run (`ARCHITECTURE.md` § External systems), so its exit is that run's end.
 
-**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID; a JVM worker that dies before item 1 gives no PID, so the plugin takes that worker's end from the return of `callTestRunnerSubprocess`, a second signal on the JVM. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
+**Costs** It relies on every run's process running on the same machine as Mill's process, and on the start time to tell the run's process from a later one that reuses its PID; a JVM worker that dies before the `runStarted` event gives no PID, so the plugin takes that worker's end from the return of `callTestRunnerSubprocess`, a second signal on the JVM. The Scala.js and Native adapters can host several runs in one process; no path in Mill was found that does so, but if one did, a run's stream would end only when that process exits, after every run it hosts.
 
 **Settled by**
 
@@ -320,7 +320,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ---
 
-## The consolidation library, not the run, assembles each run's test structure, from each suite's filtered structure and events tagged by node.
+## The consolidation library, not the run, assembles each run's test structure, from each suite's filtered structure and events assigned to nodes.
 
 **Alternatives** Each run assembling its own test structure still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
@@ -339,7 +339,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - A tree of the whole run built before the run starts cannot be built under the test-interface, which gives a runner one task per top-level class and no run-wide view; a JVM worker under Mill claims its classes one at a time (`research/mill-test-worker-args.md` § 1.2).
 - Inferring each node's parent from `Ordinal` prefixes, as IntelliJ's reporter does (`ARCHITECTURE.md` § External systems), fails under the `Framework`, where every task of a run shares one linear ordinal tracker.
 
-**Reasoning** Events from one emitter arrive in a reliable order even under `-P` and `ParallelTestExecution`; structure is lost only where emitters' events merge. A structure wrapper on each suite, nested suite and test tags each event with its node before that merge, which keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
+**Reasoning** Events from one emitter arrive in a reliable order even under `-P` and `ParallelTestExecution`; structure is lost only where emitters' events merge. A structure wrapper on each suite, nested suite and test assigns each event to its node before that merge, which keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
 
 **Costs** Every path that builds `Args` for a suite or test must install a wrapper.
 

@@ -12,7 +12,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** 3.2.19 already constructs the class with an empty config map before `SuiteStarting`, as `ConfigMapWrapperSuite`'s `wrappedSuite`: `Framework`'s task reads its `suiteId`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading what that instance registers runs no user code earlier than 3.2.19 does, so nothing a reporter receives changes.
 
-**Costs** Where a suite's tests depend on its config map, its structure disagrees with what runs: a test only the run's config map registers has no node, so its events are tagged with the suite (`specification/test-event-log-structure.md` AC-131), and a test only the empty config map registers never starts.
+**Costs** Where a suite's tests depend on its config map, its structure disagrees with what runs: a test only the run's config map registers has no node, so its events are assigned to the suite (`specification/test-event-log-structure.md` AC-131), and a test only the empty config map registers never starts.
 
 **Settled by** [Which instance supplies a ConfigMapWrapperSuite-wrapped suite's structure, and which class name does it carry?](https://github.com/jamesgorman2/scalatest/issues/70).
 

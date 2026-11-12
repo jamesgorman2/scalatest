@@ -7,19 +7,19 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 **Alternatives**
 
 - Keying by `suiteId` and test name is ambiguous where two distinct instances of one class run at once, as when the class is nested twice under `-P`.
-- Unwrapping known reporter chains fails outright for `RandomTestOrder`, which runs each deferred per-test instance with the suite-level `Args` rather than those given to `runTest`, and on an unknown reporter silently falls back to the suite's tag.
+- Unwrapping known reporter chains fails outright for `RandomTestOrder`, which runs each deferred per-test instance with the suite-level `Args` rather than those given to `runTest`, and on an unknown reporter silently falls back to the suite's node.
 - A thread-local fails where the distributor runs the test on another thread.
 - Carrying the node ID in `Args.configMap` shows it to user code, risking `../SPECIFICATION.md` R-002.
 
 **Reasoning** No reporter chain reliably carries the test's wrapper, since core and user code replace `args.reporter` before a test runs (`TECHNICAL-DESIGN.md` § The test event log on the JVM). The suite instance reaches every site that runs a test, and core creates each instance it runs at a known site, which registers it.
 
-**Costs** Each site that creates a suite instance core runs must register it and later remove it. A suite instance a user creates and runs, or one instance nested twice, is not found, so its tests' events take the tag of the innermost wrapper they reach (`TECHNICAL-DESIGN.md` § The test event log on the JVM).
+**Costs** Each site that creates a suite instance core runs must register it and later remove it. A suite instance a user creates and runs, or one instance nested twice, is not found, so its tests' events are assigned to the node of the innermost wrapper they reach (`TECHNICAL-DESIGN.md` § The test event log on the JVM).
 
 **Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
 
 ---
 
-## Each item of a run's test event log is a JSON object.
+## Each event of a run's test event log is a JSON object.
 
 **Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs its own escaping rules, specified and tested separately, and is unreadable where a field is absent.
 
@@ -35,9 +35,9 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 **Alternatives**
 
-- Encoding each run with core's codec and feeding the library its decoded items makes every library test depend on the event log's format.
+- Encoding each run with core's codec and feeding the library its decoded events makes every library test depend on the event log's format.
 
-**Reasoning** The library takes decoded items, not an event log (`../ARCHITECTURE-DECISIONS.md` "The consolidation library takes each run's event stream, not its test event log."), and each side of the codec is tested against the format, so the library's tests need only the items. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
+**Reasoning** The library takes decoded events, not an event log (`../ARCHITECTURE-DECISIONS.md` "The consolidation library takes each run's event stream, not its test event log."), and each side of the codec is tested against the format, so the library's tests need only the events. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
 
 **Costs** The builder must yield what the decoder yields, and only those comparisons keep the two in step.
 

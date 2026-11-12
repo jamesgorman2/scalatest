@@ -19,7 +19,7 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 - [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.19, the emitter on each of the JVM's Scala versions, and the consolidation library without Mill.
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this specification.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against. `R-nnn` IDs in this specification are the epic's.
-- [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts, their parts (§ Modules), and the boundaries between them, including the test event log's items and how it carries them (§ APIs § The emitter and the Mill plugin).
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts, their parts (§ Modules), and the boundaries between them, including the test event log's events and how it carries them (§ APIs § The emitter and the Mill plugin).
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 - [../decisions/event-log-contract.md](../decisions/event-log-contract.md) — the epic's decisions on what a test event log carries and who may read it.
 - [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md) — the feature's non-obvious technical choices, including the test event log's encoding.
@@ -82,10 +82,10 @@ The criteria are in the five `specification/` documents listed in § Spec docume
 
 - The module is a JVM test module at module path `core.test`, whose ScalaTest dependency is `com.edc::scalatest` at the release under test, in a build that adds the Mill plugin at that release by its header line (§ Scope) without changing the module's definition (R-092). A criterion's test command is § Scope's invocation, and runs the module when given `core.test`. Every JVM test module of a criterion's build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset. Some criteria instead feed a run to the consolidation library directly, without Mill; the run's test run label is then `core.test`.
 - *The runner argument* is the ScalaTest runner argument that turns the emitter on (§ Scope). A run given it outside Mill writes its test event log to a file it names.
-- *An event log holding* items is, in a `Given`, a run fed directly to the consolidation library as core's decoder would yield those items, in that order. In a `Then`, it is what core's codec decodes from the run's test event log. A criterion states an event log as its items, not as the bytes of its format. The items are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, items 1–4, one per line:
-  - `run started`: item 1.
-  - `structure`: item 2, with the suite's tree beneath it, one node to a line, each indented 2 spaces under its parent and in declared order: `suite "<name>", class "<class name>"`, `scope "<name>", label "<label>"` or `test "<name>", label "<label>"`. A suite may add `, id "<suite ID>"`; without it, its suite ID is its class name. Each node's ID, parent and declared position follow from the tree.
-  - `<node>: <event>`: item 3, a member of the decoded event family (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec) tagged with the node, named by kind and name as `test "is empty"`, or with `run` where it is the run's.
+- *An event log holding* events is, in a `Given`, a run fed directly to the consolidation library as core's decoder would yield those events, in that order. In a `Then`, it is what core's codec decodes from the run's test event log. A criterion states an event log as its events, not as the bytes of its format. The events are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, one per line: the consolidator events, `runStarted`, `structure` and `runEnded`, and the ScalaTest events:
+  - `run started`: the `runStarted` event.
+  - `structure`: a `structure` event, with the suite's tree beneath it, one node to a line, each indented 2 spaces under its parent and in declared order: `suite "<name>", class "<class name>"`, `scope "<name>", label "<label>"` or `test "<name>", label "<label>"`. A suite may add `, id "<suite ID>"`; without it, its suite ID is its class name. Each node's ID, parent and declared position follow from the tree.
+  - `<node>: <event>`: a ScalaTest event, a member of the decoded event family (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec) assigned to the node, named by kind and name as `test "is empty"`, or to `run` where it is assigned to the run.
     - Where nodes of one kind share a name, each adds `#<n>`, counting them in the order the event log's structures hold them: `scope "A Stack" #2`.
     - The event is its `org.scalatest.events` class's name, followed in parentheses by the fields the criterion fixes, each as `<field>: <value>`.
     - `analysis` is a list of strings: `analysis: ["Stack(size: 1 -> 0)"]`.
@@ -99,20 +99,20 @@ The criteria are in the five `specification/` documents listed in § Spec docume
       - `caused by` and its cause, written as a throwable, so that `A caused by B caused by C` is one chain.
 
       `TestFailed(throwable: java.lang.IllegalStateException "outer" frames ["samples.ThrowSuite.f(ThrowSuite.scala:9)"] suppressing [java.lang.RuntimeException "closing"] caused by java.io.IOException "inner")`.
-  - `run ended <how>`: item 4, where `<how>` is `completed`, `aborted` or `stopped`.
+  - `run ended <how>`: the `runEnded` event, where `<how>` is `completed`, `aborted` or `stopped`.
 
-  In an item, a string is written in double quotes, with Java's escapes `\n`, `\r`, `\t`, `\"`, `\\` and `\uXXXX`, which can write a lone surrogate. A list is written in square brackets, its elements separated by `, `, and a number as a decimal literal.
+  In an event, a string is written in double quotes, with Java's escapes `\n`, `\r`, `\t`, `\"`, `\\` and `\uXXXX`, which can write a lone surrogate. A list is written in square brackets, its elements separated by `, `, and a number as a decimal literal.
 
-  In a `Given`, a field an item does not write takes a default:
-  - an event's `message` is its throwable's message, or `""` where it has no throwable or that message is `null`;
+  In a `Given`, a field an event does not write takes a default:
+  - a ScalaTest event's `message` is its throwable's message, or `""` where it has no throwable or that message is `null`;
   - a throwable's message is `null`, and a `StackDepth`'s file pathname is absent;
   - every other optional field, such as `throwable`, `location` or `duration`, is absent, and `analysis`, frames and suppressed throwables are empty;
-  - any other field, such as a timestamp, a thread name or item 1's PID, may hold any value.
+  - any other field, such as a timestamp, a thread name or the `runStarted` event's PID, may hold any value.
 
   A `Given` leaves out each run event (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`) its criterion does not exercise.
 
-  In a `Then`, an item fixes only the fields and throwable parts it writes, and `null` fixes a `null` message. An event log *is* the items given, and no others. It *holds* items *in this order* when it holds each, in that order, with any others between them.
-- *The run's captured output* in a `Given` is the lines fed with a run fed directly to the library, as the output captured from its process, each tagged with its stream. It is given as a table of `stream`, `stdout` or `stderr`, and `line`, in the order the lines are fed. Where the criterion does not say when a line is fed among the event log's items, the criterion holds wherever it is fed.
+  In a `Then`, an event fixes only the fields and throwable parts it writes, and `null` fixes a `null` message. An event log *is* the events given, and no others. It *holds* events *in this order* when it holds each, in that order, with any others between them.
+- *The run's captured output* in a `Given` is the lines fed with a run fed directly to the library, as the output captured from its process, each tagged with its stream. It is given as a table of `stream`, `stdout` or `stderr`, and `line`, in the order the lines are fed. Where the criterion does not say when a line is fed among the event log's events, the criterion holds wherever it is fed.
 - *The console* is what the `mill` command writes to its stdout and stderr. A line of it is *outside the human-readable output* when it is not a line of the human-readable output.
 - A line is given without Mill's prefix (`specification/layout.md` AC-044). A line *sits under* another when it follows it, indented 2 spaces more, with no line between them indented as little as the other. *The lines for* a node are its own lines and every line under them.
 - Text and colours the criteria do not fix are ScalaTest 3.2.19's (R-106). Colour is on (R-124).

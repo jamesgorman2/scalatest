@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: events in the test event log
 
-Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM about its events and messages, what it leaves out, and the ScalaTest behaviour that stays unchanged. Part of [test-event-log.md](test-event-log.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
+Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM about its events and messages, what it leaves out, and the ScalaTest behaviour that stays unchanged. Part of [test-event-log.md](test-event-log.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them.
 
 Each run below is launched outside Mill.
 
@@ -22,7 +22,7 @@ Feature: Messages
         test "is empty": MarkupProvided(text: "*markup*")
         test "is empty": <closing event>
         """
-      And no other `InfoProvided`, `NoteProvided`, `AlertProvided` or `MarkupProvided` is tagged with test `is empty`
+      And no other `InfoProvided`, `NoteProvided`, `AlertProvided` or `MarkupProvided` is assigned to test `is empty`
       And each message's timestamp is the time the test called it
 
       Examples:
@@ -51,7 +51,7 @@ Feature: Messages
       Given suite `DirectSuite`, an `AnyFunSuite` that overrides `run` to keep `args.reporter`, whose test `t`, labelled `- t`, sends that reporter an `InfoProvided` with message `direct`, then succeeds
       When `Framework` runs it with the runner argument
       Then the event log holds `suite "DirectSuite": InfoProvided(message: "direct")`
-      And no `InfoProvided` is tagged with test `t`
+      And no `InfoProvided` is assigned to test `t`
 ```
 
 ## What events carry
@@ -128,7 +128,7 @@ Feature: The event log and reporters
     Scenario Outline: AC-059 <reporters>
       Given the compatibility fixture
       When `Runner.run` runs it sequentially with the runner argument, once with no reporter argument and once with <reporters>
-      Then the two runs' test event logs hold the same items, apart from timestamps, durations and thread names
+      Then the two runs' test event logs hold the same events, apart from timestamps, durations and thread names
 
       Examples:
         | reporters                                                        |

@@ -35,10 +35,10 @@ Abbreviations: `SJM` in `[mill]` is `libs/scalajslib/src/mill/scalajslib/ScalaJS
 | **Launcher** (§ 3) | A C program. Stdin, arguments and exit code passed through; the com channel and the test `Logger` worked. Killing the launcher killed the VM 8–18 ms later when the VM was in a job object; without one the VM outlived it, 30 s in a blocking sleep. Start-up: 44 ms against Node's 32 ms (medians) | A `/bin/sh` script that `exec`s Node, so the launcher is the VM: one PID, one kill. Start-up: 20 ms against 19 ms |
 | **Locating the files** (§ 4) | One launcher and one folder per module per command; one `.out` and one `.err` per VM, named by the launcher's PID: 1 pair in each of the 60 module runs | The same, 52 module runs |
 | **Death** (§ 5) | Every handed byte was in the files and read, reader keeping up or paused, in all 40 death runs. Node wrote stdout synchronously to the file: 0 B queued in Node at every exit | The same, 32 runs. `killlag` and `haltlag` lost nothing, against `JDC`'s 64 417 B |
-| **Normal exit** (§ 6) | All 20 000 last-test items, `DONE-RETURNED` and `ASYNC-AFTER-DONE` arrived in every run that finished (20) | The same (20) |
+| **Normal exit** (§ 6) | All 20 000 last-test events, `DONE-RETURNED` and `ASYNC-AFTER-DONE` arrived in every run that finished (20) | The same (20) |
 | **End** (§ 7) | The launcher writes the VM's PID and start time first. The start time matched `ProcessHandle`'s for 60 of 60 VMs. The VM's exit (`onExit`) came 7–24 ms after a normal exit; no byte reached a file after it | The same, 52 of 52 VMs. `onExit` 3–6 ms after a normal exit |
-| **Live** (§ 8) | Item delay median 6 ms, p95 13 ms; largest per run 6–31 ms. 20 000-item burst: largest 17–23 ms | Median 5 ms, p95 10 ms; largest per run 8–62 ms. Burst: largest 19–85 ms |
-| **No task** (§ 9) | Empty run: item 1 to `ASYNC-AFTER-DONE`. Death at runner construction: item 1 and the stderr. Death before any run: its stdout and stderr lines | The same |
+| **Live** (§ 8) | Event delay median 6 ms, p95 13 ms; largest per run 6–31 ms. 20 000-event burst: largest 17–23 ms | Median 5 ms, p95 10 ms; largest per run 8–62 ms. Burst: largest 19–85 ms |
+| **No task** (§ 9) | Empty run: the `runStarted` event to `ASYNC-AFTER-DONE`. Death at runner construction: the `runStarted` event and the stderr. Death before any run: its stdout and stderr lines | The same |
 
 Not run: macOS; `--no-daemon`; a script launcher on Windows; a compiled launcher on Linux; `ExoegoJsDomNodeJs`; two runs in one VM; a plugin-built `TestAdapter` under `NodeJs` (§ 12).
 
@@ -47,11 +47,11 @@ Not run: macOS; `--no-daemon`; a script launcher on Windows; a compiled launcher
 The prototype is on branch `prototype/jsdom-channel`, in `.planning/event-stream-reporting/prototype-js-stdout-launcher/`, commit `3d0f38548`. It reuses `JDC`'s shim framework, fixtures, witness and plugin structure, changed as follows.
 
 - **Two environments.** Each fixture exists as `js.<fixture>.test`, with `JsEnvConfig.JsDom`, and as `node.<fixture>.test`, with `JsEnvConfig.NodeJs`. Both configs carry `--require witness.js` and `--title=spike-<env>-<fixture>` in `args` and the witness's settings in `env`; `JsDom` adds `NODE_PATH` (`B` lines 73–90). Under `NodeJs`, the probe and the death hook take the Node branch: `Platform.dieUncaught` calls `process.exit(1)`, the call the `JsDom` env's `jsdomError` handler makes (`emitter/src/spike/Platform.scala`).
-- **The channel** is `JDC`'s console channel: one framed `console.log` line per item. Every item and test line therefore lands in the VM's stdout file.
+- **The channel** is `JDC`'s console channel: one framed `console.log` line per event. Every event and test line therefore lands in the VM's stdout file.
 - **The launcher** (§ 3) writes `<folder>/<launcher PID>.out` and `.err`. The `.out` file's first line is the launcher's header, `@@LAUNCHER`, the VM's PID, the VM's start time in epoch ms, the launcher's PID, the launcher's set-up time, and its mode.
 - **The plugin,** `spike.test <selector>...`, an exclusive command taking the `Evaluator` (`B` lines 465–596).
   - It evaluates each module's own `testForked` under a plugin-built `TaskCtx` inside `SystemStreamsUtils.withStreams`, as `JDC` § 1 did. It replaces the value of the module's `jsEnvConfig` (§ 2.1; `B` lines 410–462). `SPIKE_LAUNCHER=off` skips the replacement.
-  - **Tailer** (`B` lines 129–158, 207–235): one thread polls every module's folder every 10 ms, reads every `.out` and `.err` file from its last offset, and splits lines. It parses the header, then treats a stdout line beginning with the frame as an item and keeps every other line.
+  - **Tailer** (`B` lines 129–158, 207–235): one thread polls every module's folder every 10 ms, reads every `.out` and `.err` file from its last offset, and splits lines. It parses the header, then treats a stdout line beginning with the frame as an event and keeps every other line.
   - **On the header** (`B` lines 237–254) it compares the header's start time with `ProcessHandle.of(<VM PID>).info().startInstant()`, then watches `onExit()` of the VM and, where different, of the launcher.
   - **End signals,** per run: (x) the VM's exit; (l) the launcher's exit; (e) the module's test task returning; (p) the end of Mill's `PipeOutputThread` on the launcher's own stdout pipe. At each it records the files' size and the bytes read. After `execute` returns it waits for every VM's exit and every pause to end, then reads every file to its end.
   - **Mill's streams.** The streams given to `withStreams` count what Mill's `PipeOutputThread`s copy from the launcher's own pipes, and what Mill's other threads write (`B` lines 322–341).
@@ -59,10 +59,10 @@ The prototype is on branch `prototype/jsdom-channel`, in `.planning/event-stream
 
   | Fixture | What the plugin does |
   |---|---|
-  | `kill` | kills the VM with `destroyForcibly()` when it reads burst item 5 000 |
-  | `killlag` | stops reading at burst item 1, kills the VM 1.5 s later, reads again 2 s after the kill |
-  | `haltlag` | stops reading at burst item 1 until 1 s after the VM's exit, at most 8 s |
-  | `killstart` | kills the VM when item 1 arrives |
+  | `kill` | kills the VM with `destroyForcibly()` when it reads burst event 5 000 |
+  | `killlag` | stops reading at burst event 1, kills the VM 1.5 s later, reads again 2 s after the kill |
+  | `haltlag` | stops reading at burst event 1 until 1 s after the VM's exit, at most 8 s |
+  | `killstart` | kills the VM when the `runStarted` event arrives |
   | `killlauncher`, new | as `kill`'s fixture, but kills the launcher, not the VM, when it reads `SLEEPING`, the VM then starting a 30 s sleep; waits up to 40 s for the VM's exit |
 
 - **The witness,** `W`, preloaded in the VM, writes `<pid>.txt` with its start line (stream types, `execArgv`, working directory) and, after each write in the death fixtures, the bytes handed to the OS for stdout and for stderr. For a file stream, which has no `bytesWritten`, it counts the bytes given to `write` less `writableLength` (`W` lines 19–40).
@@ -73,7 +73,7 @@ The prototype is on branch `prototype/jsdom-channel`, in `.planning/event-stream
   - That made 60 module runs on Windows and 52 on Linux.
 - **Outside Mill,** `bench.ps1` and `bench.sh` checked stdin, arguments, exit code and a kill of the launcher, and timed 30 alternating starts of `node -` and the launcher, each fed `process.exit(0)` on stdin.
 - **Outputs** are in `R/<platform>-<env>-<mode>-r<n>/`, the bench results in `R/<platform>-bench.txt`, the adapter route's output in `R/<platform>-adapter-stdout.txt`. `analyse.py` writes `R/analysis.txt`.
-- **Delay** is an item's receipt time less the write time in it.
+- **Delay** is an event's receipt time less the write time in it.
 
 Versions: Mill `1.1.10`, Scala `3.3.6`, Scala.js `1.20.2`, ScalaTest `3.2.19`, jsdom `27.4.0`; Mill on Azul Zulu `21.0.10`, fetched by Mill.
 
@@ -169,7 +169,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, Scala.js `1.20.2`, ScalaTest `3.2.19`, j
 
 - The module's config is unchanged; only the launcher knows the folder. On Windows the launcher writes into its own folder. On Linux the folder is in the script's text. The plugin writes one launcher per module per command into `out/spike-run/<stamp>/streams/<module>/` (`B` lines 380–404).
 - Each VM's pair is named by the launcher's PID, so two VMs from one launcher get separate pairs. Every module run here had exactly one `.out` and one `.err` (112 of 112): one VM per run, as `NNFC` § 5.2 found.
-- The header was always the `.out` file's first line, read 125–2 664 ms before the run's item 1 was written. Under `JsDom` that gap was 0.75–2.66 s, jsdom's load; under `NodeJs` it was 0.13–0.31 s.
+- The header was always the `.out` file's first line, read 125–2 664 ms before the run's `runStarted` event was written. Under `JsDom` that gap was 0.75–2.66 s, jsdom's load; under `NodeJs` it was 0.13–0.31 s.
 
 ## 5. Death
 
@@ -179,28 +179,28 @@ Each cell: runs in which every byte the witness counted as handed, on stdout and
 |---|---|---|---|---|
 | `halt`: `process.exit(1)` in the next suite, reader keeping up | 2 of 2 | 2 of 2 | 2 of 2 | 2 of 2 |
 | `haltlag`: the same, reader paused | 2 of 2 | 2 of 2 | 2 of 2 | 2 of 2 |
-| `kill`: VM killed at burst item 5 000, reader keeping up | 4 of 4 | 2 of 2 | 4 of 4 | 2 of 2 |
+| `kill`: VM killed at burst event 5 000, reader keeping up | 4 of 4 | 2 of 2 | 4 of 4 | 2 of 2 |
 | `killlag`: VM killed, reader paused | 2 of 2 | 2 of 2 | 2 of 2 | 2 of 2 |
-| `killstart`: VM killed at item 1 | 2 of 2 | 2 of 2 | 2 of 2 | 2 of 2 |
+| `killstart`: VM killed at the `runStarted` event | 2 of 2 | 2 of 2 | 2 of 2 | 2 of 2 |
 | `killlauncher`: launcher killed | 4 of 4 | 2 of 2 | 4 of 4 | 2 of 2 |
 | `diehook`, `dieload` | 4 of 4 | 4 of 4 | 4 of 4 | 4 of 4 |
 
 - **Node wrote stdout and stderr synchronously.** In every run the witness reported both streams as `SyncWriteStream`, with 0 B queued in Node at every sample, `process.exit` included.
   - `[node]` `doc/api/process.md` line 4189: writes to files are synchronous on Windows and POSIX. For pipes they are asynchronous on POSIX (line 4191).
   - So `haltlag` handed its whole burst, 2.76–2.80 MB, before `process.exit(1)`. Under `JDC` on Linux, 2.69 MB stayed queued in Node.
-- **A paused reader did not hold the VM back.** In `haltlag` the VM finished the burst and died 0.61–0.77 s into the pause. In `killlag` it had written all 20 000 burst items before the kill. The reader then read 2.50–2.79 MB after the VM's exit. On Windows, under `JDC`, the VM had blocked in its own stdout write (`JDC` § 4).
+- **A paused reader did not hold the VM back.** In `haltlag` the VM finished the burst and died 0.61–0.77 s into the pause. In `killlag` it had written all 20 000 burst events before the kill. The reader then read 2.50–2.79 MB after the VM's exit. On Windows, under `JDC`, the VM had blocked in its own stdout write (`JDC` § 4).
 - **The Linux loss of `JDC` § 4 did not occur.** No byte reached the files after the VM's exit (§ 7), so the adapter's `destroy` of the launcher, which closes only Mill's pipes on Linux (`JDC` § 4), had nothing to lose. Those pipes carried 0 B (§ 3.2).
 - **Bytes beyond the witness's count.**
-  - In 7 `kill` runs the stdout file held 130 or 132 B more than the witness: one burst item. *Inference:* the kill landed between the item's write and the witness's sample.
+  - In 7 `kill` runs the stdout file held 130 or 132 B more than the witness: one burst event. *Inference:* the kill landed between the event's write and the witness's sample.
   - In the 4 `NodeJs` `dieload` runs the stderr file held 1 016 B (Linux) or 1 651 B (Windows) more. This is Node's report of the uncaught load error, which the witness's patched `process.stderr.write` never saw. The `.err` file had it.
-- **How far the VM got before a kill:** `kill` files held 5 551–11 290 burst items; `killstart` files 1–2 items.
+- **How far the VM got before a kill:** `kill` files held 5 551–11 290 burst events; `killstart` files 1–2 events.
 
 ## 6. Normal exit
 
-- In every run that finished (`alpha`, `beta`, `noisy`, `empty`, `tail`; 10 per environment and platform), the items ended `DONE-CALLED`, `DONE-RETURNED`, `ASYNC-AFTER-DONE`, with no gap and no unparseable frame.
-- Every `tail` run held all 20 000 items of its last test. The witness's exit sample showed 0 B queued and as many bytes handed as the files held, less the header.
-- The last item was written 89–174 ms before the VM's exit hook ran, Mill's `handleResults` and 100 ms sleep (`SJM` lines 424–429).
-- **Interleaving.** Every `noisy` run (8) had 2 031 items and no gap. Its stdout lines all passed through whole: 2 000 `println` lines, 20 lines left open by `print` across an item, and 20 lines of 20 000 characters. There were 40 forged or prefix-only lines and 20 stderr lines. Node is the only writer of the file, so no line came through Mill's writer threads (`JDC` § 3).
+- In every run that finished (`alpha`, `beta`, `noisy`, `empty`, `tail`; 10 per environment and platform), the events ended `DONE-CALLED`, `DONE-RETURNED`, `ASYNC-AFTER-DONE`, with no gap and no unparseable frame.
+- Every `tail` run held all 20 000 events of its last test. The witness's exit sample showed 0 B queued and as many bytes handed as the files held, less the header.
+- The last event was written 89–174 ms before the VM's exit hook ran, Mill's `handleResults` and 100 ms sleep (`SJM` lines 424–429).
+- **Interleaving.** Every `noisy` run (8) had 2 031 events and no gap. Its stdout lines all passed through whole: 2 000 `println` lines, 20 lines left open by `print` across an event, and 20 lines of 20 000 characters. There were 40 forged or prefix-only lines and 20 stderr lines. Node is the only writer of the file, so no line came through Mill's writer threads (`JDC` § 3).
 
 ## 7. End
 
@@ -209,7 +209,7 @@ Times in ms, as minimum / median / maximum.
 | Signal | `JsDom`, Windows | `NodeJs`, Windows | `JsDom`, Linux | `NodeJs`, Linux |
 |---|---|---|---|---|
 | (x) VM `onExit`, after its exit hook, normal exit (10 each) | 15 / 17 / 24 | 7 / 8 / 12 | 4 / 5 / 6 | 3 / 3.5 / 4 |
-| (x) after the last item written, normal exit | 105 / 121.5 / 195 | 96 / 111.5 / 116 | 105 / 108 / 135 | 104 / 106 / 108 |
+| (x) after the last event written, normal exit | 105 / 121.5 / 195 | 96 / 111.5 / 116 | 105 / 108 / 135 | 104 / 106 / 108 |
 | (l) launcher `onExit`, after the exit hook | 17 / 18.5 / 26 | 8 / 10 / 14 | = (x) | = (x) |
 | (e) task returned, after the exit hook | −1 / −0.5 / 0 | −1 / −1 / 0 | −1 / −0.5 / 0 | −1 / −0.5 / 0 |
 | (x) after `destroyForcibly()` of the VM | 13 / 17 / 20 (8) | 7 / 8 / 9 (8) | 4 / 8 / 17 (6) | 2 / 6 / 11 (6) |
@@ -217,7 +217,7 @@ Times in ms, as minimum / median / maximum.
 | (p) `PipeOutputThread` end | not seen: it wrote nothing, so the plugin never learned its thread | | | |
 
 - **The PID-based end held for every VM.** The header's start time equalled `ProcessHandle`'s in 112 of 112 VMs, each checked 0–17 ms after the header was read, with every VM still alive. In every run the files' size at (x) equalled their final size: no byte reached a file after the VM's exit. At (x) the reader was behind in 24 runs, by up to 2.79 MB in the paused ones. Reading every file to its end after (x) gave every byte (§ 5).
-  - This is the end `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin gives the JVM, `NodeJs` and Native. The PID and start time come from the launcher's header, not from item 1, and the start time is the launcher's on both platforms.
+  - This is the end `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin gives the JVM, `NodeJs` and Native. The PID and start time come from the launcher's header, not from the `runStarted` event, and the start time is the launcher's on both platforms.
 - **(l) on Windows** fired from 16 ms before to 3 ms after (x). The launcher waits for the VM before it exits (`LW` lines 121–135). *Inference:* the order reflects the JDK's waiter threads, not the order of the exits. When the launcher was killed in mode `nojob`, (l) came up to 30 s before (x) (§ 3.3).
 - **(e)** came within 1 ms before a normal exit, and 3–40 ms after the exit hook of a VM that ended by `process.exit(1)` or an uncaught load error. At (e) the reader was behind in 28 runs, so the task's return does not end the stream.
 
@@ -225,10 +225,10 @@ Times in ms, as minimum / median / maximum.
 
 | | `JsDom`, Windows | `NodeJs`, Windows | `JsDom`, Linux | `NodeJs`, Linux |
 |---|---|---|---|---|
-| Item delay, every non-burst item of `alpha`, `beta`, `noisy`, `empty`, `tail` (4 272 each) | median 6, p95 13, largest 29 ms | median 6, p95 13, largest 31 ms | median 5, p95 10, largest 28 ms | median 5, p95 10, largest 62 ms |
+| Event delay, every non-burst event of `alpha`, `beta`, `noisy`, `empty`, `tail` (4 272 each) | median 6, p95 13, largest 29 ms | median 6, p95 13, largest 31 ms | median 5, p95 10, largest 28 ms | median 5, p95 10, largest 62 ms |
 | Median delay per run (10) | 5–26 ms | 3–9 ms | 4–11 ms | 5–17 ms |
 | Largest delay per run | median 16, largest 29 ms | median 13, largest 31 ms | median 14, largest 28 ms | median 11, largest 62 ms |
-| Largest delay in the 20 000-item burst (`tail`) | 20, 23 ms | 17, 17 ms | 42, 19 ms | 68, 85 ms |
+| Largest delay in the 20 000-event burst (`tail`) | 20, 23 ms | 17, 17 ms | 42, 19 ms | 68, 85 ms |
 
 - The tailer polls every 10 ms. *Inference:* the poll accounts for most of the median, against `JDC` § 2's 0 ms through the pipe.
 
@@ -236,9 +236,9 @@ Times in ms, as minimum / median / maximum.
 
 | Fixture | Every platform and environment, 2 runs each |
 |---|---|
-| `empty` | item 1, `RUNNER-RETURNED`, `TASKS 0`, `DONE-CALLED`, `DONE-RETURNED`, `ASYNC-AFTER-DONE` |
-| `diehook` | item 1 only. Its `.err` held the cause: jsdom's report of the uncaught error, 31 lines, under `JsDom`; `SPIKE-EXIT-1`, 1 line, under `NodeJs` |
-| `dieload` | no item. Its `.out` held `DIELOAD-STDOUT before any run`; its `.err` held `DIELOAD-STDERR before any run` and the error, 34 lines under `JsDom`, 18 under `NodeJs` |
+| `empty` | the `runStarted` event, `RUNNER-RETURNED`, `TASKS 0`, `DONE-CALLED`, `DONE-RETURNED`, `ASYNC-AFTER-DONE` |
+| `diehook` | the `runStarted` event only. Its `.err` held the cause: jsdom's report of the uncaught error, 31 lines, under `JsDom`; `SPIKE-EXIT-1`, 1 line, under `NodeJs` |
+| `dieload` | no event. Its `.out` held `DIELOAD-STDOUT before any run`; its `.err` held `DIELOAD-STDERR before any run` and the error, 34 lines under `JsDom`, 18 under `NodeJs` |
 
 Every VM in these runs wrote its header and was found alive by its PID (§ 7).
 
@@ -249,12 +249,12 @@ What the runs show against each requirement the issue names, in `SPECIFICATION.m
 | Requirement | Windows | Linux |
 |---|---|---|
 | R-092, no change to the module | Held: only the plugin's evaluation saw the launcher (§ 2.1) | Held |
-| R-011, nothing lost or altered | No gap or unparseable item in 60 runs (§ 6) | The same, 52 runs |
-| R-071, a run with no task, and a death before its first task | Item 1 arrived for every `empty`, `diehook` and `killstart` run (§ 9) | The same |
+| R-011, nothing lost or altered | No gap or unparseable event in 60 runs (§ 6) | The same, 52 runs |
+| R-071, a run with no task, and a death before its first task | The `runStarted` event arrived for every `empty`, `diehook` and `killstart` run (§ 9) | The same |
 | R-073 with R-042, everything handed to the OS arrives when the process dies | Every handed byte arrived, stdout and stderr, reader keeping up or paused (§ 5) | The same; `JDC`'s 64 417 B loss did not recur |
 | R-074, how the run ended | `DONE-RETURNED` arrived for every run that finished and for none that died (§ 6) | The same |
-| R-076, output of a process that ended before any run | `dieload`'s stdout and stderr lines captured, with no item (§ 9) | The same |
-| R-088, each piece of output once | No item among the passed-through lines; Mill's pipes carried 0 B (§ 3.2) | The same |
+| R-076, output of a process that ended before any run | `dieload`'s stdout and stderr lines captured, with no event (§ 9) | The same |
+| R-088, each piece of output once | No event among the passed-through lines; Mill's pipes carried 0 B (§ 3.2) | The same |
 
 ## 11. Against the earlier notes
 

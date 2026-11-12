@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: the run and each suite's structure
 
-Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM about the run and its suites: the run's start and end, and each suite's structure, labels and class name. Part of [test-event-log.md](test-event-log.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
+Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM about the run and its suites: the run's start and end, and each suite's structure, labels and class name. Part of [test-event-log.md](test-event-log.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them.
 
 Each run below is launched outside Mill.
 
@@ -12,15 +12,15 @@ Feature: The run in its test event log
   Rule: A run's start is in its test event log before any test starts (R-046)
     Scenario: AC-094 A `Framework` runner is constructed
       When a `Framework` runner is constructed with the runner argument
-      Then, before it is given a task, the event log's first item is `run started`
-      And that item's PID and process start time are those `ProcessHandle.current()` gives in the run's process
+      Then, before it is given a task, the event log's first event is `run started`
+      And that event's PID and process start time are those `ProcessHandle.current()` gives in the run's process
       And the event log holds no `structure`
 
   Rule: A run's test event log records how the run ended (R-074)
-    Scenario Outline: AC-060 A run that ends <ended>
+    Scenario Outline: AC-060 A run that ends <ended>  
       Given <the run>
       When <launch> runs it with the runner argument
-      Then the event log's last item is `run ended <ended>`
+      Then the event log's last event is `run ended <ended>`
 
       Examples:
         | the run                                                                                                                                                                      | launch       | ended     |
@@ -39,7 +39,7 @@ Feature: The run in its test event log
         run: RunAborted(throwable: java.lang.OutOfMemoryError "Java heap space")
         run ended aborted
         """
-      And it holds no `SuiteAborted` and no closing event tagged with `throws on pop`
+      And it holds no `SuiteAborted` and no closing event assigned to `throws on pop`
 
   Rule: A run that aborts before `RunStarting` records the abort against the run, and holds no `structure` (R-074)
     Scenario Outline: AC-133 A wrapped suite's constructor throws given an empty config map, by <launch>
@@ -69,8 +69,8 @@ Feature: The run in its test event log
         test "sleeps": TestSucceeded
         """
       And it holds a `run: AlertProvided` for each `AlertProvided` the reporter receives, in the same order and with the same message, such as `Test still running after 1 second, 4 milliseconds: suite name: SlowSuite, test name: sleeps.`
-      And no `AlertProvided` is tagged with test `sleeps` or suite `SlowSuite`
-      And each line of its test event log decodes to one item
+      And no `AlertProvided` is assigned to test `sleeps` or suite `SlowSuite`
+      And each line of its test event log decodes to one event
 ```
 
 ## Each suite's structure
@@ -78,7 +78,7 @@ Feature: The run in its test event log
 ```gherkin
 Feature: Each suite's structure
 
-  Rule: A suite's structure, after filtering, precedes the suite's first event, and every event is tagged with the node that emitted it (R-096, R-097, R-105)
+  Rule: A suite's structure, after filtering, precedes the suite's first ScalaTest event, and every ScalaTest event is assigned to the node that emitted it (R-096, R-097, R-105)
     Scenario: AC-096 A suite whose tests run
       Given suite `StackFunSpec`, class `samples.StackFunSpec`, an `AnyFunSpec` declaring scope `A Stack`, labelled `A Stack`, holding scope `when empty`, labelled `when empty`, holding tests `is empty` and `pops`, labelled `- is empty` and `- pops`, each succeeding
       When `Framework` runs it with the runner argument
@@ -101,7 +101,7 @@ Feature: Each suite's structure
         scope "A Stack": ScopeClosed
         suite "StackFunSpec": SuiteCompleted
         """
-      And no item before the `structure` is tagged with the suite or a node in it
+      And no event before the `structure` is assigned to the suite or a node in it
 
     Scenario: AC-097 A suite whose `beforeAll` throws
       Given suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, an `AnyWordSpec` declaring `"A repo" should { "read" in …; "write" in … }`: scope `A repo`, labelled `A repo`, holding tests `read` and `write`, labelled `- should read` and `- should write`
@@ -117,7 +117,7 @@ Feature: Each suite's structure
         suite "SetupFailsSpec": SuiteStarting
         suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
         """
-      And no item is tagged with `A repo`, `read` or `write`
+      And no event is assigned to `A repo`, `read` or `write`
 
     Scenario: AC-098 Nested suites sit under the suite that nests them
       Given suite `OuterSuites`, class `samples.OuterSuites`, a `Suites` with no tests, nesting `Inner1Suite`, class `samples.Inner1Suite`, and `Inner2Suite`, class `samples.Inner2Suite`, each an `AnyFunSuite` whose one test, `inner one` and `inner two`, labelled `- inner one` and `- inner two`, succeeds
@@ -146,24 +146,24 @@ Feature: Each suite's structure
       Given suite `AddSuite`, class `samples.AddSuite`, an `AnyFunSuite` whose one test, `adds`, labelled `- adds`, succeeds, and suite `SqrtPropSpec` of `layout.md` AC-002, both on the runpath
       When `Runner.run` runs with the runner argument, the runpath given with `-R` and no `-s`, so that a `DiscoverySuite` runs them
       Then each of `AddSuite` and `SqrtPropSpec` has its own `structure`, whose root is that suite
-      And no `structure` holds a `DiscoverySuite`, and the `DiscoverySuite`'s `SuiteStarting` and `SuiteCompleted` are tagged with `run`
+      And no `structure` holds a `DiscoverySuite`, and the `DiscoverySuite`'s `SuiteStarting` and `SuiteCompleted` are assigned to `run`
 
     Scenario: AC-100 Tests run in parallel by `Runner`
       Given suite `ParFunSuite`, class `samples.ParFunSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose tests `a` and `b`, labelled `- a` and `- b`, succeed
       When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParFunSuite`
       Then the event log holds one `structure` holding `ParFunSuite`, and none holds a `DistributedTestRunnerSuite`
-      And it holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
-      And each line of its test event log decodes to one item
+      And it holds exactly one `TestStarting` and one `TestSucceeded` assigned to each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
+      And each line of its test event log decodes to one event
 
     Scenario: AC-128 A suite wraps its reporter in its own
       Given suite `ForwardingSuite`, class `samples.ForwardingSuite`, an `AnyFunSuite` whose tests `a` and `b`, labelled `- a` and `- b`, succeed, and which overrides `run` to pass `super.run` its `args` with `args.reporter` wrapped in a `Reporter` that passes each event to it unchanged
       When `Framework` runs it with the runner argument
-      Then the event log holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
+      Then the event log holds exactly one `TestStarting` and one `TestSucceeded` assigned to each of `a` and `b`, and no other `TestStarting` or `TestSucceeded`
 
-    Scenario: AC-129 Tests in random order are tagged with their own nodes
+    Scenario: AC-129 The events of tests in random order are assigned to their own nodes
       Given suite `ShuffledSuite` of AC-102
       When `Framework` runs it with the runner argument
-      Then the event log holds exactly one `TestStarting` and one `TestSucceeded` tagged with each of `a`, `b` and `c`, and no other `TestStarting` or `TestSucceeded`
+      Then the event log holds exactly one `TestStarting` and one `TestSucceeded` assigned to each of `a`, `b` and `c`, and no other `TestStarting` or `TestSucceeded`
 
     Scenario Outline: AC-130 A suite run through `ConfigMapWrapperSuite`, by <launch>
       Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `reads`, labelled `- reads`, which succeeds
@@ -185,7 +185,7 @@ Feature: Each suite's structure
         | `Runner.run`, with `-s samples.ConfigSpec`                 |
         | `Runner.run`, with the runpath given with `-R` and no `-s` |
 
-  Rule: A suite run through `ConfigMapWrapperSuite` has the structure its class registers with an empty config map, and a test only the run's config map registers is tagged with the suite (R-096)
+  Rule: A suite run through `ConfigMapWrapperSuite` has the structure its class registers with an empty config map, and the events of a test only the run's config map registers are assigned to the suite (R-096)
     Scenario: AC-131 What the suite registers depends on its config map
       Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `remote`, labelled `- remote`, when its config map holds key `db`, and test `local`, labelled `- local`, when it does not, each succeeding
       When `Framework` runs it with the runner argument and `-Ddb=on`
@@ -201,14 +201,14 @@ Feature: Each suite's structure
         suite "ConfigSpec": TestStarting(testName: "remote")
         suite "ConfigSpec": TestSucceeded(testName: "remote")
         """
-      And no item is tagged with `local`
+      And no event is assigned to `local`
 
-  Rule: A `DistributedTestRunnerSuite`'s abort is tagged with the one test it ran (R-096, R-097)
+  Rule: A `DistributedTestRunnerSuite`'s abort is assigned to the one test it ran (R-096, R-097)
     Scenario: AC-126 The suite running one test in parallel throws
       Given suite `ParAbortSuite`, class `samples.ParAbortSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose one test is `a`, labelled `- a`, and which overrides `run` to throw `RuntimeException("no fixture")` when given a test name, as the `DistributedTestRunnerSuite` running `a` gives it
       When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParAbortSuite`
       Then the event log holds `test "a": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - no fixture", throwable: java.lang.RuntimeException "no fixture")`
-      And no `SuiteAborted` is tagged with suite `ParAbortSuite` or with `run`
+      And no `SuiteAborted` is assigned to suite `ParAbortSuite` or to `run`
 
   Rule: A suite's structure holds only what the filter keeps, in declared order (R-105, R-112)
     Scenario: AC-101 A tag excluded, a test ignored
@@ -221,7 +221,7 @@ Feature: Each suite's structure
             test "fast", label "- fast"
             test "later", label "- later"
         """
-      And it holds `test "later": TestIgnored`, and no item is tagged with `slow`
+      And it holds `test "later": TestIgnored`, and no event is assigned to `slow`
 
     Scenario: AC-102 Tests in random order
       Given suite `ShuffledSuite`, class `samples.ShuffledSuite`, an `AnyFunSuite` mixing in `RandomTestOrder`, registering tests `a`, `b` and `c`, labelled `- a`, `- b` and `- c`, in that order, each succeeding

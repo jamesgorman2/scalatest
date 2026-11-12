@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: runs and test structure
 
-Acceptance criteria for what the human-readable output shows of a run: which suites, scopes, tests, failures and captured output appear, in what order, and the run's block. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them; [layout.md](layout.md) gives where each line sits and its text and colour.
+Acceptance criteria for what the human-readable output shows of a run: which suites, scopes, tests, failures and captured output appear, in what order, and the run's block. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them; [layout.md](layout.md) gives where each line sits and its text and colour.
 
 ## Order
 

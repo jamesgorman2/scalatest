@@ -1,6 +1,6 @@
 # A JVM run's PID and process start time when core targets Java 8
 
-Whether a Mill 1.x JVM test worker can run on Java 8, and how a worker on each JDK it can run on gets the PID and start time that item 1 carries and the plugin compares with `ProcessHandle` (`.planning/event-stream-reporting/ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream"). Answers [How does a JVM run get its PID and process start time on Java 8?](https://github.com/jamesgorman2/scalatest/issues/59), for [Plan: consolidated human-readable output for one JVM module](https://github.com/jamesgorman2/scalatest/issues/54). Facts and their sources only; no option is chosen.
+Whether a Mill 1.x JVM test worker can run on Java 8, and how a worker on each JDK it can run on gets the PID and start time that the `runStarted` event carries and the plugin compares with `ProcessHandle` (`.planning/event-stream-reporting/ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream"). Answers [How does a JVM run get its PID and process start time on Java 8?](https://github.com/jamesgorman2/scalatest/issues/59), for [Plan: consolidated human-readable output for one JVM module](https://github.com/jamesgorman2/scalatest/issues/54). Facts and their sources only; no option is chosen.
 
 Notes this one builds on and does not repeat:
 
@@ -136,7 +136,7 @@ The scratch artefacts (`mill-j8\`, `probe\`, `scripts\`, `windows.tsv`, `linux.t
    - Costs:
      - a small reflective helper;
      - a rule that `Method`s come from `ProcessHandle` and `ProcessHandle.Info`, not the runtime class;
-     - item 1 must say what a run without them looks like, or the emitter must refuse to open the event log. Under the Mill 1.x test command that case does not occur (§ 1).
+     - the `runStarted` event must say what a run without them looks like, or the emitter must refuse to open the event log. Under the Mill 1.x test command that case does not occur (§ 1).
 2. **A multi-release jar,** with a class under `META-INF/versions/9` that calls `ProcessHandle` directly.
    - Costs:
      - a Java 9+ compile step in an sbt build that CI runs on JDK 8 too;

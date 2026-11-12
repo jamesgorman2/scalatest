@@ -7,7 +7,7 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
 - The emitter, in a scalatest-core that compiles on JDK 8 without `java.lang.ProcessHandle`, must give the Mill plugin:
   - the PID and start time Mill's JVM reads from `ProcessHandle`;
   - each label before any test runs, though no event carries the labels;
-  - each test's events tagged with its node, though core and user code replace the reporter a test is given;
+  - each test's events assigned to its node, though core and user code replace the reporter a test is given;
   - each test's messages in the order the test called them, though no event carries that order.
 - The test command, reached as `mill scalatest/test` with nothing in the build referring to it, must split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, turn a worker's stdout and stderr byte chunks into lines, and read Mill's colour decision through `private[mill]` API.
 - The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints, though that formatting reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured.
@@ -24,7 +24,7 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
 
 ### The run's PID and process start time
 
-Item 1's start time must equal `ProcessHandle.of(pid).info().startInstant()` in Mill's JVM exactly, not closely (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().startInstant()` in Mill's JVM exactly, not closely (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
 - The emitter reads both from `ProcessHandle.current()` by reflection. The read is in core's JVM sources only; Scala.js and Native are out of scope.
 - It looks each method up on the interfaces `java.lang.ProcessHandle` and `java.lang.ProcessHandle.Info`, never on the handle's runtime class, whose methods are not accessible (`research/jvm-pid-and-start-time.md` § 2).
@@ -98,11 +98,11 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 ## The test event log on the JVM
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
-- `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each write item 1 once they have parsed the runner argument, before `RunStarting` (`specification/test-event-log-structure.md` AC-094).
-- The emitter writes item 1 to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later item (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+- `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each write the `runStarted` event once they have parsed the runner argument, before `RunStarting` (`specification/test-event-log-structure.md` AC-094).
+- The emitter writes the `runStarted` event to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
   - Event log reading never reads the other name, so a worker that dies before the move holds no event log file.
   - In the same folder, the move is one rename within one file system.
-  - Item 1 precedes every other item, so nothing is appended between the move and the reopening.
+  - The `runStarted` event precedes every other event, so nothing is appended between the move and the reopening.
 - The emitter's one write lock (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin) is taken by:
   - the run's own thread;
   - the dispatcher's thread;
@@ -118,14 +118,14 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - the events `Framework` relays from a sub-process sbt forks, and the `RunAborted` it sends when it can no longer read them;
   - the run events of the reruns that `Runner`'s `-g` graphical reporter starts through `RunnerJFrame`, `SuiteRerunner` and `TestRerunner`.
 - Event log reading polls each file every 10 ms, the only interval measured (`../research/jvm-file-channel.md` § 2).
-- The handle **Decode** returns (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is a public opaque type in the library over core's decoded item, whose classes are `private[scalatest]`.
+- The handle **Decode** returns (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is a public opaque type in the library over core's decoded event, whose classes are `private[scalatest]`.
 - A suite's structure takes each scope's and test's label from the style's registration tree, before any of them runs. The structure precedes the suite's first event (`specification/test-event-log-structure.md` AC-096), and a test that never starts (AC-097) or never closes (`TestStarting` carries `MotionToSuppress`) has no event giving its label. It builds each as `Engine.runTestImpl` and `runTestsInBranch` do, in `Engine` and `AsyncEngine`, and drops the leading indentation:
   - a test's from `Suite.getIndentedTextForTest` over its text with its parent's child prefix, with the `includeIcon` its style's `runTest` passes, or `true` for a test the filter ignores, as `TestIgnored`'s formatter has it. That flag is `false` only in `AnyFeatureSpecLike`, `FixtureAnyFeatureSpecLike` and the `FeatureSpecLike` and `FixtureFeatureSpecLike` that `project/GenSafeStyles.scala` generates from them (AC-103);
   - a scope's from `getIndentedTextForInfo` over its text with its parent's child prefix, with no icon.
 - A suite with no registration tree, one that overrides `testNames` and `runTest` itself, yields a test node for each name of `testNames` the filter keeps, in `testNames`'s order, and no scope. Each takes its name from `testNames`, never from an event's `testText`: `Suite.runTests` sends a test's name as `testText` only in the `TestIgnored` of a test the filter ignores, and otherwise the suite's own `runTest` may send any `testText`, or no event at all. Each is labelled as `Suite.runTests` labels a test it ignores, by `getEscapedIndentedTextForTest(testName, 1, true)` without the leading indentation.
 - `Framework`, `Runner` and `DiscoverySuite` run a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` as a `ConfigMapWrapperSuite`, which has no registration tree and forwards the suite's name, ID, test names, tags and nested suites to its `private lazy val wrappedSuite`, the wrapped class constructed with `Map.empty`. The suite's structure is built from `wrappedSuite`, reached through a `private[scalatest]` accessor on `ConfigMapWrapperSuite` (`SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` has the structure its class registers…"; AC-130, AC-131).
   - `wrappedSuite` is built with `Constructor.newInstance`, so a throwing constructor reaches its first reader as an `InvocationTargetException`. In `org.scalatest.tools.Framework`'s `ScalaTestTask.execute`, that reader is the first `suite.suiteId`, outside any `try`, before `SuiteStarting` (AC-132). Under `Runner` it is the `expectedTestCount` sum, inside `doRunRunRunDaDoRunRun`'s `try`, whose catch sends `RunAborted` (AC-133).
-  - With the emitter on, where the suite is a `ConfigMapWrapperSuite`, `execute` reads `suite.suiteId` once, before `registerReporter` and `runSuite`, in a `try`. Its catch builds a `DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, e)`, hands the emitter that suite's structure and the `SuiteStarting` and `SuiteAborted` `runSuite` would send for it, tagged with its node and passed to no reporter, then rethrows `e`.
+  - With the emitter on, where the suite is a `ConfigMapWrapperSuite`, `execute` reads `suite.suiteId` once, before `registerReporter` and `runSuite`, in a `try`. Its catch builds a `DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, e)`, hands the emitter that suite's structure and the `SuiteStarting` and `SuiteAborted` `runSuite` would send for it, assigned to its node and passed to no reporter, then rethrows `e`.
 - Each suite's class name is `Suite.getSuiteClassName`'s, which for a `DeferredAbortedSuite` is the class whose construction failed. A `ConfigMapWrapperSuite`'s is instead its wrapped class's (AC-104, AC-130). `SuiteAborted.suiteClassName` is never read: `Framework`'s catch around `suite.run` sets it to the suite's name.
 - A test's node is found by its suite instance and the test's name, never by reading `args.reporter`. `ParallelTestExecution.runTests`, `AsyncEngine.runTestsImpl`, `RandomTestOrder.run`, `StopOnFailure.run` and `org.scalatest.tools.Utils.wrapReporterIfNecessary` each replace `args.reporter` before a test runs, as can a user's `run`, `runTests` or `runTest` override (`specification/test-event-log-events.md` AC-105, `specification/test-event-log-structure.md` AC-128).
   - The emitter keeps an identity map from suite instance to node table, read and written under its write lock. A node table holds a suite node's ID, its scopes' IDs, its tests' IDs by test name, and its nested suites' node tables by position in `nestedSuites`.
@@ -138,7 +138,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
     - an ambiguous instance;
     - an instance never registered, such as one a user creates and runs;
     - a test name or position its table lacks.
-  - A site whose lookup misses installs no wrapper and hands nothing off, so the instance's events take the tag of the innermost wrapper they reach.
+  - A site whose lookup misses installs no wrapper and hands nothing off, so the instance's events are assigned to the node of the innermost wrapper they reach.
 - `Suite.runNestedSuites` and `StepwiseNestedSuiteExecution.runNestedSuites` install each nested suite's wrapper before its `SuiteStarting`. In the sequential branch, `callExecuteOnSuite` sends the nested suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` through the outer suite's reporter and builds the nested suite's `Args` only after `SuiteStarting`. The wrapper takes that reporter's place, both for those events and in the `Args`. In the `-P` branch of `Suite.runNestedSuites`, the wrapper goes in the `Args` given to the distributor, whose `SuiteRunner` sends those events.
   - Where `thisSuite` is a `DiscoverySuite`, each nested suite's wrapper is a top-level wrapper (AC-099).
   - Otherwise the site looks up `thisSuite`, and each nested suite it runs takes the table at its position in `nestedSuites`. Matching by position keeps structure and run in agreement where `nestedSuites` returns new instances on each call.
@@ -150,37 +150,37 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
   - The emitter keeps an identity set of the events wrappers have handed off. Under the emitter's write lock, a wrapper hands off only an event not in the set, and adds it.
   - The top-level suite's wrapper, the last wrapper any event of its suite reaches, removes the event from the set instead of adding it.
 - A test's `info` and `markup` reach reporters only in its closing event's `recordedEvents`, after its `note`s and `alert`s and with ordinals taken at the close (`Engine.runTestImpl`, `AsyncEngine.runTestImpl`). Neither the order events arrive in nor their ordinals give the order the test called them (`specification/test-event-log-events.md` AC-105). With the emitter on, the test's informer and documenter therefore also hand each message to the emitter when called. With the emitter off they behave as in 3.2.19.
-  - `runTestImpl` looks up `theSuite` and the test's name. The informer and documenter tag each message with the node found and hand it to the emitter only, never to a reporter (`../SPECIFICATION.md` R-002). Before reporting the closing event, `runTestImpl` adds it, under the write lock, to an identity set the emitter keeps. The emitter leaves the recorded events of an event in that set out of the event log, and removes the event from the set once it writes it.
-  - Where the lookup misses, the informer and documenter hand nothing off and `runTestImpl` adds no event to that set, so the emitter writes the closing event's recorded events after it, tagged as it is.
+  - `runTestImpl` looks up `theSuite` and the test's name. The informer and documenter assign each message to the node found and hand it to the emitter only, never to a reporter (`../SPECIFICATION.md` R-002). Before reporting the closing event, `runTestImpl` adds it, under the write lock, to an identity set the emitter keeps. The emitter leaves the recorded events of an event in that set out of the event log, and removes the event from the set once it writes it.
+  - Where the lookup misses, the informer and documenter hand nothing off and `runTestImpl` adds no event to that set, so the emitter writes the closing event's recorded events after it, assigned to its node.
   - The hand-off takes no ordinal from `tracker`, so every event reporters receive keeps its 3.2.19 ordinal (`specification/compatibility-and-library.md` AC-056). The event log carries no ordinal, since no output shows or uses one.
   - The message's timestamp is the time of the call (AC-105).
 - The messages of a path-style test, one of `PathAnyFunSpec` or `PathAnyFreeSpec`, never pass through that hand-off. `PathEngine.handleTest` runs the test's body while its suite is constructed, before the suite's `structure` and `SuiteStarting`. It gives the messages to four recorders, `PathMessageRecordingInformer`, `PathMessageRecordingNotifier`, `PathMessageRecordingAlerter` and `PathMessageRecordingDocumenter` in `org/scalatest/ConcurrentInformer.scala`. Each keeps its own queue, with no order across the four and no call time. Only the informer's queue reaches `TestLeaf.recordedMessages`, and `Engine.runTestImpl`, replaying the stored outcome, adds only the informer's events to the closing event's `recordedEvents`.
   - The four recorders of one test also append each call to one shared call sequence. An entry holds what its recorder stores of the call, the recorder's event function and the time of the call. `registerTest` takes, and `TestLeaf` holds, that sequence beside the informer.
-  - With the emitter on, `Engine.runTestImpl` replaying a path-style test hands the sequence's messages, in order, to the emitter after `TestStarting` and before the closing event, tagged and handed off as the informer's are at call time. Each message is built by its entry's event function, given a fresh `Tracker` in place of `tracker` so that it takes no ordinal from the run's. Its `timeStamp` is then set to the entry's call time.
+  - With the emitter on, `Engine.runTestImpl` replaying a path-style test hands the sequence's messages, in order, to the emitter after `TestStarting` and before the closing event, assigned and handed off as the informer's are at call time. Each message is built by its entry's event function, given a fresh `Tracker` in place of `tracker` so that it takes no ordinal from the run's. Its `timeStamp` is then set to the entry's call time.
   - The closing event's `recordedEvents` are built from `tracker` as in 3.2.19, emitter on or off, so the test's notes, alerts and markup still reach no reporter (`specification/compatibility-and-library.md` AC-056).
   - Where the lookup misses, as for an instance a user creates and runs, nothing is replayed, and the event log holds only the informer's messages, taken from the closing event's recorded events. The test's notes, alerts and markup are lost.
 
 ### The format
 
-Each item is a JSON object (`TECHNICAL-DESIGN-DECISIONS.md` "Each item of a run's test event log is a JSON object."), encoded as `../JSON-LAYOUT.md` § Encoding gives, except that keys are written in the order this section gives. Escaping control characters in strings keeps each item to one line.
+Each event is a JSON object (`TECHNICAL-DESIGN-DECISIONS.md` "Each event of a run's test event log is a JSON object."), encoded as `../JSON-LAYOUT.md` § Encoding gives, except that keys are written in the order this section gives. Escaping control characters in strings keeps each event to one line.
 
 - A lone surrogate's `\uXXXX` escape decodes back to the same `char`.
 - Integers are JSON numbers, read as `Long`, never through `Double`.
 - An empty array omits its key, as an absent value does.
 
-Each item's first key is `item`, naming its kind. The items are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and their keys, in order, are:
+Each event's first key is `item`, naming its kind. The events are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and the keys of each, in order, are:
 
-1. `item` `runStarted`; `pid`; `startTime`, the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
-2. `item` `structure`; `nodes`, an array of the suite's nodes in depth-first pre-order, each node's children in declared order. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes item 2 gives it. A node's `id` is an integer.
-3. `item` `event`; `node`, the `id` of the node the event is tagged with, absent where it is tagged as the run's; `event`, its `org.scalatest.events` class's simple name; then the event's fields.
-4. `item` `runEnded`; `outcome`: `completed`, `aborted` or `stopped`.
+- The `runStarted` event: `item` `runStarted`; `pid`; `startTime`, the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
+- A `structure` event: `item` `structure`; `nodes`, an array of the suite's nodes in depth-first pre-order, each node's children in declared order. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin gives it. A node's `id` is an integer.
+- A ScalaTest event: `item` `event`; `node`, the `id` of the node the event is assigned to, absent where it is assigned to the run; `event`, its `org.scalatest.events` class's simple name; then the event's fields.
+- The `runEnded` event: `item` `runEnded`; `outcome`: `completed`, `aborted` or `stopped`.
 
-An event's fields:
+A ScalaTest event's fields:
 
 - A decoded class holds every field of its `org.scalatest.events` class except:
   - `ordinal`, `formatter`, `rerunner` and `payload`;
   - `recordedEvents` (§ The test event log on the JVM);
-  - the event's copy of its node's names and IDs: `suiteName`, `suiteId`, `suiteClassName`, `testName`, `testText`, `nameInfo`, and a `ScopeOpened`'s, `ScopeClosed`'s or `ScopePending`'s `message`, since names, IDs, class names and labels come from item 2 through the node the event is tagged with;
+  - the event's copy of its node's names and IDs: `suiteName`, `suiteId`, `suiteClassName`, `testName`, `testText`, `nameInfo`, and a `ScopeOpened`'s, `ScopeClosed`'s or `ScopePending`'s `message`, since names, IDs, class names and labels come from the `structure` event through the node the event is assigned to;
   - `DiscoveryStarting`'s `configMap`, since the run record's comes from `RunStarting`.
 - Its keys are the field names of its decoded class, in that class's declaration order. Each decoded class names and orders the fields it holds as its `org.scalatest.events` class does.
 - A field whose `org.scalatest.events` type is not an `Option` is required, except that an empty sequence omits its key and decodes as empty.
@@ -188,7 +188,7 @@ An event's fields:
 - A case class, such as a `Summary`, is an object of its fields under the same rules. A member of a sealed family, such as a `Location`, is that object with first key `kind` holding its class's simple name: `{"kind":"SeeStackDepthException"}`.
 - A `ConfigMap` is an object of each value's `toString`, its keys in ascending `String.compareTo` order.
 - A throwable is an object with these keys, in order:
-  - `id`, numbered from 1 in the order the item writes its throwables. A throwable the item has already written, the same object and never merely an `equals` one, is `{"ref": <id>}`. Identity is per item, so a torn item breaks no other.
+  - `id`, numbered from 1 in the order the event writes its throwables. A throwable the event has already written, the same object and never merely an `equals` one, is `{"ref": <id>}`. Identity is per event, so a torn event breaks no other.
   - `className`; `message`, absent where `getMessage` is `null`.
   - `stackDepth`, only on a `StackDepth`: an object of `fileName`, `filePathname` and `lineNumber`, the failed code's, each present where defined.
   - `propertyCheck`, `true`, only on a `PropertyCheckFailedException`, whose message already holds its line number.
@@ -210,23 +210,23 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 
 ### Runs the criteria describe
 
-The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder in the library's tests:
+The criteria whose `Given` is an event log holding events (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder in the library's tests:
 
-- A test gives the run as one ordered list: the criterion's items, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
-- The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` items, and resolves each node an item names to its ID. It emits every item and captured line in the order given, in the form core's decoder yields, so a test can place a structure item, an event or a captured line anywhere the criterion puts it.
+- A test gives the run as one ordered list: the criterion's events, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
+- The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` events, and resolves each node an event names to its ID. It emits every event and captured line in the order given, in the form core's decoder yields, so a test can place a `structure` event, a ScalaTest event or a captured line anywhere the criterion puts it.
 - It adds the test classes the run's process took after the event stream ends, as the test command does.
 
-The emitter's and the decoder's criteria are those that state items, in the parts of `specification/test-event-log.md`. Among them, `specification/test-event-log-events.md` AC-109 writes lone surrogates, and `specification/test-event-log-structure.md` AC-100 and AC-121 write items from concurrent threads. Each side of the codec is tested against the format on its own (`../ARCHITECTURE-DECISIONS.md` "Each side of core's codec is tested on its own…"), so each such criterion has two tests. Both build the criterion's items with the same builder from its item list, and share expected text in the format, written by hand in the test: a whole line for each item the criterion states, with any value where the criterion fixes none.
+The emitter's and the decoder's criteria are those that state events, in the parts of `specification/test-event-log.md`. Among them, `specification/test-event-log-events.md` AC-109 writes lone surrogates, and `specification/test-event-log-structure.md` AC-100 and AC-121 write events from concurrent threads. Each side of the codec is tested against the format on its own (`../ARCHITECTURE-DECISIONS.md` "Each side of core's codec is tested on its own…"), so each such criterion has two tests. Both build the criterion's events with the same builder from its event list, and share expected text in the format, written by hand in the test: a whole line for each event the criterion states, with any value where the criterion fixes none.
 
-- The emitter's test runs the criterion's suites with the runner argument, on every Scala version core builds for on the JVM. It compares the lines the run writes with the expected text, only on the keys holding what the criterion fixes and under the *is* and *holds in order* rules for items (below). It compares node IDs through the structures that mint them. It then decodes the lines with core's codec and compares the decoded items with the built ones.
-- The decoder's test feeds core's decoder the expected text and compares the items it yields with the built ones.
+- The emitter's test runs the criterion's suites with the runner argument, on every Scala version core builds for on the JVM. It compares the lines the run writes with the expected text, only on the keys holding what the criterion fixes and under the *is* and *holds in order* rules for events (below). It compares node IDs through the structures that mint them. It then decodes the lines with core's codec and compares the decoded events with the built ones.
+- The decoder's test feeds core's decoder the expected text and compares the events it yields with the built ones.
 
-One further decoder test, tied to no criterion, feeds the decoder text whose last line is torn, from which it yields no item (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+One further decoder test, tied to no criterion, feeds the decoder text whose last line is torn, from which it yields no event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-Each comparison of items:
+Each comparison of events:
 
-- Each item is compared only on what the criterion fixes: a `structure` on its whole tree, an event on its node, its class and the fields the criterion names.
-- Where the criterion says the event log *is* the items, the decoded items must be exactly those built. Where it says the log *holds* them *in this order*, the built items must be a subsequence of the decoded ones.
+- Each event is compared only on what the criterion fixes: a `structure` event on its whole tree, a ScalaTest event on its node, its class and the fields the criterion names.
+- Where the criterion says the event log *is* the events, the decoded events must be exactly those built. Where it says the log *holds* them *in this order*, the built events must be a subsequence of the decoded ones.
 
 A drift between builder and decoder in what a criterion fixes then fails those tests, as well as the criteria run under Mill.
 
