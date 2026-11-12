@@ -8,11 +8,11 @@ Every run a test command starts must get its events, test structure and captured
 
 ## Modules
 
-Three deployable units. Every artifact of this fork, core's included, is published under Maven group `com.edc` (`ARCHITECTURE-DECISIONS.md` "Every artifact of this fork is published under Maven group `com.edc`…"), to the local Ivy repository (`~/.ivy2/local`) only, which Coursier, and so Mill, searches by default.
+Three deployable units. Every artifact of this fork, core's included, is published under Maven group `com.edc` (`ARCHITECTURE-DECISIONS.md` "Every artifact of this fork is published under Maven group `com.edc`…"). It is published only to the local Ivy repository (`~/.ivy2/local`), which Coursier, and so Mill, searches by default.
 
 ### ScalaTest core
 
-Every artifact the fork's sbt build publishes, scalactic and the style artifacts included, under its upstream name, with upstream's runtime and Scala-version suffixes, on every runtime and Scala version `SPECIFICATION.md` § Scope covers. A test module tests with this fork by depending on these artifacts as it would on upstream's, usually through `scalatest`. Every part below is in `scalatest-core`, which the other ScalaTest artifacts depend on, and is internal (`private[scalatest]`).
+Every artifact the fork's sbt build publishes, scalactic and the style artifacts included, keeps its upstream name and runtime and Scala-version suffixes, on every runtime and Scala version `SPECIFICATION.md` § Scope covers. A test module tests with this fork by depending on them as it would on upstream's, usually through `scalatest`. Every part below is in `scalatest-core`, which the other ScalaTest artifacts depend on, and is internal (`private[scalatest]`).
 
 - **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. It hands the emitter each `Event` it receives, tagged with its node's ID (`ARCHITECTURE-DECISIONS.md` "Structure is attached where each event is emitted…").
   - It sits ahead of the sorting reporters, which hold events back, so the emitter receives each event as it is emitted.
