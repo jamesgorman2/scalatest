@@ -46,7 +46,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 - JSON output and `-fJ` (§ 2); progress output, `P` and `-fP` (§ 9).
 - The formatting and filtering characters (R-127, R-128), and `-f` for human-readable output (R-049) (§ 16).
 - A module that presets a test command's arguments (R-126) (§ 17).
-- A module that sets `testBatchFrameworkTasks`, whatever its worker count, and a module for which Mill's `testForked` starts more than one worker: it can with test parallelism on and more than one test class, and does with several fork groups (§ 3).
+- A module that sets `testBatchFrameworkTasks`, whatever its worker count, and a module for which Mill's `testForked` starts more than one worker, as it can with test parallelism on and more than one test class, and does with several fork groups (§ 3).
 - A run given no task (R-071) (§ 3).
 - Class globs and framework arguments on the test command, the module's JUnit XML report, the paths Mill's test tasks put in their task folders (R-110), and the launcher's environment variables (R-111) (§ 4).
 - Running the tests of more than one module selector, or of a module selector that resolves to anything other than one JVM test module (§ 5).
@@ -99,6 +99,6 @@ The criteria are in the five `specification/` documents listed in § Spec docume
   - nested suites;
   - scopes, one of them pending;
   - tests that succeed, fail, are ignored, are pending and are cancelled;
-  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a test of each of `PathAnyFunSpec` and `PathAnyFreeSpec`;
+  - `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a `PathAnyFunSpec` test and a `PathAnyFreeSpec` test;
   - a suite whose `beforeAll` throws;
   - a test that writes to stdout and to stderr.

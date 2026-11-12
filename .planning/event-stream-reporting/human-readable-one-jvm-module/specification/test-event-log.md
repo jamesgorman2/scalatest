@@ -144,7 +144,7 @@ Feature: Each suite's structure
 
 ## Labels
 
-In AC-103, a style named without `Any`, `Async` or `Path`, such as `FunSuite`, holds on each Scala version whose build ships it.
+In AC-103, the criterion holds for a style named without `Any`, `Async` or `Path`, such as `FunSuite`, on each Scala version whose build ships that style.
 
 ```gherkin
 Feature: Labels
