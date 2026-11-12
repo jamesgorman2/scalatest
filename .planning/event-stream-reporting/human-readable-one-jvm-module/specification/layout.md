@@ -1,6 +1,8 @@
 # Consolidated human-readable output for one JVM module: layout
 
-Acceptance criteria for how the human-readable output lays out its lines: its tree, where each line sits, each line's text and colour, and Mill's prefix. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
+Acceptance criteria for how the human-readable output lays out its lines: its tree, where each line sits, each line's text and colour, and Mill's prefix. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* items among them.
+
+Each criterion below feeds the consolidation library an event log, except AC-002, AC-119, AC-044 and AC-053, which run the module with the test command.
 
 ## The tree
 
@@ -10,7 +12,7 @@ Feature: The tree of the human-readable output
   Rule: The output is its test run labels, with every other line under them (R-078, R-129)
     Scenario: AC-002 A module's label heads its suites
       Given the module is at Mill's default `testLogLevel`
-      And suite `SqrtPropSpec`, an `AnyPropSpec` whose one property, `sqrt of a square is the root`, succeeds
+      And suite `SqrtPropSpec`, class `samples.SqrtPropSpec`, an `AnyPropSpec` whose one property, `sqrt of a square is the root`, labelled `- sqrt of a square is the root`, succeeds
       And the run writes nothing to stdout or stderr, sends no message outside a suite, and completes
       When the test command runs the module
       Then the human-readable output is:
@@ -22,8 +24,26 @@ Feature: The tree of the human-readable output
 
   Rule: Every suite shows its name line (R-106)
     Scenario: AC-003 Nested suites sit under the suite that nests them
-      Given suite `OuterSuites`, with no tests, nesting `Inner1Suite` and `Inner2Suite`, whose one test each, `inner one` and `inner two`, succeeds
-      When the test command runs the module
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuites", class "samples.OuterSuites"
+            suite "Inner1Suite", class "samples.Inner1Suite"
+              test "inner one", label "- inner one"
+            suite "Inner2Suite", class "samples.Inner2Suite"
+              test "inner two", label "- inner two"
+        suite "OuterSuites": SuiteStarting
+        suite "Inner1Suite": SuiteStarting
+        test "inner one": TestSucceeded
+        suite "Inner1Suite": SuiteCompleted
+        suite "Inner2Suite": SuiteStarting
+        test "inner two": TestSucceeded
+        suite "Inner2Suite": SuiteCompleted
+        suite "OuterSuites": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
       Then the lines for `OuterSuites` are:
         """
         OuterSuites:
@@ -33,12 +53,35 @@ Feature: The tree of the human-readable output
             - inner two
         """
 
-  Rule: A scope's or test's line shows its label, with its style's control words
-    Scenario: AC-004 Labels of a word spec and a feature spec
-      Given suite `SetWordSpec`, an `AnyWordSpec` that ScalaTest 3.2.19 prints with scope labels `A Set` and `when empty` and test label `- should have size 0`, each nested in the one before
-      And suite `ShopFeatureSpec`, an `AnyFeatureSpec` that it prints with scope label `Feature: Checkout` and, nested in it, test label `Scenario: paying by card`
-      And both tests succeed
-      When the test command runs the module
+  Rule: A scope's or test's line shows the label its suite's structure gives it, never its name
+    Scenario: AC-004 Labels with and without a leading `- `
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "SetWordSpec", class "samples.SetWordSpec"
+            scope "A Set", label "A Set"
+              scope "empty", label "when empty"
+                test "have size 0", label "- should have size 0"
+        suite "SetWordSpec": SuiteStarting
+        scope "A Set": ScopeOpened
+        scope "empty": ScopeOpened
+        test "have size 0": TestSucceeded
+        scope "empty": ScopeClosed
+        scope "A Set": ScopeClosed
+        suite "SetWordSpec": SuiteCompleted
+        structure
+          suite "ShopFeatureSpec", class "samples.ShopFeatureSpec"
+            scope "Checkout", label "Feature: Checkout"
+              test "paying by card", label "Scenario: paying by card"
+        suite "ShopFeatureSpec": SuiteStarting
+        scope "Checkout": ScopeOpened
+        test "paying by card": TestSucceeded
+        scope "Checkout": ScopeClosed
+        suite "ShopFeatureSpec": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
       Then the lines for `SetWordSpec` and `ShopFeatureSpec` are:
         """
         SetWordSpec:
@@ -49,11 +92,28 @@ Feature: The tree of the human-readable output
           Feature: Checkout
             Scenario: paying by card
         """
+
+  Rule: Each ScalaTest style's scopes and tests show the labels ScalaTest 3.2.19 prints for them (R-106)
+    Scenario Outline: AC-119 <style>
+      Given suite `<suite>`, class `samples.<suite>`, of style `<style>`, declaring <declaration>, whose one test succeeds
+      When the test command runs the module
+      Then the lines for `<suite>` are `<suite>:` and, under it, <lines>
+
+      Examples:
+        | style            | suite             | declaration                                                    | lines                                                              |
+        | AnyFunSuite      | CalcFunSuite      | `test("adds")`                                                 | `- adds`                                                           |
+        | AnyPropSpec      | CalcPropSpec      | `property("adds")`                                             | `- adds`                                                           |
+        | AnyFunSpec       | CalcFunSpec       | `describe("A calculator") { it("adds") }`                      | `A calculator`, with `- adds` under it                             |
+        | AnyFreeSpec      | CalcFreeSpec      | `"A calculator" - { "adds" in }`                               | `A calculator`, with `- adds` under it                             |
+        | AnyWordSpec      | CalcWordSpec      | `"A calculator" when { "empty" should { "add" in } }`          | `A calculator`, with `when empty` under it and `- should add` under that |
+        | AnyFlatSpec      | CalcFlatSpec      | `"A calculator" should "add" in`                               | `A calculator`, with `- should add` under it                       |
+        | AnyFeatureSpec   | CalcFeatureSpec   | `Feature("Addition") { Scenario("adds") }`                     | `Feature: Addition`, with `Scenario: adds` under it                |
+        | RefSpec          | CalcRefSpec       | ``object `A calculator` { def `adds two`: Unit = () }``        | `A calculator`, with `- adds two` under it                         |
 ```
 
 ## Where a node's lines sit
 
-Every line sits under the line it belongs to (R-106). Where that leaves a line's place open, it sits as follows.
+Every line sits under the line it belongs to (R-106). Where that leaves a line's place open, it sits as follows when the library consolidates an event log holding the line's node in a `structure` and the event the line comes from.
 
 | ID     | Line                                                                                                      | Sits under                                                         |
 |--------|-----------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
@@ -64,7 +124,7 @@ Every line sits under the line it belongs to (R-106). Where that leaves a line's
 
 ## Scope and test lines
 
-A scope's or test's line is its label followed by its outcome's suffix.
+A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose `structure` gives the node the label `<label>`, whether or not that label begins `- `, and whose items give the node the row's outcome (`../../SPECIFICATION.md` R-098 to R-101). A node has started once the event log holds an event tagged with it.
 
 | ID     | Node and outcome                                                   | Line                       | Colour                  |
 |--------|--------------------------------------------------------------------|----------------------------|-------------------------|
@@ -82,6 +142,8 @@ A scope's or test's line is its label followed by its outcome's suffix.
 
 ## Lines that are not a node's
 
+Each row holds when the library consolidates an event log holding the row's node or event, with, for AC-047 and AC-048, the line in the run's captured output. `<class name>` is the class the suite's `structure` gives it, and `<module path>` is the test run label the run is fed with.
+
 | ID     | Line                                                         | Text                                                                                                     | Sits under                                             | Colour             |
 |--------|--------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|--------------------------------------------------------|--------------------|
 | AC-045 | a test run label                                             | `[<module path>]`                                                                                        | nothing: it is not indented                            | cyan               |
@@ -98,6 +160,8 @@ A scope's or test's line is its label followed by its outcome's suffix.
 
 ## Messages
 
+Each row holds when the library consolidates an event log holding the message's event, `InfoProvided`, `NoteProvided`, `AlertProvided` or `MarkupProvided`, with `<text>` its `message`, or for markup its `text`.
+
 | ID     | Kind   | Line              | Colour |
 |--------|--------|-------------------|--------|
 | AC-028 | info   | `[info] <text>`   | green  |
@@ -110,8 +174,23 @@ Feature: Where messages sit
 
   Rule: Messages sit under the node they attach to (R-097), after its test's failure or cancel lines, in the order the test event log holds them
     Scenario: AC-032 A test's messages sit under it, notes and alerts included
-      Given in suite `StackFunSpec`, test `is empty` calls `info("checked size")`, `note("a note")`, `alert("an alert")` and `markup("*markup*")` in that order, then succeeds
-      When the test command runs the module
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": InfoProvided(message: "checked size")
+        test "is empty": NoteProvided(message: "a note")
+        test "is empty": AlertProvided(message: "an alert")
+        test "is empty": MarkupProvided(text: "*markup*")
+        test "is empty": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
       Then the lines for test `is empty` are:
         """
         - is empty
@@ -123,24 +202,64 @@ Feature: Where messages sit
       And no line before `- is empty` holds `a note` or `an alert`
 
     Scenario: AC-033 A failed test's messages follow its failure
-      Given in suite `StackFlatSpec`, test `must have size 0` calls `info("checked")`, `note("a note")` and `alert("an alert")` in that order, then fails
-      When the test command runs the module
-      Then the last three of the lines for test `must have size 0` are:
+      Given an event log holding:
         """
-        [info] checked
-        [note] a note
-        [alert] an alert
+        run started
+        structure
+          suite "StackFlatSpec", class "samples.StackFlatSpec"
+            scope "A Stack", label "A Stack"
+              test "have size 0", label "- must have size 0"
+        suite "StackFlatSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        test "have size 0": TestStarting
+        test "have size 0": InfoProvided(message: "checked")
+        test "have size 0": NoteProvided(message: "a note")
+        test "have size 0": AlertProvided(message: "an alert")
+        test "have size 0": TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        scope "A Stack": ScopeClosed
+        suite "StackFlatSpec": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then, with every stack frame left out, the lines for test `have size 0` are:
+        """
+        - must have size 0 *** FAILED ***
+          java.lang.IllegalStateException: not empty
+          [info] checked
+          [note] a note
+          [alert] an alert
         """
       And no line before `- must have size 0 *** FAILED ***` holds `a note` or `an alert`
 
     Scenario: AC-034 A scope's message sits among its children
-      Given in suite `StackFunSpec`, scope `A Stack` emits `info("an info in a scope")` before its scope `when empty` starts
-      When the test command runs the module
-      Then the lines for `A Stack` begin:
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "ScopeInfoFunSpec", class "samples.ScopeInfoFunSpec"
+            scope "A Stack", label "A Stack"
+              test "is empty", label "- is empty"
+              scope "when full", label "when full"
+                test "pops", label "- pops"
+        suite "ScopeInfoFunSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        test "is empty": TestSucceeded
+        scope "A Stack": InfoProvided(message: "an info in a scope")
+        scope "when full": ScopeOpened
+        test "pops": TestSucceeded
+        scope "when full": ScopeClosed
+        scope "A Stack": ScopeClosed
+        suite "ScopeInfoFunSpec": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `A Stack` are:
         """
         A Stack
+          - is empty
           [info] an info in a scope
-          when empty
+          when full
+            - pops
         """
 ```
 
@@ -149,6 +268,8 @@ Feature: Where messages sit
 A collapsed subtree (R-107) shows its root's lines, then its count line (AC-016).
 
 - AC-055 A count line reads `(<counts> not run)`. `<counts>` gives how many suites, scopes and tests, in that order, sit at any depth below the root. Each count reads `<n> suite`, `<n> scope` or `<n> test`, with `s` added where `<n>` is not 1. Counts are joined by `, `, and a kind with none is left out.
+
+Each row holds when the library consolidates an event log in which a suite is aborted and the row's nodes, below it in its `structure`, never start.
 
 | ID     | Below the collapsed root    | Count line                             |
 |--------|-----------------------------|----------------------------------------|
@@ -159,10 +280,20 @@ A collapsed subtree (R-107) shows its root's lines, then its count line (AC-016)
 Feature: Collapsed subtrees
 
   Rule: A suite whose tests never started collapses into its abort (R-100, R-107)
-    Scenario: AC-039 A suite's `beforeAll` throws
-      Given suite `SetupFailsSpec`, class `samples.SetupFailsSpec`, an `AnyWordSpec` whose scope `A repo` holds tests `should read` and `should write`
-      And its `beforeAll` throws `RuntimeException("database unreachable")`
-      When the test command runs the module
+    Scenario: AC-039 A suite aborts before its first test
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "SetupFailsSpec", class "samples.SetupFailsSpec"
+            scope "A repo", label "A repo"
+              test "read", label "- should read"
+              test "write", label "- should write"
+        suite "SetupFailsSpec": SuiteStarting
+        suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+        run ended completed
+        """
+      When the library consolidates it
       Then, with every stack frame left out, the lines for `SetupFailsSpec` are:
         """
         SetupFailsSpec:

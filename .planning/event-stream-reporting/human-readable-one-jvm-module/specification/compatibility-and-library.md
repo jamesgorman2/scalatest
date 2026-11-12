@@ -87,12 +87,12 @@ Feature: The consolidation library without Mill
 
   Rule: The library writes human-readable output only once every run's event stream has ended (R-027)
     Scenario: AC-064 A completed run whose event stream has not ended
-      Given a run, fed to the consolidation library directly, that has reported that it completed
+      Given an event log holding `run started`, then `run ended completed`
       When its event stream has not yet ended
       Then the library has written no human-readable output
 
     Scenario: AC-118 A completed run whose event stream has ended
-      Given a run, fed to the consolidation library directly, that has reported that it completed
+      Given an event log holding `run started`, then `run ended completed`
       When its event stream ends and the caller ends the consolidation
       Then the library writes the human-readable output
 ```

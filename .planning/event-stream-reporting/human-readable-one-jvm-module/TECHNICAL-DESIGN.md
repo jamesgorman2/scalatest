@@ -117,10 +117,10 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 
 ### Runs the criteria describe
 
-The criteria that feed the consolidation library a run they describe (`specification/runs-and-test-structure.md` AC-036, AC-037, AC-038 and AC-054; `specification/compatibility-and-library.md` AC-064 and AC-118) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
+The criteria whose `Given` is an event log holding items (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill. Those tests build each run with a test-only builder in the library's tests, not through core's codec, so they do not depend on the event log's format:
 
 - A test declares the run's tree once, in the form `SPECIFICATION.md` § Acceptance criteria gives a `structure`: its suites with their class names, and their nested suites, scopes and tests in declared order, each scope and test with its label. The builder derives each node's ID, its parent's ID and its declared position, and emits each top-level suite's structure item before that suite's first event.
-- The test scripts the run by node name: each node's events, messages attached to a node or to the run, captured lines tagged with their stream, and how the run ended. The builder emits each in the form core's decoder yields, tagged with its node's ID or as the run's.
+- The test scripts the run by node name, with `#<n>` where nodes share one: each node's events, messages attached to a node or to the run, captured lines tagged with their stream, and how the run ended. The builder emits each in the form core's decoder yields, tagged with its node's ID or as the run's.
 - It adds the test classes the run's process took after the event stream ends, as the test command does.
 - Cost: the builder must yield what the decoder yields.
 

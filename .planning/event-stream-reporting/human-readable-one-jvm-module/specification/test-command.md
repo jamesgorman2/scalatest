@@ -54,7 +54,7 @@ Feature: The module's own ScalaTest arguments
 
   Rule: An argument R-125 allows reaches the run with its values, even a value that looks like a flag (R-125)
     Scenario: AC-079 A test-name substring that begins with `-`
-      Given suite `FlagSuite`, an `AnyFunSuite` with tests `parses -y` and `parses -x`, each succeeding where it runs
+      Given suite `FlagSuite`, class `samples.FlagSuite`, an `AnyFunSuite` with tests `parses -y` and `parses -x`, labelled `- parses -y` and `- parses -x`, each succeeding where it runs
       And the module's own ScalaTest arguments are `-z -y`
       When the test command runs the module
       Then the human-readable output is:
@@ -66,7 +66,7 @@ Feature: The module's own ScalaTest arguments
 
   Rule: Every other argument is withheld with its values (R-125, R-041)
     Scenario Outline: AC-080 <arguments> has no effect
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, and suite `OtherSuite`, whose one test, `other`, succeeds
+      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, and suite `OtherSuite`, class `samples.OtherSuite`, an `AnyFunSuite` whose one test, `other`, labelled `- other`, succeeds
       And the module's own ScalaTest arguments are <arguments>
       When the test command runs the module
       Then the human-readable output is the one the test command writes for these suites when the module has no ScalaTest arguments of its own
@@ -108,7 +108,7 @@ Feature: Running the module
   Rule: A test sees the environment and working directory Mill's `testForked` gives it (R-053)
     Scenario: AC-082 A `forkEnv` variable and the working directory with test sandboxing off
       Given the module's `forkEnv` sets `FIXTURE_ENV` to `from-forkEnv`, and its `testSandboxWorkingDir` is false
-      And suite `WhereSuite`, whose one test writes `env=<the value of FIXTURE_ENV>` and `cwd=<its working directory>` to stdout
+      And suite `WhereSuite`, class `samples.WhereSuite`, an `AnyFunSuite` whose one test, `reports where`, labelled `- reports where`, writes `env=<the value of FIXTURE_ENV>` and `cwd=<its working directory>` to stdout
       When the test command runs the module, and `mill core.test.testForked` runs it
       Then the run's block holds `[stdout] env=from-forkEnv`
       And the `cwd=` line it holds is the one `testForked` wrote
@@ -134,16 +134,16 @@ Feature: The test command's result
 
   Rule: Of runs that complete, the test command fails where one reports a failure, and not otherwise (R-046)
     Scenario Outline: AC-084 <tests>
-      Given suite `ResultSuite`, an `AnyFunSuite` in which <tests>
+      Given suite `ResultSuite`, class `samples.ResultSuite`, an `AnyFunSuite` in which <tests>
       When the test command runs the module
       Then the test command <result>
 
       Examples:
-        | tests                                                                                              | result   |
-        | every test succeeds                                                                                | succeeds |
-        | test `ignored` is ignored, `pending` is pending and `cancelled` is cancelled, and the rest succeed | succeeds |
-        | test `fails` fails                                                                                 | fails    |
-        | `beforeAll` throws                                                                                 | fails    |
+        | tests                                                                                                                                                                     | result   |
+        | every test succeeds                                                                                                                                                       | succeeds |
+        | test `ignored`, labelled `- ignored`, is ignored, `pending`, labelled `- pending`, is pending and `cancelled`, labelled `- cancelled`, is cancelled, and the rest succeed | succeeds |
+        | test `fails`, labelled `- fails`, fails                                                                                                                                   | fails    |
+        | `beforeAll` throws                                                                                                                                                        | fails    |
 
   Rule: A worker that dies fails the test command, whether or not a run existed in it (R-046)
     Scenario Outline: AC-085 <how the worker dies>
@@ -152,16 +152,16 @@ Feature: The test command's result
       Then the test command fails
 
       Examples:
-        | how the worker dies                                                                                     |
-        | a test of suite `ExitSuite` calls `System.exit(0)`                                                      |
-        | the module's `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it |
+        | how the worker dies                                                                                                         |
+        | test `exits`, labelled `- exits`, of suite `ExitSuite`, class `samples.ExitSuite`, an `AnyFunSuite`, calls `System.exit(0)` |
+        | the module's `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it                     |
 
   Rule: The test command's failure lists no test (R-046)
     Scenario: AC-086 A failed test is not named outside the human-readable output
-      Given suite `StackFlatSpec`, whose test `must have size 0` fails
+      Given suite `StackFlatSpec`, class `samples.StackFlatSpec`, an `AnyFlatSpec` declaring `"A Stack" must "have size 0" in`: test `have size 0`, labelled `- must have size 0`, which fails
       When the test command runs the module
       Then the test command fails
-      And no line on the console outside the human-readable output holds `must have size 0`
+      And no line on the console outside the human-readable output holds `have size 0`
 
   Rule: A module that tests with another framework, or with another release of this fork, fails the test command (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-087 <framework>
@@ -184,7 +184,8 @@ Feature: What else reaches the console
 
   Rule: A run reaches the console only through the human-readable output (R-040, R-041, R-044, R-045)
     Scenario: AC-088 A failing test that writes to both streams
-      Given suite `StackFlatSpec`, of class `samples.StackFlatSpec`, whose test `is empty` succeeds, and whose test `must have size 0` writes `dividing now` to stdout and `warn: careful` to stderr, then fails
+      Given suite `QueueFlatSpec`, class `samples.QueueFlatSpec`, an `AnyFlatSpec` declaring `"A Queue" should "be empty" in` and then `it must "have size 0" in`: tests `be empty` and `have size 0`, labelled `- should be empty` and `- must have size 0`
+      And `be empty` succeeds, and `have size 0` writes `dividing now` to stdout and `warn: careful` to stderr, then fails
       When the test command runs the module
       Then no line on the console, in the human-readable output or outside it, holds any of:
         | what                           | such as                                                         |
@@ -193,8 +194,8 @@ Feature: What else reaches the console
         | Mill's per-class test result   | `Test result:`                                                  |
       And no line on the console outside the human-readable output holds any of:
         | what                                                   | such as                                  |
-        | a line a ScalaTest reporter prints for a suite or test | `StackFlatSpec:`, `- is empty`           |
-        | Mill's progress for the module's test classes          | `samples.StackFlatSpec`, `1/1 completed` |
+        | a line a ScalaTest reporter prints for a suite or test | `QueueFlatSpec:`, `- should be empty`    |
+        | Mill's progress for the module's test classes          | `samples.QueueFlatSpec`, `1/1 completed` |
         | a line the run wrote                                   | `dividing now`, `warn: careful`          |
 
   Rule: A runner that is not a run adds nothing to the output or the result (R-072)
