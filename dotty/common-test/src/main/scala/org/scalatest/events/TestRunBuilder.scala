@@ -35,8 +35,8 @@ private[scalatest] final case class BuiltRun(items: Vector[BuiltRunItem]) {
  * yields it.
  *
  * A run is given as its parts in order: blocks of events in the notation, and captured lines where they are fed.
- * Each event is built as a `Given` gives it, with a default for every field it does not write, and carries what a
- * `Then` fixes of it for `EventLogComparison`.
+ * Each event is built as a `Given` gives it, with a default for every field it does not write. It also carries the
+ * parts a `Then` fixes, for `EventLogComparison`.
  */
 private[scalatest] object TestRunBuilder {
 

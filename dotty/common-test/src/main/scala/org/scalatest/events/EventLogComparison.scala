@@ -3,10 +3,13 @@ package org.scalatest.events
 /**
  * Compares the events of a test event log with those a criterion gives, built by `TestRunBuilder`.
  *
- * Each event is compared only on what its criterion fixes: a `structure` event on its whole tree, and a ScalaTest
- * event on its node, its execution, its class and the fields and throwable parts it writes. The log's node IDs
- * need not be the built ones: each built node is taken to be the log's node at its place in a matching `structure`
- * event, and must stay that node in every later event.
+ * Each event is compared only on what its criterion fixes:
+ *
+ *  - a `structure` event on its whole tree;
+ *  - a ScalaTest event on its node, its execution, its class, and the fields and throwable parts it writes.
+ *
+ * The log's node IDs need not be the built ones. Each built node is taken to be the log's node at its place in a
+ * matching `structure` event, and must stay that node in every later event.
  */
 private[scalatest] object EventLogComparison {
 
@@ -29,9 +32,9 @@ private[scalatest] object EventLogComparison {
   }
 
   /**
-   * Returns why the log does not hold the events expected, in that order, with any others between them, or `None`
-   * where it does. Each event expected is taken to be the first event of the log, after the one before it, that it
-   * matches.
+   * Returns why the log does not hold the expected events in order, with any others between them, or `None` where
+   * it does. Each expected event is matched with the first matching event of the log after the one matched with
+   * its predecessor.
    */
   def mismatchWhenHoldsInOrder(log: Seq[TestEventLogEvent], expected: Seq[BuiltEvent]): Option[String] = {
     val logged = log.toVector

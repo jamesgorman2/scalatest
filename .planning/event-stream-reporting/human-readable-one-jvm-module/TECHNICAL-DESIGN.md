@@ -369,7 +369,7 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 
 ### Runs the criteria describe
 
-The criteria whose `Given` is an event log holding events (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder, `org.scalatest.events.TestRunBuilder`. It is in the build's common test project, `dotty/common-test`, which is not published. Core's test project depends on it. The library's project takes its classpath as the unmanaged test classpath and does not depend on it, so the library's published POM and `ivy.xml` do not name it.
+The criteria whose `Given` is an event log holding events (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder, `org.scalatest.events.TestRunBuilder`. It is in the build's common test project, `dotty/common-test`, which is not published. Core's test project depends on it. The library's project does not: it adds the common test project's classpath to its own unmanaged test classpath, so the library's published POM and `ivy.xml` do not name that project.
 
 The builder takes its input and builds the run as follows:
 

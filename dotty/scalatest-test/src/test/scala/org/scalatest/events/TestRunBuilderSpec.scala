@@ -157,7 +157,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "take a suite of another suite ID as another suite, with IDs no earlier structure gave" in {
+      "give new IDs to a suite with another suite ID" in {
         structuresOf(
           """
           structure
@@ -173,7 +173,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "take a suite whose suite ID an earlier structure holds only under a parent as another suite, with IDs no earlier structure gave" in {
+      "give new IDs to a suite whose suite ID an earlier structure holds only under a parent" in {
         structuresOf(
           """
           structure
@@ -308,7 +308,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ).last shouldBe Vector(suite(4, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"))
       }
 
-      "take a suite whose suite ID an earlier structure holds only with no parent as another suite, with IDs no earlier structure gave" in {
+      "give new IDs to a suite whose suite ID an earlier structure holds only with no parent" in {
         structuresOf(
           """
           structure
@@ -326,7 +326,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "take a suite whose suite ID an earlier structure holds only under another parent as another suite, with IDs no earlier structure gave" in {
+      "give new IDs to a suite whose suite ID an earlier structure holds only under another parent" in {
         structuresOf(
           """
           structure
@@ -485,7 +485,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "continue the first of the sibling suites sharing the suite ID, the only one a block of one suite can be at the place of" in {
+      "continue the first of the sibling suites that share the suite ID, the only one whose place a block of one suite can take" in {
         structuresOf(
           """
           structure
@@ -727,7 +727,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         lastParentExecutionOf(joined(stackSuite, """test "pops" execution 2: TestStarting""")) shouldBe Some(1)
       }
 
-      "count an execution open from any first event of it" in {
+      "count an execution as open from its first event, whatever that event is" in {
         lastParentExecutionOf(
           joined(stackSuite, """
           scope "A Stack" execution 2: ScopeClosed
@@ -737,7 +737,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(1)
       }
 
-      "count a scope's execution closed by ScopePending" in {
+      "count a scope's execution as closed by ScopePending" in {
         lastParentExecutionOf(
           joined(stackSuite, """
           scope "A Stack": ScopeOpened
@@ -748,7 +748,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(1)
       }
 
-      "count a suite's execution closed by SuiteCompleted" in {
+      "count a suite's execution as closed by SuiteCompleted" in {
         lastParentExecutionOf(
           joined(stackSuite, """
           suite "StackSuite": SuiteStarting
@@ -759,7 +759,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(1)
       }
 
-      "count a suite's execution closed by SuiteAborted" in {
+      "count a suite's execution as closed by SuiteAborted" in {
         lastParentExecutionOf(
           joined(stackSuite, """
           suite "StackSuite": SuiteStarting
@@ -956,14 +956,14 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         }
       }
 
-      "be empty where its throwable's message is null" in {
+      "leave it empty where its throwable's message is null" in {
         lastDecodedEventOf("run: SuiteAborted(throwable: java.lang.IllegalStateException null)") match {
           case DecodedEvent.SuiteAborted(message, Some(_), None, None, "main", 0L) => message shouldBe ""
           case other => fail(s"not the SuiteAborted given: $other")
         }
       }
 
-      "be empty where its throwable writes no message" in {
+      "leave it empty where its throwable writes no message" in {
         lastDecodedEventOf("run: NoteProvided(throwable: java.lang.IllegalStateException)") match {
           case DecodedEvent.NoteProvided(message, Some(_), None, "main", 0L) => message shouldBe ""
           case other => fail(s"not the NoteProvided given: $other")

@@ -36,7 +36,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
 
   private def log(blocks: String*): Vector[TestEventLogEvent] = expected(blocks*).map(_.event)
 
-  // The log's nodes take the IDs after those of a suite the log does not hold, so none is its expected node's ID.
+  // The log's node IDs follow those of a suite the log does not hold, so no node has its expected node's ID.
   private def logWithOtherNodeIds(blocks: String*): Vector[TestEventLogEvent] =
     log((suiteHeldBeforeTheLog +: blocks)*).drop(1)
 
@@ -70,7 +70,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     run ended completed
     """
 
-  "Comparing a log with the events it is" should {
+  "Comparing a log with the events it is expected to be" should {
     "find no mismatch where the log is those events" in {
       EventLogComparison.mismatchWhenIs(log(wholeRun), expected(wholeRun)) shouldBe None
     }
@@ -83,12 +83,12 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       EventLogComparison.mismatchWhenIs(Vector.empty, Vector.empty) shouldBe None
     }
 
-    "report a log that holds an event more" in {
+    "report a log that holds one event too many" in {
       EventLogComparison.mismatchWhenIs(log("run started", "run ended completed"), expected("run started")) shouldBe
         Some("the log holds 2 events, not the 1 expected")
     }
 
-    "report a log that holds an event fewer" in {
+    "report a log that holds one event too few" in {
       EventLogComparison.mismatchWhenIs(log("run started"), expected("run started", "run ended completed")) shouldBe
         Some("the log holds 1 events, not the 2 expected")
     }
@@ -218,7 +218,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
     }
 
-    "report a scope whose name and label differ, though one written after the other reads the same" in {
+    "report a scope whose name and label differ, though they read the same written one after the other" in {
       EventLogComparison.mismatchWhenIs(
         log(
           """
@@ -240,7 +240,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
     }
 
-    "report a suite whose name and class differ, though one written after the other reads the same" in {
+    "report a suite whose name and class differ, though they read the same written one after the other" in {
       EventLogComparison.mismatchWhenIs(
         log(
           """
@@ -525,7 +525,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
   }
 
   "Comparing a throwable" should {
-    "report an event with no throwable where the event writes one" in {
+    "report a logged event with no throwable where one is written" in {
       mismatchOfLastEvent("run: RunAborted(throwable: java.lang.Error)", "run: RunAborted") shouldBe
         notThrowable("java.lang.Error", "it has no throwable")
     }
@@ -622,7 +622,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
     }
 
-    "report frames where none are written between the brackets" in {
+    "report frames where empty brackets are written" in {
       mismatchOfThrowable("java.lang.Error frames []", """java.lang.Error frames ["samples.A.f(A.scala:3)"]""") shouldBe
         notThrowable(
           "java.lang.Error frames []",
@@ -672,7 +672,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  "Comparing a log with events it holds in order" should {
+  "Comparing a log with the events it is expected to hold in order" should {
     val heldEvents =
       """
       test "pops": TestStarting
