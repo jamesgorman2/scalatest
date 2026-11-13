@@ -142,11 +142,12 @@ Feature: The test command's result
       Then the test command <result>
 
       Examples:
-        | tests                                                                                                                                                                                             | result   |
-        | test `succeeds`, labelled `- succeeds`, succeeds                                                                                                                                                  | succeeds |
-        | test `ignored`, labelled `- ignored`, is ignored, `pending`, labelled `- pending`, is pending, `cancelled`, labelled `- cancelled`, is cancelled, and `succeeds`, labelled `- succeeds`, succeeds | succeeds |
-        | test `fails`, labelled `- fails`, fails, and `succeeds`, labelled `- succeeds`, succeeds                                                                                                          | fails    |
-        | test `succeeds`, labelled `- succeeds`, succeeding where it runs, and `beforeAll` throws                                                                                                          | fails    |
+        | tests                                                                                                                                          | result   |
+        | test `succeeds`, labelled `- succeeds`, succeeds                                                                                               | succeeds |
+        | test `ignored`, labelled `- ignored`, is ignored, `pending`, labelled `- pending`, is pending, and `succeeds`, labelled `- succeeds`, succeeds | succeeds |
+        | test `cancelled`, labelled `- cancelled`, is cancelled, and `succeeds`, labelled `- succeeds`, succeeds                                        | fails    |
+        | test `fails`, labelled `- fails`, fails, and `succeeds`, labelled `- succeeds`, succeeds                                                       | fails    |
+        | test `succeeds`, labelled `- succeeds`, succeeding where it runs, and `beforeAll` throws                                                       | fails    |
 
   Rule: A worker that dies fails the test command, whether or not a run existed in it (R-046)
     Scenario Outline: AC-085 <how the worker dies>

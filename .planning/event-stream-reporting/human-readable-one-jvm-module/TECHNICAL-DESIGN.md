@@ -65,7 +65,7 @@ This serves `specification/test-command.md` AC-084 to AC-086 and AC-157.
 
 - The library keeps the consolidation state (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**) readable from any thread without a lock: event log reading adds events on its own thread while the test command's thread reads the state.
   - Each operation that makes the state failed does so before it returns, so a read after that operation returns sees it.
-  - The events that report a failure are `TestFailed` and `SuiteAborted`. A `RunAborted` or `RunStopped` is not among them (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "What the library takes").
+  - The events that report a failure (`../SPECIFICATION.md` R-046) are `TestFailed`, `TestCanceled` and `SuiteAborted`. A `RunAborted` or `RunStopped` is not among them (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "What the library takes").
 - The test command reads the state once, after **End** returns.
 - Mill's test-runner subprocess call returns a `Result[(String, Seq[TestResult])]` (`../research/mill-worker-channels.md` § 2.3), which the test command leaves unread, a `Result.Failure` included.
   - A worker that dies makes the call return a `Result.Failure`, not throw (`../research/mill-worker-channels.md` § 3.1, "A dead worker"). The captured line sequence is then complete (§ Capturing a JVM worker's stdout and stderr), and the test command adds the worker's run, or its process where the `processFolder` holds no event log file (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "On the JVM, on Scala.js under `NodeJs` and on Native").

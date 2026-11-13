@@ -214,6 +214,8 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 ### When the test command fails
 
+A run *reports a failure* when a test in it fails or is cancelled, or a suite in it aborts. A test that is ignored or pending is not a failure.
+
 - R-046 The test command fails if:
   - any run reports a failure or does not complete: it ends aborted or stopped, or does not finish;
   - a process started to execute tests ends before any run exists in it; or
