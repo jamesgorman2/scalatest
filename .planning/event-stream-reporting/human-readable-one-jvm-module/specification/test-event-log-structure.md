@@ -27,7 +27,7 @@ Feature: The run in its test event log
         | suite `SqrtPropSpec` of `layout.md` AC-002                                                                                                                                   | `Framework`  | completed |
         | suite `SqrtPropSpec` of `layout.md` AC-002                                                                                                                                   | `Runner.run` | completed |
         | suite `AbortSuite`, class `samples.AbortSuite`, an `AnyFunSuite` whose one test, `throws on pop`, labelled `- throws on pop`, throws `OutOfMemoryError("Java heap space")`   | `Runner.run` | aborted   |
-        | suite `StopSuite`, class `samples.StopSuite`, an `AnyFunSuite` mixing in `StopOnFailure`, whose tests `a` and `b`, labelled `- a` and `- b`, run in that order and `a` fails | `Runner.run` | stopped   |
+        | suite `StopSuite`, class `org.scalatest.samples.StopSuite`, an `AnyFunSuite` mixing in `StopOnFailure`, which is private to ScalaTest's package, whose tests `a` and `b`, labelled `- a` and `- b`, run in that order and `a` fails | `Runner.run` | stopped   |
 
   Rule: A run that a test's fatal error aborts records the abort against the run, and no abort of the test's suite (R-074)
     Scenario: AC-120 `Runner.run` aborts on an `OutOfMemoryError`

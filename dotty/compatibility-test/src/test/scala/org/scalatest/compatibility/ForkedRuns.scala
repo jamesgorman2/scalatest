@@ -41,7 +41,8 @@ final case class RunOutput(
   summary: Seq[String],
   stdout: Seq[String],
   stderr: Seq[String],
-  files: Map[String, Seq[String]]
+  files: Map[String, Seq[String]],
+  threadNames: Set[String]
 ) {
   def reporterText: Map[String, Seq[String]] =
     Map(
@@ -142,8 +143,14 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     val events = directory.resolve("events.txt")
     val loggerLines = directory.resolve("logger-lines.txt")
     val summary = directory.resolve("summary.txt")
+    val threads = directory.resolve("threads.txt")
     val recorderFiles =
-      List("-Dcompatibility.events=" + events, "-Dcompatibility.loggerLines=" + loggerLines, "-Dcompatibility.summary=" + summary)
+      List(
+        "-Dcompatibility.events=" + events,
+        "-Dcompatibility.loggerLines=" + loggerLines,
+        "-Dcompatibility.summary=" + summary,
+        "-Dcompatibility.threads=" + threads
+      )
     val (suiteOptions, suiteArguments) = launch match {
       case Launch.RunnerRun => (Nil, CompatibilityFixture.suiteClassNames.flatMap(List("-s", _)))
       case Launch.Framework => (List("-Dcompatibility.suites=" + CompatibilityFixture.suiteClassNames.mkString(",")), Nil)
@@ -155,7 +162,8 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
       lines(summary),
       lines(directory.resolve("stdout.txt")),
       lines(directory.resolve("stderr.txt")),
-      filesIn(workingDirectory).map(file => file.getFileName.toString -> lines(file)).toMap
+      filesIn(workingDirectory).map(file => file.getFileName.toString -> lines(file)).toMap,
+      lines(threads).toSet
     )
   }
 

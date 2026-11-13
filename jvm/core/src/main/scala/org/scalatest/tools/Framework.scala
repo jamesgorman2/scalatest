@@ -662,7 +662,8 @@ class Framework extends SbtFramework {
     slowpokeDetectionDelay: Long,
     slowpokeDetectionPeriod: Long,
     concurrentConfig: ConcurrentConfig,
-    testSortingReporterTimeout: Span
+    testSortingReporterTimeout: Span,
+    handOffToTestEventLog: Event => Unit
   ) extends sbt.testing.Runner {
     val isDone = new AtomicBoolean(false)
     val serverThread = new AtomicReference[Option[Thread]](None)
@@ -682,7 +683,14 @@ class Framework extends SbtFramework {
     if (detectSlowpokes)
       dispatchReporter.registerSlowpokeReporter(suiteSortingReporter)
 
-    dispatchReporter(RunStarting(tracker.nextOrdinal(), 0, configMap))
+    dispatchReporter.registerSlowpokeAlertHandOff(handOffToTestEventLog)
+
+    private def sendRunEvent(event: Event): Unit = {
+      handOffToTestEventLog(event)
+      dispatchReporter(event)
+    }
+
+    sendRunEvent(RunStarting(tracker.nextOrdinal(), 0, configMap))
 
     private val atomicThreadCounter = new AtomicInteger
 
@@ -775,7 +783,7 @@ class Framework extends SbtFramework {
         val duration = System.currentTimeMillis - runStartTime
         val summary = new Summary(summaryCounter.testsSucceededCount.get, summaryCounter.testsFailedCount.get, summaryCounter.testsIgnoredCount.get, summaryCounter.testsPendingCount.get,
                                   summaryCounter.testsCanceledCount.get, summaryCounter.suitesCompletedCount.get, summaryCounter.suitesAbortedCount.get, summaryCounter.scopesPendingCount.get)
-        dispatchReporter(RunCompleted(tracker.nextOrdinal(), Some(duration), Some(summary)))
+        sendRunEvent(RunCompleted(tracker.nextOrdinal(), Some(duration), Some(summary)))
         dispatchReporter.dispatchDisposeAndWaitUntilDone()
 
         execSvc.shutdown()
@@ -961,26 +969,32 @@ class Framework extends SbtFramework {
    */
   def runner(args: Array[String], remoteArgs: Array[String], testClassLoader: ClassLoader): SbtRunner = {
 
-    val ParsedArgs(
-      runpathArgs,
-      reporterArgs,
-      suiteArgs,
-      againArgs,
-      junitArgs,
-      propertiesArgs,
-      tagsToIncludeArgs,
-      tagsToExcludeArgs,
-      concurrentArgs,
-      membersOnlyArgs,
-      wildcardArgs,
-      testNGArgs,
-      suffixes,
-      chosenStyles,
-      spanScaleFactors,
-      testSortingReporterTimeouts,
-      slowpokeArgs,
-      seedArgs
-    ) = parseArgs(args)
+    val (
+      ParsedArgs(
+        runpathArgs,
+        reporterArgs,
+        suiteArgs,
+        againArgs,
+        junitArgs,
+        propertiesArgs,
+        tagsToIncludeArgs,
+        tagsToExcludeArgs,
+        concurrentArgs,
+        membersOnlyArgs,
+        wildcardArgs,
+        testNGArgs,
+        suffixes,
+        chosenStyles,
+        spanScaleFactors,
+        testSortingReporterTimeouts,
+        slowpokeArgs,
+        seedArgs
+      ),
+      testEventLogFileArg
+    ) = parseArgsWithTestEventLog(args)
+
+    // The runner of a sub-process sbt forks is given the main runner's arguments, and must not write to its file.
+    val testEventLogFile = if (remoteArgs.isEmpty) testEventLogFileArg else None
 
     if (!runpathArgs.isEmpty)
       throw new IllegalArgumentException("Specifying a runpath (-R <runpath>) is not supported when running ScalaTest from sbt.")
@@ -1096,7 +1110,7 @@ class Framework extends SbtFramework {
           // the reason that sub-process must use stdout is that the Array[Logger] is passed in from SBT only when the
           // suite is run, in the fork mode case this happens only at the sub-process side, the main process will not be
           // able to get the Array[Logger] to create SbtInfoLoggerReporter.
-          (!remoteArgs.isEmpty || reporterArgs.isEmpty, false, !sbtNoFormat, false, false, false, false, false, false, false, false, false, Set.empty[ReporterConfigParam])
+          (!remoteArgs.isEmpty || (reporterArgs.isEmpty && testEventLogFile.isEmpty), false, !sbtNoFormat, false, false, false, false, false, false, false, false, false, Set.empty[ReporterConfigParam])
       }
 
     //val reporterConfigs = fullReporterConfigurations.copy(standardOutReporterConfiguration = None)
@@ -1147,7 +1161,8 @@ class Framework extends SbtFramework {
       slowpokeDetectionDelay,
       slowpokeDetectionPeriod,
       concurrentConfig,
-      testSortingReporterTimeout
+      testSortingReporterTimeout,
+      TestEventLogEmitter.startedIfGiven(testEventLogFile)
     )
   }
 

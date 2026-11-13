@@ -90,6 +90,22 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
       Compared.firstDifference(comparable) shouldBe None
     }
 
+    Launch.values.toList.foreach { launch =>
+      Scenario(s"A $launch launch not given the runner argument creates no file and starts no thread that 3.2.20 does not") {
+        Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
+        When(s"$launch runs it on 3.2.20 and on this fork, with a -f reporter and a -C reporter that records the run's threads")
+        val output = runs.ofFixture(launch, List("-f", "report.txt", "-C", "compatibility.recorders.ThreadRecordingReporter"))
+
+        Then("the fork's run leaves in its working directory only the files 3.2.20's leaves")
+        output.upstream.files.keySet shouldBe Set("report.txt")
+        output.fork.files.keySet.diff(output.upstream.files.keySet) shouldBe Set.empty
+
+        And("the fork's run starts only the threads 3.2.20's starts")
+        output.upstream.threadNames should contain("ScalaTest-dispatcher")
+        output.fork.threadNames.diff(output.upstream.threadNames) shouldBe Set.empty
+      }
+    }
+
     for {
       launch <- Launch.values.toList
       characters <- reporterCharacterLists

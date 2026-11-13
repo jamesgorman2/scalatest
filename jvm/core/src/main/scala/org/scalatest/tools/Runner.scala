@@ -810,33 +810,39 @@ object Runner {
       case None =>
     }
 
-    val ParsedArgs(
-      runpathArgs,
-      reporterArgs,
-      suiteArgs,
-      againArgs,
-      junitArgs,
-      propertiesArgs,
-      tagsToIncludeArgs,
-      tagsToExcludeArgs,
-      concurrentArgs,
-      membersOnlyArgs,
-      wildcardArgs,
-      testNGArgs,
-      suffixes, 
-      chosenStyles, 
-      spanScaleFactors, 
-      testSortingReporterTimeouts,
-      slowpokeArgs,
-      seedArgs
-    ) = parseArgs(args)
+    val (
+      ParsedArgs(
+        runpathArgs,
+        reporterArgs,
+        suiteArgs,
+        againArgs,
+        junitArgs,
+        propertiesArgs,
+        tagsToIncludeArgs,
+        tagsToExcludeArgs,
+        concurrentArgs,
+        membersOnlyArgs,
+        wildcardArgs,
+        testNGArgs,
+        suffixes,
+        chosenStyles,
+        spanScaleFactors,
+        testSortingReporterTimeouts,
+        slowpokeArgs,
+        seedArgs
+      ),
+      testEventLogFile
+    ) = parseArgsWithTestEventLog(args)
 
     val fullReporterConfigurations: ReporterConfigurations =
-      if (reporterArgs.isEmpty)
+      if (reporterArgs.isEmpty && testEventLogFile.isEmpty)
         // If no reporters specified, just give them a graphic reporter
         new ReporterConfigurations(Some(GraphicReporterConfiguration(Set())), Nil, Nil, Nil, /*Nil, Nil, */None, None, Nil, Nil, Nil, Nil)
       else
         parseReporterArgsIntoConfigurations(reporterArgs)
+
+    if (testEventLogFile.isDefined && fullReporterConfigurations.graphicReporterConfiguration.isDefined)
+      throw new IllegalArgumentException("The graphic reporter (-g) is not supported with " + TestEventLogArgument.flag + ".")
 
     val (suitesList: List[SuiteParam], testSpecs: List[TestSpec]) =
       parseSuiteArgs(suiteArgs)
@@ -959,6 +965,7 @@ object Runner {
         rjf.blockUntilWindowClosed()
       }
       case None => { // Run the test without a GUI
+        val handOffToTestEventLog = TestEventLogEmitter.startedIfGiven(testEventLogFile)
         withClassLoaderAndDispatchReporter(
           runpathList,
           reporterConfigs,
@@ -968,6 +975,7 @@ object Runner {
           slowpokeDetectionDelay,
           slowpokeDetectionPeriod
        ) { (loader, dispatchReporter) =>
+          dispatchReporter.registerSlowpokeAlertHandOff(handOffToTestEventLog)
           doRunRunRunDaDoRunRun(
             dispatchReporter,
             suitesList,
@@ -989,12 +997,13 @@ object Runner {
             concurrentConfig,
             suffixes,
             chosenStyleSet,
-            testSortingReporterTimeout
+            testSortingReporterTimeout,
+            handOffToTestEventLog
           )
         }
       }
     }
-    
+
     passFailReporter match {
       case Some(pfr) => pfr.allTestsPassed
       case None => false
@@ -1063,6 +1072,55 @@ object Runner {
     suffixes: Option[Pattern],
     chosenStyleSet: Set[String],
     testSortingReporterTimeout: Span
+  ): Unit =
+    doRunRunRunDaDoRunRun(
+      dispatch,
+      suitesList,
+      agains,
+      testSpecs,
+      junitsList,
+      stopper,
+      tagsToIncludeSet,
+      tagsToExcludeSet,
+      configMap,
+      concurrent,
+      membersOnlyList,
+      wildcardList,
+      testNGList,
+      runpath,
+      loader,
+      doneListener,
+      runStamp,
+      concurrentConfig,
+      suffixes,
+      chosenStyleSet,
+      testSortingReporterTimeout,
+      TestEventLogHandOff.none
+    )
+
+  private[scalatest] def doRunRunRunDaDoRunRun(
+    dispatch: DispatchReporter,
+    suitesList: List[SuiteParam],
+    agains: List[String],
+    testSpecs: List[TestSpec],
+    junitsList: List[String],
+    stopper: Stopper,
+    tagsToIncludeSet: Set[String],
+    tagsToExcludeSet: Set[String],
+    configMap: ConfigMap,
+    concurrent: Boolean,
+    membersOnlyList: List[String],
+    wildcardList: List[String],
+    testNGList: List[String],
+    runpath: List[String],
+    loader: ClassLoader,
+    doneListener: RunDoneListener,
+    runStamp: Int,
+    concurrentConfig: ConcurrentConfig,
+    suffixes: Option[Pattern],
+    chosenStyleSet: Set[String],
+    testSortingReporterTimeout: Span,
+    handOffToTestEventLog: Event => Unit
   ): Unit = {
 
     // TODO: add more, and to RunnerThread too
@@ -1086,6 +1144,15 @@ object Runner {
     val (globSuites, nonGlobSuites) = suitesList.partition(_.isGlob)
 
     var tracker = new Tracker(new Ordinal(runStamp))
+
+    def sendRunEvent(event: Event): Unit = {
+      handOffToTestEventLog(event)
+      dispatch(event)
+    }
+
+    // The events SuiteRunner sends for a DiscoverySuite pass no structure wrapper.
+    def testEventLogHandOffFor(suite: Suite): Event => Unit =
+      if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
 
     //
     // Generates SuiteConfigs for Suites found via discovery.
@@ -1118,7 +1185,7 @@ object Runner {
       }
       else {
         val discoveryStartTime = System.currentTimeMillis
-        dispatch(DiscoveryStarting(tracker.nextOrdinal(), configMap))
+        sendRunEvent(DiscoveryStarting(tracker.nextOrdinal(), configMap))
 
         val accessibleSuites: Set[String] =
           discoverSuiteNames(runpath, loader, suffixes)
@@ -1158,7 +1225,7 @@ object Runner {
           }
 
         val discoveryDuration = System.currentTimeMillis - discoveryStartTime
-        dispatch(
+        sendRunEvent(
           DiscoveryCompleted(tracker.nextOrdinal(), Some(discoveryDuration)))
 
         discoSuites
@@ -1181,7 +1248,7 @@ object Runner {
           }
           if (!unrunnableList.isEmpty) {
             val names = for (suiteParam <- unrunnableList) yield " " + suiteParam.className
-            dispatch(RunAborted(tracker.nextOrdinal(), Resources.nonSuite + names.mkString(", "), None))
+            sendRunEvent(RunAborted(tracker.nextOrdinal(), Resources.nonSuite + names.mkString(", "), None))
             true
           }
           else {
@@ -1190,7 +1257,7 @@ object Runner {
         }
         catch {
           case e: ClassNotFoundException => {
-            dispatch(RunAborted(tracker.nextOrdinal(), Resources.cannotLoadSuite(e.getMessage), Some(e)))
+            sendRunEvent(RunAborted(tracker.nextOrdinal(), Resources.cannotLoadSuite(e.getMessage), Some(e)))
             true
           }
         }
@@ -1242,7 +1309,7 @@ object Runner {
 
           val expectedTestCount = sumInts(testCountList)
 
-          dispatch(RunStarting(tracker.nextOrdinal(), expectedTestCount, configMap))
+          sendRunEvent(RunStarting(tracker.nextOrdinal(), expectedTestCount, configMap))
           
           if (concurrent) {
 
@@ -1290,7 +1357,7 @@ object Runner {
                     val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                     val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
                     val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
-                    distributor.apply(suiteConfig.suite, runArgs)
+                    distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite))
                   }
                   distributor.waitUntilDone()
                   (new CompositeStatus(statuses.toSet)).waitUntilCompleted()
@@ -1301,7 +1368,7 @@ object Runner {
                   val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                   val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
                   val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
-                  distributor.apply(suiteConfig.suite, runArgs)
+                  distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite))
                 }
                 distributor.waitUntilDone()
                 (new CompositeStatus(statuses.toSet)).waitUntilCompleted()
@@ -1317,7 +1384,7 @@ object Runner {
               val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
               val runArgs = Args(dispatch, stopper, filter, configMap, None, tracker, chosenStyleSet, false, None, None)
               val status = new ScalaTestStatefulStatus()
-              val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status)
+              val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status, testEventLogHandOffFor(suiteConfig.suite))
               suiteRunner.run()
               status.waitUntilCompleted()
             }
@@ -1325,21 +1392,21 @@ object Runner {
 
           val duration = System.currentTimeMillis - runStartTime
           if (stopper.stopRequested) {
-            dispatch(RunStopped(tracker.nextOrdinal(), Some(duration)))
+            sendRunEvent(RunStopped(tracker.nextOrdinal(), Some(duration)))
           }
           else {
-            dispatch(RunCompleted(tracker.nextOrdinal(), Some(duration)))
+            sendRunEvent(RunCompleted(tracker.nextOrdinal(), Some(duration)))
           }
         }
         catch {
           case e: InstantiationException =>
-            dispatch(RunAborted(tracker.nextOrdinal(), Resources.cannotInstantiateSuite(e.getMessage), Some(e), Some(System.currentTimeMillis - runStartTime)))
+            sendRunEvent(RunAborted(tracker.nextOrdinal(), Resources.cannotInstantiateSuite(e.getMessage), Some(e), Some(System.currentTimeMillis - runStartTime)))
           case e: IllegalAccessException =>
-            dispatch(RunAborted(tracker.nextOrdinal(), Resources.cannotInstantiateSuite(e.getMessage), Some(e), Some(System.currentTimeMillis - runStartTime)))
+            sendRunEvent(RunAborted(tracker.nextOrdinal(), Resources.cannotInstantiateSuite(e.getMessage), Some(e), Some(System.currentTimeMillis - runStartTime)))
           case e: NoClassDefFoundError =>
-            dispatch(RunAborted(tracker.nextOrdinal(), Resources.cannotLoadClass(e.getMessage), Some(e), Some(System.currentTimeMillis - runStartTime)))
+            sendRunEvent(RunAborted(tracker.nextOrdinal(), Resources.cannotLoadClass(e.getMessage), Some(e), Some(System.currentTimeMillis - runStartTime)))
           case e: Throwable =>
-            dispatch(RunAborted(tracker.nextOrdinal(), Resources.bigProblems(e), Some(e), Some(System.currentTimeMillis - runStartTime)))
+            sendRunEvent(RunAborted(tracker.nextOrdinal(), Resources.bigProblems(e), Some(e), Some(System.currentTimeMillis - runStartTime)))
         }
       }
     }

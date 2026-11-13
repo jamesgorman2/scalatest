@@ -31,10 +31,10 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
 
 The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().startInstant()` in Mill's JVM exactly, not closely (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-- The emitter reads both from `ProcessHandle.current()` by reflection. The read is in core's JVM sources only; Scala.js and Native are out of scope.
+- The emitter reads both from `ProcessHandle.current()` by reflection, in `org.scalatest.tools.ProcessIdentity`. The read is in core's JVM sources only; Scala.js and Native are out of scope.
 - It looks each method up on the interfaces `java.lang.ProcessHandle` and `java.lang.ProcessHandle.Info`, never on the handle's runtime class, whose methods are not accessible (`research/jvm-pid-and-start-time.md` § 2).
 - `RuntimeMXBean.getStartTime()` is not a fallback: it records when the JVM finished initialising and never matched (`research/jvm-pid-and-start-time.md` § 3).
-- A runner given the runner argument fails at construction where the JVM has no `ProcessHandle` or `startInstant()` is empty (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream").
+- A runner given the runner argument fails at construction, with an `IllegalStateException` and before it creates any file, where the JVM has no `ProcessHandle` or `startInstant()` is empty (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "The end of a run's event stream").
   - Mill 1.x supports user-defined modules down to Java 11 only, and its test worker's entry point is Java 11 bytecode in Mill 1.1.10 and 1.3.1 (`research/jvm-pid-and-start-time.md` § 1). No worker under the test command runs without `ProcessHandle`.
 
 ### A module's own ScalaTest arguments
@@ -152,13 +152,26 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
 
 ## The test event log on the JVM
 
-- `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
-- Core's runner argument definition (`../ARCHITECTURE.md` § Modules § ScalaTest core) is one `private[scalatest]` definition in `org.scalatest.tools`, shared by `ArgsParser` and the library's **Build the runner argument** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library). The event log file is in the worker's `processFolder`. The test command adds the argument that operation returns, unread, to the worker's arguments.
-- `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each write the `runStarted` event once they have parsed the runner argument, before `RunStarting` (`specification/test-event-log-structure.md` AC-094).
-- The emitter writes the `runStarted` event to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+- The runner argument is two arguments: the flag `--test-event-log`, then the event log file's path. No ScalaTest 3.2.20 flag begins `--`.
+- Core's runner argument definition (`../ARCHITECTURE.md` § Modules § ScalaTest core) is `org.scalatest.tools.TestEventLogArgument`, one `private[scalatest]` definition shared by `ArgsParser` and the library's **Build the runner argument** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library), which is `org.scalatest.consolidation.RunnerArgument.forEventLogFile`. The event log file is in the worker's `processFolder`. The test command adds the argument that operation returns, unread, to the worker's arguments.
+- `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it reads the runner argument:
+  - `ArgsParser.parseArgsWithTestEventLog`, which `Runner.run` and `Framework.runner` call, returns the file the argument names beside the other arguments. It rejects the flag with no argument after it, and the runner argument given twice.
+  - `ArgsParser.parseArgs`, which every other caller still calls, rejects the flag with 3.2.20's message for an argument it does not recognise.
+  - `ArgsParser.checkArgsForValidity`, which only `Runner.run` calls, accepts the runner argument.
+- `Runner.run` rejects the runner argument given with the graphic reporter `-g`, whose runs `RunnerJFrame` starts. Given the runner argument and no reporter argument, it configures no reporter, where 3.2.20 configures the graphic reporter.
+- `Framework.runner` given the runner argument and no reporter argument builds no `SbtLogInfoReporter`. A sub-process runner, one given remote arguments, ignores the runner argument: sbt gives it the main runner's arguments, and the event log file is the main runner's.
+- `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each start the emitter, `org.scalatest.tools.TestEventLogEmitter`, once they have parsed and checked their arguments. Starting it writes the `runStarted` event, before `RunStarting` (`specification/test-event-log-structure.md` AC-094).
+- The emitter writes the `runStarted` event to a file of another name in the same folder, the event log's name followed by `.tmp`. It moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
   - Event log reading never reads the other name, so a worker that dies before the move holds no event log file.
   - In the same folder, the move is one rename within one file system.
   - The `runStarted` event precedes every other event, so nothing is appended between the move and the reopening.
+  - It appends through a `java.io.FileOutputStream`, with one `write` call for each event. An interrupt of a thread writing to a `FileChannel` closes the channel for every thread, and a test's time limit can interrupt a test thread.
+- The emitter writes nothing after the `runEnded` event, and closes the file once it has written it.
+- A hand-off never throws. An event that cannot be encoded or written ends the event log before that event, so the run has no `runEnded` event.
+- A send site hands its event off by calling a function, an `Event => Unit`, before it reports the event. A run without the runner argument is given a function that does nothing. The function reaches each site as follows:
+  - `Runner.doRunRunRunDaDoRunRun` and `Framework`'s runner take it as a parameter.
+  - `SuiteRunner` takes it as a constructor parameter. `Runner` supplies it for a `DiscoverySuite`, through `ConcurrentDistributor` under `-P`.
+  - `DispatchReporter` takes it through `registerSlowpokeAlertHandOff`, as it takes `Framework`'s `SuiteSortingReporter` through `registerSlowpokeReporter`.
 - The emitter's one write lock (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin) is taken by:
   - the run's own thread;
   - the dispatcher's thread;
@@ -420,7 +433,7 @@ Each test of human-readable output compares the whole output, written with colou
 
 ### Comparison with ScalaTest 3.2.20
 
-This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `specification/test-event-log-events.md` AC-113, AC-114 and AC-116, and `specification/runs-and-test-structure-nodes.md` AC-073.
+This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `specification/test-event-log-events.md` AC-113, AC-114, AC-116 and AC-117, and `specification/runs-and-test-structure-nodes.md` AC-073.
 
 - AC-056 and AC-057 run in a test project of `project/DottyBuild.scala`.
   - The compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) are the sources of an sbt configuration of the project's own that extends neither `Compile` nor `Test` and whose one library dependency is `org.scalatest:scalatest` 3.2.20. They compile there once, so both runs load the same compiled classes. `../SPECIFICATION.md` R-004 lets the fork run them.
@@ -446,6 +459,10 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `spe
     - under `Framework`, whose `-o` reporter writes to the loggers, the loggers, stderr and the file.
   - Before comparing, it replaces each run of stack-frame lines, and each `stackTraces` and `depth` value in a `J` reporter's JSON, with one placeholder, and blanks durations, timestamps and thread names.
   - The fixture's test writes one line to stdout and one to stderr. Under `Runner.run` the reporters write from the dispatch thread, so where those lines fall among a reporter's is not fixed. The test takes them out of each stream before comparing, and checks that each run wrote each once.
+- A test of AC-117 forks the same pair of JVMs, launched through `Runner.run` and through `Framework`, without the runner argument and with a `-f` reporter.
+  - It compares the names of the files each run leaves in its working directory, which is a directory of that JVM's own.
+  - A `-C` reporter records, at each event it receives, the names of the live threads of thread group `main`, with each number replaced by `N`. The JVM's own threads are in other groups.
+  - The fork's run must leave no file and record no thread name that 3.2.20's does not.
 - AC-116 runs in a Scala.js and a Native test project of `project/DottyBuild.scala`. The fixture and the recorders compile once against 3.2.20's artefacts for the platform, and the test links them twice, once with 3.2.20's and once with the fork's. There the recorders print each event to stdout as one line, in the form the JVM's recorders write it, and print each line the loggers receive, normalised as for AC-114. The test compares the two runs' lines.
 - AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.20 and passes `-f` in its own ScalaTest arguments, configured as `SPECIFICATION.md` § Acceptance criteria requires of every JVM test module of a criterion's build; Mill's `testForked` on that module writes the file the criterion compares with.
 

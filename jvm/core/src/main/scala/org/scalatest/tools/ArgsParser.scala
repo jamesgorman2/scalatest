@@ -96,6 +96,10 @@ private[tools] object ArgsParser {
           it.next
         }
       }
+      else if (TestEventLogArgument.isFlag(s)) {
+        if (it.hasNext)
+          it.next
+      }
       else if (!s.startsWith("-D") && !s.startsWith("-g") && !s.startsWith("-o") && !s.startsWith("-e") && !s.startsWith("-P")) {
         lb += s
       }
@@ -176,7 +180,12 @@ private[tools] object ArgsParser {
       Some(Pattern.compile(".*(" + suffixesList.mkString("|") + ")$"))
   }
 
-  private[scalatest] def parseArgs(args: Array[String]): ParsedArgs = {
+  private[scalatest] def parseArgs(args: Array[String]): ParsedArgs = parse(args, false)._1
+
+  // Also accepts the test event log argument, and returns the file it names.
+  private[scalatest] def parseArgsWithTestEventLog(args: Array[String]): (ParsedArgs, Option[String]) = parse(args, true)
+
+  private def parse(args: Array[String], acceptsTestEventLog: Boolean): (ParsedArgs, Option[String]) = {
 
     // SKIP-SCALATESTJS,NATIVE-START
     val runpath = new ListBuffer[String]()
@@ -206,6 +215,7 @@ private[tools] object ArgsParser {
     val slowpoke = new ListBuffer[String]()
     // SKIP-SCALATESTJS,NATIVE-END
     val seeds = ListBuffer[String]()
+    val testEventLogFiles = ListBuffer[String]()
 
     val it = args.iterator.buffered
     while (it.hasNext) {
@@ -447,12 +457,18 @@ private[tools] object ArgsParser {
         // SKIP-SCALATESTJS,NATIVE-END
         //SCALATESTJS,NATIVE-ONLY throw new IllegalArgumentException("Argument not supported by ScalaTest-js: " + s)
       }
+      else if (acceptsTestEventLog && TestEventLogArgument.isFlag(s)) {
+        testEventLogFiles += TestEventLogArgument.fileAfterFlag(it)
+      }
       else {
         throw new IllegalArgumentException("Argument unrecognized by ScalaTest's Runner: " + s)
       }
     }
 
-    ParsedArgs(
+    if (testEventLogFiles.size > 1)
+      throw new IllegalArgumentException("Only one " + TestEventLogArgument.flag + " allowed")
+
+    val parsedArgs = ParsedArgs(
       // SKIP-SCALATESTJS,NATIVE-START
       runpath.toList,
       // SKIP-SCALATESTJS,NATIVE-END
@@ -480,6 +496,8 @@ private[tools] object ArgsParser {
       // SKIP-SCALATESTJS,NATIVE-END
       seeds.toList
     )
+
+    (parsedArgs, testEventLogFiles.headOption)
   }
 
   // Used to parse -j, -m, and -w args, one of which will be passed as a String as dashArg

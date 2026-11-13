@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
+description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
 ---
 
 <learning>
@@ -82,4 +82,14 @@ Compiling there with Scala 3.3 then fails with `value getOffsetStatic is not a m
 Pin the library for such a configuration with `dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value`.
 
 sbt's slash syntax addresses a configuration by its capitalised name, not by the `val` that holds it: `config("fixture")` is `<project>/Fixture/compile`.
+</learning>
+
+<learning>
+date: 2026-11-14
+---
+sbt-mima-plugin 1.1.4 does not report a change to a package-qualified private class or member, such as `private[scalatest]`, of a Scala 3 artifact, though each is public in bytecode. A `private[scalatest]` class whose only constructor gained a parameter passed `mimaReportBinaryIssues` with no filter.
+
+A passing check therefore does not show that a jar of another artifact in the same package, compiled against the earlier release, still links: upstream splits ScalaTest into artifacts that share package `org.scalatest` and call each other through such members.
+
+Where a caller outside the artifact may exist, keep the earlier signature beside the new one, as an overload or an auxiliary constructor.
 </learning>

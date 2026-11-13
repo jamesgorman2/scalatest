@@ -16,6 +16,7 @@
 package org.scalatest.tools
 
 import org.scalatest._
+import org.scalatest.events.Event
 import org.scalactic.Requirements._
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
@@ -34,10 +35,12 @@ private[scalatest] class ConcurrentDistributor(args: Args, execSvc: ExecutorServ
     apply(suite, args.copy(tracker = tracker))
   }
  
-  def apply(suite: Suite, args: Args): Status = {
+  def apply(suite: Suite, args: Args): Status = apply(suite, args, TestEventLogHandOff.none)
+
+  def apply(suite: Suite, args: Args, handOffToTestEventLog: Event => Unit): Status = {
     requireNonNull(suite, args)
     val status = new ScalaTestStatefulStatus
-    val suiteRunner = new SuiteRunner(suite, args, status)
+    val suiteRunner = new SuiteRunner(suite, args, status, handOffToTestEventLog)
     val future: Future[_] = execSvc.submit(suiteRunner)
     futureQueue.put(future)
     status
