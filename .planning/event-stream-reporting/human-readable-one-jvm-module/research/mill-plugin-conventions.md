@@ -23,7 +23,7 @@ Notes this one builds on and does not repeat:
   - Changed: test discovery now calls the runner's `done()`.
   - Changed: Mill is built on Scala `3.9.0`, not `3.8.2`.
   - At `1.4.0-M2` the same six internals are unchanged from `1.3.1`, except that `callTestRunnerSubprocess` writes `testargs` inside `MappedRoots.withMapping(Seq())`.
-- **Beyond the question,** `mill.exec.Execution`, which the test command copies (`.planning/event-stream-reporting/ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…"), changed in 743 lines between `1.1.10` and `1.3.1`. From `1.3.0-M1` an exclusive command no longer takes the daemon-wide workspace lock (§ 6).
+- **Beyond the question,** `mill.exec.Execution`, which the test command copies (`.planning/event-stream-reporting/decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…"), changed in 743 lines between `1.1.10` and `1.3.1`. From `1.3.0-M1` an exclusive command no longer takes the daemon-wide workspace lock (§ 6).
 
 ## What was read and what was run
 

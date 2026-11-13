@@ -70,7 +70,7 @@ Risks:
 
 - `decisions/test-command.md` "A run receives only those of its module's own ScalaTest arguments on an allow-list…" (Costs: what the list withholds, should it also govern the test command's own framework arguments)
 - `decisions/capture-and-console.md` "Under the test command, Mill's own console results for a module's tests are replaced by the consolidated output." (Costs: no report at Mill's usual path)
-- `ARCHITECTURE-DECISIONS.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible among the ScalaTest arguments each run receives)
+- `decisions/architecture-test-event-log.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible among the ScalaTest arguments each run receives)
 - `research/mill-test-without-module-trait.md` § 4 (R-053 compared on the JVM only)
 
 ## 5. Many modules in one test command
@@ -94,7 +94,7 @@ Settles:
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…" (Costs: reflection on a `private val`; a copy of `mill.exec.Execution`; its failure count on the prompt)
+- `decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…" (Costs: reflection on a `private val`; a copy of `mill.exec.Execution`; its failure count on the prompt)
 - `research/mill-nested-keep-going.md` § 2 (concurrent `execute` calls break Mill's pool), § 5
 - `research/mill-command-lifetime.md` § 2.2 (the body is skipped after an earlier failure without `--keep-going`), § 2.6 (one evaluation, not one Mill command)
 - `decisions/test-command.md` "A selected test module that does not test with the release of this fork…" (Costs: mixed builds narrow their module selectors)
@@ -156,7 +156,7 @@ Settles:
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: Mill's `@internal` queue and claim layout; on Windows one class in two workers' `claim.log`, `research/emitter-plugin-spike.md` § 2)
+- `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: Mill's `@internal` queue and claim layout; on Windows one class in two workers' `claim.log`, `research/emitter-plugin-spike.md` § 2)
 - `decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…" (Costs) and "When a run's process dies, the consolidated output holds everything the run handed to the operating system before it died." (Costs)
 - `research/emitter-plugin-spike.md` § 4 (Mill reports `out.json does not exist` for a dead worker)
 - `research/jvm-file-channel.md` § 8 (a worker killed between tasks or with classes queued, not run)
@@ -224,16 +224,16 @@ Enables:
 Settles:
 
 - How R-044 holds under Mill's own test task run with the plugin's `TaskCtx`, on Scala.js and, in feature 13, Native (`ARCHITECTURE.md` is silent; `research/native-stdio-wrapper.md` § 4 records Mill's own results line).
-- The C toolchain that cross-compiles the Windows launcher (`ARCHITECTURE-DECISIONS.md` "The Mill plugin is built by its own Mill build in this repo." Costs).
+- The C toolchain that cross-compiles the Windows launcher (`decisions/architecture-library-and-modules.md` "The Mill plugin is built by its own Mill build in this repo." Costs).
 - The names of each launcher's file pair in the launcher folder.
 - How the test command learns a Scala.js module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-066 and R-094 cannot hold on Scala.js, and `SPECIFICATION.md` § Scope needs that exception.
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
-- `ARCHITECTURE-DECISIONS.md` "Every Scala.js VM starts through a launcher the plugin supplies…" (Costs: shipped Windows binary; ARM64 emulation; start-up cost; not run on macOS)
-- `ARCHITECTURE-DECISIONS.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time)
-- `ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: one process hosting several runs)
+- `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
+- `decisions/architecture-running-tests.md` "Every Scala.js VM starts through a launcher the plugin supplies…" (Costs: shipped Windows binary; ARM64 emulation; start-up cost; not run on macOS)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time)
+- `decisions/architecture-test-event-log.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: one process hosting several runs)
 - `ARCHITECTURE.md` § Modules § ScalaTest core, Emitter (Scala.js runners ignore `-C` and build no `RunStarting`; `research/node-native-file-channel.md` § 1)
 - `research/emission-gap-analysis.md` § Short answer (run-level events and a throwing constructor need new code on Scala.js and Native)
 - `research/js-stdout-launcher.md` § 3.3 (without a job object the VM outlives a killed launcher), § 12 (not run: macOS, `--no-daemon`, a compiled launcher on Linux)
@@ -255,7 +255,7 @@ Settles:
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: holds only while every event is one whole line)
+- `decisions/architecture-test-event-log.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: holds only while every event is one whole line)
 - `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted events), § 11 (jsdom other than `27.4.0` not run)
 
 ## 13. Scala Native
@@ -276,13 +276,13 @@ Enables:
 
 Settles:
 
-- Whether a module's compiled launcher is reused across test commands (`ARCHITECTURE-DECISIONS.md` "Every Native test binary starts through a launcher…" Costs). Any reuse still writes the launcher into the module's launcher folder, which the test command creates afresh for each test command (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+- Whether a module's compiled launcher is reused across test commands (`decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher…" Costs). Any reuse still writes the launcher into the module's launcher folder, which the test command creates afresh for each test command (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 - How the test command learns a Native module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-066 and R-094 cannot hold on Native, and `SPECIFICATION.md` § Scope needs that exception.
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
-- `ARCHITECTURE-DECISIONS.md` "Every Native test binary starts through a launcher compiled with the module's toolchain…" (Costs: compiled per module; run only on Linux, `--no-daemon`, host architecture)
+- `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
+- `decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher compiled with the module's toolchain…" (Costs: compiled per module; run only on Linux, `--no-daemon`, host architecture)
 - `decisions/test-command.md` "A run that did not complete fails the test command, even where Mill's test task passes it." (Costs)
 - `research/native-stdio-wrapper.md` § 4 (Mill's results line; exit status after a crash), § 7 (another architecture under its emulator; Windows crash exit status)
 - `research/mill-test-without-module-trait.md` § 8 (Native on Linux not run)

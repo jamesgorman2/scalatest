@@ -65,7 +65,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Reasoning** `JsDom` runs the page in a Node process, and a run's test event log and its captured stdout and stderr there all come from the launcher's files, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
 
-**Costs** Test code in a `JsDom` window has no `require`, so a run's event log there shares the VM's stdout with test output and depends on framing (`../ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…"). Modules tested in any other JS environment, browsers included, get no consolidated output.
+**Costs** Test code in a `JsDom` window has no `require`, so a run's event log there shares the VM's stdout with test output and depends on framing (`architecture-test-event-log.md` "Under `JsDom`, a run's test event log is framed lines…"). Modules tested in any other JS environment, browsers included, get no consolidated output.
 
 **Settled by** [Which JS environments does the epic cover on Scala.js?](https://github.com/jamesgorman2/scalatest/issues/39).
 
@@ -83,7 +83,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). With no trait, evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime, and driving Mill's test queue from the plugin did so on the JVM. Both kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053); driving the test queue also held R-044 (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime, though meeting them needs Mill API that Mill does not keep stable.").
 
-**Costs** On Scala.js and Native the plugin relies on Mill's own test body running correctly under a `TaskCtx` it did not build, and on the JVM it drives Mill's test queue itself (`../ARCHITECTURE-DECISIONS.md` "The plugin runs a module's test discovery itself…"); a Mill change can break either route at run time, not compile time.
+**Costs** On Scala.js and Native the plugin relies on Mill's own test body running correctly under a `TaskCtx` it did not build, and on the JVM it drives Mill's test queue itself (`architecture-running-tests.md` "The plugin runs a module's test discovery itself…"); a Mill change can break either route at run time, not compile time.
 
 **Settled by**
 

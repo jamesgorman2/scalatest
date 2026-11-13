@@ -147,6 +147,6 @@ The scratch artefacts (`mill-j8\`, `probe\`, `scripts\`, `windows.tsv`, `linux.t
    - Costs:
      - it never matched;
      - the gap varied up to 228 ms on Windows and was about 0.5–0.7 s under WSL 2;
-     - a tolerance wide enough to cover that weakens the start-time check against PID reuse that `.planning/event-stream-reporting/ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits." Costs relies on;
+     - a tolerance wide enough to cover that weakens the start-time check against PID reuse that `.planning/event-stream-reporting/decisions/architecture-test-event-log.md` "The plugin learns that a run's stream has ended when the run's process exits." Costs relies on;
      - `getName()`'s format is unspecified.
    - Nothing it buys is reachable under the Mill 1.x test command.
