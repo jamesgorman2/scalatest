@@ -32,6 +32,9 @@ From GitBash on Windows, `sbt.bat` passes each argument through `cmd`, which bre
 
 - `'set p / libraryDependencies += "g" % "a" % "v"'` reaches sbt with its strings dropped and fails with `Error parsing expression`.
 - An argument holding `(x / y).value` stops the launcher with `.value was unexpected at this time`.
+- An sbt command wrapped as `'"…"'` stops the launcher with `The syntax of the command is incorrect.`, exit code 255, before any build starts.
+
+Pass an sbt command holding spaces as one plain single-quoted argument: `sbt.bat 'project/testOnly package.Prefix*'`.
 
 Redirecting a file of commands to `sbt.bat`'s stdin starts the interactive shell, which never exits.
 

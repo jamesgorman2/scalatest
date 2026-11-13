@@ -289,6 +289,7 @@ Each event is a JSON object (`TECHNICAL-DESIGN-DECISIONS.md` "Each event of a ru
 Each event's first key is `item`, naming its kind. The events are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and the keys of each, in order, are:
 
 - The `runStarted` event: `item` `runStarted`; `pid`; `startTime`, the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
+  - Core's codec takes and yields `startTime` as that text, since core also builds for Scala.js, which has no `java.time`. The emitter's JVM sources format it and the library parses it.
 - A `structure` event: `item` `structure`; `nodes`, an array of the suite's nodes in depth-first pre-order, each node's children in declared order. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin gives it. A node's `id` is an integer.
   - The first node is the event's root suite. A top-level suite has no `parent` or `position`. A nested suite that is the root has `parent`, and the `position` an earlier event gave it; one new to the event log has none (§ Critical code paths § A node's executions and its suite's latest structure).
   - A further `structure` event has the same form. Its root is a suite an earlier event holds, or a nested suite new to the event log under a suite an earlier event holds. It holds the root's scopes and tests whole, their `position`s from 0 among themselves, and none of its nested suites. A node an earlier event holds has the same `id`, and a suite the same `className`.
@@ -321,7 +322,14 @@ A ScalaTest event's fields:
   - `stackTrace`, its frames, a `StackDepth`'s included, each a frame with the keys `../JSON-LAYOUT.md` § Throwables gives a frame, each absent where that section says, followed by `text`, its `StackTraceElement.toString`, which on JDK 9 and later can hold a module and a class loader name.
   - `cause`; `suppressed`, in order.
 
-A line cannot be decoded where it is not one JSON object, holds a key this section does not give its object, lacks a required key, or holds an `item`, `event`, `kind` or `outcome` value this section does not give.
+A line cannot be decoded where it:
+
+- is not one JSON object, repeats a key within an object, or nests values more than 512 deep;
+- holds a key this section does not give its object;
+- lacks a required key;
+- holds an `item`, `event`, `kind` or `outcome` value this section does not give;
+- holds a value of another JSON type than this section gives its key, `null` included, or an integer outside its field's range;
+- holds a `ref` to an `id` the event has not yet written, or two throwables with one `id`.
 
 ## Publishing
 

@@ -437,6 +437,7 @@ object GenScalaTestDotty {
   def genScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, List.empty) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty) ++ 
     copyDir("js/core/src/main/scala/org/scalatest/compatible", "org/scalatest/compatible", targetDir, List.empty) ++ 
     copyDir("js/core/src/main/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, List.empty) ++ 
@@ -498,6 +499,7 @@ object GenScalaTestDotty {
   def genScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, List.empty) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty) ++ 
     copyDir("native/core/src/main/scala/org/scalatest/compatible", "org/scalatest/compatible", targetDir, List.empty) ++ 
     copyDir("native/core/src/main/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, List.empty) ++ 
