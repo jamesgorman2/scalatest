@@ -37,7 +37,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
 - The test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module. This narrows what R-048, R-049 and R-055 allow.
 - The test command supports Mill 1.3.1 only.
-- A module that does not test with the plugin's release of this fork, such as one testing with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork, fails the test command.
+- A module that does not test with this fork, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, fails the test command.
 
 ### Out of scope
 
@@ -52,6 +52,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one, or 
 - Running the tests of more than one module selector, or of a module selector that resolves to anything other than one JVM test module (§ 5).
 - A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet) (§ 5).
 - Failing a module that does not test with the plugin's release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
+- A module that tests with a release of this fork other than the plugin's (R-059) (§ 5).
 - An unsupported Mill release (R-093, R-118) (§ 6).
 - `--halt-on-failure` (§ 7).
 - What the consolidated output shows for a run that does not finish, or for a process that ends before any run exists in it (§ 8).

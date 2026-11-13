@@ -179,7 +179,7 @@ Feature: The test command's result
       Then the test command fails
       And no line on the console outside the human-readable output holds `have size 0`
 
-  Rule: A module that does not test with the plugin's release of this fork fails the test command (`../SPECIFICATION.md` § Scope)
+  Rule: A module that does not test with this fork fails the test command (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-087 <framework>
       Given the module tests with <framework>
       And its one suite, `samples.FrameworkSuite`, written for <framework>, has one test, `runs`, which succeeds
@@ -191,7 +191,6 @@ Feature: The test command's result
         | MUnit                                          |
         | uTest                                          |
         | `org.scalatest:scalatest` 3.2.19               |
-        | a release of this fork other than the plugin's |
 ```
 
 ## The console
