@@ -53,10 +53,12 @@ A test event log's format, the consolidation library's API and the switch by whi
 
 ### Compatibility with ScalaTest 3.2.x
 
-*3.2.19* means `org.scalatest:scalatest` 3.2.19 run with the same arguments over the same compiled suites. A reporter *receives what 3.2.19 sends* when it receives the events 3.2.19 sends it, with the same field values apart from timestamps, durations and thread names, in this order:
+*3.2.19* means `org.scalatest:scalatest` 3.2.19 run with the same arguments over the same compiled suites. A reporter *receives what 3.2.19 sends* when it receives the events 3.2.19 sends it, with the same field values apart from timestamps, durations, thread names and internal stack frames, in this order:
 
 - in a sequential run, the same sequence;
 - in a concurrent run, an order 3.2.19 could deliver them, with each suite's events in the order 3.2.19 delivers that suite's.
+
+An *internal stack frame* is a frame, of a throwable or any of its causes, whose class is in `org.scalatest`, `org.scalactic` or a subpackage of either. Each run of consecutive internal frames counts as one frame, whatever it holds. Every other frame must match, as must its position among those runs.
 
 - R-001 A run with the emitter off uses the reporters ScalaTest 3.2.19 uses. Each receives what 3.2.19 sends, and the build tool receives the test-interface events 3.2.19 sends.
 - R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.19 sends.
