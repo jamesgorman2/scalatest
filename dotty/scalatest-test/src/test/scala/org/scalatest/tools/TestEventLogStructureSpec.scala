@@ -98,59 +98,44 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
   private val refSpecScopeThrew =
     "org.scalatest.exceptions.NotAllowedException: java.lang.RuntimeException was thrown inside object `a scope`, construction cannot continue."
-  private val pathScopeThrew =
+  private val pathFunSpecScopeThrew =
     "org.scalatest.exceptions.NotAllowedException: " +
       "java.lang.RuntimeException was thrown inside describe(\"b\"), construction cannot continue: \"boom\""
-  private val refSpec = "a RefSpec whose scope object throws as it is registered"
-  private val pathFunSpec = "a PathAnyFunSpec whose second scope throws as it is registered"
+  private val pathFreeSpecScopeThrew =
+    "org.scalatest.exceptions.NotAllowedException: " +
+      "java.lang.RuntimeException was thrown inside \"b\" -, construction cannot continue: \"boom\""
 
-  // Framework asks a top-level suite for its tests as it builds the suite's SuiteStarting, outside the catch that reports SuiteAborted.
-  private val registrationsThatThrowFromFrameworkTasks = List(
-    (refSpec, "samples.ThrowingScopeRefSpec", refSpecScopeThrew),
-    (pathFunSpec, "samples.ThrowingSecondScopePathFunSpec", pathScopeThrew)
+  // Each suite, the simple name of its sample class, which a sample named Nests<that name> nests, and what its registration throws.
+  private val suitesWhoseRegistrationThrows = List(
+    ("a RefSpec whose scope object throws as it is registered", "ThrowingScopeRefSpec", refSpecScopeThrew),
+    ("a PathAnyFunSpec whose second scope throws as it is registered", "ThrowingSecondScopePathFunSpec", pathFunSpecScopeThrew),
+    ("a PathAnyFreeSpec whose second scope throws as it is registered", "ThrowingSecondScopePathFreeSpec", pathFreeSpecScopeThrew)
   )
 
-  private val registrationsThatThrow = List(
-    RegistrationThatThrows(
-      refSpec,
-      "samples.ThrowingScopeRefSpec",
-      Launch.ByRunner,
-      Vector(s"RunAborted, thrown $refSpecScopeThrew"),
-      "run started\nrun: RunAborted\nrun ended aborted"
-    ),
-    RegistrationThatThrows(
-      pathFunSpec,
-      "samples.ThrowingSecondScopePathFunSpec",
-      Launch.ByRunner,
-      Vector(s"RunAborted, thrown $pathScopeThrew"),
-      "run started\nrun: RunAborted\nrun ended aborted"
-    )
-  ) ++ Launch.values.toList.flatMap { launch =>
-    List(
+  // Framework asks a top-level suite for its tests as it builds the suite's SuiteStarting, outside the catch that reports SuiteAborted.
+  private val registrationsThatThrowFromFrameworkTasks =
+    suitesWhoseRegistrationThrows.map((suite, sampleName, thrown) => (suite, "samples." + sampleName, thrown))
+
+  private val registrationsThatThrow =
+    suitesWhoseRegistrationThrows.map { (suite, sampleName, thrown) =>
       RegistrationThatThrows(
-        s"a suite nesting $refSpec, and counting none of its tests",
-        "samples.NestsThrowingScopeRefSpec",
-        launch,
-        Vector(
-          "SuiteStarting NestsThrowingScopeRefSpec",
-          s"SuiteAborted NestsThrowingScopeRefSpec, thrown $refSpecScopeThrew",
-          "RunCompleted"
-        ),
-        "run started\nrun: RunStarting"
-      ),
-      RegistrationThatThrows(
-        s"a suite nesting $pathFunSpec, and counting none of its tests",
-        "samples.NestsThrowingSecondScopePathFunSpec",
-        launch,
-        Vector(
-          "SuiteStarting NestsThrowingSecondScopePathFunSpec",
-          s"SuiteAborted NestsThrowingSecondScopePathFunSpec, thrown $pathScopeThrew",
-          "RunCompleted"
-        ),
-        "run started\nrun: RunStarting"
+        suite,
+        "samples." + sampleName,
+        Launch.ByRunner,
+        Vector(s"RunAborted, thrown $thrown"),
+        "run started\nrun: RunAborted\nrun ended aborted"
       )
-    )
-  }
+    } ++ Launch.values.toList.flatMap { launch =>
+      suitesWhoseRegistrationThrows.map { (suite, sampleName, thrown) =>
+        RegistrationThatThrows(
+          s"a suite nesting $suite, and counting none of its tests",
+          "samples.Nests" + sampleName,
+          launch,
+          Vector(s"SuiteStarting Nests$sampleName", s"SuiteAborted Nests$sampleName, thrown $thrown", "RunCompleted"),
+          "run started\nrun: RunStarting"
+        )
+      }
+    }
 
   // Returns what the suite's task throws, and ends the run so that its event log is closed.
   private def thrownByFrameworkTask(suiteClassName: String, arguments: Seq[String]): String = {
@@ -256,6 +241,65 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         TestEventLogLine.test(8, 7, 0, "t", "- t"),
         TestEventLogLine.scope(9, 2, 3, "x", "should x that provides"),
         TestEventLogLine.test(10, 9, 0, "t", "- t")
+      )
+    ),
+    LabelledDeclaration(
+      List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
+      """"u" which { "t" in }; it should { "x" in }; "v" that { "t" in }; they must { "x" in }; "w" which provides { "t" in }; """ +
+        """it can { "x" in }; "y" that provides { "t" in }; they should { "x" in }; "z" should { "t" in }; it must { "x" in }; """ +
+        """"q" when { "t" in }; they when { "x" in }, provides being afterWord("provides")""",
+      "WithShorthandScopes",
+      "two scopes for each of u, v, w, y, z and q, the second named and labelled as the first: labelled 'u which', 'v that', " +
+        "'w which provides', 'y that provides', 'z' and 'q', the first holding test t and the second test x",
+      """scope "u", label "u which"
+        |  test "t", label "- t"
+        |scope "u", label "u which"
+        |  test "x", label "- should x"
+        |scope "v", label "v that"
+        |  test "t", label "- t"
+        |scope "v", label "v that"
+        |  test "x", label "- must x"
+        |scope "w", label "w which provides"
+        |  test "t", label "- t"
+        |scope "w", label "w which provides"
+        |  test "x", label "- can x"
+        |scope "y", label "y that provides"
+        |  test "t", label "- t"
+        |scope "y", label "y that provides"
+        |  test "x", label "- should x"
+        |scope "z", label "z"
+        |  test "t", label "- should t"
+        |scope "z", label "z"
+        |  test "x", label "- must x"
+        |scope "q", label "q"
+        |  test "t", label "- when t"
+        |scope "q", label "q"
+        |  test "x", label "- when x"""".stripMargin,
+      List(
+        TestEventLogLine.scope(2, 1, 0, "u", "u which"),
+        TestEventLogLine.test(3, 2, 0, "t", "- t"),
+        TestEventLogLine.scope(4, 1, 1, "u", "u which"),
+        TestEventLogLine.test(5, 4, 0, "x", "- should x"),
+        TestEventLogLine.scope(6, 1, 2, "v", "v that"),
+        TestEventLogLine.test(7, 6, 0, "t", "- t"),
+        TestEventLogLine.scope(8, 1, 3, "v", "v that"),
+        TestEventLogLine.test(9, 8, 0, "x", "- must x"),
+        TestEventLogLine.scope(10, 1, 4, "w", "w which provides"),
+        TestEventLogLine.test(11, 10, 0, "t", "- t"),
+        TestEventLogLine.scope(12, 1, 5, "w", "w which provides"),
+        TestEventLogLine.test(13, 12, 0, "x", "- can x"),
+        TestEventLogLine.scope(14, 1, 6, "y", "y that provides"),
+        TestEventLogLine.test(15, 14, 0, "t", "- t"),
+        TestEventLogLine.scope(16, 1, 7, "y", "y that provides"),
+        TestEventLogLine.test(17, 16, 0, "x", "- should x"),
+        TestEventLogLine.scope(18, 1, 8, "z", "z"),
+        TestEventLogLine.test(19, 18, 0, "t", "- should t"),
+        TestEventLogLine.scope(20, 1, 9, "z", "z"),
+        TestEventLogLine.test(21, 20, 0, "x", "- must x"),
+        TestEventLogLine.scope(22, 1, 10, "q", "q"),
+        TestEventLogLine.test(23, 22, 0, "t", "- when t"),
+        TestEventLogLine.scope(24, 1, 11, "q", "q"),
+        TestEventLogLine.test(25, 24, 0, "x", "- when x")
       )
     ),
     LabelledDeclaration(

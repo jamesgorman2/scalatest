@@ -398,6 +398,74 @@ class FixtureAsyncWordSpecWithWhichAndThat extends FixtureAsyncWordSpec with Asy
 }
 
 @DoNotDiscover
+class AnyWordSpecWithShorthandScopes extends AnyWordSpec {
+  def provides = afterWord("provides")
+  "u" which { "t" in { succeed } }
+  it should { "x" in { succeed } }
+  "v" that { "t" in { succeed } }
+  they must { "x" in { succeed } }
+  "w" which provides { "t" in { succeed } }
+  it can { "x" in { succeed } }
+  "y" that provides { "t" in { succeed } }
+  they should { "x" in { succeed } }
+  "z" should { "t" in { succeed } }
+  it must { "x" in { succeed } }
+  "q" when { "t" in { succeed } }
+  they when { "x" in { succeed } }
+}
+
+@DoNotDiscover
+class AsyncWordSpecWithShorthandScopes extends AsyncWordSpec {
+  def provides = afterWord("provides")
+  "u" which { "t" in { succeed } }
+  it should { "x" in { succeed } }
+  "v" that { "t" in { succeed } }
+  they must { "x" in { succeed } }
+  "w" which provides { "t" in { succeed } }
+  it can { "x" in { succeed } }
+  "y" that provides { "t" in { succeed } }
+  they should { "x" in { succeed } }
+  "z" should { "t" in { succeed } }
+  it must { "x" in { succeed } }
+  "q" when { "t" in { succeed } }
+  they when { "x" in { succeed } }
+}
+
+@DoNotDiscover
+class FixtureAnyWordSpecWithShorthandScopes extends FixtureAnyWordSpec with StringFixture {
+  def provides = afterWord("provides")
+  "u" which { "t" in { _ => succeed } }
+  it should { "x" in { _ => succeed } }
+  "v" that { "t" in { _ => succeed } }
+  they must { "x" in { _ => succeed } }
+  "w" which provides { "t" in { _ => succeed } }
+  it can { "x" in { _ => succeed } }
+  "y" that provides { "t" in { _ => succeed } }
+  they should { "x" in { _ => succeed } }
+  "z" should { "t" in { _ => succeed } }
+  it must { "x" in { _ => succeed } }
+  "q" when { "t" in { _ => succeed } }
+  they when { "x" in { _ => succeed } }
+}
+
+@DoNotDiscover
+class FixtureAsyncWordSpecWithShorthandScopes extends FixtureAsyncWordSpec with AsyncStringFixture {
+  def provides = afterWord("provides")
+  "u" which { "t" in { _ => succeed } }
+  it should { "x" in { _ => succeed } }
+  "v" that { "t" in { _ => succeed } }
+  they must { "x" in { _ => succeed } }
+  "w" which provides { "t" in { _ => succeed } }
+  it can { "x" in { _ => succeed } }
+  "y" that provides { "t" in { _ => succeed } }
+  they should { "x" in { _ => succeed } }
+  "z" should { "t" in { _ => succeed } }
+  it must { "x" in { _ => succeed } }
+  "q" when { "t" in { _ => succeed } }
+  they when { "x" in { _ => succeed } }
+}
+
+@DoNotDiscover
 class AnyFlatSpecWithRegisterTest extends AnyFlatSpec {
   registerTest("can open a file") { succeed }
   registerIgnoredTest("should close it") { succeed }

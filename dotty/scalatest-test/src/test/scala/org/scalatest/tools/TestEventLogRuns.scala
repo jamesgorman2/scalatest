@@ -14,11 +14,9 @@ import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
-import sbt.testing.Event as SbtEvent
 import sbt.testing.EventHandler
 import sbt.testing.Logger
 import sbt.testing.Runner as SbtRunner
-import sbt.testing.Status as SbtStatus
 import sbt.testing.SubclassFingerprint
 import sbt.testing.SuiteSelector
 import sbt.testing.TaskDef
@@ -106,16 +104,14 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected def frameworkRunner(arguments: Seq[String], remoteArguments: Seq[String] = Nil): SbtRunner =
     new Framework().runner(arguments.toArray, remoteArguments.toArray, getClass.getClassLoader)
 
-  /** Executes the suite's task and the tasks it returns, and returns the status of each test-interface event. */
-  protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Vector[SbtStatus] = {
-    val statuses = new ConcurrentLinkedQueue[SbtStatus]
-    val recordingStatuses: EventHandler = (event: SbtEvent) => statuses.add(event.status)
+  /** Executes the suite's task and the tasks it returns. */
+  protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Unit = {
+    val ignoringEvents: EventHandler = _ => ()
     val fingerprint = new Framework().fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
     var tasks = runner.tasks(Array(new TaskDef(suiteClassName, fingerprint, true, Array(new SuiteSelector)))).toList
     while (tasks.nonEmpty) {
-      tasks = tasks.head.execute(recordingStatuses, Array(logger)).toList ::: tasks.tail
+      tasks = tasks.head.execute(ignoringEvents, Array(logger)).toList ::: tasks.tail
     }
-    statuses.asScala.toVector
   }
 
   /** Runs the suite to the run's end. */

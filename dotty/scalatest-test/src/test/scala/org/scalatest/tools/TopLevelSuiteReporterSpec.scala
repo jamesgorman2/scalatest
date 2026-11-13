@@ -3,6 +3,7 @@ package org.scalatest.tools
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.Args
 import org.scalatest.Filter
 import org.scalatest.Reporter
@@ -40,6 +41,13 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
       stopper.requestStop()
     }
     stopper
+  }
+
+  // Suite.runNestedSuites asks once before it runs a nested suite, and again as it starts that suite.
+  private def stopperStoppedOnceAsked: Stopper = new Stopper {
+    private val timesAsked = new AtomicInteger
+    def stopRequested: Boolean = timesAsked.incrementAndGet() > 1
+    def requestStop(): Unit = ()
   }
 
   private def withPoolOfOneThread[A](body: ExecutorService => A): A = {
@@ -127,6 +135,28 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
           discoverySuiteRunBy(pool, stopRequested = true, new RecordingReporter, reporterOfSuite)
           reporterOfSuite.askedFor shouldBe Vector.empty
         }
+      }
+    }
+  }
+
+  "A DiscoverySuite that runs its nested suite itself" when {
+
+    def reporterAskedForWhenRunWith(stopper: Stopper): Vector[(Suite, Filter, Reporter)] = {
+      val reporterOfSuite = new ReporterOfSuite
+      val discoverySuite = new DiscoverySuite("", Set("samples.Inner1Suite"), true, getClass.getClassLoader, reporterOfSuite.function)
+      discoverySuite.run(None, Args(new RecordingReporter, stopper))
+      reporterOfSuite.askedFor
+    }
+
+    "a stop was requested before it ran" should {
+      "not ask for the nested suite's reporter" in {
+        reporterAskedForWhenRunWith(stopper(stopRequested = true)) shouldBe Vector.empty
+      }
+    }
+
+    "a stop is requested once it has chosen to run the nested suite, before that suite starts" should {
+      "not ask for the nested suite's reporter" in {
+        reporterAskedForWhenRunWith(stopperStoppedOnceAsked) shouldBe Vector.empty
       }
     }
   }

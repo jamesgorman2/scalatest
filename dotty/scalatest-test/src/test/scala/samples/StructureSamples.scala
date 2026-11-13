@@ -13,6 +13,7 @@ import org.scalatest.Suites
 import org.scalatest.Tag
 import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
+import org.scalatest.freespec.PathAnyFreeSpec
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funspec.PathAnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
@@ -134,6 +135,19 @@ class ThrowingSecondScopePathFunSpec extends PathAnyFunSpec {
   }
 }
 
+// Registers scope b when first asked for its tests, in a second instance, whose constructor then throws.
+@DoNotDiscover
+class ThrowingSecondScopePathFreeSpec extends PathAnyFreeSpec {
+
+  "a" - {
+    "t" in {}
+  }
+
+  "b" - {
+    throw new RuntimeException("boom")
+  }
+}
+
 // Each counts no test of the suite it nests, so nothing asks that suite for its tests before this suite runs.
 @DoNotDiscover
 class NestsThrowingScopeRefSpec extends Suites(new ThrowingScopeRefSpec) {
@@ -142,5 +156,10 @@ class NestsThrowingScopeRefSpec extends Suites(new ThrowingScopeRefSpec) {
 
 @DoNotDiscover
 class NestsThrowingSecondScopePathFunSpec extends Suites(new ThrowingSecondScopePathFunSpec) {
+  override def expectedTestCount(filter: Filter): Int = 0
+}
+
+@DoNotDiscover
+class NestsThrowingSecondScopePathFreeSpec extends Suites(new ThrowingSecondScopePathFreeSpec) {
   override def expectedTestCount(filter: Filter): Int = 0
 }

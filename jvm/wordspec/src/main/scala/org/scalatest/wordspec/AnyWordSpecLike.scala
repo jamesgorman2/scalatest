@@ -256,7 +256,8 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
                   case "can" => Resources.canCannotAppearInsideAnIn
                 }
               try {
-                registerNestedBranch(descriptionText, childPrefix, fun(), registrationClosedMessageFun, "AnyWordSpecLike.scala", methodName, stackDepth, adjustment, None, Some(pos))
+                // The scope is registered with the previous scope's text, so it takes the name the suite's source gave that scope.
+                registerNestedBranch(descriptionText, childPrefix, { last.nameInSource.foreach(name => engine.nameCurrentScope(name)); fun() }, registrationClosedMessageFun, "AnyWordSpecLike.scala", methodName, stackDepth, adjustment, None, Some(pos))
               }
               catch {
                 case e: TestFailedException => rethrowIfCauseIsNAEOrDTNE(e, pos)
