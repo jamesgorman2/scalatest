@@ -13,8 +13,6 @@ import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.RunStopped
 import org.scalatest.events.TestEventLogEncoder
-import scala.util.Try
-import scala.util.control.NonFatal
 
 /**
  * Writes one run's test event log to a file, which already holds the run's `runStarted` event.
@@ -30,21 +28,35 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
    * nothing after that.
    *
-   * It never throws, so that a hand-off cannot change what the run's reporters receive. An event that cannot be
-   * encoded or written ends the event log there, which leaves the run without its `runEnded` event.
+   * An event that cannot be encoded or written ends the event log there, which leaves the run without its
+   * `runEnded` event. So that a hand-off cannot change what the run's reporters receive, what encoding or writing
+   * throws does not reach the caller, with these exceptions:
+   *
+   *  - an `InterruptedException` is not thrown either, but the calling thread is left interrupted;
+   *  - a `VirtualMachineError` other than a `StackOverflowError`, or a `ThreadDeath`, is thrown once the event log
+   *    is closed. A `StackOverflowError` is contained: a throwable or config map value that recurses without end
+   *    is one more event that cannot be encoded.
    */
   def runEvent(event: Event): Unit = {
     // Encoded outside the lock: encoding calls the methods of the run's own throwables and config map values, which
     // may block, and every thread of the run takes the lock.
-    val encoded = Try(TestEventLogEncoder.event(event, None))
-    synchronized {
+    val encoded = TestEventLogEmitter.caught(TestEventLogEncoder.event(event, None))
+    val thrown = synchronized {
       if (isOpen) {
         val runEnded = TestEventLogEmitter.outcomeOfClosing(event).map(TestEventLogEncoder.runEnded)
-        val written = encoded.flatMap(line => Try((line +: runEnded.toList).foreach(write)))
-        if (written.isFailure || runEnded.isDefined) {
+        val written = encoded.flatMap(line => TestEventLogEmitter.caught((line +: runEnded.toList).foreach(write)))
+        if (written.isLeft || runEnded.isDefined) {
           close()
         }
+        written.left.toOption
+      } else {
+        encoded.left.toOption
       }
+    }
+    thrown.foreach {
+      case _: InterruptedException => Thread.currentThread().interrupt()
+      case uncontained if !TestEventLogEmitter.isContained(uncontained) => throw uncontained
+      case _ => ()
     }
   }
 
@@ -61,7 +73,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def close(): Unit = {
     isOpen = false
-    try eventLog.close() catch { case NonFatal(_) => () }
+    try eventLog.close() catch { case contained: Throwable if TestEventLogEmitter.isContained(contained) => () }
   }
 }
 
@@ -103,6 +115,18 @@ private[scalatest] object TestEventLogEmitter {
 
   /** Returns an emitter that appends to an event log which already holds the run's `runStarted` event. */
   def appendingTo(eventLog: OutputStream): TestEventLogEmitter = new TestEventLogEmitter(eventLog)
+
+  private def caught[A](body: => A): Either[Throwable, A] =
+    try Right(body) catch { case thrown: Throwable => Left(thrown) }
+
+  // Whether a hand-off keeps a throwable from its caller. One that says the JVM or the thread cannot go on is not kept.
+  private def isContained(thrown: Throwable): Boolean = {
+    thrown match {
+      case _: StackOverflowError => true
+      case _: VirtualMachineError | _: ThreadDeath => false
+      case _ => true
+    }
+  }
 
   private def outcomeOfClosing(event: Event): Option[RunOutcome] = {
     event match {

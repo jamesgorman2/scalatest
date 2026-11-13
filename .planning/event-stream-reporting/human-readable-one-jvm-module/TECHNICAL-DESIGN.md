@@ -167,10 +167,13 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
   - The `runStarted` event precedes every other event, so nothing is appended between the move and the reopening.
   - It appends through a `java.io.FileOutputStream`, with one `write` call for each event. An interrupt of a thread writing to a `FileChannel` closes the channel for every thread, and a test's time limit can interrupt a test thread.
 - The emitter writes nothing after the `runEnded` event, and closes the file once it has written it.
-- A hand-off never throws. An event that cannot be encoded or written ends the event log before that event and closes the file, so the run has no `runEnded` event.
-- A run that ends with no closing run event leaves no file open. Its event log has no `runEnded` event. The emitter's file is closed:
+- An event that cannot be encoded or written ends the event log before that event and closes the file, so the run has no `runEnded` event. Turning the emitter on must not stop a reporter receiving an event, so a hand-off keeps what encoding or writing throws from its send site, with these exceptions:
+  - An `InterruptedException` is not thrown either, but the hand-off leaves its thread interrupted. Encoding calls user code that can block, and a test's time limit can interrupt it there.
+  - A `VirtualMachineError` other than a `StackOverflowError`, or a `ThreadDeath`, is thrown to the send site once the file is closed. A `StackOverflowError` is kept from the send site: a throwable or config map value that recurses without end is one more event that cannot be encoded.
+- A run that ends with no closing run event has no `runEnded` event in its event log. The emitter's file is closed:
   - by `Runner.run`, when its run without `-g` returns or throws;
-  - by `Framework.runner`, when the construction of its runner throws, as where a custom reporter class cannot be loaded. The exception reaches the build tool, and the event log holds the `runStarted` event alone.
+  - by `Framework.runner`, when the construction of its runner throws, as where a custom reporter class cannot be loaded. The exception reaches the build tool, and the event log holds the `runStarted` event alone;
+  - by the `Framework` runner's `done`, when it throws before it sends `RunCompleted`, as where its wait for a sub-process's events is interrupted. A runner whose `done` the build tool never calls keeps its file open.
 - A send site hands its event off by calling a function, an `Event => Unit`, before it reports the event. A run without the runner argument is given a function that does nothing. The function reaches each site as follows:
   - `Runner.doRunRunRunDaDoRunRun` and `Framework`'s runner take it as a parameter.
   - `SuiteRunner` takes it as a constructor parameter. `Runner` supplies it for a `DiscoverySuite`, through `ConcurrentDistributor` under `-P`.

@@ -1,7 +1,9 @@
 package org.scalatest.tools
 
 import java.io.File
+import java.io.ObjectOutputStream
 import java.net.ServerSocket
+import java.net.Socket
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -9,6 +11,8 @@ import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.BuiltEvent
 import org.scalatest.events.EventLogComparison
+import org.scalatest.events.Ordinal
+import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
@@ -24,7 +28,6 @@ import sbt.testing.SubclassFingerprint
 import sbt.testing.SuiteSelector
 import sbt.testing.Task
 import sbt.testing.TaskDef
-import scala.util.Try
 
 final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers {
 
@@ -62,10 +65,6 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   private val ignoringEvents: EventHandler = (_: SbtEvent) => ()
 
-  private def runStartedLine(pid: Long, startTime: String): String = s"""{"item":"runStarted","pid":$pid,"startTime":"$startTime"}"""
-
-  private def runEndedLine(ended: String): String = s"""{"item":"runEnded","outcome":"$ended"}"""
-
   private def built(notation: String): Vector[BuiltEvent] =
     TestRunBuilder.build(TestRunPart.Events(notation)).fold(reason => fail(reason), _.events)
 
@@ -74,26 +73,30 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   private def thisProcess: ProcessIdentity = {
     val current = ProcessIdentity.current
-    assume(current.isRight, "an emitter needs a JVM that has ProcessHandle")
+    assume(current.isRight, s"an emitter needs its process's identity: ${current.left.getOrElse("")}")
     current.fold(reason => fail(reason), identity)
   }
 
   private def noProcessHandleMessage(eventLogFile: Path): String = {
-    assume(ProcessIdentity.current.isLeft, "this JVM has ProcessHandle")
-    s"Cannot write the test event log $eventLogFile: this JVM has no java.lang.ProcessHandle"
+    val noProcessHandle = "this JVM has no java.lang.ProcessHandle"
+    assume(ProcessIdentity.current == Left(noProcessHandle), "this scenario needs a JVM that has no java.lang.ProcessHandle")
+    s"Cannot write the test event log $eventLogFile: $noProcessHandle"
   }
 
   private val runTimeLimitSeconds = 120L
 
   // Runner.run blocks for as long as a graphic reporter's window is open, so a run that wrongly opens one must fail.
   private def runnerRun(arguments: Seq[String]): Boolean = {
-    val outcome = new AtomicReference[Option[Try[Boolean]]](None)
-    val run = new Thread(() => outcome.set(Some(Try(Runner.run(arguments.toArray)))))
+    val outcome = new AtomicReference[Option[Either[Throwable, Boolean]]](None)
+    val run = new Thread(() => {
+      outcome.set(Some(try Right(Runner.run(arguments.toArray)) catch { case thrown: Throwable => Left(thrown) }))
+    })
     run.setDaemon(true)
     run.start()
     run.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds))
     outcome.get match {
-      case Some(result) => result.get
+      case Some(Right(allTestsPassed)) => allTestsPassed
+      case Some(Left(thrown)) => throw thrown
       case None =>
         run.interrupt()
         java.awt.Window.getWindows.foreach(_.dispose())
@@ -110,6 +113,21 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   private def frameworkRunner(arguments: Seq[String], remoteArguments: Seq[String] = Nil): SbtRunner =
     new Framework().runner(arguments.toArray, remoteArguments.toArray, getClass.getClassLoader)
+
+  // Neither thread is a daemon. The one that waits for a sub-process's events ends when it reads RunCompleted.
+  private def endThreadsLeftByDoneThrowing(runner: SbtRunner, subProcessServer: Array[String]): Unit = {
+    val scalaTestRunner = runner.asInstanceOf[Framework#ScalaTestRunner]
+    val socket = new Socket(subProcessServer(0), subProcessServer(1).toInt)
+    try {
+      val events = new ObjectOutputStream(socket.getOutputStream)
+      events.writeObject(RunCompleted(new Ordinal(1)))
+      events.flush()
+      scalaTestRunner.serverThread.get.foreach(_.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds)))
+    } finally {
+      socket.close()
+      scalaTestRunner.dispatchReporter.dispatchDisposeAndWaitUntilDone()
+    }
+  }
 
   private def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
 
@@ -154,7 +172,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
           Then("before it is given a task, the event log's first event is the run's start")
           And("that event's PID and process start time are those of the run's process")
-          lines.head shouldBe runStartedLine(process.pid, process.startTime.toString)
+          lines.head shouldBe TestEventLogLine.runStarted(process.pid, process.startTime.toString)
           val events = decodedOrFail(lines)
           events.head shouldBe TestEventLogEvent.RunStarted(process.pid, process.startTime.toString)
           EventLogComparison.mismatchWhenIs(events.take(1), built("run started")) shouldBe None
@@ -170,7 +188,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
     Scenario("The decoder reads a run's start") {
       When("the decoder is given the line of a run's start")
-      val event = TestEventLogDecoder.decode(runStartedLine(4242L, "2026-01-02T03:04:05.678Z"))
+      val event = TestEventLogDecoder.decode(TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z"))
 
       Then("it yields the run's start, with the line's PID and process start time")
       event shouldBe Right(TestEventLogEvent.RunStarted(4242L, "2026-01-02T03:04:05.678Z"))
@@ -187,7 +205,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then(s"the event log's last event is that the run ended ${run.ended}")
-          lines.last shouldBe runEndedLine(run.ended)
+          lines.last shouldBe TestEventLogLine.runEnded(run.ended)
           EventLogComparison.mismatchWhenIs(decodedOrFail(lines).takeRight(1), built(s"run ended ${run.ended}")) shouldBe None
         }
       }
@@ -196,7 +214,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     runsThatEnd.map(run => run.ended -> run.outcome).distinct.foreach { (ended, outcome) =>
       Scenario(s"The decoder reads that a run ended $ended") {
         When(s"the decoder is given the line of a run that ended $ended")
-        val event = TestEventLogDecoder.decode(runEndedLine(ended))
+        val event = TestEventLogDecoder.decode(TestEventLogLine.runEnded(ended))
 
         Then(s"it yields that the run ended $ended")
         event shouldBe Right(TestEventLogEvent.RunEnded(outcome))
@@ -324,6 +342,41 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
         And("the event log file is not held open, so it can be moved")
         val moved = Files.move(eventLogFile, eventLogFile.resolveSibling("moved.log"))
         TemporaryEventLog.namesIn(moved.getParent) shouldBe Set("moved.log")
+      }
+    }
+  }
+
+  Feature("A Framework run whose done throws before it sends RunCompleted") {
+
+    Scenario("A Framework runner whose done is interrupted while it waits for a sub-process's events closes its event log") {
+      thisProcess
+      TemporaryEventLog.in { eventLogFile =>
+        Given("a Framework runner constructed with the runner argument, waiting for the events of a sub-process")
+        val runner = frameworkRunner(runnerArgument(eventLogFile))
+        val subProcessServer = runner.remoteArgs()
+        try {
+          When("its done is called by a thread that has been interrupted")
+          Then("done throws InterruptedException")
+          Thread.currentThread.interrupt()
+          try an[InterruptedException] should be thrownBy runner.done() finally Thread.interrupted()
+
+          And("the event log is the run's start and its RunStarting, without the run's end")
+          EventLogComparison.mismatchWhenIs(
+            eventLogOf(eventLogFile),
+            built(
+              """
+              run started
+              run: RunStarting(testCount: 0)
+              """
+            )
+          ) shouldBe None
+
+          And("the event log file is not held open, so it can be moved")
+          val moved = Files.move(eventLogFile, eventLogFile.resolveSibling("moved.log"))
+          TemporaryEventLog.namesIn(moved.getParent) shouldBe Set("moved.log")
+        } finally {
+          endThreadsLeftByDoneThrowing(runner, subProcessServer)
+        }
       }
     }
   }

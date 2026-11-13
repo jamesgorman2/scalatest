@@ -33,7 +33,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
   private val timeStamp = 1700000000000L
   private val identity = Right(ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z")))
 
-  private val runStartedLine = """{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}"""
+  private val runStartedLine = TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z")
   private val runStartingLine =
     """{"item":"event","event":"RunStarting","testCount":3,"configMap":{},"threadName":"main","timeStamp":1700000000000}"""
 
@@ -43,8 +43,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
 
   private def alert(message: String, threadName: String): Event =
     AlertProvided(ordinal, message, None, threadName = threadName, timeStamp = timeStamp)
-
-  private def runEndedLine(outcome: String): String = s"""{"item":"runEnded","outcome":"$outcome"}"""
 
   private def eventLine(eventName: String, fields: String): String =
     s"""{"item":"event","event":"$eventName",$fields"threadName":"main","timeStamp":1700000000000}"""
@@ -58,8 +56,25 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  private final class ThrowsFromToString {
-    override def toString: String = throw new IllegalStateException("no text")
+  private final class ThrowsFromToString(thrown: Throwable) {
+    override def toString: String = throw thrown
+  }
+
+  private def cannotBeEncodedFor(thrown: Throwable): Event =
+    RunStarting(ordinal, 3, ConfigMap("key" -> new ThrowsFromToString(thrown)), threadName = "main", timeStamp = timeStamp)
+
+  private final class RecursesWithoutEndFromToString {
+    override def toString: String = "recursing " + toString
+  }
+
+  private final class RejectsWrites extends OutputStream {
+    private val closed = new AtomicBoolean
+
+    def isClosed: Boolean = closed.get
+
+    override def write(byte: Int): Unit = throw new IOException("no space left")
+
+    override def close(): Unit = closed.set(true)
   }
 
   private val waitLimitSeconds = 30L
@@ -190,17 +205,17 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
 
     "handed the event that closes the run" should {
       "write that the run ended completed after a RunCompleted" in {
-        linesAfterHandingOff() shouldBe Vector(runStartedLine, eventLine("RunCompleted", ""), runEndedLine("completed"))
+        linesAfterHandingOff() shouldBe Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
       }
 
       "write that the run ended stopped after a RunStopped" in {
         linesAfterHandingOff(RunStopped(ordinal, threadName = "main", timeStamp = timeStamp)) shouldBe
-          Vector(runStartedLine, eventLine("RunStopped", ""), runEndedLine("stopped"))
+          Vector(runStartedLine, eventLine("RunStopped", ""), TestEventLogLine.runEnded("stopped"))
       }
 
       "write that the run ended aborted after a RunAborted" in {
         linesAfterHandingOff(RunAborted(ordinal, "no suites", None, threadName = "main", timeStamp = timeStamp)) shouldBe
-          Vector(runStartedLine, eventLine("RunAborted", """"message":"no suites","""), runEndedLine("aborted"))
+          Vector(runStartedLine, eventLine("RunAborted", """"message":"no suites","""), TestEventLogLine.runEnded("aborted"))
       }
 
       "write nothing handed to it afterwards" in {
@@ -210,7 +225,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
           emitter.runEvent(alert("late", "main"))
           emitter.runEvent(runCompleted)
           TemporaryEventLog.lines(eventLogFile) shouldBe
-            Vector(runStartedLine, eventLine("RunCompleted", ""), runEndedLine("completed"))
+            Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
         }
       }
     }
@@ -220,10 +235,69 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
         TemporaryEventLog.in { eventLogFile =>
           val emitter = TestEventLogEmitter.started(eventLogFile, identity)
           emitter.runEvent(runStarting)
-          emitter.runEvent(RunStarting(ordinal, 3, ConfigMap("key" -> new ThrowsFromToString), threadName = "main", timeStamp = timeStamp))
+          emitter.runEvent(cannotBeEncodedFor(new IllegalStateException("no text")))
           emitter.runEvent(runCompleted)
           TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
         }
+      }
+    }
+
+    "handed an event whose encoding is interrupted" should {
+      "not throw, close the event log, and leave its thread interrupted" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val wasLeftInterrupted =
+          try {
+            emitter.runEvent(cannotBeEncodedFor(new InterruptedException("interrupted while blocked")))
+            Thread.currentThread.isInterrupted
+          } finally {
+            Thread.interrupted()
+          }
+        wasLeftInterrupted shouldBe true
+        eventLog.isClosed shouldBe true
+      }
+
+      "leave its thread interrupted where the event log is already closed" in {
+        val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
+        emitter.endWithoutRunEnded()
+        val wasLeftInterrupted =
+          try {
+            emitter.runEvent(cannotBeEncodedFor(new InterruptedException("interrupted while blocked")))
+            Thread.currentThread.isInterrupted
+          } finally {
+            Thread.interrupted()
+          }
+        wasLeftInterrupted shouldBe true
+      }
+    }
+
+    "handed an event whose encoding overflows the stack" should {
+      "not throw, and close the event log" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        emitter.runEvent(RunStarting(ordinal, 3, ConfigMap("key" -> new RecursesWithoutEndFromToString), threadName = "main", timeStamp = timeStamp))
+        eventLog.writes shouldBe Vector.empty
+        eventLog.isClosed shouldBe true
+      }
+    }
+
+    "handed an event whose encoding throws another VirtualMachineError" should {
+      "close the event log, then throw that error" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val outOfMemory = new OutOfMemoryError("no heap")
+        val thrown = the[OutOfMemoryError] thrownBy emitter.runEvent(cannotBeEncodedFor(outOfMemory))
+        thrown should be theSameInstanceAs outOfMemory
+        eventLog.isClosed shouldBe true
+      }
+    }
+
+    "its event log rejects a write" should {
+      "not throw, and close the event log" in {
+        val eventLog = new RejectsWrites
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        emitter.runEvent(runStarting)
+        eventLog.isClosed shouldBe true
       }
     }
 

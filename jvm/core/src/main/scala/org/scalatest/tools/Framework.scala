@@ -663,8 +663,9 @@ class Framework extends SbtFramework {
     slowpokeDetectionPeriod: Long,
     concurrentConfig: ConcurrentConfig,
     testSortingReporterTimeout: Span,
-    handOffToTestEventLog: Event => Unit
+    testEventLogEmitter: Option[TestEventLogEmitter]
   ) extends sbt.testing.Runner {
+    private val handOffToTestEventLog = TestEventLogEmitter.handOffTo(testEventLogEmitter)
     val isDone = new AtomicBoolean(false)
     val serverThread = new AtomicReference[Option[Thread]](None)
     val statusList = new LinkedBlockingQueue[Status]()
@@ -761,7 +762,7 @@ class Framework extends SbtFramework {
       } yield task
 
     def done = {
-      if (!isDone.getAndSet(true)) {
+      if (!isDone.getAndSet(true)) try {
 
         // Wait until all status is completed
         statusList.asScala.foreach { s =>
@@ -802,6 +803,10 @@ class Framework extends SbtFramework {
             presentFilePathname
           )
         fragments.map(_.toPossiblyColoredText(presentInColor)).mkString("\n")
+      }
+      finally {
+        // A done that throws before it sends RunCompleted must not leave the run's test event log open.
+        testEventLogEmitter.foreach(_.endWithoutRunEnded())
       }
       else
         throw new IllegalStateException("done method is called twice")
@@ -1164,7 +1169,7 @@ class Framework extends SbtFramework {
         slowpokeDetectionPeriod,
         concurrentConfig,
         testSortingReporterTimeout,
-        TestEventLogEmitter.handOffTo(testEventLogEmitter)
+        testEventLogEmitter
       )
     }
     catch {
