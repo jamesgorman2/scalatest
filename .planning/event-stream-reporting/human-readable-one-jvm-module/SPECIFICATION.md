@@ -16,7 +16,7 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 - [specification/runs-and-test-structure.md](specification/runs-and-test-structure.md) — acceptance criteria for which suites, scopes, tests, failures and captured output the human-readable output shows, how often and in what order, and a run's block.
 - [specification/test-command.md](specification/test-command.md) — acceptance criteria for the test command's arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks and BSP server.
 - [specification/test-event-log.md](specification/test-event-log.md) — acceptance criteria for what a run's test event log holds on the JVM, and for the ScalaTest behaviour that stays unchanged.
-- [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.19, the emitter on each of the JVM's Scala versions, and the consolidation library without Mill.
+- [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.20, the emitter on Scala 3 on the JVM, and the consolidation library without Mill.
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this specification.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against. `R-nnn` IDs in this specification are the epic's.
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts, their parts (§ Modules), and the boundaries between them, including the test event log's events and how it carries them (§ APIs § The emitter and the Mill plugin).
@@ -37,7 +37,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
 - The test command fails before any test starts, with no consolidated output, when given any other output argument, such as `-oP` or an `-f`, or module selectors other than one that resolves to one JVM test module. This narrows what R-048, R-049 and R-055 allow.
 - The test command supports Mill 1.3.1 only.
-- A module that does not test with this fork, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.19, fails the test command.
+- A module that does not test with this fork, such as one testing with MUnit, uTest or upstream ScalaTest 3.2.20, fails the test command.
 
 ### Out of scope
 
@@ -76,7 +76,7 @@ The first bullet's requirements hold in full. Each other holds for one module se
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
 - R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails; for a run that ends aborted or stopped, only that the consolidation state is failed).
 - R-048 (human-readable output on stdout), R-124 (on stdout), R-050.
-- `../SPECIFICATION.md` § Scope: the JVM's Scala versions.
+- `../SPECIFICATION.md` § Scope: Scala 3 on the JVM.
 
 ## Acceptance criteria
 
@@ -123,9 +123,9 @@ The criteria are in the `specification/` documents listed in § Spec documents a
 - *The run's captured output* in a `Given` is the lines fed with a run fed directly to the library, as the output captured from its process, each tagged with its stream. It is given as a table of `stream`, `stdout` or `stderr`, and `line`, in the order the lines are fed. Where the criterion does not say when a line is fed among the event log's events, the criterion holds wherever it is fed.
 - *The console* is what the `mill` command writes to its stdout and stderr. A line of it is *outside the human-readable output* when it is not a line of the human-readable output.
 - A line is given without Mill's prefix (`specification/layout.md` AC-044). A line *sits under* another when it follows it, indented 2 spaces more, with no line between them indented as little as the other. *The lines for* a node are its own lines and every line under them.
-- Text and colours the criteria do not fix are ScalaTest 3.2.19's (R-106). Colour is on (R-124).
+- Text and colours the criteria do not fix are ScalaTest 3.2.20's (R-106). Colour is on (R-124).
 - "With every stack frame left out" drops each line under a throwable's first line or `Cause:` line.
-- *The compatibility fixture* is a set of suites, at least one of each style `specification/test-event-log-structure.md` AC-103 names that the build for the fixture's runtime and Scala version ships, holding between them:
+- *The compatibility fixture* is a set of suites, at least one of each style `specification/test-event-log-structure.md` AC-103 names that the build for the fixture's runtime ships, holding between them:
   - nested suites;
   - scopes, one of them pending;
   - tests that succeed, fail, are ignored, are pending and are cancelled;

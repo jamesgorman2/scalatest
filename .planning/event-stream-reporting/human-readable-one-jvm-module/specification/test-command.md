@@ -47,9 +47,9 @@ Feature: The module's own ScalaTest arguments
   Rule: An argument whose flag the JVM `org.scalatest.tools.Runner` does not recognise fails the test command before any test starts, naming it (R-125)
     Scenario: AC-078 An unrecognised flag
       Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035
-      And the module's own ScalaTest arguments are `-l samples.Slow -y`
+      And the module's own ScalaTest arguments are `-l samples.Slow -x`
       When the test command runs the module
-      Then the test command fails before any test starts, and its failure names `-y`
+      Then the test command fails before any test starts, and its failure names `-x`
       And the console holds no line of human-readable output
 
   Rule: An argument R-125 allows reaches the run with its values, even a value that looks like a flag (R-125)
@@ -116,18 +116,11 @@ Feature: Running the module
       Then the run's block holds `[stdout] env=from-forkEnv`
       And the `cwd=` line it holds is the one `testForked` wrote
 
-  Rule: The test command runs a module whose definition names nothing from the plugin, on each of the JVM's Scala versions (R-092, `../../SPECIFICATION.md` § Scope)
-    Scenario Outline: AC-083 The plugin is added to a build on Scala <version>
-      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala <version>, is the module of `layout.md` AC-002
+  Rule: The test command runs a module whose definition names nothing from the plugin, on Scala 3 (R-092, `../../SPECIFICATION.md` § Scope)
+    Scenario: AC-083 The plugin is added to a build on Scala 3.3
+      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala 3.3, is the module of `layout.md` AC-002
       When the plugin's header line (`../SPECIFICATION.md` § Scope), at the release `core.test` tests with, is added to its `build.mill`, with nothing else in the build changed, and the test command runs the module
       Then the human-readable output is the one `layout.md` AC-002 gives
-
-      Examples:
-        | version |
-        | 2.11    |
-        | 2.12    |
-        | 2.13    |
-        | 3.3     |
 ```
 
 ## The test command's result
@@ -190,7 +183,7 @@ Feature: The test command's result
         | framework                                      |
         | MUnit                                          |
         | uTest                                          |
-        | `org.scalatest:scalatest` 3.2.19               |
+        | `org.scalatest:scalatest` 3.2.20               |
 ```
 
 ## The console

@@ -196,7 +196,7 @@ Feature: Nodes that share a name
 ```gherkin
 Feature: Filtered tests
 
-  Rule: A test a filter excludes is shown only as ScalaTest 3.2.19 reports it (R-112)
+  Rule: A test a filter excludes is shown only as ScalaTest 3.2.20 reports it (R-112)
     Scenario: AC-071 A tag the module's own arguments exclude
       Given suite `SpeedSuite`, class `samples.SpeedSuite`, an `AnyFunSuite` with tests `fast` and `slow`, labelled `- fast` and `- slow`, each succeeding where it runs, of which `slow` is tagged `samples.Slow` and writes `slow ran` to stdout
       And nothing else in the run writes to stdout or stderr or sends a message outside a suite
@@ -226,10 +226,10 @@ Feature: Failures
         second line: ü ß 日本 ✓ (UnicodeSuite.scala:7)
         """
 
-  Rule: Every suite, scope, test and failure ScalaTest 3.2.19 prints is shown (R-021)
+  Rule: Every suite, scope, test and failure ScalaTest 3.2.20 prints is shown (R-021)
     Scenario: AC-073 The compatibility fixture
       Given the module's suites are the compatibility fixture, in which the suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` does not abort
-      And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
+      And the file ScalaTest 3.2.20's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
       Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, with leading spaces removed, is a line of the human-readable output with leading spaces removed, unless it then begins `+ ` (a message) or is a stack-frame line (`test-event-log-events.md` AC-114)
       And each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the human-readable output

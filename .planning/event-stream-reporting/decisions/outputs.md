@@ -10,7 +10,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 - Showing only the last execution hides a failure that a later running of the same test followed with a success (`../SPECIFICATION.md` R-021).
 - One line with a rolled-up outcome gives a node an outcome no event carries, which R-098 leaves to readers; it is deferred (`../ROADMAP.md` § Deferred).
 
-**Reasoning** ScalaTest 3.2.19 prints every running of a test with its own outcome, failure and messages, so showing each execution keeps R-106 and R-021 while the test structure stays what the run registered (R-130).
+**Reasoning** ScalaTest 3.2.20 prints every running of a test with its own outcome, failure and messages, so showing each execution keeps R-106 and R-021 while the test structure stays what the run registered (R-130).
 
 **Costs** The event log, every writer and every reader must handle a node with several executions, and a test run many times prints as many lines. The JSON output's layout for such a node is not fixed (`../JSON-LAYOUT.md` § Not yet fixed).
 
@@ -111,7 +111,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ## Each JSON node holds its final state, with nothing per event.
 
-**Alternatives** Writing each node's events with every field, as ScalaTest 3.2.19's JSON lines do, repeats each event's suite name, suite ID and suite class name, and carries ordinals, formatters and rerunners, which only restate the order the tree already gives or have no meaning outside the run that wrote them.
+**Alternatives** Writing each node's events with every field, as ScalaTest 3.2.20's JSON lines do, repeats each event's suite name, suite ID and suite class name, and carries ordinals, formatters and rerunners, which only restate the order the tree already gives or have no meaning outside the run that wrote them.
 
 **Reasoning** Every reader of the JSON output needs a node's state and its place, and the tree gives the place. One record per node, with one key per value, is what the format's documentation can describe and keep stable under semantic versioning (`../SPECIFICATION.md` R-108, R-084).
 

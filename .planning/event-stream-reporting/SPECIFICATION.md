@@ -27,7 +27,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The test command's output arguments: progress and human-readable output on its stdout or in files, JSON output in files, any number of files, and formatting and filtering of human-readable output.
 - A module a build defines to preset a test command's arguments (R-126).
 
-The emitter, the consolidation library and the Mill plugin cover runs on the JVM, Scala.js and Native, on these Scala versions: the JVM on Scala 2.11, 2.12, 2.13 and 3.3; Scala.js and Native on 2.12, 2.13 and 3.3. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
+The emitter, the consolidation library and the Mill plugin cover runs on the JVM, Scala.js and Native, on Scala 3 only. The fork builds its artifacts with Scala 3.3.8, and builds and publishes none for Scala 2. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
 
 The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. Each lists the Mill releases its integration tests passed on, and supports exactly those (*supported Mill releases*).
 
@@ -53,22 +53,22 @@ A test event log's format, the consolidation library's API and the switch by whi
 
 ### Compatibility with ScalaTest 3.2.x
 
-*3.2.19* means `org.scalatest:scalatest` 3.2.19 run with the same arguments over the same compiled suites. A reporter *receives what 3.2.19 sends* when it receives the events 3.2.19 sends it, with the same field values apart from timestamps, durations and thread names, in this order:
+This fork follows upstream ScalaTest's 3.2 line and is based on its release 3.2.20, which every comparison below is made with. *3.2.20* means `org.scalatest:scalatest` 3.2.20 run with the same arguments over the same compiled suites. A reporter *receives what 3.2.20 sends* when it receives the events 3.2.20 sends it, with the same field values apart from timestamps, durations and thread names, in this order:
 
 - in a sequential run, the same sequence;
-- in a concurrent run, an order 3.2.19 could deliver them, with each suite's events in the order 3.2.19 delivers that suite's.
+- in a concurrent run, an order 3.2.20 could deliver them, with each suite's events in the order 3.2.20 delivers that suite's.
 
 A throwable is compared on its class, its message and its chain of causes, and, where it records the file and line of the code that failed, on that file name and line number. Its stack frames, and where among them the failed code lies, are not compared.
 
-- R-001 A run with the emitter off uses the reporters ScalaTest 3.2.19 uses. Each receives what 3.2.19 sends, and the build tool receives the test-interface events 3.2.19 sends.
-- R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.19 sends.
-- R-051 With the emitter on, the build tool still receives the test-interface events 3.2.19 sends.
-- R-004 The fork stays binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.19.
+- R-001 A run with the emitter off uses the reporters ScalaTest 3.2.20 uses. Each receives what 3.2.20 sends, and the build tool receives the test-interface events 3.2.20 sends.
+- R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.20 sends.
+- R-051 With the emitter on, the build tool still receives the test-interface events 3.2.20 sends.
+- R-004 The fork's Scala 3 artifacts stay binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.20's.
 
 ### Compatibility with IDEs and Mill's test tasks
 
-- R-003 Test runs launched by Metals, Bloop and IntelliJ behave as they do against ScalaTest 3.2.19, including in a build that uses the Mill plugin. This holds in each mode in which IntelliJ's Scala plugin runs ScalaTest:
-  - *forked*: the IDE calls `Runner.run` with only its own `-C` reporter, compiled against ScalaTest 3.2.19;
+- R-003 Test runs launched by Metals, Bloop and IntelliJ behave as they do against ScalaTest 3.2.20, including in a build that uses the Mill plugin. This holds in each mode in which IntelliJ's Scala plugin runs ScalaTest:
+  - *forked*: the IDE calls `Runner.run` with only its own `-C` reporter, compiled against ScalaTest 3.2.20;
   - *sbt shell*: the IDE forces `-oDU` and parses the text ScalaTest prints;
   - *BSP*: the build server runs `Framework` and forwards its test-interface events.
 - R-060 In a build that uses the Mill plugin, Mill's test tasks (`testForked`, `testOnly`, `testCached` and `testLocal`), including when run as `mill __.test`, behave as they do without the plugin.
@@ -99,7 +99,7 @@ These hold for each run's test structure and for how the human-readable and JSON
 - R-098 Every execution of a test has an outcome. An execution of a scope has one only when it is pending or aborted, an execution of a suite only when it is aborted, and a run only when it is aborted or stopped. No node or execution is given an outcome rolled up from its children or from other executions; readers roll them up.
 - R-099 A suite that aborts, including one whose constructor throws, is shown as aborted on every runtime. Each execution of a scope or test open inside it when it aborts is aborted.
 - R-100 Each nested suite, scope and test a run was to execute that never started is aborted with reason *not run*.
-- R-112 A suite, scope or test that a filter excludes, as by tag or test name, is not aborted as R-100 aborts a node that never started. It is shown only as the events ScalaTest 3.2.19 reports for it give.
+- R-112 A suite, scope or test that a filter excludes, as by tag or test name, is not aborted as R-100 aborts a node that never started. It is shown only as the events ScalaTest 3.2.20 reports for it give.
 - R-103 Each execution has a duration, except where the events that time it carry none. A node that never ran has none.
 
 ## Consolidated output
@@ -121,31 +121,31 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### Human-readable output
 
-- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.19 prints it with no reporter configuration characters, as changed by its formatting and filtering characters (R-127), except that:
+- R-106 The human-readable output shows each suite, scope, test, message and failure in the format ScalaTest 3.2.20 prints it with no reporter configuration characters, as changed by its formatting and filtering characters (R-127), except that:
   - its root is the consolidation, with test run labels below it (R-078), and labels and top-level suites take the order R-079 gives (ascending lexicographic, by name);
-  - every line is indented under the line it belongs to, in place of 3.2.19's indentation;
+  - every line is indented under the line it belongs to, in place of 3.2.20's indentation;
   - each message is marked with its kind (R-097);
-  - every suite shows its name line, including one for which 3.2.19 prints none;
-  - each outcome R-098 gives a node, and each reason R-100, R-101, R-102, R-058 and R-114 give, is shown with its node, including where 3.2.19 prints no line for it;
+  - every suite shows its name line, including one for which 3.2.20 prints none;
+  - each outcome R-098 gives a node, and each reason R-100, R-101, R-102, R-058 and R-114 give, is shown with its node, including where 3.2.20 prints no line for it;
   - on stdout, each line carries the prefix Mill puts on every line the test command's own task writes.
 - R-131 The human-readable output shows a scope or test once for each of its executions, each with what that execution alone produced (its outcome, failure, messages, captured output and duration), and once where it has none.
-- R-133 In the human-readable output, the executions of a scope or test that ran in one execution of its parent scope, or in its suite where its parent is the suite, appear together at the node's declared position (R-105), in the order they started. This overrides R-106 (the format ScalaTest 3.2.19 prints).
+- R-133 In the human-readable output, the executions of a scope or test that ran in one execution of its parent scope, or in its suite where its parent is the suite, appear together at the node's declared position (R-105), in the order they started. This overrides R-106 (the format ScalaTest 3.2.20 prints).
 - R-134 In the human-readable output, an execution of a scope or test appears under the execution of its parent scope that it ran in.
-- R-132 The human-readable output shows a suite's name line once, however many times the suite ran. Under it, each of the suite's executions shows what it alone produced (its abort, with the lines under it, and its messages), in the order the executions started. This overrides R-106 (the format ScalaTest 3.2.19 prints).
-- R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.19 reporter configuration character:
+- R-132 The human-readable output shows a suite's name line once, however many times the suite ran. Under it, each of the suite's executions shows what it alone produced (its abort, with the lines under it, and its messages), in the order the executions started. This overrides R-106 (the format ScalaTest 3.2.20 prints).
+- R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.20 reporter configuration character:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.
 
   Each `-o` and `-f` formats only its own output, and its characters apply alike to every module of the test command. A `-f` naming JSON output takes none (R-121). This overrides R-021, R-097 and R-012 in the human-readable output for the lines a filter hides.
-- R-128 `s` and `f` add no stack trace for a `StackDepthException`, such as a `TestFailedException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.19).
-- R-124 Human-readable output on the test command's stdout is coloured where Mill colours its own console output, and not where `w` is given. A file `-f` writes is never coloured. This overrides R-106 (the format ScalaTest 3.2.19 prints) for colour.
+- R-128 `s` and `f` add no stack trace for a `StackDepthException`, such as a `TestFailedException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.20).
+- R-124 Human-readable output on the test command's stdout is coloured where Mill colours its own console output, and not where `w` is given. A file `-f` writes is never coloured. This overrides R-106 (the format ScalaTest 3.2.20 prints) for colour.
 - R-107 In the human-readable output, a subtree is *collapsed* when its root is aborted and no other node in it has an execution. A collapsed subtree is shown as its root alone, with a count of the nodes it hides where it hides any. Nothing else is collapsed: a node with an execution never collapses into an ancestor, and siblings are never merged. This overrides R-021 (every suite, scope and test is shown). The JSON output collapses nothing.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
   - output captured against the run;
   - messages attached to the run rather than to a suite;
   - how the run ended, where it aborted, stopped or did not finish.
 
-  This overrides R-106 (the human-readable output keeps the format ScalaTest 3.2.19 prints).
+  This overrides R-106 (the human-readable output keeps the format ScalaTest 3.2.20 prints).
 
 ### JSON output
 
@@ -167,7 +167,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### Captured output
 
-- R-012 Each piece of captured output is shown on the narrowest suite, scope or test it was captured against, else on its run: in the run's run record in the JSON output, and in the run's block in the human-readable output. Each is shown with its stream, stdout or stderr, where that is known. In the human-readable output, output captured against a suite, scope or test keeps its position among the events of the execution it was captured in. In the human-readable output, this overrides R-106 (the format ScalaTest 3.2.19 prints).
+- R-012 Each piece of captured output is shown on the narrowest suite, scope or test it was captured against, else on its run: in the run's run record in the JSON output, and in the run's block in the human-readable output. Each is shown with its stream, stdout or stderr, where that is known. In the human-readable output, output captured against a suite, scope or test keeps its position among the events of the execution it was captured in. In the human-readable output, this overrides R-106 (the format ScalaTest 3.2.20 prints).
 - R-122 In the JSON output, each node and run record holds the output captured against it, not only test output, whatever its source and whether or not its stream is known.
 - R-088 In each of the human-readable and JSON output, each piece of output a process wrote appears at most once, even where it was captured both against a node and from the process's stdout or stderr.
 - R-086 Output captured only against the run is shown without claiming that it is test output or worker output.
@@ -230,7 +230,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 These hold for every run a test command starts.
 
 - R-040 Nothing the run writes to stdout or stderr reaches the console except through the consolidated output.
-- R-041 Neither the reporter ScalaTest uses when no reporter is configured, nor a reporter the test module's own ScalaTest arguments configure (R-125), prints the run's events. This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.19 sends).
+- R-041 Neither the reporter ScalaTest uses when no reporter is configured, nor a reporter the test module's own ScalaTest arguments configure (R-125), prints the run's events. This overrides R-002 (with the emitter on, every existing reporter receives what 3.2.20 sends).
 - R-042 Output captured from the stdout and stderr of the run's processes is captured against the run.
 - R-129 No line that Mill's test runner writes in the run's processes for a test class it runs, such as `Running Test Class <name>`, is captured. This overrides R-042 (output captured from the run's processes is captured against the run).
 - R-043 Output captured from the run's processes' stdout keeps its order, as does output captured from their stderr, whatever its source. Its position among the run's events, and the order of stdout relative to stderr, are not guaranteed.
@@ -318,7 +318,7 @@ A process *takes* a test class as follows:
 
 ### A test module the test command cannot run
 
-- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose test event logs the Mill plugin reads, or to a Scala.js test module whose JS environment is not `NodeJs` or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.19 or another release of this fork. Each file it was to write stays deleted or emptied, as R-077 left it when the test command started.
+- R-059 IF a module selector resolves to a test module that does not test with the release of this fork whose test event logs the Mill plugin reads, or to a Scala.js test module whose JS environment is not `NodeJs` or `JsDom`, THEN the test command fails before any test starts, naming each such module, and produces no consolidated output. Examples are a module that tests with MUnit, uTest, upstream ScalaTest 3.2.20 or another release of this fork. Each file it was to write stays deleted or emptied, as R-077 left it when the test command started.
 
 ### A test module whose tests cannot start
 
@@ -344,4 +344,4 @@ These hold where the running Mill release is not a supported Mill release.
 - R-093 Before any test starts, the test command warns on the console, naming the running Mill version, and any human-readable output repeats the warning.
 - R-118 The test command runs. Where a Mill internal it needs is missing, it may instead fail before any test starts, naming the Mill version and producing no consolidated output.
 - R-119 No other requirement holds for the test command or its output, except that any JSON output records the Mill version and its support status, as R-081 gives for the root.
-- R-120 Mill's test tasks behave as they do without the plugin (R-060), and runs launched by Metals, Bloop and IntelliJ behave as they do against ScalaTest 3.2.19 (R-003), on every Mill release the plugin runs on, supported or not.
+- R-120 Mill's test tasks behave as they do without the plugin (R-060), and runs launched by Metals, Bloop and IntelliJ behave as they do against ScalaTest 3.2.20 (R-003), on every Mill release the plugin runs on, supported or not.

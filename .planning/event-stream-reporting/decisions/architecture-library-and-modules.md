@@ -2,6 +2,18 @@
 
 Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, builds on and decides, and how the fork's artifacts are built and published, newest first.
 
+## The fork compiles with Scala 3.3.8 on every runtime.
+
+**Alternatives** Scala 3.9.0, the version the fork's consumer builds with, has an unknown cost in the macros of Scalactic and ScalaTest, and raises the JDK the artifacts need.
+
+**Reasoning** Upstream's 3.3 line, whose sources are near-identical to these, builds with Scala 3.3.8, so these sources are known to compile on it. A module on a later Scala 3 version, such as 3.9.0, uses a library built with 3.3.8 unchanged.
+
+**Costs** A module on a Scala 3 version before 3.3 cannot compile against the fork's artifacts, as it can against upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3.
+
+**Settled by** [What binary compatibility does the fork promise, given its base is upstream 3.3.0-alpha.2?](https://github.com/jamesgorman2/scalatest/issues/107).
+
+---
+
 ## The library gives the consolidation state as a synchronous read of four states, available from **Start**.
 
 **Alternatives**
@@ -34,7 +46,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 **Alternatives**
 
-- Keeping `org.scalatest` makes a fork release and upstream `org.scalatest:scalatest` 3.2.19 versions of one artifact, so in a build that also resolves upstream ScalaTest, conflict resolution silently keeps one and evicts the other.
+- Keeping `org.scalatest` gives a fork release the coordinates of upstream's release of the same version, `org.scalatest:scalatest` 3.2.20, so a build cannot tell which of the two it resolved, and against any other upstream version conflict resolution silently keeps one and evicts the other.
 - Renaming the artifacts under `org.scalatest` also separates the coordinates, but publishes under a group this fork does not own, which Maven Central refuses.
 
 **Reasoning** A test module must test with this fork's release for the test command to run it (`../SPECIFICATION.md` R-059). Under a group of its own, the fork's artifacts stay on a module's resolved classpath whatever else the module resolves, and their coordinates alone tell them from upstream's.
@@ -59,7 +71,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 ## The consolidation library builds on scalatest-core and shares its formatting.
 
-**Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from the ScalaTest 3.2.19 format `../SPECIFICATION.md` R-106 requires.
+**Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from the ScalaTest 3.2.20 format `../SPECIFICATION.md` R-106 requires.
 
 **Reasoning** A test event log is read only by the release that wrote it (`event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output in the format R-106 requires.
 

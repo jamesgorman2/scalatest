@@ -9,7 +9,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 - Round-trip tests in one build pass even where the builds of core that write and read an event log disagree, and never feed the decoder a torn last line.
 - End-to-end tests alone cannot produce a torn last line on demand, and a failure does not say which side drifted.
 
-**Reasoning** The encoder runs in the run's process, on core's build for the module's runtime and Scala version, and the decoder in Mill's JVM on core's Scala 3 build (`../ARCHITECTURE.md` § Modules § Mill plugin), so within one release they are separate components whose only interface is the format. Testing each side against expected text in that format covers every pairing of those builds, and lets the decoder's tests feed it what a dying run leaves.
+**Reasoning** The encoder runs in the run's process, on core's build for the module's runtime, and the decoder in Mill's JVM on core's JVM build (`../ARCHITECTURE.md` § Modules § Mill plugin), so within one release they are separate components whose only interface is the format. Testing each side against expected text in that format covers every pairing of those builds, and lets the decoder's tests feed it what a dying run leaves.
 
 **Costs** The format must be written down, and every change to it updates the expected text of both sides' tests.
 

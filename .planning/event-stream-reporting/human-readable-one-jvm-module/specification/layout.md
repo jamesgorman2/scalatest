@@ -97,7 +97,7 @@ Feature: The tree of the human-readable output
             Scenario: paying by card
         """
 
-  Rule: The scopes and tests of each `Any` style, `AsyncFeatureSpec` and `RefSpec` show the labels ScalaTest 3.2.19 prints for them (R-106)
+  Rule: The scopes and tests of each `Any` style, `AsyncFeatureSpec` and `RefSpec` show the labels ScalaTest 3.2.20 prints for them (R-106)
     Scenario Outline: AC-119 <style>
       Given suite `<suite>`, class `samples.<suite>`, of style `<style>`, declaring <declaration>, whose one test succeeds
       When the test command runs the module
@@ -153,14 +153,14 @@ Each row holds when the library consolidates an event log holding the row's node
 |--------|--------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|--------------------------------------------------------|--------------------|
 | AC-045 | a test run label                                             | `[<module path>]`                                                                                        | nothing: it is not indented                            | cyan               |
 | AC-012 | a suite's abort line                                         | `<class name> *** ABORTED ***`, or `<class name> *** NOT RUN ***` where its reason is *not run*          | the suite's name line                                  | red                |
-| AC-013 | an aborted suite's abort message lines and its throwable's first line | 3.2.19's                                                                                        | the suite's abort line                                 | red                |
+| AC-013 | an aborted suite's abort message lines and its throwable's first line | 3.2.20's                                                                                        | the suite's abort line                                 | red                |
 | AC-016 | a collapsed subtree's count line                             | AC-055's                                                                                                 | its root's line: a suite's name line or a scope's line | red                |
 | AC-046 | a run's block heading                                        | `Output outside any suite:`                                                                              | its test run label                                     | cyan               |
 | AC-014 | a message attached to the run                                | AC-028 to AC-031's                                                                                       | the block's heading                                    | AC-028 to AC-031's |
 | AC-047 | a line captured from stdout                                  | `[stdout] <text>`                                                                                        | the block's heading                                    | uncoloured         |
 | AC-048 | a line captured from stderr                                  | `[stderr] <text>`                                                                                        | the block's heading                                    | yellow             |
 | AC-050 | an aborted run's end                                         | `*** RUN ABORTED ***`                                                                                    | the block's heading                                    | red                |
-| AC-015 | a run abort's message lines and its throwable's first line   | 3.2.19's                                                                                                 | `*** RUN ABORTED ***`                                  | red                |
+| AC-015 | a run abort's message lines and its throwable's first line   | 3.2.20's                                                                                                 | `*** RUN ABORTED ***`                                  | red                |
 | AC-051 | a stopped run's end                                          | `*** RUN STOPPED ***`                                                                                    | the block's heading                                    | red                |
 
 ## Messages

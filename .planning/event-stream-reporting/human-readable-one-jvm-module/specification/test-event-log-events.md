@@ -166,7 +166,7 @@ Feature: What the event log keeps of each event
         | a `StackDepth` exception                  | calls `fail("boom")` at line 7                                               | the throwable `org.scalatest.exceptions.TestFailedException "boom" at FailSuite.scala:7`, which also holds the pathname of `FailSuite.scala` |
         | a property check failure                  | runs a `forAll` from `TableDrivenPropertyChecks` whose property fails         | a throwable marked `property check`                                                                                                                         |
         | a throwable whose message is `null`       | throws `new RuntimeException()`                                              | the throwable `java.lang.RuntimeException null`                                                                                                            |
-        | an assertion with analysis                | calls `assert(Point(1, 2) == Point(1, 3))`, `Point` being a case class, for which 3.2.19's `TestFailed` carries an analysis | the `analysis` that a `-C` recording reporter in the same run receives on the test's `TestFailed`                                                         |
+        | an assertion with analysis                | calls `assert(Point(1, 2) == Point(1, 3))`, `Point` being a case class, for which 3.2.20's `TestFailed` carries an analysis | the `analysis` that a `-C` recording reporter in the same run receives on the test's `TestFailed`                                                         |
 ```
 
 ## Captured output
@@ -202,10 +202,10 @@ Feature: The event log and reporters
 
 ## Unchanged behaviour
 
-These hold on this fork against ScalaTest 3.2.19, with the emitter off and on (R-001, R-002, R-051).
+These hold on this fork against ScalaTest 3.2.20, with the emitter off and on (R-001, R-002, R-051).
 
 - AC-113 No class of `org.scalatest.events` gains, loses or changes a field or constructor parameter, and no event class is added or removed. Any such change violates it, even an added field MiMa accepts.
-- AC-114 Every `-o`, `-e` and `-f` reporter the run's arguments configure, `J` reporters included, writes what 3.2.19 writes for the same events, through `Framework`'s test-interface loggers where `Framework` runs it. A difference in any character, colour or line violates it, apart from what the comparison with 3.2.19 leaves out (`../../SPECIFICATION.md` § Constraints § Compatibility with ScalaTest 3.2.x), a `J` reporter's `stackTraces` and `depth` among them. In text, each run of *stack-frame lines*, the `at ` lines printed for a throwable's frames, counts as one line, whatever it holds. The one reporter excepted is the reporter ScalaTest uses when no reporter is configured, which with the emitter on prints nothing (R-041).
-- AC-115 `Runner.run` and `Framework` accept every argument list 3.2.19's accept, and reject every one 3.2.19's reject with 3.2.19's message. The runner argument is the only argument they newly accept.
-- AC-116 On Scala.js and Native, which take no runner argument, for the compatibility fixture compiled for each, every reporter and the build tool's test-interface event handler receive what 3.2.19 sends them, and the build tool's test-interface loggers receive the lines they receive on 3.2.19, apart from what AC-114 exempts.
-- AC-117 A run not given the runner argument writes no test event log, and creates no file and starts no thread that 3.2.19 does not.
+- AC-114 Every `-o`, `-e` and `-f` reporter the run's arguments configure, `J` reporters included, writes what 3.2.20 writes for the same events, through `Framework`'s test-interface loggers where `Framework` runs it. A difference in any character, colour or line violates it, apart from what the comparison with 3.2.20 leaves out (`../../SPECIFICATION.md` § Constraints § Compatibility with ScalaTest 3.2.x), a `J` reporter's `stackTraces` and `depth` among them. In text, each run of *stack-frame lines*, the `at ` lines printed for a throwable's frames, counts as one line, whatever it holds. The one reporter excepted is the reporter ScalaTest uses when no reporter is configured, which with the emitter on prints nothing (R-041).
+- AC-115 `Runner.run` and `Framework` accept every argument list 3.2.20's accept, and reject every one 3.2.20's reject with 3.2.20's message. The runner argument is the only argument they newly accept.
+- AC-116 On Scala.js and Native, which take no runner argument, for the compatibility fixture compiled for each, every reporter and the build tool's test-interface event handler receive what 3.2.20 sends them, and the build tool's test-interface loggers receive the lines they receive on 3.2.20, apart from what AC-114 exempts.
+- AC-117 A run not given the runner argument writes no test event log, and creates no file and starts no thread that 3.2.20 does not.

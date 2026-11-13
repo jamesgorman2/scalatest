@@ -1,10 +1,10 @@
 # Consolidated human-readable output for one JVM module: compatibility, the emitter and the library
 
-Acceptance criteria for what holds outside the test command: compatibility with ScalaTest 3.2.19, the emitter on each of the JVM's Scala versions, and the consolidation library without Mill. [test-event-log.md](test-event-log.md) gives what the test event log holds. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
+Acceptance criteria for what holds outside the test command: compatibility with ScalaTest 3.2.20, the emitter on Scala 3 on the JVM, and the consolidation library without Mill. [test-event-log.md](test-event-log.md) gives what the test event log holds. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use.
 
-## Compatibility with ScalaTest 3.2.19
+## Compatibility with ScalaTest 3.2.20
 
-AC-056 and AC-057 hold on each of Scala 2.11, 2.12, 2.13 and 3.3, with the compatibility fixture compiled for that version and run on this fork's and 3.2.19's builds for it.
+AC-056 and AC-057 hold on Scala 3, with the compatibility fixture compiled once with Scala 3.3 and run on this fork's and 3.2.20's Scala 3 builds.
 
 Each IntelliJ run mode is a case of these criteria with the emitter off (R-003):
 
@@ -15,58 +15,51 @@ Each IntelliJ run mode is a case of these criteria with the emitter off (R-003):
 In a build that adds the plugin, what an IDE asks of Mill's BSP server is [test-command.md](test-command.md) AC-093.
 
 ```gherkin
-Feature: Compatibility with ScalaTest 3.2.19
+Feature: Compatibility with ScalaTest 3.2.20
 
   Background:
-    Given the compatibility fixture, compiled against `org.scalatest:scalatest` 3.2.19
-    And it runs sequentially, once on 3.2.19 and once on this fork
+    Given the compatibility fixture, compiled against `org.scalatest:scalatest` 3.2.20
+    And it runs sequentially, once on 3.2.20 and once on this fork
 
-  Rule: Reporters and the build tool receive what 3.2.19 sends them, with the emitter off or on (R-001, R-002, R-051, R-003)
+  Rule: Reporters and the build tool receive what 3.2.20 sends them, with the emitter off or on (R-001, R-002, R-051, R-003)
     Scenario Outline: AC-056 <launch>, emitter <emitter>
       When each run is launched through <launch>, the fork's run given the runner argument only where the emitter is on
-      Then <receiver> receives on this fork what 3.2.19 sends it (`../../SPECIFICATION.md` § Constraints § Compatibility with ScalaTest 3.2.x)
+      Then <receiver> receives on this fork what 3.2.20 sends it (`../../SPECIFICATION.md` § Constraints § Compatibility with ScalaTest 3.2.x)
 
       Examples:
         | launch                                                                           | emitter | receiver                         |
-        | `Runner.run`, its one reporter a `-C` recording reporter compiled against 3.2.19 | off     | the `-C` reporter                |
-        | `Runner.run`, its one reporter a `-C` recording reporter compiled against 3.2.19 | on      | the `-C` reporter                |
+        | `Runner.run`, its one reporter a `-C` recording reporter compiled against 3.2.20 | off     | the `-C` reporter                |
+        | `Runner.run`, its one reporter a `-C` recording reporter compiled against 3.2.20 | on      | the `-C` reporter                |
         | `Framework`, its runner given no other argument                                  | off     | the test-interface event handler |
         | `Framework`, its runner given no other argument                                  | on      | the test-interface event handler |
 
-  Rule: The text ScalaTest's standard-output reporter prints, as IntelliJ's sbt shell mode reads it, is 3.2.19's, with the emitter off or on (R-001, R-002, R-003)
+  Rule: The text ScalaTest's standard-output reporter prints, as IntelliJ's sbt shell mode reads it, is 3.2.20's, with the emitter off or on (R-001, R-002, R-003)
     Scenario Outline: AC-057 `-oDU` through `Framework`, emitter <emitter>
       When each run is launched through `Framework`, its runner given `-oDU`, the fork's run given the runner argument only where the emitter is on
-      Then the lines the runner's test-interface loggers receive on this fork are those they receive on 3.2.19, apart from what `test-event-log-events.md` AC-114 exempts
+      Then the lines the runner's test-interface loggers receive on this fork are those they receive on 3.2.20, apart from what `test-event-log-events.md` AC-114 exempts
 
       Examples:
         | emitter |
         | off     |
         | on      |
 
-  Rule: The fork stays binary compatible with ScalaTest 3.2.x (R-004)
-    Scenario: AC-058 MiMa against 3.2.19
-      When MiMa checks each artifact that both this fork and ScalaTest 3.2.19 publish against 3.2.19's
+  Rule: The fork's Scala 3 artifacts stay binary compatible with ScalaTest 3.2.x (R-004)
+    Scenario: AC-058 MiMa against 3.2.20
+      When MiMa checks each Scala 3 artifact that both this fork and ScalaTest 3.2.20 publish against 3.2.20's
       Then it reports no binary incompatibility
 ```
 
-## The emitter on each Scala version
+## The emitter on Scala 3
 
 ```gherkin
-Feature: The emitter on each of the JVM's Scala versions
+Feature: The emitter on Scala 3 on the JVM
 
-  Rule: The emitter covers the JVM on each of its Scala versions (`../../SPECIFICATION.md` § Scope)
-    Scenario Outline: AC-061 Scala <version>
-      Given suite `SqrtPropSpec` of `layout.md` AC-002, compiled with Scala <version>
-      When it runs through `Framework` on this fork's build for Scala <version>, with the runner argument
+  Rule: The emitter covers the JVM on Scala 3 (`../../SPECIFICATION.md` § Scope)
+    Scenario: AC-061 Scala 3.3
+      Given suite `SqrtPropSpec` of `layout.md` AC-002, compiled with Scala 3.3
+      When it runs through `Framework` on this fork's Scala 3 build, with the runner argument
       And its test event log, decoded with core's codec, is fed to the consolidation library directly
       Then the human-readable output is the one `layout.md` AC-002 gives
-
-      Examples:
-        | version |
-        | 2.11    |
-        | 2.12    |
-        | 2.13    |
-        | 3.3     |
 ```
 
 ## The consolidation library without Mill

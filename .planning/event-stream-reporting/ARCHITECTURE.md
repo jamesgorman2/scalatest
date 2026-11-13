@@ -12,7 +12,7 @@ Three deployable units. Every artifact of this fork, core's included, is publish
 
 ### ScalaTest core
 
-Every artifact the fork's sbt build publishes, scalactic and the style artifacts included, keeps its upstream name and runtime and Scala-version suffixes, on every runtime and Scala version `SPECIFICATION.md` § Scope covers. A test module tests with this fork by depending on them as it would on upstream's, usually through `scalatest`. Every part below is in `scalatest-core`, which the other ScalaTest artifacts depend on, and is internal (`private[scalatest]`).
+Every artifact the fork's sbt build publishes, scalactic and the style artifacts included, keeps its upstream name and its runtime and Scala 3 suffixes, on every runtime `SPECIFICATION.md` § Scope covers. Each is built with Scala 3.3.8 (`decisions/architecture-library-and-modules.md` "The fork compiles with Scala 3.3.8 on every runtime."), on Scala.js with Scala.js 1.20.2 and on Native with Scala Native 0.5.10. A test module tests with this fork by depending on them as it would on upstream's, usually through `scalatest`. Every part below is in `scalatest-core`, which the other ScalaTest artifacts depend on, and is internal (`private[scalatest]`).
 
 - **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. It hands each `Event` it receives to the emitter, unless another wrapper already has, so only the innermost wrapper an event reaches hands it off (`decisions/architecture-test-structure.md` "Structure is attached where each event is emitted…").
   - A wrapper that receives an event another wrapper has handed off still gives the emitter its own node. If the emitter holds that event, this places the event's suite instance (§ APIs § The emitter and the Mill plugin, item 3).
@@ -34,7 +34,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - It numbers each node's executions (§ APIs § The emitter and the Mill plugin, item 3).
   - It is not a `-C` reporter opened on `RunStarting`, which could not send the `runStarted` event in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
 - **Codec** — the one implementation of the event log's format (§ APIs § The emitter and the Mill plugin). The encoder runs in every run with the emitter on; the decoder runs in Mill's JVM. Each side is tested on its own against the format (`decisions/architecture-test-event-log.md` "Each side of core's codec is tested on its own…").
-  - It encodes and decodes the format by hand, since core builds for Scala 2.11 to 3 on the JVM, Scala.js and Native and takes no serialisation library.
+  - It encodes and decodes the format by hand, since core builds for the JVM, Scala.js and Native and takes no serialisation library.
   - The decoder yields each ScalaTest event as a member of the decoded event family, one class per `org.scalatest.events` class, holding what the event log carries of that event (`decisions/architecture-test-event-log.md` "Core's decoder yields each ScalaTest event as a member of a decoded event family…").
   - An event's throwable decodes to core's decoded throwable, its cause and suppressed throwables included. A throwable met twice within one event decodes to the same object, so a cycle decodes as a cycle.
 - **Runner argument definition** — the one definition of the runner argument's spelling and syntax (§ APIs § The emitter and the Mill plugin). Core's own argument parsing reads the argument through it.
@@ -57,7 +57,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
 `scalatest-mill`, published as `scalatest-mill_mill1_3`, Mill 1.x's plugin form. Built by its own Mill build inside this repo, not the sbt build, against the locally published scalatest-core and consolidation library. It hosts the consolidation library and adds the test command.
 
-- Mill fixes the plugin's Scala version: Mill `1.3.1`, the release the plugin is built against, is built on Scala 3.9.0, while core's Scala 3 build is 3.3.8. The plugin loads core's Scala 3 build and the library into Mill's JVM.
+- Mill fixes the plugin's Scala version: Mill `1.3.1`, the release the plugin is built against, is built on Scala 3.9.0, while core and the library are built with Scala 3.3.8 (§ ScalaTest core). The plugin loads both into Mill's JVM.
 - Its integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns.").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
@@ -267,6 +267,6 @@ flowchart LR
   - The Scala.js adapter runs the `jsEnvConfig`'s `executable` with its `args` and `env`. When it closes a run it calls `destroyForcibly()` on that process, which on Linux closes Mill's pipes to it and discards what Mill had not read (`research/jsdom-channel.md` § 4).
   - The Native adapter runs `<CROSSCOMPILING_EMULATOR words> <binaryFile> <port>` on Mill's own stdin, stdout and stderr (`inheritIO()`), so no byte the binary writes passes through Mill's JVM (`research/js-native-channels.md` § 1.2, § 5.2).
   - `JsDom` window code has no `require` and no `process`, so a `JsDom` run can write no file, open no Node socket, and learn neither its PID nor its start time (`research/jsdom-channel.md` § 1).
-- **Metals, Bloop and IntelliJ** — launch runs without the runner argument, so the emitter stays off and every reporter receives what 3.2.19 sends (`SPECIFICATION.md` R-001, R-003).
+- **Metals, Bloop and IntelliJ** — launch runs without the runner argument, so the emitter stays off and every reporter receives what 3.2.20 sends (`SPECIFICATION.md` R-001, R-003).
   - In IntelliJ's *forked* mode, its reporter writes TeamCity service messages (`##teamcity[…]`) to stdout, inferring each node's parent from `Ordinal` prefixes and `suiteId`. It needs each `SuiteStarting` and `ScopeOpened` before the tests inside it and every open closed, and silently drops event types it does not know.
   - In *sbt shell* mode, IntelliJ parses the text ScalaTest prints with regular expressions.

@@ -22,11 +22,11 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 **Alternatives**
 
 - Keeping the empty config map's structure for the whole run leaves a test only the run's config map registers without a node, and shows a test only the empty config map registers as not run.
-- Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor earlier than 3.2.19: one that throws given that config map then throws before `SuiteStarting`, where 3.2.19 reports `SuiteStarting` and then `SuiteAborted` (`specification/compatibility-and-library.md` AC-056, `../SPECIFICATION.md` R-002).
-- Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.19 does, before `SuiteStarting`.
+- Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor earlier than 3.2.20: one that throws given that config map then throws before `SuiteStarting`, where 3.2.20 reports `SuiteStarting` and then `SuiteAborted` (`specification/compatibility-and-library.md` AC-056, `../SPECIFICATION.md` R-002).
+- Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.20 does, before `SuiteStarting`.
 - A structure of the suite's test names alone, as for a suite with no registration tree, drops a wrapped style's scopes and labels, against `specification/test-event-log-structure.md` AC-103's Rule.
 
-**Reasoning** 3.2.19 already constructs the class with an empty config map before `SuiteStarting`, as `ConfigMapWrapperSuite`'s `wrappedSuite`: `Framework`'s task reads its `suiteId`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading what that instance registers runs no user code earlier than 3.2.19 does, so nothing a reporter receives changes. The instance that runs is built after `SuiteStarting`, as in 3.2.19, and where it registers a different tree a further `structure` replaces the first (`specification/test-event-log-structure.md` AC-131).
+**Reasoning** 3.2.20 already constructs the class with an empty config map before `SuiteStarting`, as `ConfigMapWrapperSuite`'s `wrappedSuite`: `Framework`'s task reads its `suiteId`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading what that instance registers runs no user code earlier than 3.2.20 does, so nothing a reporter receives changes. The instance that runs is built after `SuiteStarting`, as in 3.2.20, and where it registers a different tree a further `structure` replaces the first (`specification/test-event-log-structure.md` AC-131).
 
 **Costs** Where a suite's tests depend on its config map, the event log first holds a structure that disagrees with what runs: a run that dies between the suite's `SuiteStarting` and the further `structure` leaves the empty config map's structure as the one shown.
 
@@ -41,11 +41,11 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Alternatives**
 
-- Carrying `org.scalatest.ConfigMapWrapperSuite`, as 3.2.19's events do, shows the same class on every wrapped suite's abort line (`specification/layout.md` AC-012).
+- Carrying `org.scalatest.ConfigMapWrapperSuite`, as 3.2.20's events do, shows the same class on every wrapped suite's abort line (`specification/layout.md` AC-012).
 
 **Reasoning** The abort line names the class that aborted so a reader can find it, and only the annotated class holds the code that ran.
 
-**Costs** The event log's class name for such a suite differs from the one 3.2.19's reporters receive.
+**Costs** The event log's class name for such a suite differs from the one 3.2.20's reporters receive.
 
 **Settled by** [Which instance supplies a ConfigMapWrapperSuite-wrapped suite's structure, and which class name does it carry?](https://github.com/jamesgorman2/scalatest/issues/70).
 

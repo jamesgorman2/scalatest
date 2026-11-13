@@ -4,11 +4,11 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 ## A cancelled test fails the test command, even where Mill's test task passes it.
 
-**Alternatives** Passing a cancelled test, as ScalaTest 3.2.19 does under sbt and Mill's test task, keeps existing builds green, but lets a build whose tests did not run for want of a precondition look green.
+**Alternatives** Passing a cancelled test, as ScalaTest 3.2.20 does under sbt and Mill's test task, keeps existing builds green, but lets a build whose tests did not run for want of a precondition look green.
 
 **Reasoning** A test is cancelled where a precondition it needs is not met, so it did not test what it was written to test. If that did not fail the test command, a cancelled test would be an error a build could ignore, and no error should be ignorable (`../SPECIFICATION.md` R-046).
 
-**Costs** A build with a cancelled test passes under Mill's test task and ScalaTest 3.2.19 and fails under the test command.
+**Costs** A build with a cancelled test passes under Mill's test task and ScalaTest 3.2.20 and fails under the test command.
 
 **Settled by** [How does the test command learn whether a run reported a failure, and whether its stream ended without a runEnded event?](https://github.com/jamesgorman2/scalatest/issues/103).
 
