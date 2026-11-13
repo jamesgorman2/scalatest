@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions or MiMa settings, or running sbt from GitBash on Windows.
+description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions or MiMa settings, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
 ---
 
 <learning>
@@ -41,7 +41,11 @@ To run such a command in batch mode, put it in a temporary `.sbt` file at the bu
 <learning>
 date: 2026-11-13
 ---
-On Windows, sbt-osgi's `bundle` task rewrites the project's jar on every run and fails with `FileSystemException: … being used by another process` where the same sbt session has already opened that jar, as compiling a dependent project or running MiMa does.
+On Windows, sbt-osgi's `bundle` task rewrites the project's jar on every run and fails with `FileSystemException: … being used by another process` where the same sbt session has already bundled a dependent project. sbt-osgi 0.9.6 reads `dependencyClasspathAsJars`, so the dependent's bundle opens the jar of each project it depends on and keeps it open.
 
-Run a task that bundles and publishes, such as `publishLocal`, in a fresh sbt session or before any task that reads the jars.
+- Packaging or publishing a dependent project bundles it. So does running `mimaReportBinaryIssues` on it where `mimaCurrentClassfiles` is the packaged jar.
+- Compiling a dependent project does not open the jar: its classpath holds the dependency's `classes` directory.
+- Running `mimaReportBinaryIssues` on the project itself does not hold its jar open.
+
+In one sbt session, bundle each project once, dependencies first. Bundle a project again only in a fresh session.
 </learning>
