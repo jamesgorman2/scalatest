@@ -11,7 +11,11 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
   - the scopes and tests of an instance that runs, though the instance first read may register others and user code runs instances core never sees;
   - each execution of a node told from its others, though no event says which run of its suite or call of `runTest` sent it;
   - each test's messages in the order the test called them, though no event carries that order.
-- The test command, reached as `mill scalatest/test` with nothing in the build referring to it, must split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them, turn a worker's stdout and stderr byte chunks into lines, read Mill's colour decision through `private[mill]` API, and take its result from library state that another thread changes, not from what Mill's test-runner subprocess call returns.
+- The test command, reached as `mill scalatest/test` with nothing in the build referring to it, must:
+  - split a module's own ScalaTest arguments as ScalaTest's JVM runner parses them;
+  - turn a worker's stdout and stderr byte chunks into lines;
+  - read Mill's colour decision through `private[mill]` API;
+  - take its result from library state that another thread changes, not from what Mill's test-runner subprocess call returns.
 - The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints, though that formatting reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured.
 - Every artifact must move to group `com.edc` while the build's MiMa check still compares against upstream's.
 
@@ -64,7 +68,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 This serves `specification/test-command.md` AC-084 to AC-086 and AC-157.
 
 - The library keeps the consolidation state (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**) readable from any thread without a lock: event log reading adds events on its own thread while the test command's thread reads the state.
-  - Each operation that makes the state failed does so before it returns, so a read after that operation returns sees it.
+  - Each operation that makes the state failed does so before it returns, so a read made after that operation returns sees the failure.
   - The events that report a failure (`../SPECIFICATION.md` R-046) are `TestFailed`, `TestCanceled` and `SuiteAborted`. A `RunAborted` or `RunStopped` is not among them (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "What the library takes").
 - The test command reads the state once, after **End** returns.
 - Mill's test-runner subprocess call returns a `Result[(String, Seq[TestResult])]` (`../research/mill-worker-channels.md` § 2.3), which the test command leaves unread, a `Result.Failure` included.
@@ -126,7 +130,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 ## The test event log on the JVM
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
-- Core's runner argument definition (`../ARCHITECTURE.md` § Modules § ScalaTest core) is one `private[scalatest]` definition in `org.scalatest.tools`, shared by `ArgsParser` and the library's **Build the runner argument** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library). The event log file is in the worker's `processFolder`, and the test command adds the argument that operation returns to the worker's arguments unread.
+- Core's runner argument definition (`../ARCHITECTURE.md` § Modules § ScalaTest core) is one `private[scalatest]` definition in `org.scalatest.tools`, shared by `ArgsParser` and the library's **Build the runner argument** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library). The event log file is in the worker's `processFolder`. The test command adds the argument that operation returns, unread, to the worker's arguments.
 - `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each write the `runStarted` event once they have parsed the runner argument, before `RunStarting` (`specification/test-event-log-structure.md` AC-094).
 - The emitter writes the `runStarted` event to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
   - Event log reading never reads the other name, so a worker that dies before the move holds no event log file.

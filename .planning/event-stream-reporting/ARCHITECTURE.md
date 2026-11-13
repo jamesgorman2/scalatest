@@ -42,7 +42,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
 ### Consolidation library
 
-`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses four `private[scalatest]` parts of core, its formatting of human-readable output, its decoder, its argument splitter and its definition of the runner argument, which is why it sits in core's package.
+`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it. It sits in core's package because it reuses four `private[scalatest]` parts of core: its formatting of human-readable output, its decoder, its argument splitter and its definition of the runner argument.
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
   - It keeps each node's events against the node's ID, by execution, apart from the structure. The writers report each suite's latest structure, with those events.
@@ -84,7 +84,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
 ### The emitter and the Mill plugin
 
-- **The runner argument** — one ScalaTest runner argument, among those the test command adds to each run's arguments (`SPECIFICATION.md` R-053, R-125). The test command gets each one from **Build the runner argument** (§ APIs § The Mill plugin and the consolidation library). It turns the emitter on and turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-041). It reaches the runner on every runtime and in every JS environment the epic covers.
+- **The runner argument** — one ScalaTest runner argument, among those the test command adds to each run's arguments (`SPECIFICATION.md` R-053, R-125). It turns the emitter on and turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-041). It reaches the runner on every runtime and in every JS environment the epic covers. The test command gets each run's argument from **Build the runner argument** (§ APIs § The Mill plugin and the consolidation library).
   - Where the test event log is a file (below), the argument carries its path. On Scala.js under `NodeJs` and on Native that is the absolute path of the module's one event log file.
   - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's framework arguments are those of the `TestModuleUtil` its subprocess call is made on, so the test command makes each worker's call on one built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no test event log (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
@@ -161,7 +161,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 The Mill plugin is the library's only caller (`decisions/event-log-contract.md` "The consolidation library's API carries no compatibility promise…"). Its operations:
 
 - **Split a module's ScalaTest arguments**: returns them grouped by flag, each with its values, from core's argument splitter (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot call. The test command calls it before it starts the module's tests.
-- **Build the runner argument** (§ APIs § The emitter and the Mill plugin): given what the argument carries, the event log file's absolute path or, under `JsDom`, the framing prefix and this test command's nonce, returns the argument, from core's runner argument definition (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot read. The test command calls it for each run it starts.
+- **Build the runner argument** (§ APIs § The emitter and the Mill plugin): given what the argument carries, returns the argument, from core's runner argument definition (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot read. The argument carries the event log file's absolute path or, under `JsDom`, the framing prefix and this test command's nonce. The test command calls it for each run it starts.
 - **Decode a line of a run's test event log**: given one whole line without its `\n`, and under `JsDom` without its frame, returns the event it holds or that it cannot be decoded, from core's decoder (§ Modules § ScalaTest core, Codec), which the plugin, outside core's package, cannot call. Event log reading calls it for each line, then adds each event to the run's event stream (**Add a run**).
   - The plugin sees an event only as a handle exposing the `runStarted` event's PID and start time, which it watches the run's process by (§ APIs § The emitter and the Mill plugin, "The end of a run's event stream").
 - **Start** a consolidation, given:
@@ -185,7 +185,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 - **Read the consolidation state**: returns, at once and at any time from **Start**, one of *open*, *open, failed*, *ended* and *ended, failed* (`decisions/architecture-library-and-modules.md` "The consolidation library, not the Mill plugin, decides whether the test command has failed." and "The library gives the consolidation state as a synchronous read of four states…").
   - The state becomes failed, and stays failed, when (`SPECIFICATION.md` R-046):
     - an event reporting a failure is added to a run's event stream;
-    - the library gives a run an outcome other than completed, whether from its `runEnded` event or as R-102 aborts it, as when the caller ends the run's event stream (**Add a run**) without the `runEnded` event;
+    - the library gives a run an outcome other than completed, whether from its `runEnded` event or because R-102 aborts it, as when the caller ends the run's event stream (**Add a run**) without the `runEnded` event;
     - the caller adds a process that ended before any run existed in it, or a module whose tests did not start.
   - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-046 for it: the result of Mill's test-runner subprocess call plays no part.
 

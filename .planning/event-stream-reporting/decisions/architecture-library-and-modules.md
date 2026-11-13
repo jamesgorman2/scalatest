@@ -20,7 +20,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 ## The consolidation library, not the Mill plugin, decides whether the test command has failed.
 
-**Alternatives** The **Decode** handle exposing each event's facts, for the plugin to derive the result from, repeats in the plugin the rules by which the library decides how each run ended (`../SPECIFICATION.md` R-082), and widens what the plugin sees of core's events.
+**Alternatives** Having the **Decode** handle expose each event's facts, so that the plugin derives the result, repeats in the plugin the rules by which the library decides how each run ended (`../SPECIFICATION.md` R-082), and widens what the plugin sees of core's events.
 
 **Reasoning** For its output the library already decides what `../SPECIFICATION.md` R-046 turns on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-046 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin derives no result from any event.
 
