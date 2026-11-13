@@ -11,7 +11,7 @@ object RunnerArgument {
    * given file.
    *
    * @param eventLogFile the absolute path of the file, in a folder that exists
-   * @throws IllegalArgumentException where the path is not absolute
+   * @throws IllegalArgumentException if the path is not absolute
    */
   def forEventLogFile(eventLogFile: Path): Seq[String] = {
     require(eventLogFile.isAbsolute, s"the event log file's path must be absolute, but was $eventLogFile")

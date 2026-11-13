@@ -998,7 +998,7 @@ class Framework extends SbtFramework {
       testEventLogFileArg
     ) = parseArgsWithTestEventLog(args)
 
-    // The runner of a sub-process sbt forks is given the main runner's arguments, and must not write to its file.
+    // The runner of a sub-process sbt forks is given the main runner's arguments, and must not write to the main runner's file.
     val testEventLogFile = if (remoteArgs.isEmpty) testEventLogFileArg else None
 
     if (!runpathArgs.isEmpty)

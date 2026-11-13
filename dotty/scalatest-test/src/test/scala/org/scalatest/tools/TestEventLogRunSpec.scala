@@ -85,7 +85,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   private val runTimeLimitSeconds = 120L
 
-  // Runner.run blocks for as long as a graphic reporter's window is open, so a run that wrongly opens one must fail.
+  // Runner.run blocks while a graphic reporter's window is open, so a run that wrongly opens one fails at the time limit.
   private def runnerRun(arguments: Seq[String]): Boolean = {
     val outcome = new AtomicReference[Option[Either[Throwable, Boolean]]](None)
     val run = new Thread(() => {
@@ -267,7 +267,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     }
 
     List("sequentially" -> Nil, "in parallel" -> List("-P2")).foreach { (how, parallelArguments) =>
-      Scenario(s"The events of a Runner.run run that discovers its suites, $how, outside every suite are assigned to the run") {
+      Scenario(s"The events outside every suite are assigned to the run when Runner.run discovers its suites and runs them $how") {
         thisProcess
         TemporaryEventLog.in { eventLogFile =>
           Given("a runpath holding one suite, whose one test succeeds")

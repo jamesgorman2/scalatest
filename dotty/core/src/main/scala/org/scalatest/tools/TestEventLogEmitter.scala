@@ -30,11 +30,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    *
    * An event that cannot be encoded or written ends the event log there, which leaves the run without its
    * `runEnded` event. So that a hand-off cannot change what the run's reporters receive, what encoding or writing
-   * throws does not reach the caller, with these exceptions:
+   * throws does not reach the caller. Two kinds of throwable are treated differently:
    *
-   *  - an `InterruptedException` is not thrown either, but the calling thread is left interrupted;
+   *  - an `InterruptedException` does not reach the caller either, but the calling thread is left interrupted;
    *  - a `VirtualMachineError` other than a `StackOverflowError`, or a `ThreadDeath`, is thrown once the event log
-   *    is closed. A `StackOverflowError` is contained: a throwable or config map value that recurses without end
+   *    is closed. A `StackOverflowError` is not thrown: a throwable or config map value that recurses without end
    *    is one more event that cannot be encoded.
    */
   def runEvent(event: Event): Unit = {
@@ -119,7 +119,7 @@ private[scalatest] object TestEventLogEmitter {
   private def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }
 
-  // Whether a hand-off keeps a throwable from its caller. One that says the JVM or the thread cannot go on is not kept.
+  // Whether a hand-off keeps a throwable from its caller. One that says the JVM or the thread cannot go on reaches it.
   private def isContained(thrown: Throwable): Boolean = {
     thrown match {
       case _: StackOverflowError => true

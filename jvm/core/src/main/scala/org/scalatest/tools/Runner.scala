@@ -1158,7 +1158,7 @@ object Runner {
       dispatch(event)
     }
 
-    // The events SuiteRunner sends for a DiscoverySuite pass no structure wrapper.
+    // The events SuiteRunner sends for a DiscoverySuite pass through no structure wrapper.
     def testEventLogHandOffFor(suite: Suite): Event => Unit =
       if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
 

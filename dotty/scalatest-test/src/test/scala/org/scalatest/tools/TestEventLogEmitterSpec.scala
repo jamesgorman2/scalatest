@@ -281,7 +281,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "handed an event whose encoding throws another VirtualMachineError" should {
+    "handed an event whose encoding throws a VirtualMachineError other than a StackOverflowError" should {
       "close the event log, then throw that error" in {
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
@@ -334,7 +334,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
     }
 
     "handed events by several threads at once" should {
-      "write each as one whole line in one write that overlaps no other, and each thread's in the order that thread handed them off" in {
+      "write each as one whole line, in one write that overlaps no other, and keep each thread's events in the order it handed them off" in {
         val threadCount = 4
         val eventsOfEachThread = 25
         val eventLog = new RecordingEventLog

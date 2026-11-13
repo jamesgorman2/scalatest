@@ -29,7 +29,7 @@ final class TestEventLogArgumentSpec extends AnyWordSpec with Matchers {
       parsedArgs shouldBe ArgsParser.parseArgs(others)
     }
 
-    "take a path that looks like a flag as the path" in {
+    "take the argument after the flag as the path, even where it looks like a flag" in {
       val (parsedArgs, eventLogFile) = ArgsParser.parseArgsWithTestEventLog(Array("--test-event-log", "-oD"))
       eventLogFile shouldBe Some("-oD")
       parsedArgs.reporters shouldBe Nil
