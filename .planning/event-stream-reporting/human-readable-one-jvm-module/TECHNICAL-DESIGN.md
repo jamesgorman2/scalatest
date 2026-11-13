@@ -327,9 +327,11 @@ A line cannot be decoded where it is not one JSON object, holds a key this secti
 
 The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every artifact is published at one version, the fork's release, and the plugin depends on core and the library at its own version.
 
-- The sbt build's `organization` becomes `com.edc` in every project it publishes, its `org.scalatest` and `org.scalactic` projects alike.
-- Each `mimaPreviousArtifacts` under `project/` takes its group from `organization.value`, so it would then name a `com.edc` 3.2.19 that does not exist. Each names its project's upstream group, `org.scalatest` or `org.scalactic`, in place of `organization.value`.
-- The consolidation library is a JVM-only project of `project/DottyBuild.scala`, depending on its Scala 3 scalatest-core project, so the sbt build publishes it with core, before the plugin's Mill build resolves both.
+- The sbt build's `organization` is `com.edc` in every project, those upstream publishes under `org.scalatest` and `org.scalactic` alike.
+- Each `mimaPreviousArtifacts` under `project/` names its project's upstream group, `org.scalatest` or `org.scalactic`, since no `com.edc` 3.2.19 exists.
+- A dependency on a ScalaTest+ artifact excludes upstream's groups. Its upstream ScalaTest would otherwise sit on the classpath beside the fork's, which no longer evicts it.
+- The consolidation library is a JVM-only project of `project/DottyBuild.scala`, `scalatestConsolidation`, depending on its Scala 3 scalatest-core project. `scalatestDotty` aggregates it, so the sbt build publishes it with core, before the plugin's Mill build resolves both.
+- `scalatestConsolidation/checkNoMillDependency` checks `specification/compatibility-and-library.md` AC-062. It publishes the library and the projects it depends on with `publishLocal`, resolves the published library transitively from the local Ivy repository and Maven Central alone, and fails on any dependency with group `com.lihaoyi` and a name beginning `mill-`.
 - The plugin's Mill build publishes `scalatest-mill` under `com.edc` with `publishLocal`.
 
 ## Testing

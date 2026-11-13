@@ -169,8 +169,8 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
 
   def scalatestTestLibraryDependencies(theScalaVersion: String) =
     Seq(
-      "org.scalatestplus" %% "testng-6-7" % plusTestNGVersion % "test",
-      "org.scalatestplus" %% "junit-4-13" % plusJUnitVersion % "test"
+      withoutUpstreamScalatest("org.scalatestplus" %% "testng-6-7" % plusTestNGVersion % "test"),
+      withoutUpstreamScalatest("org.scalatestplus" %% "junit-4-13" % plusJUnitVersion % "test")
     )
 
   lazy val commonTest = Project("common-test", file("jvm/common-test"))
@@ -194,7 +194,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(sharedSettings: _*)
     .settings(
       projectTitle := "Scalactic Macro",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         Def.task{
           ScalacticGenResourcesJVM.genResources((sourceManaged in Compile).value / "org" / "scalactic", version.value, scalaVersion.value) ++
@@ -217,7 +217,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(scalacticDocSettings: _*)
     .settings(
       projectTitle := "Scalactic",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       initialCommands in console := "import org.scalactic._",
       sourceGenerators in Compile += {
         Def.task{
@@ -238,7 +238,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
             file(".").getCanonicalFile),
           docsrcDir.value), 
       docTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalacticOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"), 
       mimaBinaryIssueFilters ++= 
         Seq(
@@ -274,7 +274,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(sharedSettings: _*)
     .settings(
       projectTitle := "Scalactic Test",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       testOptions in Test ++=
         Seq(Tests.Argument(TestFrameworks.ScalaTest,
           "-oDIF",
@@ -291,7 +291,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
 
   def sharedTestSettings: Seq[Setting[_]] = 
     Seq(
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= scalatestLibraryDependencies,
       libraryDependencies ++= scalatestTestLibraryDependencies(scalaVersion.value),
       testOptions in Test := scalatestTestOptions,
@@ -383,7 +383,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest App",
       name := "scalatest-app",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= scalatestLibraryDependencies,
       // include the scalactic classes and resources in the jar
       mappings in (Compile, packageBin) ++= mappings.in(scalactic, Compile, packageBin).value,
@@ -402,7 +402,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
       },
       scalatestDocSettings,
       unmanagedResourceDirectories in Compile += baseDirectory.value / "scalatest" / "src" / "main" / "resources",
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -481,7 +481,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Doc",
       name := "scalatest-doc",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= scalatestLibraryDependencies,
       libraryDependencies ++= scalaXmlDependency(scalaVersion.value),
       javaSourceManaged := target.value / "java",
@@ -509,7 +509,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
       scalatestDocSettings,
       docTaskSetting,
       unmanagedResourceDirectories in Compile += baseDirectory.value / "scalatest" / "src" / "main" / "resources",
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).dependsOn(
       scalacticMacro, 
@@ -545,7 +545,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Compatible",
       name := "scalatest-compatible",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       javaSourceManaged := target.value / "java",
       autoScalaLibrary := false, 
       crossPaths := false, // disable using the Scala version in output paths and artifacts
@@ -557,7 +557,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -582,7 +582,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Core",
       name := "scalatest-core",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= scalaXmlDependency(scalaVersion.value),
       libraryDependencies ++= scalatestLibraryDependencies,
       sourceGenerators in Compile += {
@@ -603,7 +603,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
        }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"), 
       mimaBinaryIssueFilters ++= {
         Seq(
@@ -646,7 +646,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest FeatureSpec",
       name := "scalatest-featurespec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -655,7 +655,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -680,7 +680,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest FlatSpec",
       name := "scalatest-flatspec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -689,7 +689,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -714,7 +714,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest FreeSpec",
       name := "scalatest-freespec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -723,7 +723,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -748,7 +748,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest FunSuite",
       name := "scalatest-funsuite",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -757,7 +757,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -782,7 +782,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest FunSpec",
       name := "scalatest-funspec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -791,7 +791,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -816,7 +816,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest PropSpec",
       name := "scalatest-propspec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -825,7 +825,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -850,7 +850,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest RefSpec",
       name := "scalatest-refspec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -859,7 +859,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -884,7 +884,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest WordSpec",
       name := "scalatest-wordspec",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -893,7 +893,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -918,7 +918,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Diagrams",
       name := "scalatest-diagrams",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -927,7 +927,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -952,7 +952,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Matchers Core",
       name := "scalatest-matchers-core",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -966,7 +966,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
        }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -992,7 +992,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Should Matchers",
       name := "scalatest-shouldmatchers",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -1001,7 +1001,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -1026,7 +1026,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Must Matchers",
       name := "scalatest-mustmatchers",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -1040,7 +1040,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
        }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -1088,7 +1088,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest",
       name := "scalatest",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
         Def.task{
@@ -1097,7 +1097,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %% name.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.privatePackage := Seq.empty, 
@@ -1141,8 +1141,8 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
   def gentestsLibraryDependencies =
     Seq(
       flexmarkAll,
-      "org.scalatestplus" %% "testng-6-7" % plusTestNGVersion % "test",
-      "org.scalatestplus" %% "junit-4-13" % plusJUnitVersion % "test"
+      withoutUpstreamScalatest("org.scalatestplus" %% "testng-6-7" % plusTestNGVersion % "test"),
+      withoutUpstreamScalatest("org.scalatestplus" %% "junit-4-13" % plusJUnitVersion % "test")
     )
 
   def gentestsSharedSettings: Seq[Setting[_]] = scalaVersionsSettings ++ Seq(

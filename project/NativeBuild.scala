@@ -33,7 +33,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedNativeSettings)
     .settings(
       projectTitle := "Scalactic Macro.native",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       sourceGenerators in Compile += {
         Def.task{
           GenScalacticNative.genMacroScala((sourceManaged in Compile).value / "scala", version.value, scalaVersion.value) ++
@@ -57,7 +57,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalacticDocSettings: _*)
     .settings(
       projectTitle := "Scalactic.native",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       moduleName := "scalactic",
       sourceGenerators in Compile += {
         Def.task {
@@ -100,7 +100,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest",
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
@@ -150,7 +150,7 @@ trait NativeBuild { this: BuildCommons =>
       .settings(
         projectTitle := "ScalaTest App",
         name := "scalatest-app",
-        organization := "org.scalatest",
+        organization := forkOrganization,
         moduleName := "scalatest-app",
         libraryDependencies ++= nativeCrossBuildLibraryDependencies.value,
         libraryDependencies += "org.scala-native" %%% "test-interface" % nativeVersion,
@@ -243,7 +243,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Core Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-core",
       libraryDependencies ++= nativeCrossBuildLibraryDependencies.value,
       libraryDependencies += "org.scala-native" %%% "test-interface" % nativeVersion,
@@ -316,7 +316,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest FeatureSpec Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-featurespec",
       sourceGenerators in Compile += {
         Def.task {
@@ -345,7 +345,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest FlatSpec Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-flatspec",
       sourceGenerators in Compile += {
         Def.task {
@@ -374,7 +374,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest FreeSpec Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-freespec",
       sourceGenerators in Compile += {
         Def.task {
@@ -403,7 +403,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest FunSuite Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-funsuite",
       sourceGenerators in Compile += {
         Def.task {
@@ -432,7 +432,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest FunSpec Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-funspec",
       sourceGenerators in Compile += {
         Def.task {
@@ -461,7 +461,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest PropSpec Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-propspec",
       sourceGenerators in Compile += {
         Def.task {
@@ -490,7 +490,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest WordSpec Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-wordspec",
       sourceGenerators in Compile += {
         Def.task {
@@ -519,7 +519,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Diagrams Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-diagrams",
       sourceGenerators in Compile += {
         Def.task {
@@ -548,7 +548,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Matchers Core Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-matchers-core",
       sourceGenerators in Compile += {
         Def.task {
@@ -579,7 +579,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Should Matchers Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-shouldmatchers",
       sourceGenerators in Compile += {
         Def.task {
@@ -608,7 +608,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Must Matchers Native",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-mustmatchers",
       sourceGenerators in Compile += {
         Def.task {
@@ -652,7 +652,7 @@ trait NativeBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedNativeSettings)
     .settings(
       projectTitle := "Scalactic Test.native",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       testOptions in Test ++=
         Seq(Tests.Argument(TestFrameworks.ScalaTest, "-oDIF")),
       sourceGenerators in Test += {

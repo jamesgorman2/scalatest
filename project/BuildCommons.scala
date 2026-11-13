@@ -26,6 +26,16 @@ trait BuildCommons {
 
   val previousReleaseVersion = "3.2.19"
 
+  val forkOrganization = "com.edc"
+  val upstreamScalatestOrganization = "org.scalatest"
+  val upstreamScalacticOrganization = "org.scalactic"
+
+  def withoutUpstreamScalatest(module: ModuleID): ModuleID =
+    module.excludeAll(
+      ExclusionRule(organization = upstreamScalatestOrganization),
+      ExclusionRule(organization = upstreamScalacticOrganization)
+    )
+
   val plusJUnitVersion = "3.2.10.0"
   val plusTestNGVersion = "3.2.10.0"
   val flexmarkVersion = "0.62.2"
@@ -254,7 +264,7 @@ trait BuildCommons {
 
   def sharedTestSettingsNative: Seq[Setting[_]] =
     Seq(
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= nativeCrossBuildLibraryDependencies.value,
       // libraryDependencies += "io.circe" %%% "circe-parser" % "0.7.1" % "test",
       fork in test := false,

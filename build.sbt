@@ -1,3 +1,5 @@
+ThisBuild / organization := ScalatestBuild.forkOrganization
+
 lazy val commonTest = ScalatestBuild.commonTest
 lazy val commonTestJS = ScalatestBuild.commonTestJS
 lazy val commonTestNative = ScalatestBuild.commonTestNative
@@ -151,6 +153,7 @@ lazy val scalatestModulesNative = ScalatestBuild.scalatestModulesNative
 lazy val scalatestCoreDotty = ScalatestBuild.scalatestCoreDotty
 lazy val scalatestCoreDottyJS = ScalatestBuild.scalatestCoreDottyJS
 lazy val scalatestCoreDottyNative = ScalatestBuild.scalatestCoreDottyNative
+lazy val scalatestConsolidation = ScalatestBuild.scalatestConsolidation
 lazy val scalatestFeatureSpecDotty = ScalatestBuild.scalatestFeatureSpecDotty
 lazy val scalatestFeatureSpecDottyJS = ScalatestBuild.scalatestFeatureSpecDottyJS
 lazy val scalatestFeatureSpecDottyNative = ScalatestBuild.scalatestFeatureSpecDottyNative
