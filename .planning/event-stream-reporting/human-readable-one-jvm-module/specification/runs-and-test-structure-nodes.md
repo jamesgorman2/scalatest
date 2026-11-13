@@ -231,6 +231,6 @@ Feature: Failures
       Given the module's suites are the compatibility fixture, in which the suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` does not abort
       And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
-      Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, with leading spaces removed, is a line of the human-readable output with leading spaces removed, unless it then begins `+ ` (a message)
+      Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, with leading spaces removed, is a line of the human-readable output with leading spaces removed, unless it then begins `+ ` (a message) or is a stack-frame line (`test-event-log-events.md` AC-114)
       And each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the human-readable output
 ```

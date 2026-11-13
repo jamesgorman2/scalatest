@@ -2,13 +2,16 @@
 
 Decisions behind `../SPECIFICATION.md` on what a reporter must receive to count as receiving what 3.2.19 sends, newest first.
 
-## A throwable's ScalaTest-internal stack frames are exempt from the comparison with 3.2.19 whole, not only their line numbers.
+## A throwable is compared with 3.2.19's without its stack frames.
 
-**Alternatives** Exempting only the line numbers pins the class and method of every internal frame, so any refactor of `Engine` or `Suite`, or a wrapper the emitter puts round a suite or test body, breaks compatibility.
+**Alternatives**
 
-**Reasoning** No reporter or IDE depends on ScalaTest's internal call chain, which changes between upstream patch releases. What a reader takes from a stack trace is the user's frames and the failure's position, and both are still compared.
+- Exempting only the line numbers of ScalaTest's own frames freezes its internal call structure, so any refactor of `Engine` or `Suite`, or a wrapper the emitter puts round a suite or test body, breaks compatibility.
+- Exempting ScalaTest's own frames whole, by package, still fails on forwarders the compiler adds to the user's class, library frames ScalaTest's code calls, traces a reporter cuts to a fixed number of frames, and the failed code's stack depth.
 
-**Costs** A failure that reaches user code by an unintended internal path, such as a body run twice, passes the comparison when its other frames are unchanged.
+**Reasoning** The JVM fills a stack trace when the throwable is constructed, so the only frames the fork changes are those of its own call chain. A throwable replaced or wrapped on its way to a reporter still shows in its class, message or cause, and the failed code's file and line pin the position users and IDEs navigate to.
+
+**Costs** A fork that called `setStackTrace` on a user's throwable, or computed a wrong stack depth that resolves to the same file and line, passes the comparison.
 
 **Settled by** [Does "receives what 3.2.19 sends" cover the stack frames of ScalaTest's own classes?](https://github.com/jamesgorman2/scalatest/issues/105).
 

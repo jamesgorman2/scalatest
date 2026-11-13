@@ -36,7 +36,7 @@ Feature: Compatibility with ScalaTest 3.2.19
   Rule: The text ScalaTest's standard-output reporter prints, as IntelliJ's sbt shell mode reads it, is 3.2.19's, with the emitter off or on (R-001, R-002, R-003)
     Scenario Outline: AC-057 `-oDU` through `Framework`, emitter <emitter>
       When each run is launched through `Framework`, its runner given `-oDU`, the fork's run given the runner argument only where the emitter is on
-      Then the lines the runner's test-interface loggers receive on this fork are those they receive on 3.2.19, apart from the durations they show
+      Then the lines the runner's test-interface loggers receive on this fork are those they receive on 3.2.19, apart from what `test-event-log-events.md` AC-114 exempts
 
       Examples:
         | emitter |

@@ -22,7 +22,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 **Alternatives**
 
 - Keeping the empty config map's structure for the whole run leaves a test only the run's config map registers without a node, and shows a test only the empty config map registers as not run.
-- Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor and its side effects earlier than 3.2.19, changing an abort's stack frames (`specification/compatibility-and-library.md` AC-056, `../SPECIFICATION.md` R-002).
+- Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor earlier than 3.2.19: one that throws given that config map then throws before `SuiteStarting`, where 3.2.19 reports `SuiteStarting` and then `SuiteAborted` (`specification/compatibility-and-library.md` AC-056, `../SPECIFICATION.md` R-002).
 - Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.19 does, before `SuiteStarting`.
 - A structure of the suite's test names alone, as for a suite with no registration tree, drops a wrapped style's scopes and labels, against `specification/test-event-log-structure.md` AC-103's Rule.
 
