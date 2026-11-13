@@ -159,6 +159,18 @@ Feature: The test command's result
         | test `exits`, labelled `- exits`, of suite `ExitSuite`, class `samples.ExitSuite`, an `AnyFunSuite`, calls `System.exit(0)`                                         |
         | the module holds suite `AddSuite` of `test-event-log-structure.md` AC-099, and its `forkArgs` hold `-XX:+NoSuchOption`, so the worker's JVM exits before any run exists in it |
 
+  Rule: A run that ends aborted or stopped leaves the consolidation state failed, and one that completes without a failure does not (R-046)
+    Scenario Outline: AC-157 A run that ends <how>
+      Given the event log, and any captured output, of `runs-and-test-structure-runs.md` <criterion>
+      When the library consolidates it
+      Then the consolidation state the library gives is <state>
+
+      Examples:
+        | how       | criterion | state           |
+        | completed | AC-054    | *ended*         |
+        | aborted   | AC-037    | *ended, failed* |
+        | stopped   | AC-038    | *ended, failed* |
+
   Rule: The test command's failure lists no test (R-046)
     Scenario: AC-086 A failed test is not named outside the human-readable output
       Given suite `StackFlatSpec`, class `samples.StackFlatSpec`, an `AnyFlatSpec` declaring `"A Stack" must "have size 0" in`: test `have size 0`, labelled `- must have size 0`, which fails

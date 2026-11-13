@@ -87,6 +87,10 @@ How captured output relates to a process's stdout or stderr: output is captured 
 Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
+**Consolidation state**:
+Whether a consolidation has ended and whether anything has failed its test command: *open* or *open, failed* until the consolidation ends, then *ended* or *ended, failed*. Once failed, it stays failed.
+_Avoid_: Result, status, running, complete
+
 **Event stream**:
 One run's events, test structure and the output it captures, in the order the run produced them, independent of how they are carried.
 _Avoid_: Event log, event feed

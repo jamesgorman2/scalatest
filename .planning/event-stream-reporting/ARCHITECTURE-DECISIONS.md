@@ -2,6 +2,34 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## The library gives the consolidation state as a synchronous read of four states, available from **Start**.
+
+**Alternatives**
+
+- **End** returning the result alone leaves `--halt-on-failure` (`SPECIFICATION.md` R-057) with no way to learn of a failure while runs are still going.
+- A Boolean reads as passed before **End**, where false means only that nothing has failed yet.
+- A value that resolves once, on the first failure or at **End**, has three states and cannot tell failed and still open from failed and ended; as a future, it also needs a dependency or callbacks threaded through the library, which has neither.
+
+**Reasoning** Whether the consolidation has ended and whether anything has failed are independent facts, so four states carry both. One read then serves the test command's result after **End** and `--halt-on-failure`'s check while runs are still going. A plain read asks nothing of the library but the state it already keeps.
+
+**Costs** A caller can only poll: `--halt-on-failure` learns of a failure when it next reads the state, before it starts a module's tests, not when the failure happens.
+
+**Settled by** [How does the test command learn whether a run reported a failure, and whether its stream ended without a runEnded event?](https://github.com/jamesgorman2/scalatest/issues/103).
+
+---
+
+## The consolidation library, not the Mill plugin, decides whether the test command has failed.
+
+**Alternatives** The **Decode** handle exposing each event's facts, for the plugin to derive the result from, repeats in the plugin the rules by which the library decides how each run ended (`SPECIFICATION.md` R-082), and widens what the plugin sees of core's events.
+
+**Reasoning** For its output the library already decides what `SPECIFICATION.md` R-046 turns on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-046 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin interprets no event.
+
+**Costs** The library does more than write output, and the test command's result rests on library state the plugin cannot inspect.
+
+**Settled by** [How does the test command learn whether a run reported a failure, and whether its stream ended without a runEnded event?](https://github.com/jamesgorman2/scalatest/issues/103).
+
+---
+
 ## The emitter holds the events of a suite instance the run did not know of until the suite it runs inside is known, rather than writing them against a node placed later.
 
 **Alternatives** Writing each event at once against a provisional node that a later `structure` event places needs an unplaced-node form in the format. It also leaves assembly to hold the node's events and to show a node never placed.

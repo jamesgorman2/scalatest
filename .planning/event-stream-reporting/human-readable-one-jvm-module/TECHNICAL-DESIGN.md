@@ -59,6 +59,17 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 - When its stream ends, a splitter appends the line it still holds, if it holds any bytes. Mill's call returns only once both reader threads have finished (`../research/mill-worker-channels.md` § 2.3), so the sequence is complete when the call returns.
 - A worker writes a piped stdout and stderr in the platform's native encoding unless its `forkArgs` set `file.encoding`, `stdout.encoding` or `stderr.encoding`. The splitter decodes with the charset Mill's JVM names in its `native.encoding` system property, or `Charset.defaultCharset()` where that property is absent, and replaces malformed bytes with U+FFFD rather than dropping them.
 
+### The test command's result
+
+This serves `specification/test-command.md` AC-084 to AC-086 and AC-157.
+
+- The library keeps the consolidation state (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**) as one value of four cases, readable from any thread without a lock. Event log reading adds events on its own thread while the test command's thread reads the state.
+  - Each operation that brings a cause of failure makes the state failed before it returns, so a read after that operation returns sees it.
+  - The events that report a failure are `TestFailed` and `SuiteAborted`. A `RunAborted` or `RunStopped` changes nothing itself: the run's `runEnded` event, or its absence when the stream ends, does.
+- The test command reads the state once, after **End** returns, and fails its Mill task where the state is *ended, failed*, with a message that names no test.
+- It reads neither the value Mill's test-runner subprocess call returns nor the `TestResult`s Mill collects. Whether that call returns or throws, the test command goes on to add the worker's run or process and to call **End**.
+- AC-157's test feeds each run through the test-only builder (§ Testing § Runs the criteria describe) and reads the state after **End**.
+
 ### A message among its node's children
 
 This serves `specification/layout.md` AC-034.
@@ -112,6 +123,7 @@ The `org.scalatest.tools.StringReporter` companion builds each line from a live 
 ## The test event log on the JVM
 
 - `org.scalatest.tools.ArgsParser` throws on an argument it does not recognise, so it must accept the runner argument.
+- One `private[scalatest]` definition in `org.scalatest.tools` holds the runner argument's flag and how the event log file's path joins it. `ArgsParser` reads the argument through that definition, and the library's **Build the runner argument** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) writes it through the same one. The test command passes that operation the absolute path of the event log file in the worker's `processFolder`, and adds what it returns to the worker's arguments unread.
 - `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each write the `runStarted` event once they have parsed the runner argument, before `RunStarting` (`specification/test-event-log-structure.md` AC-094).
 - The emitter writes the `runStarted` event to a file of another name in the same folder, moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
   - Event log reading never reads the other name, so a worker that dies before the move holds no event log file.
