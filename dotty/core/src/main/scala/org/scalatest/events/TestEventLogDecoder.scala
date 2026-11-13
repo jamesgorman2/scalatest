@@ -250,7 +250,7 @@ private[scalatest] object TestEventLogDecoder {
     )
   }
 
-  // Holds the throwables one event has read, by ID, so that a ref yields the object its ID yielded.
+  // Holds the throwables one event has read, by ID, so that a ref yields the same object as the throwable it names.
   private final class ThrowableDecoder {
 
     private val decoded = mutable.Map.empty[Long, DecodedThrowable]
@@ -261,8 +261,8 @@ private[scalatest] object TestEventLogDecoder {
       }
     }
 
-    // Keeps the throwables whose causes and suppressed throwables are still to read in a list rather than on the
-    // call stack, so that no length of cause chain overflows it.
+    // Keeps the throwables whose causes and suppressed throwables are still to read in a list, not on the call
+    // stack, so that a long chain of causes cannot overflow the stack.
     @tailrec
     private def linked(open: List[OpenThrowable]): Either[String, Unit] = {
       open match {
@@ -283,8 +283,8 @@ private[scalatest] object TestEventLogDecoder {
       }
     }
 
-    // Yields a ref's throwable alone, and a throwable the event has not yet read with its cause and suppressed
-    // throwables still to read.
+    // Yields the throwable a ref names, or a new throwable together with its cause and suppressed throwables,
+    // which are still to read.
     private def throwableOrRef(reader: JsonObjectReader): Either[String, (DecodedThrowable, Option[OpenThrowable])] = {
       reader.optionalLong("ref").flatMap {
         case Some(id) => decoded.get(id).toRight(s"ref $id names no throwable the event holds before it").map(_ -> None)
@@ -362,7 +362,7 @@ private[scalatest] object TestEventLogDecoder {
   }
 }
 
-// Records each key it is asked for, so that a key the format does not give the object is one never asked for.
+// Records each key it is asked for. A key never asked for is one the format does not give the object.
 private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
 
   private val values = fields.toMap

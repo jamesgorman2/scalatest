@@ -139,7 +139,7 @@ private[scalatest] final case class DecodedStackFrame(
 )
 
 // Not a case class, and linked after construction: a throwable can be its own cause or suppressed throwable,
-// so a structural equals, hashCode or toString would not end.
+// so a structural equals, hashCode or toString would never return.
 private[scalatest] final class DecodedThrowable(
   val className: String,
   val message: Option[String],

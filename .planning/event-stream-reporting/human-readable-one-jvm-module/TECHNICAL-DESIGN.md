@@ -328,7 +328,7 @@ A line cannot be decoded where it:
 - holds a key this section does not give its object;
 - lacks a required key;
 - holds an `item`, `event`, `kind` or `outcome` value this section does not give;
-- holds a value of another JSON type than this section gives its key, `null` included;
+- holds a value whose JSON type is not the one this section gives its key, `null` included;
 - holds an integer that does not fit its field's `Int` or `Long`, or one below the least this section gives its key: 0 for a `position`, 1 for an `execution`, a `parentExecution` and a throwable's `id`;
 - holds a `ref` to an `id` the event has not yet written, or two throwables with one `id`.
 

@@ -92,7 +92,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           """{"id":4,"kind":"suite","parent":1,"position":1,"name":"QueueSpec","suiteId":"example.QueueSpec","className":"example.QueueSpec"}""" +
           """]}""" + "\n"
       }
-      "write a further structure whose root is a nested suite new to the event log with its parent and no position" in {
+      "write the root of a further structure, a nested suite new to the event log, with its parent and no position" in {
         val nodes = Vector(
           StructureNode.Suite(NodeId(5), Some(NodeId(1)), None, "HelperSpec", "example.HelperSpec", "example.HelperSpec"),
           StructureNode.Test(NodeId(6), NodeId(5), 0, "helps", "- helps")
@@ -388,7 +388,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "write a different throwable that equals one already written in full, not as a ref" in {
+      "write in full, not as a ref, a different throwable that equals one already written" in {
         val cause = withoutStackTrace(new EqualToEveryThrowable)
         val failure = withoutStackTrace(new EqualToEveryThrowable)
         failure.initCause(cause)

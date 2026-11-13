@@ -21,7 +21,7 @@ private[scalatest] object JsonWriter {
     case Punctuation(char: Char)
   }
 
-  // Keeps what is still to write in a list rather than on the call stack, so that no depth of nesting overflows it.
+  // Keeps what is still to write in a list, not on the call stack, so that deep nesting cannot overflow the stack.
   def write(value: JsonValue): String = {
     val builder = new StringBuilder
     var pending = List[Pending](Pending.Value(value))
@@ -145,7 +145,7 @@ private final class JsonReader(text: String) {
   import JsonReader.{OpenArray, OpenContainer, OpenObject}
 
   private var position = 0
-  // Innermost first. Held here rather than on the call stack, so that no depth of nesting overflows it.
+  // Innermost first. Held here, not on the call stack, so that deep nesting cannot overflow the stack.
   private var open = List.empty[OpenContainer]
 
   def end(): Either[String, Unit] = {
@@ -330,7 +330,7 @@ private final class JsonReader(text: String) {
     }
   }
 
-  // Character.digit also takes the digits of other scripts, which JSON does not.
+  // Character.digit also accepts the digits of other scripts, which JSON does not.
   private def hexDigit(char: Char): Int = {
     if (char >= '0' && char <= '9') {
       char - '0'

@@ -182,8 +182,8 @@ private[scalatest] object TestEventLogEncoder {
 
     private val written = mutable.ArrayBuffer.empty[Throwable]
 
-    // Keeps the throwables whose causes and suppressed throwables are still to write in a list rather than on the
-    // call stack, so that no length of cause chain overflows it.
+    // Keeps the throwables whose causes and suppressed throwables are still to write in a list, not on the call
+    // stack, so that a long chain of causes cannot overflow the stack.
     def encode(throwable: Throwable): JsonValue = {
       refTo(throwable).getOrElse {
         val outermost = opened(throwable)

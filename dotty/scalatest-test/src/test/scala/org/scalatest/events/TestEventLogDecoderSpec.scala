@@ -104,7 +104,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           )
         )
       }
-      "yield a further structure whose root is a nested suite new to the event log with its parent and no position" in {
+      "yield the root of a further structure, a nested suite new to the event log, with its parent and no position" in {
         val line =
           """{"item":"structure","nodes":[""" +
             """{"id":5,"kind":"suite","parent":1,"name":"HelperSpec","suiteId":"example.HelperSpec","className":"example.HelperSpec"},""" +
@@ -312,7 +312,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         cause.suppressed shouldBe Vector.empty
       }
 
-      "yield its suppressed throwables in the order written, one without a message having none" in {
+      "yield its suppressed throwables in the order written, and no message for one written without a message" in {
         val suppressed = throwableIn(throwableWithCauseAndSuppressedLine).suppressed
         suppressed.map(_.className) shouldBe Vector("java.lang.RuntimeException", "java.lang.UnsupportedOperationException")
         suppressed.map(_.message) shouldBe Vector(None, Some("suppressed later"))
@@ -502,7 +502,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         "a string with a short unicode escape" -> infoLine("""some \u12"""),
         "a string with a unicode escape in fullwidth digits" -> infoLine("some \\u" + "\uFF10\uFF10\uFF16\uFF13 info"),
         "a number with a leading zero" -> """{"item":"runStarted","pid":01,"startTime":"t"}""",
-        "arrays nested without end" -> ("[" * 100000),
+        "arrays nested 100000 deep and not closed" -> ("[" * 100000),
         "arrays nested 100000 deep" -> ("[" * 100000 + "]" * 100000)
       )
       descriptionsAndLines.foreach { case (description, line) =>
