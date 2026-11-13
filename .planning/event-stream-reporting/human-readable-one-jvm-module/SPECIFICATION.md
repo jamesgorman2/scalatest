@@ -51,7 +51,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one, or 
 - Class globs and framework arguments on the test command, the module's JUnit XML report, the paths Mill's test tasks put in their task folders (R-110), and the launcher's environment variables (R-111) (§ 4).
 - Running the tests of more than one module selector, or of a module selector that resolves to anything other than one JVM test module (§ 5).
 - A module whose tests cannot start, as when it fails to compile (R-058; R-046 third bullet) (§ 5).
-- Failing a module that does not test with the plugin's release of this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
+- Failing a module that does not test with this fork before any test starts, naming it, with no consolidated output (R-059) (§ 5).
 - A module that tests with a release of this fork other than the plugin's (R-059) (§ 5).
 - An unsupported Mill release (R-093, R-118) (§ 6).
 - `--halt-on-failure` (§ 7).

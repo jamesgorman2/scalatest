@@ -65,7 +65,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 
 ### The test command's result
 
-This serves `specification/test-command.md` AC-084 to AC-086 and AC-157.
+This serves `specification/test-command.md` AC-084 to AC-087 and AC-157.
 
 - The library keeps the consolidation state (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**) readable from any thread without a lock: event log reading adds events on its own thread while the test command's thread reads the state.
   - Each operation that makes the state failed does so before it returns, so a read made after that operation returns sees the failure.
@@ -76,6 +76,7 @@ This serves `specification/test-command.md` AC-084 to AC-086 and AC-157.
   - The call throws where Mill's `CREATE_NEW` write of `testargs` is refused, before it starts the worker (`../research/mill-test-worker-args.md` § 2.3), so that throw leaves no worker, no captured line and no event log. The write is not refused in a `processFolder` the test command has cleared and starts one worker in (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "On the JVM, on Scala.js under `NodeJs` and on Native").
   - `TestModuleUtil.runTests()` also throws when a worker future failed (`../research/mill-worker-channels.md` § 5), but the test command drives the test queue itself (`../ARCHITECTURE.md` § Data flow) and never calls it.
   - A user interrupt does not reach this path: the command's thread does not regain control (`../research/mill-command-lifetime.md` § 5; `../SPECIFICATION.md` R-069, R-116).
+- AC-087 needs no check of the module's framework or release. MUnit and uTest have no emitter, and 3.2.19's `ArgsParser`, which its `Framework.runner` calls, throws on the runner argument (§ The test event log on the JVM). The worker's `processFolder` therefore holds no event log file when Mill's call returns, so the test command adds the worker as a process that ended before any run existed in it, which makes the consolidation state failed (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
 
 ### A message among its node's children
 
