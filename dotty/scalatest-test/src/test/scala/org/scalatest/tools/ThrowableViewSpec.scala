@@ -11,23 +11,39 @@ import org.scalatest.exceptions.GeneratorDrivenPropertyCheckFailedException
 import org.scalatest.exceptions.StackDepthException
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.StackFrames.frames
+import org.scalatest.tools.StackFrames.withFrames
 import org.scalatest.wordspec.AnyWordSpec
 
 final class ThrowableViewSpec extends AnyWordSpec with Matchers {
 
-  private def frames(count: Int): Array[StackTraceElement] =
-    Array.tabulate(count)(index => new StackTraceElement("Stack", "method" + index, "Stack.scala", 10 + index))
-
-  private def withFrames[T <: Throwable](throwable: T, count: Int): T = {
-    throwable.setStackTrace(frames(count))
-    throwable
-  }
-
   private def testFailedException(message: Option[String], cause: Option[Throwable], position: Position): TestFailedException =
     new TestFailedException((_: StackDepthException) => message, cause, Left(position), None, Vector.empty)
 
+  // The stack depth is past the last frame, so no frame gives a file name and line number.
+  private def failureWithoutFileNameAndLineNumber: TestFailedException =
+    withFrames(
+      new TestFailedException((_: StackDepthException) => Some("the stack was empty"), None, Right((_: StackDepthException) => 7), None, Vector.empty),
+      "Stack",
+      2
+    )
+
+  private final class FailureNamingAnotherFile
+    extends TestFailedException(
+      (_: StackDepthException) => Some("failed"),
+      None,
+      Left(Position("Stack.scala", "/src/Stack.scala", 12)),
+      None,
+      Vector.empty
+    ) {
+
+    override def failedCodeFileNameAndLineNumberString: Option[String] = Some("Other.scala:99")
+
+    override lazy val failedCodeFilePathnameAndLineNumberString: Option[String] = Some("/elsewhere/Other.scala:99")
+  }
+
   private def decodedFrames(count: Int): Vector[DecodedStackFrame] =
-    frames(count).toVector.map { frame =>
+    frames("Stack", count).toVector.map { frame =>
       DecodedStackFrame(frame.getClassName, frame.getMethodName, Some(frame.getFileName), Some(frame.getLineNumber), false, frame.toString)
     }
 
@@ -69,7 +85,7 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
 
   "The view of a live throwable" should {
     "hold the throwable's class name, message, frames and cause" in {
-      val view = ThrowableView.of(withFrames(new IllegalStateException("boom", withFrames(new IllegalArgumentException, 1)), 2))
+      val view = ThrowableView.of(withFrames(new IllegalStateException("boom", withFrames(new IllegalArgumentException, "Stack", 1)), "Stack", 2))
       view.className shouldBe "java.lang.IllegalStateException"
       view.message shouldBe Some("boom")
       view.frames shouldBe Vector("Stack.method0(Stack.scala:10)", "Stack.method1(Stack.scala:11)")
@@ -82,11 +98,22 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
       cause.cause shouldBe None
     }
     "hold a StackDepth exception's file, pathname and line number, and the failed code's stack depth" in {
-      val failure = withFrames(testFailedException(Some("failed"), None, Position("Stack.scala", "/src/Stack.scala", 12)), 4)
+      val failure = withFrames(testFailedException(Some("failed"), None, Position("Stack.scala", "/src/Stack.scala", 12)), "Stack", 4)
       val stackDepth = ThrowableView.of(failure).stackDepth.get
       stackDepth.fileNameAndLineNumber shouldBe Some("Stack.scala:12")
       stackDepth.filePathnameAndLineNumber shouldBe Some("/src/Stack.scala:12")
       stackDepth.failedCodeStackDepth shouldBe Some(2)
+    }
+    "hold the file name, pathname and line number a StackDepth exception gives in place of its position's" in {
+      val stackDepth = ThrowableView.of(new FailureNamingAnotherFile).stackDepth.get
+      stackDepth.fileNameAndLineNumber shouldBe Some("Other.scala:99")
+      stackDepth.filePathnameAndLineNumber shouldBe Some("/elsewhere/Other.scala:99")
+    }
+    "hold no file name, pathname or line number for a StackDepth exception whose stack depth is past its last frame" in {
+      val stackDepth = ThrowableView.of(failureWithoutFileNameAndLineNumber).stackDepth.get
+      stackDepth.fileNameAndLineNumber shouldBe None
+      stackDepth.filePathnameAndLineNumber shouldBe None
+      stackDepth.failedCodeStackDepth shouldBe Some(7)
     }
     "mark a PropertyCheckFailedException as a property check failure" in {
       val failure = new GeneratorDrivenPropertyCheckFailedException(
@@ -141,8 +168,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
 
   "StringReporter's error lines" should {
     "leave every line unindented after the first, which is the formatter's text" in {
-      val cause = withFrames(new IllegalArgumentException("root cause"), 1)
-      val failure = withFrames(new IllegalStateException("boom", cause), 2)
+      val cause = withFrames(new IllegalArgumentException("root cause"), "Stack", 1)
+      val failure = withFrames(new IllegalStateException("boom", cause), "Stack", 2)
       errorLines("the message", Some(ThrowableView.of(failure)), Vector("an analysis line")) shouldBe Vector(
         "    - should pop *** FAILED ***",
         "Analysis:",
@@ -156,9 +183,29 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
         "..."
       )
     }
-    "be the same for a decoded throwable as for the live throwable it was decoded from" in {
-      val cause = withFrames(new IllegalArgumentException("root cause"), 1)
-      val failure = withFrames(new IllegalStateException("boom", cause), 2)
+    "end the cause chain before a StackDepth exception where no stack trace is presented" in {
+      val innermost = withFrames(new IllegalArgumentException("root cause"), "Stack", 1)
+      val inner = withFrames(testFailedException(Some("the helper failed"), Some(innermost), Position("Stack.scala", "/src/Stack.scala", 11)), "Stack", 2)
+      val failure = withFrames(new IllegalStateException("boom", inner), "Stack", 2)
+      errorLines("the message", Some(ThrowableView.of(failure))) shouldBe Vector(
+        "    - should pop *** FAILED ***",
+        "java.lang.IllegalStateException: boom",
+        "at Stack.method0(Stack.scala:10)",
+        "at Stack.method1(Stack.scala:11)",
+        "..."
+      )
+    }
+    "give the message alone for a StackDepth exception without a file name and line number" in {
+      errorLines("the stack was empty", Some(ThrowableView.of(failureWithoutFileNameAndLineNumber))) shouldBe
+        Vector("    - should pop *** FAILED ***", "the stack was empty")
+    }
+    "give the message alone for a StackDepth exception without a file name and line number where pathnames are presented" in {
+      errorLines("the stack was empty", Some(ThrowableView.of(failureWithoutFileNameAndLineNumber)), presentFilePathname = true) shouldBe
+        Vector("    - should pop *** FAILED ***", "the stack was empty")
+    }
+    "be the same for a decoded throwable as for a live throwable of the same content" in {
+      val cause = withFrames(new IllegalArgumentException("root cause"), "Stack", 1)
+      val failure = withFrames(new IllegalStateException("boom", cause), "Stack", 2)
       val decodedCause = decoded("java.lang.IllegalArgumentException", Some("root cause"), 1)
       val decodedFailure = decoded("java.lang.IllegalStateException", Some("boom"), 2, cause = Some(decodedCause))
       errorLines("the message", Some(decodedFailure)) shouldBe errorLines("the message", Some(ThrowableView.of(failure)))
@@ -218,8 +265,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
         List("java.lang.IllegalStateException: boom", "at Stack.method0(Stack.scala:10)")
     }
     "stop at a live throwable that its cause chain has already shown" in {
-      val outer = withFrames(new IllegalStateException("outer"), 1)
-      val inner = withFrames(new IllegalArgumentException("inner", outer), 1)
+      val outer = withFrames(new IllegalStateException("outer"), "Stack", 1)
+      val inner = withFrames(new IllegalArgumentException("inner", outer), "Stack", 1)
       outer.initCause(inner)
       StringReporter.stackTraceLines(Some(ThrowableView.of(outer)), presentShortStackTraces = false, presentFullStackTraces = true) shouldBe
         List(

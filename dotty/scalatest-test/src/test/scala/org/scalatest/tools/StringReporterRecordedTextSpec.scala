@@ -8,6 +8,7 @@ import org.scalatest.exceptions.GeneratorDrivenPropertyCheckFailedException
 import org.scalatest.exceptions.StackDepthException
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.StackFrames.withFrames
 import org.scalatest.wordspec.AnyWordSpec
 import scala.io.Codec
 import scala.io.Source
@@ -56,14 +57,6 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
   private val testNameInfo = NameInfo(suiteName, suiteId, suiteClassName, Some(testName))
   private val suiteNameInfo = NameInfo(suiteName, suiteId, suiteClassName, None)
 
-  private def frames(className: String, count: Int): Array[StackTraceElement] =
-    Array.tabulate(count)(index => new StackTraceElement(className, "method" + index, className + ".scala", 10 + index))
-
-  private def withFrames[T <: Throwable](throwable: T, className: String, count: Int): T = {
-    throwable.setStackTrace(frames(className, count))
-    throwable
-  }
-
   private def plainFailureWithCause: Throwable =
     withFrames(
       new IllegalStateException("boom", withFrames(new IllegalArgumentException("root cause\nsecond line"), "Disk", 3)),
@@ -106,6 +99,20 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       5
     )
 
+  // The stack depth is past the last frame, so no frame gives a file name and line number.
+  private def stackDepthFailureWithoutFileNameAndLineNumber: Throwable =
+    withFrames(
+      new TestFailedException(
+        (_: StackDepthException) => Some("the stack was empty"),
+        None,
+        Right((_: StackDepthException) => 7),
+        None,
+        Vector.empty
+      ),
+      "Stack",
+      2
+    )
+
   private def stackDepthFailureWithoutMessage: Throwable =
     withFrames(
       new TestFailedException(
@@ -135,21 +142,43 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       4
     )
 
-  private val throwables: Vector[(String, () => Throwable)] = Vector(
+  // The StackDepth exception has a cause of its own, which the chain must not reach where it ends at the StackDepth exception.
+  private def plainFailureCausedByStackDepthFailure: Throwable = {
+    val innermost = withFrames(new IllegalArgumentException("root cause"), "Disk", 2)
+    val inner = new TestFailedException(
+      (_: StackDepthException) => Some("the helper failed"),
+      Some(innermost),
+      Left(Position("Helper.scala", "/src/Helper.scala", 11)),
+      None,
+      Vector.empty
+    )
+    withFrames(new IllegalStateException("boom", withFrames(inner, "Helper", 4)), "Store", 3)
+  }
+
+  private val throwablesOfMessages: Vector[(String, () => Throwable)] = Vector(
     "a plain exception with a cause" -> (() => plainFailureWithCause),
     "a plain exception without a message" -> (() => plainFailureWithoutMessage),
-    "a StackDepth exception with causes" -> (() => stackDepthFailureWithCauses),
-    "a StackDepth exception without a position" -> (() => stackDepthFailureWithoutPosition),
-    "a StackDepth exception without a message" -> (() => stackDepthFailureWithoutMessage),
-    "a property check failure" -> (() => propertyCheckFailure)
+    "a StackDepth exception with causes" -> (() => stackDepthFailureWithCauses)
   )
 
-  private val formatters: Vector[(String, Option[Formatter])] = Vector(
-    "at the top level" -> Some(IndentedText("- " + testText, testText, 0)),
-    "indented two levels" -> Some(IndentedText("    - " + testText, testText, 2)),
-    "without a formatter" -> None,
-    "with a motion to suppress" -> Some(MotionToSuppress)
+  private val throwables: Vector[(String, () => Throwable)] = throwablesOfMessages ++ Vector(
+    "a StackDepth exception without a position" -> (() => stackDepthFailureWithoutPosition),
+    "a StackDepth exception without a message" -> (() => stackDepthFailureWithoutMessage),
+    "a property check failure" -> (() => propertyCheckFailure),
+    "a StackDepth exception without a file name and line number" -> (() => stackDepthFailureWithoutFileNameAndLineNumber),
+    "a plain exception caused by a StackDepth exception" -> (() => plainFailureCausedByStackDepthFailure)
   )
+
+  private val indentedTwoLevels: Option[Formatter] = Some(IndentedText("    - " + testText, testText, 2))
+
+  private val formattersOfErrorsWithThrowable: Vector[(String, Option[Formatter])] = Vector(
+    "at the top level" -> Some(IndentedText("- " + testText, testText, 0)),
+    "indented two levels" -> indentedTwoLevels,
+    "without a formatter" -> None
+  )
+
+  private val formatters: Vector[(String, Option[Formatter])] =
+    formattersOfErrorsWithThrowable :+ ("with a motion to suppress" -> Some(MotionToSuppress))
 
   private val nameInfos: Vector[(String, Option[NameInfo])] = Vector(
     "in a test" -> Some(testNameInfo),
@@ -363,8 +392,6 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     )
   )
 
-  private val indentedTwoLevels = formatters(1)._2
-
   private val eventCases: Vector[EventCase] = {
     val errorCasesWithoutThrowable =
       for {
@@ -375,7 +402,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       for {
         (eventName, event) <- errorEvents
         (throwableName, throwable) <- throwables
-        (formatterName, formatter) <- formatters.take(3)
+        (formatterName, formatter) <- formattersOfErrorsWithThrowable
       } yield EventCase(s"$eventName by $throwableName, $formatterName", event("the message", Some(throwable()), formatter))
     val messageCasesWithoutThrowable =
       for {
@@ -386,7 +413,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     val messageCasesWithThrowable =
       for {
         (eventName, event) <- messageEvents
-        (throwableName, throwable) <- throwables.take(3)
+        (throwableName, throwable) <- throwablesOfMessages
       } yield EventCase(s"$eventName in a test with $throwableName", event(Some(testNameInfo), Some(throwable()), indentedTwoLevels))
     val formattedCases =
       for {
@@ -501,12 +528,14 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     testFailed("", Some(stackDepthFailureWithoutPosition), None, ordinal = firstOrdinal)
   )
 
+  private val summaryOfSeveralFailuresAndAborts: Option[Summary] = Some(Summary(3, 2, 1, 1, 2, 4, 3, 5))
+
   private val summaries: Vector[(String, Option[Summary])] = Vector(
     "no summary" -> None,
     "every test passing" -> Some(Summary(3, 0, 1, 2, 0, 2, 0, 0)),
     "no test run" -> Some(Summary(0, 0, 0, 0, 0, 1, 0, 0)),
     "one test failed and one suite aborted" -> Some(Summary(3, 1, 0, 0, 1, 2, 1, 0)),
-    "several tests failed, several suites aborted and scopes pending" -> Some(Summary(3, 2, 1, 1, 2, 4, 3, 5)),
+    "several tests failed, several suites aborted and scopes pending" -> summaryOfSeveralFailuresAndAborts,
     "one suite aborted and no test failed" -> Some(Summary(3, 0, 0, 0, 0, 2, 1, 0))
   )
 
@@ -527,7 +556,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
           s"$runEndName with failed, canceled and aborted events",
           runCompleted,
           duration,
-          summaries(4)._2,
+          summaryOfSeveralFailuresAndAborts,
           exceptionalEvents
         )
     withoutReminders ++ withReminders
@@ -537,8 +566,8 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     for {
       (reminderName, reminderEvents) <- Vector("with no event to remind of" -> Vector.empty, "with events to remind of" -> exceptionalEvents)
       (eventName, event) <- Vector(
-        "RunCompleted" -> RunCompleted(firstOrdinal, duration, summaries(4)._2, threadName = threadName, timeStamp = timeStamp),
-        "RunStopped" -> RunStopped(firstOrdinal, duration, summaries(4)._2, threadName = threadName, timeStamp = timeStamp)
+        "RunCompleted" -> RunCompleted(firstOrdinal, duration, summaryOfSeveralFailuresAndAborts, threadName = threadName, timeStamp = timeStamp),
+        "RunStopped" -> RunStopped(firstOrdinal, duration, summaryOfSeveralFailuresAndAborts, threadName = threadName, timeStamp = timeStamp)
       )
     } yield RunEndCase(s"$eventName $reminderName", event, reminderEvents)
   }

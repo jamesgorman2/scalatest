@@ -19509,3 +19509,2259 @@ AnsiCyan|Suites: completed 4, aborted 3  Scopes: pending 5
 AnsiCyan|Tests: succeeded 3, failed 2, canceled 2, ignored 1, pending 1
 AnsiRed|*** 3 SUITES ABORTED ***
 AnsiRed|*** 2 TESTS FAILED ***
+# TestFailed by a StackDepth exception without a file name and line number, at the top level
+## formatted
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  the message
+## formatted with D
+AnsiRed|- should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|  the message
+## formatted with S
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## formatted with F
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  the message
+## formatted with D, S, F and V
+AnsiRed|- should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+## unformatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## unformatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+## unformatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+# TestFailed by a StackDepth exception without a file name and line number, indented two levels
+## formatted
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    the message
+## formatted with D
+AnsiRed|    - should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|    the message
+## formatted with S
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    ...
+AnsiRed|    ...
+## formatted with F
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    the message
+## formatted with D, S, F and V
+AnsiRed|    - should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    the message
+## unformatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|    the message
+## unformatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    ...
+AnsiRed|    ...
+## unformatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    the message
+## unformatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+# TestFailed by a StackDepth exception without a file name and line number, without a formatter
+## formatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+## formatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## formatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## formatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+## formatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+## unformatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## unformatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  the message
+## unformatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+# TestFailed by a plain exception caused by a StackDepth exception, at the top level
+## formatted
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D
+AnsiRed|- should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with S
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## formatted with F
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|- should pop *** FAILED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D, S, F and V
+AnsiRed|- should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+# TestFailed by a plain exception caused by a StackDepth exception, indented two levels
+## formatted
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with D
+AnsiRed|    - should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with S
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    ...
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    ...
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+AnsiRed|    ...
+## formatted with F
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|    - should pop *** FAILED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with D, S, F and V
+AnsiRed|    - should pop *** FAILED *** (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    ...
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    ...
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+AnsiRed|    ...
+## unformatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+# TestFailed by a plain exception caused by a StackDepth exception, without a formatter
+## formatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## formatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with S
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D, S, F and V
+AnsiRed|TEST FAILED - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+# TestCanceled by a StackDepth exception without a file name and line number, at the top level
+## formatted
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  the message
+## formatted with D
+AnsiYellow|- should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|  the message
+## formatted with S
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  ...
+AnsiYellow|  ...
+## formatted with F
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  the message
+## formatted with D, S, F and V
+AnsiYellow|- should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+## unformatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  the message
+## unformatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  ...
+AnsiYellow|  ...
+## unformatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+## unformatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+# TestCanceled by a StackDepth exception without a file name and line number, indented two levels
+## formatted
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    the message
+## formatted with D
+AnsiYellow|    - should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|    the message
+## formatted with S
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    the message
+AnsiYellow|    org.scalatest.exceptions.TestFailedException:
+AnsiYellow|    ...
+AnsiYellow|    ...
+## formatted with F
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    the message
+AnsiYellow|    org.scalatest.exceptions.TestFailedException:
+AnsiYellow|    at Stack.method0(Stack.scala:10)
+AnsiYellow|    at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    the message
+## formatted with D, S, F and V
+AnsiYellow|    - should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|    the message
+AnsiYellow|    org.scalatest.exceptions.TestFailedException:
+AnsiYellow|    at Stack.method0(Stack.scala:10)
+AnsiYellow|    at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    the message
+## unformatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|    the message
+## unformatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    the message
+AnsiYellow|    org.scalatest.exceptions.TestFailedException:
+AnsiYellow|    ...
+AnsiYellow|    ...
+## unformatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    the message
+AnsiYellow|    org.scalatest.exceptions.TestFailedException:
+AnsiYellow|    at Stack.method0(Stack.scala:10)
+AnsiYellow|    at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    the message
+## unformatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|    the message
+AnsiYellow|    org.scalatest.exceptions.TestFailedException:
+AnsiYellow|    at Stack.method0(Stack.scala:10)
+AnsiYellow|    at Stack.method1(Stack.scala:11)
+# TestCanceled by a StackDepth exception without a file name and line number, without a formatter
+## formatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+## formatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  the message
+## formatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  ...
+AnsiYellow|  ...
+## formatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+## formatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+## unformatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  the message
+## unformatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  ...
+AnsiYellow|  ...
+## unformatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  the message
+## unformatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  the message
+AnsiYellow|  org.scalatest.exceptions.TestFailedException:
+AnsiYellow|  at Stack.method0(Stack.scala:10)
+AnsiYellow|  at Stack.method1(Stack.scala:11)
+# TestCanceled by a plain exception caused by a StackDepth exception, at the top level
+## formatted
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## formatted with D
+AnsiYellow|- should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## formatted with S
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  ...
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  ...
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+AnsiYellow|  ...
+## formatted with F
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiYellow|- should pop !!! CANCELED !!!
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## formatted with D, S, F and V
+AnsiYellow|- should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## unformatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## unformatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  ...
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  ...
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+AnsiYellow|  ...
+## unformatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## unformatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+# TestCanceled by a plain exception caused by a StackDepth exception, indented two levels
+## formatted
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+## formatted with D
+AnsiYellow|    - should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+## formatted with S
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+AnsiYellow|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|    ...
+AnsiYellow|    at Helper.method1(Helper.scala:11)
+AnsiYellow|    at Helper.method2(Helper.scala:12)
+AnsiYellow|    at Helper.method3(Helper.scala:13)
+AnsiYellow|    ...
+AnsiYellow|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|    at Disk.method0(Disk.scala:10)
+AnsiYellow|    at Disk.method1(Disk.scala:11)
+AnsiYellow|    ...
+## formatted with F
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|    at Helper.method0(Helper.scala:10)
+AnsiYellow|    at Helper.method1(Helper.scala:11)
+AnsiYellow|    at Helper.method2(Helper.scala:12)
+AnsiYellow|    at Helper.method3(Helper.scala:13)
+AnsiYellow|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|    at Disk.method0(Disk.scala:10)
+AnsiYellow|    at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiYellow|    - should pop !!! CANCELED !!!
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+## formatted with D, S, F and V
+AnsiYellow|    - should pop !!! CANCELED !!! (1 second, 234 milliseconds)
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|    at Helper.method0(Helper.scala:10)
+AnsiYellow|    at Helper.method1(Helper.scala:11)
+AnsiYellow|    at Helper.method2(Helper.scala:12)
+AnsiYellow|    at Helper.method3(Helper.scala:13)
+AnsiYellow|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|    at Disk.method0(Disk.scala:10)
+AnsiYellow|    at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+## unformatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+## unformatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+AnsiYellow|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|    ...
+AnsiYellow|    at Helper.method1(Helper.scala:11)
+AnsiYellow|    at Helper.method2(Helper.scala:12)
+AnsiYellow|    at Helper.method3(Helper.scala:13)
+AnsiYellow|    ...
+AnsiYellow|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|    at Disk.method0(Disk.scala:10)
+AnsiYellow|    at Disk.method1(Disk.scala:11)
+AnsiYellow|    ...
+## unformatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|    at Helper.method0(Helper.scala:10)
+AnsiYellow|    at Helper.method1(Helper.scala:11)
+AnsiYellow|    at Helper.method2(Helper.scala:12)
+AnsiYellow|    at Helper.method3(Helper.scala:13)
+AnsiYellow|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|    at Disk.method0(Disk.scala:10)
+AnsiYellow|    at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    ...
+## unformatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|    java.lang.IllegalStateException: boom
+AnsiYellow|    at Store.method0(Store.scala:10)
+AnsiYellow|    at Store.method1(Store.scala:11)
+AnsiYellow|    at Store.method2(Store.scala:12)
+AnsiYellow|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|    at Helper.method0(Helper.scala:10)
+AnsiYellow|    at Helper.method1(Helper.scala:11)
+AnsiYellow|    at Helper.method2(Helper.scala:12)
+AnsiYellow|    at Helper.method3(Helper.scala:13)
+AnsiYellow|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|    at Disk.method0(Disk.scala:10)
+AnsiYellow|    at Disk.method1(Disk.scala:11)
+# TestCanceled by a plain exception caused by a StackDepth exception, without a formatter
+## formatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## formatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## formatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  ...
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  ...
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+AnsiYellow|  ...
+## formatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## formatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## unformatted with D
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## unformatted with S
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  ...
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  ...
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+AnsiYellow|  ...
+## unformatted with F
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  ...
+## unformatted with D, S, F and V
+AnsiYellow|Test Canceled - StackSpec: A stack should pop: the message (1 second, 234 milliseconds)
+AnsiYellow|  java.lang.IllegalStateException: boom
+AnsiYellow|  at Store.method0(Store.scala:10)
+AnsiYellow|  at Store.method1(Store.scala:11)
+AnsiYellow|  at Store.method2(Store.scala:12)
+AnsiYellow|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiYellow|  at Helper.method0(Helper.scala:10)
+AnsiYellow|  at Helper.method1(Helper.scala:11)
+AnsiYellow|  at Helper.method2(Helper.scala:12)
+AnsiYellow|  at Helper.method3(Helper.scala:13)
+AnsiYellow|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiYellow|  at Disk.method0(Disk.scala:10)
+AnsiYellow|  at Disk.method1(Disk.scala:11)
+# SuiteAborted by a StackDepth exception without a file name and line number, at the top level
+## formatted
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+## formatted with D
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  the message
+## formatted with S
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## formatted with F
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+## formatted with D, S, F and V
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+## unformatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## unformatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+## unformatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+# SuiteAborted by a StackDepth exception without a file name and line number, indented two levels
+## formatted
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+## formatted with D
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    the message
+## formatted with S
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    ...
+AnsiRed|    ...
+## formatted with F
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+## formatted with D, S, F and V
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    the message
+## unformatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|    the message
+## unformatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    ...
+AnsiRed|    ...
+## unformatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    the message
+## unformatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+# SuiteAborted by a StackDepth exception without a file name and line number, without a formatter
+## formatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+## formatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## formatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## formatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+## formatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+## unformatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## unformatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  the message
+## unformatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+# SuiteAborted by a plain exception caused by a StackDepth exception, at the top level
+## formatted
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with S
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## formatted with F
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D, S, F and V
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+# SuiteAborted by a plain exception caused by a StackDepth exception, indented two levels
+## formatted
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with D
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with S
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    ...
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    ...
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+AnsiRed|    ...
+## formatted with F
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with D, S, F and V
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    ...
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    ...
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+AnsiRed|    ...
+## unformatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+# SuiteAborted by a plain exception caused by a StackDepth exception, without a formatter
+## formatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## formatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with S
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|SUITE ABORTED - StackSpec: the message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D, S, F and V
+AnsiRed|SUITE ABORTED - StackSpec: the message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+# RunAborted by a StackDepth exception without a file name and line number, at the top level
+## formatted
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+## formatted with D
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  the message
+## formatted with S
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## formatted with F
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  the message
+## formatted with D, S, F and V
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+## unformatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## unformatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+## unformatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+# RunAborted by a StackDepth exception without a file name and line number, indented two levels
+## formatted
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+## formatted with D
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    the message
+## formatted with S
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    ...
+AnsiRed|    ...
+## formatted with F
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    the message
+## formatted with D, S, F and V
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    the message
+## unformatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|    the message
+## unformatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    ...
+AnsiRed|    ...
+## unformatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    the message
+## unformatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|    the message
+AnsiRed|    org.scalatest.exceptions.TestFailedException:
+AnsiRed|    at Stack.method0(Stack.scala:10)
+AnsiRed|    at Stack.method1(Stack.scala:11)
+# RunAborted by a StackDepth exception without a file name and line number, without a formatter
+## formatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+## formatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## formatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## formatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## formatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+## formatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+## unformatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  the message
+## unformatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  ...
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+## unformatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  the message
+## unformatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  the message
+AnsiRed|  org.scalatest.exceptions.TestFailedException:
+AnsiRed|  at Stack.method0(Stack.scala:10)
+AnsiRed|  at Stack.method1(Stack.scala:11)
+# RunAborted by a plain exception caused by a StackDepth exception, at the top level
+## formatted
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with S
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## formatted with F
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|- should pop *** ABORTED ***
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D, S, F and V
+AnsiRed|- should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+# RunAborted by a plain exception caused by a StackDepth exception, indented two levels
+## formatted
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with D
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with S
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    ...
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    ...
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+AnsiRed|    ...
+## formatted with F
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|    - should pop *** ABORTED ***
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## formatted with D, S, F and V
+AnsiRed|    - should pop *** ABORTED *** (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    ...
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    ...
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+AnsiRed|    ...
+## unformatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    ...
+## unformatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|    java.lang.IllegalStateException: boom
+AnsiRed|    at Store.method0(Store.scala:10)
+AnsiRed|    at Store.method1(Store.scala:11)
+AnsiRed|    at Store.method2(Store.scala:12)
+AnsiRed|    Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|    at Helper.method0(Helper.scala:10)
+AnsiRed|    at Helper.method1(Helper.scala:11)
+AnsiRed|    at Helper.method2(Helper.scala:12)
+AnsiRed|    at Helper.method3(Helper.scala:13)
+AnsiRed|    Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|    at Disk.method0(Disk.scala:10)
+AnsiRed|    at Disk.method1(Disk.scala:11)
+# RunAborted by a plain exception caused by a StackDepth exception, without a formatter
+## formatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## formatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## formatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## formatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with S
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  ...
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  ...
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+AnsiRed|  ...
+## unformatted with F
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
+## unformatted with V
+AnsiRed|*** RUN ABORTED ***\nthe message
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  ...
+## unformatted with D, S, F and V
+AnsiRed|*** RUN ABORTED ***\nthe message (1 second, 234 milliseconds)
+AnsiRed|  java.lang.IllegalStateException: boom
+AnsiRed|  at Store.method0(Store.scala:10)
+AnsiRed|  at Store.method1(Store.scala:11)
+AnsiRed|  at Store.method2(Store.scala:12)
+AnsiRed|  Cause: org.scalatest.exceptions.TestFailedException: the helper failed
+AnsiRed|  at Helper.method0(Helper.scala:10)
+AnsiRed|  at Helper.method1(Helper.scala:11)
+AnsiRed|  at Helper.method2(Helper.scala:12)
+AnsiRed|  at Helper.method3(Helper.scala:13)
+AnsiRed|  Cause: java.lang.IllegalArgumentException: root cause
+AnsiRed|  at Disk.method0(Disk.scala:10)
+AnsiRed|  at Disk.method1(Disk.scala:11)
