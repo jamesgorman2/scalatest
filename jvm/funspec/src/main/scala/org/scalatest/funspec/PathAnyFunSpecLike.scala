@@ -127,6 +127,8 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
    */
   protected class ItWord {
 
+    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    //DOTTY-ONLY def inline$applyImpl(testText: String, testTags: Tag*)(testFun: => Unit, pos: source.Position): Unit = applyImpl(testText, testTags: _*)(testFun, pos)
     private final def applyImpl(testText: String, testTags: Tag*)(testFun: => Unit /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3
@@ -256,6 +258,8 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
    */
   protected class TheyWord {
 
+    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    //DOTTY-ONLY def inline$applyImpl(testText: String, testTags: Tag*)(testFun: => Unit, pos: source.Position): Unit = applyImpl(testText, testTags: _*)(testFun, pos)
     private def applyImpl(testText: String, testTags: Tag*)(testFun: => Unit /* Assertion */, pos: source.Position): Unit = {
       handleTest(thisSuite, testText, Transformer(() => testFun), Resources.theyCannotAppearInsideAnotherItOrThey, "PathAnyFunSpecLike.scala", "apply", 3, -2, None, Some(pos), testTags: _*)
     }

@@ -158,6 +158,8 @@ trait AnyFunSpecLike extends TestSuite with TestRegistration with Informing with
    */
   protected class ItWord {
 
+    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    //DOTTY-ONLY def inline$applyImpl(specText: String, testTags: Tag*)(testFun: => Any, pos: source.Position): Unit = applyImpl(specText, testTags: _*)(testFun, pos)
     private final def applyImpl(specText: String, testTags: Tag*)(testFun: => Any /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3
@@ -293,6 +295,8 @@ trait AnyFunSpecLike extends TestSuite with TestRegistration with Informing with
    */
   protected class TheyWord {
 
+    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    //DOTTY-ONLY def inline$applyImpl(specText: String, testTags: Tag*)(testFun: => Any, pos: source.Position): Unit = applyImpl(specText, testTags: _*)(testFun, pos)
     private final def applyImpl(specText: String, testTags: Tag*)(testFun: => Any /* Assertion */, pos: source.Position): Unit = {
       engine.registerTest(specText, Transformer(() => testFun), Resources.theyCannotAppearInsideAnotherItOrThey, sourceFileName, "apply", 3, -2, None, None, Some(pos), None, testTags: _*)
     }

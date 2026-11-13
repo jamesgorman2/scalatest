@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions or MiMa settings, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
+description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
 ---
 
 <learning>
@@ -56,4 +56,28 @@ On Windows, sbt-osgi's `bundle` task rewrites the project's jar on every run and
 - Running `mimaReportBinaryIssues` on the project itself does not hold its jar open.
 
 In one sbt session, bundle each project once, dependencies first. Bundle a project again only in a fresh session.
+</learning>
+
+<learning>
+date: 2026-11-13
+---
+Scala 3.3 names the inline accessor of a private member of a non-final class `<owner>$$inline$<member>`. Scala 3.1 named it `inline$<member>`. Code compiled against a library built with Scala 3.1 calls the accessor by that name, so the same library sources rebuilt with Scala 3.3 fail it at run time with `NoSuchMethodError: '… <Class>.inline$<member>(…)'`.
+
+sbt-mima-plugin 1.1.4's `mimaReportBinaryIssues` passes with the accessor missing, so a passing MiMa check does not show that code compiled against the earlier build still links.
+
+- To find lost accessors, compare the ` inline$` methods `javap -p` lists for each class in the earlier jar and in the rebuilt classes.
+- To restore one, declare a public `def inline$<member>(…)` in the class with the private member's parameters, forwarding to it.
+- Only running code compiled against the earlier build on the rebuilt one proves the fix.
+</learning>
+
+<learning>
+date: 2026-11-13
+---
+sbt forces the Scala library to `scalaVersion` only in its standard configurations. A configuration of a project's own, extending neither `Compile` nor `Test`, resolves the `scala3-library_3` its dependencies ask for: 3.1.3 for `org.scalatest:scalatest_3:3.2.20`.
+
+Compiling there with Scala 3.3 then fails with `value getOffsetStatic is not a member of object scala.runtime.LazyVals` and `Bad symbolic reference. A signature in … scala3-library_3-3.1.3.jar(scala/runtime/LazyVals.class)`.
+
+Pin the library for such a configuration with `dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value`.
+
+sbt's slash syntax addresses a configuration by its capitalised name, not by the `val` that holds it: `config("fixture")` is `<project>/Fixture/compile`.
 </learning>

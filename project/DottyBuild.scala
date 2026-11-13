@@ -1432,8 +1432,43 @@ trait DottyBuild { this: BuildCommons =>
       scalatestFunSpecTestDotty, 
       scalatestFunSuiteTestDotty, 
       scalatestPropSpecTestDotty, 
-      scalatestWordSpecTestDotty
+      scalatestWordSpecTestDotty,
+      scalatestCompatibilityTestDotty
     )
+
+  lazy val CompatibilityFixture = config("fixture").hide
+
+  lazy val scalatestCompatibilityTestDotty = project.in(file("dotty/compatibility-test"))
+    .configs(CompatibilityFixture)
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(inConfig(CompatibilityFixture)(Defaults.configSettings): _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Test",
+      libraryDependencies += upstreamScalatestOrganization %% "scalatest" % previousReleaseVersion % CompatibilityFixture,
+      // ScalaTest 3.2.20 asks for the Scala 3.1 library, which code compiled by Scala 3.3 cannot link against.
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      CompatibilityFixture / unmanagedSourceDirectories += (CompatibilityFixture / sourceDirectory).value / "scala-jvm",
+      // ScalaTest leaves the test interface to the build tool, so the fixture configuration takes sbt's own.
+      CompatibilityFixture / unmanagedJars += Attributed.blank(testInterfaceJar),
+      Test / resourceGenerators += Def.task {
+        def pathList(files: Seq[File]): String = files.distinct.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator)
+        val classpaths = new java.util.Properties
+        classpaths.setProperty("fixture", pathList((CompatibilityFixture / products).value))
+        classpaths.setProperty("upstream", pathList((CompatibilityFixture / managedClasspath).value.files))
+        classpaths.setProperty("fork", pathList((scalatestDotty / Runtime / fullClasspath).value.files ++ (scalacticDotty / Runtime / fullClasspath).value.files))
+        classpaths.setProperty("testInterface", pathList(Seq(testInterfaceJar)))
+        classpaths.setProperty("runsDirectory", (target.value / "compatibility-runs").getAbsolutePath)
+        val resource = (Test / resourceManaged).value / "compatibility.properties"
+        IO.write(classpaths, "The classpaths of the comparison with ScalaTest " + previousReleaseVersion, resource)
+        Seq(resource)
+      }.taskValue,
+      Test / logBuffered := false,
+      noPublishSettings,
+    ).dependsOn(scalatestDotty % "test")
+
+  private def testInterfaceJar: File =
+    new File(classOf[sbt.testing.Framework].getProtectionDomain.getCodeSource.getLocation.toURI)
 
   def sharedTestSettingsDottyJS: Seq[Setting[_]] = 
     Seq(

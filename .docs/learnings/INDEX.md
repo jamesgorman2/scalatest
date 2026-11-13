@@ -4,7 +4,7 @@ Each kind maps to a per-kind file in this directory.
 
 | Kind | Description |
 |---|---|
-| [sbt-build-tooling](sbt-build-tooling.md) | How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions or MiMa settings, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows. |
+| [sbt-build-tooling](sbt-build-tooling.md) | How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows. |
 
 ## Curating learnings
 

@@ -77,6 +77,7 @@ lazy val scalatestPropSpecTestDotty = ScalatestBuild.scalatestPropSpecTestDotty
 lazy val scalatestPropSpecTestDottyJS = ScalatestBuild.scalatestPropSpecTestDottyJS
 lazy val scalatestPropSpecTestDottyNative = ScalatestBuild.scalatestPropSpecTestDottyNative
 lazy val scalatestWordSpecTestDotty = ScalatestBuild.scalatestWordSpecTestDotty
+lazy val scalatestCompatibilityTestDotty = ScalatestBuild.scalatestCompatibilityTestDotty
 lazy val scalatestWordSpecTestDottyJS = ScalatestBuild.scalatestWordSpecTestDottyJS
 lazy val scalatestWordSpecTestDottyNative = ScalatestBuild.scalatestWordSpecTestDottyNative
 lazy val scalatestApp = ScalatestBuild.scalatestApp
