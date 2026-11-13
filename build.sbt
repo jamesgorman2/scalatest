@@ -1,5 +1,3 @@
-ThisBuild / organization := ScalatestBuild.forkOrganization
-
 lazy val commonTest = ScalatestBuild.commonTest
 lazy val commonTestJS = ScalatestBuild.commonTestJS
 lazy val commonTestNative = ScalatestBuild.commonTestNative

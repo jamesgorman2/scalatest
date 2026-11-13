@@ -4,6 +4,8 @@ import java.io.PrintWriter
 import scala.io.Source
 
 import scalanative.sbtplugin.ScalaNativePlugin
+import com.typesafe.tools.mima.plugin.MimaKeys.{mimaPreviousArtifacts, mimaCurrentClassfiles}
+import com.typesafe.sbt.osgi.OsgiKeys
 
 trait BuildCommons {
 
@@ -14,7 +16,7 @@ trait BuildCommons {
 
   val runFlickerTests = Option(System.getenv("SCALATEST_RUN_FLICKER_TESTS")).getOrElse("FALSE").toUpperCase == "TRUE"
 
-  val scalaJSVersion = Option(System.getenv("SCALAJS_VERSION")).getOrElse("1.8.0")
+  val scalaJSVersion = Option(System.getenv("SCALAJS_VERSION")).getOrElse("1.20.2")
   def scalatestJSLibraryDependencies =
     Seq(
       "org.scala-js" %% "scalajs-test-interface" % scalaJSVersion
@@ -24,7 +26,7 @@ trait BuildCommons {
 
   val releaseVersion = "3.2.20"
 
-  val previousReleaseVersion = "3.2.19"
+  val previousReleaseVersion = "3.2.20"
 
   val forkOrganization = "com.edc"
   val upstreamScalatestOrganization = "org.scalatest"
@@ -34,6 +36,15 @@ trait BuildCommons {
     module.excludeAll(
       ExclusionRule(organization = upstreamScalatestOrganization),
       ExclusionRule(organization = upstreamScalacticOrganization)
+    )
+
+  def bundleCheckedAgainstUpstream(upstreamOrganization: String): Seq[Setting[_]] =
+    Seq(
+      // The bundle is written over the jar. Packaging it as the jar gives that path one writer,
+      // which runs before any dependent project opens the jar: Windows cannot replace an open file.
+      Compile / packageBin := OsgiKeys.bundle.value,
+      mimaPreviousArtifacts := Set((upstreamOrganization % moduleName.value % previousReleaseVersion).cross(crossVersion.value)),
+      mimaCurrentClassfiles := (Compile / packageBin).value
     )
 
   val plusJUnitVersion = "3.2.10.0"
@@ -264,7 +275,7 @@ trait BuildCommons {
 
   def sharedTestSettingsNative: Seq[Setting[_]] =
     Seq(
-      organization := forkOrganization,
+      organization := "org.scalatest",
       libraryDependencies ++= nativeCrossBuildLibraryDependencies.value,
       // libraryDependencies += "io.circe" %%% "circe-parser" % "0.7.1" % "test",
       fork in test := false,

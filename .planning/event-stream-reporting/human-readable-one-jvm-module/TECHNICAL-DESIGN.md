@@ -330,12 +330,15 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 - The fork's release is the sbt build's `releaseVersion`, `3.2.20`, so the JVM's core is `com.edc:scalatest-core_3:3.2.20`.
 - The fork builds and publishes only the Scala 3 projects of `project/DottyBuild.scala` and the Java-only `scalatestCompatible` of `project/scalatest.scala`, which `scalatestCoreDotty` and `scalatestAppDotty` depend on. Each has `organization` `com.edc`, those upstream publishes under `org.scalatest` and `org.scalactic` alike.
 - The build's Scala 2 projects stay as upstream wrote them, group included, so that a merge from upstream's `3.2.x-new` branch applies to them unchanged. The fork neither builds nor publishes them, and nothing keeps them compiling. `scalatestCompatible` is the one project of `project/scalatest.scala` the fork changes.
+  - The build definition must still compile on the raised toolchain, so a Scala 2 project's setting changes where the raised sbt plugins no longer compile it. The change is the smallest that compiles and keeps the setting's behaviour. The one case is `scalatestTestJS` of `project/JsBuild.scala`: Scala.js 1.20.2 rejects `withStrictFloats`, so the call is removed. Strict floats are its default.
 - Every Scala 3 project compiles with the Scala, Scala.js and Scala Native versions `../ARCHITECTURE.md` § Modules § ScalaTest core gives. Upstream's 3.2.20 build sets:
   - Scala 3.1.3 for the JVM and Scala.js (`dottyVersion`'s default);
   - Scala 3.3.3 for Native (`nativeDottySettings`);
-  - Scala.js 1.8.0 (`scalaJSVersion`'s default, in both `project/plugins.sbt` and `project/BuildCommons.scala`).
+  - Scala.js 1.8.0 (`scalaJSVersion`'s default, in both `project/plugins.sbt` and `project/BuildCommons.scala`);
+  - Scala Native 0.5.10 (`scalaNativeVersion`'s default, in `project/plugins.sbt`), which has no Scala 3.3.8 library.
 
-  Its Scala Native version is already the architecture's.
+  The feature changes those defaults, so the build needs no `SCALAJS_VERSION` or `SCALANATIVE_VERSION` environment variable.
+- `publishLocal` of a Scala 3 project must work on Windows, for the dependency check below and for the plugin's Mill build. Upstream's doc settings pass `-doc-source-url`, which Scaladoc 3 does not have: it reads the URL as a source path, and Windows rejects that path. The Scala 3 projects that take those settings drop the option and its URL.
 - MiMa compares with upstream's 3.2.20 (`../SPECIFICATION.md` R-004), and `previousReleaseVersion` is `3.2.20`.
   - The check covers every project the fork publishes whose artifact upstream 3.2.20 also publishes, on all three runtimes: every published Scala 3 project but the consolidation library, and `scalatestCompatible`.
   - Each covered project's `mimaPreviousArtifacts` names upstream's group, `org.scalatest` or `org.scalactic`, the project's `moduleName`, its platform cross-version and `3.2.20`, and its `mimaCurrentClassfiles` is the jar the project packages. `scalatest-compatible` has no Scala suffix.
@@ -398,5 +401,6 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `spe
 
 The check runs with no problem filter, since a filter would let it pass without the compatibility it proves:
 
-- The `mimaBinaryIssueFilters` upstream's build sets are removed. They excuse upstream's own changes since 3.2.19, and against 3.2.20 they could only hide a break the fork makes.
+- The `mimaBinaryIssueFilters` upstream's build sets on covered projects are removed. They excuse upstream's own changes since 3.2.19, and against 3.2.20 they could only hide a break the fork makes.
+- Those it sets on Scala 2 projects stay, as part of upstream's text (§ Publishing). The fork runs no check on those projects.
 - Review rejects any filter this feature adds.

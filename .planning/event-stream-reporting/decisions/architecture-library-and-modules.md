@@ -8,8 +8,9 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 - Scala 3.9.0, the version the fork's consumer builds with, has an unknown cost in the macros of Scalactic and ScalaTest, and raises the JDK the artifacts need.
 - The compilers upstream 3.2.20 builds with, Scala 3.1.3 on the JVM and Scala.js and 3.3.3 on Native, serve only modules on Scala 3.1 and 3.2, which `../SPECIFICATION.md` § Scope does not cover. They also put two compiler versions over one set of sources, holding the emitter and the codec to the older language level.
+- Scala Native 0.5.10, the version upstream 3.2.20 builds with, has no Scala 3.3.8 library: its newest `scala3lib_native0.5_3` for the 3.3 line is `3.3.7+0.5.10`. Keeping it would put Scala 3.3.7 on Native and 3.3.8 elsewhere.
 
-**Reasoning** Upstream's 3.3 line, whose sources are near-identical to these, builds with Scala 3.3.8, so these sources are known to compile on it. A module on a later Scala 3 version, such as 3.9.0, uses a library built with 3.3.8 unchanged.
+**Reasoning** Upstream's 3.3 line, whose sources are near-identical to these, builds with Scala 3.3.8, so these sources are known to compile on it. A module on a later Scala 3 version, such as 3.9.0, uses a library built with 3.3.8 unchanged. On Native the build uses Scala Native 0.5.12: `scala3lib_native0.5_3` for Scala 3.3.8 is published only as `3.3.8+0.5.12`. The artifacts keep the `native0.5` suffix, so MiMa still compares them with upstream's.
 
 **Costs** A module on Scala 3.1 or 3.2 (JVM or Scala.js), or on Scala.js before 1.20.2, cannot use the fork's artifacts, as it can upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3. A problem MiMa reports against upstream's jars, built with older compilers, can come from the compiler and not from the fork's sources.
 

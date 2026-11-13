@@ -28,7 +28,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "Scalactic Macro.js",
-      organization := forkOrganization,
+      organization := "org.scalactic",
       sourceGenerators in Compile += {
         // We'll delete JS_DEPENDENCIES in scalactic-macro.js
         Def.task{
@@ -60,7 +60,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(scalacticDocSettings: _*)
     .settings(
       projectTitle := "Scalactic.js",
-      organization := forkOrganization,
+      organization := "org.scalactic",
       moduleName := "scalactic",
       sourceGenerators in Compile += {
         Def.task {
@@ -80,7 +80,7 @@ trait JsBuild { this: BuildCommons =>
       mappings in (Compile, packageBin) ++= mappings.in(scalacticMacroJS, Compile, packageBin).value,
       // include the macro sources in the main source jar
       mappings in (Compile, packageSrc) ++= mappings.in(scalacticMacroJS, Compile, packageSrc).value,
-      mimaPreviousArtifacts := Set(upstreamScalacticOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"), 
       mimaBinaryIssueFilters ++= 
         Seq(
@@ -118,7 +118,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(
       projectTitle := "ScalaTest App",
       name := "scalatest-app",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       moduleName := "scalatest-app",
       libraryDependencies ++= scalatestJSLibraryDependencies,
       // include the scalactic classes and resources in the jar
@@ -136,7 +136,7 @@ trait JsBuild { this: BuildCommons =>
           Seq.empty[File]
         }.taskValue
       },
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -228,7 +228,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "Scalactic Test.js",
-      organization := forkOrganization,
+      organization := "org.scalactic",
       testOptions in Test ++=
         Seq(Tests.Argument(TestFrameworks.ScalaTest, "-oDIF")),
       jsEnv := {
@@ -253,7 +253,7 @@ trait JsBuild { this: BuildCommons =>
 
   def sharedTestSettingsJS: Seq[Setting[_]] = 
     Seq(
-      organization := forkOrganization,
+      organization := "org.scalatest",
       //jsDependencies += RuntimeDOM % "test",
       scalaJSLinkerConfig ~= { _.withOptimizer(false) },
       //jsEnv := NodeJSEnv(executable = "node").value,
@@ -279,7 +279,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedTestSettingsJS: _*)
     .settings(
       projectTitle := "ScalaTest Test",
-      scalaJSLinkerConfig ~= { _.withOptimizer(false).withSemantics(_.withStrictFloats(true)) },
+      scalaJSLinkerConfig ~= { _.withOptimizer(false) },
       sourceGenerators in Test += {
         Def.task {
           GenScalaTestJS.genTest((sourceManaged in Test).value, version.value, scalaVersion.value)
@@ -422,7 +422,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(scalatestDocSettings: _*)
     .settings(
       projectTitle := "ScalaTest Core JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       moduleName := "scalatest-core",
       initialCommands in console := """|import org.scalatest._
                                       |import org.scalactic._
@@ -457,7 +457,7 @@ trait JsBuild { this: BuildCommons =>
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
       scalatestJSDocTaskSetting,
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"), 
       mimaBinaryIssueFilters ++= {
        Seq(
@@ -504,7 +504,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest FeatureSpec JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-featurespec",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -513,7 +513,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -536,7 +536,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest FlatSpec JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-flatspec",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -545,7 +545,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -568,7 +568,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest FreeSpec JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-freespec",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -577,7 +577,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -600,7 +600,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest FunSuite JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-funsuite",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -609,7 +609,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -632,7 +632,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest FunSpec JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-funspec",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -641,7 +641,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -664,7 +664,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest PropSpec JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-propspec",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -673,7 +673,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -696,7 +696,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest WordSpec JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-wordspec",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -705,7 +705,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -728,7 +728,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest Diagrams JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-diagrams",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -737,7 +737,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -760,7 +760,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest Matchers Core JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-matchers-core",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -770,7 +770,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -794,7 +794,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest Should Matchers JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-shouldmatchers",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -803,7 +803,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -826,7 +826,7 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest Must Matchers JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest-mustmatchers",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       Compile / sourceGenerators += {
@@ -835,7 +835,7 @@ trait JsBuild { this: BuildCommons =>
         }
       },
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
@@ -858,11 +858,11 @@ trait JsBuild { this: BuildCommons =>
     .settings(sharedSettings ++ sharedJSSettings: _*)
     .settings(
       projectTitle := "ScalaTest JS",
-      organization := forkOrganization,
+      organization := "org.scalatest",
       name := "scalatest",
       scalacOptions ++= Seq("-P:scalajs:mapSourceURI:" + rootProject.base.toURI + "->https://raw.githubusercontent.com/scalatest/scalatest/v" + version.value + "/"),
       scalacOptions ++= (if (scalaBinaryVersion.value == "2.10" || scalaVersion.value.startsWith("2.13")) Seq.empty[String] else Seq("-Ypartial-unification")),
-      mimaPreviousArtifacts := Set(upstreamScalatestOrganization %%% moduleName.value % previousReleaseVersion),
+      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
       mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"), 
       sourceGenerators in Compile += {
         // Little trick to get rid of bnd error when publish.
