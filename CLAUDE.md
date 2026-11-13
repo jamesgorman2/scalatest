@@ -35,3 +35,7 @@ the repo, are not visible to the user, and accumulate as garbage.
   - quote an argument containing spaces as `'"…"'`: `-z '"AC-007 An expected"'`.
   - always write `^` as `^^^^`.
   - always write `!` as `"\!"`. You must escape and you double quotes.
+
+## Running bash
+
+Always run in the foreground to avoid idle/timeout issues.
