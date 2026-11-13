@@ -21,11 +21,24 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
   private val summary = Summary(1, 2, 3, 4, 5, 6, 7, 8)
   private val suiteExecution = Some(NodeExecution(NodeId(1), 1, None))
   private val testExecution = Some(NodeExecution(NodeId(3), 2, Some(1)))
+  private val lineInFile = Some(LineInFile(12, "StackSpec.scala", None))
+
+  private val boomText = """"throwable":{"id":1,"className":"java.lang.IllegalStateException","message":"boom"},"""
+  private val summaryText =
+    """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
+      """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},"""
+  private val lineInFileText = """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala"},"""
+  private val threadAndTimeText = """"threadName":"main","timeStamp":1700000000000}"""
+  private val testEventText = """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"""
+  private val suiteEventText = """{"item":"event","node":1,"execution":1,"event":"""
+  private val runEventText = """{"item":"event","event":"""
 
   private def withoutStackTrace[T <: Throwable](throwable: T): T = {
     throwable.setStackTrace(Array.empty)
     throwable
   }
+
+  private def boom: Option[Throwable] = Some(withoutStackTrace(new IllegalStateException("boom")))
 
   private def suiteAbortedBy(throwable: Throwable): String = {
     TestEventLogEncoder.event(
@@ -208,74 +221,93 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
       val eventsWithEveryKeptField: Seq[((Event, Option[NodeExecution]), String)] = Seq(
         (TestFailed(
           ordinal, "1 did not equal 2", "StackSpec", "example.StackSpec", Some("example.StackSpec"), "A stack should pop", "should pop",
-          Vector.empty, Vector("first line", "second line"), None, Some(7L), None, Some(SeeStackDepthException), None, None, "main", timeStamp
+          Vector.empty, Vector("first line", "second line"), throwable = boom, duration = Some(7L),
+          location = Some(SeeStackDepthException), threadName = "main", timeStamp = timeStamp
         ), testExecution) ->
-          ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestFailed","message":"1 did not equal 2",""" +
-            """"analysis":["first line","second line"],"duration":7,"location":{"kind":"SeeStackDepthException"},""" +
-            """"threadName":"main","timeStamp":1700000000000}"""),
+          (testEventText + """"TestFailed","message":"1 did not equal 2","analysis":["first line","second line"],""" + boomText +
+            """"duration":7,"location":{"kind":"SeeStackDepthException"},""" + threadAndTimeText),
         (TestIgnored(
           ordinal, "StackSpec", "example.StackSpec", Some("example.StackSpec"), "A stack should pop", "should pop",
-          None, Some(TopOfMethod("example.StackSpec", "public void example.StackSpec.pop()")), None, "main", timeStamp
+          location = Some(TopOfMethod("example.StackSpec", "public void example.StackSpec.pop()")), threadName = "main",
+          timeStamp = timeStamp
         ), testExecution) ->
-          ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestIgnored",""" +
+          (testEventText + """"TestIgnored",""" +
             """"location":{"kind":"TopOfMethod","className":"example.StackSpec","methodId":"public void example.StackSpec.pop()"},""" +
-            """"threadName":"main","timeStamp":1700000000000}"""),
+            threadAndTimeText),
         (TestPending(
           ordinal, "StackSpec", "example.StackSpec", Some("example.StackSpec"), "A stack should pop", "should pop",
-          Vector.empty, Some(7L), None, None, None, "main", timeStamp
+          Vector.empty, duration = Some(7L), location = lineInFile, threadName = "main", timeStamp = timeStamp
         ), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestPending","duration":7,"threadName":"main","timeStamp":1700000000000}""",
+          (testEventText + """"TestPending","duration":7,""" + lineInFileText + threadAndTimeText),
         (TestCanceled(
           ordinal, "the database was down", "StackSpec", "example.StackSpec", Some("example.StackSpec"), "A stack should pop", "should pop",
-          Vector.empty, None, Some(7L), None, None, None, None, "main", timeStamp
+          Vector.empty, throwable = boom, duration = Some(7L), location = lineInFile, threadName = "main", timeStamp = timeStamp
         ), testExecution) ->
-          ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestCanceled","message":"the database was down",""" +
-            """"duration":7,"threadName":"main","timeStamp":1700000000000}"""),
+          (testEventText + """"TestCanceled","message":"the database was down",""" + boomText + """"duration":7,""" +
+            lineInFileText + threadAndTimeText),
         (SuiteCompleted(
-          ordinal, "StackSpec", "example.StackSpec", Some("example.StackSpec"), Some(7L), None, None, None, None, "main", timeStamp
+          ordinal, "StackSpec", "example.StackSpec", Some("example.StackSpec"), duration = Some(7L), location = lineInFile,
+          threadName = "main", timeStamp = timeStamp
         ), suiteExecution) ->
-          """{"item":"event","node":1,"execution":1,"event":"SuiteCompleted","duration":7,"threadName":"main","timeStamp":1700000000000}""",
+          (suiteEventText + """"SuiteCompleted","duration":7,""" + lineInFileText + threadAndTimeText),
         (SuiteAborted(
-          ordinal, "the suite aborted", "StackSpec", "example.StackSpec", Some("example.StackSpec"), None, Some(7L), None, None, None, None,
-          "main", timeStamp
+          ordinal, "the suite aborted", "StackSpec", "example.StackSpec", Some("example.StackSpec"), throwable = boom,
+          duration = Some(7L), location = lineInFile, threadName = "main", timeStamp = timeStamp
         ), suiteExecution) ->
-          ("""{"item":"event","node":1,"execution":1,"event":"SuiteAborted","message":"the suite aborted",""" +
-            """"duration":7,"threadName":"main","timeStamp":1700000000000}"""),
-        (RunCompleted(ordinal, Some(7L), Some(summary), None, None, None, "main", timeStamp), None) ->
-          ("""{"item":"event","event":"RunCompleted","duration":7,""" +
-            """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
-            """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},""" +
-            """"threadName":"main","timeStamp":1700000000000}"""),
-        (RunStopped(ordinal, Some(7L), Some(summary), None, None, None, "main", timeStamp), None) ->
-          ("""{"item":"event","event":"RunStopped","duration":7,""" +
-            """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
-            """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},""" +
-            """"threadName":"main","timeStamp":1700000000000}"""),
-        (RunAborted(ordinal, "the run aborted", None, Some(7L), Some(summary), None, None, None, "main", timeStamp), None) ->
-          ("""{"item":"event","event":"RunAborted","message":"the run aborted","duration":7,""" +
-            """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
-            """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},""" +
-            """"threadName":"main","timeStamp":1700000000000}"""),
-        (InfoProvided(ordinal, "some info", Some(nameInfo), None, None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"InfoProvided","message":"some info","threadName":"main","timeStamp":1700000000000}""",
-        (AlertProvided(ordinal, "an alert", Some(nameInfo), None, None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"AlertProvided","message":"an alert","threadName":"main","timeStamp":1700000000000}""",
-        (NoteProvided(ordinal, "a note", Some(nameInfo), None, None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"NoteProvided","message":"a note","threadName":"main","timeStamp":1700000000000}""",
-        (MarkupProvided(ordinal, "*markup*", Some(nameInfo), None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"MarkupProvided","text":"*markup*","threadName":"main","timeStamp":1700000000000}""",
-        (ScopeOpened(ordinal, "A stack", nameInfo, None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"ScopeOpened","threadName":"main","timeStamp":1700000000000}""",
-        (ScopeClosed(ordinal, "A stack", nameInfo, None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"ScopeClosed","threadName":"main","timeStamp":1700000000000}""",
-        (ScopePending(ordinal, "A stack", nameInfo, None, None, None, "main", timeStamp), testExecution) ->
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"ScopePending","threadName":"main","timeStamp":1700000000000}""",
+          (suiteEventText + """"SuiteAborted","message":"the suite aborted",""" + boomText + """"duration":7,""" +
+            lineInFileText + threadAndTimeText),
+        (RunStarting(
+          ordinal, 3, ConfigMap("key" -> "value"), location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), None) ->
+          (runEventText + """"RunStarting","testCount":3,"configMap":{"key":"value"},""" + lineInFileText + threadAndTimeText),
+        (RunCompleted(
+          ordinal, Some(7L), Some(summary), location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), None) ->
+          (runEventText + """"RunCompleted","duration":7,""" + summaryText + lineInFileText + threadAndTimeText),
+        (RunStopped(
+          ordinal, Some(7L), Some(summary), location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), None) ->
+          (runEventText + """"RunStopped","duration":7,""" + summaryText + lineInFileText + threadAndTimeText),
+        (RunAborted(
+          ordinal, "the run aborted", boom, Some(7L), Some(summary), location = lineInFile, threadName = "main",
+          timeStamp = timeStamp
+        ), None) ->
+          (runEventText + """"RunAborted","message":"the run aborted",""" + boomText + """"duration":7,""" + summaryText +
+            lineInFileText + threadAndTimeText),
+        (InfoProvided(
+          ordinal, "some info", Some(nameInfo), throwable = boom, location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"InfoProvided","message":"some info",""" + boomText + lineInFileText + threadAndTimeText),
+        (AlertProvided(
+          ordinal, "an alert", Some(nameInfo), throwable = boom, location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"AlertProvided","message":"an alert",""" + boomText + lineInFileText + threadAndTimeText),
+        (NoteProvided(
+          ordinal, "a note", Some(nameInfo), throwable = boom, location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"NoteProvided","message":"a note",""" + boomText + lineInFileText + threadAndTimeText),
+        (MarkupProvided(
+          ordinal, "*markup*", Some(nameInfo), location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"MarkupProvided","text":"*markup*",""" + lineInFileText + threadAndTimeText),
+        (ScopeOpened(
+          ordinal, "A stack", nameInfo, location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"ScopeOpened",""" + lineInFileText + threadAndTimeText),
+        (ScopeClosed(
+          ordinal, "A stack", nameInfo, location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"ScopeClosed",""" + lineInFileText + threadAndTimeText),
+        (ScopePending(
+          ordinal, "A stack", nameInfo, location = lineInFile, threadName = "main", timeStamp = timeStamp
+        ), testExecution) ->
+          (testEventText + """"ScopePending",""" + lineInFileText + threadAndTimeText),
         (DiscoveryCompleted(ordinal, Some(7L), "main", timeStamp), None) ->
-          """{"item":"event","event":"DiscoveryCompleted","duration":7,"threadName":"main","timeStamp":1700000000000}"""
+          (runEventText + """"DiscoveryCompleted","duration":7,""" + threadAndTimeText)
       )
 
       eventsWithEveryKeptField.foreach { case ((event, execution), expectedLine) =>
-        s"write the fields the format keeps of a ${event.getClass.getSimpleName}, in its class's order" in {
+        s"write every field the format keeps of a ${event.getClass.getSimpleName}, in its class's order" in {
           TestEventLogEncoder.event(event, execution) shouldBe expectedLine + "\n"
         }
       }
@@ -300,11 +332,11 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
 
     "writing a throwable" should {
 
-      "write its class name, message, frames, cause and suppressed throwables, numbering each in the order written" in {
+      "write its class name, message, frames, cause and suppressed throwables in order, numbering each in the order written" in {
         val cause = withoutStackTrace(new IllegalStateException("inner"))
-        val suppressed = withoutStackTrace(new RuntimeException(null: String))
         val failure = new IllegalArgumentException("outer", cause)
-        failure.addSuppressed(suppressed)
+        failure.addSuppressed(withoutStackTrace(new RuntimeException(null: String)))
+        failure.addSuppressed(withoutStackTrace(new UnsupportedOperationException("suppressed later")))
         failure.setStackTrace(
           Array(
             new StackTraceElement("example.Stack", "pop", "Stack.scala", 17),
@@ -318,8 +350,22 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
             """{"className":"example.Native","methodName":"call","isNative":true,"text":"example.Native.call(Native Method)"},""" +
             """{"className":"example.Unknown","methodName":"run","text":"example.Unknown.run(Unknown Source)"}],""" +
             """"cause":{"id":2,"className":"java.lang.IllegalStateException","message":"inner"},""" +
-            """"suppressed":[{"id":3,"className":"java.lang.RuntimeException"}]}"""
+            """"suppressed":[{"id":3,"className":"java.lang.RuntimeException"},""" +
+            """{"id":4,"className":"java.lang.UnsupportedOperationException","message":"suppressed later"}]}"""
         )
+      }
+
+      "write a chain of 10000 causes whole, each inside the one before" in {
+        val length = 10000
+        val innermost = withoutStackTrace(new RuntimeException(s"cause $length"))
+        val outermost = (length - 1 to 1 by -1).foldLeft(innermost) { (cause, number) =>
+          withoutStackTrace(new RuntimeException(s"cause $number", cause))
+        }
+        val expectedThrowableText =
+          (1 to length)
+            .map(number => s"""{"id":$number,"className":"java.lang.RuntimeException","message":"cause $number"""")
+            .mkString(""","cause":""") + "}" * length
+        suiteAbortedBy(outermost) shouldBe suiteAbortedLine(expectedThrowableText)
       }
 
       "write a throwable the event has already written as a ref to its id" in {

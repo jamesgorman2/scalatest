@@ -182,23 +182,48 @@ private[scalatest] object TestEventLogEncoder {
 
     private val written = mutable.ArrayBuffer.empty[Throwable]
 
+    // Keeps the throwables whose causes and suppressed throwables are still to write in a list rather than on the
+    // call stack, so that no length of cause chain overflows it.
     def encode(throwable: Throwable): JsonValue = {
+      refTo(throwable).getOrElse {
+        val outermost = opened(throwable)
+        var open = List(outermost)
+        while (open.nonEmpty) {
+          val innermost = open.head
+          innermost.nextLinked() match {
+            case Some(linked) =>
+              refTo(linked) match {
+                case Some(ref) => innermost.add(ref)
+                case None => open = opened(linked) :: open
+              }
+            case None =>
+              open = open.tail
+              open.headOption.foreach(_.add(innermost.closed))
+          }
+        }
+        outermost.closed
+      }
+    }
+
+    private def refTo(throwable: Throwable): Option[JsonValue] = {
       val index = written.indexWhere(_ eq throwable)
-      if (index >= 0) {
-        record(integer("ref", index + 1L))
-      } else {
-        written += throwable
-        record(
+      if (index >= 0) Some(record(integer("ref", index + 1L))) else None
+    }
+
+    private def opened(throwable: Throwable): OpenThrowable = {
+      written += throwable
+      new OpenThrowable(
+        Seq(
           integer("id", written.size.toLong),
           text("className", throwable.getClass.getName),
           optionalText("message", Option(throwable.getMessage)),
           stackDepth(throwable),
           trueOrAbsent("propertyCheck", throwable.isInstanceOf[PropertyCheckFailedException]),
-          array("stackTrace", throwable.getStackTrace.toIndexedSeq.map(frame)),
-          nested("cause", Option(throwable.getCause).map(encode)),
-          array("suppressed", throwable.getSuppressed.toIndexedSeq.map(encode))
-        )
-      }
+          array("stackTrace", throwable.getStackTrace.toIndexedSeq.map(frame))
+        ),
+        Option(throwable.getCause),
+        throwable.getSuppressed.iterator
+      )
     }
 
     private def stackDepth(throwable: Throwable): Field = {
@@ -224,5 +249,31 @@ private[scalatest] object TestEventLogEncoder {
         trueOrAbsent("isNative", element.isNativeMethod),
         text("text", element.toString)
       )
+  }
+
+  // A throwable whose own fields are written, taking its cause and then each suppressed throwable as they are written.
+  private final class OpenThrowable(ownFields: Seq[Field], cause: Option[Throwable], suppressed: Iterator[Throwable]) {
+
+    private var causeIsNext = cause.nonEmpty
+    private var addsCause = false
+    private var writtenCause: Option[JsonValue] = None
+    private val writtenSuppressed = Vector.newBuilder[JsonValue]
+
+    def nextLinked(): Option[Throwable] = {
+      addsCause = causeIsNext
+      causeIsNext = false
+      if (addsCause) cause else suppressed.nextOption()
+    }
+
+    def add(linked: JsonValue): Unit = {
+      if (addsCause) {
+        writtenCause = Some(linked)
+      } else {
+        writtenSuppressed += linked
+      }
+    }
+
+    def closed: JsonValue =
+      record((ownFields :+ nested("cause", writtenCause) :+ array("suppressed", writtenSuppressed.result())): _*)
   }
 }

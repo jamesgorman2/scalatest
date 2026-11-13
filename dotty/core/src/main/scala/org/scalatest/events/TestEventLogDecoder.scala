@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 private[scalatest] object TestEventLogDecoder {
@@ -65,7 +66,7 @@ private[scalatest] object TestEventLogDecoder {
         case "suite" =>
           for {
             parent <- reader.optionalLong("parent")
-            position <- reader.optionalInt("position")
+            position <- reader.optionalIntFrom("position", 0)
             suiteId <- reader.text("suiteId")
             className <- reader.text("className")
           } yield StructureNode.Suite(NodeId(id), parent.map(NodeId(_)), position, name, suiteId, className)
@@ -79,7 +80,7 @@ private[scalatest] object TestEventLogDecoder {
   private def scopeOrTest(reader: JsonObjectReader)(build: (NodeId, Int, String) => StructureNode): Either[String, StructureNode] = {
     for {
       parent <- reader.long("parent")
-      position <- reader.int("position")
+      position <- reader.intFrom("position", 0)
       label <- reader.text("label")
     } yield build(NodeId(parent), position, label)
   }
@@ -87,8 +88,8 @@ private[scalatest] object TestEventLogDecoder {
   private def nodeExecution(reader: JsonObjectReader): Either[String, Option[NodeExecution]] = {
     for {
       node <- reader.optionalLong("node")
-      execution <- reader.optionalInt("execution")
-      parentExecution <- reader.optionalInt("parentExecution")
+      execution <- reader.optionalIntFrom("execution", 1)
+      parentExecution <- reader.optionalIntFrom("parentExecution", 1)
       assigned <- (node, execution) match {
         case (Some(nodeId), Some(number)) => Right(Some(NodeExecution(NodeId(nodeId), number, parentExecution)))
         case (None, None) if parentExecution.isEmpty => Right(None)
@@ -254,26 +255,51 @@ private[scalatest] object TestEventLogDecoder {
 
     private val decoded = mutable.Map.empty[Long, DecodedThrowable]
 
-    def decode(reader: JsonObjectReader): Either[String, DecodedThrowable] = whole(reader)(throwableOrRef)
+    def decode(reader: JsonObjectReader): Either[String, DecodedThrowable] = {
+      whole(reader)(throwableOrRef).flatMap { case (throwable, opened) =>
+        linked(opened.toList).map(_ => throwable)
+      }
+    }
 
-    private def throwableOrRef(reader: JsonObjectReader): Either[String, DecodedThrowable] = {
+    // Keeps the throwables whose causes and suppressed throwables are still to read in a list rather than on the
+    // call stack, so that no length of cause chain overflows it.
+    @tailrec
+    private def linked(open: List[OpenThrowable]): Either[String, Unit] = {
+      open match {
+        case Nil => Right(())
+        case innermost :: outer =>
+          innermost.nextLinked() match {
+            case None =>
+              innermost.close()
+              linked(outer)
+            case Some(reader) =>
+              whole(reader)(throwableOrRef) match {
+                case Left(reason) => Left(reason)
+                case Right((throwable, opened)) =>
+                  innermost.add(throwable)
+                  linked(opened.toList ::: open)
+              }
+          }
+      }
+    }
+
+    // Yields a ref's throwable alone, and a throwable the event has not yet read with its cause and suppressed
+    // throwables still to read.
+    private def throwableOrRef(reader: JsonObjectReader): Either[String, (DecodedThrowable, Option[OpenThrowable])] = {
       reader.optionalLong("ref").flatMap {
-        case Some(id) => decoded.get(id).toRight(s"ref $id names no throwable the event holds before it")
+        case Some(id) => decoded.get(id).toRight(s"ref $id names no throwable the event holds before it").map(_ -> None)
         case None =>
           for {
-            id <- reader.long("id")
+            id <- reader.longFrom("id", 1L)
             className <- reader.text("className")
             message <- reader.optionalText("message")
             stackDepth <- reader.optionalObject("stackDepth").flatMap(ifPresent(_)(whole(_)(decodeStackDepth)))
             isPropertyCheckFailure <- reader.isTrue("propertyCheck")
             stackTrace <- reader.objects("stackTrace").flatMap(each(_)(whole(_)(frame)))
+            cause <- reader.optionalObject("cause")
+            suppressed <- reader.objects("suppressed")
             throwable <- registered(id, new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, stackTrace))
-            cause <- reader.optionalObject("cause").flatMap(ifPresent(_)(decode))
-            suppressed <- reader.objects("suppressed").flatMap(each(_)(decode))
-          } yield {
-            throwable.link(cause, suppressed)
-            throwable
-          }
+          } yield throwable -> Some(new OpenThrowable(throwable, cause, suppressed.iterator))
       }
     }
 
@@ -305,6 +331,35 @@ private[scalatest] object TestEventLogDecoder {
       } yield DecodedStackFrame(className, methodName, fileName, lineNumber, isNative, text)
     }
   }
+
+  // A throwable whose own fields are read, taking its cause and then each suppressed throwable as they are read.
+  private final class OpenThrowable(
+    throwable: DecodedThrowable,
+    cause: Option[JsonObjectReader],
+    suppressed: Iterator[JsonObjectReader]
+  ) {
+
+    private var causeIsNext = cause.nonEmpty
+    private var addsCause = false
+    private var readCause: Option[DecodedThrowable] = None
+    private val readSuppressed = Vector.newBuilder[DecodedThrowable]
+
+    def nextLinked(): Option[JsonObjectReader] = {
+      addsCause = causeIsNext
+      causeIsNext = false
+      if (addsCause) cause else suppressed.nextOption()
+    }
+
+    def add(linked: DecodedThrowable): Unit = {
+      if (addsCause) {
+        readCause = Some(linked)
+      } else {
+        readSuppressed += linked
+      }
+    }
+
+    def close(): Unit = throwable.link(readCause, readSuppressed.result())
+  }
 }
 
 // Records each key it is asked for, so that a key the format does not give the object is one never asked for.
@@ -333,10 +388,22 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
   def optionalLong(key: String): Either[String, Option[Long]] =
     optional(key, "an integer") { case JsonValue.Integer(value) => value }
 
+  def longFrom(key: String, minimum: Long): Either[String, Long] = {
+    required(key, optional(key, s"an integer from $minimum") { case JsonValue.Integer(value) if value >= minimum => value })
+  }
+
   def int(key: String): Either[String, Int] = required(key, optionalInt(key))
 
   def optionalInt(key: String): Either[String, Option[Int]] =
     optional(key, "a 32-bit integer") { case JsonValue.Integer(value) if value.isValidInt => value.toInt }
+
+  def intFrom(key: String, minimum: Int): Either[String, Int] = required(key, optionalIntFrom(key, minimum))
+
+  def optionalIntFrom(key: String, minimum: Int): Either[String, Option[Int]] = {
+    optional(key, s"a 32-bit integer from $minimum") {
+      case JsonValue.Integer(value) if value.isValidInt && value >= minimum => value.toInt
+    }
+  }
 
   def isTrue(key: String): Either[String, Boolean] =
     optional(key, "true or false") { case JsonValue.Bool(value) => value }.map(_.getOrElse(false))

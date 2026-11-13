@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 private[scalatest] enum JsonValue {
@@ -14,38 +15,43 @@ private[scalatest] object JsonWriter {
 
   private val hexDigits = "0123456789ABCDEF"
 
+  private enum Pending {
+    case Value(value: JsonValue)
+    case Key(key: String)
+    case Punctuation(char: Char)
+  }
+
+  // Keeps what is still to write in a list rather than on the call stack, so that no depth of nesting overflows it.
   def write(value: JsonValue): String = {
     val builder = new StringBuilder
-    append(builder, value)
+    var pending = List[Pending](Pending.Value(value))
+    while (pending.nonEmpty) {
+      val next = pending.head
+      pending = pending.tail
+      next match {
+        case Pending.Punctuation(char) => builder.append(char)
+        case Pending.Key(key) =>
+          appendString(builder, key)
+          builder.append(':')
+        case Pending.Value(JsonValue.Text(text)) => appendString(builder, text)
+        case Pending.Value(JsonValue.Integer(number)) => builder.append(number)
+        case Pending.Value(JsonValue.Bool(flag)) => builder.append(flag)
+        case Pending.Value(JsonValue.Array(items)) =>
+          builder.append('[')
+          val members = items.map(item => List[Pending](Pending.Value(item)))
+          pending = separated(members) ::: Pending.Punctuation(']') :: pending
+        case Pending.Value(JsonValue.Object(fields)) =>
+          builder.append('{')
+          val members = fields.map { case (key, fieldValue) => List[Pending](Pending.Key(key), Pending.Value(fieldValue)) }
+          pending = separated(members) ::: Pending.Punctuation('}') :: pending
+      }
+    }
     builder.toString
   }
 
-  private def append(builder: StringBuilder, value: JsonValue): Unit = {
-    value match {
-      case JsonValue.Text(text) => appendString(builder, text)
-      case JsonValue.Integer(number) => builder.append(number)
-      case JsonValue.Bool(flag) => builder.append(flag)
-      case JsonValue.Array(items) =>
-        builder.append('[')
-        appendSeparated(builder, items)(item => append(builder, item))
-        builder.append(']')
-      case JsonValue.Object(fields) =>
-        builder.append('{')
-        appendSeparated(builder, fields) { case (key, fieldValue) =>
-          appendString(builder, key)
-          builder.append(':')
-          append(builder, fieldValue)
-        }
-        builder.append('}')
-    }
-  }
-
-  private def appendSeparated[A](builder: StringBuilder, items: Vector[A])(appendItem: A => Unit): Unit = {
-    items.zipWithIndex.foreach { case (item, index) =>
-      if (index > 0) {
-        builder.append(',')
-      }
-      appendItem(item)
+  private def separated(members: Vector[List[Pending]]): List[Pending] = {
+    members.zipWithIndex.toList.flatMap { case (member, index) =>
+      if (index > 0) Pending.Punctuation(',') :: member else member
     }
   }
 
@@ -93,20 +99,54 @@ private[scalatest] object JsonWriter {
 
 private[scalatest] object JsonReader {
 
-  val maxDepth: Int = 512
-
   def read(text: String): Either[String, JsonValue] = {
     val reader = new JsonReader(text)
     for {
-      value <- reader.value(0)
+      value <- reader.value()
       _ <- reader.end()
     } yield value
+  }
+
+  private sealed abstract class OpenContainer(val closing: Char) {
+
+    def add(value: JsonValue): Unit
+
+    def closed: JsonValue
+  }
+
+  private final class OpenArray extends OpenContainer(']') {
+
+    private val items = Vector.newBuilder[JsonValue]
+
+    def add(value: JsonValue): Unit = items += value
+
+    def closed: JsonValue = JsonValue.Array(items.result())
+  }
+
+  private final class OpenObject extends OpenContainer('}') {
+
+    private val fields = Vector.newBuilder[(String, JsonValue)]
+    private val keys = mutable.Set.empty[String]
+    private var keyOfNextValue = ""
+
+    def startField(key: String): Either[String, Unit] = {
+      keyOfNextValue = key
+      if (keys.add(key)) Right(()) else Left(s"the key $key is repeated")
+    }
+
+    def add(value: JsonValue): Unit = fields += (keyOfNextValue -> value)
+
+    def closed: JsonValue = JsonValue.Object(fields.result())
   }
 }
 
 private final class JsonReader(text: String) {
 
+  import JsonReader.{OpenArray, OpenContainer, OpenObject}
+
   private var position = 0
+  // Innermost first. Held here rather than on the call stack, so that no depth of nesting overflows it.
+  private var open = List.empty[OpenContainer]
 
   def end(): Either[String, Unit] = {
     skipWhitespace()
@@ -117,23 +157,77 @@ private final class JsonReader(text: String) {
     }
   }
 
-  def value(depth: Int): Either[String, JsonValue] = {
+  def value(): Either[String, JsonValue] = placed(valueStart())
+
+  // A step is the value just read, or None where it opened a container.
+  @tailrec
+  private def placed(step: Either[String, Option[JsonValue]]): Either[String, JsonValue] = {
+    step match {
+      case Left(reason) => Left(reason)
+      case Right(None) => placed(firstMember())
+      case Right(Some(value)) =>
+        open match {
+          case Nil => Right(value)
+          case innermost :: _ =>
+            innermost.add(value)
+            placed(nextMember(innermost))
+        }
+    }
+  }
+
+  private def valueStart(): Either[String, Option[JsonValue]] = {
     skipWhitespace()
     if (position >= text.length) {
       Left(s"the text ends where a value should start, at offset $position")
-    } else if (depth > JsonReader.maxDepth) {
-      Left(s"values are nested more than ${JsonReader.maxDepth} deep")
     } else {
       text.charAt(position) match {
-        case '{' => objectValue(depth)
-        case '[' => arrayValue(depth)
-        case '"' => string().map(JsonValue.Text(_))
+        case '{' => opened(new OpenObject)
+        case '[' => opened(new OpenArray)
+        case '"' => string().map(read => Some(JsonValue.Text(read)))
         case 't' => literal("true", JsonValue.Bool(true))
         case 'f' => literal("false", JsonValue.Bool(false))
         case char if char == '-' || isDigit(char) => integer()
         case _ => Left(s"no value starts at offset $position")
       }
     }
+  }
+
+  private def opened(container: OpenContainer): Either[String, Option[JsonValue]] = {
+    position += 1
+    open = container :: open
+    Right(None)
+  }
+
+  private def firstMember(): Either[String, Option[JsonValue]] = {
+    val innermost = open.head
+    skipWhitespace()
+    if (at(innermost.closing)) close(innermost) else member(innermost)
+  }
+
+  private def nextMember(innermost: OpenContainer): Either[String, Option[JsonValue]] = {
+    skipWhitespace()
+    if (at(',')) {
+      position += 1
+      member(innermost)
+    } else if (at(innermost.closing)) {
+      close(innermost)
+    } else {
+      Left(s"neither ',' nor '${innermost.closing}' is at offset $position")
+    }
+  }
+
+  private def member(innermost: OpenContainer): Either[String, Option[JsonValue]] = {
+    skipWhitespace()
+    innermost match {
+      case _: OpenArray => valueStart()
+      case openObject: OpenObject => key().flatMap(openObject.startField).flatMap(_ => valueStart())
+    }
+  }
+
+  private def close(innermost: OpenContainer): Either[String, Option[JsonValue]] = {
+    position += 1
+    open = open.tail
+    Right(Some(innermost.closed))
   }
 
   private def skipWhitespace(): Unit = {
@@ -146,16 +240,16 @@ private final class JsonReader(text: String) {
 
   private def at(char: Char): Boolean = position < text.length && text.charAt(position) == char
 
-  private def literal(word: String, value: JsonValue): Either[String, JsonValue] = {
+  private def literal(word: String, value: JsonValue): Either[String, Option[JsonValue]] = {
     if (text.startsWith(word, position)) {
       position += word.length
-      Right(value)
+      Right(Some(value))
     } else {
       Left(s"no value starts at offset $position")
     }
   }
 
-  private def integer(): Either[String, JsonValue] = {
+  private def integer(): Either[String, Option[JsonValue]] = {
     val start = position
     if (at('-')) {
       position += 1
@@ -173,7 +267,7 @@ private final class JsonReader(text: String) {
       Left(s"the number at offset $start is not an integer")
     } else {
       text.substring(start, position).toLongOption
-        .map(JsonValue.Integer(_))
+        .map(number => Some(JsonValue.Integer(number)))
         .toRight(s"the integer at offset $start does not fit a Long")
     }
   }
@@ -227,7 +321,7 @@ private final class JsonReader(text: String) {
   }
 
   private def unicodeEscapedChar(): Either[String, Char] = {
-    val digits = text.substring(position, math.min(position + 4, text.length)).map(char => Character.digit(char, 16))
+    val digits = text.substring(position, math.min(position + 4, text.length)).map(hexDigit)
     if (digits.length == 4 && digits.forall(_ >= 0)) {
       position += 4
       Right(digits.foldLeft(0)((codeUnit, digit) => codeUnit * 16 + digit).toChar)
@@ -236,25 +330,17 @@ private final class JsonReader(text: String) {
     }
   }
 
-  private def arrayValue(depth: Int): Either[String, JsonValue] = {
-    position += 1
-    val items = Vector.newBuilder[JsonValue]
-    members(']') {
-      value(depth + 1).map(item => items += item)
-    }.map(_ => JsonValue.Array(items.result()))
-  }
-
-  private def objectValue(depth: Int): Either[String, JsonValue] = {
-    position += 1
-    val fields = Vector.newBuilder[(String, JsonValue)]
-    val keys = mutable.Set.empty[String]
-    members('}') {
-      for {
-        key <- key()
-        _ <- if (keys.add(key)) Right(()) else Left(s"the key $key is repeated")
-        fieldValue <- value(depth + 1)
-      } yield fields += (key -> fieldValue)
-    }.map(_ => JsonValue.Object(fields.result()))
+  // Character.digit also takes the digits of other scripts, which JSON does not.
+  private def hexDigit(char: Char): Int = {
+    if (char >= '0' && char <= '9') {
+      char - '0'
+    } else if (char >= 'a' && char <= 'f') {
+      char - 'a' + 10
+    } else if (char >= 'A' && char <= 'F') {
+      char - 'A' + 10
+    } else {
+      -1
+    }
   }
 
   private def key(): Either[String, String] = {
@@ -270,34 +356,6 @@ private final class JsonReader(text: String) {
           Left(s"no ':' follows the key $key")
         }
       }
-    }
-  }
-
-  private def members(closing: Char)(readMember: => Either[String, Any]): Either[String, Unit] = {
-    skipWhitespace()
-    if (at(closing)) {
-      position += 1
-      Right(())
-    } else {
-      var failure: Option[String] = None
-      var closed = false
-      while (failure.isEmpty && !closed) {
-        skipWhitespace()
-        readMember match {
-          case Left(reason) => failure = Some(reason)
-          case Right(_) =>
-            skipWhitespace()
-            if (at(',')) {
-              position += 1
-            } else if (at(closing)) {
-              position += 1
-              closed = true
-            } else {
-              failure = Some(s"neither ',' nor '$closing' is at offset $position")
-            }
-        }
-      }
-      failure.toLeft(())
     }
   }
 }

@@ -32,8 +32,38 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       """{"className":"example.Native","methodName":"call","isNative":true,"text":"example.Native.call(Native Method)"},""" +
       """{"className":"example.Unknown","methodName":"run","text":"example.Unknown.run(Unknown Source)"}],""" +
       """"cause":{"id":2,"className":"java.lang.IllegalStateException","message":"inner"},""" +
-      """"suppressed":[{"id":3,"className":"java.lang.RuntimeException"}]}"""
+      """"suppressed":[{"id":3,"className":"java.lang.RuntimeException"},""" +
+      """{"id":4,"className":"java.lang.UnsupportedOperationException","message":"suppressed later"}]}"""
   )
+
+  private val boomText = """"throwable":{"id":1,"className":"java.lang.IllegalStateException","message":"boom"},"""
+  private val summaryText =
+    """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
+      """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},"""
+  private val lineInFileText = """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala"},"""
+  private val threadAndTimeText = """"threadName":"main","timeStamp":1700000000000}"""
+  private val testEventText = """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"""
+  private val suiteEventText = """{"item":"event","node":1,"execution":1,"event":"""
+  private val runEventText = """{"item":"event","event":"""
+
+  private val lineInFile = Some(LineInFile(12, "StackSpec.scala", None))
+
+  private def boom: Option[DecodedThrowable] =
+    Some(new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, Vector.empty))
+
+  // A DecodedThrowable has no structural equality, so an event is compared with each throwable replaced by its
+  // class name and message.
+  private def comparable(event: TestEventLogEvent): Any = {
+    event match {
+      case TestEventLogEvent.ScalaTestEvent(execution, decoded) =>
+        val fields = decoded.productIterator.map {
+          case Some(throwable: DecodedThrowable) => Some((throwable.className, throwable.message))
+          case other => other
+        }
+        (execution, decoded.productPrefix, fields.toVector)
+      case other => other
+    }
+  }
 
   private def throwableIn(line: String): DecodedThrowable = {
     TestEventLogDecoder.decode(line) match {
@@ -137,104 +167,95 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      val linesOfEveryOtherEventClass: Seq[(String, TestEventLogEvent)] = Seq(
-        ("""{"item":"event","node":1,"execution":1,"event":"SuiteStarting",""" +
-          """"location":{"kind":"TopOfClass","className":"example.StackSpec"},"threadName":"main","timeStamp":1700000000000}""") ->
+      val linesHoldingEveryKeyOfAnEventClass: Seq[(String, TestEventLogEvent)] = Seq(
+        (suiteEventText + """"SuiteStarting","location":{"kind":"TopOfClass","className":"example.StackSpec"},""" +
+          threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             suiteExecution,
             DecodedEvent.SuiteStarting(Some(TopOfClass("example.StackSpec")), "main", timeStamp)
           ),
-        ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestStarting",""" +
+        (testEventText + """"TestStarting",""" +
           """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala","filePathname":"/src/StackSpec.scala"},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
+          threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             testExecution,
             DecodedEvent.TestStarting(Some(LineInFile(12, "StackSpec.scala", Some("/src/StackSpec.scala"))), "main", timeStamp)
           ),
-        ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestSucceeded","duration":5,""" +
-          """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala"},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
-          TestEventLogEvent.ScalaTestEvent(
-            testExecution,
-            DecodedEvent.TestSucceeded(Some(5L), Some(LineInFile(12, "StackSpec.scala", None)), "main", timeStamp)
-          ),
-        ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestFailed","message":"1 did not equal 2",""" +
-          """"analysis":["first line","second line"],"duration":7,"location":{"kind":"SeeStackDepthException"},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
+        (testEventText + """"TestSucceeded","duration":5,""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.TestSucceeded(Some(5L), lineInFile, "main", timeStamp)),
+        (testEventText + """"TestFailed","message":"1 did not equal 2","analysis":["first line","second line"],""" + boomText +
+          """"duration":7,"location":{"kind":"SeeStackDepthException"},""" + threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             testExecution,
             DecodedEvent.TestFailed(
-              "1 did not equal 2", Vector("first line", "second line"), None, Some(7L), Some(SeeStackDepthException), "main", timeStamp
+              "1 did not equal 2", Vector("first line", "second line"), boom, Some(7L), Some(SeeStackDepthException), "main", timeStamp
             )
           ),
-        ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestIgnored",""" +
+        (testEventText + """"TestIgnored",""" +
           """"location":{"kind":"TopOfMethod","className":"example.StackSpec","methodId":"public void example.StackSpec.pop()"},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
+          threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             testExecution,
             DecodedEvent.TestIgnored(
               Some(TopOfMethod("example.StackSpec", "public void example.StackSpec.pop()")), "main", timeStamp
             )
           ),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestPending","duration":7,"threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.TestPending(Some(7L), None, "main", timeStamp)),
-        ("""{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestCanceled","message":"the database was down",""" +
-          """"duration":7,"threadName":"main","timeStamp":1700000000000}""") ->
+        (testEventText + """"TestPending","duration":7,""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.TestPending(Some(7L), lineInFile, "main", timeStamp)),
+        (testEventText + """"TestCanceled","message":"the database was down",""" + boomText + """"duration":7,""" +
+          lineInFileText + threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             testExecution,
-            DecodedEvent.TestCanceled("the database was down", None, Some(7L), None, "main", timeStamp)
+            DecodedEvent.TestCanceled("the database was down", boom, Some(7L), lineInFile, "main", timeStamp)
           ),
-        """{"item":"event","node":1,"execution":1,"event":"SuiteCompleted","duration":7,"threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(suiteExecution, DecodedEvent.SuiteCompleted(Some(7L), None, "main", timeStamp)),
-        ("""{"item":"event","node":1,"execution":1,"event":"SuiteAborted","message":"the suite aborted",""" +
-          """"duration":7,"threadName":"main","timeStamp":1700000000000}""") ->
+        (suiteEventText + """"SuiteCompleted","duration":7,""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(suiteExecution, DecodedEvent.SuiteCompleted(Some(7L), lineInFile, "main", timeStamp)),
+        (suiteEventText + """"SuiteAborted","message":"the suite aborted",""" + boomText + """"duration":7,""" +
+          lineInFileText + threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             suiteExecution,
-            DecodedEvent.SuiteAborted("the suite aborted", None, Some(7L), None, "main", timeStamp)
+            DecodedEvent.SuiteAborted("the suite aborted", boom, Some(7L), lineInFile, "main", timeStamp)
           ),
-        ("""{"item":"event","event":"RunCompleted","duration":7,""" +
-          """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
-          """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
-          TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.RunCompleted(Some(7L), Some(summary), None, "main", timeStamp)),
-        ("""{"item":"event","event":"RunStopped","duration":7,""" +
-          """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
-          """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
-          TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.RunStopped(Some(7L), Some(summary), None, "main", timeStamp)),
-        ("""{"item":"event","event":"RunAborted","message":"the run aborted","duration":7,""" +
-          """"summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,"testsPendingCount":4,""" +
-          """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},""" +
-          """"threadName":"main","timeStamp":1700000000000}""") ->
+        (runEventText + """"RunStarting","testCount":3,"configMap":{"key":"value"},""" + lineInFileText + threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(
             None,
-            DecodedEvent.RunAborted("the run aborted", None, Some(7L), Some(summary), None, "main", timeStamp)
+            DecodedEvent.RunStarting(3, Map("key" -> "value"), lineInFile, "main", timeStamp)
           ),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"InfoProvided","message":"some info","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.InfoProvided("some info", None, None, "main", timeStamp)),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"AlertProvided","message":"an alert","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.AlertProvided("an alert", None, None, "main", timeStamp)),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"NoteProvided","message":"a note","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.NoteProvided("a note", None, None, "main", timeStamp)),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"MarkupProvided","text":"*markup*","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.MarkupProvided("*markup*", None, "main", timeStamp)),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"ScopeOpened","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.ScopeOpened(None, "main", timeStamp)),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"ScopeClosed","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.ScopeClosed(None, "main", timeStamp)),
-        """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"ScopePending","threadName":"main","timeStamp":1700000000000}""" ->
-          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.ScopePending(None, "main", timeStamp)),
-        """{"item":"event","event":"DiscoveryCompleted","duration":7,"threadName":"main","timeStamp":1700000000000}""" ->
+        (runEventText + """"RunCompleted","duration":7,""" + summaryText + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.RunCompleted(Some(7L), Some(summary), lineInFile, "main", timeStamp)),
+        (runEventText + """"RunStopped","duration":7,""" + summaryText + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.RunStopped(Some(7L), Some(summary), lineInFile, "main", timeStamp)),
+        (runEventText + """"RunAborted","message":"the run aborted",""" + boomText + """"duration":7,""" + summaryText +
+          lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(
+            None,
+            DecodedEvent.RunAborted("the run aborted", boom, Some(7L), Some(summary), lineInFile, "main", timeStamp)
+          ),
+        (testEventText + """"InfoProvided","message":"some info",""" + boomText + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.InfoProvided("some info", boom, lineInFile, "main", timeStamp)),
+        (testEventText + """"AlertProvided","message":"an alert",""" + boomText + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.AlertProvided("an alert", boom, lineInFile, "main", timeStamp)),
+        (testEventText + """"NoteProvided","message":"a note",""" + boomText + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.NoteProvided("a note", boom, lineInFile, "main", timeStamp)),
+        (testEventText + """"MarkupProvided","text":"*markup*",""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.MarkupProvided("*markup*", lineInFile, "main", timeStamp)),
+        (testEventText + """"ScopeOpened",""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.ScopeOpened(lineInFile, "main", timeStamp)),
+        (testEventText + """"ScopeClosed",""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.ScopeClosed(lineInFile, "main", timeStamp)),
+        (testEventText + """"ScopePending",""" + lineInFileText + threadAndTimeText) ->
+          TestEventLogEvent.ScalaTestEvent(testExecution, DecodedEvent.ScopePending(lineInFile, "main", timeStamp)),
+        (runEventText + """"DiscoveryCompleted","duration":7,""" + threadAndTimeText) ->
           TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryCompleted(Some(7L), "main", timeStamp))
       )
 
-      linesOfEveryOtherEventClass.foreach { case (line, expectedEvent) =>
+      linesHoldingEveryKeyOfAnEventClass.foreach { case (line, expectedEvent) =>
         val eventName = expectedEvent match {
           case TestEventLogEvent.ScalaTestEvent(_, event) => event.productPrefix
           case other => other.productPrefix
         }
-        s"yield a $eventName with its node, its executions and the fields the format keeps" in {
-          TestEventLogDecoder.decode(line) shouldBe Right(expectedEvent)
+        s"yield a $eventName with its node, its executions and every field the format keeps" in {
+          TestEventLogDecoder.decode(line).map(comparable) shouldBe Right(comparable(expectedEvent))
         }
       }
     }
@@ -249,7 +270,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           "high \uD83D low \uDE00 end".toVector
       }
       "yield an escaped surrogate pair and an unescaped one as the same two chars" in {
-        infoMessageIn(infoLine("""😀 """ + "😀")).toVector shouldBe "😀 😀".toVector
+        infoMessageIn(infoLine("""\uD83D\uDE00 """ + "😀")).toVector shouldBe "😀 😀".toVector
       }
     }
 
@@ -291,10 +312,21 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         cause.suppressed shouldBe Vector.empty
       }
 
-      "yield its suppressed throwables, one without a message having none" in {
+      "yield its suppressed throwables in the order written, one without a message having none" in {
         val suppressed = throwableIn(throwableWithCauseAndSuppressedLine).suppressed
-        suppressed.map(_.className) shouldBe Vector("java.lang.RuntimeException")
-        suppressed.map(_.message) shouldBe Vector(None)
+        suppressed.map(_.className) shouldBe Vector("java.lang.RuntimeException", "java.lang.UnsupportedOperationException")
+        suppressed.map(_.message) shouldBe Vector(None, Some("suppressed later"))
+      }
+
+      "yield a chain of 10000 causes whole, each the cause of the one before" in {
+        val length = 10000
+        val throwableText =
+          (1 to length)
+            .map(number => s"""{"id":$number,"className":"java.lang.RuntimeException","message":"cause $number"""")
+            .mkString(""","cause":""") + "}" * length
+        val outermost = throwableIn(suiteAbortedLine(throwableText))
+        val chain = Iterator.iterate(Option(outermost))(_.flatMap(_.cause)).takeWhile(_.nonEmpty).flatten.toVector
+        chain.map(_.message) shouldBe (1 to length).map(number => Some(s"cause $number"))
       }
 
       "yield the same object for a ref as for the throwable it names" in {
@@ -360,26 +392,26 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "given a line holding a key the format does not give its object" should {
       val linesAndUnknownKeys = Seq(
-        """{"item":"runStarted","pid":1,"startTime":"t","extra":1}""" -> "extra",
-        """{"item":"runEnded","outcome":"completed","duration":1}""" -> "duration",
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","label":"S","suiteId":"s","className":"c"}]}""" -> "label",
-        """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":0,"name":"t","label":"- t","suiteId":"s"}]}""" -> "suiteId",
-        """{"item":"structure","nodes":[{"id":2,"kind":"scope","parent":1,"position":0,"name":"t","label":"t","className":"c"}]}""" -> "className",
-        """{"item":"event","event":"DiscoveryStarting","ordinal":1,"threadName":"main","timeStamp":1}""" -> "ordinal",
-        """{"item":"event","event":"DiscoveryStarting","location":{"kind":"SeeStackDepthException"},"threadName":"main","timeStamp":1}""" -> "location",
-        """{"item":"event","node":1,"execution":1,"parentExecution":1,"event":"ScopeOpened","message":"A stack","threadName":"main","timeStamp":1}""" -> "message",
-        """{"item":"event","node":1,"execution":1,"event":"SuiteStarting","suiteName":"S","threadName":"main","timeStamp":1}""" -> "suiteName",
-        """{"item":"event","event":"RunCompleted","location":{"kind":"TopOfClass","className":"c","methodId":"m"},"threadName":"main","timeStamp":1}""" -> "methodId",
+        """{"item":"runStarted","pid":1,"startTime":"t","extra":1}""" -> ("extra", "the runStarted event"),
+        """{"item":"runEnded","outcome":"completed","duration":1}""" -> ("duration", "the runEnded event"),
+        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","label":"S","suiteId":"s","className":"c"}]}""" -> ("label", "a suite node"),
+        """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":0,"name":"t","label":"- t","suiteId":"s"}]}""" -> ("suiteId", "a test node"),
+        """{"item":"structure","nodes":[{"id":2,"kind":"scope","parent":1,"position":0,"name":"t","label":"t","className":"c"}]}""" -> ("className", "a scope node"),
+        """{"item":"event","event":"DiscoveryStarting","ordinal":1,"threadName":"main","timeStamp":1}""" -> ("ordinal", "a ScalaTest event"),
+        """{"item":"event","event":"DiscoveryStarting","location":{"kind":"SeeStackDepthException"},"threadName":"main","timeStamp":1}""" -> ("location", "a DiscoveryStarting event"),
+        """{"item":"event","node":1,"execution":1,"parentExecution":1,"event":"ScopeOpened","message":"A stack","threadName":"main","timeStamp":1}""" -> ("message", "a ScopeOpened event"),
+        """{"item":"event","node":1,"execution":1,"event":"SuiteStarting","suiteName":"S","threadName":"main","timeStamp":1}""" -> ("suiteName", "a SuiteStarting event"),
+        """{"item":"event","event":"RunCompleted","location":{"kind":"TopOfClass","className":"c","methodId":"m"},"threadName":"main","timeStamp":1}""" -> ("methodId", "a TopOfClass location"),
         ("""{"item":"event","event":"RunCompleted","summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,""" +
           """"testsPendingCount":4,"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8,""" +
-          """"testsCompletedCount":3},"threadName":"main","timeStamp":1}""") -> "testsCompletedCount",
-        suiteAbortedLine("""{"id":1,"className":"c","depth":3}""") -> "depth",
-        suiteAbortedLine("""{"id":1,"className":"c","cause":{"ref":1,"id":2}}""") -> "id",
-        suiteAbortedLine("""{"id":1,"className":"c","stackDepth":{"depth":3}}""") -> "depth",
-        suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m","text":"c.m","moduleName":"x"}]}""") -> "moduleName"
+          """"testsCompletedCount":3},"threadName":"main","timeStamp":1}""") -> ("testsCompletedCount", "a summary"),
+        suiteAbortedLine("""{"id":1,"className":"c","depth":3}""") -> ("depth", "a throwable"),
+        suiteAbortedLine("""{"id":1,"className":"c","cause":{"ref":1,"id":2}}""") -> ("id", "a ref to a throwable"),
+        suiteAbortedLine("""{"id":1,"className":"c","stackDepth":{"depth":3}}""") -> ("depth", "a throwable's stackDepth"),
+        suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m","text":"c.m","moduleName":"x"}]}""") -> ("moduleName", "a stack frame")
       )
-      linesAndUnknownKeys.zipWithIndex.foreach { case ((line, key), index) =>
-        s"report that it cannot be decoded, naming the key $key (line ${index + 1})" in {
+      linesAndUnknownKeys.foreach { case (line, (key, description)) =>
+        s"report the unknown key $key of $description" in {
           TestEventLogDecoder.decode(line) shouldBe Left(s"unknown key $key")
         }
       }
@@ -387,41 +419,41 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "given a line lacking a required key" should {
       val linesAndMissingKeys = Seq(
-        """{"pid":1,"startTime":"t"}""" -> "item",
-        """{"item":"runStarted","startTime":"t"}""" -> "pid",
-        """{"item":"runStarted","pid":1}""" -> "startTime",
-        """{"item":"runEnded"}""" -> "outcome",
-        """{"item":"structure"}""" -> "nodes",
-        """{"item":"structure","nodes":[{"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> "id",
-        """{"item":"structure","nodes":[{"id":1,"name":"S","suiteId":"s","className":"c"}]}""" -> "kind",
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","suiteId":"s","className":"c"}]}""" -> "name",
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","className":"c"}]}""" -> "suiteId",
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","suiteId":"s"}]}""" -> "className",
-        """{"item":"structure","nodes":[{"id":2,"kind":"test","position":0,"name":"t","label":"- t"}]}""" -> "parent",
-        """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"name":"t","label":"- t"}]}""" -> "position",
-        """{"item":"structure","nodes":[{"id":2,"kind":"scope","parent":1,"position":0,"name":"t"}]}""" -> "label",
-        """{"item":"event","threadName":"main","timeStamp":1}""" -> "event",
-        """{"item":"event","execution":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> "node",
-        """{"item":"event","parentExecution":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> "node",
-        """{"item":"event","node":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> "execution",
-        """{"item":"event","event":"DiscoveryStarting","timeStamp":1}""" -> "threadName",
-        """{"item":"event","event":"DiscoveryStarting","threadName":"main"}""" -> "timeStamp",
-        """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"TestFailed","threadName":"main","timeStamp":1}""" -> "message",
-        """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"MarkupProvided","threadName":"main","timeStamp":1}""" -> "text",
-        """{"item":"event","event":"RunStarting","configMap":{},"threadName":"main","timeStamp":1}""" -> "testCount",
-        """{"item":"event","event":"RunStarting","testCount":1,"threadName":"main","timeStamp":1}""" -> "configMap",
-        """{"item":"event","event":"RunCompleted","location":{"className":"c"},"threadName":"main","timeStamp":1}""" -> "kind",
-        """{"item":"event","event":"RunCompleted","location":{"kind":"LineInFile","lineNumber":1},"threadName":"main","timeStamp":1}""" -> "fileName",
-        """{"item":"event","event":"RunCompleted","location":{"kind":"TopOfMethod","className":"c"},"threadName":"main","timeStamp":1}""" -> "methodId",
+        """{"pid":1,"startTime":"t"}""" -> ("item", "any event"),
+        """{"item":"runStarted","startTime":"t"}""" -> ("pid", "the runStarted event"),
+        """{"item":"runStarted","pid":1}""" -> ("startTime", "the runStarted event"),
+        """{"item":"runEnded"}""" -> ("outcome", "the runEnded event"),
+        """{"item":"structure"}""" -> ("nodes", "a structure event"),
+        """{"item":"structure","nodes":[{"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("id", "a suite node"),
+        """{"item":"structure","nodes":[{"id":1,"name":"S","suiteId":"s","className":"c"}]}""" -> ("kind", "a node"),
+        """{"item":"structure","nodes":[{"id":1,"kind":"suite","suiteId":"s","className":"c"}]}""" -> ("name", "a suite node"),
+        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","className":"c"}]}""" -> ("suiteId", "a suite node"),
+        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","suiteId":"s"}]}""" -> ("className", "a suite node"),
+        """{"item":"structure","nodes":[{"id":2,"kind":"test","position":0,"name":"t","label":"- t"}]}""" -> ("parent", "a test node"),
+        """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"name":"t","label":"- t"}]}""" -> ("position", "a test node"),
+        """{"item":"structure","nodes":[{"id":2,"kind":"scope","parent":1,"position":0,"name":"t"}]}""" -> ("label", "a scope node"),
+        """{"item":"event","threadName":"main","timeStamp":1}""" -> ("event", "a ScalaTest event"),
+        """{"item":"event","execution":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("node", "a ScalaTest event with an execution"),
+        """{"item":"event","parentExecution":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("node", "a ScalaTest event with a parentExecution"),
+        """{"item":"event","node":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("execution", "a ScalaTest event with a node"),
+        """{"item":"event","event":"DiscoveryStarting","timeStamp":1}""" -> ("threadName", "a DiscoveryStarting event"),
+        """{"item":"event","event":"DiscoveryStarting","threadName":"main"}""" -> ("timeStamp", "a DiscoveryStarting event"),
+        """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"TestFailed","threadName":"main","timeStamp":1}""" -> ("message", "a TestFailed event"),
+        """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"MarkupProvided","threadName":"main","timeStamp":1}""" -> ("text", "a MarkupProvided event"),
+        """{"item":"event","event":"RunStarting","configMap":{},"threadName":"main","timeStamp":1}""" -> ("testCount", "a RunStarting event"),
+        """{"item":"event","event":"RunStarting","testCount":1,"threadName":"main","timeStamp":1}""" -> ("configMap", "a RunStarting event"),
+        """{"item":"event","event":"RunCompleted","location":{"className":"c"},"threadName":"main","timeStamp":1}""" -> ("kind", "a location"),
+        """{"item":"event","event":"RunCompleted","location":{"kind":"LineInFile","lineNumber":1},"threadName":"main","timeStamp":1}""" -> ("fileName", "a LineInFile location"),
+        """{"item":"event","event":"RunCompleted","location":{"kind":"TopOfMethod","className":"c"},"threadName":"main","timeStamp":1}""" -> ("methodId", "a TopOfMethod location"),
         ("""{"item":"event","event":"RunCompleted","summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,""" +
           """"testsPendingCount":4,"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7},""" +
-          """"threadName":"main","timeStamp":1}""") -> "scopesPendingCount",
-        suiteAbortedLine("""{"className":"c"}""") -> "id",
-        suiteAbortedLine("""{"id":1}""") -> "className",
-        suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m"}]}""") -> "text"
+          """"threadName":"main","timeStamp":1}""") -> ("scopesPendingCount", "a summary"),
+        suiteAbortedLine("""{"className":"c"}""") -> ("id", "a throwable"),
+        suiteAbortedLine("""{"id":1}""") -> ("className", "a throwable"),
+        suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m"}]}""") -> ("text", "a stack frame")
       )
-      linesAndMissingKeys.zipWithIndex.foreach { case ((line, key), index) =>
-        s"report that it cannot be decoded, naming the key $key (line ${index + 1})" in {
+      linesAndMissingKeys.foreach { case (line, (key, description)) =>
+        s"report the missing key $key of $description" in {
           TestEventLogDecoder.decode(line) shouldBe Left(s"missing key $key")
         }
       }
@@ -465,11 +497,13 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         "an object with an unquoted key" -> """{item:"runEnded","outcome":"completed"}""",
         "an object with a repeated key" -> """{"item":"runEnded","item":"runEnded","outcome":"completed"}""",
         "an object with a null value" -> """{"item":"runEnded","outcome":null}""",
-        "a string with an unescaped control character" -> ("""{"item":"runEnded","outcome":"comp""" + "\t" + """leted"}"""),
-        "a string with an unknown escape" -> """{"item":"runEnded","outcome":"\x"}""",
-        "a string with a short unicode escape" -> """{"item":"runEnded","outcome":"\u12"}""",
+        "a string with an unescaped control character" -> infoLine("some" + "\t" + "info"),
+        "a string with an unknown escape" -> infoLine("""some \x info"""),
+        "a string with a short unicode escape" -> infoLine("""some \u12"""),
+        "a string with a unicode escape in fullwidth digits" -> infoLine("some \\u" + "\uFF10\uFF10\uFF16\uFF13 info"),
         "a number with a leading zero" -> """{"item":"runStarted","pid":01,"startTime":"t"}""",
-        "arrays nested without end" -> ("[" * 100000)
+        "arrays nested without end" -> ("[" * 100000),
+        "arrays nested 100000 deep" -> ("[" * 100000 + "]" * 100000)
       )
       descriptionsAndLines.foreach { case (description, line) =>
         s"report that $description cannot be decoded" in {
@@ -502,6 +536,37 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       descriptionsAndLines.foreach { case (description, line) =>
         s"report that $description cannot be decoded" in {
           TestEventLogDecoder.decode(line).isLeft shouldBe true
+        }
+      }
+    }
+
+    "given a line holding an integer below the least the format gives its key" should {
+      val descriptionsLinesAndReasons = Seq(
+        (
+          "a test node's position below 0",
+          """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":-1,"name":"t","label":"- t"}]}""",
+          "position is not a 32-bit integer from 0"
+        ),
+        (
+          "a suite node's position below 0",
+          """{"item":"structure","nodes":[{"id":4,"kind":"suite","parent":1,"position":-1,"name":"S","suiteId":"s","className":"c"}]}""",
+          "position is not a 32-bit integer from 0"
+        ),
+        (
+          "an execution below 1",
+          """{"item":"event","node":1,"execution":0,"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
+          "execution is not a 32-bit integer from 1"
+        ),
+        (
+          "a parentExecution below 1",
+          """{"item":"event","node":3,"execution":1,"parentExecution":0,"event":"TestStarting","threadName":"main","timeStamp":1}""",
+          "parentExecution is not a 32-bit integer from 1"
+        ),
+        ("a throwable's id below 1", suiteAbortedLine("""{"id":0,"className":"c"}"""), "id is not an integer from 1")
+      )
+      descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
+        s"report that $description cannot be decoded" in {
+          TestEventLogDecoder.decode(line) shouldBe Left(reason)
         }
       }
     }

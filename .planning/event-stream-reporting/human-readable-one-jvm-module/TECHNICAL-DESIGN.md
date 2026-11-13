@@ -320,15 +320,16 @@ A ScalaTest event's fields:
   - `stackDepth`, only on a `StackDepth`: an object of `fileName`, `filePathname` and `lineNumber`, the failed code's, each present where defined.
   - `propertyCheck`, `true`, only on a `PropertyCheckFailedException`, whose message already holds its line number.
   - `stackTrace`, its frames, a `StackDepth`'s included, each a frame with the keys `../JSON-LAYOUT.md` § Throwables gives a frame, each absent where that section says, followed by `text`, its `StackTraceElement.toString`, which on JDK 9 and later can hold a module and a class loader name.
-  - `cause`; `suppressed`, in order.
+  - `cause`; `suppressed`, in order. Core's codec writes and reads nested values without recursion, so a chain of causes of any length is written and read whole, whatever the thread's stack size.
 
 A line cannot be decoded where it:
 
-- is not one JSON object, repeats a key within an object, or nests values more than 512 deep;
+- is not one JSON object, or repeats a key within an object;
 - holds a key this section does not give its object;
 - lacks a required key;
 - holds an `item`, `event`, `kind` or `outcome` value this section does not give;
-- holds a value of another JSON type than this section gives its key, `null` included, or an integer outside its field's range;
+- holds a value of another JSON type than this section gives its key, `null` included;
+- holds an integer that does not fit its field's `Int` or `Long`, or one below the least this section gives its key: 0 for a `position`, 1 for an `execution`, a `parentExecution` and a throwable's `id`;
 - holds a `ref` to an `id` the event has not yet written, or two throwables with one `id`.
 
 ## Publishing
