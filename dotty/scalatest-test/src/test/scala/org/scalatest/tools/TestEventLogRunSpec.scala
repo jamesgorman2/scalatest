@@ -1,8 +1,11 @@
 package org.scalatest.tools
 
 import java.io.File
+import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.BuiltEvent
 import org.scalatest.events.EventLogComparison
@@ -21,6 +24,7 @@ import sbt.testing.SubclassFingerprint
 import sbt.testing.SuiteSelector
 import sbt.testing.Task
 import sbt.testing.TaskDef
+import scala.util.Try
 
 final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers {
 
@@ -74,6 +78,29 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     current.fold(reason => fail(reason), identity)
   }
 
+  private def noProcessHandleMessage(eventLogFile: Path): String = {
+    assume(ProcessIdentity.current.isLeft, "this JVM has ProcessHandle")
+    s"Cannot write the test event log $eventLogFile: this JVM has no java.lang.ProcessHandle"
+  }
+
+  private val runTimeLimitSeconds = 120L
+
+  // Runner.run blocks for as long as a graphic reporter's window is open, so a run that wrongly opens one must fail.
+  private def runnerRun(arguments: Seq[String]): Boolean = {
+    val outcome = new AtomicReference[Option[Try[Boolean]]](None)
+    val run = new Thread(() => outcome.set(Some(Try(Runner.run(arguments.toArray)))))
+    run.setDaemon(true)
+    run.start()
+    run.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds))
+    outcome.get match {
+      case Some(result) => result.get
+      case None =>
+        run.interrupt()
+        java.awt.Window.getWindows.foreach(_.dispose())
+        fail(s"Runner.run did not return within $runTimeLimitSeconds seconds")
+    }
+  }
+
   private def runnerArgument(eventLogFile: Path): List[String] = TestEventLogArgument.forFile(eventLogFile.toString)
 
   private def runpathOf(folder: File): String = folder.getPath.replace(" ", "\\ ")
@@ -81,8 +108,10 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
   private def testClassesRunpath: String =
     runpathOf(new File(classOf[samples.SqrtPropSpec].getProtectionDomain.getCodeSource.getLocation.toURI))
 
-  private def frameworkRunner(arguments: Seq[String]): SbtRunner =
-    new Framework().runner(arguments.toArray, Array.empty, getClass.getClassLoader)
+  private def frameworkRunner(arguments: Seq[String], remoteArguments: Seq[String] = Nil): SbtRunner =
+    new Framework().runner(arguments.toArray, remoteArguments.toArray, getClass.getClassLoader)
+
+  private def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
 
   private def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Unit = {
     val fingerprint = new Framework().fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
@@ -99,7 +128,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
         execute(runner, suiteClassName, new RecordingLogger)
         runner.done()
       case Launch.ByRunner =>
-        Runner.run((List("-R", testClassesRunpath, "-s", suiteClassName) ++ arguments).toArray)
+        runnerRun(List("-R", testClassesRunpath, "-s", suiteClassName) ++ arguments)
     }
   }
 
@@ -184,11 +213,33 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
         Then("the event log holds the run's start, its run events assigned to the run, and its end, in that order")
         EventLogComparison.mismatchWhenHoldsInOrder(
-          decodedOrFail(TemporaryEventLog.lines(eventLogFile)),
+          eventLogOf(eventLogFile),
           built(
             """
             run started
             run: RunStarting(testCount: 0)
+            run: RunCompleted
+            run ended completed
+            """
+          )
+        ) shouldBe None
+      }
+    }
+
+    Scenario("A Runner.run run of a suite it is given by name writes none of that suite's events") {
+      thisProcess
+      Given("a suite whose one property succeeds")
+      TemporaryEventLog.in { eventLogFile =>
+        When("Runner.run runs it by name with the runner argument")
+        launched(Launch.ByRunner, "samples.SqrtPropSpec", runnerArgument(eventLogFile))
+
+        Then("the event log is the run's start, its run events assigned to the run, and its end")
+        EventLogComparison.mismatchWhenIs(
+          eventLogOf(eventLogFile),
+          built(
+            """
+            run started
+            run: RunStarting(testCount: 1)
             run: RunCompleted
             run ended completed
             """
@@ -204,11 +255,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
           Given("a runpath holding one suite, whose one test succeeds")
           withRunpathOfOneSuite(eventLogFile.resolveSibling("runpath")) { runpath =>
             When(s"Runner.run discovers and runs the runpath's suites $how, with the runner argument")
-            Runner.run((List("-R", runpath) ++ parallelArguments ++ runnerArgument(eventLogFile)).toArray)
+            runnerRun(List("-R", runpath) ++ parallelArguments ++ runnerArgument(eventLogFile))
 
             Then("the event log holds the run's start, discovery's events, the run events and the discovery suite's own, and the run's end")
             EventLogComparison.mismatchWhenHoldsInOrder(
-              decodedOrFail(TemporaryEventLog.lines(eventLogFile)),
+              eventLogOf(eventLogFile),
               built(
                 """
                 run started
@@ -224,6 +275,108 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
             ) shouldBe None
           }
         }
+      }
+    }
+  }
+
+  Feature("A run that ends before its runner sends RunStarting") {
+
+    val runsThatAbortEarly = List(
+      "a custom reporter class that does not exist" -> ((_: Path) => List("-C", "samples.NoSuchReporter")),
+      "a file of suites to run again that does not exist" -> ((folder: Path) => List("-A", folder.resolve("no-such-file").toString))
+    )
+
+    runsThatAbortEarly.foreach { (description, argumentsIn) =>
+      Scenario(s"A Runner.run run given $description ends aborted") {
+        thisProcess
+        TemporaryEventLog.in { eventLogFile =>
+          When(s"Runner.run is given $description, and the runner argument")
+          val allTestsPassed = runnerRun(argumentsIn(eventLogFile.getParent) ++ runnerArgument(eventLogFile))
+
+          Then("it returns that not all tests passed")
+          allTestsPassed shouldBe false
+
+          And("the event log is the run's start, its RunAborted assigned to the run, and that the run ended aborted")
+          EventLogComparison.mismatchWhenIs(
+            eventLogOf(eventLogFile),
+            built(
+              """
+              run started
+              run: RunAborted
+              run ended aborted
+              """
+            )
+          ) shouldBe None
+        }
+      }
+    }
+
+    Scenario("A Framework runner that fails at construction leaves an event log that holds only the run's start") {
+      thisProcess
+      TemporaryEventLog.in { eventLogFile =>
+        When("a Framework runner is constructed with a custom reporter class that does not exist, and the runner argument")
+        Then("its construction fails")
+        an[IllegalArgumentException] should be thrownBy frameworkRunner(List("-C", "samples.NoSuchReporter") ++ runnerArgument(eventLogFile))
+
+        And("the event log is the run's start")
+        EventLogComparison.mismatchWhenIs(eventLogOf(eventLogFile), built("run started")) shouldBe None
+
+        And("the event log file is not held open, so it can be moved")
+        val moved = Files.move(eventLogFile, eventLogFile.resolveSibling("moved.log"))
+        TemporaryEventLog.namesIn(moved.getParent) shouldBe Set("moved.log")
+      }
+    }
+  }
+
+  Feature("A sub-process runner") {
+
+    Scenario("A Framework runner given remote arguments writes no event log") {
+      TemporaryEventLog.in { eventLogFile =>
+        Given("a server for the runner's events, as sbt's main runner opens for a sub-process it forks")
+        val server = new ServerSocket(0)
+        try {
+          When("a Framework runner is constructed with the runner argument and that server as its remote arguments, and is done")
+          frameworkRunner(runnerArgument(eventLogFile), List("localhost", server.getLocalPort.toString)).done()
+
+          Then("the event log's folder holds no file")
+          TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set.empty
+        } finally {
+          server.close()
+        }
+      }
+    }
+  }
+
+  Feature("A JVM that has no ProcessHandle") {
+
+    Scenario("A Framework runner given the runner argument fails at construction") {
+      TemporaryEventLog.in { eventLogFile =>
+        val message = noProcessHandleMessage(eventLogFile)
+
+        When("a Framework runner is constructed with the runner argument")
+        val failure = the[IllegalStateException] thrownBy frameworkRunner(runnerArgument(eventLogFile))
+
+        Then("it fails, saying why")
+        failure should have message message
+
+        And("it creates no file")
+        TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set.empty
+      }
+    }
+
+    Scenario("Runner.run given the runner argument fails before it runs a suite") {
+      TemporaryEventLog.in { eventLogFile =>
+        val message = noProcessHandleMessage(eventLogFile)
+
+        When("Runner.run is given a suite and the runner argument")
+        val failure = the[IllegalStateException] thrownBy
+          runnerRun(List("-R", testClassesRunpath, "-s", "samples.SqrtPropSpec") ++ runnerArgument(eventLogFile))
+
+        Then("it fails, saying why")
+        failure should have message message
+
+        And("it creates no file")
+        TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set.empty
       }
     }
   }
@@ -256,7 +409,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     Scenario("Runner.run rejects the graphic reporter with the runner argument") {
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run is given -g and the runner argument")
-        val rejection = the[IllegalArgumentException] thrownBy Runner.run((List("-g") ++ runnerArgument(eventLogFile)).toArray)
+        val rejection = the[IllegalArgumentException] thrownBy runnerRun(List("-g") ++ runnerArgument(eventLogFile))
 
         Then("it fails, naming both")
         rejection should have message "The graphic reporter (-g) is not supported with --test-event-log."

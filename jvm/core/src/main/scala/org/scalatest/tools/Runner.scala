@@ -965,41 +965,49 @@ object Runner {
         rjf.blockUntilWindowClosed()
       }
       case None => { // Run the test without a GUI
-        val handOffToTestEventLog = TestEventLogEmitter.startedIfGiven(testEventLogFile)
-        withClassLoaderAndDispatchReporter(
-          runpathList,
-          reporterConfigs,
-          None,
-          passFailReporter,
-          detectSlowpokes,
-          slowpokeDetectionDelay,
-          slowpokeDetectionPeriod
-       ) { (loader, dispatchReporter) =>
-          dispatchReporter.registerSlowpokeAlertHandOff(handOffToTestEventLog)
-          doRunRunRunDaDoRunRun(
-            dispatchReporter,
-            suitesList,
-            agains,
-            testSpecs,
-            junitsList,
-            Stopper.default,
-            tagsToInclude,
-            tagsToExclude,
-            configMap,
-            concurrent,
-            membersOnlyList,
-            wildcardList,
-            testNGList,
+        val testEventLogEmitter = TestEventLogEmitter.startedIfGiven(testEventLogFile)
+        val handOffToTestEventLog = TestEventLogEmitter.handOffTo(testEventLogEmitter)
+        try {
+          withClassLoaderAndDispatchReporter(
             runpathList,
-            loader,
-            new RunDoneListener {},
-            1,
-            concurrentConfig,
-            suffixes,
-            chosenStyleSet,
-            testSortingReporterTimeout,
+            reporterConfigs,
+            None,
+            passFailReporter,
+            detectSlowpokes,
+            slowpokeDetectionDelay,
+            slowpokeDetectionPeriod,
             handOffToTestEventLog
-          )
+          ) { (loader, dispatchReporter) =>
+            dispatchReporter.registerSlowpokeAlertHandOff(handOffToTestEventLog)
+            doRunRunRunDaDoRunRun(
+              dispatchReporter,
+              suitesList,
+              agains,
+              testSpecs,
+              junitsList,
+              Stopper.default,
+              tagsToInclude,
+              tagsToExclude,
+              configMap,
+              concurrent,
+              membersOnlyList,
+              wildcardList,
+              testNGList,
+              runpathList,
+              loader,
+              new RunDoneListener {},
+              1,
+              concurrentConfig,
+              suffixes,
+              chosenStyleSet,
+              testSortingReporterTimeout,
+              handOffToTestEventLog
+            )
+          }
+        }
+        finally {
+          // A run that ends with no event that closes it must not leave its test event log open.
+          testEventLogEmitter.foreach(_.endWithoutRunEnded())
         }
       }
     }
@@ -1537,6 +1545,27 @@ object Runner {
     detectSlowpokes: Boolean,
     slowpokeDetectionDelay: Long,
     slowpokeDetectionPeriod: Long
+  )(f: (ClassLoader, DispatchReporter) => Unit): Unit =
+    withClassLoaderAndDispatchReporter(
+      runpathList,
+      reporterSpecs,
+      graphicReporter,
+      passFailReporter,
+      detectSlowpokes,
+      slowpokeDetectionDelay,
+      slowpokeDetectionPeriod,
+      TestEventLogHandOff.none
+    )(f)
+
+  private[scalatest] def withClassLoaderAndDispatchReporter(
+    runpathList: List[String],
+    reporterSpecs: ReporterConfigurations,
+    graphicReporter: Option[Reporter],
+    passFailReporter: Option[Reporter],
+    detectSlowpokes: Boolean,
+    slowpokeDetectionDelay: Long,
+    slowpokeDetectionPeriod: Long,
+    handOffToTestEventLog: Event => Unit
   )(f: (ClassLoader, DispatchReporter) => Unit): Unit = {
 
     val loader: ClassLoader = getRunpathClassLoader(runpathList)
@@ -1560,6 +1589,7 @@ object Runner {
           ex.printStackTrace(System.err)
           val tracker = new Tracker(new Ordinal(1))
           val runAborted = RunAborted(tracker.nextOrdinal(), msg, None)
+          handOffToTestEventLog(runAborted)
           graphicReporter.foreach { rep =>
             rep(runAborted)
           }

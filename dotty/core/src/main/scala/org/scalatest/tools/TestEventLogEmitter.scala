@@ -13,6 +13,7 @@ import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.RunStopped
 import org.scalatest.events.TestEventLogEncoder
+import scala.util.Try
 import scala.util.control.NonFatal
 
 /**
@@ -29,21 +30,29 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
    * nothing after that.
    *
-   * It never throws, so that a hand-off cannot change what the run's reporters receive. A failed write ends the
-   * event log there, which leaves the run without its `runEnded` event.
+   * It never throws, so that a hand-off cannot change what the run's reporters receive. An event that cannot be
+   * encoded or written ends the event log there, which leaves the run without its `runEnded` event.
    */
   def runEvent(event: Event): Unit = {
+    // Encoded outside the lock: encoding calls the methods of the run's own throwables and config map values, which
+    // may block, and every thread of the run takes the lock.
+    val encoded = Try(TestEventLogEncoder.event(event, None))
     synchronized {
       if (isOpen) {
-        try {
-          write(TestEventLogEncoder.event(event, None))
-          TestEventLogEmitter.outcomeOfClosing(event).foreach { outcome =>
-            write(TestEventLogEncoder.runEnded(outcome))
-            close()
-          }
-        } catch {
-          case NonFatal(_) => close()
+        val runEnded = TestEventLogEmitter.outcomeOfClosing(event).map(TestEventLogEncoder.runEnded)
+        val written = encoded.flatMap(line => Try((line +: runEnded.toList).foreach(write)))
+        if (written.isFailure || runEnded.isDefined) {
+          close()
         }
+      }
+    }
+  }
+
+  /** Closes the event log of a run that ends without an event that closes it, leaving it without its `runEnded` event. */
+  def endWithoutRunEnded(): Unit = {
+    synchronized {
+      if (isOpen) {
+        close()
       }
     }
   }
@@ -58,15 +67,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
 private[scalatest] object TestEventLogEmitter {
 
-  /**
-   * Starts an emitter where a run is given a test event log file, and returns the hand-off for the events its
-   * runner sends outside every structure wrapper.
-   */
-  def startedIfGiven(eventLogFile: Option[String]): Event => Unit = {
-    eventLogFile match {
-      case Some(file) =>
-        val emitter = started(Paths.get(file), ProcessIdentity.current)
-        emitter.runEvent(_)
+  /** Starts an emitter where a run is given a test event log file. */
+  def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] =
+    eventLogFile.map(file => started(Paths.get(file), ProcessIdentity.current))
+
+  /** Returns the hand-off for the events a run's runner sends outside every structure wrapper. */
+  def handOffTo(emitter: Option[TestEventLogEmitter]): Event => Unit = {
+    emitter match {
+      case Some(started) => started.runEvent(_)
       case None => TestEventLogHandOff.none
     }
   }
@@ -87,11 +95,14 @@ private[scalatest] object TestEventLogEmitter {
         Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8))
         Files.move(unmoved, eventLogFile, StandardCopyOption.ATOMIC_MOVE)
         // Not a FileChannel: interrupting a thread that is writing to one closes it for every thread.
-        new TestEventLogEmitter(new FileOutputStream(eventLogFile.toFile, true))
+        appendingTo(new FileOutputStream(eventLogFile.toFile, true))
       case Left(reason) =>
         throw new IllegalStateException(s"Cannot write the test event log $eventLogFile: $reason")
     }
   }
+
+  /** Returns an emitter that appends to an event log which already holds the run's `runStarted` event. */
+  def appendingTo(eventLog: OutputStream): TestEventLogEmitter = new TestEventLogEmitter(eventLog)
 
   private def outcomeOfClosing(event: Event): Option[RunOutcome] = {
     event match {

@@ -167,7 +167,10 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
   - The `runStarted` event precedes every other event, so nothing is appended between the move and the reopening.
   - It appends through a `java.io.FileOutputStream`, with one `write` call for each event. An interrupt of a thread writing to a `FileChannel` closes the channel for every thread, and a test's time limit can interrupt a test thread.
 - The emitter writes nothing after the `runEnded` event, and closes the file once it has written it.
-- A hand-off never throws. An event that cannot be encoded or written ends the event log before that event, so the run has no `runEnded` event.
+- A hand-off never throws. An event that cannot be encoded or written ends the event log before that event and closes the file, so the run has no `runEnded` event.
+- A run that ends with no closing run event leaves no file open. Its event log has no `runEnded` event. The emitter's file is closed:
+  - by `Runner.run`, when its run without `-g` returns or throws;
+  - by `Framework.runner`, when the construction of its runner throws, as where a custom reporter class cannot be loaded. The exception reaches the build tool, and the event log holds the `runStarted` event alone.
 - A send site hands its event off by calling a function, an `Event => Unit`, before it reports the event. A run without the runner argument is given a function that does nothing. The function reaches each site as follows:
   - `Runner.doRunRunRunDaDoRunRun` and `Framework`'s runner take it as a parameter.
   - `SuiteRunner` takes it as a constructor parameter. `Runner` supplies it for a `DiscoverySuite`, through `ConcurrentDistributor` under `-P`.
@@ -177,10 +180,16 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
   - the dispatcher's thread;
   - test threads, including for messages a test's informers hand straight to the emitter;
   - the `-W` slowpoke timer's thread.
+- The emitter encodes an event before it takes the write lock. Encoding calls `getMessage`, `getStackTrace`, `getCause` and `getSuppressed` on the run's throwables and `toString` on its config map's values, any of which can block or be slow, and none of which may hold up another thread's hand-off. Under the lock the emitter only:
+  - checks that the event log is still open;
+  - writes the event's line;
+  - after a closing run event, writes the `runEnded` event and closes the file;
+  - closes the file where the event could not be encoded or written.
 - The places that hand off an event sent outside every structure wrapper (`../ARCHITECTURE.md` § Modules § ScalaTest core, Emitter):
   - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction, and `RunCompleted` in `done`.
   - `org.scalatest.DispatchReporter`'s slowpoke timer under `-W`: its `AlertProvided`, which has `nameInfo = None` (`specification/test-event-log-structure.md` AC-121). The timer also passes that same event to the `SuiteSortingReporter` that `Framework` registers with `registerSlowpokeReporter`. From there it reaches at most a task's `SbtLogInfoReporter`, through no wrapper, and is not handed off again.
   - `org.scalatest.tools.Runner.doRunRunRunDaDoRunRun` and its catches: `RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`.
+  - `org.scalatest.tools.Runner.withClassLoaderAndDispatchReporter`'s catch, for the run `Runner.run` starts without `-g`: the `RunAborted` it gives the pass-fail reporter. It catches what `ReporterFactory.getDispatchReporter` throws, as where a custom reporter class cannot be loaded, and what `doRunRunRunDaDoRunRun` throws outside its own `try`, as where a `-A` file cannot be read. `Runner.run` passes it the hand-off through an overload. `RunnerJFrame` calls the 3.2.20 signature, which hands nothing off.
   - `org.scalatest.tools.SuiteRunner` running each `DiscoverySuite` that `Runner.genDiscoSuites` builds: that suite's `SuiteStarting`, its `SuiteCompleted`, and the `SuiteAborted` it sends in its `Failure(ue)` branch and its `NotAllowedException` and `RuntimeException` catches.
 - Not handed off (`SPECIFICATION.md` § Scope § Out of scope):
   - the `AlertProvided`s that `Runner.readMemoryFiles` sends for `-A`;

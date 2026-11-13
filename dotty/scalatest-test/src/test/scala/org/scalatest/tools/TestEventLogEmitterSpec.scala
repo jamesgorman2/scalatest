@@ -1,10 +1,17 @@
 package org.scalatest.tools
 
+import java.io.IOException
+import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.time.Instant
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.ConfigMap
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
@@ -14,9 +21,11 @@ import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.RunStarting
 import org.scalatest.events.RunStopped
+import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import scala.jdk.CollectionConverters.*
 
 final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
 
@@ -37,7 +46,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
 
   private def runEndedLine(outcome: String): String = s"""{"item":"runEnded","outcome":"$outcome"}"""
 
-  private def closingEventLine(eventName: String, fields: String): String =
+  private def eventLine(eventName: String, fields: String): String =
     s"""{"item":"event","event":"$eventName",$fields"threadName":"main","timeStamp":1700000000000}"""
 
   private def linesAfterHandingOff(events: Event*): Vector[String] = {
@@ -51,6 +60,52 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
 
   private final class ThrowsFromToString {
     override def toString: String = throw new IllegalStateException("no text")
+  }
+
+  private val waitLimitSeconds = 30L
+
+  private final class MessageHeldBack extends RuntimeException {
+    val isBeingRead = new CountDownLatch(1)
+    val mayBeRead = new CountDownLatch(1)
+
+    override def getMessage: String = {
+      isBeingRead.countDown()
+      mayBeRead.await(waitLimitSeconds, TimeUnit.SECONDS)
+      "held back"
+    }
+  }
+
+  // Each write takes long enough that writes made without a common lock overlap.
+  private final class RecordingEventLog extends OutputStream {
+    private val writesUnderWay = new AtomicInteger
+    private val overlapped = new AtomicBoolean
+    private val closed = new AtomicBoolean
+    private val recorded = new ConcurrentLinkedQueue[String]
+
+    def writes: Vector[String] = recorded.asScala.toVector
+    def hadOverlappingWrites: Boolean = overlapped.get
+    def isClosed: Boolean = closed.get
+
+    override def write(byte: Int): Unit = write(Array(byte.toByte), 0, 1)
+
+    override def write(bytes: Array[Byte], offset: Int, length: Int): Unit = {
+      if (writesUnderWay.incrementAndGet() > 1) {
+        overlapped.set(true)
+      }
+      try {
+        Thread.sleep(1)
+        recorded.add(new String(bytes, offset, length, StandardCharsets.UTF_8))
+      } finally {
+        writesUnderWay.decrementAndGet()
+      }
+    }
+
+    override def close(): Unit = closed.set(true)
+  }
+
+  private def joined(thread: Thread): Boolean = {
+    thread.join(TimeUnit.SECONDS.toMillis(waitLimitSeconds))
+    !thread.isAlive
   }
 
   "A started emitter" should {
@@ -85,6 +140,16 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
         } finally {
           emitter.runEvent(runCompleted)
         }
+      }
+    }
+  }
+
+  "An emitter that cannot write the file it moves to the event log's name" should {
+    "fail to start, and create no event log file" in {
+      TemporaryEventLog.in { eventLogFile =>
+        Files.createDirectory(eventLogFile.resolveSibling("events.log.tmp"))
+        an[IOException] should be thrownBy TestEventLogEmitter.started(eventLogFile, identity)
+        TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set("events.log.tmp")
       }
     }
   }
@@ -125,17 +190,17 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
 
     "handed the event that closes the run" should {
       "write that the run ended completed after a RunCompleted" in {
-        linesAfterHandingOff() shouldBe Vector(runStartedLine, closingEventLine("RunCompleted", ""), runEndedLine("completed"))
+        linesAfterHandingOff() shouldBe Vector(runStartedLine, eventLine("RunCompleted", ""), runEndedLine("completed"))
       }
 
       "write that the run ended stopped after a RunStopped" in {
         linesAfterHandingOff(RunStopped(ordinal, threadName = "main", timeStamp = timeStamp)) shouldBe
-          Vector(runStartedLine, closingEventLine("RunStopped", ""), runEndedLine("stopped"))
+          Vector(runStartedLine, eventLine("RunStopped", ""), runEndedLine("stopped"))
       }
 
       "write that the run ended aborted after a RunAborted" in {
         linesAfterHandingOff(RunAborted(ordinal, "no suites", None, threadName = "main", timeStamp = timeStamp)) shouldBe
-          Vector(runStartedLine, closingEventLine("RunAborted", """"message":"no suites","""), runEndedLine("aborted"))
+          Vector(runStartedLine, eventLine("RunAborted", """"message":"no suites","""), runEndedLine("aborted"))
       }
 
       "write nothing handed to it afterwards" in {
@@ -145,7 +210,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
           emitter.runEvent(alert("late", "main"))
           emitter.runEvent(runCompleted)
           TemporaryEventLog.lines(eventLogFile) shouldBe
-            Vector(runStartedLine, closingEventLine("RunCompleted", ""), runEndedLine("completed"))
+            Vector(runStartedLine, eventLine("RunCompleted", ""), runEndedLine("completed"))
         }
       }
     }
@@ -162,20 +227,59 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "handed events by several threads at once" should {
-      "write each as a whole line, and each thread's in the order that thread handed them off" in {
-        val threadCount = 8
-        val eventsOfEachThread = 200
-        val decoded = TemporaryEventLog.in { eventLogFile =>
-          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          val threads = (1 to threadCount).map { thread =>
-            new Thread(() => (1 to eventsOfEachThread).foreach(event => emitter.runEvent(alert(s"alert $event", s"thread $thread"))))
-          }
-          threads.foreach(_.start())
-          threads.foreach(_.join())
-          emitter.runEvent(runCompleted)
-          TemporaryEventLog.decoded(eventLogFile)
+    "handed an event whose throwable holds back its message" should {
+      "write an event another thread hands it meanwhile" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val heldBack = new MessageHeldBack
+        val waiting = new Thread(() => emitter.runEvent(AlertProvided(ordinal, "waiting", None, Some(heldBack), threadName = "main", timeStamp = timeStamp)))
+        val meanwhile = new Thread(() => emitter.runEvent(alert("meanwhile", "main")))
+        waiting.start()
+        try {
+          heldBack.isBeingRead.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
+          meanwhile.start()
+          joined(meanwhile) shouldBe true
+          eventLog.writes shouldBe Vector(eventLine("AlertProvided", """"message":"meanwhile",""") + "\n")
+        } finally {
+          heldBack.mayBeRead.countDown()
+          joined(waiting)
         }
+      }
+    }
+
+    "told that its run ends without an event that closes it" should {
+      "close the event log, and write nothing handed to it afterwards" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        emitter.runEvent(runStarting)
+        emitter.endWithoutRunEnded()
+        emitter.runEvent(runCompleted)
+        eventLog.writes shouldBe Vector(runStartingLine + "\n")
+        eventLog.isClosed shouldBe true
+      }
+    }
+
+    "handed events by several threads at once" should {
+      "write each as one whole line in one write that overlaps no other, and each thread's in the order that thread handed them off" in {
+        val threadCount = 4
+        val eventsOfEachThread = 25
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val start = new CountDownLatch(1)
+        val threads = (1 to threadCount).map { thread =>
+          new Thread(() => {
+            start.await(waitLimitSeconds, TimeUnit.SECONDS)
+            (1 to eventsOfEachThread).foreach(event => emitter.runEvent(alert(s"alert $event", s"thread $thread")))
+          })
+        }
+        threads.foreach(_.start())
+        start.countDown()
+        threads.map(joined) shouldBe Vector.fill(threadCount)(true)
+
+        val writes = eventLog.writes
+        eventLog.hadOverlappingWrites shouldBe false
+        writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
+        val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
         val messagesByThread =
           decoded.collect { case Right(TestEventLogEvent.ScalaTestEvent(None, alert: org.scalatest.events.DecodedEvent.AlertProvided)) =>
             alert.threadName -> alert.message

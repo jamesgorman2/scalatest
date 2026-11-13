@@ -1134,36 +1134,45 @@ class Framework extends SbtFramework {
     if (!concurrentArgs.isEmpty && concurrentConfig.numThreads == 0)
       throw new IllegalArgumentException("-P without specifying <numthreads> is not supported when running ScalaTest from sbt, please use sbt parallel configuration instead.")
 
-    new ScalaTestRunner(
-      args,
-      testClassLoader,
-      tagsToInclude,
-      tagsToExclude,
-      membersOnly,
-      wildcard,
-      autoSelectors,
-      configMap,
-      reporterConfigs,
-      useStdout,
-      presentAllDurations,
-      presentInColor,
-      presentShortStackTraces,
-      presentFullStackTraces,
-      presentUnformatted,
-      presentReminder,
-      presentReminderWithShortStackTraces,
-      presentReminderWithFullStackTraces,
-      presentReminderWithoutCanceledTests,
-      presentFilePathname,
-      presentJson,
-      configSet,
-      detectSlowpokes,
-      slowpokeDetectionDelay,
-      slowpokeDetectionPeriod,
-      concurrentConfig,
-      testSortingReporterTimeout,
-      TestEventLogEmitter.startedIfGiven(testEventLogFile)
-    )
+    val testEventLogEmitter = TestEventLogEmitter.startedIfGiven(testEventLogFile)
+    try {
+      new ScalaTestRunner(
+        args,
+        testClassLoader,
+        tagsToInclude,
+        tagsToExclude,
+        membersOnly,
+        wildcard,
+        autoSelectors,
+        configMap,
+        reporterConfigs,
+        useStdout,
+        presentAllDurations,
+        presentInColor,
+        presentShortStackTraces,
+        presentFullStackTraces,
+        presentUnformatted,
+        presentReminder,
+        presentReminderWithShortStackTraces,
+        presentReminderWithFullStackTraces,
+        presentReminderWithoutCanceledTests,
+        presentFilePathname,
+        presentJson,
+        configSet,
+        detectSlowpokes,
+        slowpokeDetectionDelay,
+        slowpokeDetectionPeriod,
+        concurrentConfig,
+        testSortingReporterTimeout,
+        TestEventLogEmitter.handOffTo(testEventLogEmitter)
+      )
+    }
+    catch {
+      // A runner that fails at construction ends no run, and must not leave its test event log open.
+      case e: Throwable =>
+        testEventLogEmitter.foreach(_.endWithoutRunEnded())
+        throw e
+    }
   }
 
   private case class ScalaTestSbtEvent(
