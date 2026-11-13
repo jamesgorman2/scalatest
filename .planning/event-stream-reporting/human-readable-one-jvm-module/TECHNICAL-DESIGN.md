@@ -388,7 +388,10 @@ One further decoder test, tied to no criterion, feeds the decoder text whose las
 
 Each comparison of events is made by `org.scalatest.events.EventLogComparison`, beside the builder:
 
-- Each event is compared only on what the criterion fixes: a `structure` event on its whole tree, a ScalaTest event on its node, its execution number, its parent's execution number where the criterion writes one, its class, and the fields the criterion names, a throwable on the parts the criterion writes.
+- Each event is compared only on what the criterion fixes:
+  - A `structure` event is compared on its whole tree.
+  - A ScalaTest event is compared on its node, its execution number, its parent's execution number where the criterion writes one, its class, and the fields the criterion names.
+  - A throwable is compared on the parts the criterion writes.
 - Where the criterion says the event log *is* the events, the decoded events must be exactly those built. Where it says the log *holds* them *in this order*, the built events must be a subsequence of the decoded ones.
 
 A drift between builder and decoder in what a criterion fixes then fails those tests, as well as the criteria run under Mill.
