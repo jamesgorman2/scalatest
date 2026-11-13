@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters a suite's tests, on when a suite registers its tests and what a failed registration reports, or on a run that is asked to stop; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, or on a run asked to stop; and before changing a style trait's private registration members.
 ---
 
 <learning>
@@ -20,7 +20,10 @@ date: 2026-11-14
 
 A `TaskDef` that is not explicitly specified keeps the nested suites' tests, but `Framework` returns a task for it only where the class is discoverable, so not for a class annotated `@DoNotDiscover`.
 
-To run a suite by name with its nested suites' tests, use `Runner.run` with `-s <class>`, whose filter requires no selected tag.
+To run a suite by name with its nested suites' tests, either:
+
+- give the `TaskDef` a `NestedSuiteSelector` holding each nested suite's suite ID, beside its `SuiteSelector`; or
+- use `Runner.run` with `-s <class>`, whose filter requires no selected tag.
 </learning>
 
 <learning>
@@ -56,4 +59,32 @@ A suite compiled against 3.2.20 therefore links to those private members' 3.2.20
 - A change to what an inline method passes reaches only suites compiled against the changed trait. A change inside the private member's body reaches both.
 
 List a trait's accessors with `javap -p` on the 3.2.20 jar and on the rebuilt classes, and compare the lines holding `inline$`.
+</learning>
+
+
+<learning>
+date: 2026-11-14
+---
+Under `org.scalatest.tools.Framework`, a run's reporters do not receive a suite's events in the order the suites send them. `Framework` reports through a `SuiteSortingReporter`, which holds a nested suite's events back until the suite that nests it has completed:
+
+- a suite nesting two suites is reported as `SuiteStarting` and `SuiteCompleted` of the outer suite, then each nested suite's events in turn;
+- one instance nested twice, whose two runs share a suite ID, is reported as `SuiteStarting`, its tests, `SuiteStarting`, its tests, `SuiteCompleted`, `SuiteCompleted`.
+
+`Runner.run` without `-P` reports in the order sent. Take an expected order of reported events under `Framework` from a run on 3.2.20, never from the order the code sends them in.
+</learning>
+
+<learning>
+date: 2026-11-14
+---
+`Runner.run` renames the thread it is called on to `ScalaTest-run` until it returns. It constructs the suites it discovers on that thread, in `DiscoverySuite`'s constructor, after the rename.
+
+Code that must recognise the thread of a run, such as a sample suite whose constructor behaves differently under one test, cannot go by a name the caller gave the thread. The thread's group is unchanged: start `Runner.run` on a thread of a named `ThreadGroup` and compare `Thread.currentThread.getThreadGroup.getName`.
+</learning>
+
+<learning>
+date: 2026-11-14
+---
+`Suite.runTests`, which runs a suite that has no registration tree and overrides `testNames` and `runTest` itself, gives the `TestIgnored` of a test the filter ignores the location `Suite.getTopOfMethod(thisSuite, testName)`. That looks up a public method named as the test by reflection, and throws `IllegalArgumentException: Test not found: <name>` where the suite has none. The suite's `run` then throws, and the suite is reported with `SuiteAborted` and no `TestIgnored`.
+
+A hand-written `Suite` whose test names are not method names can have no ignored test. To have one report `TestIgnored`, give it a public no-argument method of the ignored test's name.
 </learning>

@@ -1,7 +1,9 @@
 package org.scalatest.tools
 
+import java.io.ByteArrayOutputStream
 import org.scalatest.Reporter
 import org.scalatest.Suite
+import org.scalatest.SuiteRegistration
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
 import org.scalatest.events.NodeId
@@ -11,7 +13,11 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class StructureWrapperSpec extends AnyWordSpec with Matchers {
 
-  private val table = new SuiteNodeTable(new Suite {}, NodeId(1), "samples.OneSuite", "samples.OneSuite", Map.empty, Map.empty, Vector.empty)
+  private val suite = new Suite {}
+  private val table =
+    new SuiteNodeTable(suite, NodeId(1), "samples.OneSuite", "samples.OneSuite", Map.empty, Map.empty, Map.empty, Vector.empty)
+  private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), table, suite)
+  private val node = WrapperNode.NestedSuite(registration)
 
   private def alert(message: String): Event = AlertProvided(new Ordinal(1), message, None)
 
@@ -21,27 +27,27 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
 
     def inOrder: Vector[(String, AnyRef, Event)] = recorded
 
-    val handOff: (SuiteNodeTable, Event) => Unit = (namedTable, event) => recorded :+= (("handed off", namedTable, event))
+    val handOff: (WrapperNode, Event) => Unit = (named, event) => recorded :+= (("handed off", named, event))
 
     val reporter: Reporter = new Reporter {
       def apply(event: Event): Unit = recorded :+= (("passed on", "the wrapped reporter", event))
     }
 
-    def handOffThrowing(thrown: Throwable): (SuiteNodeTable, Event) => Unit = (_, _) => throw thrown
+    def handOffThrowing(thrown: Throwable): (WrapperNode, Event) => Unit = (_, _) => throw thrown
 
     def passedOn: Vector[Event] = recorded.collect { case ("passed on", _, event) => event }
   }
 
   private def passedOnWhenHandOffThrows(thrown: Throwable, event: Event): Vector[Event] = {
     val recording = new Recording
-    new StructureWrapper(recording.reporter, table, recording.handOffThrowing(thrown))(event)
+    new StructureWrapper(recording.reporter, node, recording.handOffThrowing(thrown))(event)
     recording.passedOn
   }
 
   "A structure wrapper" should {
-    "hand off each event, naming its suite's node table, before it passes that event on" in {
+    "hand off each event, naming its node, before it passes that event on" in {
       val recording = new Recording
-      val wrapper = new StructureWrapper(recording.reporter, table, recording.handOff)
+      val wrapper = new StructureWrapper(recording.reporter, node, recording.handOff)
       val first = alert("first")
       val second = alert("second")
       wrapper(first)
@@ -51,7 +57,19 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
       steps.map((_, _, event) => event).zip(Vector(first, first, second, second)).foreach { (recorded, sent) =>
         recorded should be theSameInstanceAs sent
       }
-      steps.collect { case ("handed off", namedTable, _) => namedTable }.foreach(_ should be theSameInstanceAs table)
+      steps.collect { case ("handed off", named, _) => named }.foreach(_ should be theSameInstanceAs node)
+    }
+
+    "give the registration of its suite where it is a suite's wrapper" in {
+      val ofTopLevelSuite = new StructureWrapper(new Recording().reporter, WrapperNode.TopLevelSuite(registration), new Recording().handOff)
+      val ofNestedSuite = new StructureWrapper(new Recording().reporter, WrapperNode.NestedSuite(registration), new Recording().handOff)
+      ofTopLevelSuite.registrationOfItsSuite should be theSameInstanceAs registration
+      ofNestedSuite.registrationOfItsSuite should be theSameInstanceAs registration
+    }
+
+    "give no registration where it is a test's wrapper" in {
+      val ofTest = new StructureWrapper(new Recording().reporter, WrapperNode.Test(registration, "a test"), new Recording().handOff)
+      ofTest.registrationOfItsSuite should be theSameInstanceAs SuiteRegistration.none
     }
 
     "pass an event on where its hand-off throws an exception" in {
@@ -80,7 +98,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
     "throw a VirtualMachineError other than a StackOverflowError that its hand-off throws, and not pass the event on" in {
       val recording = new Recording
       val outOfMemory = new OutOfMemoryError("no heap")
-      val wrapper = new StructureWrapper(recording.reporter, table, recording.handOffThrowing(outOfMemory))
+      val wrapper = new StructureWrapper(recording.reporter, node, recording.handOffThrowing(outOfMemory))
       val thrown = the[OutOfMemoryError] thrownBy wrapper(alert("lost"))
       thrown should be theSameInstanceAs outOfMemory
       recording.passedOn shouldBe Vector.empty

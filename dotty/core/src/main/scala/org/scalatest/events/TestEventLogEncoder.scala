@@ -5,6 +5,13 @@ import org.scalatest.exceptions.PropertyCheckFailedException
 import org.scalatest.exceptions.StackDepth
 import scala.collection.mutable
 
+/**
+ * A ScalaTest event as the event log writes it, without the node and executions it is assigned to.
+ *
+ * @param fields the event's own fields, as the members of a JSON object without its braces
+ */
+private[scalatest] final class EncodedEvent private[events] (private[events] val name: String, private[events] val fields: String)
+
 private[scalatest] object TestEventLogEncoder {
 
   private type Field = Option[(String, JsonValue)]
@@ -15,17 +22,32 @@ private[scalatest] object TestEventLogEncoder {
   def structure(nodes: Seq[StructureNode]): String =
     line(text("item", "structure"), array("nodes", nodes.map(node)))
 
-  def event(event: Event, execution: Option[NodeExecution]): String = {
+  def event(event: Event, execution: Option[NodeExecution]): String = line(encoded(event), execution)
+
+  /**
+   * Encodes all of an event but what it is assigned to. This calls the methods of the event's throwables and config
+   * map values, which are the run's own code.
+   */
+  def encoded(event: Event): EncodedEvent = {
     val (eventName, eventFields) = nameAndFields(event)
-    val allFields =
-      Seq(
-        text("item", "event"),
-        optionalInteger("node", execution.map(_.node.value)),
-        optionalInteger("execution", execution.map(_.execution.toLong)),
-        optionalInteger("parentExecution", execution.flatMap(_.parentExecution).map(_.toLong)),
-        text("event", eventName)
-      ) ++ eventFields
-    line(allFields: _*)
+    val members = JsonWriter.write(record(eventFields: _*))
+    new EncodedEvent(eventName, members.substring(1, members.length - 1))
+  }
+
+  /** The line of an encoded event assigned to a node's execution, or to the run. It calls none of the run's own code. */
+  def line(encoded: EncodedEvent, execution: Option[NodeExecution]): String = {
+    val assigned =
+      JsonWriter.write(
+        record(
+          text("item", "event"),
+          optionalInteger("node", execution.map(_.node.value)),
+          optionalInteger("execution", execution.map(_.execution.toLong)),
+          optionalInteger("parentExecution", execution.flatMap(_.parentExecution).map(_.toLong)),
+          text("event", encoded.name)
+        )
+      )
+    val fields = if (encoded.fields.isEmpty) "" else "," + encoded.fields
+    assigned.substring(0, assigned.length - 1) + fields + "}\n"
   }
 
   def runEnded(outcome: RunOutcome): String = {

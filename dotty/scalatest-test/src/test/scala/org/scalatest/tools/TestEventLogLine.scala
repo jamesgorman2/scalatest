@@ -25,6 +25,20 @@ private[tools] object TestEventLogLine {
   def test(id: Long, parent: Long, position: Int, name: String, label: String): String =
     s"""{"id":$id,"kind":"test","parent":$parent,"position":$position,"name":"$name","label":"$label"}"""
 
+  private val fieldsNoCriterionFixes = """"threadName":"any thread","timeStamp":1"""
+
+  /** A ScalaTest event assigned to the run. `fields` holds the event's own fields, each followed by a comma. */
+  def runEvent(eventName: String, fields: String = ""): String =
+    s"""{"item":"event","event":"$eventName",$fields$fieldsNoCriterionFixes}"""
+
+  /** A ScalaTest event assigned to a suite. `fields` holds the event's own fields, each followed by a comma. */
+  def suiteEvent(node: Long, execution: Int, eventName: String, fields: String = ""): String =
+    s"""{"item":"event","node":$node,"execution":$execution,"event":"$eventName",$fields$fieldsNoCriterionFixes}"""
+
+  /** A ScalaTest event assigned to a scope or test. `fields` holds the event's own fields, each followed by a comma. */
+  def scopeOrTestEvent(node: Long, execution: Int, parentExecution: Int, eventName: String, fields: String = ""): String =
+    s"""{"item":"event","node":$node,"execution":$execution,"parentExecution":$parentExecution,"event":"$eventName",$fields$fieldsNoCriterionFixes}"""
+
   private val nodeReference = """"(id|parent)":(\d+)""".r
 
   /**

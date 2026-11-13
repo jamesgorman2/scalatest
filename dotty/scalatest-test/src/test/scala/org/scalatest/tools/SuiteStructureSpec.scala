@@ -57,9 +57,9 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
   "The structure read from a suite with a registration tree" should {
     "hold each scope, and the tests the filter keeps, in the order registered" in {
       SuiteStructure.read(new ScopedSuite, excludingSlow).scopesAndTests shouldBe List(
-        ScopeOrTest.Scope("first", "first", List(keptTest("runs", "first runs", "- runs"))),
-        ScopeOrTest.Scope("second", "second", Nil),
-        ScopeOrTest.Scope("third", "third", List(keptTest("is ignored", "third is ignored", "- is ignored")))
+        ScopeOrTest.Scope("first", "first", "first", List(keptTest("runs", "first runs", "- runs"))),
+        ScopeOrTest.Scope("second", "second", "second", Nil),
+        ScopeOrTest.Scope("third", "third", "third", List(keptTest("is ignored", "third is ignored", "- is ignored")))
       )
     }
 
@@ -67,6 +67,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
       SuiteStructure.read(new ScenarioSuite, Filter.default).scopesAndTests shouldBe List(
         ScopeOrTest.Scope(
           "s",
+          "Feature: s",
           "Feature: s",
           List(
             keptTest("runs", "Feature: s Scenario: runs", "Scenario: runs"),

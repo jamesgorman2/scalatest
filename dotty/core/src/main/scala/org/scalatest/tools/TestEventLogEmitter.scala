@@ -7,17 +7,34 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicLong
 import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.Suite
+import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
+import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
+import org.scalatest.events.RecordableEvent
 import org.scalatest.events.RunAborted
 import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.RunStopped
+import org.scalatest.events.ScopeClosed
+import org.scalatest.events.ScopeOpened
+import org.scalatest.events.ScopePending
+import org.scalatest.events.SuiteAborted
+import org.scalatest.events.SuiteCompleted
+import org.scalatest.events.SuiteStarting
+import org.scalatest.events.TestCanceled
 import org.scalatest.events.TestEventLogEncoder
+import org.scalatest.events.TestFailed
+import org.scalatest.events.TestIgnored
+import org.scalatest.events.TestPending
+import org.scalatest.events.TestStarting
+import org.scalatest.events.TestSucceeded
 
 /**
  * Writes one run's test event log to a file, which already holds the run's `runStarted` event.
@@ -29,6 +46,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private var isOpen = true
   private val mintedNodes = new AtomicLong(0L)
+  // Both are read and written only under this emitter's lock, and keyed by the event's identity: an event's
+  // `equals` compares its fields, which hold the run's own objects.
+  private val originOfEvent = new IdentityHashMap[Event, RecordedOrigin]
+  private val handedOffByAnInnerWrapper = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
 
   /**
    * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
@@ -53,7 +74,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   /**
    * Returns the structure wrapper of a top-level suite, over the reporter the suite would report to. Before it
    * returns, it mints the suite's node table and writes the suite's structure to the event log: the suite, its nested
-   * suites, and the scopes and tests the filter keeps.
+   * suites, and the scopes and tests the filter keeps. It registers the suite instance against that table, and the
+   * caller removes the registration when the suite's run throws or the `Status` it returns completes.
    *
    * A structure that cannot be read ends the event log before it, as an event that cannot be encoded does, and the
    * suite then reports to the reporter itself. What reading or writing the structure throws is kept from the caller
@@ -62,7 +84,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   def wrapperOfTopLevelSuite(suite: Suite, filter: Filter, reporter: Reporter): Reporter = {
     // Read outside the lock: reading calls the suite's own methods.
     TestEventLogEmitter.caught(SuiteStructure.read(suite, filter)) match {
-      case Right(structure) => new StructureWrapper(reporter, topLevelSuite(structure), suiteEvent)
+      case Right(structure) =>
+        val registration = new RegisteredSuite(this, topLevelSuite(structure), suite)
+        RegisteredSuites.add(suite, registration)
+        new StructureWrapper(reporter, WrapperNode.TopLevelSuite(registration), suiteEvent)
       case Left(thrown) =>
         endWithoutRunEnded()
         TestEventLogEmitter.rethrowIfUncontained(thrown)
@@ -80,11 +105,122 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     table
   }
 
+  /** Starts an execution for a run of a registered suite instance. */
+  def runStarting(registration: RegisteredSuite): Unit = synchronized {
+    registration.startRun()
+  }
+
+  /** Keeps an event's origin until a structure wrapper hands the event off. An event log that has ended keeps none. */
+  def recordOrigin(event: Event, origin: RecordingOrigin): Unit = synchronized {
+    if (isOpen) {
+      originOfEvent.put(event, origin.recorded())
+    }
+  }
+
   /**
-   * Takes an event a structure wrapper received, with the node table the wrapper names. It writes nothing: the
-   * event log holds only the run's own events and each top-level suite's structure.
+   * Takes an event a structure wrapper received, with the wrapper's node, and writes it unless another wrapper has
+   * handed it off: an event reaches the wrapper of its test, of its suite and of each suite around that one, and
+   * only the first of them writes it.
+   *
+   * The event is assigned to the node its origin names, in the executions its origin names. An event with no
+   * origin, which is one that no engine site of a registered suite instance sent, is assigned to the wrapper's node,
+   * in the execution of that node that opened last and has not closed. The messages recorded in a test's closing
+   * event are written before it, assigned as it is.
+   *
+   * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
-  def suiteEvent(table: SuiteNodeTable, event: Event): Unit = ()
+  def suiteEvent(wrapper: WrapperNode, event: Event): Unit = {
+    originWhereFirstHandedOff(wrapper, event).foreach { origin =>
+      // Encoded outside the lock, as `runEvent` encodes.
+      val encoded = TestEventLogEmitter.caught {
+        TestEventLogEmitter.recordedIn(event).map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event)
+      }
+      val thrown = synchronized {
+        if (isOpen) {
+          val written = encoded.flatMap { events =>
+            TestEventLogEmitter.caught {
+              val execution = Some(assigned(wrapper, origin, event))
+              events.foreach(one => write(TestEventLogEncoder.line(one, execution)))
+            }
+          }
+          if (written.isLeft) {
+            close()
+          }
+          written.left.toOption
+        } else {
+          encoded.left.toOption
+        }
+      }
+      thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+    }
+  }
+
+  // Returns the event's origin, if it has one, where no wrapper has handed the event off, and nothing where one has.
+  // The wrapper of a top-level suite is the last wrapper an event reaches, so it forgets the event.
+  private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Option[RecordedOrigin]] = synchronized {
+    val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
+    if (!isOpen) {
+      None
+    } else if (handedOffByAnInnerWrapper.contains(event)) {
+      if (isLastWrapper) {
+        handedOffByAnInnerWrapper.remove(event)
+      }
+      None
+    } else {
+      if (!isLastWrapper) {
+        handedOffByAnInnerWrapper.add(event)
+      }
+      Some(Option(originOfEvent.remove(event)))
+    }
+  }
+
+  // Called under the lock. Numbers the executions the event names, where the event is the first to name them.
+  private def assigned(wrapper: WrapperNode, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+    val table = origin.fold(wrapper.registration.table)(_.registration.table)
+    // A scope or test the suite's structure does not hold has no node, so its event is assigned to the suite.
+    table.scopeOrTest(origin.fold(wrapper.treeNode)(_.node)) match {
+      case Some(scopeOrTest) => assignedToScopeOrTest(table, scopeOrTest, origin, event)
+      case None => assignedToSuite(table, origin, event)
+    }
+  }
+
+  private def assignedToScopeOrTest(table: SuiteNodeTable, node: NodeId, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+    val executions = table.executionsOf(node)
+    val executionsOfParent = table.executionsOf(table.parents(node))
+    val (execution, executionOfParent) = origin match {
+      case Some(recorded) => (recorded.execution, recorded.executionOfRun)
+      case None =>
+        (
+          TestEventLogEmitter.executionWithNoOrigin(executions, event),
+          executionsOfParent.openedLast.orElse(executionsOfParent.latest).getOrElse(new Execution)
+        )
+    }
+    val assigned = NodeExecution(node, executions.numberOf(execution), Some(executionsOfParent.numberOf(executionOfParent)))
+    if (TestEventLogEmitter.closesItsScopeOrTest(event)) {
+      executions.close(execution)
+    }
+    assigned
+  }
+
+  private def assignedToSuite(table: SuiteNodeTable, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+    val executions = table.executionsOf(table.node)
+    val execution = origin match {
+      case Some(recorded) => recorded.executionOfRun
+      case None =>
+        val opensAnExecution = executions.openedLast.isEmpty && event.isInstanceOf[SuiteStarting]
+        val withNoOrigin = TestEventLogEmitter.executionWithNoOrigin(executions, event)
+        if (opensAnExecution) {
+          table.awaitRun(withNoOrigin)
+        }
+        withNoOrigin
+    }
+    val assigned = NodeExecution(table.node, executions.numberOf(execution), None)
+    if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
+      executions.close(execution)
+      table.closedWithoutRun(execution)
+    }
+    assigned
+  }
 
   /** Closes the event log of a run that ends without an event that closes it, leaving it without its `runEnded` event. */
   def endWithoutRunEnded(): Unit = {
@@ -116,11 +252,42 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def close(): Unit = {
     isOpen = false
+    originOfEvent.clear()
+    handedOffByAnInnerWrapper.clear()
     try eventLog.close() catch { case contained: Throwable if TestEventLogEmitter.isContained(contained) => () }
   }
 }
 
 private[scalatest] object TestEventLogEmitter {
+
+  // The messages a test's closing event carries, which no reporter receives as events of their own.
+  private def recordedIn(event: Event): Vector[RecordableEvent] = {
+    event match {
+      case closing: TestSucceeded => closing.recordedEvents.toVector
+      case closing: TestFailed => closing.recordedEvents.toVector
+      case closing: TestPending => closing.recordedEvents.toVector
+      case closing: TestCanceled => closing.recordedEvents.toVector
+      case _ => Vector.empty
+    }
+  }
+
+  // The execution of an event that has no origin: the node's execution that opened last and has not closed. Where
+  // none is open, an event that opens an execution takes a new one, and any other the node's latest, or a first.
+  private def executionWithNoOrigin(executions: NodeExecutions, event: Event): Execution = {
+    val opensAnExecution = event match {
+      case _: SuiteStarting | _: TestStarting | _: ScopeOpened | _: TestIgnored => true
+      case _ => false
+    }
+    executions.openedLast.getOrElse(if (opensAnExecution) new Execution else executions.latest.getOrElse(new Execution))
+  }
+
+  private def closesItsScopeOrTest(event: Event): Boolean = {
+    event match {
+      case _: TestSucceeded | _: TestFailed | _: TestPending | _: TestCanceled | _: TestIgnored => true
+      case _: ScopeClosed | _: ScopePending => true
+      case _ => false
+    }
+  }
 
   /** Starts an emitter where a run is given a test event log file. */
   def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] =
@@ -171,7 +338,10 @@ private[scalatest] object TestEventLogEmitter {
   }
 
   /** Returns an emitter that appends to an event log which already holds the run's `runStarted` event. */
-  def appendingTo(eventLog: OutputStream): TestEventLogEmitter = new TestEventLogEmitter(eventLog)
+  def appendingTo(eventLog: OutputStream): TestEventLogEmitter = {
+    SuiteRegistration.lookedUpIn(RegisteredSuites)
+    new TestEventLogEmitter(eventLog)
+  }
 
   private def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }

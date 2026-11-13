@@ -307,6 +307,7 @@ class Framework extends SbtFramework {
       }
 
     val report = reporterOfTopLevelSuite(suite, filter, sbtReporter)
+    val registration = SuiteRegistration.madeTaking(report, sbtReporter)
 
     if (!suite.isInstanceOf[DistributedTestRunnerSuite])
       report(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName))))
@@ -369,6 +370,8 @@ class Framework extends SbtFramework {
       }
     }
     finally {
+      // The suite's run has thrown, or the Status it returned has completed.
+      registration.removed()
       statefulStatus match {
         case Some(s) => s.setCompleted()
         case None => // Do nothing

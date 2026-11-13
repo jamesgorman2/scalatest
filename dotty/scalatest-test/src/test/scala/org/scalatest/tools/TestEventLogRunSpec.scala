@@ -139,14 +139,14 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A Runner.run run of a suite it is given by name writes that suite's structure and none of its events") {
+    Scenario("A Runner.run run of a suite it is given by name writes that suite's structure and events between its run events") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run runs it by name with the runner argument")
         launched(Launch.ByRunner, "samples.SqrtPropSpec", runnerArgument(eventLogFile))
 
-        Then("the event log is the run's start, its run events assigned to the run with the suite's structure between them, and its end")
+        Then("the event log is the run's start, its run events assigned to the run with the suite's structure and events between them, and its end")
         EventLogComparison.mismatchWhenIs(
           eventLogOf(eventLogFile),
           built(
@@ -156,6 +156,10 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
             structure
               suite "SqrtPropSpec", class "samples.SqrtPropSpec"
                 test "sqrt of a square is the root", label "- sqrt of a square is the root"
+            suite "SqrtPropSpec": SuiteStarting
+            test "sqrt of a square is the root": TestStarting
+            test "sqrt of a square is the root": TestSucceeded
+            suite "SqrtPropSpec": SuiteCompleted
             run: RunCompleted
             run ended completed
             """

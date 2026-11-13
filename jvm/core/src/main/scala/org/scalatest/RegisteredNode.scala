@@ -3,8 +3,8 @@ package org.scalatest
 /** A scope or test of a suite's registration tree, named and labelled as a test event log's structure gives it. */
 private[scalatest] sealed abstract class RegisteredNode
 
-/** A scope, holding its scopes and tests in the order registered. */
-private[scalatest] final case class RegisteredScope(name: String, label: String, nodes: List[RegisteredNode]) extends RegisteredNode
+/** A scope, holding its scopes and tests in the order registered. Its `text` is the text it is registered with. */
+private[scalatest] final case class RegisteredScope(name: String, text: String, label: String, nodes: List[RegisteredNode]) extends RegisteredNode
 
 /**
  * A test. Its `label` is the text ScalaTest's formatter gives its closing event, and `labelWhenIgnored` the text it

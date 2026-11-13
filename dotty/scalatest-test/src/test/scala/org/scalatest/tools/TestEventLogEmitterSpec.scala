@@ -15,7 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.ConfigMap
 import org.scalatest.Filter
 import org.scalatest.Reporter
+import org.scalatest.ScopePlace
 import org.scalatest.Suite
+import org.scalatest.SuiteRegistration
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
 import org.scalatest.events.NodeId
@@ -31,7 +33,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.jdk.CollectionConverters.*
 
-final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
+final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with EventLogRecording {
 
   private val ordinal = new Ordinal(1)
   private val timeStamp = 1700000000000L
@@ -81,8 +83,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
     override def close(): Unit = closed.set(true)
   }
 
-  private val waitLimitSeconds = 30L
-
   private final class MessageHeldBack extends RuntimeException {
     val isBeingRead = new CountDownLatch(1)
     val mayBeRead = new CountDownLatch(1)
@@ -92,65 +92,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
       mayBeRead.await(waitLimitSeconds, TimeUnit.SECONDS)
       "held back"
     }
-  }
-
-  // Each write takes long enough that writes made without a common lock overlap.
-  private final class RecordingEventLog extends OutputStream {
-    private val writesUnderWay = new AtomicInteger
-    private val overlapped = new AtomicBoolean
-    private val closed = new AtomicBoolean
-    private val recorded = new ConcurrentLinkedQueue[String]
-
-    def writes: Vector[String] = recorded.asScala.toVector
-    def hadOverlappingWrites: Boolean = overlapped.get
-    def isClosed: Boolean = closed.get
-
-    override def write(byte: Int): Unit = write(Array(byte.toByte), 0, 1)
-
-    override def write(bytes: Array[Byte], offset: Int, length: Int): Unit = {
-      if (writesUnderWay.incrementAndGet() > 1) {
-        overlapped.set(true)
-      }
-      try {
-        Thread.sleep(1)
-        recorded.add(new String(bytes, offset, length, StandardCharsets.UTF_8))
-      } finally {
-        writesUnderWay.decrementAndGet()
-      }
-    }
-
-    override def close(): Unit = closed.set(true)
-  }
-
-  private def joined(thread: Thread): Boolean = {
-    thread.join(TimeUnit.SECONDS.toMillis(waitLimitSeconds))
-    !thread.isAlive
-  }
-
-  /**
-   * Has each of several threads hand an emitter its events from a common start, and returns the events the event
-   * log then holds. Each must have been written as one whole line, in one write that overlaps no other.
-   */
-  private def wholeLinesWrittenByThreadsAtOnce(threadCount: Int)(handOffOfThread: (TestEventLogEmitter, Int) => Unit): Vector[TestEventLogEvent] = {
-    val eventLog = new RecordingEventLog
-    val emitter = TestEventLogEmitter.appendingTo(eventLog)
-    val start = new CountDownLatch(1)
-    val threads = (1 to threadCount).map { thread =>
-      new Thread(() => {
-        start.await(waitLimitSeconds, TimeUnit.SECONDS)
-        handOffOfThread(emitter, thread)
-      })
-    }
-    threads.foreach(_.start())
-    start.countDown()
-    threads.map(joined) shouldBe Vector.fill(threadCount)(true)
-
-    val writes = eventLog.writes
-    eventLog.hadOverlappingWrites shouldBe false
-    writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
-    val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
-    decoded.filter(_.isLeft) shouldBe Vector.empty
-    decoded.collect { case Right(event) => event }
   }
 
   private final class RecordingReporter extends Reporter {
@@ -435,8 +376,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
           outer,
           "Outer",
           List(
-            ScopeOrTest.Scope("s", "s", List(ScopeOrTest.Test("t", "s t", "- t"))),
-            ScopeOrTest.Scope("s", "s", Nil),
+            ScopeOrTest.Scope("s", "s", "s", List(ScopeOrTest.Test("t", "s t", "- t"))),
+            ScopeOrTest.Scope("s", "s", "s", Nil),
             test("flat")
           ),
           List(structureOf(inner, "Inner", List(test("i"))))
@@ -483,15 +424,27 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
         table.tests shouldBe Map("s t" -> NodeId(5), "flat" -> NodeId(7))
       }
 
-      "return a node table holding each scope's node by its path, telling sibling scopes of one name apart by their place" in {
+      "return a node table holding each scope's node by its path of registered texts, telling sibling scopes of one text apart by their place" in {
         val structure =
-          structureOf(outer, "Outer", List(ScopeOrTest.Scope("s", "s", List(ScopeOrTest.Scope("u", "when u", Nil))), ScopeOrTest.Scope("s", "s", Nil)))
+          structureOf(
+            outer,
+            "Outer",
+            List(
+              ScopeOrTest.Scope("s", "s", "s", List(ScopeOrTest.Scope("u", "u which", "when u which", Nil))),
+              ScopeOrTest.Scope("s", "s", "s", Nil)
+            )
+          )
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(structure)
         table.scopes shouldBe Map(
           List(ScopePlace("s", 0)) -> NodeId(2),
-          List(ScopePlace("s", 0), ScopePlace("u", 0)) -> NodeId(3),
+          List(ScopePlace("s", 0), ScopePlace("u which", 0)) -> NodeId(3),
           List(ScopePlace("s", 1)) -> NodeId(4)
         )
+      }
+
+      "return a node table holding the parent of each scope and test" in {
+        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
+        table.parents shouldBe Map(NodeId(4) -> NodeId(1), NodeId(5) -> NodeId(4), NodeId(6) -> NodeId(1), NodeId(7) -> NodeId(1))
       }
 
       "return a node table holding each nested suite's table at its position, with the instance it was read from" in {
@@ -551,19 +504,23 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
     "asked for the structure wrapper of a top-level suite" should {
       "have written the suite's structure, as the suite and the filter give it, when it returns the wrapper" in {
         val eventLog = new RecordingEventLog
-        TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
+        val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
+        SuiteRegistration.madeWith(wrapper).removed()
         eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
       }
 
-      "return a wrapper that passes each event unchanged to the suite's reporter, and writes none of them" in {
-        val eventLog = new RecordingEventLog
+      "return a wrapper that passes each event unchanged to the suite's reporter" in {
         val reporter = new RecordingReporter
-        val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, reporter)
-        val events = Vector(alert("first", "main"), alert("second", "main"))
-        events.foreach(wrapper(_))
-        reporter.events.size shouldBe 2
-        reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
-        eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
+        val suite = new OneTestSuite
+        val wrapper = TestEventLogEmitter.appendingTo(new RecordingEventLog).wrapperOfTopLevelSuite(suite, Filter.default, reporter)
+        try {
+          val events = Vector(alert("first", "main"), alert("second", "main"))
+          events.foreach(wrapper(_))
+          reporter.events.size shouldBe 2
+          reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
+        } finally {
+          SuiteRegistration.madeWith(wrapper).removed()
+        }
       }
 
       "end the event log before a structure it cannot read, and return the suite's reporter itself" in {

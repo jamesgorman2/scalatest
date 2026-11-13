@@ -60,7 +60,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
         Then(s"the event log's one structure holds $holds")
         structureLinesOf(lines) shouldBe Vector(structure.line)
-        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(runHolding(structure))) shouldBe None
+        EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(structure))) shouldBe None
       }
     }
 
@@ -408,6 +408,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
             Then("the event log's one structure is the discovered suite's, with no parent, after the discovery suite's SuiteStarting")
             And("no structure holds the discovery suite, whose events are assigned to the run")
+            And("the discovered suite's events follow its structure")
             EventLogComparison.mismatchWhenIs(
               eventLogOf(eventLogFile),
               built(
@@ -420,6 +421,10 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
                 structure
                   suite "OneTestSpec", class "samples.discovered.OneTestSpec"
                     test "succeeds", label "- succeeds"
+                suite "OneTestSpec": SuiteStarting
+                test "succeeds": TestStarting
+                test "succeeds": TestSucceeded
+                suite "OneTestSpec": SuiteCompleted
                 run: SuiteCompleted
                 run: RunCompleted
                 run ended completed

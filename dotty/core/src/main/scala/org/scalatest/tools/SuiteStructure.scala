@@ -7,8 +7,9 @@ import org.scalatest.RegisteredTest
 import org.scalatest.Suite
 import org.scalatest.TestsBeforeNestedSuites
 
+/** A scope or test of a suite's structure. A scope's `text` is the text it is registered with, which may hold more words than its name. */
 private[scalatest] enum ScopeOrTest {
-  case Scope(name: String, label: String, scopesAndTests: List[ScopeOrTest])
+  case Scope(name: String, text: String, label: String, scopesAndTests: List[ScopeOrTest])
   case Test(name: String, testName: String, label: String)
 }
 
@@ -64,7 +65,7 @@ private[scalatest] object SuiteStructure {
   // `filtered` returns, as `Filter.apply` does for one test, whether the test is dropped and whether it is ignored.
   private def kept(registered: List[RegisteredNode], filtered: String => (Boolean, Boolean)): List[ScopeOrTest] = {
     registered.flatMap {
-      case RegisteredScope(name, label, nodes) => Some(ScopeOrTest.Scope(name, label, kept(nodes, filtered)))
+      case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, kept(nodes, filtered)))
       case RegisteredTest(name, testName, label, labelWhenIgnored) =>
         val (isDropped, isIgnored) = filtered(testName)
         if (isDropped) None else Some(ScopeOrTest.Test(name, testName, if (isIgnored) labelWhenIgnored else label))

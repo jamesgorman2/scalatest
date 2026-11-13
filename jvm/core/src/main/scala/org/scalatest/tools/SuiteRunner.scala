@@ -54,6 +54,7 @@ private[scalatest] class SuiteRunner(
       // Asked for only once the suite is to start: a suite a stop keeps from starting gets no reporter of its own.
       val reporter = reporterOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
       val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)
+      val registration = SuiteRegistration.madeTaking(reporter, suiteArgs.reporter)
       def send(event: Event): Unit = {
         handOffToTestEventLog(event)
         reporter(event)
@@ -63,7 +64,14 @@ private[scalatest] class SuiteRunner(
         send(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner))
         
       try {
-        val runStatus = suite.run(None, args)
+        val runStatus =
+          try suite.run(None, args)
+          catch {
+            case thrown: Throwable =>
+              registration.removed()
+              throw thrown
+          }
+        registration.removedWhenCompleted(runStatus)
 
         // Must wait until runStatus completed before dispatching SuiteCompleted, because if parallel test execution is mixed in,
         // the main thread will return before the tests are done. And the HTMLReporter uses SuiteCompleted to
