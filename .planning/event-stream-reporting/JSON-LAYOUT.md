@@ -106,5 +106,6 @@ A key is absent where the run never reported the event that supplies it, as when
 - a test run label (R-025, R-058, R-078, R-080, R-083, R-095, R-114): its name, its outcome, reason (*not run* or *could not start*) and failure where its module's tests did not run, its run records, and its top-level suites and not-run test classes;
 - a process that ended before any run existed, and its output (R-076);
 - a run record's identifier, and the key by which a suite names its run record (R-080);
+- where a node has more than one execution (R-130), which of them supplies its `outcome`, `message`, `throwable`, `startedAt`, `endedAt`, `duration` and `threadName`, and how its sequence of children and messages (R-109) is ordered;
 - whether a not-run test class's `name` is its simple or its fully qualified class name (R-095);
 - within `output`, the form of the value under `stdout` and `stderr`, and where output whose stream is not known is held (R-012, R-122).

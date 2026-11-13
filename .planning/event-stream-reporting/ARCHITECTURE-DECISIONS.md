@@ -324,7 +324,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** Each run assembling its own test structure still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
-**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064, R-065). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded. A suite's structure sent again as the run learns more leaves the library to hold each node's events apart from the structure and report over the latest (`ARCHITECTURE.md` § Modules § Consolidation library, Assembly).
+**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064, R-065). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
 
 **Costs** The test event log carries more, and the library must keep the place of a node that a later structure drops.
 
@@ -341,8 +341,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 - A tree of the whole run built before the run starts cannot be built under the test-interface, which gives a runner one task per top-level class and no run-wide view; a JVM worker under Mill claims its classes one at a time (`research/mill-test-worker-args.md` § 1.2).
 - Inferring each node's parent from `Ordinal` prefixes, as IntelliJ's reporter does (`ARCHITECTURE.md` § External systems), fails under the `Framework`, where every task of a run shares one linear ordinal tracker.
+- Handing each event to the emitter at its send site, with no wrapper, misses the events user code builds and sends itself, and cannot place a suite instance user code creates and runs, whose enclosing node only the reporters downstream of it know.
 
-**Reasoning** Where core sends an event it knows the suite instance and the scope or test the event is for; that is lost only where emitters' events merge. Core records them beside the event as it is sent, and a structure wrapper on each suite, nested suite and test hands the event to the emitter before that merge. This keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
+**Reasoning** Where core sends an event it knows the suite instance and the scope or test the event is for, but not the node that instance runs under, which only the reporter chain the event travels gives; both are lost where the events of different suites and tests merge. Core records the first beside the event as it is sent, and a structure wrapper on each suite, nested suite and test supplies the second and hands the event to the emitter before that merge. This keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
 
 **Costs** Every path that builds `Args` for a suite or test must install a wrapper, and every place core sends an event must record what it is for. An event user code builds has no such record, and is placed by its own data.
 

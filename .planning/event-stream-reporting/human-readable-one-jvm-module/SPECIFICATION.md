@@ -41,7 +41,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 
 ### Out of scope
 
-Each is left to the feature of `../ROADMAP.md` it names, where it names one.
+Each is left to the feature of `../ROADMAP.md` it names, where it names one, or deferred where it names § Deferred.
 
 - JSON output and `-fJ` (§ 2); progress output, `P` and `-fP` (§ 9).
 - The formatting and filtering characters (R-127, R-128), and `-f` for human-readable output (R-049) (§ 16).
@@ -67,7 +67,7 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 - R-001, R-002, R-051, R-003, R-060, R-004.
 - R-010, R-063, R-011, R-074.
-- R-096, R-130, R-097, R-098, R-099, R-100, R-104, R-105, R-106 (with no formatting or filtering character), R-131, R-132, R-107 and R-112, for human-readable output.
+- R-096, R-130, R-097, R-098, R-099, R-100, R-104, R-105, R-106 (with no formatting or filtering character), R-131, R-133, R-134, R-132 (the name line), R-107 and R-112, for human-readable output.
 - R-054; R-055 (one module selector; whether stdout holds human-readable output); R-053 (second bullet, except where R-110 and R-111 override it), R-125; R-092, R-072.
 - R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021, R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
@@ -78,19 +78,20 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 ## Acceptance criteria
 
-The criteria are in the five `specification/` documents listed in § Spec documents. In them:
+The criteria are in the `specification/` documents listed in § Spec documents and their parts. In them:
 
 - The module is a JVM test module at module path `core.test`, whose ScalaTest dependency is `com.edc::scalatest` at the release under test, in a build that adds the Mill plugin at that release by its header line (§ Scope) without changing the module's definition (R-092). A criterion's test command is § Scope's invocation, and runs the module when given `core.test`. Every JVM test module of a criterion's build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset. Some criteria instead feed a run to the consolidation library directly, without Mill; the run's test run label is then `core.test`.
 - *The runner argument* is the ScalaTest runner argument that turns the emitter on (§ Scope). A run given it outside Mill writes its test event log to a file it names.
 - *An event log holding* events is, in a `Given`, a run fed directly to the consolidation library as core's decoder would yield those events, in that order. In a `Then`, it is what core's codec decodes from the run's test event log. A criterion states an event log as its events, not as the bytes of its format. The events are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, one per line: the consolidator events, `runStarted`, `structure` and `runEnded`, and the ScalaTest events:
   - `run started`: the `runStarted` event.
-  - `structure`: a `structure` event, with the suite's tree beneath it, one node to a line, each indented 2 spaces under its parent and in declared order: `suite "<name>", class "<class name>"`, `scope "<name>", label "<label>"` or `test "<name>", label "<label>"`. A suite may add `, id "<suite ID>"`; without it, its suite ID is its class name. Each node's ID, parent and declared position follow from the tree.
-    - `structure under suite "<name>"` holds the tree of a suite nested in the named suite, which is its parent.
-    - A later block for a suite that an earlier block already holds is a further `structure` event for that suite. It holds the suite's whole tree, and gives each node its parent, declared position and label from then on.
-    - A node of a further `structure` is the node of an earlier block, with the same node ID, where it is the same suite, a test whose scopes' names and own name, joined by single spaces, are the same, or a scope of the same name at the same place among the scopes of that name under the same parent.
+  - `structure`: a `structure` event, with the suite's tree beneath it, one node to a line, each indented 2 spaces under its parent and in declared order: `suite "<name>", class "<class name>"`, `scope "<name>", label "<label>"` or `test "<name>", label "<label>"`. A suite may add `, id "<suite ID>"`; without it, its suite ID is its class name. A test may add `, test name "<test name>"`, its ScalaTest test name; without it, in a `Given`, its test name is its scopes' names and its own, joined by single spaces, and in a `Then` the line does not fix it. Each node's ID, parent and declared position follow from the tree.
+    - `structure under suite "<name>"` holds the tree of a suite nested in the named suite, which is its parent. Where no earlier block holds that suite, it sits after its parent's existing children.
+    - A later block is a further `structure` event for a suite where an earlier block holds a suite with the same suite ID under the same parent, at the same place among the siblings sharing that ID. A nested suite's further block is headed `structure under suite "<parent>"`. A further block holds the suite's scopes and tests only: its nested suites keep the structure and place they have. It gives each scope and test its parent, declared position and label from then on.
+    - In a `Given`, a node of a further block is the node of an earlier block, with the same node ID, where it is a test of the same test name, or a scope of the same name at the same place among the scopes of that name under the same parent.
   - `<node>: <event>`: a ScalaTest event, a member of the decoded event family (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec) assigned to the node, named by kind and name as `test "is empty"`, or to `run` where it is assigned to the run. A node is named as the latest `structure` before the event names it.
     - Where nodes of one kind share a name, each adds `#<n>`, counting them in the order the event log's structures first hold them: `scope "A Stack" #2`.
-    - `<node> execution <n>: <event>` marks an event of the node's `<n>`th execution, counting the node's executions in the order they started: `test "flaky" execution 2: TestStarting`. Without it, the event is of the node's first execution.
+    - `<node> execution <n>: <event>` marks an event of the node's `<n>`th execution, counting the node's executions in the order they started: `test "flaky" execution 2: TestStarting`. Without it, the event is of the node's first execution. An execution is *open* from its first event until the event that ends it.
+    - `, parent execution <m>` after the node of a scope's or test's event marks the execution of the node's parent that the event's execution ran in: `test "pops" execution 2, parent execution 1: TestStarting`. Without it, in a `Given`, that is the parent's latest execution open at that point of the event log, else the parent's latest, else its first; in a `Then`, the event does not fix it.
     - The event is its `org.scalatest.events` class's name, followed in parentheses by the fields the criterion fixes, each as `<field>: <value>`.
     - `analysis` is a list of strings: `analysis: ["Stack(size: 1 -> 0)"]`.
     - A `location` is the `org.scalatest.events.Location` written as the Scala expression that builds it: `LineInFile(7, "FailSuite.scala", None)`, `TopOfClass("samples.FailSuite")`, `SeeStackDepthException`.
@@ -116,6 +117,7 @@ The criteria are in the five `specification/` documents listed in § Spec docume
   A `Given` leaves out each run event (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`) its criterion does not exercise.
 
   In a `Then`, an event fixes only the fields and throwable parts it writes, and `null` fixes a `null` message. An event log *is* the events given, and no others. It *holds* events *in this order* when it holds each, in that order, with any others between them.
+- A node has an *execution* for each execution the events assigned to it carry. A scope or test has *started* once it has one. A suite has started once it, or a node below it, has one.
 - *The run's captured output* in a `Given` is the lines fed with a run fed directly to the library, as the output captured from its process, each tagged with its stream. It is given as a table of `stream`, `stdout` or `stderr`, and `line`, in the order the lines are fed. Where the criterion does not say when a line is fed among the event log's events, the criterion holds wherever it is fed.
 - *The console* is what the `mill` command writes to its stdout and stderr. A line of it is *outside the human-readable output* when it is not a line of the human-readable output.
 - A line is given without Mill's prefix (`specification/layout.md` AC-044). A line *sits under* another when it follows it, indented 2 spaces more, with no line between them indented as little as the other. *The lines for* a node are its own lines and every line under them.

@@ -2,22 +2,6 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
-## The emitter holds the events of a suite instance core did not register until one of them reaches a wrapper whose suite node is known.
-
-**Alternatives**
-
-- A probe event sent through `args.reporter` when the instance's run starts would find the enclosing wrapper at once, but every reporter between would receive an event 3.2.19 does not send (`../SPECIFICATION.md` R-002).
-- A thread-local naming the node whose code is running fails where user code runs the instance on another thread.
-- Writing each event only when it reaches such a wrapper lets the instance's own `TestSortingReporter` deliver its scopes' messages after the tests they precede, and loses the order in which a test called `info` and `note`.
-
-**Reasoning** Only a wrapper downstream knows the node an instance runs under, and only the instance's own sites know its tree (`TECHNICAL-DESIGN.md` § The test event log on the JVM § Suite instances and their nodes). The instance's sorters can sit between the two, so its wrappers take each event as it is sent and the emitter writes them, in that order, once one arrives downstream.
-
-**Costs** Held events are lost where the run's process dies before one reaches such a wrapper, and dropped where none ever does. Under `RandomTestOrder` most of the instance's events can be held until the test it registered first completes.
-
-**Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
-
----
-
 ## An event's node is found from the suite instance that sent it, recorded beside the event in the emitter, never through `args.reporter`.
 
 **Alternatives**
@@ -53,9 +37,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ## The consolidation library's tests build each run with a test-only builder, not through core's codec.
 
-**Alternatives**
-
-- Encoding each run with core's codec and feeding the library its decoded events makes every library test depend on the event log's format.
+**Alternatives** Encoding each run with core's codec and feeding the library its decoded events makes every library test depend on the event log's format.
 
 **Reasoning** The library takes decoded events, not an event log (`../ARCHITECTURE-DECISIONS.md` "The consolidation library takes each run's event stream, not its test event log."), and each side of the codec is tested against the format, so the library's tests need only the events. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
 
@@ -67,9 +49,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ## A worker's stdout and stderr are read as bytes and split into lines before decoding, with the charset Mill's JVM names in `native.encoding`.
 
-**Alternatives**
-
-- `os.ProcessOutput.Readlines` decodes with the default charset of Mill's JVM and ends a line at a lone `\r`.
+**Alternatives** `os.ProcessOutput.Readlines` decodes with the default charset of Mill's JVM and ends a line at a lone `\r`.
 
 **Reasoning** A worker writes in the platform's native encoding, which need not be the default charset of Mill's JVM. Only raw bytes reach the splitter with the worker's encoding and line ends intact (`TECHNICAL-DESIGN.md` § Critical code paths § Capturing a JVM worker's stdout and stderr).
 
@@ -83,9 +63,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ## Core's argument splitter keeps its own table of each flag's arity, kept in step with `ArgsParser.parseArgs` by a test.
 
-**Alternatives**
-
-- Sharing `parseArgs`'s arities means rewriting its inline `if` chain as a table, in the parser every run goes through, emitter off included (`../SPECIFICATION.md` R-001).
+**Alternatives** Sharing `parseArgs`'s arities means rewriting its inline `if` chain as a table, in the parser every run goes through, emitter off included (`../SPECIFICATION.md` R-001).
 
 **Reasoning** The split needs each flag's arity (`TECHNICAL-DESIGN.md` § Critical code paths § A module's own ScalaTest arguments). A table of the splitter's own leaves the parser every run uses as it is, apart from the one branch that accepts the runner argument.
 
@@ -97,9 +75,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ## The test command keeps Mill's `Running Test Class` lines out of captured output by running the worker at log level `Info` or higher.
 
-**Alternatives**
-
-- Dropping captured lines that match `Running Test Class <name>` also drops a test's own line of the same text.
+**Alternatives** Dropping captured lines that match `Running Test Class <name>` also drops a test's own line of the same text.
 
 **Reasoning** At `Info` Mill never writes the line. ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which `../SPECIFICATION.md` R-041 already silences, so nothing else is lost. R-053 does not require the worker to run at the module's own log level.
 

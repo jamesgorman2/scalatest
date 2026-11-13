@@ -1,6 +1,22 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, and what its JSON output holds, newest first.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output holds, newest first.
+
+## A suite, scope or test that ran more than once is one node with many executions, and the human-readable output shows each.
+
+**Alternatives**
+
+- One node per running makes the test structure depend on how the run went, so a test's declared position, and whether it is *not run*, change with reruns.
+- Showing only the last execution hides a failure that a later running of the same test followed with a success (`../SPECIFICATION.md` R-021).
+- One line with a rolled-up outcome gives a node an outcome no event carries, which R-098 leaves to readers; it is deferred (`../ROADMAP.md` § Deferred).
+
+**Reasoning** ScalaTest 3.2.19 prints every running of a test with its own outcome, failure and messages, so showing each execution keeps R-106 and R-021 while the test structure stays what the run registered (R-130).
+
+**Costs** The event log, every writer and every reader must handle a node with several executions, and a test run many times prints as many lines. The JSON output's layout for such a node is not fixed (`../JSON-LAYOUT.md` § Not yet fixed).
+
+**Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
+
+---
 
 ## In the human-readable output only nodes that never started collapse into an ancestor, never a node that started, however much its failure reads like another's.
 

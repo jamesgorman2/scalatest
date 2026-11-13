@@ -21,6 +21,7 @@ Settles:
 
 - Key names above the suites: the root, test run labels, module selectors and build tool (R-028 fixes only the suites and below; R-080 fixes a run record's keys other than its identifier's).
 - The form and key of a run's identifier, unique within its label (R-080).
+- Which execution supplies a node's outcome, failure, timings and thread name, and how its children and messages (R-109) are ordered, where the node has more than one (R-130).
 - Where the JSON documentation lives (R-084).
 
 Risks:

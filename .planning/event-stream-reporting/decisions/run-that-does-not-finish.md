@@ -27,12 +27,12 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** Only a run knows a suite's scopes and tests, and only once it constructs the suite; the test command knows every test class before any test starts. A test class no run reported is therefore shown by name, as not run (`../SPECIFICATION.md` R-066, R-094). The user must rerun it anyway, so its structure would tell them little.
 
-**Costs** A test class no run reported shows no nested suites, scopes or tests, so a reader cannot tell from the output how many tests were not run. The test command must compile a test manifest to supply those classes (`../ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…"). A scope or test that only a later `structure` event adds to a suite is unknown where the run dies before that event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, the `structure` event).
+**Costs** A test class no run reported shows no nested suites, scopes or tests, so a reader cannot tell from the output how many tests were not run. The test command must compile a test manifest to supply those classes (`../ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
 
 **Settled by**
 
-- [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26), which settled that structure comes from the run and showed nothing for a suite no run constructed. The user, in conversation on 2026-11-11 and under no sub-issue of the plan, added the test classes no run reported, after a review flagged that a test process failing before it writes its test event log left no record of the suites it was to run.
-- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71), which added that a run sends a suite's structure again as it learns more.
+- [What does the consolidated output show when a run does not finish?](https://github.com/jamesgorman2/scalatest/issues/26).
+- The user, on 2026-11-11, under no sub-issue of the plan.
 
 **See** `../research/mill-test-worker-args.md` § 1.2.
 

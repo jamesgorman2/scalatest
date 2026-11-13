@@ -55,7 +55,7 @@ Feature: The tree of the human-readable output
             - inner two
         """
 
-  Rule: A scope's or test's line shows the label its suite's structure gives it, never its name
+  Rule: A scope's or test's line shows the label its suite's last structure to hold it gives it, never its name
     Scenario: AC-004 Labels with and without a leading `- `
       Given an event log holding:
         """
@@ -122,14 +122,14 @@ Every line sits under the line it belongs to (R-106). Where that leaves a line's
 
 | ID     | Line                                                                                                      | Sits under                                                         |
 |--------|-----------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
-| AC-007 | a suite's message that no scope holds                                                                     | the suite's name line                                              |
-| AC-009 | a test's failure or cancel message lines and analysis lines, its throwable's first line, and its messages | the test's line                                                    |
+| AC-007 | a message attached to a suite                                                                             | the suite's name line                                              |
+| AC-009 | a test's failure or cancel message lines and analysis lines, and its throwable's first line               | the test's line                                                    |
 | AC-010 | each frame line of a throwable or cause, `...` included                                                   | the throwable's first line, or the cause's `Cause:` line           |
 | AC-011 | a cause's `Cause:` line                                                                                   | the line that the first line of the throwable it causes sits under |
 
 ## Scope and test lines
 
-A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose last `structure` for the node's suite gives the node the label `<label>`, whether or not that label begins `- `, and whose events give the node the row's outcome (R-098 to R-101). A node has an execution for each execution the events assigned to it carry, and has started once it has one. A scope or test with several executions has a line for each, which takes that execution's outcome, and every line this document puts under a scope's or test's line sits under the line of the execution its event carries (`runs-and-test-structure-executions.md` AC-141, AC-142).
+A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose last `structure` to hold the node gives it the label `<label>`, whether or not that label begins `- `, and whose events give the node the row's outcome (R-098 to R-101). Where a scope or test has several executions, each row holds for each execution's line, and AC-009 to AC-011 hold under that line (`runs-and-test-structure-executions.md` AC-141, AC-142).
 
 | ID     | Node and outcome                                                                                              | Line                       | Colour                  |
 |--------|---------------------------------------------------------------------------------------------------------------|----------------------------|-------------------------|
@@ -145,9 +145,9 @@ A scope's or test's line is its label followed by its outcome's suffix. Each row
 | AC-026 | scope, aborted with reason *not run*                                                                          | `<label> *** NOT RUN ***`  | label green, suffix red |
 | AC-027 | scope, aborted because its suite or its run aborted while it was open (R-099; `../../JSON-LAYOUT.md` § Nodes) | `<label> *** ABORTED ***`  | label green, suffix red |
 
-## Lines that are not a node's
+## Label, abort, count and block lines
 
-Each row holds when the library consolidates an event log holding the row's node or event, or, for AC-047 and AC-048, when the run's captured output holds the row's line. `<class name>` is the class the suite's `structure` gives it, and `<module path>` is `core.test`, the module path the run is fed with.
+Each row holds when the library consolidates an event log holding the row's node or event, or, for AC-047 and AC-048, when the run's captured output holds the row's line. `<class name>` is the class the suite's first `structure` gives it, and `<module path>` is `core.test`, the module path the run is fed with.
 
 | ID     | Line                                                         | Text                                                                                                     | Sits under                                             | Colour             |
 |--------|--------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|--------------------------------------------------------|--------------------|

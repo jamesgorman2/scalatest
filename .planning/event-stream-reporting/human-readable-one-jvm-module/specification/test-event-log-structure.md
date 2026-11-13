@@ -78,7 +78,7 @@ Feature: The run in its test event log
 ```gherkin
 Feature: Each suite's structure
 
-  Rule: A suite's structure, after filtering, precedes the suite's first ScalaTest event, and every ScalaTest event is assigned to the node that emitted it (R-096, R-097, R-105)
+  Rule: A suite's structure precedes the suite's first ScalaTest event, and every ScalaTest event is assigned to the node that emitted it (R-096, R-105)
     Scenario: AC-096 A suite whose tests run
       Given suite `StackFunSpec`, class `samples.StackFunSpec`, an `AnyFunSpec` declaring scope `A Stack`, labelled `A Stack`, holding scope `when empty`, labelled `when empty`, holding tests `is empty` and `pops`, labelled `- is empty` and `- pops`, each succeeding
       When `Framework` runs it with the runner argument
@@ -186,7 +186,7 @@ Feature: Each suite's structure
         | `Runner.run`, with `-s samples.ConfigSpec`                 |
         | `Runner.run`, with the runpath given with `-R` and no `-s` |
 
-  Rule: Where the instance of a suite that runs registers a tree other than the structure the event log holds for the suite, a further `structure` for the suite precedes the first event that needs it, and each event is assigned to its own node (R-096, R-130)
+  Rule: Where the instance of a suite that runs registers a tree other than the structure the event log holds for the suite, a further `structure` for the suite precedes that instance's first scope or test event (R-096, R-130)
     Scenario: AC-131 What a suite run through `ConfigMapWrapperSuite` registers depends on its config map
       Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `remote`, labelled `- remote`, when its config map holds key `db`, and test `local`, labelled `- local`, when it does not, each succeeding
       When `Framework` runs it with the runner argument and `-Ddb=on`
@@ -201,6 +201,7 @@ Feature: Each suite's structure
           suite "ConfigSpec", class "samples.ConfigSpec"
             scope "A config", label "A config"
               test "remote", label "- remote"
+        scope "A config": ScopeOpened
         test "remote": TestStarting
         test "remote": TestSucceeded
         suite "ConfigSpec": SuiteCompleted
@@ -208,7 +209,14 @@ Feature: Each suite's structure
       And it holds no other `structure`
       And no event is assigned to `local`, and none but `SuiteStarting` and `SuiteCompleted` to suite `ConfigSpec`
 
-  Rule: A `DistributedTestRunnerSuite`'s abort is assigned to the one test it ran (R-096, R-097)
+  Rule: A suite, scope or test that a further `structure` holds keeps the node ID an earlier `structure` for the suite gave it (R-130)
+    Scenario: AC-154 A scope and a test that both structures hold
+      Given suite `ConfigSpec` of AC-131, whose scope `A config` also holds test `reads`, labelled `- reads`, whatever its config map
+      When `Framework` runs it with the runner argument and `-Ddb=on`
+      Then in the further `structure` for `ConfigSpec`, each of suite `ConfigSpec`, scope `A config` and test `reads` has the node ID the first `structure` gives it
+      And `remote` has a node ID the first `structure` gives no node
+
+  Rule: A `DistributedTestRunnerSuite`'s abort is assigned to the one test it ran (R-096)
     Scenario: AC-126 The suite running one test in parallel throws
       Given suite `ParAbortSuite`, class `samples.ParAbortSuite`, an `AnyFunSuite` mixing in `ParallelTestExecution`, whose one test is `a`, labelled `- a`, and which overrides `run` to throw `RuntimeException("no fixture")` when given a test name, as the `DistributedTestRunnerSuite` running `a` gives it
       When `Runner.run` runs it with the runner argument, `-P2` and `-s samples.ParAbortSuite`
@@ -276,7 +284,7 @@ Feature: Labels
 
 ## A suite's class name
 
-A suite's class name is the name `Class.getName` gives the runtime class of the suite instance that runs. For an `object` `samples.Specs` it is `samples.Specs$`; for a suite annotated `@WrapWith` with any wrapper but `ConfigMapWrapperSuite`, it is the wrapper's class. Two kinds of suite take another class:
+A suite's class name is the one its first `structure` gives it, and every further `structure` for the suite carries the same (`test-event-log-executions.md` AC-135). It is the name `Class.getName` gives the runtime class of the suite instance the run was given: for a suite annotated `@WrapWith` with any wrapper but `ConfigMapWrapperSuite`, the wrapper's class. Two kinds of suite take another class:
 
 - a suite whose constructor throws takes the class that failed to construct;
 - a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` takes the annotated class (`../SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` carries the class name…").

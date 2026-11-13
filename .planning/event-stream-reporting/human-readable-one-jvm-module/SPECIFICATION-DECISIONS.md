@@ -2,17 +2,16 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## A suite, scope or test is one node however it is reached and however often it runs, and its events are kept by execution.
+## A suite, scope or test is one node however it is reached.
 
 **Alternatives**
 
 - Assigning an event whose node its suite's structure lacks to the nearest ancestor that has one puts a test's events on its suite, so the test is never shown as a test (`../SPECIFICATION.md` R-021).
 - A node for each instance that runs gives a test declared by a wrapper and run by the instance it wraps two nodes, one of which never starts and is shown as not run (R-100).
-- A node for each time a test runs makes the test structure depend on how the run went, so a test's declared position and whether it is not run change with reruns.
 
-**Reasoning** A node is known by what its events name, its suite's ID and its test name, so a test is the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, and a suite run from several tests is one suite. Keeping executions apart from the structure lets the output show each running of a test as ScalaTest 3.2.19 prints it (R-106) while the structure stays the tests as written.
+**Reasoning** A node is known by what its events name, its suite's ID and its test name, so a test is the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, and a suite run from several tests is one suite.
 
-**Costs** A suite's structure can arrive more than once, so a node's place is known only once the run's event stream ends, and every reader must handle a node with several executions.
+**Costs** A suite's structure can arrive more than once, so a node's place is known only once the run's event stream ends.
 
 **Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 
@@ -23,7 +22,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 **Alternatives**
 
 - Keeping the empty config map's structure for the whole run leaves a test only the run's config map registers without a node, and shows a test only the empty config map registers as not run.
-- Constructing the running instance from the run's config map before `SuiteStarting`, and reusing it to run, moves the user's constructor and its side effects before `SuiteStarting`. A throwing constructor, caught and rethrown when the suite runs, still aborts with stack frames that differ from 3.2.19's, risking `specification/compatibility-and-library.md` AC-056 and `../SPECIFICATION.md` R-002.
+- Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor and its side effects earlier than 3.2.19, changing an abort's stack frames (`specification/compatibility-and-library.md` AC-056, `../SPECIFICATION.md` R-002).
 - Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.19 does, before `SuiteStarting`.
 - A structure of the suite's test names alone, as for a suite with no registration tree, drops a wrapped style's scopes and labels, against `specification/test-event-log-structure.md` AC-103's Rule.
 

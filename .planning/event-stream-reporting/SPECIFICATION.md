@@ -87,18 +87,18 @@ These hold for each run's test structure and for how the human-readable and JSON
 ### Nodes
 
 - R-096 A run's test structure has the run at its root, then suites, scopes and tests. A nested suite sits under the suite that nests it. Neither a `DiscoverySuite` nor a `DistributedTestRunnerSuite` is a node, so the suites a `DiscoverySuite` discovers are top-level.
-- R-130 The test structure holds a run's suites, scopes and tests as they are written, not as they ran. A suite, scope or test is one node however many times it ran, and has one execution for each time.
-- R-104 Nodes that share a name are never merged, within a run or across runs.
-- R-097 Each `info`, `alert`, `note` and `markup` message attaches to the node that emitted it. A message whose emitting node cannot be identified attaches to the first identifiable ancestor of that node. No message is lost or reordered.
+- R-130 The test structure holds each suite, scope and test a run registered, whether or not and however many times it ran, so it does not depend on how the tests ran. A suite, scope or test is one node in its run however many times it ran in that run, and has one execution for each time.
+- R-104 Suites, scopes or tests registered separately are separate nodes even where they share a name, within a run or across runs.
+- R-097 Each `info`, `alert`, `note` and `markup` message attaches to the node that emitted it and, for a suite, scope or test, to the execution that emitted it. A message whose emitting node cannot be identified attaches to the first identifiable ancestor of that node. No message is lost or reordered.
 - R-105 Below a top-level suite, in the human-readable and JSON output, a node's children appear in declared order where it is known, and in descending alphanumeric order by name where it is not.
 
 ### Outcomes and durations
 
-- R-098 Every test has an outcome. A scope has one only when it is pending or aborted, a suite only when it is aborted, and a run only when it is aborted or stopped. No node is given an outcome rolled up from its children; readers roll them up.
-- R-099 A suite that aborts, including one whose constructor throws, is shown as aborted on every runtime. The scopes and tests open inside it when it aborts are aborted.
+- R-098 Every execution of a test has an outcome. An execution of a scope has one only when it is pending or aborted, an execution of a suite only when it is aborted, and a run only when it is aborted or stopped. No node or execution is given an outcome rolled up from its children or from other executions; readers roll them up.
+- R-099 A suite that aborts, including one whose constructor throws, is shown as aborted on every runtime. Each execution of a scope or test open inside it when it aborts is aborted.
 - R-100 Each nested suite, scope and test a run was to execute that never started is aborted with reason *not run*.
 - R-112 A suite, scope or test that a filter excludes, as by tag or test name, is not aborted as R-100 aborts a node that never started. It is shown only as the events ScalaTest 3.2.19 reports for it give.
-- R-103 A node that ran has a duration, except where the events that time it carry none. A node that never ran has none.
+- R-103 Each execution has a duration, except where the events that time it carry none. A node that never ran has none.
 
 ## Consolidated output
 
@@ -126,8 +126,10 @@ Output is *captured against* a suite, scope or test when the means that captured
   - every suite shows its name line, including one for which 3.2.19 prints none;
   - each outcome R-098 gives a node, and each reason R-100, R-101, R-102, R-058 and R-114 give, is shown with its node, including where 3.2.19 prints no line for it;
   - on stdout, each line carries the prefix Mill puts on every line the test command's own task writes.
-- R-131 The human-readable output shows a scope or test once for each of its executions, each with that execution's outcome, failure and messages. A node's executions appear together at the node's declared position (R-105), in the order they started, and a test's execution appears under the execution of its scope that it ran in.
-- R-132 The human-readable output shows a suite's name line once, however many times the suite ran.
+- R-131 The human-readable output shows a scope or test once for each of its executions, each with what that execution alone produced (its outcome, failure, messages, captured output and duration), and once where it has none.
+- R-133 In the human-readable output, the executions of a scope or test that ran in one execution of its parent scope, or in its suite where its parent is the suite, appear together at the node's declared position (R-105), in the order they started. This overrides R-106 (the format ScalaTest 3.2.19 prints).
+- R-134 In the human-readable output, an execution of a scope or test appears under the execution of its parent scope that it ran in.
+- R-132 The human-readable output shows a suite's name line once, however many times the suite ran. Under it, each of the suite's executions shows what it alone produced (its abort, with the lines under it, and its messages), in the order the executions started. This overrides R-106 (the format ScalaTest 3.2.19 prints).
 - R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.19 reporter configuration character:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.
@@ -135,7 +137,7 @@ Output is *captured against* a suite, scope or test when the means that captured
   Each `-o` and `-f` formats only its own output, and its characters apply alike to every module of the test command. A `-f` naming JSON output takes none (R-121). This overrides R-021, R-097 and R-012 in the human-readable output for the lines a filter hides.
 - R-128 `s` and `f` add no stack trace for a `StackDepthException`, such as a `TestFailedException`. This overrides R-127 (each character does what its upper case does in ScalaTest 3.2.19).
 - R-124 Human-readable output on the test command's stdout is coloured where Mill colours its own console output, and not where `w` is given. A file `-f` writes is never coloured. This overrides R-106 (the format ScalaTest 3.2.19 prints) for colour.
-- R-107 In the human-readable output, a subtree is *collapsed* when its root is aborted and every other node in it is aborted with reason *not run* (never started). A collapsed subtree is shown as its root alone, with a count of the nodes it hides where it hides any. Nothing else is collapsed: a node that started never collapses into an ancestor, and siblings are never merged. This overrides R-021 (every suite, scope and test is shown). The JSON output collapses nothing.
+- R-107 In the human-readable output, a subtree is *collapsed* when its root is aborted and no other node in it has an execution. A collapsed subtree is shown as its root alone, with a count of the nodes it hides where it hides any. Nothing else is collapsed: a node with an execution never collapses into an ancestor, and siblings are never merged. This overrides R-021 (every suite, scope and test is shown). The JSON output collapses nothing.
 - R-082 The human-readable output shows no run. On each test run label, without naming the run, it shows one block for each run that has any of:
   - output captured against the run;
   - messages attached to the run rather than to a suite;
@@ -163,7 +165,7 @@ Output is *captured against* a suite, scope or test when the means that captured
 
 ### Captured output
 
-- R-012 Each piece of captured output is shown on the narrowest suite, scope or test it was captured against, else on its run: in the run's run record in the JSON output, and in the run's block in the human-readable output. Each is shown with its stream, stdout or stderr, where that is known. In the human-readable output, output captured against a suite, scope or test keeps its position among that node's events. In the human-readable output, this overrides R-106 (the format ScalaTest 3.2.19 prints).
+- R-012 Each piece of captured output is shown on the narrowest suite, scope or test it was captured against, else on its run: in the run's run record in the JSON output, and in the run's block in the human-readable output. Each is shown with its stream, stdout or stderr, where that is known. In the human-readable output, output captured against a suite, scope or test keeps its position among the events of the execution it was captured in. In the human-readable output, this overrides R-106 (the format ScalaTest 3.2.19 prints).
 - R-122 In the JSON output, each node and run record holds the output captured against it, not only test output, whatever its source and whether or not its stream is known.
 - R-088 In each of the human-readable and JSON output, each piece of output a process wrote appears at most once, even where it was captured both against a node and from the process's stdout or stderr.
 - R-086 Output captured only against the run is shown without claiming that it is test output or worker output.
@@ -268,7 +270,7 @@ WHERE the test command's stdout holds progress output (R-048):
 
 These hold for a run that does not finish.
 
-- R-064 The run, and each suite, scope and test that started in it without an event ending it, are aborted.
+- R-064 The run, and each execution of a suite, scope or test that started in it without an event ending it, are aborted.
 - R-065 Every scope and test registered in a suite the run constructed appears, even where the run's process died before the scope or test started. R-100 aborts each that never started, with reason *not run*.
 - R-075 Where a test ended the run's process, as a call to `System.exit` does, the consolidated output shows that test and every event the run reported before the test started.
 - R-067 Progress output shows that the run aborted as soon as its event stream ends.
@@ -278,7 +280,7 @@ These hold for a run that does not finish.
 - R-102 A run is aborted with reason *process failed* where:
   - it does not finish, when R-064 aborts it;
   - it loses one of its processes; or
-  - it reports that it completed while a suite, scope or test that started in it has no event ending it.
+  - it reports that it completed while an execution of a suite, scope or test that started in it has no event ending it.
 - R-073 When a run's process dies, these hold for everything the run had handed to the operating system: R-010 (the run writes its events, test structure and captured output to its test event log), R-011 (nothing is lost or altered on the way to the reader), R-021 (every suite, scope, test, failure and piece of captured output is shown) and R-042 (output captured from the run's processes is captured against the run). They do not cover what was still buffered inside the process.
 
 ## A process that ends before any run exists

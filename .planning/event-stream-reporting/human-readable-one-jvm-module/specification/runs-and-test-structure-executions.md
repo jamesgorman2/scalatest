@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: executions and structures that change
 
-Acceptance criteria for what the human-readable output shows of a scope or test that ran more than once, and of a suite whose structure the event log holds more than once. Part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events, executions and further `structure` events among them; [layout.md](layout.md) gives where each line sits and its text and colour.
+Acceptance criteria for what the human-readable output shows of a suite, scope or test that ran more than once, and of a suite whose structure the event log holds more than once. Part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events, executions and further `structure` events among them; [layout.md](layout.md) gives where each line sits and its text and colour.
 
 Each criterion below feeds the consolidation library an event log.
 
@@ -9,7 +9,7 @@ Each criterion below feeds the consolidation library an event log.
 ```gherkin
 Feature: Nodes that ran more than once
 
-  Rule: A test shows one line for each of its executions, each with that execution's outcome, failure and messages, together at the test's declared position and in the order they started (R-105, R-131)
+  Rule: A test shows one line for each of its executions, each with that execution's outcome, failure and messages; those that ran in one execution of its parent sit together at the test's declared position, in the order they started (R-105, R-131, R-133)
     Scenario: AC-141 A test that failed, then succeeded when run again
       Given an event log holding:
         """
@@ -42,8 +42,8 @@ Feature: Nodes that ran more than once
           - steady
         """
 
-  Rule: A scope shows one line for each of its executions, and each execution of a test sits under the execution of its scope that it ran in (R-131)
-    Scenario: AC-142 A suite whose scope and test ran twice
+  Rule: A scope shows one line for each of its executions, together at the scope's declared position and in the order they started, and each execution of a scope or test sits under the execution of its parent scope that it ran in (R-131, R-133, R-134)
+    Scenario: AC-142 A scope and its test ran twice, either side of a sibling scope
       Given an event log holding:
         """
         run started
@@ -51,11 +51,17 @@ Feature: Nodes that ran more than once
           suite "TwiceFunSpec", class "samples.TwiceFunSpec"
             scope "A Stack", label "A Stack"
               test "pops", label "- pops"
+            scope "A Queue", label "A Queue"
+              test "polls", label "- polls"
         suite "TwiceFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
         test "pops": TestStarting
         test "pops": TestFailed(throwable: java.lang.IllegalStateException "not empty")
         scope "A Stack": ScopeClosed
+        scope "A Queue": ScopeOpened
+        test "polls": TestStarting
+        test "polls": TestSucceeded
+        scope "A Queue": ScopeClosed
         scope "A Stack" execution 2: ScopeOpened
         test "pops" execution 2: TestStarting
         test "pops" execution 2: TestSucceeded
@@ -72,13 +78,119 @@ Feature: Nodes that ran more than once
               java.lang.IllegalStateException: not empty
           A Stack
             - pops
+          A Queue
+            - polls
         """
 
-  Rule: A suite shows its name line once, however many executions its scopes and tests have (R-132)
-    Scenario: AC-143 A suite whose scope and test ran twice
-      Given the event log of AC-142
+    Scenario: AC-149 Two executions of a scope overlap
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OverlapFunSpec", class "samples.OverlapFunSpec"
+            scope "A Stack", label "A Stack"
+              test "pops", label "- pops"
+        suite "OverlapFunSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        scope "A Stack" execution 2: ScopeOpened
+        test "pops", parent execution 1: TestStarting
+        test "pops" execution 2, parent execution 2: TestStarting
+        test "pops" execution 2, parent execution 2: TestSucceeded
+        test "pops", parent execution 1: TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        scope "A Stack" execution 2: ScopeClosed
+        scope "A Stack": ScopeClosed
+        suite "OverlapFunSpec": SuiteCompleted
+        run ended completed
+        """
       When the library consolidates it
-      Then the human-readable output holds one `TwiceFunSpec:` line
+      Then, with every stack frame left out, the lines for `OverlapFunSpec` are:
+        """
+        OverlapFunSpec:
+          A Stack
+            - pops *** FAILED ***
+              java.lang.IllegalStateException: not empty
+          A Stack
+            - pops
+        """
+
+  Rule: A scope's execution shows no line for a node with executions but none in it, and a scope or test with no execution is shown once, under its parent's latest execution (R-100, R-131)
+    Scenario: AC-148 One test ran in the second execution only, and one never started
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "PartFunSpec", class "samples.PartFunSpec"
+            scope "A Stack", label "A Stack"
+              test "pops", label "- pops"
+              test "peeks", label "- peeks"
+              test "grows", label "- grows"
+        suite "PartFunSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        test "pops": TestStarting
+        test "pops": TestSucceeded
+        scope "A Stack": ScopeClosed
+        scope "A Stack" execution 2: ScopeOpened
+        test "pops" execution 2: TestStarting
+        test "pops" execution 2: TestSucceeded
+        test "peeks": TestStarting
+        test "peeks": TestSucceeded
+        scope "A Stack" execution 2: ScopeClosed
+        suite "PartFunSpec": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `PartFunSpec` are:
+        """
+        PartFunSpec:
+          A Stack
+            - pops
+          A Stack
+            - pops
+            - peeks
+            - grows *** NOT RUN ***
+        """
+
+  Rule: A suite shows its name line once however many times it ran, and no abort line where no event is assigned to it but a node below it has an execution (R-100, R-132)
+    Scenario: AC-143 A suite two tests each ran
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "first", label "- first"
+            test "second", label "- second"
+        suite "OuterSuite": SuiteStarting
+        test "first": TestStarting
+        structure under suite "OuterSuite"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        test "first": TestSucceeded
+        test "second": TestStarting
+        scope "A helper" execution 2: ScopeOpened
+        test "helps" execution 2: TestStarting
+        test "helps" execution 2: TestSucceeded
+        scope "A helper" execution 2: ScopeClosed
+        test "second": TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `OuterSuite` are:
+        """
+        OuterSuite:
+          - first
+          - second
+          HelperSuite:
+            A helper
+              - helps
+            A helper
+              - helps
+        """
 ```
 
 ## A suite with more than one structure
@@ -86,35 +198,53 @@ Feature: Nodes that ran more than once
 ```gherkin
 Feature: A suite whose structure the event log holds more than once
 
-  Rule: A node is shown at the parent, declared position and label its suite's last structure gives it (R-105, R-130)
-    Scenario: AC-144 A further structure moves a test under a scope and changes its label
+  Rule: Every execution of a node is shown at the parent, declared position and label its suite's last structure gives the node (R-105, R-130)
+    Scenario: AC-144 A further structure reorders tests, relabels one and moves one under a scope
       Given an event log holding:
         """
         run started
         structure
           suite "StackSpec", class "samples.StackSpec"
-            test "A Stack pops", label "- A Stack pops"
+            scope "A Stack", label "A Stack"
+              test "pops", label "- pops"
+              test "peeks", label "- peeks"
+            test "A Stack grows", label "- A Stack grows"
         suite "StackSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        test "pops": TestStarting
+        test "pops": TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        test "peeks": TestStarting
+        test "peeks": TestSucceeded
+        scope "A Stack": ScopeClosed
         structure
           suite "StackSpec", class "samples.StackSpec"
             scope "A Stack", label "A Stack"
-              test "pops", label "- pops"
-        scope "A Stack": ScopeOpened
-        test "pops": TestStarting
-        test "pops": TestSucceeded
-        scope "A Stack": ScopeClosed
+              test "grows", label "- grows"
+              test "peeks", label "- peeks"
+              test "pops", label "- must pop"
+        scope "A Stack" execution 2: ScopeOpened
+        test "grows": TestStarting
+        test "grows": TestSucceeded
+        test "pops" execution 2: TestStarting
+        test "pops" execution 2: TestSucceeded
+        scope "A Stack" execution 2: ScopeClosed
         suite "StackSpec": SuiteCompleted
         run ended completed
         """
       When the library consolidates it
-      Then the lines for `StackSpec` are:
+      Then, with every stack frame left out, the lines for `StackSpec` are:
         """
         StackSpec:
           A Stack
-            - pops
+            - peeks
+            - must pop *** FAILED ***
+              java.lang.IllegalStateException: not empty
+          A Stack
+            - grows
+            - must pop
         """
 
-  Rule: A node with an execution that its suite's last structure lacks is shown where the last structure to hold it put it (R-021)
+  Rule: A node its suite's last structure lacks that has an execution, or holds a node that has one, is shown with the parent, declared position and label of the last structure to hold it, after any node the last structure holds at that position (R-021)
     Scenario: AC-145 A test that ran is missing from the last structure
       Given an event log holding:
         """
@@ -122,19 +252,20 @@ Feature: A suite whose structure the event log holds more than once
         structure
           suite "ShrinkFunSpec", class "samples.ShrinkFunSpec"
             scope "A Stack", label "A Stack"
-              test "is empty", label "- is empty"
               test "pops", label "- pops"
+              test "is empty", label "- is empty"
         suite "ShrinkFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
-        test "is empty": TestStarting
-        test "is empty": TestSucceeded
         test "pops": TestStarting
         test "pops": TestSucceeded
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
         scope "A Stack": ScopeClosed
         structure
           suite "ShrinkFunSpec", class "samples.ShrinkFunSpec"
             scope "A Stack", label "A Stack"
               test "is empty", label "- is empty"
+              test "peeks", label "- peeks"
         suite "ShrinkFunSpec": SuiteCompleted
         run ended completed
         """
@@ -144,6 +275,43 @@ Feature: A suite whose structure the event log holds more than once
         ShrinkFunSpec:
           A Stack
             - is empty
+            - pops
+            - peeks *** NOT RUN ***
+        """
+
+    Scenario: AC-150 A scope whose test ran is missing from the last structure
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "DropFunSpec", class "samples.DropFunSpec"
+            scope "A Stack", label "A Stack"
+              test "pops", label "- pops"
+            scope "A Queue", label "A Queue"
+              test "polls", label "- polls"
+        suite "DropFunSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        test "pops": TestStarting
+        test "pops": TestSucceeded
+        scope "A Stack": ScopeClosed
+        structure
+          suite "DropFunSpec", class "samples.DropFunSpec"
+            scope "A Queue", label "A Queue"
+              test "polls", label "- polls"
+        scope "A Queue": ScopeOpened
+        test "polls": TestStarting
+        test "polls": TestSucceeded
+        scope "A Queue": ScopeClosed
+        suite "DropFunSpec": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `DropFunSpec` are:
+        """
+        DropFunSpec:
+          A Queue
+            - polls
+          A Stack
             - pops
         """
 
