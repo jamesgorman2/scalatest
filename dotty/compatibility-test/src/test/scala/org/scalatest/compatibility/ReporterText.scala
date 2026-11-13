@@ -5,7 +5,7 @@ object ReporterText {
   val stackFrames: String = "<stack frames>"
 
   private val colour = "\u001b\\[[0-9;]*m".r
-  private val stackFrameLine = """(?:(?:error|warn|info|debug|summary): )?\s*at \S.*\(.*\)""".r
+  private val stackFrameLine = """(?:(?:error|warn|info|debug): )?\s*at \S.*\(.*\)""".r
   private val duration = {
     val unit = """\d+ (?:milliseconds?|seconds?|minutes?|hours?)"""
     s"$unit(?:, $unit)*".r

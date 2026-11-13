@@ -20,7 +20,8 @@ object FrameworkLauncher {
     val runner = framework.runner(runnerArguments, Array.empty, loader)
     val logger = new RecordingLogger(LineFile.namedBy("compatibility.loggerLines"))
     execute(runner.tasks(taskDefs), new RecordingEventHandler(LineFile.namedBy("compatibility.events")), logger)
-    logger.summary(runner.done())
+    val summary = LineFile.namedBy("compatibility.summary")
+    runner.done().split("\n", -1).foreach(summary.append)
     System.exit(0)
   }
 
@@ -76,8 +77,6 @@ final class RecordingLogger(lines: LineFile) extends Logger {
   def debug(message: String): Unit = record("debug", message)
 
   def trace(throwable: Throwable): Unit = lines.append("trace: " + EventLine.ofThrowable(throwable))
-
-  def summary(text: String): Unit = record("summary", text)
 
   private def record(level: String, message: String): Unit =
     message.split("\n", -1).foreach(line => lines.append(level + ": " + line))

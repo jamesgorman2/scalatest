@@ -66,11 +66,15 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     Scenario("The loggers of a Framework launch given -oDU receive the lines they receive on 3.2.20, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
       When("Framework runs it on 3.2.20 and on this fork, its runner given -oDU")
-      val loggerLines = runs.ofFixture(Launch.Framework, List("-oDU")).map(output => ReporterText.normalised(output.loggerLines))
+      val output = runs.ofFixture(Launch.Framework, List("-oDU"))
+      val loggerLines = output.map(run => ReporterText.normalised(run.loggerLines))
 
       Then("the loggers receive on this fork the lines they receive on 3.2.20")
       loggerLines.upstream should not be empty
       Compared.firstDifference(loggerLines) shouldBe None
+
+      And("the runner's done returns on this fork the summary it returns on 3.2.20")
+      firstDifferenceOfSummaries(output) shouldBe None
     }
   }
 
@@ -110,8 +114,19 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         text.upstream.keys.toList.sorted.flatMap { name =>
           Compared.firstDifference(text.map(lines => ReporterText.normalised(lines(name)))).map(name + ", " + _)
         } shouldBe Nil
+
+        if (launch == Launch.Framework) {
+          And("the runner's done returns on this fork the summary it returns on 3.2.20")
+          firstDifferenceOfSummaries(output) shouldBe None
+        }
       }
     }
+  }
+
+  private def firstDifferenceOfSummaries(output: Compared[RunOutput]): Option[String] = {
+    val summaries = output.map(run => ReporterText.normalised(run.summary))
+    summaries.upstream should not be empty
+    Compared.firstDifference(summaries)
   }
 
   private def classOf(shape: String): String = shape.split(' ').dropWhile(_ != "class")(1)

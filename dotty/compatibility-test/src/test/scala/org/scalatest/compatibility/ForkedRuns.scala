@@ -38,6 +38,7 @@ object Compared {
 final case class RunOutput(
   events: Seq[String],
   loggerLines: Seq[String],
+  summary: Seq[String],
   stdout: Seq[String],
   stderr: Seq[String],
   files: Map[String, Seq[String]]
@@ -140,7 +141,9 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     val directory = newRunDirectory(launch.toString, library)
     val events = directory.resolve("events.txt")
     val loggerLines = directory.resolve("logger-lines.txt")
-    val recorderFiles = List("-Dcompatibility.events=" + events, "-Dcompatibility.loggerLines=" + loggerLines)
+    val summary = directory.resolve("summary.txt")
+    val recorderFiles =
+      List("-Dcompatibility.events=" + events, "-Dcompatibility.loggerLines=" + loggerLines, "-Dcompatibility.summary=" + summary)
     val (suiteOptions, suiteArguments) = launch match {
       case Launch.RunnerRun => (Nil, CompatibilityFixture.suiteClassNames.flatMap(List("-s", _)))
       case Launch.Framework => (List("-Dcompatibility.suites=" + CompatibilityFixture.suiteClassNames.mkString(",")), Nil)
@@ -149,6 +152,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     RunOutput(
       lines(events),
       lines(loggerLines),
+      lines(summary),
       lines(directory.resolve("stdout.txt")),
       lines(directory.resolve("stderr.txt")),
       filesIn(workingDirectory).map(file => file.getFileName.toString -> lines(file)).toMap
