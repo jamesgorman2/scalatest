@@ -24,7 +24,7 @@ Decisions behind `../SPECIFICATION.md` on which upstream line and release the fo
 - A base and comparator of 3.2.19 leaves the fork one release behind upstream.
 - A base of 3.2.20 compared with 3.2.19 shows upstream's own 3.2.20 changes as differences.
 
-**Reasoning** With the base equal to the comparator, the fork's sources differ from the comparator's only where the fork changed them. No comparison then shows a change upstream made between releases, whether MiMa's (`../SPECIFICATION.md` R-004) or that of what reporters and the build tool receive (R-001, R-002, R-051, R-003, R-106). 3.2.20 is the tip of `3.2.x-new`, the branch upstream releases its 3.2 line from.
+**Reasoning** With the base equal to the comparator, the fork's sources differ from the comparator's only where the fork changed them. No comparison then shows a change upstream made between releases. This holds for MiMa's (`../SPECIFICATION.md` R-004) and for what reporters and the build tool receive (R-001, R-002, R-051, R-003, R-106). 3.2.20 is the tip of `3.2.x-new`, the branch upstream releases its 3.2 line from.
 
 **Costs** Nothing in the fork checks it against an earlier 3.2.x release: compatibility with one rests on upstream's own between its releases.
 
@@ -34,7 +34,7 @@ Decisions behind `../SPECIFICATION.md` on which upstream line and release the fo
 
 ## The fork builds, tests and publishes no Scala 2 artifacts.
 
-**Alternatives** Building the Scala 2.11, 2.12 and 2.13 artifacts upstream publishes serves no user of the fork, and holds the emitter, the codec and their tests to what compiles and passes on each of those versions, on every runtime.
+**Alternatives** Building the Scala 2.11, 2.12 and 2.13 artifacts upstream publishes serves no user of the fork. It also holds the emitter, the codec and their tests to what compiles and passes on each of those versions, on every runtime.
 
 **Reasoning** The fork's consumer builds with Scala 3.9.0, so it would use no Scala 2 artifact. The consolidation library and the Mill plugin run on Scala 3 alone whatever the fork builds.
 

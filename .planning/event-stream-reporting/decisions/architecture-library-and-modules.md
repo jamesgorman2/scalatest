@@ -7,11 +7,11 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 **Alternatives**
 
 - Scala 3.9.0, the version the fork's consumer builds with, has an unknown cost in the macros of Scalactic and ScalaTest, and raises the JDK the artifacts need.
-- The compilers upstream 3.2.20 builds with, Scala 3.1.3 on the JVM and Scala.js and 3.3.3 on Native, serve only modules on Scala 3.1 and 3.2, unsupported compiler lines outside `../SPECIFICATION.md` § Scope, and put two compiler versions over one set of sources, holding the emitter and the codec to the older language level.
+- The compilers upstream 3.2.20 builds with, Scala 3.1.3 on the JVM and Scala.js and 3.3.3 on Native, serve only modules on Scala 3.1 and 3.2, which `../SPECIFICATION.md` § Scope does not cover. They also put two compiler versions over one set of sources, holding the emitter and the codec to the older language level.
 
 **Reasoning** Upstream's 3.3 line, whose sources are near-identical to these, builds with Scala 3.3.8, so these sources are known to compile on it. A module on a later Scala 3 version, such as 3.9.0, uses a library built with 3.3.8 unchanged.
 
-**Costs** A module on Scala 3.1 or 3.2, on the JVM or Scala.js, or on Scala.js before 1.20.2, cannot use the fork's artifacts, as it can upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3, and a problem MiMa reports against upstream's jars, built with older compilers, can come from the compiler and not from the fork's sources.
+**Costs** A module on Scala 3.1 or 3.2 (JVM or Scala.js), or on Scala.js before 1.20.2, cannot use the fork's artifacts, as it can upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3. A problem MiMa reports against upstream's jars, built with older compilers, can come from the compiler and not from the fork's sources.
 
 **Settled by** [What binary compatibility does the fork promise, given its base is upstream 3.3.0-alpha.2?](https://github.com/jamesgorman2/scalatest/issues/107).
 
@@ -49,7 +49,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 **Alternatives**
 
-- Keeping `org.scalatest` gives a fork release the coordinates of upstream's release of the same version, `org.scalatest:scalatest` 3.2.20, so a build cannot tell which of the two it resolved, and against any other upstream version conflict resolution silently keeps one and evicts the other.
+- Keeping `org.scalatest` gives a fork release the same coordinates as upstream's release of that version, `org.scalatest:scalatest` 3.2.20, so a build cannot tell which it resolved. Against any other upstream version, conflict resolution silently keeps one and evicts the other.
 - Renaming the artifacts under `org.scalatest` also separates the coordinates, but publishes under a group this fork does not own, which Maven Central refuses.
 
 **Reasoning** A test module must test with this fork's release for the test command to run it (`../SPECIFICATION.md` R-059). Under a group of its own, the fork's artifacts stay on a module's resolved classpath whatever else the module resolves, and their coordinates alone tell them from upstream's.
