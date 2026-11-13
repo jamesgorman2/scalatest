@@ -46,12 +46,29 @@ Feature: Messages
         scope "when full": ScopeOpened
         """
 
-  Rule: A message a test sends straight to a reporter an ancestor was given, bypassing the test's own, attaches to that ancestor (R-097)
-    Scenario: AC-107 A test reports to its suite's reporter
-      Given suite `DirectSuite`, an `AnyFunSuite` that overrides `run` to keep `args.reporter`, whose test `t`, labelled `- t`, sends that reporter an `InfoProvided` with message `direct`, then succeeds
+  Rule: A message a test sends straight to a reporter an ancestor was given, bypassing the test's own, attaches to that ancestor only where its `nameInfo` names no test (R-097)
+    Scenario Outline: AC-107 A test reports to its suite's reporter, with <nameInfo>
+      Given suite `DirectSuite`, an `AnyFunSuite` that overrides `run` to keep `args.reporter`, whose test `t`, labelled `- t`, sends that reporter an `InfoProvided` with message `direct` and <nameInfo>, then succeeds
       When `Framework` runs it with the runner argument
       Then the event log holds `suite "DirectSuite": InfoProvided(message: "direct")`
       And no `InfoProvided` is assigned to test `t`
+
+      Examples:
+        | nameInfo                                      |
+        | no `nameInfo`                                 |
+        | a `nameInfo` naming `DirectSuite` and no test |
+
+  Rule: A message whose `nameInfo` names a test is assigned to that test, in the test's execution open when it is sent, whichever reporter it is sent to (R-097)
+    Scenario: AC-134 A test reports to its suite's reporter, naming itself
+      Given suite `DirectSuite` of AC-107, whose test `t` gives the `InfoProvided` a `nameInfo` naming `DirectSuite` and test `t`
+      When `Framework` runs it with the runner argument
+      Then the event log holds, in this order:
+        """
+        test "t": TestStarting
+        test "t": InfoProvided(message: "direct")
+        test "t": TestSucceeded
+        """
+      And no `InfoProvided` is assigned to suite `DirectSuite`
 ```
 
 ## What events carry

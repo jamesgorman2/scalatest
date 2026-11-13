@@ -129,7 +129,7 @@ Every line sits under the line it belongs to (R-106). Where that leaves a line's
 
 ## Scope and test lines
 
-A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose `structure` gives the node the label `<label>`, whether or not that label begins `- `, and whose events give the node the row's outcome (R-098 to R-101). A node has started once the event log holds an event assigned to it.
+A scope's or test's line is its label followed by its outcome's suffix. Each row holds when the library consolidates an event log whose last `structure` for the node's suite gives the node the label `<label>`, whether or not that label begins `- `, and whose events give the node the row's outcome (R-098 to R-101). A node has an execution for each execution the events assigned to it carry, and has started once it has one. A scope or test with several executions has a line for each, which takes that execution's outcome, and every line this document puts under a scope's or test's line sits under the line of the execution its event carries (`runs-and-test-structure-executions.md` AC-141, AC-142).
 
 | ID     | Node and outcome                                                                                              | Line                       | Colour                  |
 |--------|---------------------------------------------------------------------------------------------------------------|----------------------------|-------------------------|
@@ -391,7 +391,7 @@ Feature: Mill's prefix and colour
 
   Rule: Colour changes no text (R-124)
     Scenario: AC-053 The same text with colour on and off
-      Given the module of `runs-and-test-structure.md` AC-035
+      Given the module of `runs-and-test-structure-runs.md` AC-035
       When the test command runs it once with Mill's `--color true` and once with `--color false`
       Then the second human-readable output holds no ANSI escape sequence
       And it equals the first with every ANSI escape sequence removed

@@ -13,7 +13,7 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 ## Spec documents
 
 - [specification/layout.md](specification/layout.md) — acceptance criteria for the human-readable output's layout: its tree, where each line sits, each line's text and colour, messages, collapsed subtrees, and Mill's prefix.
-- [specification/runs-and-test-structure.md](specification/runs-and-test-structure.md) — acceptance criteria for which suites, scopes, tests, failures and captured output the human-readable output shows, in what order, and a run's block.
+- [specification/runs-and-test-structure.md](specification/runs-and-test-structure.md) — acceptance criteria for which suites, scopes, tests, failures and captured output the human-readable output shows, how often and in what order, and a run's block.
 - [specification/test-command.md](specification/test-command.md) — acceptance criteria for the test command's arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks and BSP server.
 - [specification/test-event-log.md](specification/test-event-log.md) — acceptance criteria for what a run's test event log holds on the JVM, and for the ScalaTest behaviour that stays unchanged.
 - [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.19, the emitter on each of the JVM's Scala versions, and the consolidation library without Mill.
@@ -59,7 +59,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one.
 - The emitter, consolidated output and the test command on Scala.js and Native (§ 11–15).
 - Adding the plugin through `mvnDeps` on `mill-build/build.mill`'s `MillBuildRootModule`.
 - Writing these to the test event log: `Runner`'s `-A` rerun alerts, the events of the reruns that `Runner`'s `-g` graphical reporter starts, and the events `Framework` relays from a process sbt forks.
-- A structure matching the tests that run, for a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` whose tests depend on its config map. Its structure holds the tests its class registers with an empty config map (`SPECIFICATION-DECISIONS.md` "A suite run through `ConfigMapWrapperSuite` has the structure its class registers…").
+- Showing a test's several executions as one line (`../ROADMAP.md` § Deferred).
 
 ## Epic requirements met
 
@@ -67,9 +67,9 @@ Each holds for one module selector, one JVM test module and one worker. Where a 
 
 - R-001, R-002, R-051, R-003, R-060, R-004.
 - R-010, R-063, R-011, R-074.
-- R-096, R-097, R-098, R-099, R-100 (except as § Out of scope says of a suite run through `ConfigMapWrapperSuite`), R-104, R-105, R-106 (with no formatting or filtering character), R-107 and R-112, for human-readable output.
+- R-096, R-130, R-097, R-098, R-099, R-100, R-104, R-105, R-106 (with no formatting or filtering character), R-131, R-132, R-107 and R-112, for human-readable output.
 - R-054; R-055 (one module selector; whether stdout holds human-readable output); R-053 (second bullet, except where R-110 and R-111 override it), R-125; R-092, R-072.
-- R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021 (except as § Out of scope says of a suite run through `ConfigMapWrapperSuite`), R-012 (on the run), R-086.
+- R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021, R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
 - R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails).
@@ -85,8 +85,12 @@ The criteria are in the five `specification/` documents listed in § Spec docume
 - *An event log holding* events is, in a `Given`, a run fed directly to the consolidation library as core's decoder would yield those events, in that order. In a `Then`, it is what core's codec decodes from the run's test event log. A criterion states an event log as its events, not as the bytes of its format. The events are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, one per line: the consolidator events, `runStarted`, `structure` and `runEnded`, and the ScalaTest events:
   - `run started`: the `runStarted` event.
   - `structure`: a `structure` event, with the suite's tree beneath it, one node to a line, each indented 2 spaces under its parent and in declared order: `suite "<name>", class "<class name>"`, `scope "<name>", label "<label>"` or `test "<name>", label "<label>"`. A suite may add `, id "<suite ID>"`; without it, its suite ID is its class name. Each node's ID, parent and declared position follow from the tree.
-  - `<node>: <event>`: a ScalaTest event, a member of the decoded event family (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec) assigned to the node, named by kind and name as `test "is empty"`, or to `run` where it is assigned to the run.
-    - Where nodes of one kind share a name, each adds `#<n>`, counting them in the order the event log's structures hold them: `scope "A Stack" #2`.
+    - `structure under suite "<name>"` holds the tree of a suite nested in the named suite, which is its parent.
+    - A later block for a suite that an earlier block already holds is a further `structure` event for that suite. It holds the suite's whole tree, and gives each node its parent, declared position and label from then on.
+    - A node of a further `structure` is the node of an earlier block, with the same node ID, where it is the same suite, a test whose scopes' names and own name, joined by single spaces, are the same, or a scope of the same name at the same place among the scopes of that name under the same parent.
+  - `<node>: <event>`: a ScalaTest event, a member of the decoded event family (`../ARCHITECTURE.md` § Modules § ScalaTest core, Codec) assigned to the node, named by kind and name as `test "is empty"`, or to `run` where it is assigned to the run. A node is named as the latest `structure` before the event names it.
+    - Where nodes of one kind share a name, each adds `#<n>`, counting them in the order the event log's structures first hold them: `scope "A Stack" #2`.
+    - `<node> execution <n>: <event>` marks an event of the node's `<n>`th execution, counting the node's executions in the order they started: `test "flaky" execution 2: TestStarting`. Without it, the event is of the node's first execution.
     - The event is its `org.scalatest.events` class's name, followed in parentheses by the fields the criterion fixes, each as `<field>: <value>`.
     - `analysis` is a list of strings: `analysis: ["Stack(size: 1 -> 0)"]`.
     - A `location` is the `org.scalatest.events.Location` written as the Scala expression that builds it: `LineInFile(7, "FailSuite.scala", None)`, `TopOfClass("samples.FailSuite")`, `SeeStackDepthException`.

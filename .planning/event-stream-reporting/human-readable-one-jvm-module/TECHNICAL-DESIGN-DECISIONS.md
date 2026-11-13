@@ -2,20 +2,40 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
-## A test's structure wrapper finds its test's node by its suite instance, never through `args.reporter`.
+## The emitter holds the events of a suite instance core did not register until one of them reaches a wrapper whose suite node is known.
 
 **Alternatives**
 
-- Keying by `suiteId` and test name is ambiguous where two distinct instances of one class run at once, as when the class is nested twice under `-P`.
+- A probe event sent through `args.reporter` when the instance's run starts would find the enclosing wrapper at once, but every reporter between would receive an event 3.2.19 does not send (`../SPECIFICATION.md` R-002).
+- A thread-local naming the node whose code is running fails where user code runs the instance on another thread.
+- Writing each event only when it reaches such a wrapper lets the instance's own `TestSortingReporter` deliver its scopes' messages after the tests they precede, and loses the order in which a test called `info` and `note`.
+
+**Reasoning** Only a wrapper downstream knows the node an instance runs under, and only the instance's own sites know its tree (`TECHNICAL-DESIGN.md` § The test event log on the JVM § Suite instances and their nodes). The instance's sorters can sit between the two, so its wrappers take each event as it is sent and the emitter writes them, in that order, once one arrives downstream.
+
+**Costs** Held events are lost where the run's process dies before one reaches such a wrapper, and dropped where none ever does. Under `RandomTestOrder` most of the instance's events can be held until the test it registered first completes.
+
+**Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
+
+---
+
+## An event's node is found from the suite instance that sent it, recorded beside the event in the emitter, never through `args.reporter`.
+
+**Alternatives**
+
+- Keying by `suiteId` and test name alone is ambiguous where two distinct instances of one class run at once, as when the class is nested twice under `-P`.
 - Unwrapping known reporter chains fails outright for `RandomTestOrder`, which runs each deferred per-test instance with the suite-level `Args` rather than those given to `runTest`, and on an unknown reporter silently falls back to the suite's node.
 - A thread-local fails where the distributor runs the test on another thread.
 - Carrying the node ID in `Args.configMap` shows it to user code, risking `../SPECIFICATION.md` R-002.
+- Tracking a wrapper's open scopes by the order of `ScopeOpened` and `ScopeClosed` cannot tell sibling scopes of one text apart, and holds only while every scope's events arrive in nesting order.
 
-**Reasoning** No reporter chain reliably carries the test's wrapper, since core and user code replace `args.reporter` before a test runs (`TECHNICAL-DESIGN.md` § The test event log on the JVM). The suite instance reaches every site that runs a test, and core creates each instance it runs at a known site, which registers it.
+**Reasoning** No reporter chain reliably carries a node's wrapper, since core and user code replace `args.reporter` before a test runs. The suite instance reaches every engine site that sends an event, together with the test name or branch the event is for, so the site records them against the event and the wrapper that hands the event off needs only to name a node table (`TECHNICAL-DESIGN.md` § The test event log on the JVM § An event's node). An instance no core site created registers itself when its run starts.
 
-**Costs** Each site that creates a suite instance core runs must register it and later remove it. A suite instance a user creates and runs, or one instance nested twice, is not found, so its tests' events are assigned to the node of the innermost wrapper they reach (`TECHNICAL-DESIGN.md` § The test event log on the JVM).
+**Costs** Each site that creates or first runs a suite instance must register it and later remove it, and every engine site that sends an event must record its origin. The origin of an event that reaches no wrapper stays in the emitter's state until the run ends.
 
-**Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+**Settled by**
+
+- [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 
 ---
 

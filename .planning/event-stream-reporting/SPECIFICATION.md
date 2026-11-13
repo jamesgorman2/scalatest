@@ -87,6 +87,7 @@ These hold for each run's test structure and for how the human-readable and JSON
 ### Nodes
 
 - R-096 A run's test structure has the run at its root, then suites, scopes and tests. A nested suite sits under the suite that nests it. Neither a `DiscoverySuite` nor a `DistributedTestRunnerSuite` is a node, so the suites a `DiscoverySuite` discovers are top-level.
+- R-130 The test structure holds a run's suites, scopes and tests as they are written, not as they ran. A suite, scope or test is one node however many times it ran, and has one execution for each time.
 - R-104 Nodes that share a name are never merged, within a run or across runs.
 - R-097 Each `info`, `alert`, `note` and `markup` message attaches to the node that emitted it. A message whose emitting node cannot be identified attaches to the first identifiable ancestor of that node. No message is lost or reordered.
 - R-105 Below a top-level suite, in the human-readable and JSON output, a node's children appear in declared order where it is known, and in descending alphanumeric order by name where it is not.
@@ -125,6 +126,8 @@ Output is *captured against* a suite, scope or test when the means that captured
   - every suite shows its name line, including one for which 3.2.19 prints none;
   - each outcome R-098 gives a node, and each reason R-100, R-101, R-102, R-058 and R-114 give, is shown with its node, including where 3.2.19 prints no line for it;
   - on stdout, each line carries the prefix Mill puts on every line the test command's own task writes.
+- R-131 The human-readable output shows a scope or test once for each of its executions, each with that execution's outcome, failure and messages. A node's executions appear together at the node's declared position (R-105), in the order they started, and a test's execution appears under the execution of its scope that it ran in.
+- R-132 The human-readable output shows a suite's name line once, however many times the suite ran.
 - R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.19 reporter configuration character:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.

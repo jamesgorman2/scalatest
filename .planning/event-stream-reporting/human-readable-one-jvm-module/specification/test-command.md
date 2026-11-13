@@ -9,7 +9,7 @@ Feature: The test command's output arguments
 
   Rule: With no `-o`, or with `-oH`, stdout holds human-readable output and no other consolidated output; a bare `-o` leaves it without consolidated output (R-048, R-055)
     Scenario Outline: AC-076 <arguments>
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, whose test `adds two numbers` writes `dividing now` to stdout
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035, whose test `adds two numbers` writes `dividing now` to stdout
       When the test command runs the module with <arguments>
       Then the console holds <consolidated output>
       And the test command succeeds
@@ -22,7 +22,7 @@ Feature: The test command's output arguments
 
   Rule: An output argument this feature does not take fails the test command before any test starts, with no consolidated output (`../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-077 <arguments>
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035
       When the test command runs the module with <arguments>, which hold <what>
       Then the test command fails before any test starts
       And the console holds no line of human-readable output
@@ -46,7 +46,7 @@ Feature: The module's own ScalaTest arguments
 
   Rule: An argument whose flag the JVM `org.scalatest.tools.Runner` does not recognise fails the test command before any test starts, naming it (R-125)
     Scenario: AC-078 An unrecognised flag
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035
       And the module's own ScalaTest arguments are `-l samples.Slow -y`
       When the test command runs the module
       Then the test command fails before any test starts, and its failure names `-y`
@@ -67,7 +67,7 @@ Feature: The module's own ScalaTest arguments
 
   Rule: Every other argument is withheld with its values (R-125, R-041)
     Scenario Outline: AC-080 <arguments> has no effect
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, whose test `adds two numbers` writes `dividing now` to stdout, and suite `OtherSuite`, class `samples.OtherSuite`, an `AnyFunSuite` whose one test, `other`, labelled `- other`, succeeds
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035, whose test `adds two numbers` writes `dividing now` to stdout, and suite `OtherSuite`, class `samples.OtherSuite`, an `AnyFunSuite` whose one test, `other`, labelled `- other`, succeeds
       And the module's own ScalaTest arguments are <arguments>
       When the test command runs the module
       Then the human-readable output is the one the test command writes for these suites when the module has no ScalaTest arguments of its own
@@ -218,7 +218,7 @@ Feature: What else reaches the console
 
   Rule: The human-readable output shows only the runs its test command started (R-020)
     Scenario: AC-091 A second test command after a test is fixed
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, whose test `adds two numbers`, labelled `- adds two numbers`, has been changed to fail
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035, whose test `adds two numbers`, labelled `- adds two numbers`, has been changed to fail
       And the test command has run the module
       When the test is changed back to succeed, and the test command runs the module again
       Then the second human-readable output is the one AC-035 gives
@@ -232,7 +232,7 @@ Feature: Mill's own test tasks and BSP server
 
   Rule: In a build that adds the plugin, Mill's test tasks behave as they do without it, and produce no consolidated output (R-060, R-054)
     Scenario Outline: AC-092 `mill <task>`
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, and suite `StackFlatSpec` of AC-086
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035, and suite `StackFlatSpec` of AC-086
       When `mill <task>` runs in a build that adds the plugin, and in the same build without it
       Then Mill's result is the same under both
       And so is its console output, apart from durations and the lines Mill writes while it compiles the build itself
@@ -249,7 +249,7 @@ Feature: Mill's own test tasks and BSP server
 
   Rule: In a build that adds the plugin, Mill's BSP server answers an IDE's requests as it does without it (R-003)
     Scenario Outline: AC-093 <request>
-      Given suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, and suite `StackFlatSpec` of AC-086
+      Given suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035, and suite `StackFlatSpec` of AC-086
       When a BSP client connected to Mill's BSP server sends <request>, in a build that adds the plugin, and in the same build without it
       Then the client receives the same response and notifications under both, apart from durations, timestamps and task IDs
       And no notification under either holds `[core.test]` or `Output outside any suite:`

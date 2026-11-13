@@ -7,9 +7,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 **Alternatives**
 
 - A thread-local flag, set while a wrapper forwards, breaks where a reporter between wrappers holds events back and releases them later, as ScalaTest's `TestSortingReporter` or a user's buffering reporter does.
-- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting an ancestor's wrapper assign it to its node, as `SPECIFICATION.md` R-097 requires.
+- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting the next wrapper it reaches hand it off.
 
-**Reasoning** `SPECIFICATION.md` R-002 forbids marking an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it. The top-level suite's wrapper, the last any event of its suite reaches, removes the event, so the set holds only events still between wrappers.
+**Reasoning** `SPECIFICATION.md` R-002 forbids changing an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it. The top-level suite's wrapper, the last any event of its suite reaches, removes the event, so the set holds only events still between wrappers.
 
 **Costs** Each event costs one insert and one remove under the emitter's write lock, and a handed-off event that never reaches its top-level suite's wrapper stays in the set until the run ends. Where a reporter between wrappers forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
 
@@ -324,11 +324,14 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** Each run assembling its own test structure still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
-**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064, R-065). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
+**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`SPECIFICATION.md` R-064, R-065). Structure sent as each suite starts (`decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded. A suite's structure sent again as the run learns more leaves the library to hold each node's events apart from the structure and report over the latest (`ARCHITECTURE.md` § Modules § Consolidation library, Assembly).
 
-**Costs** The test event log carries more.
+**Costs** The test event log carries more, and the library must keep the place of a node that a later structure drops.
 
-**Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
+**Settled by**
+
+- [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
+- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 
 ---
 
@@ -339,11 +342,14 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 - A tree of the whole run built before the run starts cannot be built under the test-interface, which gives a runner one task per top-level class and no run-wide view; a JVM worker under Mill claims its classes one at a time (`research/mill-test-worker-args.md` § 1.2).
 - Inferring each node's parent from `Ordinal` prefixes, as IntelliJ's reporter does (`ARCHITECTURE.md` § External systems), fails under the `Framework`, where every task of a run shares one linear ordinal tracker.
 
-**Reasoning** Events from one emitter arrive in a reliable order even under `-P` and `ParallelTestExecution`; structure is lost only where emitters' events merge. A structure wrapper on each suite, nested suite and test assigns each event to its node before that merge, which keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
+**Reasoning** Where core sends an event it knows the suite instance and the scope or test the event is for; that is lost only where emitters' events merge. Core records them beside the event as it is sent, and a structure wrapper on each suite, nested suite and test hands the event to the emitter before that merge. This keeps the structure without changing any event (R-002) and lets the consolidation library place each event by its node ID alone.
 
-**Costs** Every path that builds `Args` for a suite or test must install a wrapper.
+**Costs** Every path that builds `Args` for a suite or test must install a wrapper, and every place core sends an event must record what it is for. An event user code builds has no such record, and is placed by its own data.
 
-**Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
+**Settled by**
+
+- [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
+- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 
 ---
 

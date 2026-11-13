@@ -17,7 +17,7 @@ Feature: The run in its test event log
       And the event log holds no `structure`
 
   Rule: A run's test event log records how the run ended (R-074)
-    Scenario Outline: AC-060 A run that ends <ended>  
+    Scenario Outline: AC-060 A run that ends <ended>
       Given <the run>
       When <launch> runs it with the runner argument
       Then the event log's last event is `run ended <ended>`
@@ -178,6 +178,7 @@ Feature: Each suite's structure
         test "reads": TestStarting
         test "reads": TestSucceeded
         """
+      And it holds one `structure` for `ConfigSpec`
 
       Examples:
         | launch                                                     |
@@ -185,23 +186,27 @@ Feature: Each suite's structure
         | `Runner.run`, with `-s samples.ConfigSpec`                 |
         | `Runner.run`, with the runpath given with `-R` and no `-s` |
 
-  Rule: A suite run through `ConfigMapWrapperSuite` has the structure its class registers with an empty config map, and the events of a test only the run's config map registers are assigned to the suite (R-096)
-    Scenario: AC-131 What the suite registers depends on its config map
+  Rule: Where the instance of a suite that runs registers a tree other than the structure the event log holds for the suite, a further `structure` for the suite precedes the first event that needs it, and each event is assigned to its own node (R-096, R-130)
+    Scenario: AC-131 What a suite run through `ConfigMapWrapperSuite` registers depends on its config map
       Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`, holding test `remote`, labelled `- remote`, when its config map holds key `db`, and test `local`, labelled `- local`, when it does not, each succeeding
       When `Framework` runs it with the runner argument and `-Ddb=on`
-      Then the event log's `structure` for `ConfigSpec` is:
+      Then the event log holds, in this order:
         """
         structure
           suite "ConfigSpec", class "samples.ConfigSpec"
             scope "A config", label "A config"
               test "local", label "- local"
+        suite "ConfigSpec": SuiteStarting
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+            scope "A config", label "A config"
+              test "remote", label "- remote"
+        test "remote": TestStarting
+        test "remote": TestSucceeded
+        suite "ConfigSpec": SuiteCompleted
         """
-      And it holds, in this order:
-        """
-        suite "ConfigSpec": TestStarting(testName: "remote")
-        suite "ConfigSpec": TestSucceeded(testName: "remote")
-        """
-      And no event is assigned to `local`
+      And it holds no other `structure`
+      And no event is assigned to `local`, and none but `SuiteStarting` and `SuiteCompleted` to suite `ConfigSpec`
 
   Rule: A `DistributedTestRunnerSuite`'s abort is assigned to the one test it ran (R-096, R-097)
     Scenario: AC-126 The suite running one test in parallel throws
@@ -288,7 +293,7 @@ Feature: A suite's class name
       Examples:
         | case                                                            | suite                                                                                                                                 | launch                              | name             | class                    | throwable                                                                                       |
         | a nested suite's `beforeAll` throws                             | suite `SetupFailsSuites`, class `samples.SetupFailsSuites`, a `Suites` with no tests nesting suite `SetupFailsSpec` of AC-097         | `Framework`                         | `SetupFailsSpec` | `samples.SetupFailsSpec` | `java.lang.RuntimeException "database unreachable"`                                             |
-        | its constructor throws                                          | suite class `samples.BrokenCtorSpec` of `runs-and-test-structure.md` AC-068                                                           | `Framework`                         | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.IllegalStateException "no config"`                                                   |
+        | its constructor throws                                          | suite class `samples.BrokenCtorSpec` of `runs-and-test-structure-nodes.md` AC-068                                                     | `Framework`                         | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.IllegalStateException "no config"`                                                   |
         | its constructor throws under discovery                          | suite class `samples.BrokenCtorSpec` of the row above, on the runpath                                                                 | `Runner.run`, with `-R` and no `-s` | `BrokenCtorSpec` | `samples.BrokenCtorSpec` | `java.lang.RuntimeException caused by java.lang.IllegalStateException "no config"`              |
         | a wrapped suite's `beforeAll` throws                            | suite `ConfigSpec` of AC-130, also mixing in `BeforeAndAfterAll`, whose `beforeAll` throws `RuntimeException("database unreachable")` | `Framework`                         | `ConfigSpec`     | `samples.ConfigSpec`     | `java.lang.RuntimeException "database unreachable"`                                             |
         | a wrapped suite's constructor throws given the run's config map | suite `ConfigSpec` of AC-130, whose constructor throws `IllegalStateException("no db")` where its config map holds key `db`           | `Framework`, with `-Ddb=on`         | `ConfigSpec`     | `samples.ConfigSpec`     | `java.lang.reflect.InvocationTargetException caused by java.lang.IllegalStateException "no db"` |

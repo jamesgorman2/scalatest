@@ -81,7 +81,7 @@ Feature: The consolidation library without Mill
 
   Rule: The library writes the same human-readable output without Mill as under the test command (R-113)
     Scenario: AC-063 One run, with and without Mill
-      Given the test command has run a module holding suite `CalculatorSuite` of `runs-and-test-structure.md` AC-035, with Mill's `--color false`
+      Given the test command has run a module holding suite `CalculatorSuite` of `runs-and-test-structure-runs.md` AC-035, with Mill's `--color false`
       When the suite runs through `Framework` outside Mill with the runner argument, and its test event log, decoded with core's codec, and the lines it wrote to stdout and stderr are fed to the consolidation library directly, with colour off
       Then the library's human-readable output is the test command's, with Mill's prefix removed from each line
 
