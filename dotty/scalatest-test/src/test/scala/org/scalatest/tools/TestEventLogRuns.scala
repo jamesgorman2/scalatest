@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Assertions
+import org.scalatest.Reporter
+import org.scalatest.events.Event
 import org.scalatest.events.BuiltEvent
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
@@ -37,6 +39,23 @@ private[tools] final class RecordingLogger extends Logger {
   def info(message: String): Unit = record(message)
   def debug(message: String): Unit = record(message)
   def trace(throwable: Throwable): Unit = record(String.valueOf(throwable))
+}
+
+/** The reporter a run is given with `-C` so that a test can read the events the run's reporters receive. */
+final class RunRecordingReporter extends Reporter {
+  def apply(event: Event): Unit = RunRecordingReporter.received.add(event)
+}
+
+object RunRecordingReporter {
+
+  private val received = new ConcurrentLinkedQueue[Event]
+
+  /** Returns the events the recording reporters of the runs `launch` starts receive. One caller records at a time. */
+  def eventsReportedIn(launch: => Unit): Vector[Event] = synchronized {
+    received.clear()
+    launch
+    received.asScala.toVector
+  }
 }
 
 /** Launches runs given the runner argument, and reads the event logs they write. */
@@ -99,18 +118,21 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     statuses.asScala.toVector
   }
 
-  /** Runs the suite to the run's end, and returns whether every test passed. */
-  protected def launched(launch: Launch, suiteClassName: String, arguments: Seq[String]): Boolean = {
+  /** Runs the suite to the run's end. */
+  protected def launched(launch: Launch, suiteClassName: String, arguments: Seq[String]): Unit = {
     launch match {
       case Launch.ByFramework =>
         val runner = frameworkRunner(arguments)
-        val statuses = execute(runner, suiteClassName, new RecordingLogger)
+        execute(runner, suiteClassName, new RecordingLogger)
         runner.done()
-        statuses.forall(_ == SbtStatus.Success)
       case Launch.ByRunner =>
         runnerRun(List("-R", testClassesRunpath, "-s", suiteClassName) ++ arguments)
     }
   }
+
+  /** Runs the suite to the run's end, and returns the events the run's reporters received. */
+  protected def eventsReportedWhenLaunched(launch: Launch, suiteClassName: String, arguments: Seq[String]): Vector[Event] =
+    RunRecordingReporter.eventsReportedIn(launched(launch, suiteClassName, arguments ++ List("-C", classOf[RunRecordingReporter].getName)))
 
   // Discovery reads every class of a runpath, so the suite is given a runpath that holds nothing else.
   protected def withRunpathOfOneSuite[A](folder: Path)(body: String => A): A = {

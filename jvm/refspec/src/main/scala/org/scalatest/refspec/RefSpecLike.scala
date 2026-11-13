@@ -50,7 +50,7 @@ trait RefSpecLike extends TestSuite with Informing with Notifying with Alerting 
   import engine._
 
   private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
-    ensureScopesAndTestsRegistered()
+    registeredForStructure(ensureScopesAndTestsRegistered())
     Some(engine.registeredNodes(true))
   }
   // Sychronized on thisSuite, only accessed from ensureScopesAndTestsRegistered
@@ -59,6 +59,7 @@ trait RefSpecLike extends TestSuite with Informing with Notifying with Alerting 
   private def ensureScopesAndTestsRegistered(): Unit = {
     
     thisSuite.synchronized {
+      throwFailureOfRegistrationForStructure()
       if (!scopesRegistered) {
         scopesRegistered = true
         def getMethod(o: AnyRef, methodName: String) = { 

@@ -53,7 +53,7 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
   import engine._
 
   private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
-    ensureTestResultsRegistered(thisSuite)
+    registeredForStructure(ensureTestResultsRegistered(thisSuite))
     Some(engine.registeredNodes(true))
   }
 

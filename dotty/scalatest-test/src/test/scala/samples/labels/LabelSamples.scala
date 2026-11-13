@@ -320,3 +320,103 @@ class RefSpecWithObject extends RefSpec {
     def `t u`: Unit = ()
   }
 }
+
+@DoNotDiscover
+class AnyWordSpecWithWhichAndThat extends AnyWordSpec {
+  def provides = afterWord("provides")
+  "s" should {
+    "u" which {
+      "t" in { succeed }
+    }
+    "v" that {
+      "t" in { succeed }
+    }
+    "w" which provides {
+      "t" in { succeed }
+    }
+    "x" that provides {
+      "t" in { succeed }
+    }
+  }
+}
+
+@DoNotDiscover
+class AsyncWordSpecWithWhichAndThat extends AsyncWordSpec {
+  def provides = afterWord("provides")
+  "s" should {
+    "u" which {
+      "t" in { succeed }
+    }
+    "v" that {
+      "t" in { succeed }
+    }
+    "w" which provides {
+      "t" in { succeed }
+    }
+    "x" that provides {
+      "t" in { succeed }
+    }
+  }
+}
+
+@DoNotDiscover
+class FixtureAnyWordSpecWithWhichAndThat extends FixtureAnyWordSpec with StringFixture {
+  def provides = afterWord("provides")
+  "s" should {
+    "u" which {
+      "t" in { _ => succeed }
+    }
+    "v" that {
+      "t" in { _ => succeed }
+    }
+    "w" which provides {
+      "t" in { _ => succeed }
+    }
+    "x" that provides {
+      "t" in { _ => succeed }
+    }
+  }
+}
+
+@DoNotDiscover
+class FixtureAsyncWordSpecWithWhichAndThat extends FixtureAsyncWordSpec with AsyncStringFixture {
+  def provides = afterWord("provides")
+  "s" should {
+    "u" which {
+      "t" in { _ => succeed }
+    }
+    "v" that {
+      "t" in { _ => succeed }
+    }
+    "w" which provides {
+      "t" in { _ => succeed }
+    }
+    "x" that provides {
+      "t" in { _ => succeed }
+    }
+  }
+}
+
+@DoNotDiscover
+class AnyFlatSpecWithRegisterTest extends AnyFlatSpec {
+  registerTest("can open a file") { succeed }
+  registerIgnoredTest("should close it") { succeed }
+}
+
+@DoNotDiscover
+class AsyncFlatSpecWithRegisterTest extends AsyncFlatSpec {
+  registerAsyncTest("can open a file") { succeed }
+  registerIgnoredAsyncTest("should close it") { succeed }
+}
+
+@DoNotDiscover
+class FixtureAnyFlatSpecWithRegisterTest extends FixtureAnyFlatSpec with StringFixture {
+  registerTest("can open a file") { _ => succeed }
+  registerIgnoredTest("should close it") { _ => succeed }
+}
+
+@DoNotDiscover
+class FixtureAsyncFlatSpecWithRegisterTest extends FixtureAsyncFlatSpec with AsyncStringFixture {
+  registerAsyncTest("can open a file") { _ => succeed }
+  registerIgnoredAsyncTest("should close it") { _ => succeed }
+}

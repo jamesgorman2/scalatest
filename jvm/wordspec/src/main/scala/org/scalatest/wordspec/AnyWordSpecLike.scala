@@ -205,6 +205,10 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
         )
     }
 
+  // Registers a scope whose description holds more words than the name the suite's source gives it.
+  private def registerBranchNamed(nameInSource: String, description: String, childPrefix: Option[String], verb: String, methodName:String, stackDepth: Int, adjustment: Int, pos: source.Position, fun: () => Unit): Unit =
+    registerBranch(description, childPrefix, verb, methodName, stackDepth, adjustment, pos, () => { engine.nameCurrentScope(nameInSource); fun() })
+
   private def registerBranch(description: String, childPrefix: Option[String], verb: String, methodName:String, stackDepth: Int, adjustment: Int, pos: source.Position, fun: () => Unit): Unit = {
 
     def registrationClosedMessageFun: String =
@@ -555,11 +559,11 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
       val stackDepth = 4
       // SKIP-SCALATESTJS,NATIVE-END
       //SCALATESTJS,NATIVE-ONLY val stackDepth = 6
-      registerBranch(string.trim + " that", None, "that", "that", stackDepth, -2, pos, () => f)
+      registerBranchNamed(string.trim, string.trim + " that", None, "that", "that", stackDepth, -2, pos, () => f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def that(f: => Unit): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " that", None, "that", "that", 4, -2, pos, () => f)}) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " that", None, "that", "that", 4, -2, pos, () => f)}) } 
     //DOTTY-ONLY }
 
     /**
@@ -584,11 +588,11 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
       val stackDepth = 4
       // SKIP-SCALATESTJS,NATIVE-END
       //SCALATESTJS,NATIVE-ONLY val stackDepth = 6
-      registerBranch(string.trim + " which", None, "which", "which", stackDepth, -2, pos, () => f)
+      registerBranchNamed(string.trim, string.trim + " which", None, "which", "which", stackDepth, -2, pos, () => f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def which(f: => Unit): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " which", None, "which", "which", 4, -2, pos, () => f)}) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " which", None, "which", "which", 4, -2, pos, () => f)}) } 
     //DOTTY-ONLY }
 
     /**
@@ -611,11 +615,11 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
      */
     // SKIP-DOTTY-START
     def that(resultOfAfterWordApplication: ResultOfAfterWordApplication)(implicit pos: source.Position): Unit = {
-      registerBranch(string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", "that", 4, -2, pos, resultOfAfterWordApplication.f)
+      registerBranchNamed(string.trim, string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", "that", 4, -2, pos, resultOfAfterWordApplication.f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def that(resultOfAfterWordApplication: ResultOfAfterWordApplication): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", "that", 4, -2, pos, resultOfAfterWordApplication.f)}) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", "that", 4, -2, pos, resultOfAfterWordApplication.f)}) } 
     //DOTTY-ONLY }
     
     /**
@@ -638,11 +642,11 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
      */
     // SKIP-DOTTY-START 
     def which(resultOfAfterWordApplication: ResultOfAfterWordApplication)(implicit pos: source.Position): Unit = {
-      registerBranch(string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", "which", 4, -2, pos, resultOfAfterWordApplication.f)
+      registerBranchNamed(string.trim, string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", "which", 4, -2, pos, resultOfAfterWordApplication.f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def which(resultOfAfterWordApplication: ResultOfAfterWordApplication): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", "which", 4, -2, pos, resultOfAfterWordApplication.f)}) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", "which", 4, -2, pos, resultOfAfterWordApplication.f)}) } 
     //DOTTY-ONLY }
   }
 

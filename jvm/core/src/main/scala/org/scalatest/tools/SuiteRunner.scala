@@ -27,20 +27,19 @@ import scala.util.{Success, Failure}
 
 private[scalatest] class SuiteRunner(
   suite: Suite,
-  args: Args,
+  suiteArgs: Args,
   status: ScalaTestStatefulStatus,
-  handOffToTestEventLog: Event => Unit
+  handOffToTestEventLog: Event => Unit,
+  reporterOfSuite: (Suite, Filter, Reporter) => Reporter
 ) extends Runnable {
+
+  def this(suite: Suite, args: Args, status: ScalaTestStatefulStatus, handOffToTestEventLog: Event => Unit) =
+    this(suite, args, status, handOffToTestEventLog, TestEventLogHandOff.noStructureWrapper)
 
   def this(suite: Suite, args: Args, status: ScalaTestStatefulStatus) =
     this(suite, args, status, TestEventLogHandOff.none)
 
-  import args.stopper
-
-  private def send(event: Event): Unit = {
-    handOffToTestEventLog(event)
-    args.reporter(event)
-  }
+  import suiteArgs.stopper
 
   def run(): Unit = {
 
@@ -48,9 +47,17 @@ private[scalatest] class SuiteRunner(
       val rawString = Resources.suiteExecutionStarting
       val formatter = formatterForSuiteStarting(suite)
       val suiteClassName = getSuiteClassName(suite)
-      val tracker = args.tracker
+      val tracker = suiteArgs.tracker
 
       val suiteStartTime = System.currentTimeMillis
+
+      // Asked for only once the suite is to start: a suite a stop keeps from starting gets no reporter of its own.
+      val reporter = reporterOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
+      val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)
+      def send(event: Event): Unit = {
+        handOffToTestEventLog(event)
+        reporter(event)
+      }
 
       if (!suite.isInstanceOf[DistributedTestRunnerSuite])
         send(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner))

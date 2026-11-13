@@ -1227,7 +1227,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
           }
         case Some(distribute) =>
           for (nestedSuite <- nestedSuitesArray) 
-            statusBuffer += distribute(nestedSuite, args.copy(reporter = reporterOfNestedSuite(nestedSuite, filter, reporter), tracker = tracker.nextTracker()))
+            statusBuffer += distributeNestedSuite(distribute, nestedSuite, args.copy(tracker = tracker.nextTracker()))
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)
@@ -1314,11 +1314,18 @@ trait Suite extends Assertions with Serializable { thisSuite =>
   private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
 
   /**
-   * The reporter a nested suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` are sent to, and that it is
-   * run with, given the one this suite would give it. A suite whose nested suites are top-level suites of a run
+   * The reporter a nested suite this suite runs itself has its `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`
+   * sent to, and is run with, given the one this suite would give it. A suite whose nested suites are top-level suites of a run
    * that writes a test event log overrides this.
    */
   private[scalatest] def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter = reporter
+
+  /**
+   * Hands a nested suite to the distributor that runs it. A suite whose nested suites are top-level suites of a run
+   * that writes a test event log overrides this.
+   */
+  private[scalatest] def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status =
+    distribute(nestedSuite, args)
   
   /**
    * The fully qualified class name of the rerunner to rerun this suite.  This implementation will look at this.getClass and see if it is

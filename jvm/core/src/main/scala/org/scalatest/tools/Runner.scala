@@ -1166,8 +1166,8 @@ object Runner {
       if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
 
     // A DiscoverySuite is no top-level suite: the suites it nests are, and it gives each its reporter.
-    def reporterOf(suite: Suite, filter: Filter, reporter: Reporter): Reporter =
-      if (suite.isInstanceOf[DiscoverySuite]) reporter else reporterOfTopLevelSuite(suite, filter, reporter)
+    def reporterOfTopLevelSuiteFor(suite: Suite): (Suite, Filter, Reporter) => Reporter =
+      if (suite.isInstanceOf[DiscoverySuite]) TestEventLogHandOff.noStructureWrapper else reporterOfTopLevelSuite
 
     //
     // Generates SuiteConfigs for Suites found via discovery.
@@ -1371,8 +1371,8 @@ object Runner {
                   val statuses = for (suiteConfig <- suiteInstances) yield {
                     val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                     val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
-                    val runArgs = Args(reporterOf(suiteConfig.suite, filter, concurrentDispatch), stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
-                    distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite))
+                    val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
+                    distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite), reporterOfTopLevelSuiteFor(suiteConfig.suite))
                   }
                   distributor.waitUntilDone()
                   (new CompositeStatus(statuses.toSet)).waitUntilCompleted()
@@ -1382,8 +1382,8 @@ object Runner {
                 val statuses = for (suiteConfig <- suiteInstances) yield {
                   val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                   val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
-                  val runArgs = Args(reporterOf(suiteConfig.suite, filter, concurrentDispatch), stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
-                  distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite))
+                  val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
+                  distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite), reporterOfTopLevelSuiteFor(suiteConfig.suite))
                 }
                 distributor.waitUntilDone()
                 (new CompositeStatus(statuses.toSet)).waitUntilCompleted()
@@ -1397,9 +1397,9 @@ object Runner {
             for (suiteConfig <- suiteInstances) {
               val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
               val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
-              val runArgs = Args(reporterOf(suiteConfig.suite, filter, dispatch), stopper, filter, configMap, None, tracker, chosenStyleSet, false, None, None)
+              val runArgs = Args(dispatch, stopper, filter, configMap, None, tracker, chosenStyleSet, false, None, None)
               val status = new ScalaTestStatefulStatus()
-              val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status, testEventLogHandOffFor(suiteConfig.suite))
+              val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status, testEventLogHandOffFor(suiteConfig.suite), reporterOfTopLevelSuiteFor(suiteConfig.suite))
               suiteRunner.run()
               status.waitUntilCompleted()
             }

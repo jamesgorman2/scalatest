@@ -44,6 +44,8 @@ import scala.util.Try
 private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleModMessageFun: => String, simpleClassName: String) {
 
   sealed abstract class Node(val parentOption: Option[Branch]) {
+    // The name the suite's source gives this scope or test, where its style registers it with more words than that.
+    @volatile var nameInSource: Option[String] = None
     def indentationLevel: Int = {
       def calcLevel(currentParentOpt: Option[Branch], currentLevel: Int): Int = 
         currentParentOpt match {
@@ -494,19 +496,27 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       case _ => testText
     }
 
+  /** Names the scope being registered as the suite's source names it. Called from the scope's own registration function. */
+  def nameCurrentScope(nameInSource: String): Unit = atomic.get.currentBranch.nameInSource = Some(nameInSource)
+
+  /** Names the test registered last as the suite's source names it. Called as that test's registration returns. */
+  def nameLastRegisteredTest(nameInSource: String): Unit =
+    atomic.get.currentBranch.subNodes.headOption.foreach(test => test.nameInSource = Some(nameInSource))
+
   /**
    * Returns the scopes and tests registered so far, in the order registered, each labelled as `runTestsInBranch` and
-   * `runTestImpl` label its events. `includeIcon` is the one the style's `runTest` passes `runTestImpl`. The two
-   * functions give a scope's and a test's name from the text it is registered with.
+   * `runTestImpl` label its events. `includeIcon` is the one the style's `runTest` passes `runTestImpl`. A scope or
+   * test takes the name its registration gave it from the suite's source. For any other, the two functions give the
+   * name from the text it is registered with.
    */
   def registeredNodes(includeIcon: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
     // Recurses once for each scope nested in another, as registering and running them do.
     def nodesIn(branch: Branch): List[RegisteredNode] =
       branch.subNodes.reverse.collect {
-        case TestLeaf(_, testName, testText, _, _, _, _) =>
-          RegisteredNode.test(nameOfTest(testText), testName, prependChildPrefix(branch, testText), includeIcon)
+        case test @ TestLeaf(_, testName, testText, _, _, _, _) =>
+          RegisteredNode.test(test.nameInSource.getOrElse(nameOfTest(testText)), testName, prependChildPrefix(branch, testText), includeIcon)
         case scope @ DescriptionBranch(_, descriptionText, _, _) =>
-          RegisteredScope(nameOfScope(descriptionText), RegisteredNode.scopeLabel(prependChildPrefix(branch, descriptionText)), nodesIn(scope))
+          RegisteredScope(scope.nameInSource.getOrElse(nameOfScope(descriptionText)), RegisteredNode.scopeLabel(prependChildPrefix(branch, descriptionText)), nodesIn(scope))
       }
     nodesIn(Trunk)
   }

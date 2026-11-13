@@ -54,7 +54,7 @@ trait AnyFlatSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
   import engine._
 
   private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
-    Some(engine.registeredNodes(true, (text: String) => text, org.scalatest.RegisteredNode.flatSpecTestName))
+    Some(engine.registeredNodes(true))
 
   /**
    * Returns an <code>Informer</code> that during test execution will forward strings passed to its
@@ -164,6 +164,7 @@ trait AnyFlatSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerTest(specText, Transformer(testFun), testRegistrationClosedMessageFun, "AnyFlatSpecLike.scala", methodName, stackDepth, stackDepthAdjustment, None, None, Some(pos), None, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**
@@ -1792,6 +1793,7 @@ import resultOfStringPassedToVerb.verb
     //SCALATESTJS,NATIVE-ONLY val stackDepth = 6
     //SCALATESTJS,NATIVE-ONLY val stackDepthAdjustment = -6
     engine.registerIgnoredTest(specText, Transformer(testFun), Resources.ignoreCannotAppearInsideAnInOrAnIs, "AnyFlatSpecLike.scala", methodName, stackDepth, stackDepthAdjustment, None, Some(pos), testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**

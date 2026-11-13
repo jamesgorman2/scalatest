@@ -1,8 +1,16 @@
 package org.scalatest.tools
 
 import org.scalatest.GivenWhenThen
+import org.scalatest.events.Event
 import org.scalatest.events.EventLogComparison
+import org.scalatest.events.RunAborted
+import org.scalatest.events.RunCompleted
+import org.scalatest.events.SuiteAborted
+import org.scalatest.events.SuiteCompleted
+import org.scalatest.events.SuiteStarting
 import org.scalatest.events.TestEventLogDecoder
+import org.scalatest.events.TestFailed
+import org.scalatest.events.TestSucceeded
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -63,6 +71,92 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       Then(s"it yields a structure that holds $holds")
       EventLogComparison.mismatchWhenIs(event.toSeq, built(structure.inNotation)) shouldBe None
     }
+  }
+
+  private def thrownBy(throwable: Option[Throwable]): String = throwable.fold("nothing")(thrown => s"${thrown.getClass.getName}: ${thrown.getMessage}")
+
+  /** How each suite and test of a run ended, and how the run did, as its reporters were told, in the order they were told. */
+  private def reported(events: Vector[Event]): Vector[String] = {
+    events.collect {
+      case starting: SuiteStarting => s"SuiteStarting ${starting.suiteName}"
+      case completed: SuiteCompleted => s"SuiteCompleted ${completed.suiteName}"
+      case aborted: SuiteAborted => s"SuiteAborted ${aborted.suiteName}, thrown ${thrownBy(aborted.throwable)}"
+      case succeeded: TestSucceeded => s"TestSucceeded ${succeeded.testName}"
+      case failed: TestFailed => s"TestFailed ${failed.testName}"
+      case _: RunCompleted => "RunCompleted"
+      case aborted: RunAborted => s"RunAborted, thrown ${thrownBy(aborted.throwable)}"
+    }
+  }
+
+  private final case class RegistrationThatThrows(
+    suite: String,
+    suiteClassName: String,
+    launch: Launch,
+    reports: Vector[String],
+    eventLogIs: String
+  )
+
+  private val refSpecScopeThrew =
+    "org.scalatest.exceptions.NotAllowedException: java.lang.RuntimeException was thrown inside object `a scope`, construction cannot continue."
+  private val pathScopeThrew =
+    "org.scalatest.exceptions.NotAllowedException: " +
+      "java.lang.RuntimeException was thrown inside describe(\"b\"), construction cannot continue: \"boom\""
+  private val refSpec = "a RefSpec whose scope object throws as it is registered"
+  private val pathFunSpec = "a PathAnyFunSpec whose second scope throws as it is registered"
+
+  // Framework asks a top-level suite for its tests as it builds the suite's SuiteStarting, outside the catch that reports SuiteAborted.
+  private val registrationsThatThrowFromFrameworkTasks = List(
+    (refSpec, "samples.ThrowingScopeRefSpec", refSpecScopeThrew),
+    (pathFunSpec, "samples.ThrowingSecondScopePathFunSpec", pathScopeThrew)
+  )
+
+  private val registrationsThatThrow = List(
+    RegistrationThatThrows(
+      refSpec,
+      "samples.ThrowingScopeRefSpec",
+      Launch.ByRunner,
+      Vector(s"RunAborted, thrown $refSpecScopeThrew"),
+      "run started\nrun: RunAborted\nrun ended aborted"
+    ),
+    RegistrationThatThrows(
+      pathFunSpec,
+      "samples.ThrowingSecondScopePathFunSpec",
+      Launch.ByRunner,
+      Vector(s"RunAborted, thrown $pathScopeThrew"),
+      "run started\nrun: RunAborted\nrun ended aborted"
+    )
+  ) ++ Launch.values.toList.flatMap { launch =>
+    List(
+      RegistrationThatThrows(
+        s"a suite nesting $refSpec, and counting none of its tests",
+        "samples.NestsThrowingScopeRefSpec",
+        launch,
+        Vector(
+          "SuiteStarting NestsThrowingScopeRefSpec",
+          s"SuiteAborted NestsThrowingScopeRefSpec, thrown $refSpecScopeThrew",
+          "RunCompleted"
+        ),
+        "run started\nrun: RunStarting"
+      ),
+      RegistrationThatThrows(
+        s"a suite nesting $pathFunSpec, and counting none of its tests",
+        "samples.NestsThrowingSecondScopePathFunSpec",
+        launch,
+        Vector(
+          "SuiteStarting NestsThrowingSecondScopePathFunSpec",
+          s"SuiteAborted NestsThrowingSecondScopePathFunSpec, thrown $pathScopeThrew",
+          "RunCompleted"
+        ),
+        "run started\nrun: RunStarting"
+      )
+    )
+  }
+
+  // Returns what the suite's task throws, and ends the run so that its event log is closed.
+  private def thrownByFrameworkTask(suiteClassName: String, arguments: Seq[String]): String = {
+    val runner = frameworkRunner(arguments)
+    try thrownBy(scala.util.Try(execute(runner, suiteClassName, new RecordingLogger)).failed.toOption)
+    finally runner.done()
   }
 
   private def scopeHoldingTests(scopeLabel: String, testLabels: String*): List[String] =
@@ -138,6 +232,44 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       scopeHoldingTests("s", "- can t")
     ),
     LabelledDeclaration(
+      List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
+      """"s" should { "u" which { "t" in }; "v" that { "t" in }; "w" which provides { "t" in }; "x" that provides { "t" in } }, provides being afterWord("provides")""",
+      "WithWhichAndThat",
+      "scope s, labelled 's', holding scopes u, v, w and x, labelled 'should u which', 'should v that', " +
+        "'should w which provides' and 'should x that provides', each holding test t, labelled '- t'",
+      """scope "s", label "s"
+        |  scope "u", label "should u which"
+        |    test "t", label "- t"
+        |  scope "v", label "should v that"
+        |    test "t", label "- t"
+        |  scope "w", label "should w which provides"
+        |    test "t", label "- t"
+        |  scope "x", label "should x that provides"
+        |    test "t", label "- t"""".stripMargin,
+      List(
+        TestEventLogLine.scope(2, 1, 0, "s", "s"),
+        TestEventLogLine.scope(3, 2, 0, "u", "should u which"),
+        TestEventLogLine.test(4, 3, 0, "t", "- t"),
+        TestEventLogLine.scope(5, 2, 1, "v", "should v that"),
+        TestEventLogLine.test(6, 5, 0, "t", "- t"),
+        TestEventLogLine.scope(7, 2, 2, "w", "should w which provides"),
+        TestEventLogLine.test(8, 7, 0, "t", "- t"),
+        TestEventLogLine.scope(9, 2, 3, "x", "should x that provides"),
+        TestEventLogLine.test(10, 9, 0, "t", "- t")
+      )
+    ),
+    LabelledDeclaration(
+      List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
+      """registerTest("can open a file"); registerIgnoredTest("should close it"), or the async style's registerAsyncTest and registerIgnoredAsyncTest""",
+      "WithRegisterTest",
+      "test 'can open a file', labelled '- can open a file', and test 'should close it', labelled '- should close it'",
+      "test \"can open a file\", label \"- can open a file\"\ntest \"should close it\", label \"- should close it\"",
+      List(
+        TestEventLogLine.test(2, 1, 0, "can open a file", "- can open a file"),
+        TestEventLogLine.test(3, 1, 1, "should close it", "- should close it")
+      )
+    ),
+    LabelledDeclaration(
       List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
       """"s" should "t" in; it must "u" in""",
       "WithSubject",
@@ -195,10 +327,16 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         Given("a suite whose one test passes only where the event log held the suite's structure when the suite started to run")
         TemporaryEventLog.in { eventLogFile =>
           When(s"${launch.named} runs it with the runner argument")
-          val allTestsPassed = launched(launch, "samples.ReadsItsStructureSuite", List(s"-DeventLog=$eventLogFile") ++ runnerArgument(eventLogFile))
+          val events =
+            eventsReportedWhenLaunched(launch, "samples.ReadsItsStructureSuite", List(s"-DeventLog=$eventLogFile") ++ runnerArgument(eventLogFile))
 
-          Then("its test passes")
-          allTestsPassed shouldBe true
+          Then("the run's reporters are told that the suite started, that its test succeeded and that it completed")
+          reported(events) shouldBe Vector(
+            "SuiteStarting ReadsItsStructureSuite",
+            "TestSucceeded reads its structure",
+            "SuiteCompleted ReadsItsStructureSuite",
+            "RunCompleted"
+          )
 
           And("the event log holds the suite's structure")
           EventLogComparison.mismatchWhenHoldsInOrder(
@@ -245,6 +383,56 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
               )
             ) shouldBe None
           }
+        }
+      }
+    }
+
+    registrationsThatThrowFromFrameworkTasks.foreach { (suite, suiteClassName, thrown) =>
+      Scenario(s"Framework runs $suite") {
+        thisProcess
+        Given(suite)
+        When("Framework runs it without the runner argument")
+        val thrownWithoutTheArgument = thrownByFrameworkTask(suiteClassName, Nil)
+
+        Then("the suite's task throws what the registration threw, as in ScalaTest 3.2.20")
+        thrownWithoutTheArgument shouldBe thrown
+
+        TemporaryEventLog.in { eventLogFile =>
+          When("Framework runs it with the runner argument")
+          val thrownWithTheArgument = thrownByFrameworkTask(suiteClassName, runnerArgument(eventLogFile))
+
+          Then("the suite's task throws the same")
+          thrownWithTheArgument shouldBe thrown
+
+          And("the event log holds no structure")
+          EventLogComparison.mismatchWhenIs(
+            eventLogOf(eventLogFile),
+            built("run started\nrun: RunStarting\nrun: RunCompleted\nrun ended completed")
+          ) shouldBe None
+        }
+      }
+    }
+
+    registrationsThatThrow.foreach { registration =>
+      Scenario(s"${registration.launch.named} runs ${registration.suite}") {
+        thisProcess
+        Given(registration.suite)
+        When(s"${registration.launch.named} runs it without the runner argument")
+        val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(registration.launch, registration.suiteClassName, Nil))
+
+        Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
+        reportedWithoutTheArgument shouldBe registration.reports
+
+        TemporaryEventLog.in { eventLogFile =>
+          When(s"${registration.launch.named} runs it with the runner argument")
+          val reportedWithTheArgument =
+            reported(eventsReportedWhenLaunched(registration.launch, registration.suiteClassName, runnerArgument(eventLogFile)))
+
+          Then("the run's reporters are told the same")
+          reportedWithTheArgument shouldBe registration.reports
+
+          And("the event log holds no structure of the suite")
+          EventLogComparison.mismatchWhenIs(eventLogOf(eventLogFile), built(registration.eventLogIs)) shouldBe None
         }
       }
     }

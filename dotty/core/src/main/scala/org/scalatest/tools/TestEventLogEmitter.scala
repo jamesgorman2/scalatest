@@ -65,7 +65,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       case Right(structure) => new StructureWrapper(reporter, topLevelSuite(structure), suiteEvent)
       case Left(thrown) =>
         endWithoutRunEnded()
-        TestEventLogEmitter.keepFromCaller(thrown)
+        TestEventLogEmitter.rethrowIfUncontained(thrown)
         reporter
     }
   }
@@ -109,7 +109,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         encoded.left.toOption
       }
     }
-    thrown.foreach(TestEventLogEmitter.keepFromCaller)
+    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
   private def write(line: String): Unit = eventLog.write(line.getBytes(StandardCharsets.UTF_8))
@@ -146,7 +146,7 @@ private[scalatest] object TestEventLogEmitter {
   }
 
   /** Runs a hand-off, keeping what it throws from the caller as `runEvent` keeps what encoding or writing throws. */
-  def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(keepFromCaller)
+  def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(rethrowIfUncontained)
 
   /**
    * Returns an emitter whose file holds the run's `runStarted` event.
@@ -176,7 +176,7 @@ private[scalatest] object TestEventLogEmitter {
   private def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }
 
-  private def keepFromCaller(thrown: Throwable): Unit = {
+  private def rethrowIfUncontained(thrown: Throwable): Unit = {
     thrown match {
       case _: InterruptedException => Thread.currentThread().interrupt()
       case uncontained if !isContained(uncontained) => throw uncontained

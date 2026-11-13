@@ -52,7 +52,7 @@ trait FixtureAnyFlatSpecLike extends org.scalatest.FixtureTestSuite with org.sca
   import engine._
 
   private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
-    Some(engine.registeredNodes(true, (text: String) => text, org.scalatest.RegisteredNode.flatSpecTestName))
+    Some(engine.registeredNodes(true))
 
   private[scalatest] val sourceFileName = "FixtureAnyFlatSpecLike.scala"
 
@@ -167,6 +167,7 @@ trait FixtureAnyFlatSpecLike extends org.scalatest.FixtureTestSuite with org.sca
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerTest(specText, Transformer(testFun), testRegistrationClosedMessageFun, sourceFileName, methodName, stackDepth, stackDepthAdjustment, None, None, Some(pos), None, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   private def registerPendingTestToRun(specText: String, testTags: List[Tag], methodName: String, testFun: FixtureParam => PendingStatement, pos: source.Position): Unit = {
@@ -177,6 +178,7 @@ trait FixtureAnyFlatSpecLike extends org.scalatest.FixtureTestSuite with org.sca
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerTest(specText, Transformer(testFun), testRegistrationClosedMessageFun, sourceFileName, methodName, 4, -3, None, None, Some(pos), None, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**
@@ -2361,10 +2363,12 @@ trait FixtureAnyFlatSpecLike extends org.scalatest.FixtureTestSuite with org.sca
     //SCALATESTJS,NATIVE-ONLY val stackDepth = 6
     //SCALATESTJS,NATIVE-ONLY val stackDepthAdjustment = -7
     engine.registerIgnoredTest(specText, Transformer(testFun), Resources.ignoreCannotAppearInsideAnInOrAnIs, sourceFileName, methodName, stackDepth, stackDepthAdjustment, None, Some(pos), testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   private def registerPendingTestToIgnore(specText: String, testTags: List[Tag], methodName: String, testFun: FixtureParam => PendingStatement, pos: source.Position): Unit = {
     engine.registerIgnoredTest(specText, Transformer(testFun), Resources.ignoreCannotAppearInsideAnInOrAnIs, sourceFileName, methodName, 4, -4, None, Some(pos), testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**

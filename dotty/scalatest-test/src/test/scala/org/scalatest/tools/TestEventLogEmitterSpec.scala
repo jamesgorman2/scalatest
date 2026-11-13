@@ -127,6 +127,32 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
     !thread.isAlive
   }
 
+  /**
+   * Has each of several threads hand an emitter its events from a common start, and returns the events the event
+   * log then holds. Each must have been written as one whole line, in one write that overlaps no other.
+   */
+  private def wholeLinesWrittenByThreadsAtOnce(threadCount: Int)(handOffOfThread: (TestEventLogEmitter, Int) => Unit): Vector[TestEventLogEvent] = {
+    val eventLog = new RecordingEventLog
+    val emitter = TestEventLogEmitter.appendingTo(eventLog)
+    val start = new CountDownLatch(1)
+    val threads = (1 to threadCount).map { thread =>
+      new Thread(() => {
+        start.await(waitLimitSeconds, TimeUnit.SECONDS)
+        handOffOfThread(emitter, thread)
+      })
+    }
+    threads.foreach(_.start())
+    start.countDown()
+    threads.map(joined) shouldBe Vector.fill(threadCount)(true)
+
+    val writes = eventLog.writes
+    eventLog.hadOverlappingWrites shouldBe false
+    writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
+    val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
+    decoded.filter(_.isLeft) shouldBe Vector.empty
+    decoded.collect { case Right(event) => event }
+  }
+
   private final class RecordingReporter extends Reporter {
     private var received = Vector.empty[Event]
     def events: Vector[Event] = received
@@ -371,28 +397,13 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
       "write each as one whole line, in one write that overlaps no other, and keep each thread's events in the order it handed them off" in {
         val threadCount = 4
         val eventsOfEachThread = 25
-        val eventLog = new RecordingEventLog
-        val emitter = TestEventLogEmitter.appendingTo(eventLog)
-        val start = new CountDownLatch(1)
-        val threads = (1 to threadCount).map { thread =>
-          new Thread(() => {
-            start.await(waitLimitSeconds, TimeUnit.SECONDS)
-            (1 to eventsOfEachThread).foreach(event => emitter.runEvent(alert(s"alert $event", s"thread $thread")))
-          })
+        val decoded = wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, thread) =>
+          (1 to eventsOfEachThread).foreach(event => emitter.runEvent(alert(s"alert $event", s"thread $thread")))
         }
-        threads.foreach(_.start())
-        start.countDown()
-        threads.map(joined) shouldBe Vector.fill(threadCount)(true)
-
-        val writes = eventLog.writes
-        eventLog.hadOverlappingWrites shouldBe false
-        writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
-        val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
         val messagesByThread =
-          decoded.collect { case Right(TestEventLogEvent.ScalaTestEvent(None, alert: org.scalatest.events.DecodedEvent.AlertProvided)) =>
+          decoded.collect { case TestEventLogEvent.ScalaTestEvent(None, alert: org.scalatest.events.DecodedEvent.AlertProvided) =>
             alert.threadName -> alert.message
           }.groupMap((threadName, _) => threadName)((_, message) => message)
-        decoded.filter(_.isLeft) shouldBe Vector.empty
         messagesByThread shouldBe
           (1 to threadCount).map(thread => s"thread $thread" -> (1 to eventsOfEachThread).map(event => s"alert $event").toVector).toMap
       }
@@ -521,27 +532,12 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
       "write each as one whole line, and give every node of the run its own ID" in {
         val threadCount = 4
         val suitesOfEachThread = 25
-        val eventLog = new RecordingEventLog
-        val emitter = TestEventLogEmitter.appendingTo(eventLog)
-        val start = new CountDownLatch(1)
-        val threads = (1 to threadCount).map { thread =>
-          new Thread(() => {
-            start.await(waitLimitSeconds, TimeUnit.SECONDS)
-            (1 to suitesOfEachThread).foreach { suite =>
-              emitter.topLevelSuite(structureOf(new Suite {}, s"Suite${suite}OfThread$thread", List(test("a"), test("b"))))
-            }
-          })
+        val decoded = wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, thread) =>
+          (1 to suitesOfEachThread).foreach { suite =>
+            emitter.topLevelSuite(structureOf(new Suite {}, s"Suite${suite}OfThread$thread", List(test("a"), test("b"))))
+          }
         }
-        threads.foreach(_.start())
-        start.countDown()
-        threads.map(joined) shouldBe Vector.fill(threadCount)(true)
-
-        val writes = eventLog.writes
-        eventLog.hadOverlappingWrites shouldBe false
-        writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
-        val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
-        decoded.filter(_.isLeft) shouldBe Vector.empty
-        val nodeIds = decoded.collect { case Right(TestEventLogEvent.Structure(nodes)) =>
+        val nodeIds = decoded.collect { case TestEventLogEvent.Structure(nodes) =>
           nodes.map {
             case suite: org.scalatest.events.StructureNode.Suite => suite.id
             case scope: org.scalatest.events.StructureNode.Scope => scope.id

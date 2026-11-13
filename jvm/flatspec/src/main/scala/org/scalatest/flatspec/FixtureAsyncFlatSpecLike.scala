@@ -54,7 +54,7 @@ trait FixtureAsyncFlatSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
   import engine._
 
   private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
-    Some(engine.registeredNodes(true, (text: String) => text, org.scalatest.RegisteredNode.flatSpecTestName))
+    Some(engine.registeredNodes(true))
 
   /**
    * Returns an <code>Informer</code> that during test execution will forward strings passed to its
@@ -152,6 +152,7 @@ trait FixtureAsyncFlatSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerAsyncTest(specText, transformToOutcome(testFun), testRegistrationClosedMessageFun, None, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   private def registerPendingTestToRun(specText: String, testTags: List[Tag], methodName: String, testFun: FixtureParam => PendingStatement, pos: source.Position): Unit = {
@@ -162,6 +163,7 @@ trait FixtureAsyncFlatSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerAsyncTest(specText, AsyncPendingTransformer(testFun), testRegistrationClosedMessageFun, None, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**
@@ -2332,10 +2334,12 @@ trait FixtureAsyncFlatSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
    */
   private def registerAsyncTestToIgnore(specText: String, testTags: List[Tag], testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = {
     engine.registerIgnoredAsyncTest(specText, transformToOutcome(testFun), Resources.ignoreCannotAppearInsideAnInOrAnIs, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   private def registerPendingTestToIgnore(specText: String, testTags: List[Tag], testFun: FixtureParam => PendingStatement, pos: source.Position): Unit = {
     engine.registerIgnoredAsyncTest(specText, AsyncPendingTransformer(testFun), Resources.ignoreCannotAppearInsideAnInOrAnIs, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**

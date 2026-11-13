@@ -30,7 +30,7 @@ private[scalatest] object RegisteredNode {
 
   private val flatSpecVerbs = List("should ", "must ", "can ")
 
-  /** The name of a FlatSpec test: its text without the verb its registration puts before it. */
+  /** The name of a FlatSpec test registered through a verb: its text without the verb that registration puts before it. */
   def flatSpecTestName(testText: String): String =
     flatSpecVerbs.find(verb => testText.startsWith(verb)).fold(testText)(verb => testText.substring(verb.length))
 

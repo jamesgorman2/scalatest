@@ -37,10 +37,14 @@ private[scalatest] class ConcurrentDistributor(args: Args, execSvc: ExecutorServ
  
   def apply(suite: Suite, args: Args): Status = apply(suite, args, TestEventLogHandOff.none)
 
-  def apply(suite: Suite, args: Args, handOffToTestEventLog: Event => Unit): Status = {
+  def apply(suite: Suite, args: Args, handOffToTestEventLog: Event => Unit): Status =
+    apply(suite, args, handOffToTestEventLog, TestEventLogHandOff.noStructureWrapper)
+
+  /** Runs the suite with the reporter `reporterOfSuite` gives it, asked for as the suite starts. */
+  def apply(suite: Suite, args: Args, handOffToTestEventLog: Event => Unit, reporterOfSuite: (Suite, Filter, Reporter) => Reporter): Status = {
     requireNonNull(suite, args)
     val status = new ScalaTestStatefulStatus
-    val suiteRunner = new SuiteRunner(suite, args, status, handOffToTestEventLog)
+    val suiteRunner = new SuiteRunner(suite, args, status, handOffToTestEventLog, reporterOfSuite)
     val future: Future[_] = execSvc.submit(suiteRunner)
     futureQueue.put(future)
     status
