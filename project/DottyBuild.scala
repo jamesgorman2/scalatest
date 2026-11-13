@@ -440,7 +440,7 @@ trait DottyBuild { this: BuildCommons =>
         if (found.nonEmpty)
           sys.error(moduleName.value + " depends on Mill: " + found.map(module => module.organization + ":" + module.name + ":" + module.revision).mkString(", "))
       }
-    ).dependsOn(scalatestCoreDotty)
+    ).dependsOn(scalatestCoreDotty, commonTestDotty % "test")
 
   private implicit class DottyProjectEx(private val p: Project) {
     /** common settings for all scalatest modules */

@@ -369,7 +369,7 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 
 ### Runs the criteria describe
 
-The criteria whose `Given` is an event log holding events (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder in the library's tests:
+The criteria whose `Given` is an event log holding events (`SPECIFICATION.md` § Acceptance criteria) are tested without Mill and without the codec (`TECHNICAL-DESIGN-DECISIONS.md` "The consolidation library's tests build each run with a test-only builder…"). Those tests build each run with a test-only builder, `org.scalatest.events.TestRunBuilder`. It is in the build's common test project, `dotty/common-test`, which is not published and which core's tests and the library's tests both depend on:
 
 - A test gives the run as one ordered list: the criterion's events, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
 - The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` events, and resolves each node an event names to its ID. It emits every event and captured line in the order given, in the form core's decoder yields, so a test can place a `structure` event, a ScalaTest event or a captured line anywhere the criterion puts it.
@@ -384,7 +384,7 @@ The emitter's and the decoder's criteria are those that state events, in the par
 
 One further decoder test, tied to no criterion, feeds the decoder text whose last line is torn, from which it yields no event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-Each comparison of events:
+Each comparison of events is made by `org.scalatest.events.EventLogComparison`, beside the builder:
 
 - Each event is compared only on what the criterion fixes: a `structure` event on its whole tree, a ScalaTest event on its node, its class and the fields the criterion names.
 - Where the criterion says the event log *is* the events, the decoded events must be exactly those built. Where it says the log *holds* them *in this order*, the built events must be a subsequence of the decoded ones.
