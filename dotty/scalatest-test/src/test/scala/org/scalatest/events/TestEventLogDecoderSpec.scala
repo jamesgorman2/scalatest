@@ -515,11 +515,6 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
     "given a line holding a value of the wrong type" should {
       val descriptionsAndLines = Seq(
         "an integer written as a string" -> """{"item":"runStarted","pid":"1","startTime":"t"}""",
-        "an integer written with a fraction" -> """{"item":"runStarted","pid":1.0,"startTime":"t"}""",
-        "an integer written with an exponent" -> """{"item":"runStarted","pid":1e3,"startTime":"t"}""",
-        "an integer larger than a Long" -> """{"item":"runStarted","pid":9223372036854775808,"startTime":"t"}""",
-        "a position larger than an Int" ->
-          """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":2147483648,"name":"t","label":"- t"}]}""",
         "a string written as a number" -> """{"item":"event","event":"DiscoveryStarting","threadName":7,"timeStamp":1}""",
         "nodes written as an object" -> """{"item":"structure","nodes":{}}""",
         "a node written as a string" -> """{"item":"structure","nodes":["suite"]}""",
@@ -527,15 +522,109 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"TestFailed","message":"m","analysis":[1],"threadName":"main","timeStamp":1}""",
         "a config map value written as a number" ->
           """{"item":"event","event":"RunStarting","testCount":1,"configMap":{"key":1},"threadName":"main","timeStamp":1}""",
-        "a property check mark written as a string" -> suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":"true"}"""),
-        "a ref to a throwable the event does not hold" -> suiteAbortedLine("""{"id":1,"className":"c","cause":{"ref":5}}"""),
-        "a ref to a throwable the event holds later" ->
-          suiteAbortedLine("""{"id":1,"className":"c","cause":{"ref":2},"suppressed":[{"id":2,"className":"c"}]}"""),
-        "two throwables with one id" -> suiteAbortedLine("""{"id":1,"className":"c","cause":{"id":1,"className":"c"}}""")
+        "a property check mark written as a string" -> suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":"true"}""")
       )
       descriptionsAndLines.foreach { case (description, line) =>
         s"report that $description cannot be decoded" in {
           TestEventLogDecoder.decode(line).isLeft shouldBe true
+        }
+      }
+    }
+
+    "given a line holding a number that is not an integer its key can hold" should {
+      val descriptionsLinesAndReasons = Seq(
+        (
+          "a pid written with a fraction",
+          """{"item":"runStarted","pid":1.0,"startTime":"t"}""",
+          "the number at offset 27 is not an integer"
+        ),
+        (
+          "a pid written with an exponent",
+          """{"item":"runStarted","pid":1e3,"startTime":"t"}""",
+          "the number at offset 27 is not an integer"
+        ),
+        (
+          "a pid above the greatest Long",
+          """{"item":"runStarted","pid":9223372036854775808,"startTime":"t"}""",
+          "the integer at offset 27 does not fit a Long"
+        ),
+        (
+          "a pid below the least Long",
+          """{"item":"runStarted","pid":-9223372036854775809,"startTime":"t"}""",
+          "the integer at offset 27 does not fit a Long"
+        ),
+        (
+          "a position above the greatest Int",
+          """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":2147483648,"name":"t","label":"- t"}]}""",
+          "position is not a 32-bit integer from 0"
+        ),
+        (
+          "an execution above the greatest Int",
+          """{"item":"event","node":1,"execution":2147483648,"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
+          "execution is not a 32-bit integer from 1"
+        ),
+        (
+          "a testCount above the greatest Int",
+          """{"item":"event","event":"RunStarting","testCount":2147483648,"configMap":{},"threadName":"main","timeStamp":1}""",
+          "testCount is not a 32-bit integer"
+        ),
+        (
+          "a testCount below the least Int",
+          """{"item":"event","event":"RunStarting","testCount":-2147483649,"configMap":{},"threadName":"main","timeStamp":1}""",
+          "testCount is not a 32-bit integer"
+        ),
+        (
+          "a location's lineNumber below the least Int",
+          """{"item":"event","event":"RunCompleted","location":{"kind":"LineInFile","lineNumber":-2147483649,"fileName":"f"},""" +
+            """"threadName":"main","timeStamp":1}""",
+          "lineNumber is not a 32-bit integer"
+        ),
+        (
+          "a summary's count above the greatest Int",
+          """{"item":"event","event":"RunCompleted","summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,""" +
+            """"testsPendingCount":4,"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,""" +
+            """"scopesPendingCount":2147483648},"threadName":"main","timeStamp":1}""",
+          "scopesPendingCount is not a 32-bit integer"
+        ),
+        (
+          "a stackDepth's lineNumber above the greatest Int",
+          suiteAbortedLine("""{"id":1,"className":"c","stackDepth":{"lineNumber":2147483648}}"""),
+          "lineNumber is not a 32-bit integer"
+        ),
+        (
+          "a stack frame's lineNumber above the greatest Int",
+          suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m","lineNumber":2147483648,"text":"c.m"}]}"""),
+          "lineNumber is not a 32-bit integer"
+        )
+      )
+      descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
+        s"report that $description cannot be decoded" in {
+          TestEventLogDecoder.decode(line) shouldBe Left(reason)
+        }
+      }
+    }
+
+    "given a line holding a ref to no earlier throwable, or an id two throwables share" should {
+      val descriptionsLinesAndReasons = Seq(
+        (
+          "a ref to a throwable the event does not hold",
+          suiteAbortedLine("""{"id":1,"className":"c","cause":{"ref":5}}"""),
+          "ref 5 names no throwable the event holds before it"
+        ),
+        (
+          "a ref to a throwable the event holds later",
+          suiteAbortedLine("""{"id":1,"className":"c","cause":{"ref":2},"suppressed":[{"id":2,"className":"c"}]}"""),
+          "ref 2 names no throwable the event holds before it"
+        ),
+        (
+          "two throwables with one id",
+          suiteAbortedLine("""{"id":1,"className":"c","cause":{"id":1,"className":"c"}}"""),
+          "two throwables have id 1"
+        )
+      )
+      descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
+        s"report that $description cannot be decoded" in {
+          TestEventLogDecoder.decode(line) shouldBe Left(reason)
         }
       }
     }
