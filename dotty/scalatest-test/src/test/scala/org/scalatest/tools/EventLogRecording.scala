@@ -7,12 +7,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import org.scalatest.Reporter
+import org.scalatest.events.Event
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.matchers.should.Matchers
 import scala.jdk.CollectionConverters.*
 
-/** An event log that records each write made to it, and threads that hand an emitter their events at once. */
+/** An event log that records each write made to it, a reporter that records its events, and threads that hand an emitter their events at once. */
 private[tools] trait EventLogRecording { this: Matchers =>
 
   protected val waitLimitSeconds = 30L
@@ -43,6 +45,12 @@ private[tools] trait EventLogRecording { this: Matchers =>
     }
 
     override def close(): Unit = closed.set(true)
+  }
+
+  protected final class RecordingReporter extends Reporter {
+    private var received = Vector.empty[Event]
+    def events: Vector[Event] = received
+    def apply(event: Event): Unit = received :+= event
   }
 
   protected def joined(thread: Thread): Boolean = {

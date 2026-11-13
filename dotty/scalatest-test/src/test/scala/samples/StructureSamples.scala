@@ -14,7 +14,6 @@ import org.scalatest.Tag
 import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.freespec.PathAnyFreeSpec
-import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funspec.PathAnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.refspec.RefSpec
@@ -89,7 +88,7 @@ class Inner2Suite extends AnyFunSuite {
 class OuterSuites extends Suites(new Inner1Suite, new Inner2Suite)
 
 @DoNotDiscover
-class BrokenCtorSpec extends AnyFunSpec {
+class BrokenCtorSpec extends AnyFunSuite {
 
   throw new IllegalStateException("no config")
 }

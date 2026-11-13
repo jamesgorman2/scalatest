@@ -6,6 +6,7 @@ import org.scalatest.events.DecodedEvent
 import org.scalatest.events.Event
 import org.scalatest.events.EventLogComparison
 import org.scalatest.events.InfoProvided
+import org.scalatest.events.MarkupProvided
 import org.scalatest.events.RecordableEvent
 import org.scalatest.events.RunAborted
 import org.scalatest.events.RunCompleted
@@ -55,6 +56,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       case failed: TestFailed => s"TestFailed ${failed.testName}: ${failed.message}${recordedIn(failed.recordedEvents)}"
       case ignored: TestIgnored => s"TestIgnored ${ignored.testName}"
       case info: InfoProvided => s"InfoProvided ${info.message}"
+      case markup: MarkupProvided => s"MarkupProvided ${markup.text}"
     }
   }
 
@@ -894,10 +896,187 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     )
   )
 
+  private val twinScopesAsyncFunSpec = StatedRun(
+    Vector(
+      "RunStarting",
+      "SuiteStarting TwinScopesAsyncFunSpec",
+      "ScopeOpened s",
+      "TestStarting s t",
+      "TestSucceeded s t",
+      "ScopeClosed s",
+      "ScopeOpened s",
+      "TestStarting s u",
+      "TestSucceeded s u",
+      "ScopeClosed s",
+      "SuiteCompleted TwinScopesAsyncFunSpec",
+      "RunCompleted"
+    ),
+    """
+    run started
+    run: RunStarting
+    structure
+      suite "TwinScopesAsyncFunSpec", class "samples.TwinScopesAsyncFunSpec"
+        scope "s", label "s"
+          test "t", label "- t"
+        scope "s", label "s"
+          test "u", label "- u"
+    suite "TwinScopesAsyncFunSpec": SuiteStarting
+    scope "s" #1: ScopeOpened
+    test "t": TestStarting
+    test "t": TestSucceeded
+    scope "s" #1: ScopeClosed
+    scope "s" #2: ScopeOpened
+    test "u": TestStarting
+    test "u": TestSucceeded
+    scope "s" #2: ScopeClosed
+    suite "TwinScopesAsyncFunSpec": SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    frameworkRunOf(
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(1, "TwinScopesAsyncFunSpec", "samples.TwinScopesAsyncFunSpec"),
+        TestEventLogLine.scope(2, 1, 0, "s", "s"),
+        TestEventLogLine.test(3, 2, 0, "t", "- t"),
+        TestEventLogLine.scope(4, 1, 1, "s", "s"),
+        TestEventLogLine.test(5, 4, 0, "u", "- u")
+      ),
+      suiteStarting(1),
+      inFirstExecution(2, "ScopeOpened"),
+      inFirstExecution(3, "TestStarting"),
+      inFirstExecution(3, "TestSucceeded"),
+      inFirstExecution(2, "ScopeClosed"),
+      inFirstExecution(4, "ScopeOpened"),
+      inFirstExecution(5, "TestStarting"),
+      inFirstExecution(5, "TestSucceeded"),
+      inFirstExecution(4, "ScopeClosed"),
+      suiteCompleted(1)
+    )
+  )
+
+  private val runsTwiceAsyncSpec = StatedRun(
+    Vector(
+      "RunStarting",
+      "SuiteStarting RunsTwiceAsyncSpec",
+      "TestStarting t",
+      "TestSucceeded t",
+      "TestStarting t",
+      "TestSucceeded t",
+      "SuiteCompleted RunsTwiceAsyncSpec",
+      "RunCompleted"
+    ),
+    """
+    run started
+    run: RunStarting
+    structure
+      suite "RunsTwiceAsyncSpec", class "samples.RunsTwiceAsyncSpec"
+        test "t", label "- t"
+    suite "RunsTwiceAsyncSpec": SuiteStarting
+    test "t": TestStarting
+    test "t": TestSucceeded
+    test "t" execution 2, parent execution 2: TestStarting
+    test "t" execution 2, parent execution 2: TestSucceeded
+    suite "RunsTwiceAsyncSpec" execution 2: SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    frameworkRunOf(
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(1, "RunsTwiceAsyncSpec", "samples.RunsTwiceAsyncSpec"),
+        TestEventLogLine.test(2, 1, 0, "t", "- t")
+      ),
+      suiteStarting(1),
+      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestStarting"),
+      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestSucceeded"),
+      TestEventLogLine.scopeOrTestEvent(2, 2, 2, "TestStarting"),
+      TestEventLogLine.scopeOrTestEvent(2, 2, 2, "TestSucceeded"),
+      TestEventLogLine.suiteEvent(1, 2, "SuiteCompleted")
+    )
+  )
+
+  private val stackPathFunSpec = StatedRun(
+    Vector(
+      "RunStarting",
+      "SuiteStarting StackPathFunSpec",
+      "ScopeOpened A Stack",
+      "TestStarting A Stack is empty",
+      "TestSucceeded A Stack is empty",
+      "ScopeOpened when full",
+      "TestStarting A Stack when full pops",
+      "TestSucceeded A Stack when full pops",
+      "ScopeClosed when full",
+      "ScopeClosed A Stack",
+      "SuiteCompleted StackPathFunSpec",
+      "RunCompleted"
+    ),
+    """
+    run started
+    run: RunStarting
+    structure
+      suite "StackPathFunSpec", class "samples.StackPathFunSpec"
+        scope "A Stack", label "A Stack"
+          test "is empty", label "- is empty"
+          scope "when full", label "when full"
+            test "pops", label "- pops"
+    suite "StackPathFunSpec": SuiteStarting
+    scope "A Stack": ScopeOpened
+    test "is empty": TestStarting
+    test "is empty": TestSucceeded
+    scope "when full": ScopeOpened
+    test "pops": TestStarting
+    test "pops": TestSucceeded
+    scope "when full": ScopeClosed
+    scope "A Stack": ScopeClosed
+    suite "StackPathFunSpec": SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    frameworkRunOf(
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(1, "StackPathFunSpec", "samples.StackPathFunSpec"),
+        TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
+        TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
+        TestEventLogLine.scope(4, 2, 1, "when full", "when full"),
+        TestEventLogLine.test(5, 4, 0, "pops", "- pops")
+      ),
+      suiteStarting(1),
+      inFirstExecution(2, "ScopeOpened"),
+      inFirstExecution(3, "TestStarting"),
+      inFirstExecution(3, "TestSucceeded"),
+      inFirstExecution(4, "ScopeOpened"),
+      inFirstExecution(5, "TestStarting"),
+      inFirstExecution(5, "TestSucceeded"),
+      inFirstExecution(4, "ScopeClosed"),
+      inFirstExecution(2, "ScopeClosed"),
+      suiteCompleted(1)
+    )
+  )
+
+  private val markupDocSpec = StatedRun(
+    Vector("RunStarting", "SuiteStarting MarkupDocSpec", "MarkupProvided A stack pops", "SuiteCompleted MarkupDocSpec", "RunCompleted"),
+    """
+    run started
+    run: RunStarting
+    structure
+      suite "MarkupDocSpec", class "org.scalatest.samples.MarkupDocSpec"
+    suite "MarkupDocSpec": SuiteStarting
+    suite "MarkupDocSpec": MarkupProvided(text: "A stack pops")
+    suite "MarkupDocSpec": SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    frameworkRunOf(
+      TestEventLogLine.structure(TestEventLogLine.suite(1, "MarkupDocSpec", "org.scalatest.samples.MarkupDocSpec")),
+      suiteStarting(1),
+      TestEventLogLine.suiteEvent(1, 1, "MarkupProvided", """"text":"A stack pops","""),
+      suiteCompleted(1)
+    )
+  )
+
   // Discovery gives the runpath's suites in no stated order.
   private val discoveredSuites = List(
     ("AddSuite", "samples.discovered.AddSuite", "adds"),
-    ("OneTestSpec", "samples.discovered.OneTestSpec", "succeeds")
+    ("SqrtPropSpec", "samples.discovered.SqrtPropSpec", "sqrt of a square is the root")
   )
 
   private def runOfDiscoveredSuites(inOrder: List[(String, String, String)]): StatedRun = {
@@ -1010,6 +1189,15 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     Nil
   )
 
+  private def slowSuiteAlertedBy(alert: String): List[String] = {
+    List(
+      TestEventLogLine.structure(TestEventLogLine.suite(1, "SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(2, 1, 0, "sleeps", "- sleeps")),
+      inFirstExecution(2, "TestStarting"),
+      alert,
+      inFirstExecution(2, "TestSucceeded")
+    )
+  }
+
   private val slowSuiteAlerted = StatedRun(
     Vector.empty,
     """
@@ -1020,21 +1208,21 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     run: AlertProvided
     test "sleeps": TestSucceeded
     """,
-    List(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(2, 1, 0, "sleeps", "- sleeps")),
-      inFirstExecution(2, "TestStarting"),
-      TestEventLogLine.runEvent("AlertProvided", """"message":"Test still running after 1 second: suite name: SlowSuite, test name: sleeps.","""),
-      inFirstExecution(2, "TestSucceeded")
+    slowSuiteAlertedBy(
+      TestEventLogLine.runEvent("AlertProvided", """"message":"Test still running after 1 second: suite name: SlowSuite, test name: sleeps.",""")
     )
   )
+
+  // The time a slowpoke alert's message gives is the run's own.
+  private val slowSuiteAlertedWithAnyMessage = slowSuiteAlertedBy(TestEventLogLine.runEvent("AlertProvided"))
 
   Feature("Each suite's structure") {
 
     Scenario("Suites Runner discovers are top-level") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
-        Given("a runpath holding two suites, each an AnyFunSuite whose one test succeeds")
-        withRunpathOf(eventLogFile.resolveSibling("runpath"), classFilesOf("AddSuite", "OneTestSpec")) { runpath =>
+        Given("a runpath holding two suites, an AnyFunSuite whose one test succeeds and an AnyPropSpec whose one property succeeds")
+        withRunpathOf(eventLogFile.resolveSibling("runpath"), classFilesOf("AddSuite", "SqrtPropSpec")) { runpath =>
           When("Runner.run discovers and runs the runpath's suites without the runner argument, and again with it")
           val arguments = List("-R", runpath, "-C", classOf[RunRecordingReporter].getName)
           val reportedWithoutTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments)))
@@ -1056,7 +1244,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("The decoder reads the event log of: Suites Runner discovers are top-level") {
       When("the decoder is given the lines of that event log")
-      val run = runsOfDiscoveredSuites.head
+      val run = runOfDiscoveredSuites(discoveredSuites)
       val events = decodedOrFail(run.eventLogInFormat)
 
       Then("it yields each suite's own structure and events, and the discovery suite's events assigned to the run")
@@ -1094,6 +1282,22 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       "samples.TwinScopesFunSpec",
       "the suite's structure, then the events of each scope and its test assigned to that scope and test, in declared order",
       twinScopesFunSpec
+    )
+
+    eventScenarios(
+      "Sibling scopes of one text in an async suite",
+      "an AsyncFunSpec declaring scope s twice, the first holding test t and the second test u",
+      "samples.TwinScopesAsyncFunSpec",
+      "the suite's structure, then the events of each scope and its test assigned to that scope and test, in declared order",
+      twinScopesAsyncFunSpec
+    )
+
+    eventScenarios(
+      "A path suite whose tests run",
+      "a PathAnyFunSpec declaring scope A Stack, holding test is empty and scope when full, which holds test pops, each test succeeding",
+      "samples.StackPathFunSpec",
+      "the suite's structure, then each event of the suite, its scopes and its tests assigned to its own node, each in a first execution",
+      stackPathFunSpec
     )
 
     eventScenarios(
@@ -1216,10 +1420,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         val eventLog = decodedOrFail(lines)
 
         And("the event log holds the test's TestStarting, an AlertProvided assigned to the run, and the test's TestSucceeded, in that order")
+        StatedLines.mismatchWhenHoldsInOrder(lines, slowSuiteAlertedWithAnyMessage) shouldBe None
         EventLogComparison.mismatchWhenHoldsInOrder(eventLog, built(slowSuiteAlerted.eventLogInNotation)) shouldBe None
 
-        And("it holds an AlertProvided assigned to the run for each one the reporter receives, in the same order and with the same message")
-        val alertsReported = events.collect { case alert: AlertProvided => alert.message }
+        And("it holds an AlertProvided assigned to the run for each one the reporter receives while the test runs, in the same order and with the same message")
+        // An alert the timer sends as the run ends can reach the reporter after the event log has closed. One the
+        // reporter receives before the test's TestSucceeded was handed off before the test ended.
+        val alertsReported = events.takeWhile(!_.isInstanceOf[TestSucceeded]).collect { case alert: AlertProvided => alert.message }
         val alertsInEventLog = eventLog.collect { case TestEventLogEvent.ScalaTestEvent(execution, alert: DecodedEvent.AlertProvided) =>
           execution.map(_.node) -> alert.message
         }
@@ -1286,9 +1493,25 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       "the test's events in its first execution, then in its second, which ran in a second execution of the suite, in which the suite completes",
       runsTwiceSuite
     )
+
+    eventScenarios(
+      "An async suite's run runs its tests twice",
+      "an AsyncFunSpec with one test, whose run calls super.run twice",
+      "samples.RunsTwiceAsyncSpec",
+      "the test's events in its first execution, then in its second, which ran in a second execution of the suite, in which the suite completes",
+      runsTwiceAsyncSpec
+    )
   }
 
   Feature("Messages") {
+
+    eventScenarios(
+      "A DocSpec's markup",
+      "a DocSpec, which is private to ScalaTest's package, whose document is one markup snippet",
+      "org.scalatest.samples.MarkupDocSpec",
+      "the markup assigned to the suite, between its SuiteStarting and its SuiteCompleted",
+      markupDocSpec
+    )
 
     eventScenarios(
       "A suite's own messages",

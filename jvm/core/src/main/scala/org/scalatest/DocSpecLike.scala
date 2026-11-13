@@ -70,6 +70,7 @@ private[scalatest] trait DocSpecLike extends Suite with Informing with Notifying
 
   protected override def runNestedSuites(args: Args): Status = {
     import args._
+    val origin = SuiteRegistration.of(thisSuite).originAt(Nil)
     for (snippet <- doc) {
       snippet match {
         case SuiteSnippet(suite) =>
@@ -82,7 +83,7 @@ private[scalatest] trait DocSpecLike extends Suite with Informing with Notifying
           // Like mocha did in the output, and in the HTML.
           suite.run(None, args)
         case MarkupSnippet(text) =>
-          reportMarkupProvided(thisSuite, reporter, tracker, None, trimMarkup(DocSpec.stripMargin(text)), 0, None, true)
+          reportMarkupProvided(thisSuite, reporter, tracker, None, trimMarkup(DocSpec.stripMargin(text)), 0, None, true, true, origin)
       }
     }
     SucceededStatus

@@ -7,13 +7,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
-import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicLong
 import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.Suite
-import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
@@ -47,9 +45,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   private var isOpen = true
   private val mintedNodes = new AtomicLong(0L)
   // Both are read and written only under this emitter's lock, and keyed by the event's identity: an event's
-  // `equals` compares its fields, which hold the run's own objects.
+  // `equals` compares its fields, which hold the run's own objects. An event an inner wrapper handed off is kept
+  // with that wrapper's registration. The registry's lock is taken under this one, to count the event log closed,
+  // and never the other way round.
   private val originOfEvent = new IdentityHashMap[Event, RecordedOrigin]
-  private val handedOffByAnInnerWrapper = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
+  private val handedOffByAnInnerWrapper = new IdentityHashMap[Event, RegisteredSuite]
 
   /**
    * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
@@ -85,7 +85,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     // Read outside the lock: reading calls the suite's own methods.
     TestEventLogEmitter.caught(SuiteStructure.read(suite, filter)) match {
       case Right(structure) =>
-        val registration = new RegisteredSuite(this, topLevelSuite(structure), suite)
+        val registration = new RegisteredSuite(this, topLevelSuite(structure), suite, None)
         RegisteredSuites.add(suite, registration)
         new StructureWrapper(reporter, WrapperNode.TopLevelSuite(registration), suiteEvent)
       case Left(thrown) =>
@@ -116,6 +116,26 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       originOfEvent.put(event, origin.recorded())
     }
   }
+
+  /**
+   * Drops what this emitter keeps for a registration that has been removed: the origins it recorded for events no
+   * wrapper has handed off and, for a top-level suite's registration, the events the wrappers of its run handed off
+   * that have not reached its own wrapper. An event whose reporter does not pass it on reaches no further wrapper,
+   * and would otherwise be kept, with its suite instance, until the event log closes.
+   *
+   * A nested suite's handed-off events are kept until its top-level suite's registration is removed: a reporter that
+   * holds events back, such as a `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's
+   * run has completed.
+   */
+  def forget(registration: RegisteredSuite): Unit = synchronized {
+    originOfEvent.values.removeIf(_.registration eq registration)
+    if (registration.topLevel eq registration) {
+      handedOffByAnInnerWrapper.values.removeIf(_.topLevel eq registration)
+    }
+  }
+
+  /** How many events this emitter keeps an origin for, or keeps as handed off by an inner wrapper. */
+  def keptEventCount: Int = synchronized(originOfEvent.size + handedOffByAnInnerWrapper.size)
 
   /**
    * Takes an event a structure wrapper received, with the wrapper's node, and writes it unless another wrapper has
@@ -161,14 +181,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
     if (!isOpen) {
       None
-    } else if (handedOffByAnInnerWrapper.contains(event)) {
+    } else if (handedOffByAnInnerWrapper.containsKey(event)) {
       if (isLastWrapper) {
         handedOffByAnInnerWrapper.remove(event)
       }
       None
     } else {
       if (!isLastWrapper) {
-        handedOffByAnInnerWrapper.add(event)
+        handedOffByAnInnerWrapper.put(event, wrapper.registration)
       }
       Some(Option(originOfEvent.remove(event)))
     }
@@ -254,6 +274,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     isOpen = false
     originOfEvent.clear()
     handedOffByAnInnerWrapper.clear()
+    RegisteredSuites.eventLogClosed()
     try eventLog.close() catch { case contained: Throwable if TestEventLogEmitter.isContained(contained) => () }
   }
 }
@@ -339,7 +360,7 @@ private[scalatest] object TestEventLogEmitter {
 
   /** Returns an emitter that appends to an event log which already holds the run's `runStarted` event. */
   def appendingTo(eventLog: OutputStream): TestEventLogEmitter = {
-    SuiteRegistration.lookedUpIn(RegisteredSuites)
+    RegisteredSuites.eventLogOpened()
     new TestEventLogEmitter(eventLog)
   }
 

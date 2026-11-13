@@ -14,7 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.ConfigMap
 import org.scalatest.Filter
-import org.scalatest.Reporter
 import org.scalatest.ScopePlace
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
@@ -92,12 +91,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       mayBeRead.await(waitLimitSeconds, TimeUnit.SECONDS)
       "held back"
     }
-  }
-
-  private final class RecordingReporter extends Reporter {
-    private var received = Vector.empty[Event]
-    def events: Vector[Event] = received
-    def apply(event: Event): Unit = received :+= event
   }
 
   private def structureOf(
@@ -505,7 +498,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "have written the suite's structure, as the suite and the filter give it, when it returns the wrapper" in {
         val eventLog = new RecordingEventLog
         val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
-        SuiteRegistration.madeWith(wrapper).removed()
+        SuiteRegistration.madeWith(wrapper).remove()
         eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
       }
 
@@ -519,7 +512,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           reporter.events.size shouldBe 2
           reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
         } finally {
-          SuiteRegistration.madeWith(wrapper).removed()
+          SuiteRegistration.madeWith(wrapper).remove()
         }
       }
 

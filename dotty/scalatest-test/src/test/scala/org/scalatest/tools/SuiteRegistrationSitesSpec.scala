@@ -3,7 +3,9 @@ package org.scalatest.tools
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Args
+import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
 import org.scalatest.Status
@@ -12,17 +14,17 @@ import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.Suites
 import org.scalatest.events.Event
+import org.scalatest.events.SuiteCompleted
 import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.samples.MarkupDocSpec
 import org.scalatest.samples.RegistrationProbeSuite
 import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Promise
 
-final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with TestEventLogRuns {
-
-  private val waitLimitSeconds = 30L
+final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with TestEventLogRuns with EventLogRecording {
 
   private val ignoringEvents: Reporter = new Reporter {
     def apply(event: Event): Unit = ()
@@ -61,8 +63,15 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   // Its one test completes only once the promise does, on another thread than the one that runs the suite.
   private final class AsyncProbe(mayComplete: Promise[Unit]) extends AsyncFunSpec {
     @volatile var testIsGivenAStructureWrapper = false
+    @volatile var statusOfRun = Option.empty[Status]
 
     implicit override def executionContext: ExecutionContext = ExecutionContext.global
+
+    override def run(testName: Option[String], args: Args): Status = {
+      val status = super.run(testName, args)
+      statusOfRun = Some(status)
+      status
+    }
 
     override protected def runTest(testName: String, args: Args): Status = {
       testIsGivenAStructureWrapper = args.reporter.isInstanceOf[StructureWrapper]
@@ -77,9 +86,9 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   private def emitter: TestEventLogEmitter = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
 
   // Runs a top-level suite as Runner does, with the emitter's function for its reporter where there is an emitter.
-  private def runAsTopLevelSuite(suite: Suite, emitter: Option[TestEventLogEmitter]): ScalaTestStatefulStatus = {
+  private def runAsTopLevelSuite(suite: Suite, emitter: Option[TestEventLogEmitter], reporter: Reporter = ignoringEvents): ScalaTestStatefulStatus = {
     val status = new ScalaTestStatefulStatus
-    new SuiteRunner(suite, Args(ignoringEvents), status, TestEventLogHandOff.none, TestEventLogEmitter.reporterOfTopLevelSuiteFor(emitter)).run()
+    new SuiteRunner(suite, Args(reporter), status, TestEventLogHandOff.none, TestEventLogEmitter.reporterOfTopLevelSuiteFor(emitter)).run()
     status
   }
 
@@ -117,7 +126,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
         SuiteRegistration.of(suite) should be theSameInstanceAs SuiteRegistration.madeWith(wrapper)
         hasNoRegistration(suite) shouldBe false
       } finally {
-        SuiteRegistration.madeWith(wrapper).removed()
+        SuiteRegistration.madeWith(wrapper).remove()
       }
     }
 
@@ -182,6 +191,28 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
         (isRegistered(nested.registrationInTest), hasNoRegistration(nested)) shouldBe ((true, true))
       }
 
+      "stay registered once its run has returned, until the Status that run returned completes" in {
+        val mayComplete = Promise[Unit]()
+        val nested = new AsyncProbe(mayComplete)
+        val wasRegisteredOnceItsRunHadReturned = new AtomicReference(Option.empty[Boolean])
+        // The outer suite sends the nested suite's SuiteCompleted once the nested suite's run has returned, while its test has yet to complete.
+        val completingTheTestAtSuiteCompleted: Reporter = new Reporter {
+          def apply(event: Event): Unit = {
+            event match {
+              case completed: SuiteCompleted if completed.suiteId == nested.suiteId =>
+                wasRegisteredOnceItsRunHadReturned.set(Some(!hasNoRegistration(nested)))
+                mayComplete.success(())
+              case _ => ()
+            }
+          }
+        }
+        val completed = new CountDownLatch(1)
+        runAsTopLevelSuite(nest(List(nested)), Some(emitter), completingTheTestAtSuiteCompleted)
+        nested.statusOfRun.foreach(_.whenCompleted(_ => completed.countDown()))
+        completed.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
+        (wasRegisteredOnceItsRunHadReturned.get, hasNoRegistration(nested)) shouldBe ((Some(true), true))
+      }
+
       "have no registration and no structure wrapper where the run writes no test event log" in {
         val nested = new Probe
         runAsTopLevelSuite(nest(List(nested)), None)
@@ -194,6 +225,94 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   nestedSuiteSites("Suite.runNestedSuites", nested => new Suites(nested*))
 
   nestedSuiteSites("StepwiseNestedSuiteExecution.runNestedSuites", nested => new Suites(nested*) with StepwiseNestedSuiteExecution)
+
+  "A path suite whose run is called twice" should {
+    "send the events of its second run in a second execution of each of its scopes and tests" in {
+      val eventLog = new RecordingEventLog
+      val suite = new samples.StackPathFunSpec
+      val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      try {
+        suite.run(None, Args(wrapper))
+        suite.run(None, Args(wrapper))
+      } finally {
+        SuiteRegistration.madeWith(wrapper).remove()
+      }
+      def eventsOfRun(execution: Int): List[String] = {
+        def inRun(node: Long, eventName: String): String = TestEventLogLine.scopeOrTestEvent(node, execution, execution, eventName)
+        List(
+          inRun(2, "ScopeOpened"),
+          inRun(3, "TestStarting"),
+          inRun(3, "TestSucceeded"),
+          inRun(4, "ScopeOpened"),
+          inRun(5, "TestStarting"),
+          inRun(5, "TestSucceeded"),
+          inRun(4, "ScopeClosed"),
+          inRun(2, "ScopeClosed")
+        )
+      }
+      val structure =
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(1, "StackPathFunSpec", "samples.StackPathFunSpec"),
+          TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
+          TestEventLogLine.scope(4, 2, 1, "when full", "when full"),
+          TestEventLogLine.test(5, 4, 0, "pops", "- pops")
+        )
+      StatedLines.mismatchWhenIs(eventLog.writes.map(_.stripSuffix("\n")), structure :: eventsOfRun(1) ::: eventsOfRun(2)) shouldBe None
+    }
+  }
+
+  "A DocSpec" should {
+    "record that its markup is its suite's own as it sends it" in {
+      val anEmitter = emitter
+      val suite = new MarkupDocSpec
+      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      try {
+        // Sent to a reporter that is no structure wrapper, so the emitter keeps the origin until the registration is removed.
+        suite.run(None, Args(ignoringEvents))
+        anEmitter.keptEventCount shouldBe 1
+      } finally {
+        SuiteRegistration.madeWith(wrapper).remove()
+      }
+      anEmitter.keptEventCount shouldBe 0
+    }
+  }
+
+  "A lookup of a suite instance's registration" should {
+    "not wait for a thread that holds the lock instances are registered and removed under" in {
+      val anEmitter = emitter
+      val suite = new Probe
+      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      val lookedUp = new AtomicReference(Option.empty[SuiteRegistration])
+      val lookup = new Thread(() => lookedUp.set(Some(SuiteRegistration.of(suite))))
+      try {
+        val returnedWhileTheLockWasHeld = RegisteredSuites.synchronized {
+          lookup.start()
+          joined(lookup)
+        }
+        returnedWhileTheLockWasHeld shouldBe true
+        lookedUp.get.get should be theSameInstanceAs SuiteRegistration.madeWith(wrapper)
+      } finally {
+        joined(lookup)
+        SuiteRegistration.madeWith(wrapper).remove()
+        anEmitter.endWithoutRunEnded()
+      }
+    }
+  }
+
+  "A process's suite instances" should {
+    "be looked up while an event log of the process is open, and have no registration once the last has closed" in {
+      TemporaryEventLog.in { eventLogFile =>
+        val output = outputOfItsOwnJvm(SuiteLookupsInTheirOwnJvm.getClass.getName.stripSuffix("$"), Nil, eventLogFile.getParent)
+        output.stdout shouldBe Vector(
+          "with one event log open: registered",
+          "with the first of two event logs closed: registered",
+          "with both closed: not registered",
+          "with another opened: registered"
+        )
+      }
+    }
+  }
 
   "A suite Framework runs" should {
     "be registered while it runs with the runner argument, and not once its task has ended" in {

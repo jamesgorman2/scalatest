@@ -71,10 +71,10 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
             try nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty))
             catch {
               case thrown: Throwable =>
-                nestedRegistration.removed()
+                nestedRegistration.remove()
                 throw thrown
             }
-          nestedRegistration.removedWhenCompleted(status)
+          nestedRegistration.removeWhenCompleted(status)
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)

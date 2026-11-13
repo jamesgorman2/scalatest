@@ -371,7 +371,7 @@ class Framework extends SbtFramework {
     }
     finally {
       // The suite's run has thrown, or the Status it returned has completed.
-      registration.removed()
+      registration.remove()
       statefulStatus match {
         case Some(s) => s.setCompleted()
         case None => // Do nothing

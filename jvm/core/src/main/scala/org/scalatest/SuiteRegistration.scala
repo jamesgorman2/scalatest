@@ -49,10 +49,10 @@ private[scalatest] abstract class SuiteRegistration {
   def reporterOfNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter
 
   /** Removes this registration. Called where the instance's run throws. */
-  def removed(): Unit
+  def remove(): Unit
 
   /** Removes this registration once the `Status` the instance's run returned completes. */
-  def removedWhenCompleted(status: Status): Unit
+  def removeWhenCompleted(status: Status): Unit
 
   /** The `Args` a test is run with: `args`, reporting to the test's structure wrapper. */
   final def argsOfTest(testName: String, args: Args): Args = {
@@ -66,9 +66,13 @@ private[scalatest] abstract class SuiteRegistrations {
 
   /** The instance's registration, or `SuiteRegistration.none` where it has none or several. */
   def of(suite: Suite): SuiteRegistration
+}
 
-  /** The registration made with a suite's structure wrapper, or `SuiteRegistration.none` for any other reporter. */
-  def madeWith(reporter: Reporter): SuiteRegistration
+/** A reporter that knows the registration made with it: a structure wrapper, in a run that writes a test event log. */
+private[scalatest] trait ReporterOfRegisteredSuite extends Reporter {
+
+  /** The registration a site made as it took this reporter for a suite, or `SuiteRegistration.none` where it took it for a test. */
+  def registrationOfItsSuite: SuiteRegistration
 }
 
 private[scalatest] object SuiteRegistration {
@@ -80,24 +84,31 @@ private[scalatest] object SuiteRegistration {
     def originOfTestExecution(testName: String): EventOrigin = EventOrigin.none
     def reporterOfTest(testName: String, reporter: Reporter): Reporter = reporter
     def reporterOfNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = reporter
-    def removed(): Unit = ()
-    def removedWhenCompleted(status: Status): Unit = ()
+    def remove(): Unit = ()
+    def removeWhenCompleted(status: Status): Unit = ()
   }
 
   private val noRegistrations: SuiteRegistrations = new SuiteRegistrations {
     def of(suite: Suite): SuiteRegistration = none
-    def madeWith(reporter: Reporter): SuiteRegistration = none
   }
 
   // A suite instance cannot carry its registration, and `Args` reaches user code, so the sites find it here.
   private val registrations = new AtomicReference[SuiteRegistrations](noRegistrations)
 
-  /** Makes `registered` the registrations every site looks in. Called when a process first writes a test event log. */
-  def lookedUpIn(registered: SuiteRegistrations): Unit = registrations.set(registered)
+  /** Makes `registered` the registrations every site looks in. Called when a process that writes no test event log starts to write one. */
+  def lookUpIn(registered: SuiteRegistrations): Unit = registrations.set(registered)
+
+  /** Has every site find no registration again. Called when a process closes the last test event log it was writing. */
+  def lookUpNowhere(): Unit = registrations.set(noRegistrations)
 
   def of(suite: Suite): SuiteRegistration = registrations.get.of(suite)
 
-  def madeWith(reporter: Reporter): SuiteRegistration = registrations.get.madeWith(reporter)
+  /** The registration made with a suite's structure wrapper, or `none` for any other reporter. */
+  def madeWith(reporter: Reporter): SuiteRegistration =
+    reporter match {
+      case ofRegisteredSuite: ReporterOfRegisteredSuite => ofRegisteredSuite.registrationOfItsSuite
+      case _ => none
+    }
 
   /**
    * The registration a site made as it took a suite's structure wrapper, `taken`, in place of the reporter it would

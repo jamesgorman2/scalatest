@@ -134,9 +134,10 @@ println("&&&&&&&&&&&")
     val statusBuffer = new ListBuffer[Status]()
 
     val (_, registeredSuites) = atomic.get.unpack
+    val origin = SuiteRegistration.of(thisDoc).originAt(Nil)
     snippets foreach {
       case Markup(text) =>
-        reportMarkupProvided(thisDoc, reporter, tracker, None, trimMarkup(Doc.stripMargin(text)), 0, None, true)
+        reportMarkupProvided(thisDoc, reporter, tracker, None, trimMarkup(Doc.stripMargin(text)), 0, None, true, true, origin)
       case IncludedSuite(suite) =>
         println("Send SuiteStarting ... ")  // TODO: Why is runTestedSuites even here?
         statusBuffer += suite.run(None, args)

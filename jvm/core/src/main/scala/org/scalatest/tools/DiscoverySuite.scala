@@ -61,10 +61,10 @@ private[scalatest] class DiscoverySuite(
           try other(nestedSuite, args.copy(reporter = reporter))
           catch {
             case thrown: Throwable =>
-              registration.removed()
+              registration.remove()
               throw thrown
           }
-        registration.removedWhenCompleted(status)
+        registration.removeWhenCompleted(status)
         status
     }
   }

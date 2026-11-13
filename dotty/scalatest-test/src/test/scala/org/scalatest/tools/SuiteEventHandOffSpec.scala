@@ -1,8 +1,11 @@
 package org.scalatest.tools
 
+import org.scalatest.Args
 import org.scalatest.Filter
 import org.scalatest.Reporter
+import org.scalatest.ScalaTestStatefulStatus
 import org.scalatest.ScopePlace
+import org.scalatest.Status
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.events.DecodedEvent
@@ -43,6 +46,21 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     it("flat") {}
   }
 
+  // Its structure gives the suite node 1, scope s node 2 and its test t node 3. Its run gives its scopes and tests a
+  // reporter that passes no event on.
+  private final class PassesNoEventOnSpec extends AnyFunSpec {
+    override def run(testName: Option[String], args: Args): Status = {
+      val passingNoEventOn = new Reporter {
+        def apply(event: Event): Unit = ()
+      }
+      super.run(testName, args.copy(reporter = passingNoEventOn))
+    }
+
+    describe("s") {
+      it("t") {}
+    }
+  }
+
   private final class OneTestSuite extends Suite {
     override def testNames: Set[String] = Set("only")
   }
@@ -70,12 +88,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   private def scopeOrTestLine(node: Int, execution: Int, parentExecution: Int, eventName: String, fields: String = ""): String =
     s"""{"item":"event","node":$node,"execution":$execution,"parentExecution":$parentExecution,"event":"$eventName",$fields$threadAndTime"""
 
-  private final class RecordingReporter extends Reporter {
-    private var received = Vector.empty[Event]
-    def events: Vector[Event] = received
-    def apply(event: Event): Unit = received :+= event
-  }
-
   /** A top-level suite registered with an emitter, with what its events are sent through. */
   private final class RegisteredRun(val eventLog: RecordingEventLog, val emitter: TestEventLogEmitter, val reporter: RecordingReporter, suite: Suite) {
     val wrapperOfSuite: Reporter = emitter.wrapperOfTopLevelSuite(suite, Filter.default, reporter)
@@ -90,7 +102,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   private def withRegisteredSuite[A](body: RegisteredRun => A): A = {
     val eventLog = new RecordingEventLog
     val run = new RegisteredRun(eventLog, TestEventLogEmitter.appendingTo(eventLog), new RecordingReporter, new ScopedSuite)
-    try body(run) finally run.registration.removed()
+    try body(run) finally run.registration.remove()
   }
 
   "An emitter handed an event that has no origin" should {
@@ -260,8 +272,8 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         eventLog.writes.drop(1).map(_.stripSuffix("\n")) shouldBe
           Vector(s"""{"item":"event","node":2,"execution":1,"event":"SuiteStarting",$threadAndTime""")
       } finally {
-        SuiteRegistration.madeWith(wrapperOfInner).removed()
-        registrationOfOuter.removed()
+        SuiteRegistration.madeWith(wrapperOfInner).remove()
+        registrationOfOuter.remove()
       }
     }
 
@@ -270,6 +282,36 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.wrapperOfTest("s t")(starting)
       run.wrapperOfTest("s t")(starting)
       run.eventLines shouldBe Vector(scopeOrTestLine(3, 1, 1, "TestStarting"), scopeOrTestLine(3, 1, 1, "TestStarting"))
+    }
+  }
+
+  "An emitter whose suite gives its scopes and tests a reporter that passes no event on" should {
+    def afterTheSuiteRan[A](body: (RecordingEventLog, TestEventLogEmitter) => A): A = {
+      val eventLog = new RecordingEventLog
+      val emitter = TestEventLogEmitter.appendingTo(eventLog)
+      new SuiteRunner(
+        new PassesNoEventOnSpec,
+        Args(new RecordingReporter),
+        new ScalaTestStatefulStatus,
+        TestEventLogHandOff.none,
+        TestEventLogEmitter.reporterOfTopLevelSuiteFor(Some(emitter))
+      ).run()
+      body(eventLog, emitter)
+    }
+
+    "write the suite's SuiteStarting and SuiteCompleted and each event of its test, which its test's wrapper hands off, and no event of its scope" in
+      afterTheSuiteRan { (eventLog, _) =>
+        val stated = List(
+          TestEventLogLine.suiteEvent(1, 1, "SuiteStarting"),
+          TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
+          TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
+          TestEventLogLine.suiteEvent(1, 1, "SuiteCompleted")
+        )
+        StatedLines.mismatchWhenIs(eventLog.writes.drop(1).map(_.stripSuffix("\n")), stated) shouldBe None
+      }
+
+    "keep none of the suite's events once the suite's run has completed" in afterTheSuiteRan { (_, emitter) =>
+      emitter.keptEventCount shouldBe 0
     }
   }
 
@@ -348,7 +390,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
             }
           }
         } finally {
-          registrations.forEach(_.removed())
+          registrations.forEach(_.remove())
         }
       val testOfSuite = decoded.collect { case TestEventLogEvent.Structure(nodes) =>
         nodes.collect { case test: org.scalatest.events.StructureNode.Test => test.id }.head

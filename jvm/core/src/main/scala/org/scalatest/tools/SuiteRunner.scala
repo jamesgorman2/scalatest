@@ -68,10 +68,10 @@ private[scalatest] class SuiteRunner(
           try suite.run(None, args)
           catch {
             case thrown: Throwable =>
-              registration.removed()
+              registration.remove()
               throw thrown
           }
-        registration.removedWhenCompleted(runStatus)
+        registration.removeWhenCompleted(runStatus)
 
         // Must wait until runStatus completed before dispatching SuiteCompleted, because if parallel test execution is mixed in,
         // the main thread will return before the tests are done. And the HTMLReporter uses SuiteCompleted to

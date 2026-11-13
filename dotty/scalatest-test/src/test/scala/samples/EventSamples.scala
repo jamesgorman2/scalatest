@@ -15,6 +15,7 @@ import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funspec.AsyncFunSpec
+import org.scalatest.funspec.PathAnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.immutable.ListSet
@@ -202,6 +203,51 @@ class RunsTwiceSuite extends AnyFunSuite {
 
   test("t") {
     succeed
+  }
+}
+
+@DoNotDiscover
+class TwinScopesAsyncFunSpec extends AsyncFunSpec {
+
+  describe("s") {
+    it("t") {
+      Future.successful(succeed)
+    }
+  }
+
+  describe("s") {
+    it("u") {
+      Future.successful(succeed)
+    }
+  }
+}
+
+@DoNotDiscover
+class RunsTwiceAsyncSpec extends AsyncFunSpec {
+
+  override def run(testName: Option[String], args: Args): Status = {
+    super.run(testName, args)
+    super.run(testName, args)
+  }
+
+  it("t") {
+    Future.successful(succeed)
+  }
+}
+
+@DoNotDiscover
+class StackPathFunSpec extends PathAnyFunSpec {
+
+  describe("A Stack") {
+    it("is empty") {
+      succeed
+    }
+
+    describe("when full") {
+      it("pops") {
+        succeed
+      }
+    }
   }
 }
 

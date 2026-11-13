@@ -1183,10 +1183,10 @@ trait Suite extends Assertions with Serializable { thisSuite =>
             try nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty))
             catch {
               case thrown: Throwable =>
-                nestedRegistration.removed()
+                nestedRegistration.remove()
                 throw thrown
             }
-          nestedRegistration.removedWhenCompleted(status)
+          nestedRegistration.removeWhenCompleted(status)
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)

@@ -1,6 +1,7 @@
 package org.scalatest.tools
 
 import org.scalatest.Reporter
+import org.scalatest.ReporterOfRegisteredSuite
 import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
 
@@ -40,7 +41,7 @@ private[scalatest] final class StructureWrapper(
   wrapped: Reporter,
   node: WrapperNode,
   handOff: (WrapperNode, Event) => Unit
-) extends Reporter {
+) extends ReporterOfRegisteredSuite {
 
   def apply(event: Event): Unit = {
     TestEventLogEmitter.keptFromCaller(handOff(node, event))

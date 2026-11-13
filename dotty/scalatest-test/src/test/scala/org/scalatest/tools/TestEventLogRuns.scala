@@ -1,5 +1,6 @@
 package org.scalatest.tools
 
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
@@ -11,7 +12,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Assertions
+import org.scalatest.Filter
 import org.scalatest.Reporter
+import org.scalatest.Suite
+import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
 import org.scalatest.events.BuiltEvent
 import org.scalatest.events.TestEventLogDecoder
@@ -69,6 +73,34 @@ private[tools] final case class JvmOutput(stdout: Vector[String], stderr: Vector
 object FrameworkRunInItsOwnJvm extends Assertions with TestEventLogRuns {
 
   def main(arguments: Array[String]): Unit = launched(Launch.ByFramework, arguments.head, arguments.tail.toSeq)
+}
+
+/**
+ * The main class of a JVM that registers one suite instance, then closes and opens event logs, printing after each
+ * step whether a site would find the instance's registration. The registration is never removed, and only a JVM
+ * of its own has no other event log open.
+ */
+object SuiteLookupsInTheirOwnJvm {
+
+  def main(arguments: Array[String]): Unit = {
+    val ignoringEvents = new Reporter {
+      def apply(event: Event): Unit = ()
+    }
+    val suite = new Suite {}
+    def report(step: String): Unit =
+      println(s"$step: ${if (SuiteRegistration.of(suite) eq SuiteRegistration.none) "not registered" else "registered"}")
+
+    val first = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
+    first.wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+    report("with one event log open")
+    val second = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
+    first.endWithoutRunEnded()
+    report("with the first of two event logs closed")
+    second.endWithoutRunEnded()
+    report("with both closed")
+    TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
+    report("with another opened")
+  }
 }
 
 /** Launches runs given the runner argument, and reads the event logs they write. */
@@ -181,18 +213,22 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     }
   }
 
+  /** Has Framework run the suite in a JVM of its own, and returns what that JVM wrote to its stdout and stderr. */
+  protected def outputOfFrameworkRunInItsOwnJvm(suiteClassName: String, arguments: Seq[String], folder: Path): JvmOutput =
+    outputOfItsOwnJvm(FrameworkRunInItsOwnJvm.getClass.getName.stripSuffix("$"), suiteClassName +: arguments, folder)
+
   /**
-   * Has Framework run the suite in a JVM of its own, which holds this JVM's classes, and returns what that JVM wrote
-   * to its stdout and stderr. The files that hold them are written to `folder`.
+   * Runs a main class in a JVM of its own, which holds this JVM's classes, and returns what that JVM wrote to its
+   * stdout and stderr. The files that hold them are written to `folder`.
    */
-  protected def outputOfFrameworkRunInItsOwnJvm(suiteClassName: String, arguments: Seq[String], folder: Path): JvmOutput = {
+  protected def outputOfItsOwnJvm(mainClassName: String, arguments: Seq[String], folder: Path): JvmOutput = {
     val classpath =
       (classpathOf(getClass.getClassLoader).map(url => Paths.get(url.toURI).toString) ++
         System.getProperty("java.class.path").split(File.pathSeparator)).distinct.mkString(File.pathSeparator)
     val java = Paths.get(System.getProperty("java.home"), "bin", "java").toString
     val stdout = folder.resolve("stdout.txt")
     val stderr = folder.resolve("stderr.txt")
-    val command = List(java, "-cp", classpath, FrameworkRunInItsOwnJvm.getClass.getName.stripSuffix("$"), suiteClassName) ++ arguments
+    val command = List(java, "-cp", classpath, mainClassName) ++ arguments
     val jvm = new ProcessBuilder(command.asJava).redirectOutput(stdout.toFile).redirectError(stderr.toFile).start()
     def linesOf(file: Path): Vector[String] = new String(Files.readAllBytes(file), StandardCharsets.UTF_8).linesIterator.toVector
     try {

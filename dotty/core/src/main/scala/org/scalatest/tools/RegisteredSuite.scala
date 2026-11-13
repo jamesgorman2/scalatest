@@ -1,6 +1,6 @@
 package org.scalatest.tools
 
-import java.util.IdentityHashMap
+import java.util.concurrent.ConcurrentHashMap
 import org.scalatest.EventOrigin
 import org.scalatest.Reporter
 import org.scalatest.ScopePlace
@@ -37,9 +37,20 @@ private[scalatest] abstract class RecordingOrigin extends EventOrigin {
   def recorded(): RecordedOrigin
 }
 
-/** The registration of a suite instance against its suite's node table, in a run that writes a test event log. */
-private[scalatest] final class RegisteredSuite(emitter: TestEventLogEmitter, val table: SuiteNodeTable, instance: Suite)
-    extends SuiteRegistration {
+/**
+ * The registration of a suite instance against its suite's node table, in a run that writes a test event log.
+ *
+ * @param ofTopLevelSuite the registration of the top-level suite this instance runs within, or none where it is that suite
+ */
+private[scalatest] final class RegisteredSuite(
+  emitter: TestEventLogEmitter,
+  val table: SuiteNodeTable,
+  instance: Suite,
+  ofTopLevelSuite: Option[RegisteredSuite]
+) extends SuiteRegistration {
+
+  /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
+  val topLevel: RegisteredSuite = ofTopLevelSuite.getOrElse(this)
 
   // Read and written only under the emitter's lock.
   private var executionOfLatestRun = Option.empty[Execution]
@@ -67,22 +78,25 @@ private[scalatest] final class RegisteredSuite(emitter: TestEventLogEmitter, val
   def reporterOfNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
     table.nestedSuites.lift(position) match {
       case Some(tableOfNestedSuite) =>
-        val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite)
+        val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite, Some(topLevel))
         RegisteredSuites.add(nestedSuite, registration)
         new StructureWrapper(reporter, WrapperNode.NestedSuite(registration), emitter.suiteEvent)
       case None => reporter
     }
   }
 
-  def removed(): Unit = RegisteredSuites.remove(instance, this)
+  def remove(): Unit = {
+    RegisteredSuites.remove(instance, this)
+    emitter.forget(this)
+  }
 
   // `whenCompleted` is the method of a Status the suite's own `run` may have built. Where it throws, nothing will
   // call back, so the registration is removed at once.
-  def removedWhenCompleted(status: Status): Unit = {
-    try status.whenCompleted(_ => removed())
+  def removeWhenCompleted(status: Status): Unit = {
+    try status.whenCompleted(_ => remove())
     catch {
       case thrown: Throwable =>
-        removed()
+        remove()
         TestEventLogEmitter.keptFromCaller(throw thrown)
     }
   }
@@ -118,35 +132,63 @@ private[scalatest] final class RegisteredSuite(emitter: TestEventLogEmitter, val
 /**
  * The registrations of this process's suite instances, by instance. A suite instance cannot carry its registration,
  * and no argument reaches every site that sends its events, so every run that writes a test event log registers here.
+ *
+ * A lookup takes no lock: every test of every run of the process makes one. Registering, removing and counting the
+ * open event logs take this object's lock.
  */
 private[scalatest] object RegisteredSuites extends SuiteRegistrations {
 
-  private val registrationsOf = new IdentityHashMap[Suite, List[RegisteredSuite]]
+  // A suite instance as a key: a suite's own `equals` and `hashCode` are user code.
+  private final class Identity(val instance: Suite) {
+    override def hashCode: Int = System.identityHashCode(instance)
+
+    override def equals(other: Any): Boolean = {
+      other match {
+        case identity: Identity => identity.instance eq instance
+        case _ => false
+      }
+    }
+  }
+
+  // Each value is immutable, and replaced only under this object's lock.
+  private val registrationsOf = new ConcurrentHashMap[Identity, List[RegisteredSuite]]
+  // Read and written only under this object's lock.
+  private var openEventLogs = 0
+
+  /** Counts an emitter whose event log has opened. The first has every site look its suite instance up here. */
+  def eventLogOpened(): Unit = synchronized {
+    openEventLogs += 1
+    if (openEventLogs == 1) {
+      SuiteRegistration.lookUpIn(this)
+    }
+  }
+
+  /** Counts out an emitter whose event log has closed. After the last, every site finds no registration again. */
+  def eventLogClosed(): Unit = synchronized {
+    openEventLogs -= 1
+    if (openEventLogs == 0) {
+      SuiteRegistration.lookUpNowhere()
+    }
+  }
 
   def add(instance: Suite, registration: RegisteredSuite): Unit = synchronized {
-    registrationsOf.put(instance, registration :: registered(instance))
+    registrationsOf.put(new Identity(instance), registration :: registered(instance))
   }
 
   def remove(instance: Suite, registration: RegisteredSuite): Unit = synchronized {
     registered(instance).filterNot(_ eq registration) match {
-      case Nil => registrationsOf.remove(instance)
-      case remaining => registrationsOf.put(instance, remaining)
+      case Nil => registrationsOf.remove(new Identity(instance))
+      case remaining => registrationsOf.put(new Identity(instance), remaining)
     }
   }
 
   def of(suite: Suite): SuiteRegistration = {
-    synchronized(registered(suite)) match {
+    registered(suite) match {
       case registration :: Nil => registration
       case _ => SuiteRegistration.none
     }
   }
 
-  def madeWith(reporter: Reporter): SuiteRegistration = {
-    reporter match {
-      case wrapper: StructureWrapper => wrapper.registrationOfItsSuite
-      case _ => SuiteRegistration.none
-    }
-  }
-
-  private def registered(instance: Suite): List[RegisteredSuite] = Option(registrationsOf.get(instance)).getOrElse(Nil)
+  private def registered(instance: Suite): List[RegisteredSuite] =
+    Option(registrationsOf.get(new Identity(instance))).getOrElse(Nil)
 }
