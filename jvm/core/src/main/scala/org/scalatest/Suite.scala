@@ -1025,7 +1025,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         val (filterTest, ignoreTest) = filter(tn, tags, suiteId)
         if (!filterTest) {
           if (ignoreTest)
-            reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.originOfTestExecution(tn))
+            reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
           else
             statusBuffer += runTest(tn, registration.argsOfTest(tn, newArgs))
         }
@@ -1034,7 +1034,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         for ((tn, ignoreTest) <- filter(theTestNames, tags, suiteId)) {
           if (!stopper.stopRequested) {
             if (ignoreTest)
-              reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.originOfTestExecution(tn))
+              reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
             else
               statusBuffer += runTest(tn, registration.argsOfTest(tn, newArgs))
           }
@@ -1170,7 +1170,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
-        val nestedReport = reporterOfNestedSuite(nestedSuite, filter, registration.reporterOfNestedSuite(position, nestedSuite, report))
+        val nestedReport = reporterOfNestedSuite(nestedSuite, filter, registration.registerNestedSuite(position, nestedSuite, report))
         val nestedRegistration = SuiteRegistration.madeTaking(nestedReport, report)
 
         val suiteStartTime = System.currentTimeMillis

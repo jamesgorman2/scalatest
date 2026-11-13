@@ -117,12 +117,13 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       (isRegistered(suite.registrationInTest), hasNoRegistration(suite)) shouldBe ((true, true))
     }
 
-    "stay registered where a suite that is run with its structure wrapper as its reporter completes" in {
+    "stay registered where another suite is run with its structure wrapper as its reporter and completes" in {
       val suite = new Probe
+      val other = new Probe
       val anEmitter = emitter
       val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, org.scalatest.Filter.default, ignoringEvents)
       try {
-        new SuiteRunner(new Probe, Args(wrapper), new ScalaTestStatefulStatus).run()
+        new SuiteRunner(other, Args(wrapper), new ScalaTestStatefulStatus).run()
         SuiteRegistration.of(suite) should be theSameInstanceAs SuiteRegistration.madeWith(wrapper)
         hasNoRegistration(suite) shouldBe false
       } finally {
@@ -225,6 +226,37 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   nestedSuiteSites("Suite.runNestedSuites", nested => new Suites(nested*))
 
   nestedSuiteSites("StepwiseNestedSuiteExecution.runNestedSuites", nested => new Suites(nested*) with StepwiseNestedSuiteExecution)
+
+  "A suite whose nested suites StepwiseNestedSuiteExecution.runNestedSuites runs" should {
+    "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
+      val eventLog = new RecordingEventLog
+      val suite = new samples.StepwiseOuterSuites
+      val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      try {
+        suite.run(None, Args(wrapper))
+      } finally {
+        SuiteRegistration.madeWith(wrapper).remove()
+      }
+      val stated = List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(1, "StepwiseOuterSuites", "samples.StepwiseOuterSuites"),
+          TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
+        ),
+        TestEventLogLine.suiteEvent(2, 1, "SuiteStarting"),
+        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
+        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
+        TestEventLogLine.suiteEvent(2, 1, "SuiteCompleted"),
+        TestEventLogLine.suiteEvent(4, 1, "SuiteStarting"),
+        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestStarting"),
+        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestSucceeded"),
+        TestEventLogLine.suiteEvent(4, 1, "SuiteCompleted")
+      )
+      StatedLines.mismatchWhenIs(eventLog.writes.map(_.stripSuffix("\n")), stated) shouldBe None
+    }
+  }
 
   "A path suite whose run is called twice" should {
     "send the events of its second run in a second execution of each of its scopes and tests" in {

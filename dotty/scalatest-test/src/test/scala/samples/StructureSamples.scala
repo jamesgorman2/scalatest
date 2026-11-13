@@ -6,6 +6,7 @@ import org.scalatest.Args
 import org.scalatest.DoNotDiscover
 import org.scalatest.Filter
 import org.scalatest.RandomTestOrder
+import org.scalatest.StepwiseNestedSuiteExecution
 import org.scalatest.Status
 import org.scalatest.SucceededStatus
 import org.scalatest.Suite
@@ -86,6 +87,9 @@ class Inner2Suite extends AnyFunSuite {
 
 @DoNotDiscover
 class OuterSuites extends Suites(new Inner1Suite, new Inner2Suite)
+
+@DoNotDiscover
+class StepwiseOuterSuites extends Suites(new Inner1Suite, new Inner2Suite) with StepwiseNestedSuiteExecution
 
 @DoNotDiscover
 class BrokenCtorSpec extends AnyFunSuite {

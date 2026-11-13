@@ -30,8 +30,12 @@ private[scalatest] final class RecordedOrigin(
   val executionOfRun: Execution
 )
 
-/** The origin of the events one engine site sends. The emitter asks it for what to keep beside each of them. */
-private[scalatest] abstract class RecordingOrigin extends EventOrigin {
+/**
+ * The origin of the events one engine site sends. The emitter asks it for what to keep beside each of them.
+ *
+ * @param registration the registration of the instance that sends the events
+ */
+private[scalatest] abstract class RecordingOrigin(val registration: RegisteredSuite) extends EventOrigin {
 
   /** Called under the emitter's lock. */
   def recorded(): RecordedOrigin
@@ -52,30 +56,37 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = ofTopLevelSuite.getOrElse(this)
 
-  // Read and written only under the emitter's lock.
+  // Both are read and written only under the emitter's lock.
   private var executionOfLatestRun = Option.empty[Execution]
+  private var isRemoved = false
 
   /** Starts an execution for a run of the instance. Called under the emitter's lock. */
-  def startRun(): Execution = {
+  def startRunUnderLock(): Execution = {
     val execution = table.executionOfStartingRun()
     executionOfLatestRun = Some(execution)
     execution
   }
 
   /** The execution of the instance's latest run, starting one where no site has. Called under the emitter's lock. */
-  def executionOfRun(): Execution = executionOfLatestRun.getOrElse(startRun())
+  def executionOfRun(): Execution = executionOfLatestRun.getOrElse(startRunUnderLock())
 
-  def runStarting(): Unit = emitter.runStarting(this)
+  /** Marks this registration removed. Called under the emitter's lock. */
+  def markRemoved(): Unit = isRemoved = true
+
+  /** Whether this registration has been removed. Called under the emitter's lock. */
+  def hasBeenRemoved: Boolean = isRemoved
+
+  def startRun(): Unit = emitter.startRun(this)
 
   def originAt(scopes: List[ScopePlace]): EventOrigin =
     new OriginInRun(if (scopes.isEmpty) TreeNode.OfSuite else TreeNode.Scope(scopes))
 
-  def originOfTestExecution(testName: String): EventOrigin = new OriginOfTestExecution(testName)
+  def startTestExecution(testName: String): EventOrigin = new OriginOfTestExecution(testName)
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
     new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.suiteEvent)
 
-  def reporterOfNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
+  def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
     table.nestedSuites.lift(position) match {
       case Some(tableOfNestedSuite) =>
         val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite, Some(topLevel))
@@ -102,7 +113,7 @@ private[scalatest] final class RegisteredSuite(
   }
 
   // The origin of the events of the suite itself or of one of its scopes, each of which takes the run's execution.
-  private final class OriginInRun(node: TreeNode) extends RecordingOrigin {
+  private final class OriginInRun(node: TreeNode) extends RecordingOrigin(RegisteredSuite.this) {
 
     def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
 
@@ -113,7 +124,7 @@ private[scalatest] final class RegisteredSuite(
   }
 
   // The origin of the events of one execution of a test, which ran in the run in flight when its first event was sent.
-  private final class OriginOfTestExecution(testName: String) extends RecordingOrigin {
+  private final class OriginOfTestExecution(testName: String) extends RecordingOrigin(RegisteredSuite.this) {
 
     private val execution = new Execution
     // Read and written only under the emitter's lock.

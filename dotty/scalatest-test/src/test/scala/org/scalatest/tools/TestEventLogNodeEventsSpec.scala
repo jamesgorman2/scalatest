@@ -57,6 +57,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       case ignored: TestIgnored => s"TestIgnored ${ignored.testName}"
       case info: InfoProvided => s"InfoProvided ${info.message}"
       case markup: MarkupProvided => s"MarkupProvided ${markup.text}"
+      case other => other.getClass.getSimpleName
     }
   }
 
@@ -1073,52 +1074,148 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     )
   )
 
-  // Discovery gives the runpath's suites in no stated order.
-  private val discoveredSuites = List(
-    ("AddSuite", "samples.discovered.AddSuite", "adds"),
-    ("SqrtPropSpec", "samples.discovered.SqrtPropSpec", "sqrt of a square is the root")
+  private val discoveredWithAddSuiteFirst = StatedRun(
+    Vector(
+      "DiscoveryStarting",
+      "DiscoveryCompleted",
+      "RunStarting",
+      "SuiteStarting DiscoverySuite",
+      "SuiteStarting AddSuite",
+      "TestStarting adds",
+      "TestSucceeded adds",
+      "SuiteCompleted AddSuite",
+      "SuiteStarting SqrtPropSpec",
+      "TestStarting sqrt of a square is the root",
+      "TestSucceeded sqrt of a square is the root",
+      "SuiteCompleted SqrtPropSpec",
+      "SuiteCompleted DiscoverySuite",
+      "RunCompleted"
+    ),
+    """
+    run started
+    run: DiscoveryStarting
+    run: DiscoveryCompleted
+    run: RunStarting(testCount: 2)
+    run: SuiteStarting
+    structure
+      suite "AddSuite", class "samples.discovered.AddSuite"
+        test "adds", label "- adds"
+    suite "AddSuite": SuiteStarting
+    test "adds": TestStarting
+    test "adds": TestSucceeded
+    suite "AddSuite": SuiteCompleted
+    structure
+      suite "SqrtPropSpec", class "samples.discovered.SqrtPropSpec"
+        test "sqrt of a square is the root", label "- sqrt of a square is the root"
+    suite "SqrtPropSpec": SuiteStarting
+    test "sqrt of a square is the root": TestStarting
+    test "sqrt of a square is the root": TestSucceeded
+    suite "SqrtPropSpec": SuiteCompleted
+    run: SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    List(
+      runStarted,
+      TestEventLogLine.runEvent("DiscoveryStarting"),
+      TestEventLogLine.runEvent("DiscoveryCompleted"),
+      TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
+      TestEventLogLine.runEvent("SuiteStarting"),
+      TestEventLogLine.structure(TestEventLogLine.suite(1, "AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(2, 1, 0, "adds", "- adds")),
+      suiteStarting(1),
+      inFirstExecution(2, "TestStarting"),
+      inFirstExecution(2, "TestSucceeded"),
+      suiteCompleted(1),
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(3, "SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
+        TestEventLogLine.test(4, 3, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
+      ),
+      suiteStarting(3),
+      inFirstExecution(4, "TestStarting"),
+      inFirstExecution(4, "TestSucceeded"),
+      suiteCompleted(3),
+      TestEventLogLine.runEvent("SuiteCompleted"),
+      runCompleted,
+      runEndedCompleted
+    )
   )
 
-  private def runOfDiscoveredSuites(inOrder: List[(String, String, String)]): StatedRun = {
-    val reportedOfSuites = inOrder.flatMap { (suiteName, _, testName) =>
-      List(s"SuiteStarting $suiteName", s"TestStarting $testName", s"TestSucceeded $testName", s"SuiteCompleted $suiteName")
-    }
-    val notationOfSuites = inOrder.map { (suiteName, className, testName) =>
-      s"""structure
-         |  suite "$suiteName", class "$className"
-         |    test "$testName", label "- $testName"
-         |suite "$suiteName": SuiteStarting
-         |test "$testName": TestStarting
-         |test "$testName": TestSucceeded
-         |suite "$suiteName": SuiteCompleted""".stripMargin
-    }
-    val linesOfSuites = inOrder.zip(List(1L, 3L)).flatMap { case ((suiteName, className, testName), suiteNode) =>
+  private val discoveredWithSqrtPropSpecFirst = StatedRun(
+    Vector(
+      "DiscoveryStarting",
+      "DiscoveryCompleted",
+      "RunStarting",
+      "SuiteStarting DiscoverySuite",
+      "SuiteStarting SqrtPropSpec",
+      "TestStarting sqrt of a square is the root",
+      "TestSucceeded sqrt of a square is the root",
+      "SuiteCompleted SqrtPropSpec",
+      "SuiteStarting AddSuite",
+      "TestStarting adds",
+      "TestSucceeded adds",
+      "SuiteCompleted AddSuite",
+      "SuiteCompleted DiscoverySuite",
+      "RunCompleted"
+    ),
+    """
+    run started
+    run: DiscoveryStarting
+    run: DiscoveryCompleted
+    run: RunStarting(testCount: 2)
+    run: SuiteStarting
+    structure
+      suite "SqrtPropSpec", class "samples.discovered.SqrtPropSpec"
+        test "sqrt of a square is the root", label "- sqrt of a square is the root"
+    suite "SqrtPropSpec": SuiteStarting
+    test "sqrt of a square is the root": TestStarting
+    test "sqrt of a square is the root": TestSucceeded
+    suite "SqrtPropSpec": SuiteCompleted
+    structure
+      suite "AddSuite", class "samples.discovered.AddSuite"
+        test "adds", label "- adds"
+    suite "AddSuite": SuiteStarting
+    test "adds": TestStarting
+    test "adds": TestSucceeded
+    suite "AddSuite": SuiteCompleted
+    run: SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    List(
+      runStarted,
+      TestEventLogLine.runEvent("DiscoveryStarting"),
+      TestEventLogLine.runEvent("DiscoveryCompleted"),
+      TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
+      TestEventLogLine.runEvent("SuiteStarting"),
       TestEventLogLine.structure(
-        TestEventLogLine.suite(suiteNode, suiteName, className),
-        TestEventLogLine.test(suiteNode + 1, suiteNode, 0, testName, s"- $testName")
-      ) :: suiteStarting(suiteNode) :: startingAndSucceeded(suiteNode + 1) ::: List(suiteCompleted(suiteNode))
-    }
-    StatedRun(
-      (List("RunStarting", "SuiteStarting DiscoverySuite") ::: reportedOfSuites ::: List("SuiteCompleted DiscoverySuite", "RunCompleted")).toVector,
-      (List("run started", "run: DiscoveryStarting", "run: DiscoveryCompleted", "run: RunStarting(testCount: 2)", "run: SuiteStarting") :::
-        notationOfSuites ::: List("run: SuiteCompleted", "run: RunCompleted", "run ended completed")).mkString("\n"),
-      List(
-        runStarted,
-        TestEventLogLine.runEvent("DiscoveryStarting"),
-        TestEventLogLine.runEvent("DiscoveryCompleted"),
-        TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
-        TestEventLogLine.runEvent("SuiteStarting")
-      ) ::: linesOfSuites ::: List(TestEventLogLine.runEvent("SuiteCompleted"), runCompleted, runEndedCompleted)
+        TestEventLogLine.suite(1, "SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
+        TestEventLogLine.test(2, 1, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
+      ),
+      suiteStarting(1),
+      inFirstExecution(2, "TestStarting"),
+      inFirstExecution(2, "TestSucceeded"),
+      suiteCompleted(1),
+      TestEventLogLine.structure(TestEventLogLine.suite(3, "AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(4, 3, 0, "adds", "- adds")),
+      suiteStarting(3),
+      inFirstExecution(4, "TestStarting"),
+      inFirstExecution(4, "TestSucceeded"),
+      suiteCompleted(3),
+      TestEventLogLine.runEvent("SuiteCompleted"),
+      runCompleted,
+      runEndedCompleted
     )
-  }
+  )
 
-  private val runsOfDiscoveredSuites = List(discoveredSuites, discoveredSuites.reverse).map(runOfDiscoveredSuites)
+  // Discovery gives the runpath's suites in no stated order.
+  private val runsOfDiscoveredSuites = List(discoveredWithAddSuiteFirst, discoveredWithSqrtPropSpecFirst)
 
   private val cannotLoadBrokenCtorSpec =
     "Unable to load a Suite class samples.discovered.BrokenCtorSpec that was discovered in the runpath: no config"
 
   private val brokenCtorSpecDiscovered = StatedRun(
     Vector(
+      "DiscoveryStarting",
+      "DiscoveryCompleted",
       "RunStarting",
       "SuiteStarting DiscoverySuite",
       "SuiteStarting BrokenCtorSpec",
@@ -1244,11 +1341,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("The decoder reads the event log of: Suites Runner discovers are top-level") {
       When("the decoder is given the lines of that event log")
-      val run = runOfDiscoveredSuites(discoveredSuites)
-      val events = decodedOrFail(run.eventLogInFormat)
+      val events = decodedOrFail(discoveredWithAddSuiteFirst.eventLogInFormat)
 
       Then("it yields each suite's own structure and events, and the discovery suite's events assigned to the run")
-      EventLogComparison.mismatchWhenIs(events, built(run.eventLogInNotation)) shouldBe None
+      EventLogComparison.mismatchWhenIs(events, built(discoveredWithAddSuiteFirst.eventLogInNotation)) shouldBe None
     }
 
     eventScenarios(

@@ -31,13 +31,13 @@ private[scalatest] object EventOrigin {
 private[scalatest] abstract class SuiteRegistration {
 
   /** Starts an execution for a run of the instance. Called by the first engine site the run reaches. */
-  def runStarting(): Unit
+  def startRun(): Unit
 
   /** The origin of an event of the suite itself, where `scopes` is empty, and otherwise of the scope at that path from the suite down. */
   def originAt(scopes: List[ScopePlace]): EventOrigin
 
   /** Starts an execution of a test, and returns the origin of that execution's events. */
-  def originOfTestExecution(testName: String): EventOrigin
+  def startTestExecution(testName: String): EventOrigin
 
   /** The reporter a test is run with: the test's structure wrapper over `reporter`. */
   def reporterOfTest(testName: String, reporter: Reporter): Reporter
@@ -46,7 +46,7 @@ private[scalatest] abstract class SuiteRegistration {
    * Registers a nested suite the instance is about to run, against the node at its position in `nestedSuites`, and
    * returns the reporter the nested suite is started and run with: its structure wrapper over `reporter`.
    */
-  def reporterOfNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter
+  def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter
 
   /** Removes this registration. Called where the instance's run throws. */
   def remove(): Unit
@@ -79,11 +79,11 @@ private[scalatest] object SuiteRegistration {
 
   /** The registration of every suite instance of a run that writes no test event log. It registers and wraps nothing. */
   val none: SuiteRegistration = new SuiteRegistration {
-    def runStarting(): Unit = ()
+    def startRun(): Unit = ()
     def originAt(scopes: List[ScopePlace]): EventOrigin = EventOrigin.none
-    def originOfTestExecution(testName: String): EventOrigin = EventOrigin.none
+    def startTestExecution(testName: String): EventOrigin = EventOrigin.none
     def reporterOfTest(testName: String, reporter: Reporter): Reporter = reporter
-    def reporterOfNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = reporter
+    def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = reporter
     def remove(): Unit = ()
     def removeWhenCompleted(status: Status): Unit = ()
   }

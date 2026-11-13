@@ -255,7 +255,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       throw new IllegalArgumentException("No test in this suite has name: \"" + testName + "\"")
 
     val theTest = atomic.get.testsMap(testName)
-    val origin = SuiteRegistration.of(theSuite).originOfTestExecution(testName)
+    val origin = SuiteRegistration.of(theSuite).startTestExecution(testName)
 
     reportTestStarting(theSuite, report, tracker, testName, theTest.testText, theSuite.rerunner, theTest.location, origin)
 
@@ -437,12 +437,12 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                   statusVec :+ (
                     if (parallelAsyncTestExecution || statusVec.isEmpty) {
                       // Even if serial async test execution (i.e., not parallelAsyncTestExection), first time still just go for it
-                      reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.originOfTestExecution(testName))
+                      reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.startTestExecution(testName))
                       SucceededStatus
                     }
                     else {
                       statusVec.last thenRun {
-                        reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.originOfTestExecution(testName))
+                        reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.startTestExecution(testName))
                         SucceededStatus
                       }  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
                     }
@@ -594,7 +594,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
           if (!filterTest) {
             if (ignoreTest) {
               val theTest = atomic.get.testsMap(tn)
-              reportTestIgnored(theSuite, report, tracker, tn, tn, getIndentedTextForTest(tn, 1, true), theTest.location, registration.originOfTestExecution(tn))
+              reportTestIgnored(theSuite, report, tracker, tn, tn, getIndentedTextForTest(tn, 1, true), theTest.location, registration.startTestExecution(tn))
               Vector.empty
             }
             else {
@@ -638,7 +638,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
 
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val registration = SuiteRegistration.of(theSuite)
-    registration.runStarting()
+    registration.startRun()
     val origin = registration.originAt(Nil)
 
     val informerForThisSuite =

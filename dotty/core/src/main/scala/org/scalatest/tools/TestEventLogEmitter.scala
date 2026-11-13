@@ -106,28 +106,33 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /** Starts an execution for a run of a registered suite instance. */
-  def runStarting(registration: RegisteredSuite): Unit = synchronized {
-    registration.startRun()
+  def startRun(registration: RegisteredSuite): Unit = synchronized {
+    registration.startRunUnderLock()
   }
 
-  /** Keeps an event's origin until a structure wrapper hands the event off. An event log that has ended keeps none. */
+  /**
+   * Keeps an event's origin until a structure wrapper hands the event off. An event log that has ended keeps none,
+   * and none is kept for a registration that has been removed, so its event is assigned as one with no origin.
+   */
   def recordOrigin(event: Event, origin: RecordingOrigin): Unit = synchronized {
-    if (isOpen) {
+    if (isOpen && !origin.registration.hasBeenRemoved) {
       originOfEvent.put(event, origin.recorded())
     }
   }
 
   /**
-   * Drops what this emitter keeps for a registration that has been removed: the origins it recorded for events no
+   * Marks a registration removed, and drops what this emitter keeps for it: the origins it recorded for events no
    * wrapper has handed off and, for a top-level suite's registration, the events the wrappers of its run handed off
    * that have not reached its own wrapper. An event whose reporter does not pass it on reaches no further wrapper,
    * and would otherwise be kept, with its suite instance, until the event log closes.
    *
    * A nested suite's handed-off events are kept until its top-level suite's registration is removed: a reporter that
    * holds events back, such as a `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's
-   * run has completed.
+   * run has completed. After that, an event sent late, as by a thread the run started, is kept by none of them: no
+   * origin is recorded for it, and only the top-level suite's wrapper writes it.
    */
   def forget(registration: RegisteredSuite): Unit = synchronized {
+    registration.markRemoved()
     originOfEvent.values.removeIf(_.registration eq registration)
     if (registration.topLevel eq registration) {
       handedOffByAnInnerWrapper.values.removeIf(_.topLevel eq registration)
@@ -176,10 +181,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   // Returns the event's origin, if it has one, where no wrapper has handed the event off, and nothing where one has.
-  // The wrapper of a top-level suite is the last wrapper an event reaches, so it forgets the event.
+  // The wrapper of a top-level suite is the last wrapper an event reaches, so it forgets the event. Once the
+  // top-level suite's registration is removed, an inner wrapper hands nothing off: keeping the event would retain it
+  // where it reaches no further wrapper, and without it the top-level suite's wrapper could not tell it was written.
   private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Option[RecordedOrigin]] = synchronized {
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
     if (!isOpen) {
+      None
+    } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
       None
     } else if (handedOffByAnInnerWrapper.containsKey(event)) {
       if (isLastWrapper) {

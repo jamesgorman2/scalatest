@@ -58,7 +58,7 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
-        val report = registration.reporterOfNestedSuite(position, nestedSuite, suiteReport)
+        val report = registration.registerNestedSuite(position, nestedSuite, suiteReport)
         val nestedRegistration = SuiteRegistration.madeTaking(report, suiteReport)
 
         val suiteStartTime = System.currentTimeMillis

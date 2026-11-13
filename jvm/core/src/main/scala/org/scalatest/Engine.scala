@@ -265,7 +265,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
       throw new IllegalArgumentException("No test in this suite has name: \"" + testName + "\"")
 
     val theTest = atomic.get.testsMap(testName)
-    val origin = SuiteRegistration.of(theSuite).originOfTestExecution(testName)
+    val origin = SuiteRegistration.of(theSuite).startTestExecution(testName)
 
     reportTestStarting(theSuite, report, tracker, testName, theTest.testText, theSuite.rerunner, theTest.location, origin)
 
@@ -429,7 +429,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
                 if (ignoreTest) {
                   val testTextWithOptionalPrefix = prependChildPrefix(branch, testText)
                   val theTest = atomic.get.testsMap(testName)
-                  reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.originOfTestExecution(testName))
+                  reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.startTestExecution(testName))
                 }
                 else
                   statusList += runTest(testName, registration.argsOfTest(testName, args))
@@ -540,7 +540,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
         if (!filterTest) {
           if (ignoreTest) {
             val theTest = atomic.get.testsMap(tn)
-            reportTestIgnored(theSuite, report, tracker, tn, tn, getIndentedTextForTest(tn, 1, true), theTest.location, registration.originOfTestExecution(tn))
+            reportTestIgnored(theSuite, report, tracker, tn, tn, getIndentedTextForTest(tn, 1, true), theTest.location, registration.startTestExecution(tn))
           }
           else {
             statusBuffer += runTest(tn, registration.argsOfTest(tn, newArgs))
@@ -569,7 +569,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
 
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val registration = SuiteRegistration.of(theSuite)
-    registration.runStarting()
+    registration.startRun()
     val origin = registration.originAt(Nil)
 
     val informerForThisSuite =
@@ -1168,7 +1168,7 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val newArgs = if (report eq reporter) args else args.copy(reporter = report)
     val registration = SuiteRegistration.of(theSuite)
-    registration.runStarting()
+    registration.startRun()
     val origin = registration.originAt(Nil)
 
     val informerForThisSuite =
