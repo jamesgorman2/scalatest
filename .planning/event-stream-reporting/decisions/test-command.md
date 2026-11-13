@@ -213,7 +213,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
-**Reasoning** A user who runs the test command in place of Mill's test task expects the output to change and nothing else (`../SPECIFICATION.md` R-053).
+**Reasoning** A user who runs the test command in place of Mill's test task expects the same tests to run in the same processes, working directory and environment (`../SPECIFICATION.md` R-053).
 
 **Costs** The plugin must take each run's output from the processes Mill's fork grouping and parallelism start, in Mill's sandbox working directory, rather than from processes it chooses because their output is easier to take, such as one worker for every module.
 
