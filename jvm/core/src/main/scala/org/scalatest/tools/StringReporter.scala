@@ -20,8 +20,7 @@ import org.scalatest.events._
 import StringReporter._
 import scala.collection.mutable.ListBuffer
 import Suite.indentation
-import org.scalatest.exceptions.PropertyCheckFailedException
-import org.scalatest.exceptions.StackDepth
+import scala.annotation.tailrec
 
 import org.scalactic.Prettifier
 
@@ -228,10 +227,25 @@ private[scalatest] object StringReporter {
     ansiColor: AnsiColor
   ): Vector[Fragment] = {
 
-    val lines: Vector[String] = stringsToPrintOnError(noteMessageFun, errorMessageFun, message, throwable, analysis, formatter, suiteName, testName, duration,
+    val lines: Vector[String] = stringsToPrintOnError(noteMessageFun, errorMessageFun, message, throwable.map(ThrowableView.of), analysis, formatter, suiteName, testName, duration,
         presentUnformatted, presentAllDurations, presentShortStackTraces, presentFullStackTraces, presentFilePathname)
 
-    lines map (new Fragment(_, ansiColor))
+    indentedAfterFirstLine(lines, formatter) map (new Fragment(_, ansiColor))
+  }
+
+  // The whiteSpace is just used for printing out stack traces, etc., things that go after a test name. The formatted
+  // text for test names actually goes over to the left once in a sense, to make room for the icon. So if the indentation
+  // level is 3 for example, the "- " for that test's formatted text is really indented 2 times (or four spaces: "    ")
+  // So that's why normally the indentation level times two spaces should be the white space. But at the top level (indentation
+  // level of 0), the icon also has to go at 0 (because subtracting one would put it at -1), so in that case the white space
+  // should be two spaces (or 1 level of indentation).
+  private def indentedAfterFirstLine(lines: Vector[String], formatter: Option[Formatter]): Vector[String] = {
+    val whiteSpace =
+      formatter match {
+        case Some(IndentedText(_, _, indentationLevel)) if (indentationLevel != 0) => indentation(indentationLevel)
+        case _ => indentation(1)
+      }
+    lines.take(1) ++ lines.drop(1).map(whiteSpace + _)
   }
 
   def summaryFragments(
@@ -460,7 +474,7 @@ private[scalatest] object StringReporter {
     }
   }
 
-  def withPossibleLineNumber(stringToPrint: String, throwable: Option[Throwable], presentFilePathname: Boolean): String = {
+  def withPossibleLineNumber(stringToPrint: String, throwable: Option[ThrowableView], presentFilePathname: Boolean): String = {
 
     /*
      The simple file name approach looks like:
@@ -479,16 +493,16 @@ private[scalatest] object StringReporter {
         case None => stringToPrint
       }
 
-    throwable match {
-      case Some(stackDepth: StackDepth) =>
+    throwable.flatMap(_.stackDepth) match {
+      case Some(stackDepth) =>
         if (presentFilePathname) {
-          stackDepth.failedCodeFilePathnameAndLineNumberString match {
+          stackDepth.filePathnameAndLineNumber match {
             case Some(lineNumberString) =>
               Resources.printedReportPlusPath(stringToPrint, lineNumberString)
-            case None => simpleFileNameApproach(stackDepth.failedCodeFileNameAndLineNumberString)
+            case None => simpleFileNameApproach(stackDepth.fileNameAndLineNumber)
           }
         }
-        else simpleFileNameApproach(stackDepth.failedCodeFileNameAndLineNumberString)
+        else simpleFileNameApproach(stackDepth.fileNameAndLineNumber)
       case None => stringToPrint
     }
   }
@@ -521,33 +535,21 @@ private[scalatest] object StringReporter {
     presentShortStackTraces: Boolean,
     presentFullStackTraces: Boolean,
     presentFilePathname: Boolean
-  ): Vector[Fragment] = {
-    val (suiteName, testName) =
-      event.nameInfo match {
-        case Some(NameInfo(suiteName, _, _, testName)) => (Some(suiteName), testName)
-        case None => (None, None)
-      }
-    val lines: Vector[String] =
-      stringsToPrintOnError(
-        Resources.infoProvidedNote,
-        Resources.infoProvided _,
-        event.message,
-        event.throwable,
-        Vector.empty,
-        event.formatter,
-        suiteName,
-        testName,
-        None,
-        presentUnformatted,
-        presentAllDurations,
-        presentShortStackTraces,
-        presentFullStackTraces,
-        presentFilePathname
-      )
-
-    lines map (new Fragment(_, ansiColor))
-    // for (line <- lines) printPossiblyInColor(line, ansiColor)
-  }
+  ): Vector[Fragment] =
+    messageFragments(
+      Resources.infoProvidedNote,
+      Resources.infoProvided _,
+      event.message,
+      event.nameInfo,
+      event.throwable,
+      event.formatter,
+      ansiColor,
+      presentUnformatted,
+      presentAllDurations,
+      presentShortStackTraces,
+      presentFullStackTraces,
+      presentFilePathname
+    )
 
   def alertProvidedFragments(
     event: AlertProvided,
@@ -556,32 +558,21 @@ private[scalatest] object StringReporter {
     presentShortStackTraces: Boolean,
     presentFullStackTraces: Boolean,
     presentFilePathname: Boolean
-  ): Vector[Fragment] = {
-    val (suiteName, testName) =
-      event.nameInfo match {
-        case Some(NameInfo(suiteName, _, _, testName)) => (Some(suiteName), testName)
-        case None => (None, None)
-      }
-    val lines: Vector[String] =
-      stringsToPrintOnError(
-        Resources.alertProvidedNote,
-        Resources.alertProvided _,
-        event.message,
-        event.throwable,
-        Vector.empty,
-        event.formatter,
-        suiteName,
-        testName,
-        None,
-        presentUnformatted,
-        presentAllDurations,
-        presentShortStackTraces,
-        presentFullStackTraces,
-        presentFilePathname
-      )
-
-    lines map (new Fragment(_, AnsiYellow))
-  }
+  ): Vector[Fragment] =
+    messageFragments(
+      Resources.alertProvidedNote,
+      Resources.alertProvided _,
+      event.message,
+      event.nameInfo,
+      event.throwable,
+      event.formatter,
+      AnsiYellow,
+      presentUnformatted,
+      presentAllDurations,
+      presentShortStackTraces,
+      presentFullStackTraces,
+      presentFilePathname
+    )
 
   def noteProvidedFragments(
     event: NoteProvided,
@@ -590,43 +581,67 @@ private[scalatest] object StringReporter {
     presentShortStackTraces: Boolean,
     presentFullStackTraces: Boolean,
     presentFilePathname: Boolean
-  ): Vector[Fragment] = {
-    val (suiteName, testName) =
-      event.nameInfo match {
-        case Some(NameInfo(suiteName, _, _, testName)) => (Some(suiteName), testName)
-        case None => (None, None)
-      }
-    val lines: Vector[String] =
-      stringsToPrintOnError(
-        Resources.noteProvidedNote,
-        Resources.noteProvided _,
-        event.message,
-        event.throwable,
-        Vector.empty,
-        event.formatter,
-        suiteName,
-        testName,
-        None,
-        presentUnformatted,
-        presentAllDurations,
-        presentShortStackTraces,
-        presentFullStackTraces,
-        presentFilePathname
-      )
+  ): Vector[Fragment] =
+    messageFragments(
+      Resources.noteProvidedNote,
+      Resources.noteProvided _,
+      event.message,
+      event.nameInfo,
+      event.throwable,
+      event.formatter,
+      AnsiGreen,
+      presentUnformatted,
+      presentAllDurations,
+      presentShortStackTraces,
+      presentFullStackTraces,
+      presentFilePathname
+    )
 
-    lines map (new Fragment(_, AnsiGreen))
+  private def messageFragments(
+    noteMessageFun: String,
+    errorMessageFun: Any => String,
+    message: String,
+    nameInfo: Option[NameInfo],
+    throwable: Option[Throwable],
+    formatter: Option[Formatter],
+    ansiColor: AnsiColor,
+    presentUnformatted: Boolean,
+    presentAllDurations: Boolean,
+    presentShortStackTraces: Boolean,
+    presentFullStackTraces: Boolean,
+    presentFilePathname: Boolean
+  ): Vector[Fragment] = {
+    val (suiteName, testName) = suiteAndTestName(nameInfo)
+    fragmentsOnError(
+      noteMessageFun,
+      errorMessageFun,
+      message,
+      throwable,
+      Vector.empty,
+      formatter,
+      suiteName,
+      testName,
+      None,
+      presentUnformatted,
+      presentAllDurations,
+      presentShortStackTraces,
+      presentFullStackTraces,
+      presentFilePathname,
+      ansiColor
+    )
   }
+
+  private def suiteAndTestName(nameInfo: Option[NameInfo]): (Option[String], Option[String]) =
+    nameInfo match {
+      case Some(NameInfo(suiteName, _, _, testName)) => (Some(suiteName), testName)
+      case None => (None, None)
+    }
 
   // This will return either an empty Vector or a Vector with one element. Vector instead of Option because
   // that makes it easier to combine them with other Vector[Fragment]s coming back from other sibling methods.
   def markupProvidedOptionalFragment(event: MarkupProvided, ansiColor: AnsiColor, presentUnformatted: Boolean): Vector[Fragment] = {
 
-    val (suiteName, testName) =
-      event.nameInfo match {
-        case Some(NameInfo(suiteName, _, _, testName)) =>
-          (Some(suiteName), testName)
-        case None => (None, None)
-      }
+    val (suiteName, testName) = suiteAndTestName(event.nameInfo)
 
     val stringToPrint: Vector[String] = stringToPrintWhenMarkup(event.formatter, suiteName, testName, event.text, presentUnformatted)
 
@@ -802,10 +817,8 @@ private[scalatest] object StringReporter {
 
       case SuiteAborted(ordinal, message, suiteName, suiteId, suiteClassName, throwable, duration, formatter, location, rerunnable, payload, threadName, timeStamp) => 
 
-        val lines = stringsToPrintOnError(Resources.abortedNote, Resources.suiteAborted _, message, throwable, Vector.empty, formatter, Some(suiteName), None, duration,
-            presentUnformatted, presentAllDurations, presentShortStackTraces, presentFullStackTraces, presentFilePathname)
-
-        for (line <- lines) yield new Fragment(line, AnsiRed)
+        fragmentsOnError(Resources.abortedNote, Resources.suiteAborted _, message, throwable, Vector.empty, formatter, Some(suiteName), None, duration,
+            presentUnformatted, presentAllDurations, presentShortStackTraces, presentFullStackTraces, presentFilePathname, AnsiRed)
 
       case TestStarting(ordinal, suiteName, suiteId, suiteClassName, testName, testText, formatter, location, rerunnable, payload, threadName, timeStamp) =>
 
@@ -914,11 +927,12 @@ private[scalatest] object StringReporter {
   }
 
   // Called for TestFailed, InfoProvided (because it can have a throwable in it), SuiteAborted, and RunAborted
+  // Returns the event's first line, built from the formatter's text as given, then the lines under it without indentation.
   def stringsToPrintOnError(
     noteMessageFun: String,
     errorMessageFun: Any => String,
     message: String,
-    throwable: Option[Throwable],
+    throwable: Option[ThrowableView],
     analysis: scala.collection.immutable.IndexedSeq[String],
     formatter: Option[Formatter],
     suiteName: Option[String],
@@ -967,99 +981,72 @@ private[scalatest] object StringReporter {
         case None => stringToPrint
       }
 
-    // If there's a message, put it on the next line, indented two spaces
+    // If there's a message, put it on the next line
     val possiblyEmptyMessage = Reporter.messageOrThrowablesDetailMessage(message, throwable)
 
     val possiblyEmptyMessageWithPossibleLineNumber =
       throwable match {
-        case Some(e: PropertyCheckFailedException) => possiblyEmptyMessage // PCFEs already include the line number
-        case Some(e: StackDepth) => withPossibleLineNumber(possiblyEmptyMessage, throwable, presentFilePathname) // Show it in the stack depth case
+        case Some(e) if e.isPropertyCheckFailure => possiblyEmptyMessage // PCFEs already include the line number
+        case Some(e) if e.stackDepth.nonEmpty => withPossibleLineNumber(possiblyEmptyMessage, throwable, presentFilePathname) // Show it in the stack depth case
         case _ => "" // Don't show it in the non-stack depth case. It will be shown after the exception class name and colon.
-      }
-
-    // The whiteSpace is just used for printing out stack traces, etc., things that go after a test name. The formatted
-    // text for test names actually goes over to the left once in a sense, to make room for the icon. So if the indentation
-    // level is 3 for example, the "- " for that test's formatted text is really indented 2 times (or four spaces: "    ")
-    // So that's why normally the indentation level times two spaces should be the white space. But at the top level (indentation
-    // level of 0), the icon also has to go at 0 (because subtracting one would put it at -1), so in that case the white space
-    // should be two spaces (or 1 level of indentation).
-    val whiteSpace =
-      formatter match {
-        case Some(IndentedText(_, _, indentationLevel)) if (indentationLevel != 0) => indentation(indentationLevel)
-        case _ => indentation(1)
-      }
-
-    def getStackTrace(throwable: Option[Throwable]): List[String] =
-      throwable match {
-        case Some(throwable) =>
-
-          def stackTrace(throwable: Throwable, isCause: Boolean): List[String] = {
-
-            val className = throwable.getClass.getName 
-            val labeledClassName = if (isCause) Resources.DetailsCause + ": " + className else className
-            // Only show the : message if a cause, because first one will have its message printed out 
-            // Or if it is a non-StackDepth exception, because if they throw Exception with no message, the
-            // message was coming out as "java.lang.Exception" then on the next line it repeated it. In the
-            // case of no exception message, I think it looks best to just say the class name followed by a colon
-            // and nothing else.
-            val colonMessageOrJustColon =
-              if ((throwable.getMessage != null && !throwable.getMessage.trim.isEmpty) && (isCause || !(throwable.isInstanceOf[StackDepth])))
-                ": " + throwable.getMessage.trim
-              else
-                ":"
-
-            val labeledClassNameWithMessage =
-              whiteSpace + labeledClassName + colonMessageOrJustColon
-
-            if (presentShortStackTraces || presentFullStackTraces || !(throwable.isInstanceOf[StackDepth])) {
-
-              // Indent each stack trace item two spaces, and prepend that with an "at "
-              val stackTraceElements = throwable.getStackTrace.toList map { whiteSpace + "at " + _.toString }
-              val cause = throwable.getCause
-
-              val stackTraceThisThrowable = labeledClassNameWithMessage :: stackTraceElements
-
-              if (presentFullStackTraces) {
-                if (cause == null)
-                  stackTraceThisThrowable
-                else
-                  stackTraceThisThrowable ::: stackTrace(cause, true) // Not tail recursive, but shouldn't be too deep
-              }
-              else {
-
-                // The drop(1) or drop(stackDepth + 1) that extra one is the labeledClassNameWithMessage
-                val stackTraceThisThrowableTruncated = 
-                  throwable match {
-                    case e: Throwable with StackDepth =>
-                      val stackDepth = e.failedCodeStackDepth
-                      stackTraceThisThrowable.head :: (whiteSpace + "...") :: stackTraceThisThrowable.drop(stackDepth + 1).take(shortStackTraceSize - 3) ::: List(whiteSpace + "...")
-                    case _ => // In case of IAE or what not, show top 10 stack frames
-                      stackTraceThisThrowable.head :: stackTraceThisThrowable.drop(1).take(shortStackTraceSize) ::: List(whiteSpace + "...")
-                  }
-    
-                if (cause == null)
-                  stackTraceThisThrowableTruncated
-                else
-                  stackTraceThisThrowableTruncated ::: stackTrace(cause, true) // Not tail recursive, but shouldn't be too deep
-              }
-            }
-            else
-              Nil
-          }
-          stackTrace(throwable, false)
-        case None => List()
       }
 
     val diffAnalysisContent = analysis.toList
     val diffAnalysisHeader = if (diffAnalysisContent.isEmpty) List.empty else List(FailureMessages.analysis)
-    val diffAnalysis = (diffAnalysisHeader ::: diffAnalysisContent).map(whiteSpace + _)
+    val diffAnalysis = diffAnalysisHeader ::: diffAnalysisContent
+
+    val stackTrace = stackTraceLines(throwable, presentShortStackTraces, presentFullStackTraces)
 
     val resultAsList =
       if (possiblyEmptyMessageWithPossibleLineNumber.isEmpty)
-        stringToPrintWithPossibleDuration :: diffAnalysis ::: getStackTrace(throwable)
+        stringToPrintWithPossibleDuration :: diffAnalysis ::: stackTrace
       else
-        stringToPrintWithPossibleDuration :: possiblyEmptyMessageWithPossibleLineNumber.split("\n").toList.map(whiteSpace + _) ::: diffAnalysis ::: getStackTrace(throwable)
+        stringToPrintWithPossibleDuration :: possiblyEmptyMessageWithPossibleLineNumber.split("\n").toList ::: diffAnalysis ::: stackTrace
     Vector.empty ++ resultAsList
+  }
+
+  // Returns, for each throwable of the cause chain, its class name and message then its stack frames, without indentation.
+  // The chain ends before a StackDepth exception when neither kind of stack trace is presented, and before a throwable already shown.
+  def stackTraceLines(throwable: Option[ThrowableView], presentShortStackTraces: Boolean, presentFullStackTraces: Boolean): List[String] = {
+
+    def linesOf(throwable: ThrowableView, isCause: Boolean): List[String] = {
+
+      val className = throwable.className
+      val labeledClassName = if (isCause) Resources.DetailsCause + ": " + className else className
+      // Only show the : message if a cause, because first one will have its message printed out
+      // Or if it is a non-StackDepth exception, because if they throw Exception with no message, the
+      // message was coming out as "java.lang.Exception" then on the next line it repeated it. In the
+      // case of no exception message, I think it looks best to just say the class name followed by a colon
+      // and nothing else.
+      val colonMessageOrJustColon =
+        throwable.message.map(_.trim) match {
+          case Some(trimmedMessage) if !trimmedMessage.isEmpty && (isCause || throwable.stackDepth.isEmpty) => ": " + trimmedMessage
+          case _ => ":"
+        }
+
+      val stackTraceThisThrowable = (labeledClassName + colonMessageOrJustColon) :: throwable.frames.toList.map("at " + _)
+
+      if (presentFullStackTraces)
+        stackTraceThisThrowable
+      else
+        // The drop(1) or drop(stackDepth + 1) that extra one is the labeledClassNameWithMessage
+        throwable.stackDepth.flatMap(_.failedCodeStackDepth) match {
+          case Some(stackDepth) =>
+            stackTraceThisThrowable.head :: "..." :: stackTraceThisThrowable.drop(stackDepth + 1).take(shortStackTraceSize - 3) ::: List("...")
+          case None => // In case of IAE or what not, show top 10 stack frames
+            stackTraceThisThrowable.head :: stackTraceThisThrowable.drop(1).take(shortStackTraceSize) ::: List("...")
+        }
+    }
+
+    @tailrec
+    def linesOfChain(throwable: Option[ThrowableView], shown: Set[ThrowableView], lines: Vector[String]): Vector[String] =
+      throwable match {
+        case Some(next) if (presentShortStackTraces || presentFullStackTraces || next.stackDepth.isEmpty) && !shown.contains(next) =>
+          linesOfChain(next.cause, shown + next, lines ++ linesOf(next, shown.nonEmpty))
+        case _ => lines
+      }
+
+    linesOfChain(throwable, Set.empty, Vector.empty).toList
   }
 
   final val ansiReset = "\u001b[0m"

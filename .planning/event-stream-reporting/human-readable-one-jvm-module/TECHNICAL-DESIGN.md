@@ -16,7 +16,7 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
   - turn a worker's stdout and stderr byte chunks into lines;
   - read Mill's colour decision through `private[mill]` API;
   - take its result from library state that another thread changes, not from what Mill's test-runner subprocess call returns.
-- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints, though that formatting reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured.
+- The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints, though in ScalaTest 3.2.20 that formatting reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured.
 - Every artifact must move to group `com.edc` while MiMa checks each one upstream also publishes against upstream's. Upstream's build sets the check on few of those projects and names the right artifact on two.
 
 ## Critical code paths
@@ -102,23 +102,35 @@ This serves `specification/runs-and-test-structure-executions.md` AC-141 to AC-1
 
 ### The human-readable writer's reuse of `StringReporter`'s formatting
 
-The `org.scalatest.tools.StringReporter` companion builds each line from a live `Throwable` (`getClass.getName`, `isInstanceOf[StackDepth]`, `isInstanceOf[PropertyCheckFailedException]`, `getCause`, `getStackTrace`), and returns whole lines, indented and in one colour.
+In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds each line from a live `Throwable` (`getClass.getName`, `isInstanceOf[StackDepth]`, `isInstanceOf[PropertyCheckFailedException]`, `getCause`, `getStackTrace`), and returns whole lines, indented and in one colour. The decoded event stream cannot rebuild a live `Throwable`.
 
-- Its line-building functions take a throwable view in place of a `Throwable`:
-  - the error lines (`stringsToPrintOnError`, its nested `getStackTrace`, and `withPossibleLineNumber`);
-  - `Reporter.messageOrThrowablesDetailMessage` (`object Reporter` in `org/scalatest/Reporter.scala`, which `stringsToPrintOnError` calls for a blank message);
-  - the text of info, alert, note and markup messages.
+- These line-building functions take a throwable view, `org.scalatest.tools.ThrowableView`, in place of a `Throwable`:
+  - `stringsToPrintOnError`, which builds the lines of a failed or canceled test, an aborted suite or run, and an info, alert or note message;
+  - `stackTraceLines`, which builds a throwable's stack trace lines and those of its causes;
+  - `withPossibleLineNumber`;
+  - `Reporter.messageOrThrowablesDetailMessage` (`object Reporter` in `org/scalatest/Reporter.scala`, which `stringsToPrintOnError` calls for a blank message).
 
-  The functions stay where they are, in objects already `private[scalatest]`. The no-error lines (`stringToPrintWhenNoError`) take no throwable and keep their parameters.
-- The view is `private[scalatest]`, in `org.scalatest.tools`. A wrapper supplies it for a live `Throwable`, and core's decoded throwable supplies it too. It holds what the decoded throwable holds (§ The test event log on the JVM § The format), except its frames' fields and its suppressed throwables. For a `StackDepth` it also holds the failed code's stack depth, which only the live wrapper fills.
-- The functions return text without indentation or colour. An event's first line is the text its caller passes. The stack-trace function returns each throwable of the cause chain as its first line, `Cause: ` included for a cause, with its frame lines, `...` included.
-- `StringReporter` adds the indentation it adds now, the formatter's indentation level or else one level, to every line after the first, and colours each line with its event's colour.
+  The functions are in the objects 3.2.20 has them in, which are `private[scalatest]`. `stackTraceLines` was nested in `stringsToPrintOnError` as `getStackTrace`. The lines that format no throwable keep their parameters: the no-error lines (`stringToPrintWhenNoError`) and a markup message's text (`stringToPrintWhenMarkup`).
+- The view is `private[scalatest]`. `ThrowableView.of` supplies it for a live `Throwable`, and core's decoded throwable is one. It holds:
+  - the class name, and the message where the throwable has one;
+  - whether the throwable is a `PropertyCheckFailedException`;
+  - each frame's `StackTraceElement.toString` text;
+  - the cause;
+  - for a `StackDepth`, the failed code's file name and its pathname, each joined to the line number as `StackDepth` joins them, and the failed code's stack depth, which only the live throwable's view fills.
+- `stringsToPrintOnError` returns an event's first line, built from the formatter's text as its caller passes it, then the lines under it without indentation. `stackTraceLines` returns, for each throwable of the cause chain, its class name line, `Cause: ` included for a cause, then its frame lines, `...` included, all without indentation.
+  - `stackTraceLines` walks the cause chain in a loop, so a chain of any length is formatted whatever the thread's stack size. It stops at a throwable the chain has already shown, since a decoded throwable can be its own cause. Two views of one live `Throwable` are equal for that test. 3.2.20 recurses over the chain, and overflows the stack on a chain that returns to itself.
+  - A blank message with a throwable that has no message throws a `NullPointerException`, as it does in 3.2.20.
+- `StringReporter`'s fragment functions add the indentation 3.2.20 adds, the formatter's indentation level or else one level, to every line after the first, and colour each line with its event's colour.
   - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent` (`../SPECIFICATION.md` § Scope § Out of scope, R-003).
 - The writer passes a label's text without the formatter's leading indentation, indents each line by its depth in the tree (`specification/layout.md` AC-009 to AC-011), and composes multi-colour lines (AC-026, AC-027). It adds the suffixes, lines and marks `../SPECIFICATION.md` R-106 adds to 3.2.20's text.
-- The writer calls the stack-trace function with `S` and `F` off (`../SPECIFICATION.md` R-106). The decoded throwable therefore leaves the failed code's stack depth absent: only `StringReporter`'s `S` path reads it, and `s` will never need it (`../SPECIFICATION.md` R-128).
-- A characterisation test proves `StringReporter` byte-identical. It is written and passes before the change, and passes unchanged after it.
-  - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, against text recorded from the code before the change. It turns each of `D`, `S`, `F` and `V` on and off, and for the end-of-run summary, which formats a throwable only in its reminders, each of `I`, `T`, `G` and `K`.
-  - Its throwables are a non-`StackDepth` throwable of more than ten frames with a non-`StackDepth` cause, a `StackDepth` exception with a cause, and a `PropertyCheckFailedException`. Their frames are fixed with `setStackTrace`, and each `StackDepth` exception's `source.Position` is fixed. One failure carries analysis lines.
+- The writer calls `stackTraceLines` with `S` and `F` off (`../SPECIFICATION.md` R-106). The decoded throwable therefore leaves the failed code's stack depth absent: only `StringReporter`'s `S` path reads it, and `s` will never need it (`../SPECIFICATION.md` R-128).
+- A characterisation test, `StringReporterRecordedTextSpec`, proves `StringReporter` byte-identical. It was written and passed before the functions took the view, and passes unchanged after.
+  - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, against text recorded from the code before the change, in the test resource `StringReporterRecordedText.txt`. For each event it turns `D`, `S`, `F` and `V` all off, each on alone, and all on. For the end-of-run summary, which formats a throwable only in its reminders, it turns `I`, `T`, `G` and `K` all off, each on alone, each of `T`, `G` and `K` on with `I`, and all on, and turns `D` and `V` on with reminders.
+  - Its throwables are these, among others. Their frames are fixed with `setStackTrace`, and each `StackDepth` exception's `source.Position` or stack depth is fixed. Two failures carry analysis lines.
+    - a non-`StackDepth` throwable of more than ten frames with a non-`StackDepth` cause;
+    - a `StackDepth` exception of more than ten frames whose cause is a `StackDepth` exception with a non-`StackDepth` cause;
+    - a `PropertyCheckFailedException` with a cause.
+  - The recorded text holds a line feed where the run-aborted text holds the platform's line separator, so one recording serves every platform.
   - The existing `StringReporterSuite`, `StringReporterAlertSpec` and `StringReporterSummarySpec` stay. They print no non-`StackDepth` frames, no `Cause:` line and no `PropertyCheckFailedException`, so they cannot prove the change alone.
 
 ## Stdout

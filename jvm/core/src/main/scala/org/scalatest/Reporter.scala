@@ -16,6 +16,7 @@
 package org.scalatest
 
 import org.scalatest.events.Event
+import org.scalatest.tools.ThrowableView
 
 /**
  * Trait whose instances collect the results of a running
@@ -129,13 +130,13 @@ private[scalatest] object Reporter {
   }
 
   // In the unlikely event that a message is blank, use the throwable's detail message
-  def messageOrThrowablesDetailMessage(message: String, throwable: Option[Throwable]): String = {
+  def messageOrThrowablesDetailMessage(message: String, throwable: Option[ThrowableView]): String = {
     val trimmedMessage = message.trim
     if (!trimmedMessage.isEmpty)
       trimmedMessage
     else
       throwable match {
-        case Some(t) => t.getMessage.trim
+        case Some(t) => t.message.orNull.trim // A throwable without a message throws here, as it does in ScalaTest 3.2.20
         case None => ""
       }
   }

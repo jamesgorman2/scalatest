@@ -1,5 +1,8 @@
 package org.scalatest.events
 
+import org.scalatest.tools.StackDepthView
+import org.scalatest.tools.ThrowableView
+
 private[scalatest] opaque type NodeId = Long
 
 private[scalatest] object NodeId {
@@ -127,7 +130,17 @@ private[scalatest] final case class DecodedStackDepth(
   fileName: Option[String],
   filePathname: Option[String],
   lineNumber: Option[Int]
-)
+) extends StackDepthView {
+
+  def fileNameAndLineNumber: Option[String] = withLineNumber(fileName)
+
+  def filePathnameAndLineNumber: Option[String] = withLineNumber(filePathname)
+
+  def failedCodeStackDepth: Option[Int] = None
+
+  private def withLineNumber(file: Option[String]): Option[String] =
+    for (name <- file; line <- lineNumber) yield name + ":" + line
+}
 
 private[scalatest] final case class DecodedStackFrame(
   className: String,
@@ -146,7 +159,7 @@ private[scalatest] final class DecodedThrowable(
   val stackDepth: Option[DecodedStackDepth],
   val isPropertyCheckFailure: Boolean,
   val stackTrace: IndexedSeq[DecodedStackFrame]
-) {
+) extends ThrowableView {
 
   private var linkedCause: Option[DecodedThrowable] = None
   private var linkedSuppressed: IndexedSeq[DecodedThrowable] = Vector.empty
@@ -154,6 +167,8 @@ private[scalatest] final class DecodedThrowable(
   def cause: Option[DecodedThrowable] = linkedCause
 
   def suppressed: IndexedSeq[DecodedThrowable] = linkedSuppressed
+
+  def frames: IndexedSeq[String] = stackTrace.map(_.text)
 
   def link(cause: Option[DecodedThrowable], suppressed: IndexedSeq[DecodedThrowable]): Unit = {
     linkedCause = cause
