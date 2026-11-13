@@ -228,7 +228,7 @@ Feature: Failures
 
   Rule: Every suite, scope, test and failure ScalaTest 3.2.19 prints is shown (R-021)
     Scenario: AC-073 The compatibility fixture
-      Given the module's suites are the compatibility fixture
+      Given the module's suites are the compatibility fixture, in which the suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` does not abort
       And the file ScalaTest 3.2.19's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
       Then each line of that file from its first suite's name line and before the first line that begins `Run completed in`, with leading spaces removed, is a line of the human-readable output with leading spaces removed, unless it then begins `+ ` (a message)

@@ -63,13 +63,14 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one, or 
 
 ## Epic requirements met
 
-Each holds for one module selector, one JVM test module and one worker. Where a requirement carries a qualifier, only the part it names holds.
+Those of the first bullet hold in full. Each other holds for one module selector, one JVM test module and one worker. Where a requirement carries a qualifier, only the part it names holds.
 
-- R-001, R-002, R-051, R-003, R-060, R-004.
+- R-001, R-002, R-051, R-003, R-004.
+- R-060.
 - R-010, R-063, R-011, R-074.
-- R-096, R-130, R-097, R-098, R-099, R-100, R-104, R-105, R-106 (with no formatting or filtering character), R-131, R-133, R-134, R-132 (the name line), R-107 and R-112, for human-readable output.
+- R-096, R-130, R-097, R-098, R-099, R-100 (runs that finish), R-104, R-105, R-106 (with no formatting or filtering character), R-131, R-133, R-134, R-132 (the name line), R-107 (runs that finish) and R-112, for human-readable output.
 - R-054; R-055 (one module selector; whether stdout holds human-readable output); R-053 (second bullet, except where R-110 and R-111 override it), R-125; R-092, R-072.
-- R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021, R-012 (on the run), R-086.
+- R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021 (human-readable output, runs that finish), R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
 - R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails).
@@ -114,7 +115,7 @@ The criteria are in the `specification/` documents listed in § Spec documents a
   - every other optional field, such as `throwable`, `location` or `duration`, is absent, and `analysis`, frames and suppressed throwables are empty;
   - any other field, such as a timestamp, a thread name or the `runStarted` event's PID, may hold any value.
 
-  A `Given` leaves out each run event (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`) its criterion does not exercise.
+  A `Given` leaves out each run event (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, item 3) its criterion does not exercise.
 
   In a `Then`, an event fixes only the fields and throwable parts it writes, and `null` fixes a `null` message. An event log *is* the events given, and no others. It *holds* events *in this order* when it holds each, in that order, with any others between them.
 - A node has an *execution* for each execution number the events assigned to it carry. A scope or test has *started* once it has one. A suite has started once it, or a node below it, has one.

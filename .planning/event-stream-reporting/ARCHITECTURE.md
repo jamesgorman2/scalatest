@@ -14,7 +14,8 @@ Three deployable units. Every artifact of this fork, core's included, is publish
 
 Every artifact the fork's sbt build publishes, scalactic and the style artifacts included, keeps its upstream name and runtime and Scala-version suffixes, on every runtime and Scala version `SPECIFICATION.md` § Scope covers. A test module tests with this fork by depending on them as it would on upstream's, usually through `scalatest`. Every part below is in `scalatest-core`, which the other ScalaTest artifacts depend on, and is internal (`private[scalatest]`).
 
-- **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. It hands each `Event` it receives to the emitter, unless another wrapper already has (`ARCHITECTURE-DECISIONS.md` "Structure is attached where each event is emitted…" and "Only the innermost structure wrapper an event reaches hands it to the emitter…").
+- **Structure wrapper** — an internal reporter handed to each suite, nested suite and test through `Args.reporter`. It hands each `Event` it receives to the emitter, unless another wrapper already has, so only the innermost wrapper an event reaches hands it off (`ARCHITECTURE-DECISIONS.md` "Structure is attached where each event is emitted…").
+  - A wrapper that receives an event another wrapper has handed off still gives the emitter its own node. Where the emitter holds that event, this places the event's suite instance (§ APIs § The emitter and the Mill plugin, item 3).
   - Sorting reporters hold events back, so each has ahead of it a wrapper for every node whose events it sorts, and the emitter receives each event as it is emitted.
   - A top-level suite's wrapper is installed before the suite's `SuiteStarting` is reported. As it is installed, it reads the suite's structure (§ APIs § The emitter and the Mill plugin, the `structure` event) from the constructed suite, its nested suites and the run's filter, and hands it to the emitter.
   - It hands each event off with its own node. The emitter resolves the event's node at or below that one (Emitter, below).
@@ -28,7 +29,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
     - An event of a suite, scope or test is therefore assigned to its own node even where it bypasses that node's wrapper. Only a message that nothing identifies is assigned to the node of the wrapper that hands it off, an ancestor's (`SPECIFICATION.md` R-097).
   - It sends a further `structure` event (§ APIs § The emitter and the Mill plugin, the `structure` event) when it detects that the run has learned more of a suite's structure:
     - a suite instance runs whose scopes and tests differ from those it has sent;
-    - a suite instance runs that it does not know;
+    - a suite instance runs that it does not know, and no suite node it has sent is that instance's;
     - an event resolves to a suite or test it has not sent.
   - It numbers each node's executions (§ APIs § The emitter and the Mill plugin, item 3).
   - It is not a `-C` reporter opened on `RunStarting`, which could not send the `runStarted` event in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
@@ -96,13 +97,13 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
      The run sends a further `structure` event for one suite, top-level or nested, whenever it learns more of that suite's structure:
      - where the suite instance that runs registers other scopes and tests than the structure already sent holds, as an instance constructed for the run can. The event precedes that instance's first scope or test event;
-     - where a suite instance the run did not know of runs inside a suite, as one a test creates and runs. It is that suite where their `suiteId`s match, and otherwise a nested suite directly under it, after its other children;
+     - where a suite instance the run did not know of runs inside a suite, as one a test creates and runs, and its suite node is new or it registers other scopes and tests than the structure already sent holds. Its suite node is that suite where their `suiteId`s match, else the nested suite directly under it with its `suiteId`, else a new nested suite directly under it, after its other children;
      - where an event with no record names a suite or test no `structure` event holds: that node is added.
 
      A further `structure` event holds that suite's node, with its parent where it is nested, and all its scopes and tests, which replace those the earlier events gave the suite. It holds none of the suite's nested suites, which keep the structure and place they have. Each node an earlier event held keeps its node ID;
   3. ScalaTest events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
      - each assigned to its node by the node's ID, and only after the first `structure` event that holds that node;
-       - The emitter holds, unwritten, the events of a suite instance the run did not know of until one of them shows which suite the instance runs inside. It then writes that suite's further `structure` event and the held events, in the order they were sent. Events still held when the instance's run ends reached no reporter of the run, and are dropped (`ARCHITECTURE-DECISIONS.md` "The emitter holds the events of a suite instance the run did not know of…");
+       - The emitter holds, unwritten, the events of a suite instance the run did not know of until one of them reaches the structure wrapper of a suite instance whose node is known, which places the instance (item 2). It then writes the instance's further `structure` event, where item 2 calls for one, and then the held events, in the order they were sent. Events still held when the instance's `run` throws or the `Status` it returns completes reached no reporter of the run, and are dropped (`ARCHITECTURE-DECISIONS.md` "The emitter holds the events of a suite instance the run did not know of…");
      - each one assigned to a suite, scope or test with the number of the node's execution it belongs to. One assigned to a scope or test also has the number of its parent's execution it ran in;
      - events and messages attached to the run rather than to a suite, assigned to the run. Among them are the run events (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`), which carry the run record's fields (`JSON-LAYOUT.md` § Run records; `ARCHITECTURE-DECISIONS.md` "The run's own state travels in the test event log as run events among the ScalaTest events.");
   4. the `runEnded` event: how the run ended (R-074), written once. The emitter derives it:

@@ -23,6 +23,21 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ---
 
+## A wrapper tells an event another wrapper has handed to the emitter by the event's identity in a set the emitter keeps.
+
+**Alternatives**
+
+- A thread-local flag, set while a wrapper forwards, breaks where a reporter between wrappers holds events back and releases them later, as ScalaTest's `TestSortingReporter` or a user's buffering reporter does.
+- Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting the next wrapper it reaches hand it off.
+
+**Reasoning** `../SPECIFICATION.md` R-002 forbids changing an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it.
+
+**Costs** Each event costs one insert and one remove under the emitter's write lock, and a handed-off event that never reaches its top-level suite's wrapper stays in the set until the run ends. Where a reporter between wrappers forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
+
+**Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+
+---
+
 ## Each event of a run's test event log is a JSON object.
 
 **Alternatives** A positional tab-separated format is shorter and simpler to parse, but needs its own escaping rules, specified and tested separately, and is unreadable where a field is absent.

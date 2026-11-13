@@ -236,6 +236,7 @@ Feature: Where messages sit
         """
       And no line before `- must have size 0 *** FAILED ***` holds `a note` or `an alert`
 
+  Rule: A suite's or scope's message sits among the node's children after the last, in declared order, of those that had started in the message's execution of the node when the event log held the message, and before the next; messages placed between the same two children keep the order the event log holds them (R-097)
     Scenario: AC-034 A scope's message sits among its children
       Given an event log holding:
         """
@@ -389,10 +390,11 @@ Feature: Mill's prefix and colour
       When the test command runs it
       Then each line of the human-readable output on stdout begins with the prefix Mill puts on every line the test command's own task writes, such as `1] `, ahead of the line's indentation
 
-  Rule: Colour changes no text (R-124)
+  Rule: Human-readable output on stdout is coloured where Mill colours its own console output, and colour changes no text (R-124)
     Scenario: AC-053 The same text with colour on and off
       Given the module of `runs-and-test-structure-runs.md` AC-035
       When the test command runs it once with Mill's `--color true` and once with `--color false`
-      Then the second human-readable output holds no ANSI escape sequence
+      Then the first human-readable output is the one AC-035 gives, in colour
+      And the second holds no ANSI escape sequence
       And it equals the first with every ANSI escape sequence removed
 ```

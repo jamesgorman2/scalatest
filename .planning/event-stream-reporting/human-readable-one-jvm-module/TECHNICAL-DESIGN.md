@@ -22,7 +22,6 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
 - The test command is the `test` command of a top-level `ExternalModule` object in a named package of the plugin. Beside it, `package object scalatest extends mill.api.ExternalModule.Alias(<that object>)` gives it the prefix `scalatest`, as Mill 1.3.1's `package object spotless extends ExternalModule.Alias(SpotlessModule)` does (`libs/javalib/src/mill/javalib/spotless/package.scala`).
 - Mill's selector parser accepts a single-segment prefix before `/` (`core/api/src/mill/api/internal/ParseArgs.scala` `selector`). It resolves prefix `scalatest` by loading class `scalatest$`, then `scalatest.package$`, the package object, from the meta-build's class loader (`core/resolve/src/mill/resolve/Resolve.scala` `resolveRootModule`, at Mill tag `1.3.1`).
 - That resolution was read from source, not run. An integration test runs `mill scalatest/test core.test` on a fixture build that adds the plugin by its header line.
-- If the alias does not resolve, the test command is instead `run` on an `ExternalModule` object `Tests` in top-level package `scalatest`, invoked as `mill scalatest.Tests/run`, Mill's documented `foo.Bar/qux` form, and `SPECIFICATION.md` § Scope changes with it.
 
 ### The run's PID and process start time
 
@@ -57,7 +56,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
   - Splitting before decoding never cuts a character in an ASCII-compatible charset whose multi-byte sequences never hold byte `0x0A`. That covers every encoding `native.encoding` names, among them UTF-8, the single-byte charsets, MS932, GBK, MS949 and Big5.
   - A lone `\r` stays in the line's text.
   - Lines of the two streams enter the sequence in the order their splitters completed them. `../SPECIFICATION.md` R-043 asks no more.
-- When its stream ends, a splitter appends the line it still holds, if it holds any bytes. Mill's call returns only once both reader threads have finished (`../research/mill-worker-channels.md` § 2.3), so the sequence is complete before the test command adds the test classes the worker took.
+- When its stream ends, a splitter appends the line it still holds, if it holds any bytes. Mill's call returns only once both reader threads have finished (`../research/mill-worker-channels.md` § 2.3), so the sequence is complete when the call returns.
 - A worker writes a piped stdout and stderr in the platform's native encoding unless its `forkArgs` set `file.encoding`, `stdout.encoding` or `stderr.encoding`. The splitter decodes with the charset Mill's JVM names in its `native.encoding` system property, or `Charset.defaultCharset()` where that property is absent, and replaces malformed bytes with U+FFFD rather than dropping them.
 
 ### A message among its node's children
@@ -65,7 +64,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 This serves `specification/layout.md` AC-034.
 
 - Assembly records, with each message assigned to a suite or scope, which of that node's children had sent the first event of an execution under the message's own execution (§ A node's executions and its suite's latest structure) when the message arrived.
-- The human-readable writer puts the message after the last of those children in declared order and before the next. A child declared before that one but not yet reached, as under concurrent tests, therefore also comes before the message. Messages placed between the same two children keep the order they arrived in.
+- The human-readable writer places the message from that record.
 
 ### A node's executions and its suite's latest structure
 
@@ -212,8 +211,8 @@ An event's node is found from the suite instance that sent it, never by reading 
   - Given a test name and a test sorter, `ParallelTestExecution.run`, `RandomTestOrder.run` and `AsyncEngine.runImpl` replace the reporter with a `TestSpecificReporter`. Each looks up `this`, and wraps the `TestSpecificReporter` in that test's wrapper, so the test-specific instance's events pass through it (`specification/test-event-log-structure.md` AC-100, AC-129). `AsyncEngine.runImpl` does so only in an async suite that mixes in neither `ParallelTestExecution` nor `RandomTestOrder`, for the instances `OneInstancePerTest.runTest` creates.
 - `ParallelTestExecution.runTests`, `RandomTestOrder.run` and `AsyncEngine.runTestsImpl` each look up `this` or `theSuite` and put a wrapper for the suite over the `TestSortingReporter` they create. The sorter holds back the suite's own events, such as `ScopeOpened`, `ScopeClosed` and a scope's messages, until the tests before them complete. Each test's wrapper sits ahead of the sorter and hands the test's events off at once. Through the sorter alone, a scope's message would reach the emitter after children declared after it had started, and be placed after them (§ Critical code paths § A message among its node's children).
 - A site whose lookup finds several registrations installs no wrapper. The instance's events are then handed off by the wrapper its registering site installed, which names the table (§ An event's node).
-- An event reaches every wrapper between its sender and `DispatchReporter`: its test's, its suite's and each enclosing suite's, interleaved with other reporters such as `TestSortingReporter`, `CatchReporter`, `StopOnFailureReporter` and a user's. Only the innermost wrapper it reaches hands it to the emitter (`../ARCHITECTURE-DECISIONS.md` "Only the innermost structure wrapper an event reaches hands it to the emitter…").
-  - The emitter keeps an identity set of the events wrappers have handed off. Under the emitter's write lock, a wrapper hands off only an event not in the set, and adds it.
+- An event reaches every wrapper between its sender and `DispatchReporter`: its test's, its suite's and each enclosing suite's, interleaved with other reporters such as `TestSortingReporter`, `CatchReporter`, `StopOnFailureReporter` and a user's. Only the innermost wrapper it reaches hands it to the emitter.
+  - The emitter keeps an identity set of the events wrappers have handed off (`TECHNICAL-DESIGN-DECISIONS.md` "A wrapper tells an event another wrapper has handed to the emitter…"). Under the emitter's write lock, a wrapper hands off only an event not in the set, and adds it.
   - A wrapper that receives an event already in the set still names its registration to the emitter, under the write lock. Where the event is held, that places its unplaced instance (§ Suite instances and their nodes).
   - The top-level suite's wrapper, the last wrapper any event of its suite reaches, removes the event from the set instead of adding it.
 - `wrapReporterIfNecessary` adds a `CatchReporter` over any reporter that is not one, so it adds one over a wrapper put where 3.2.19 passes a `CatchReporter` on. That layer forwards every event. A wrapper catches whatever its own hand-off throws and then passes the event on, so the layer never prints `Resources.reporterThrew` for the emitter, and no reporter misses an event (`../SPECIFICATION.md` R-002).
@@ -263,7 +262,7 @@ Each event is a JSON object (`TECHNICAL-DESIGN-DECISIONS.md` "Each event of a ru
 
 - A lone surrogate's `\uXXXX` escape decodes back to the same `char`.
 - Integers are JSON numbers, read as `Long`, never through `Double`.
-- An empty array omits its key, as an absent value does.
+- An empty array omits its key.
 
 Each event's first key is `item`, naming its kind. The events are those of `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and the keys of each, in order, are:
 
@@ -288,7 +287,7 @@ A ScalaTest event's fields:
   - the event's copy of its node's names and IDs: `suiteName`, `suiteId`, `suiteClassName`, `testName`, `testText`, `nameInfo`, and a `ScopeOpened`'s, `ScopeClosed`'s or `ScopePending`'s `message`, since names, IDs, class names and labels come from the `structure` event through the node the event is assigned to;
   - `DiscoveryStarting`'s `configMap`, since the run record's comes from `RunStarting`.
 - Its keys are the field names of its decoded class, in that class's declaration order. Each decoded class names and orders the fields it holds as its `org.scalatest.events` class does.
-- A field whose `org.scalatest.events` type is not an `Option` is required, except that an empty sequence omits its key and decodes as empty.
+- A field whose `org.scalatest.events` type is not an `Option` is required, except a sequence, whose omitted key decodes as empty.
 - A `String` is a JSON string, an `Int` or `Long` a number and a `Boolean` `true` or `false`. A sequence is an array, and `None` omits its key.
 - A case class, such as a `Summary`, is an object of its fields under the same rules. A member of a sealed family, such as a `Location`, is that object with first key `kind` holding its class's simple name: `{"kind":"SeeStackDepthException"}`.
 - A `ConfigMap` is an object of each value's `toString`, its keys in ascending `String.compareTo` order.
@@ -320,11 +319,8 @@ The criteria whose `Given` is an event log holding events (`SPECIFICATION.md` §
 - A test gives the run as one ordered list: the criterion's events, in the notation of `SPECIFICATION.md` § Acceptance criteria, with the run's captured lines at the places they are fed.
 - The builder derives only each node's ID, its parent's ID and its declared position, from the `structure` events, and resolves each node an event names to its ID. It emits every event and captured line in the order given, in the form core's decoder yields, so a test can place a `structure` event, a ScalaTest event or a captured line anywhere the criterion puts it.
 - It gives each event the execution number, and each scope's or test's event the parent's execution number, that the notation's `execution <n>` and `parent execution <m>` rules give it.
-- A `structure` block for a suite an earlier block holds becomes a further `structure` event. The builder keeps the ID of each node an earlier block holds and mints the rest, matching as the emitter's node tables do (§ The test event log on the JVM § Suite instances and their nodes):
-  - a test by its suite and its ScalaTest test name, which is the `test name` its line gives, else its scopes' names and its own joined by single spaces;
-  - a scope by its name and its place among the scopes of that name under the same parent.
-- A `structure under suite` block names its parent, which the builder resolves to that suite's ID. A suite the block adds gets no position: it sits after its parent's other children, and several such suites in the order of their blocks (§ The test event log on the JVM § The format).
-- It adds the test classes the run's process took after the event stream ends, as the test command does.
+- A `structure` block for a suite an earlier block holds becomes a further `structure` event. The builder keeps the ID of each node that `SPECIFICATION.md` § Acceptance criteria makes the node of an earlier block, and mints the rest.
+- A suite a `structure under suite` block adds gets its parent's ID and no position (§ The test event log on the JVM § The format).
 
 The emitter's and the decoder's criteria are those that state events, in the parts of `specification/test-event-log.md`. Among them, `specification/test-event-log-events.md` AC-109 writes lone surrogates, and `specification/test-event-log-structure.md` AC-100 and AC-121 write events from concurrent threads. Each side of the codec is tested against the format on its own (`../ARCHITECTURE-DECISIONS.md` "Each side of core's codec is tested on its own…"), so each such criterion has two tests. Both build the criterion's events with the same builder from its event list, and share expected text in the format, written by hand in the test: a whole line for each event the criterion states, with any value where the criterion fixes none.
 
