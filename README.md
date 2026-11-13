@@ -111,7 +111,7 @@ You can also publish it to your local Ivy repository using this command:
 
   `$ sbt publishLocal`
 
-This fork publishes its Scala 3 artifacts only, each under Maven group `com.edc` with the artifact name ScalaTest publishes it under.
+This fork publishes no Scala 2 artifacts, and publishes each of the others under Maven group `com.edc` with the artifact name ScalaTest publishes it under.
 
 Or publish it to local maven repository using this command:
 

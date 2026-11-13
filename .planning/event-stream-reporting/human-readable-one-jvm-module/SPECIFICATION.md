@@ -16,7 +16,7 @@ Nothing yet turns a run's events into consolidated output: ScalaTest has no emit
 - [specification/runs-and-test-structure.md](specification/runs-and-test-structure.md) — acceptance criteria for which suites, scopes, tests, failures and captured output the human-readable output shows, how often and in what order, and a run's block.
 - [specification/test-command.md](specification/test-command.md) — acceptance criteria for the test command's arguments, how it runs the module, its result, what else reaches the console, and Mill's own test tasks and BSP server.
 - [specification/test-event-log.md](specification/test-event-log.md) — acceptance criteria for what a run's test event log holds on the JVM, and for the ScalaTest behaviour that stays unchanged.
-- [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.20, the emitter on Scala 3 on the JVM, and the consolidation library without Mill.
+- [specification/compatibility-and-library.md](specification/compatibility-and-library.md) — acceptance criteria for compatibility with ScalaTest 3.2.20, and the consolidation library without Mill.
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this specification.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against. `R-nnn` IDs in this specification are the epic's.
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture: the modules this feature starts, their parts (§ Modules), and the boundaries between them, including the test event log's events and how it carries them (§ APIs § The emitter and the Mill plugin).
@@ -76,7 +76,7 @@ The first bullet's requirements hold in full. Each other holds for one module se
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
 - R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails; for a run that ends aborted or stopped, only that the consolidation state is failed).
 - R-048 (human-readable output on stdout), R-124 (on stdout), R-050.
-- `../SPECIFICATION.md` § Scope: Scala 3 on the JVM.
+- `../SPECIFICATION.md` § Scope: the JVM, in test modules on Scala 3.3 or later.
 
 ## Acceptance criteria
 

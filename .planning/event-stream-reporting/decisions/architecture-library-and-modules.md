@@ -2,13 +2,16 @@
 
 Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, builds on and decides, and how the fork's artifacts are built and published, newest first.
 
-## The fork compiles with Scala 3.3.8 on every runtime.
+## The fork's sbt build compiles with Scala 3.3.8 on every runtime.
 
-**Alternatives** Scala 3.9.0, the version the fork's consumer builds with, has an unknown cost in the macros of Scalactic and ScalaTest, and raises the JDK the artifacts need.
+**Alternatives**
+
+- Scala 3.9.0, the version the fork's consumer builds with, has an unknown cost in the macros of Scalactic and ScalaTest, and raises the JDK the artifacts need.
+- The compilers upstream 3.2.20 builds with, Scala 3.1.3 on the JVM and Scala.js and 3.3.3 on Native, serve only modules on Scala 3.1 and 3.2, unsupported compiler lines outside `../SPECIFICATION.md` § Scope, and put two compiler versions over one set of sources, holding the emitter and the codec to the older language level.
 
 **Reasoning** Upstream's 3.3 line, whose sources are near-identical to these, builds with Scala 3.3.8, so these sources are known to compile on it. A module on a later Scala 3 version, such as 3.9.0, uses a library built with 3.3.8 unchanged.
 
-**Costs** A module on a Scala 3 version before 3.3 cannot compile against the fork's artifacts, as it can against upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3.
+**Costs** A module on Scala 3.1 or 3.2, on the JVM or Scala.js, or on Scala.js before 1.20.2, cannot use the fork's artifacts, as it can upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3, and a problem MiMa reports against upstream's jars, built with older compilers, can come from the compiler and not from the fork's sources.
 
 **Settled by** [What binary compatibility does the fork promise, given its base is upstream 3.3.0-alpha.2?](https://github.com/jamesgorman2/scalatest/issues/107).
 
@@ -75,7 +78,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 **Reasoning** A test event log is read only by the release that wrote it (`event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output in the format R-106 requires.
 
-**Costs** Core's internals carry the library's needs, and the plugin loads scalatest-core for Scala 3 into Mill's JVM.
+**Costs** Core's internals carry the library's needs, and the plugin loads scalatest-core's JVM build into Mill's JVM.
 
 **Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
 

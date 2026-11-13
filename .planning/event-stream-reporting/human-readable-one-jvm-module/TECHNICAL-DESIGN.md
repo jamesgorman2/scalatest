@@ -17,7 +17,7 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
   - read Mill's colour decision through `private[mill]` API;
   - take its result from library state that another thread changes, not from what Mill's test-runner subprocess call returns.
 - The human-readable writer must reuse `StringReporter`'s formatting without changing what `StringReporter` prints, though that formatting reads a live `Throwable` the decoded event stream cannot rebuild and returns lines already indented and coloured.
-- Every artifact must move to group `com.edc` while the build's MiMa check still compares against upstream's.
+- Every artifact must move to group `com.edc` while MiMa checks each one upstream also publishes against upstream's, though upstream's build sets the check on few of those projects and names the right artifact on two.
 
 ## Critical code paths
 
@@ -328,9 +328,13 @@ A line cannot be decoded where it is not one JSON object, holds a key this secti
 The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every artifact is published at one version, the fork's release, and the plugin depends on core and the library at its own version.
 
 - The fork's release is the sbt build's `releaseVersion`, `3.2.20`, so the JVM's core is `com.edc:scalatest-core_3:3.2.20`.
-- The fork builds and publishes only the Scala 3 projects of `project/DottyBuild.scala`. Each has `organization` `com.edc`, those upstream publishes under `org.scalatest` and `org.scalactic` alike.
-- The build's Scala 2 projects stay as upstream wrote them, group included, so that a merge from upstream's `3.2.x-new` branch applies to them unchanged. The fork neither builds nor publishes them, and nothing keeps them compiling.
-- MiMa compares with upstream's 3.2.20 (`../SPECIFICATION.md` R-004): `previousReleaseVersion` is `3.2.20`, and each `mimaPreviousArtifacts` of a Scala 3 project names the project's upstream group, `org.scalatest` or `org.scalactic`, in place of its `organization`.
+- The fork builds and publishes only the Scala 3 projects of `project/DottyBuild.scala` and the Java-only `scalatestCompatible` of `project/scalatest.scala`, which `scalatestCoreDotty` and `scalatestAppDotty` depend on. Each has `organization` `com.edc`, those upstream publishes under `org.scalatest` and `org.scalactic` alike.
+- The build's Scala 2 projects stay as upstream wrote them, group included, so that a merge from upstream's `3.2.x-new` branch applies to them unchanged. The fork neither builds nor publishes them, and nothing keeps them compiling. `scalatestCompatible` is the one project of `project/scalatest.scala` the fork changes.
+- Every Scala 3 project compiles with the Scala, Scala.js and Scala Native versions `../ARCHITECTURE.md` § Modules § ScalaTest core gives. Upstream's 3.2.20 build sets Scala 3.1.3 for the JVM and Scala.js (`dottyVersion`'s default), Scala 3.3.3 for Native (`nativeDottySettings`) and Scala.js 1.8.0 (`scalaJSVersion`'s default, in both `project/plugins.sbt` and `project/BuildCommons.scala`); its Scala Native version is already the architecture's.
+- MiMa compares with upstream's 3.2.20 (`../SPECIFICATION.md` R-004), and `previousReleaseVersion` is `3.2.20`.
+  - The check covers every project the fork publishes whose artifact upstream 3.2.20 also publishes, on all three runtimes: every published Scala 3 project but the consolidation library, and `scalatestCompatible`.
+  - Each covered project's `mimaPreviousArtifacts` names upstream's group, `org.scalatest` or `org.scalactic`, the project's `moduleName`, its platform cross-version and `3.2.20`, and its `mimaCurrentClassfiles` is the jar the project packages. `scalatest-compatible` has no Scala suffix.
+  - Upstream's build sets both keys on eight Scala 3 projects and on `scalatestCompatible`, and names the right artifact only on `scalatestAppDotty` and `scalatestAppDottyJS`. The other six Scala 3 projects build the artifact's name and the jar's from `name`, which is the project ID where a project sets only `moduleName`, and those on Scala.js and Native use `%%`, which leaves out the platform suffix. `scalatestCompatible` uses `%%`, which adds a Scala suffix. The feature sets both keys on every covered project.
 - A dependency of a Scala 3 project on a ScalaTest+ artifact excludes upstream's groups. Its upstream ScalaTest would otherwise sit on the classpath beside the fork's, which no longer evicts it.
 - The consolidation library is a JVM-only project of `project/DottyBuild.scala`, depending on its Scala 3 scalatest-core project. `scalatestDotty` aggregates it, so the sbt build publishes it with core, before the plugin's Mill build resolves both.
 - A task of the library's project checks `specification/compatibility-and-library.md` AC-062. It publishes the library and the projects it depends on with `publishLocal`, resolves the published library transitively from the local Ivy repository and Maven Central alone, and fails on any dependency with group `com.lihaoyi` and a name beginning `mill-`.
@@ -382,4 +386,9 @@ This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `spe
 
 ### MiMa
 
-`specification/compatibility-and-library.md` AC-058 runs the MiMa check of the build's Scala 3 projects against upstream's groups (§ Publishing). Review rejects any MiMa problem filter this feature adds, since a filter would let the check pass without the compatibility it proves.
+`specification/compatibility-and-library.md` AC-058 runs the MiMa check on every project § Publishing covers. The check fails for a covered project that resolves no previous artifact.
+
+The check runs with no problem filter, since a filter would let it pass without the compatibility it proves:
+
+- The `mimaBinaryIssueFilters` upstream's build sets are removed. They excuse upstream's own changes since 3.2.19, and against 3.2.20 they could only hide a break the fork makes.
+- Review rejects any filter this feature adds.

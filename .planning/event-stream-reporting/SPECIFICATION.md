@@ -27,7 +27,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - The test command's output arguments: progress and human-readable output on its stdout or in files, JSON output in files, any number of files, and formatting and filtering of human-readable output.
 - A module a build defines to preset a test command's arguments (R-126).
 
-The emitter, the consolidation library and the Mill plugin cover runs on the JVM, Scala.js and Native, on Scala 3 only. The fork builds its artifacts with Scala 3.3.8, and builds and publishes none for Scala 2. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
+The emitter, the consolidation library and the Mill plugin cover runs on the JVM, Scala.js and Native, in test modules on Scala 3.3 or later. The fork publishes no Scala 2 artifacts. On Scala.js, § Constraints holds in every JS environment, but the emitter, the consolidated output and the test command cover only runs in the `NodeJs` and `JsDom` JS environments. Every requirement below holds on each runtime and in each JS environment it covers; none is best effort on Scala.js or Native.
 
 The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. Each lists the Mill releases its integration tests passed on, and supports exactly those (*supported Mill releases*).
 
@@ -63,7 +63,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-001 A run with the emitter off uses the reporters ScalaTest 3.2.20 uses. Each receives what 3.2.20 sends, and the build tool receives the test-interface events 3.2.20 sends.
 - R-002 With the emitter on, every existing ScalaTest reporter, and any reporter passed with `-C`, still receives what 3.2.20 sends.
 - R-051 With the emitter on, the build tool still receives the test-interface events 3.2.20 sends.
-- R-004 The fork's Scala 3 artifacts stay binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.20's.
+- R-004 Each artifact of the fork that ScalaTest 3.2.20 also publishes stays binary compatible with ScalaTest 3.2.x, checked by MiMa against 3.2.20's.
 
 ### Compatibility with IDEs and Mill's test tasks
 

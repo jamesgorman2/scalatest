@@ -116,11 +116,16 @@ Feature: Running the module
       Then the run's block holds `[stdout] env=from-forkEnv`
       And the `cwd=` line it holds is the one `testForked` wrote
 
-  Rule: The test command runs a module whose definition names nothing from the plugin, on Scala 3 (R-092, `../../SPECIFICATION.md` § Scope)
-    Scenario: AC-083 The plugin is added to a build on Scala 3.3
-      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala 3.3, is the module of `layout.md` AC-002
+  Rule: The test command runs a module on Scala 3.3 or later whose definition names nothing from the plugin (R-092, `../../SPECIFICATION.md` § Scope)
+    Scenario Outline: AC-083 The plugin is added to a build on Scala <version>
+      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala <version>, is the module of `layout.md` AC-002
       When the plugin's header line (`../SPECIFICATION.md` § Scope), at the release `core.test` tests with, is added to its `build.mill`, with nothing else in the build changed, and the test command runs the module
       Then the human-readable output is the one `layout.md` AC-002 gives
+
+      Examples:
+        | version |
+        | 3.3     |
+        | 3.9     |
 ```
 
 ## The test command's result

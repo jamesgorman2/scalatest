@@ -9,7 +9,7 @@ Decisions behind `../SPECIFICATION.md` on which upstream line and release the fo
 - A fork on upstream's 3.3 line, checked against 3.3.0-alpha.2, promises nothing to a build on 3.2.x.
 - A fork on the 3.3 line, checked against 3.2.x, needs a MiMa filter for each of upstream's own breaks, 1682 problems in `scalatest-app` alone.
 
-**Reasoning** The fork's users are on 3.2.x. Libraries compiled against 3.2.x link against API the 3.3 line removes, such as `styleName`, `TestRegistration`, `CatchReporter` and the `Args` constructor, so a fork on the 3.3 line cannot replace upstream on their classpath.
+**Reasoning** The fork's users are on 3.2.x. Libraries compiled against 3.2.x link against API the 3.3 line removes, such as `styleName`, `TestRegistration` and the `Args` constructor, so a fork on the 3.3 line cannot replace upstream on their classpath.
 
 **Costs** The fork takes nothing upstream adds only to its 3.3 line, and cannot serve a build that moves to that line.
 
@@ -24,7 +24,7 @@ Decisions behind `../SPECIFICATION.md` on which upstream line and release the fo
 - A base and comparator of 3.2.19 leaves the fork one release behind upstream.
 - A base of 3.2.20 compared with 3.2.19 shows upstream's own 3.2.20 changes as differences.
 
-**Reasoning** With the base equal to the comparator, every difference a comparison finds is the fork's own, whether MiMa finds it (`../SPECIFICATION.md` R-004) or it is in what reporters and the build tool receive (R-001, R-002, R-051, R-003, R-106). 3.2.20 is the tip of `3.2.x-new`, the branch upstream releases its 3.2 line from.
+**Reasoning** With the base equal to the comparator, the fork's sources differ from the comparator's only where the fork changed them. No comparison then shows a change upstream made between releases, whether MiMa's (`../SPECIFICATION.md` R-004) or that of what reporters and the build tool receive (R-001, R-002, R-051, R-003, R-106). 3.2.20 is the tip of `3.2.x-new`, the branch upstream releases its 3.2 line from.
 
 **Costs** Nothing in the fork checks it against an earlier 3.2.x release: compatibility with one rests on upstream's own between its releases.
 
@@ -32,7 +32,7 @@ Decisions behind `../SPECIFICATION.md` on which upstream line and release the fo
 
 ---
 
-## The fork builds, tests and publishes Scala 3 artifacts only.
+## The fork builds, tests and publishes no Scala 2 artifacts.
 
 **Alternatives** Building the Scala 2.11, 2.12 and 2.13 artifacts upstream publishes serves no user of the fork, and holds the emitter, the codec and their tests to what compiles and passes on each of those versions, on every runtime.
 
