@@ -136,7 +136,7 @@ private[scalatest] object Reporter {
       trimmedMessage
     else
       throwable match {
-        case Some(t) => t.message.orNull.trim // A throwable without a message throws here, as it does in ScalaTest 3.2.20
+        case Some(t) => t.message.orNull.trim // Throws a NullPointerException for a throwable without a message, as ScalaTest 3.2.20 does
         case None => ""
       }
   }

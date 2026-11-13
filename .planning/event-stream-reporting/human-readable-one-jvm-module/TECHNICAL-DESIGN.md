@@ -110,23 +110,31 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
   - `withPossibleLineNumber`;
   - `Reporter.messageOrThrowablesDetailMessage` (`object Reporter` in `org/scalatest/Reporter.scala`, which `stringsToPrintOnError` calls for a blank message).
 
-  The functions are in the objects 3.2.20 has them in, which are `private[scalatest]`. `stackTraceLines` was nested in `stringsToPrintOnError` as `getStackTrace`. The lines that format no throwable keep their parameters: the no-error lines (`stringToPrintWhenNoError`) and a markup message's text (`stringToPrintWhenMarkup`).
+  The functions stay in the objects that hold them in 3.2.20, which are `private[scalatest]`. 3.2.20 nests `stackTraceLines` in `stringsToPrintOnError` as `getStackTrace`. The functions that format no throwable keep their parameters: `stringToPrintWhenNoError` for the no-error lines and `stringToPrintWhenMarkup` for a markup message's text.
 - The view is `private[scalatest]`. `ThrowableView.of` supplies it for a live `Throwable`, and core's decoded throwable is one. It holds:
   - the class name, and the message where the throwable has one;
   - whether the throwable is a `PropertyCheckFailedException`;
   - each frame's `StackTraceElement.toString` text;
   - the cause;
   - for a `StackDepth`, the failed code's file name and its pathname, each joined to the line number as `StackDepth` joins them, and the failed code's stack depth, which only the live throwable's view fills.
-- `stringsToPrintOnError` returns an event's first line, built from the formatter's text as its caller passes it, then the lines under it without indentation. `stackTraceLines` returns, for each throwable of the cause chain, its class name line, `Cause: ` included for a cause, then its frame lines, `...` included, all without indentation.
-  - `stackTraceLines` walks the cause chain in a loop, so a chain of any length is formatted whatever the thread's stack size. It stops at a throwable the chain has already shown, since a decoded throwable can be its own cause. Two views of one live `Throwable` are equal for that test. 3.2.20 recurses over the chain, and overflows the stack on a chain that returns to itself.
-  - A blank message with a throwable that has no message throws a `NullPointerException`, as it does in 3.2.20.
+- The functions return lines without indentation:
+  - `stringsToPrintOnError` returns an event's first line, built from the formatter's text as its caller passes it, then the lines under it.
+  - `stackTraceLines` returns, for each throwable of the cause chain, its class name line, `Cause: ` included for a cause, then its frame lines, `...` included.
+  - `stackTraceLines` walks the cause chain in a loop, so a chain of any length is formatted whatever the thread's stack size. 3.2.20 recurses over the chain, and overflows the stack on a chain that returns to itself.
+  - `stackTraceLines` stops at a throwable the chain has already shown, since a decoded throwable can be its own cause. Two views of one live `Throwable` are equal for that check.
+  - `stringsToPrintOnError` throws a `NullPointerException` for a blank message and a throwable without a message, as it does in 3.2.20.
 - `StringReporter`'s fragment functions add the indentation 3.2.20 adds, the formatter's indentation level or else one level, to every line after the first, and colour each line with its event's colour.
   - Its output stays byte-identical, and so does that of `Framework`'s `SbtLogInfoReporter` and the Scala.js and Native `TaskRunner`, which call `fragmentsForEvent` (`../SPECIFICATION.md` § Scope § Out of scope, R-003).
 - The writer passes a label's text without the formatter's leading indentation, indents each line by its depth in the tree (`specification/layout.md` AC-009 to AC-011), and composes multi-colour lines (AC-026, AC-027). It adds the suffixes, lines and marks `../SPECIFICATION.md` R-106 adds to 3.2.20's text.
 - The writer calls `stackTraceLines` with `S` and `F` off (`../SPECIFICATION.md` R-106). The decoded throwable therefore leaves the failed code's stack depth absent: only `StringReporter`'s `S` path reads it, and `s` will never need it (`../SPECIFICATION.md` R-128).
 - A characterisation test, `StringReporterRecordedTextSpec`, proves `StringReporter` byte-identical. It was written and passed before the functions took the view, and passes unchanged after.
-  - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, against text recorded from the code before the change, in the test resource `StringReporterRecordedText.txt`. For each event it turns `D`, `S`, `F` and `V` all off, each on alone, and all on. For the end-of-run summary, which formats a throwable only in its reminders, it turns `I`, `T`, `G` and `K` all off, each on alone, each of `T`, `G` and `K` on with `I`, and all on, and turns `D` and `V` on with reminders.
-  - Its throwables are these, among others. Their frames are fixed with `setStackTrace`, and each `StackDepth` exception's `source.Position` or stack depth is fixed. Two failures carry analysis lines.
+  - It compares the fragments, text and colour, that `fragmentsForEvent` and `summaryFragments` return for every event kind they format, formatted and with `U`, against text recorded from the code before the change, in the test resource `StringReporterRecordedText.txt`.
+  - For each event it turns `D`, `S`, `F` and `V` all off, each on alone, and all on.
+  - For the end-of-run summary, which formats a throwable only in its reminders, it turns:
+    - `I`, `T`, `G` and `K` all off, each on alone, and all on;
+    - each of `T`, `G` and `K` on with `I`;
+    - `D` and `V` on with reminders.
+  - Its throwables' frames are fixed with `setStackTrace`, and each `StackDepth` exception's `source.Position` or stack depth is fixed. Two failures carry analysis lines. The throwables include:
     - a non-`StackDepth` throwable of more than ten frames with a non-`StackDepth` cause;
     - a `StackDepth` exception of more than ten frames whose cause is a `StackDepth` exception with a non-`StackDepth` cause;
     - a `PropertyCheckFailedException` with a cause.

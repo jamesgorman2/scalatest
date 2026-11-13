@@ -142,7 +142,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       4
     )
 
-  // The StackDepth exception has a cause of its own, which the chain must not reach where it ends at the StackDepth exception.
+  // The StackDepth exception has a cause of its own, which must not be shown where the chain ends before the StackDepth exception.
   private def plainFailureCausedByStackDepthFailure: Throwable = {
     val innermost = withFrames(new IllegalArgumentException("root cause"), "Disk", 2)
     val inner = new TestFailedException(

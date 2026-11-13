@@ -97,7 +97,7 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
       cause.frames shouldBe Vector("Stack.method0(Stack.scala:10)")
       cause.cause shouldBe None
     }
-    "hold a StackDepth exception's file, pathname and line number, and the failed code's stack depth" in {
+    "hold a StackDepth exception's file name, pathname and line number, and the failed code's stack depth" in {
       val failure = withFrames(testFailedException(Some("failed"), None, Position("Stack.scala", "/src/Stack.scala", 12)), "Stack", 4)
       val stackDepth = ThrowableView.of(failure).stackDepth.get
       stackDepth.fileNameAndLineNumber shouldBe Some("Stack.scala:12")
@@ -167,7 +167,7 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
   }
 
   "StringReporter's error lines" should {
-    "leave every line unindented after the first, which is the formatter's text" in {
+    "be unindented after the first line, which is the formatter's text" in {
       val cause = withFrames(new IllegalArgumentException("root cause"), "Stack", 1)
       val failure = withFrames(new IllegalStateException("boom", cause), "Stack", 2)
       errorLines("the message", Some(ThrowableView.of(failure)), Vector("an analysis line")) shouldBe Vector(
