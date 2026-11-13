@@ -105,7 +105,7 @@ private[scalatest] object EventLogComparison {
       expected.zip(tree).zipWithIndex.foldLeft[Either[String, MatchedNodes]](Right(nodes)) {
         case (Right(soFar), ((expectedNode, node), index)) =>
           if (withoutIds(expectedNode) != withoutIds(node)) {
-            Left(s"its node ${index + 1} is ${withoutIds(node)}, not ${withoutIds(expectedNode)}")
+            Left(s"its node ${index + 1} is ${inNotation(node)}, not ${inNotation(expectedNode)}")
           } else {
             val place = s"its node ${index + 1}"
             soFar.matching(idOf(expectedNode), idOf(node)).toRight(s"$place is not the node an earlier structure held there").flatMap { withNode =>
@@ -139,8 +139,24 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  private def withoutIds(node: StructureNode): String = {
-    def quoted(text: String): String = "\"" + text + "\""
+  private def withoutIds(node: StructureNode): StructureNode = {
+    val noNode = NodeId(0L)
+    node match {
+      case suite: StructureNode.Suite => suite.copy(id = noNode, parent = None)
+      case scope: StructureNode.Scope => scope.copy(id = noNode, parent = noNode)
+      case test: StructureNode.Test => test.copy(id = noNode, parent = noNode)
+    }
+  }
+
+  private def inNotation(node: StructureNode): String = {
+    def quoted(text: String): String = {
+      val escaped = text.flatMap {
+        case '"' => "\\\""
+        case '\\' => "\\\\"
+        case other => other.toString
+      }
+      "\"" + escaped + "\""
+    }
     node match {
       case StructureNode.Suite(_, _, position, name, suiteId, className) =>
         s"suite ${quoted(name)}, class ${quoted(className)}, id ${quoted(suiteId)}, ${position.fold("no position")("position " + _)}"

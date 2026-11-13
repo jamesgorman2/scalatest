@@ -3,6 +3,8 @@ package org.scalatest.events
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import EventNotationBlocks.joined
+
 final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
   private val stackSuite =
@@ -12,14 +14,6 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         scope "A Stack", label "A Stack"
           test "pops", label "- pops"
     """
-
-  private def joined(blocks: String*): String = {
-    blocks.map { block =>
-      val lines = block.split('\n').filter(_.trim.nonEmpty)
-      val indentation = lines.map(_.takeWhile(_ == ' ').length).min
-      lines.map(_.drop(indentation)).mkString("\n")
-    }.mkString("\n")
-  }
 
   private def built(parts: TestRunPart*): BuiltRun = {
     TestRunBuilder.build(parts*) match {
@@ -179,6 +173,23 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
+      "take a suite whose suite ID an earlier structure holds only under a parent as another suite, with IDs no earlier structure gave" in {
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              suite "HelperSuite", class "samples.HelperSuite"
+                test "helps", label "- helps"
+          structure
+            suite "HelperSuite", class "samples.HelperSuite"
+              test "helps", label "- helps"
+          """
+        ).last shouldBe Vector(
+          suite(4, None, None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(5, 4, 0, "helps", "- helps")
+        )
+      }
+
       "reject a structure that holds no suite" in {
         rejection("structure") shouldBe Some("a structure starts with its suite, indented 2 spaces:\nstructure")
       }
@@ -295,6 +306,44 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
             suite "HelperSuite", class "samples.HelperSuite"
           """
         ).last shouldBe Vector(suite(4, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"))
+      }
+
+      "take a suite whose suite ID an earlier structure holds only with no parent as another suite, with IDs no earlier structure gave" in {
+        structuresOf(
+          """
+          structure
+            suite "HelperSuite", class "samples.HelperSuite"
+              test "helps", label "- helps"
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+          structure under suite "OuterSuite"
+            suite "HelperSuite", class "samples.HelperSuite"
+              test "helps", label "- helps"
+          """
+        ).last shouldBe Vector(
+          suite(4, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(5, 4, 0, "helps", "- helps")
+        )
+      }
+
+      "take a suite whose suite ID an earlier structure holds only under another parent as another suite, with IDs no earlier structure gave" in {
+        structuresOf(
+          """
+          structure
+            suite "UserSuites", class "samples.UserSuites"
+              suite "User1Suite", class "samples.User1Suite"
+              suite "User2Suite", class "samples.User2Suite"
+          structure under suite "User1Suite"
+            suite "HelperSuite", class "samples.HelperSuite"
+              test "helps", label "- helps"
+          structure under suite "User2Suite"
+            suite "HelperSuite", class "samples.HelperSuite"
+              test "helps", label "- helps"
+          """
+        ).last shouldBe Vector(
+          suite(6, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(7, 6, 0, "helps", "- helps")
+        )
       }
 
       "reject a structure under a scope" in {
@@ -436,6 +485,27 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
+      "continue the first of the sibling suites sharing the suite ID, the only one a block of one suite can be at the place of" in {
+        structuresOf(
+          """
+          structure
+            suite "TwiceSuites", class "samples.TwiceSuites"
+              suite "InnerSuite", class "samples.InnerSuite"
+                test "inner one", label "- inner one"
+              suite "InnerSuite", class "samples.InnerSuite"
+                test "inner one", label "- inner one"
+          structure under suite "TwiceSuites"
+            suite "InnerSuite", class "samples.InnerSuite"
+              test "inner two", label "- inner two"
+              test "inner one", label "- inner one"
+          """
+        ).last shouldBe Vector(
+          suite(2, Some(1), Some(0), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
+          test(6, 2, 0, "inner two", "- inner two"),
+          test(3, 2, 1, "inner one", "- inner one")
+        )
+      }
+
       "reject a nested suite, which keeps the structure and place it has" in {
         rejection(
           """
@@ -573,6 +643,10 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         rejection("""spec "pops": TestStarting""") shouldBe Some("expected run, suite, scope or test at column 1 of 'spec \"pops\": TestStarting'")
       }
 
+      "reject a line that names no event class" in {
+        rejection("""run: (message: "lost")""") shouldBe Some("expected an event class at column 6 of 'run: (message: \"lost\")'")
+      }
+
       "reject text after the event" in {
         rejection("run: RunStopped and more") shouldBe Some("unexpected text at column 16 of 'run: RunStopped and more'")
       }
@@ -616,6 +690,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       "reject an execution below 1" in {
         rejection(joined(stackSuite, """test "pops" execution 0: TestStarting""")) shouldBe
           Some("expected a number from 1 at column 23 of 'test \"pops\" execution 0: TestStarting'")
+      }
+
+      "reject an execution that does not fit an Int" in {
+        rejection(joined(stackSuite, """test "pops" execution 2147483648: TestStarting""")) shouldBe
+          Some("'2147483648' does not fit an Int at column 23 of 'test \"pops\" execution 2147483648: TestStarting'")
       }
     }
 
@@ -805,6 +884,10 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           Some("the notation writes no field 'summary' at column 28 of 'run: RunCompleted(summary: 3)'")
       }
 
+      "reject parentheses that hold no field" in {
+        rejection("run: RunStopped()") shouldBe Some("expected a field name at column 17 of 'run: RunStopped()'")
+      }
+
       "reject a field written twice" in {
         rejection("""run: InfoProvided(message: "one", message: "two")""") shouldBe
           Some("an event writes its message once: 'run: InfoProvided(message: \"one\", message: \"two\")'")
@@ -818,6 +901,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       "reject a Unicode escape of fewer than 4 hexadecimal digits" in {
         rejection("""run: InfoProvided(message: "\u12G4")""") shouldBe
           Some("expected 4 hexadecimal digits at column 31 of 'run: InfoProvided(message: \"\\u12G4\")'")
+      }
+
+      "reject a string that ends in a lone backslash" in {
+        rejection("run: InfoProvided(message: \"a\\") shouldBe
+          Some("an escape that is not finished at column 31 of 'run: InfoProvided(message: \"a\\'")
       }
 
       "reject a string that is not closed" in {
@@ -837,6 +925,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       "reject a test count that does not fit an Int" in {
         rejection("run: RunStarting(testCount: 2147483648)") shouldBe
           Some("the test count 2147483648 does not fit an Int: 'run: RunStarting(testCount: 2147483648)'")
+      }
+
+      "reject a location's line number that does not fit an Int" in {
+        rejection("""run: TestStarting(location: LineInFile(2147483648, "FailSuite.scala", None))""") shouldBe
+          Some("'2147483648' does not fit an Int at column 40 of 'run: TestStarting(location: LineInFile(2147483648, \"FailSuite.scala\", None))'")
       }
 
       "reject a location that is not one of the Location classes" in {
@@ -990,6 +1083,16 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       "reject a frame whose line number is not a number" in {
         rejection("""run: RunAborted(throwable: java.lang.Error frames ["samples.A.f(A.scala:nine)"])""") shouldBe
           Some("'samples.A.f(A.scala:nine)' holds a line number that is not a number")
+      }
+
+      "reject a throwable that writes no class name" in {
+        rejection("run: RunAborted(throwable: )") shouldBe
+          Some("expected a throwable's class name at column 28 of 'run: RunAborted(throwable: )'")
+      }
+
+      "reject a throwable that writes no failed code after at" in {
+        rejection("run: RunAborted(throwable: java.lang.Error at )") shouldBe
+          Some("expected <file name>:<line number> at column 47 of 'run: RunAborted(throwable: java.lang.Error at )'")
       }
 
       "reject failed code with no line number" in {

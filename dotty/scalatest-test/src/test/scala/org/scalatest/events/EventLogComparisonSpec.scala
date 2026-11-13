@@ -3,6 +3,8 @@ package org.scalatest.events
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import EventNotationBlocks.joined
+
 final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
 
   private val stackSuite =
@@ -24,14 +26,6 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       suite "EarlierSuite", class "samples.EarlierSuite"
         test "earlier", label "- earlier"
     """
-
-  private def joined(blocks: String*): String = {
-    blocks.map { block =>
-      val lines = block.split('\n').filter(_.trim.nonEmpty)
-      val indentation = lines.map(_.takeWhile(_ == ' ').length).min
-      lines.map(_.drop(indentation)).mkString("\n")
-    }.mkString("\n")
-  }
 
   private def expected(blocks: String*): Vector[BuiltEvent] = {
     TestRunBuilder.build(TestRunPart.Events(joined(blocks*))) match {
@@ -221,6 +215,49 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
         "event 1 of the log is not 'structure\n  suite \"StackSuite\", class \"samples.StackSuite\"': " +
           "its node 1 is suite \"StackSuite\", class \"samples.StackSuite\", id \"stack\", no position, " +
           "not suite \"StackSuite\", class \"samples.StackSuite\", id \"samples.StackSuite\", no position"
+      )
+    }
+
+    "report a scope whose name and label differ, though one written after the other reads the same" in {
+      EventLogComparison.mismatchWhenIs(
+        log(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+              scope "a\", label \"b", label "c"
+          """
+        ),
+        expected(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+              scope "a", label "b\", label \"c"
+          """
+        )
+      ) shouldBe Some(
+        "event 1 of the log is not 'structure\n  suite \"StackSuite\", class \"samples.StackSuite\"\n    scope \"a\", label \"b\\\", label \\\"c\"': " +
+          "its node 2 is scope \"a\\\", label \\\"b\", label \"c\", position 0, not scope \"a\", label \"b\\\", label \\\"c\", position 0"
+      )
+    }
+
+    "report a suite whose name and class differ, though one written after the other reads the same" in {
+      EventLogComparison.mismatchWhenIs(
+        log(
+          """
+          structure
+            suite "a\", class \"b", class "c", id "x\\y"
+          """
+        ),
+        expected(
+          """
+          structure
+            suite "a", class "b\", class \"c", id "x\\y"
+          """
+        )
+      ) shouldBe Some(
+        "event 1 of the log is not 'structure\n  suite \"a\", class \"b\\\", class \\\"c\", id \"x\\\\y\"': " +
+          "its node 1 is suite \"a\\\", class \\\"b\", class \"c\", id \"x\\\\y\", no position, " +
+          "not suite \"a\", class \"b\\\", class \\\"c\", id \"x\\\\y\", no position"
       )
     }
 
@@ -471,14 +508,14 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
     }
 
-    "report another thread name and time stamp than those the event writes" in {
-      mismatchOfLastEvent(
-        """test "pops": TestStarting(threadName: "worker-3", timeStamp: 1700000000000)""",
-        """test "pops": TestStarting(threadName: "worker-3", timeStamp: 1700000000001)"""
-      ) shouldBe notLastEvent(
-        """test "pops": TestStarting(threadName: "worker-3", timeStamp: 1700000000000)""",
-        "its timeStamp is 1700000000001, not 1700000000000"
-      )
+    "report another thread name than the one the event writes" in {
+      mismatchOfLastEvent("""test "pops": TestStarting(threadName: "worker-3")""", """test "pops": TestStarting(threadName: "worker-4")""") shouldBe
+        notLastEvent("""test "pops": TestStarting(threadName: "worker-3")""", "its threadName is worker-4, not worker-3")
+    }
+
+    "report another time stamp than the one the event writes" in {
+      mismatchOfLastEvent("""test "pops": TestStarting(timeStamp: 1700000000000)""", """test "pops": TestStarting(timeStamp: 1700000000001)""") shouldBe
+        notLastEvent("""test "pops": TestStarting(timeStamp: 1700000000000)""", "its timeStamp is 1700000000001, not 1700000000000")
     }
 
     "report another test count than the one the event writes" in {

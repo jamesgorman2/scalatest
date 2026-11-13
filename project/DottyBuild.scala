@@ -417,6 +417,8 @@ trait DottyBuild { this: BuildCommons =>
       organization := forkOrganization,
       moduleName := "scalatest-consolidation",
       mimaFailOnNoPrevious := false,
+      // Not a project dependency: the common test project is not published, so the POM must not name it.
+      Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
       // Published one at a time, dependencies first: on Windows, bundling a project
       // holds its dependencies' jars open, so a dependency bundled later cannot replace its jar.
       millDependencies := Def.sequential(
@@ -440,7 +442,7 @@ trait DottyBuild { this: BuildCommons =>
         if (found.nonEmpty)
           sys.error(moduleName.value + " depends on Mill: " + found.map(module => module.organization + ":" + module.name + ":" + module.revision).mkString(", "))
       }
-    ).dependsOn(scalatestCoreDotty, commonTestDotty % "test")
+    ).dependsOn(scalatestCoreDotty)
 
   private implicit class DottyProjectEx(private val p: Project) {
     /** common settings for all scalatest modules */
