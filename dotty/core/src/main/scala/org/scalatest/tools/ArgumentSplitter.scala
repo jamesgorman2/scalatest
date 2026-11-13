@@ -71,7 +71,7 @@ private[scalatest] object ArgumentSplitter {
 
   private val cssFileFlag = "-Y"
 
-  /** Never throws: a null argument is returned as unrecognised, and a flag short of values keeps those it has. */
+  /** Never throws: a null argument is returned as unrecognised where a flag is read and kept as a value where one is read, and a flag short of values keeps those it has. */
   def split(arguments: Seq[String]): List[SplitArgument] = {
     val remaining = arguments.iterator.buffered
     val split = new ListBuffer[SplitArgument]
