@@ -10,7 +10,7 @@ Scala Native publishes its Scala 3 library, `org.scala-native:scala3lib_native0.
 
 A pair that was never published fails only at `update`, with `Error downloading org.scala-native:scala3lib_native0.5_3:<scala>+<native>`.
 
-Before fixing a Scala 3 version and a Scala Native version together, check the pair in `https://repo1.maven.org/maven2/org/scala-native/scala3lib_native0.5_3/maven-metadata.xml`.
+Before pinning a Scala 3 version and a Scala Native version together, check the pair in `https://repo1.maven.org/maven2/org/scala-native/scala3lib_native0.5_3/maven-metadata.xml`.
 </learning>
 
 <learning>
@@ -35,7 +35,12 @@ From GitBash on Windows, `sbt.bat` passes each argument through `cmd`, which bre
 
 Redirecting a file of commands to `sbt.bat`'s stdin starts the interactive shell, which never exits.
 
-To run such a command in batch mode, put it in a temporary `.sbt` file at the build root as `addCommandAlias("name", """set …""")` and pass `name` as the argument, or switch a setting on a `-Dkey=value` system property. A `set` through an alias is applied after every project's settings; a setting for another project written directly in a root `.sbt` file is not, and that project's own `:=` overrides it.
+To run such a command in batch mode, either:
+
+- put it in a temporary `.sbt` file at the build root as `addCommandAlias("name", """set …""")` and pass `name` as the argument; or
+- make the setting depend on a `-Dkey=value` system property.
+
+A `set` through an alias is applied after every project's settings; a setting for another project written directly in a root `.sbt` file is not, and that project's own `:=` overrides it.
 </learning>
 
 <learning>
