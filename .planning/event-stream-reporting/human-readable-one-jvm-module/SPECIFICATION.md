@@ -63,7 +63,7 @@ Each is left to the feature of `../ROADMAP.md` it names, where it names one, or 
 
 ## Epic requirements met
 
-Those of the first bullet hold in full. Each other holds for one module selector, one JVM test module and one worker. Where a requirement carries a qualifier, only the part it names holds.
+The first bullet's requirements hold in full. Each other holds for one module selector, one JVM test module and one worker. Where a requirement carries a qualifier, only the part it names holds.
 
 - R-001, R-002, R-051, R-003, R-004.
 - R-060.

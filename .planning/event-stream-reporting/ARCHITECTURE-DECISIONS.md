@@ -4,9 +4,9 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 ## The emitter holds the events of a suite instance the run did not know of until the suite it runs inside is known, rather than writing them against a node placed later.
 
-**Alternatives** Writing each event at once against a provisional node that a later `structure` event places needs an unplaced-node form in the format, and leaves assembly to hold the node's events and to show a node never placed.
+**Alternatives** Writing each event at once against a provisional node that a later `structure` event places needs an unplaced-node form in the format. It also leaves assembly to hold the node's events and to show a node never placed.
 
-**Reasoning** Every reporter of the run lies beyond the structure wrapper that shows where the instance runs, so a held event has reached none of them, and one never released reaches none. The event log is therefore never behind the run's reporters, and a process that dies loses only what `SPECIFICATION.md` R-073 already excludes as buffered inside the process. In the common case the event reaches that wrapper in the call that sent it, and is held only for that call.
+**Reasoning** Every reporter of the run lies beyond the structure wrapper that shows where the instance runs, so a held event has reached none of them. The event log is therefore never behind the run's reporters. A process that dies loses only what `SPECIFICATION.md` R-073 already excludes as buffered inside the process. Usually the event reaches that wrapper in the call that sent it, and is held only for that call.
 
 **Costs** Where a `TestSortingReporter` of the instance sits before that wrapper, as for a helper suite mixing in `RandomTestOrder`, the instance's events reach the event log, and so live output, only as the sorter releases them. The events of an instance given a reporter that leads to none of the run's are not in the event log.
 
