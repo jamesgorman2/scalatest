@@ -14,7 +14,7 @@ private[scalatest] final case class RegisteredTest(name: String, testName: Strin
 
 private[scalatest] object RegisteredNode {
 
-  // Level 0 makes each formatter add no indentation, so none has to be told from spaces the text itself starts with.
+  // Level 0 makes each formatter add no indentation, so none has to be told apart from spaces the text itself starts with.
   private val unindented = 0
 
   def scopeLabel(textWithChildPrefix: String): String =

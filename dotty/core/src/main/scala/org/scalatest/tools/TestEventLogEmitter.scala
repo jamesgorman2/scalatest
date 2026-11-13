@@ -51,9 +51,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Returns the structure wrapper of a top-level suite, over the reporter the suite would report to. As it is
-   * installed, the wrapper's suite gets its node table, and the event log the suite's structure: the suite, its
-   * nested suites, and the scopes and tests the filter keeps.
+   * Returns the structure wrapper of a top-level suite, over the reporter the suite would report to. Before it
+   * returns, it mints the suite's node table and writes the suite's structure to the event log: the suite, its nested
+   * suites, and the scopes and tests the filter keeps.
    *
    * A structure that cannot be read ends the event log before it, as an event that cannot be encoded does, and the
    * suite then reports to the reporter itself. What reading or writing the structure throws is kept from the caller

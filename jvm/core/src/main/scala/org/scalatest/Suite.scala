@@ -1314,9 +1314,9 @@ trait Suite extends Assertions with Serializable { thisSuite =>
   private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
 
   /**
-   * The reporter a nested suite this suite runs itself has its `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`
-   * sent to, and is run with, given the one this suite would give it. A suite whose nested suites are top-level suites of a run
-   * that writes a test event log overrides this.
+   * The reporter of a nested suite that this suite runs itself: the one its `SuiteStarting`, `SuiteCompleted` and
+   * `SuiteAborted` are sent to, and the one it is run with. `reporter` is the one this suite would give it. A suite
+   * whose nested suites are top-level suites of a run that writes a test event log overrides this.
    */
   private[scalatest] def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter = reporter
 

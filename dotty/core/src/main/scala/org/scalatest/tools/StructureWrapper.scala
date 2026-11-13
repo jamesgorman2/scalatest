@@ -4,7 +4,7 @@ import org.scalatest.Reporter
 import org.scalatest.events.Event
 
 /**
- * The reporter a suite is given in a run that writes a test event log. It hands each event it receives off, naming
+ * The reporter a suite is given in a run that writes a test event log. It hands off each event it receives, naming
  * its suite's node table, then passes the event unchanged to the reporter it wraps.
  *
  * Whatever the hand-off throws is kept from the reporter's caller as `TestEventLogEmitter.runEvent` keeps what it

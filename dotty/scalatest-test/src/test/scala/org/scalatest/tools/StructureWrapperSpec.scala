@@ -39,7 +39,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
   }
 
   "A structure wrapper" should {
-    "hand each event off, naming its suite's node table, before it passes that event on" in {
+    "hand off each event, naming its suite's node table, before it passes that event on" in {
       val recording = new Recording
       val wrapper = new StructureWrapper(recording.reporter, table, recording.handOff)
       val first = alert("first")

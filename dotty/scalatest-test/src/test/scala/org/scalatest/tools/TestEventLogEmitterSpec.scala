@@ -555,7 +555,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
         eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
       }
 
-      "return a wrapper that passes each event to the suite's reporter, the same event, and writes none of them" in {
+      "return a wrapper that passes each event unchanged to the suite's reporter, and writes none of them" in {
         val eventLog = new RecordingEventLog
         val reporter = new RecordingReporter
         val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, reporter)

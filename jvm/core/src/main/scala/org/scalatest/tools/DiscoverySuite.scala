@@ -50,7 +50,7 @@ private[scalatest] class DiscoverySuite(
   private[scalatest] override def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter =
     reporterOfTopLevelSuite(nestedSuite, filter, reporter)
 
-  // Runner's distributor asks for a suite's reporter as the suite starts. Any other is handed the reporter.
+  // Runner's distributor asks for a suite's reporter as the suite starts. Any other distributor is handed the reporter.
   private[scalatest] override def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status = {
     distribute match {
       case concurrent: ConcurrentDistributor => concurrent.apply(nestedSuite, args, TestEventLogHandOff.none, reporterOfTopLevelSuite)

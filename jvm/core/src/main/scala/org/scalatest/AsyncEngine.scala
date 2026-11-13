@@ -506,8 +506,8 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
   /**
    * Returns the scopes and tests registered so far, in the order registered, each labelled as `runTestsInBranch` and
    * `runTestImpl` label its events. `includeIcon` is the one the style's `runTest` passes `runTestImpl`. A scope or
-   * test takes the name its registration gave it from the suite's source. For any other, the two functions give the
-   * name from the text it is registered with.
+   * test whose registration recorded the name the suite's source gives it takes that name. For any other, the two
+   * functions give the name from the text it is registered with.
    */
   def registeredNodes(includeIcon: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
     // Recurses once for each scope nested in another, as registering and running them do.
