@@ -151,7 +151,7 @@ Feature: Nodes that ran more than once
         """
 
   Rule: A suite shows its name line once however many times it ran, and no abort line where no event is assigned to it but a node below it has an execution (R-100, R-132)
-    Scenario: AC-143 A suite two tests each ran
+    Scenario: AC-143 A suite that two tests each ran
       Given an event log holding:
         """
         run started
@@ -244,7 +244,7 @@ Feature: A suite whose structure the event log holds more than once
             - must pop
         """
 
-  Rule: A node its suite's last structure lacks that has an execution, or holds a node that has one, is shown with the parent, declared position and label of the last structure to hold it, after any node the last structure holds at that position (R-021)
+  Rule: A node that its suite's last structure lacks, and that has an execution or holds a node that has one, is shown with the parent, declared position and label the last structure to hold it gave it, after any node the last structure holds at that position (R-021)
     Scenario: AC-145 A test that ran is missing from the last structure
       Given an event log holding:
         """

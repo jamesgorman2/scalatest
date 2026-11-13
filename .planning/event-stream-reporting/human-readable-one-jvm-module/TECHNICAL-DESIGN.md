@@ -64,7 +64,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 
 This serves `specification/layout.md` AC-034.
 
-- Assembly records, with each message assigned to a suite or scope, which of that node's children had sent the first event of an execution under the message's own (§ A node's executions and its suite's latest structure) when the message arrived.
+- Assembly records, with each message assigned to a suite or scope, which of that node's children had sent the first event of an execution under the message's own execution (§ A node's executions and its suite's latest structure) when the message arrived.
 - The human-readable writer puts the message after the last of those children in declared order and before the next. A child declared before that one but not yet reached, as under concurrent tests, therefore also comes before the message. Messages placed between the same two children keep the order they arrived in.
 
 ### A node's executions and its suite's latest structure
@@ -171,25 +171,30 @@ An event's node is found from the suite instance that sent it, never by reading 
     - that of a nested suite of `S`: the instance is that nested suite. Where several share the `suiteId`, it is the one read from this instance, else the first in declared order that has no `SuiteCompleted` or `SuiteAborted`;
     - any other: the emitter mints a nested suite node directly under `S`, after `S`'s other children, with the registration's `suiteId` and `suiteName` and the instance's `Suite.getSuiteClassName`. Several such nodes sit in the order minted. A later run of an instance with that `suiteId` below `S` then meets the case above.
   - The emitter then writes the instance's `structure`, where its suite node is new or its tree differs from the table (§ Further `structure` events), and its held events in the order handed off. It writes each later one as it is handed off (`specification/test-event-log-executions.md` AC-135 to AC-138, AC-155).
-  - A held event that first reaches a wrapper of another unplaced instance, as a nested suite's reaches its outer suite's, waits for that instance, and its own is then placed below that instance's suite node.
+  - A held event that first reaches a wrapper of another unplaced instance, as a nested suite's reaches its outer suite's, waits for that instance. Its own instance is then placed below that instance's suite node.
   - Events still held when the registration is removed are dropped: none reached a wrapper of a placed instance.
 
 ### An event's node
 
-- Each engine site that sends an event passes the send helper of `object Suite` it calls (`reportTestStarting`, `reportScopeOpened`, `reportInfoProvided` and the rest, which already take `theSuite`) the event's tree node and executions (§ Executions). With the emitter on, the helper records these with the instance, against the event's identity in the emitter's state, before it reports the event. This record is the event's *origin*. The event is unchanged (`../SPECIFICATION.md` R-002), and the emitter drops the origin once it writes the event.
+- Each engine site that sends an event passes the event's tree node and executions (§ Executions) to the send helper of `object Suite` it calls (`reportTestStarting`, `reportScopeOpened`, `reportInfoProvided` and the rest, which already take `theSuite`). With the emitter on, the helper records these with the instance, against the event's identity in the emitter's state, before it reports the event. This record is the event's *origin*. The event is unchanged (`../SPECIFICATION.md` R-002), and the emitter drops the origin once it writes the event.
   - The tree node is the test's name for a test's event, and the `DescriptionBranch` that `runTestsInBranch` holds for a scope's event or for a message registered in that scope. A suite-level message has none.
   - A scope's node is its branch's path in the table. Nothing reads the order in which scopes open and close.
 - A wrapper names its registration's table when it hands an event off. The emitter assigns the event:
   - with an origin, to the origin's tree node in the table of the origin's instance. Where that instance has several registrations, as one instance nested twice and run by a distributor, it uses the wrapper's table;
-  - without one, as for an event user code builds or the `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` a `runNestedSuites` sends, from the event's own data at or below the wrapper's suite: its `suiteId`, or a message's `nameInfo`'s, names the suite, and its test name the test in that suite's table. Sibling nested suites sharing a `suiteId` are told apart as an unplaced instance's are (§ Suite instances and their nodes).
-- An event without an origin whose data names a suite or test no table holds is still assigned to its own node. A `suiteId` no suite at or below the wrapper's has is given a minted nested suite node, as an unplaced instance's is, with the `suiteName` and `suiteClassName` the event carries. A test name its suite's table lacks is given a test node directly under the suite, named and labelled as a test of a suite with no registration tree is. A further `structure` precedes the event.
+  - without one, as for an event user code builds or the `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` a `runNestedSuites` sends, from the event's own data at or below the wrapper's suite. Its `suiteId`, or a message's `nameInfo`'s, names the suite, and its test name names the test in that suite's table. Sibling nested suites sharing a `suiteId` are told apart as an unplaced instance's are (§ Suite instances and their nodes).
+- An event without an origin whose data names a suite or test no table holds is still assigned to its own node, and a further `structure` precedes the event:
+  - a `suiteId` no suite at or below the wrapper's has is given a minted nested suite node, as an unplaced instance's is, with the `suiteName` and `suiteClassName` the event carries;
+  - a test name its suite's table lacks is given a test node directly under the suite, named and labelled as a test of a suite with no registration tree is.
 - A message with no origin whose `nameInfo` is `None` is assigned to the wrapper's own node, since nothing identifies another (`../SPECIFICATION.md` R-097; `specification/test-event-log-events.md` AC-107, AC-151).
 - A `SuiteAborted` whose `suiteClassName` is `DistributedTestRunnerSuite`'s is assigned to the node of the wrapper that hands it off, the test that suite ran (`specification/test-event-log-structure.md` AC-126).
 
 ### Further `structure` events
 
 - A further `structure` is built without calling an overridable member of the suite. `testNames`, `tags`, `nestedSuites` and `expectedTestCount` are user code that can throw, and inside `run` 3.2.19 calls them only where it needs them (`../SPECIFICATION.md` R-002).
-  - For a suite with a registration tree it is built from `atomic` alone: nodes and labels as the first structure's are, filtered by `args.filter` over `tagsMap`, with the class's tag annotations applied as `Suite.autoTagClassAnnotations` applies them but to the tree's own test names, and with the table's `suiteId` and class name. A suite therefore keeps the class name its first `structure` gave, whichever instance runs. A suite whose `tags` override keeps a test that this filtering drops gains the test by the last case below.
+  - For a suite with a registration tree it is built from `atomic` alone:
+    - its nodes and labels are built as the first structure's are;
+    - it is filtered by `args.filter` over `tagsMap`, with the class's tag annotations applied as `Suite.autoTagClassAnnotations` applies them but to the tree's own test names. A suite whose `tags` override keeps a test that this filtering drops gains the test by the last case of the next list;
+    - it takes the table's `suiteId` and class name. A suite therefore keeps the class name its first `structure` gave, whichever instance runs.
   - For a suite with none, `Suite.runTests` builds it from the names `filter(theTestNames, tags, suiteId)` returns to its own loop.
   - It holds the suite's scopes and tests and no nested suite, which `atomic` does not hold. Each nested suite keeps the structure and place it has (§ The format).
 - It is written, before the first event that needs it:
@@ -218,7 +223,7 @@ An event's node is found from the suite instance that sent it, never by reading 
 - Core mints an execution as an object in the emitter's state. The emitter gives it a node's next number, from 1, when it first writes an event naming it for that node, as the node's own or as its parent's.
 - `Engine.runTestImpl` and `AsyncEngine.runTestImpl` mint one on each call, for the test's `TestStarting`, its closing event and its messages. A `runTest` override that calls `super.runTest` twice therefore gives its test two (`specification/test-event-log-executions.md` AC-140).
 - `traverseSubNodes`, `runTestsImpl` and `Suite.runTests` mint one for each `TestIgnored` they send.
-- The first site a run of an instance reaches mints one for the run and keeps it in the instance's registration: `runImpl` or `runPathTestsImpl`, else `runTestsImpl`, and `Suite.run`, else `Suite.runTests`, for a suite with no registration tree.
+- The first site a run of an instance reaches mints one for the run and keeps it in the instance's registration. That site is `runImpl` or `runPathTestsImpl`, else `runTestsImpl`; for a suite with no registration tree it is `Suite.run`, else `Suite.runTests`.
   - Every scope whose events `runTestsInBranch` sends in that run takes it, each numbering it among its own, and so does the suite, for the run's suite-level messages. Where the suite's `SuiteStarting` opened an execution that no run has taken, the run takes that one.
   - The run of a per-test instance mints none: it uses the execution its registration names (§ Suite instances and their nodes).
 - An origin for a scope's or test's event names the node's own execution and its parent's, which is the run's, since the suite and every scope take the run's. The emitter writes both numbers (§ The format), so a test's execution sits under the scope execution it ran in where runs of one suite overlap.
@@ -266,7 +271,13 @@ Each event's first key is `item`, naming its kind. The events are those of `../A
 - A `structure` event: `item` `structure`; `nodes`, an array of the suite's nodes in depth-first pre-order, each node's children in declared order. A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `suiteId` and `className`, each present only on the nodes `../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin gives it. A node's `id` is an integer.
   - The first node is the event's root suite. A top-level suite has no `parent` or `position`. A nested suite that is the root has `parent`, and the `position` an earlier event gave it; one new to the event log has none (§ Critical code paths § A node's executions and its suite's latest structure).
   - A further `structure` event has the same form. Its root is a suite an earlier event holds, or a nested suite new to the event log under a suite an earlier event holds. It holds the root's scopes and tests whole, their `position`s from 0 among themselves, and none of its nested suites. A node an earlier event holds has the same `id`, and a suite the same `className`.
-- A ScalaTest event: `item` `event`; `node`, the `id` of the node the event is assigned to, absent where it is assigned to the run; `execution`, the number of that node's execution the event belongs to, from 1, present exactly where `node` is; `parentExecution`, the number of the execution of the node's parent that this one ran in, present exactly where the node is a scope or test; `event`, its `org.scalatest.events` class's simple name; then the event's fields.
+- A ScalaTest event:
+  - `item` `event`;
+  - `node`, the `id` of the node the event is assigned to, absent where it is assigned to the run;
+  - `execution`, the number of that node's execution the event belongs to, from 1, present exactly where `node` is;
+  - `parentExecution`, the number of the execution of the node's parent that this one ran in, present exactly where the node is a scope or test;
+  - `event`, its `org.scalatest.events` class's simple name;
+  - then the event's fields.
 - The `runEnded` event: `item` `runEnded`; `outcome`: `completed`, `aborted` or `stopped`.
 
 A ScalaTest event's fields:

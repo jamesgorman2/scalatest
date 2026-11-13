@@ -9,7 +9,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - Assigning an event whose node its suite's structure lacks to the nearest ancestor that has one puts a test's events on its suite, so the test is never shown as a test (`../SPECIFICATION.md` R-021).
 - A node for each instance that runs gives a test declared by a wrapper and run by the instance it wraps two nodes, one of which never starts and is shown as not run (R-100).
 
-**Reasoning** A node is known by what its events name, its suite's ID and its test name, so a test is the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, and a suite run from several tests is one suite.
+**Reasoning** A node is known by what its events name: its suite's ID and its test name. A test is therefore the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, and a suite run from several tests is one suite.
 
 **Costs** A suite's structure can arrive more than once, so a node's place is known only once the run's event stream ends.
 

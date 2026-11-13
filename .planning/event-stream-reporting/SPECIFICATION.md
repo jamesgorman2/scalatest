@@ -87,7 +87,7 @@ These hold for each run's test structure and for how the human-readable and JSON
 ### Nodes
 
 - R-096 A run's test structure has the run at its root, then suites, scopes and tests. A nested suite sits under the suite that nests it. Neither a `DiscoverySuite` nor a `DistributedTestRunnerSuite` is a node, so the suites a `DiscoverySuite` discovers are top-level.
-- R-130 The test structure holds each suite, scope and test a run registered, whether or not and however many times it ran, so it does not depend on how the tests ran. A suite, scope or test is one node in its run however many times it ran in that run, and has one execution for each time.
+- R-130 The test structure holds each suite, scope and test a run registered, whether or not it ran and however many times, so it does not depend on how the tests ran. A suite, scope or test is one node in its run however many times it ran in that run, and has one execution for each time.
 - R-104 Suites, scopes or tests registered separately are separate nodes even where they share a name, within a run or across runs.
 - R-097 Each `info`, `alert`, `note` and `markup` message attaches to the node that emitted it and, for a suite, scope or test, to the execution that emitted it. A message whose emitting node cannot be identified attaches to the first identifiable ancestor of that node. No message is lost or reordered.
 - R-105 Below a top-level suite, in the human-readable and JSON output, a node's children appear in declared order where it is known, and in descending alphanumeric order by name where it is not.

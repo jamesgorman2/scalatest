@@ -26,7 +26,10 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - It assigns every node ID, unique within the run, and keeps for each suite the nodes it has sent, so that a node keeps its ID across `structure` events.
   - Where core sends an event, it records beside the event, in the emitter and never on the event, the suite instance, the registered scope or test, and the executions the event belongs to. The emitter resolves the event's node from that record. An event with no record, such as one user code builds, is resolved from its own data.
     - An event of a suite, scope or test is therefore assigned to its own node even where it bypasses that node's wrapper. Only a message that nothing identifies is assigned to the node of the wrapper that hands it off, an ancestor's (`SPECIFICATION.md` R-097).
-  - It detects that the run has learned more of a suite's structure, and then sends a further `structure` event (§ APIs § The emitter and the Mill plugin, the `structure` event): when a suite instance runs whose scopes and tests differ from those it has sent, or that it does not know, and when an event resolves to a suite or test it has not sent.
+  - It sends a further `structure` event (§ APIs § The emitter and the Mill plugin, the `structure` event) when it detects that the run has learned more of a suite's structure:
+    - a suite instance runs whose scopes and tests differ from those it has sent;
+    - a suite instance runs that it does not know;
+    - an event resolves to a suite or test it has not sent.
   - It numbers each node's executions (§ APIs § The emitter and the Mill plugin, item 3).
   - It is not a `-C` reporter opened on `RunStarting`, which could not send the `runStarted` event in time: on the JVM such a reporter can open after the runner's construction returns (`research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`research/node-native-file-channel.md` § 1).
 - **Codec** — the one implementation of the event log's format (§ APIs § The emitter and the Mill plugin). The encoder runs in every run with the emitter on; the decoder runs in Mill's JVM. Each side is tested on its own against the format (`ARCHITECTURE-DECISIONS.md` "Each side of core's codec is tested on its own…").
@@ -40,7 +43,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 `scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it, and reuses three `private[scalatest]` parts of core, its formatting of human-readable output, its decoder and its argument splitter, which is why it sits in core's package.
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
-  - It keeps each node's events against the node's ID, by execution, apart from the structure, and the writers report over each suite's latest structure with those events.
+  - It keeps each node's events against the node's ID, by execution, apart from the structure. The writers report each suite's latest structure, with those events.
   - A node the latest structure lacks stays at the place it last had while it has events, and is otherwise gone.
 - **Runs that do not finish** — once a run's event stream ends without how the run ended, marks the run, and each node it left open, aborted (`SPECIFICATION.md` R-064).
   - For each run that did not finish, and each process that ended before any run existed in it, it reports by class name each test class the process took (§ Modules § Mill plugin, Test manifest) that no run reported as a suite (R-066, R-094). A class is shown once, however many processes took it.
@@ -93,13 +96,13 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
      The run sends a further `structure` event for one suite, top-level or nested, whenever it learns more of that suite's structure:
      - where the suite instance that runs registers other scopes and tests than the structure already sent holds, as an instance constructed for the run can. The event precedes that instance's first scope or test event;
-     - where a suite instance the run did not know of runs inside a suite, as one a test creates and runs: it is that suite where their `suiteId`s match, and otherwise a nested suite directly under it, after its other children;
+     - where a suite instance the run did not know of runs inside a suite, as one a test creates and runs. It is that suite where their `suiteId`s match, and otherwise a nested suite directly under it, after its other children;
      - where an event with no record names a suite or test no `structure` event holds: that node is added.
 
      A further `structure` event holds that suite's node, with its parent where it is nested, and all its scopes and tests, which replace those the earlier events gave the suite. It holds none of the suite's nested suites, which keep the structure and place they have. Each node an earlier event held keeps its node ID;
   3. ScalaTest events, captured output, and what the outputs need that events lack (`research/emission-gap-analysis.md` § Short answer):
      - each assigned to its node by the node's ID, and only after the first `structure` event that holds that node;
-     - each one assigned to a suite, scope or test with the number of the node's execution it belongs to, and each one assigned to a scope or test also with the number of its parent's execution it ran in;
+     - each one assigned to a suite, scope or test with the number of the node's execution it belongs to. One assigned to a scope or test also has the number of its parent's execution it ran in;
      - events and messages attached to the run rather than to a suite, assigned to the run. Among them are the run events (`RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`), which carry the run record's fields (`JSON-LAYOUT.md` § Run records; `ARCHITECTURE-DECISIONS.md` "The run's own state travels in the test event log as run events among the ScalaTest events.");
   4. the `runEnded` event: how the run ended (R-074), written once. The emitter derives it:
      - where the runner sends a closing run event, from that event alone, and writes it after that event: `RunCompleted` as completed, `RunStopped` as stopped and `RunAborted` as aborted. On the JVM `Framework`'s `done` sends `RunCompleted`;

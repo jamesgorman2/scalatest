@@ -12,7 +12,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 - Carrying the node ID in `Args.configMap` shows it to user code, risking `../SPECIFICATION.md` R-002.
 - Tracking a wrapper's open scopes by the order of `ScopeOpened` and `ScopeClosed` cannot tell sibling scopes of one text apart, and holds only while every scope's events arrive in nesting order.
 
-**Reasoning** No reporter chain reliably carries a node's wrapper, since core and user code replace `args.reporter` before a test runs. The suite instance reaches every engine site that sends an event, together with the test name or branch the event is for, so the site records them against the event and the wrapper that hands the event off needs only to name a node table (`TECHNICAL-DESIGN.md` § The test event log on the JVM § An event's node). An instance no core site created registers itself when its run starts.
+**Reasoning** No reporter chain reliably carries a node's wrapper, since core and user code replace `args.reporter` before a test runs. The suite instance reaches every engine site that sends an event, together with the test name or branch the event is for. The site therefore records them against the event, and the wrapper that hands the event off needs only to name a node table (`TECHNICAL-DESIGN.md` § The test event log on the JVM § An event's node). An instance no core site created registers itself when its run starts.
 
 **Costs** Each site that creates or first runs a suite instance must register it and later remove it, and every engine site that sends an event must record its origin. The origin of an event that reaches no wrapper stays in the emitter's state until the run ends.
 
