@@ -42,8 +42,17 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
 The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../SPECIFICATION.md` R-125 allows.
 
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
-- Core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core) does not throw. It returns an argument whose flag `parseArgs` does not recognise ungrouped, under no flag. The test command fails on the first such argument and names it.
-- The splitter keeps its own table of each flag's arity. A test runs `parseArgs` and the splitter over every flag `parseArgs` recognises, each followed by values that look like flags, and requires the same split.
+- Core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core) is `org.scalatest.tools.ArgumentSplitter`, in core's Scala 3 JVM sources only. It does not throw. It returns the arguments in the order given, each as one of two kinds:
+  - an argument whose flag `parseArgs` recognises, with its values: the flag without what is written onto it (`-o` for `-oD`), then the argument as written and its values;
+  - an argument whose flag `parseArgs` does not recognise, ungrouped, under no flag. A null argument is one. The test command fails on the first such argument and names it.
+- The splitter recognises the runner argument's flag, which `parseArgs` reads only through `parseArgsWithTestEventLog` (§ The test event log on the JVM).
+- The splitter keeps its own table of each flag's arity. Where `parseArgs` throws, the splitter does as follows:
+  - a flag short of its values keeps those it has;
+  - `-W` keeps the next two arguments, whether or not they are integers.
+- Tests keep the table in step with `parseArgs`:
+  - One runs `parseArgs` and the splitter over every flag `parseArgs` recognises, the runner argument included, each with its values and followed by another flag, and requires the same split. The values look like flags, except those of `-k` and `-K`, which `parseArgs` reads only where they do not begin with `-`, and those of `-W`, which are negative integers.
+  - One gives both every printable ASCII character as a flag, written alone and with a character written onto it, and requires that the splitter recognise exactly those `parseArgs` recognises, and no flag the first test leaves out.
+- The library's **Split a module's ScalaTest arguments** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is `org.scalatest.consolidation.ScalaTestArgument.split`, which returns the splitter's result in the library's public type `ScalaTestArgument`.
 
 ### Mill's `Running Test Class` lines
 
