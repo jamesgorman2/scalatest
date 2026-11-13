@@ -43,19 +43,19 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
   Feature("Compatibility with ScalaTest 3.2.20") {
     Scenario("A recording reporter of a Runner.run launch receives what 3.2.20 sends it, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
-      When("Runner.run runs it on 3.2.20 and on this fork, its one reporter a -C recording reporter")
+      When("Runner.run runs it on 3.2.20 and on this fork, with a -C recording reporter as its only reporter")
       val events = runs.ofFixture(Launch.RunnerRun, List("-C", "compatibility.recorders.RecordingReporter")).map(_.events)
 
       Then("the reporter receives on this fork the events it receives on 3.2.20")
       Compared.firstDifference(events) shouldBe None
 
-      And("the events are of every kind the fixture is to send")
+      And("the events include every kind the fixture is meant to send")
       eventKindsOfTheFixture.filterNot(kind => events.upstream.exists(_.startsWith(kind + "("))) shouldBe Nil
     }
 
     Scenario("The test-interface event handler of a Framework launch receives what 3.2.20 sends it, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
-      When("Framework runs it on 3.2.20 and on this fork, its runner given no argument")
+      When("Framework runs it on 3.2.20 and on this fork, with no runner arguments")
       val events = runs.ofFixture(Launch.Framework, Nil).map(_.events)
 
       Then("the event handler receives on this fork the events it receives on 3.2.20")
@@ -65,7 +65,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
 
     Scenario("The loggers of a Framework launch given -oDU receive the lines they receive on 3.2.20, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
-      When("Framework runs it on 3.2.20 and on this fork, its runner given -oDU")
+      When("Framework runs it on 3.2.20 and on this fork, with the runner argument -oDU")
       val output = runs.ofFixture(Launch.Framework, List("-oDU"))
       val loggerLines = output.map(run => ReporterText.normalised(run.loggerLines))
 
@@ -106,7 +106,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         text.fork.keySet shouldBe text.upstream.keySet
         destinations.filter(name => text.upstream(name).isEmpty || text.fork(name).isEmpty) shouldBe Nil
 
-        And("the fixture's own lines are on each run's stdout and stderr")
+        And("each run writes the fixture's own lines once, one to stdout and one to stderr")
         output.map(_.stdout.count(_ == CompatibilityFixture.stdoutLine)) shouldBe Compared(1, 1)
         output.map(_.stderr.count(_ == CompatibilityFixture.stderrLine)) shouldBe Compared(1, 1)
 

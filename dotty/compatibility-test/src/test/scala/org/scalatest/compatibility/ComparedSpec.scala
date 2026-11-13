@@ -17,7 +17,7 @@ final class ComparedSpec extends AnyWordSpec with Matchers {
       }
     }
     "different in length" should {
-      "give the first line only one holds" in {
+      "give the first line that only one side has" in {
         Compared.firstDifference(Compared(List("a"), List("a", "b"))) shouldBe Some("line 2: 3.2.20 wrote no line, the fork wrote [b]")
       }
     }

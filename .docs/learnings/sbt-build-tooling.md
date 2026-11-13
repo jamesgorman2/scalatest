@@ -65,9 +65,9 @@ Scala 3.3 names the inline accessor of a private member of a non-final class `<o
 
 sbt-mima-plugin 1.1.4's `mimaReportBinaryIssues` passes with the accessor missing, so a passing MiMa check does not show that code compiled against the earlier build still links.
 
-A library's platforms can differ in the name the earlier release holds. Upstream built ScalaTest 3.2.20 with Scala 3.1 for the JVM and Scala.js, and with Scala 3.3 for Native: its `_3` and `_sjs1_3` jars hold `inline$<member>`, and its `_native0.5_3` jars only `<owner>$$inline$<member>`. Read each platform's jar before restoring an accessor there. The jars of all three hold `.class` files `javap` reads.
+A library's platforms can differ in the name the earlier release holds. Upstream built ScalaTest 3.2.20 with Scala 3.1 for the JVM and Scala.js, and with Scala 3.3 for Native: its `_3` and `_sjs1_3` jars hold `inline$<member>`, and its `_native0.5_3` jars only `<owner>$$inline$<member>`. Read each platform's jar before restoring an accessor there. The jars of all three hold `.class` files that `javap` reads.
 
-- To find lost accessors, compare the methods whose names hold `inline$` that `javap -p` lists for each class in the earlier jar and in the rebuilt classes.
+- To find lost accessors, list each class's methods with `javap -p` in the earlier jar and in the rebuilt classes, and compare those whose names hold `inline$`.
 - To restore one, declare a public `def inline$<member>(…)` in the class with the private member's parameters, forwarding to it.
 - Running code compiled against the earlier build on the rebuilt one proves the fix only for the accessors that code calls. Comparing the class files covers them all.
 </learning>
