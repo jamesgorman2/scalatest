@@ -19,13 +19,13 @@ final class ScalaTestArgumentSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "hold the runner argument with its file" in {
+      "keep the runner argument with its file" in {
         ScalaTestArgument.split(Seq("--test-event-log", "-oD")) shouldBe Seq(
           Flagged("--test-event-log", Seq("--test-event-log", "-oD"))
         )
       }
 
-      "hold each argument whose flag the runner does not recognise ungrouped, in place" in {
+      "keep each argument whose flag the runner does not recognise ungrouped, in place" in {
         ScalaTestArgument.split(Seq("-n", "Fast", "--unknown", "Fast", "-l", "Slow")) shouldBe Seq(
           Flagged("-n", Seq("-n", "Fast")),
           Unrecognised("--unknown"),

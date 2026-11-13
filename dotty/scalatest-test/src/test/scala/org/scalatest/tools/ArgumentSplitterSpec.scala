@@ -121,7 +121,7 @@ final class ArgumentSplitterSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "keep the test event log argument with its file, as parseArgsWithTestEventLog does" in {
+      "keep the runner argument with its file, as parseArgsWithTestEventLog does" in {
         val arguments = List("--test-event-log", looksLikeAFlag, allSuffixes)
 
         val (parsedArgs, eventLogFile) = ArgsParser.parseArgsWithTestEventLog(arguments.toArray)
@@ -136,7 +136,7 @@ final class ArgumentSplitterSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "given every printable flag, written alone and written onto" should {
+    "given every printable ASCII character as a flag, alone and with a character written onto it" should {
       "recognise exactly those parseArgsWithTestEventLog recognises" in {
         val recognisedBySplitter = candidateArguments.filter { argument =>
           ArgumentSplitter.split(List(argument)) match {
@@ -222,7 +222,7 @@ final class ArgumentSplitterSpec extends AnyWordSpec with Matchers {
         ArgumentSplitter.split(List("-W", "1")) shouldBe List(Flagged("-W", List("-W", "1")))
       }
 
-      "keep the test event log flag alone, where parseArgsWithTestEventLog throws" in {
+      "keep the runner argument's flag alone, where parseArgsWithTestEventLog throws" in {
         the[IllegalArgumentException] thrownBy ArgsParser.parseArgsWithTestEventLog(Array("--test-event-log")) should have message
           "--test-event-log must be followed by the path of the test event log file"
         ArgumentSplitter.split(List("--test-event-log")) shouldBe List(Flagged("--test-event-log", List("--test-event-log")))
