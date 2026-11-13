@@ -126,7 +126,7 @@ Under `--halt-on-failure`, once anything has failed the test command, it starts 
 Enables:
 
 - `SPECIFICATION.md` R-055 (`--halt-on-failure`), R-057, R-114
-- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Add a module whose tests did not start: *not run*), § Data flow (`--halt-on-failure` withholds modules not yet started)
+- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Add a module whose tests did not start: *not run*; Read the consolidation state: *open, failed* before each module starts), § Data flow (`--halt-on-failure` withholds modules not yet started)
 
 Risks:
 
@@ -247,7 +247,7 @@ The test command also runs Scala.js modules whose JS environment is `JsDom`. Eac
 Enables:
 
 - `SPECIFICATION.md` R-059 (`JsDom` accepted), and under `JsDom`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-076, R-022, R-040, R-041, R-124, R-125, R-042, R-043 (order in the launcher's files), R-044, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; the `runStarted` event under `JsDom`; framed lines; a pair tied to its run by its events), § External systems (`JsDom` window code has no `require` or `process`)
+- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; the `runStarted` event under `JsDom`; framed lines; a pair tied to its run by its events), § APIs § The Mill plugin and the consolidation library (Build the runner argument: prefix and nonce), § External systems (`JsDom` window code has no `require` or `process`)
 
 Settles:
 

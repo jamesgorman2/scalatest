@@ -22,7 +22,7 @@ Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
 **Alternatives** The **Decode** handle exposing each event's facts, for the plugin to derive the result from, repeats in the plugin the rules by which the library decides how each run ended (`SPECIFICATION.md` R-082), and widens what the plugin sees of core's events.
 
-**Reasoning** For its output the library already decides what `SPECIFICATION.md` R-046 turns on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-046 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin interprets no event.
+**Reasoning** For its output the library already decides what `SPECIFICATION.md` R-046 turns on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-046 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin derives no result from any event.
 
 **Costs** The library does more than write output, and the test command's result rests on library state the plugin cannot inspect.
 

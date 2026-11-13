@@ -31,7 +31,7 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 ## Scope
 
 - A ScalaTest runner argument on the JVM that turns the emitter on, so the run writes its test event log to a file.
-- The consolidation library, producing human-readable output, including each run's block (R-082).
+- The consolidation library, producing human-readable output, including each run's block (R-082), and giving its caller the consolidation state (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
 - The Mill plugin's test command, invoked as `mill scalatest/test <module selector> [arguments]`, such as `mill scalatest/test core.test -oH`. Given one module selector that resolves to one JVM test module, it runs the module's tests in one worker and writes human-readable output to its stdout.
 - A build adds the Mill plugin (`../ARCHITECTURE.md` § Modules § Mill plugin) as the entry `com.edc::scalatest-mill::<version>` of its `build.mill` header's `mvnDeps`, `<version>` being the plugin's release. A header without `mvnDeps` gains one line: `//| mvnDeps: ["com.edc::scalatest-mill::<version>"]`.
 - The test command's output arguments `-oH` and a bare `-o` (R-048).
@@ -73,7 +73,7 @@ The first bullet's requirements hold in full. Each other holds for one module se
 - R-020 (human-readable output), R-027 (human-readable output), R-078, R-079, R-082 (first two bullets; aborted and stopped from the third), R-101, R-021 (human-readable output, runs that finish), R-012 (on the run), R-086.
 - R-023, R-113 (human-readable output), R-025.
 - R-040, R-041, R-042, R-129, R-043, R-044, R-045.
-- R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails).
+- R-046 (first and second bullets; for a run that does not finish and a process that ends before any run exists in it, only that the test command fails; for a run that ends aborted or stopped, only that the consolidation state is failed).
 - R-048 (human-readable output on stdout), R-124 (on stdout), R-050.
 - `../SPECIFICATION.md` § Scope: the JVM's Scala versions.
 
