@@ -2,6 +2,22 @@
 
 Decisions behind [ARCHITECTURE.md](ARCHITECTURE.md), newest first.
 
+## The emitter holds the events of a suite instance the run did not know of until the suite it runs inside is known, rather than writing them against a node placed later.
+
+**Alternatives**
+
+- Writing each event at once against a provisional node that a later `structure` event places lets an event precede the `structure` event holding its node, adds an unplaced-node form to the format, moves the holding into assembly, and needs a rule for showing a node that is never placed.
+
+**Reasoning** Every reporter of the run lies beyond the structure wrapper that shows where the instance runs, so a held event has reached none of them, and one never released reaches none. The event log is therefore never behind the run's reporters, and a process that dies loses only what `SPECIFICATION.md` R-073 already excludes as buffered inside the process. In the common case the event reaches that wrapper in the call that sent it, and is held only for that call.
+
+**Costs** Where a `TestSortingReporter` of the instance sits before that wrapper, as for a helper suite mixing in `RandomTestOrder`, the instance's events reach the event log, and so live output, only as the sorter releases them. The events of an instance given a reporter that leads to none of the run's are not in the event log.
+
+**Settled by** [Does the emitter hold an unregistered suite instance's events until its parent node is known?](https://github.com/jamesgorman2/scalatest/issues/72).
+
+**See** `human-readable-one-jvm-module/TECHNICAL-DESIGN.md` § The test event log on the JVM § Suite instances and their nodes.
+
+---
+
 ## Only the innermost structure wrapper an event reaches hands it to the emitter, recognised by the event's identity in a set the emitter keeps.
 
 **Alternatives**
