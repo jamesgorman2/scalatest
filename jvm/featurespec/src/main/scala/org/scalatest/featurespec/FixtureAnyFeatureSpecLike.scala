@@ -130,8 +130,10 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
 
   class ResultOfScenarioInvocation(specText: String, testTags: Tag*) {
     
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Any /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3
@@ -151,8 +153,10 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
     //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => applyImpl(testFun, pos) }) } 
     //DOTTY-ONLY }
 
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Any /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3
@@ -206,8 +210,10 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
     new ResultOfScenarioInvocation(specText, testTags: _*)
 
   class ResultOfIgnoreInvocation(specText: String, testTags: Tag*) {
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Any /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3
@@ -227,8 +233,10 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
     //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => applyImpl(testFun, pos) }) } 
     //DOTTY-ONLY }
 
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Any /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3

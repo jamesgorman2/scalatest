@@ -3,7 +3,9 @@ package org.scalatest.compatibility
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tags.Slow
 
+@Slow
 final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen with Matchers {
 
   private val runs = new ForkedRuns(ComparisonClasspaths.load())
@@ -31,6 +33,12 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
 
   private def reporterArguments(characters: String): Seq[String] =
     List("-o" + characters, "-e" + characters, "-f" + characters, "report.txt")
+
+  private def reporterDestinations(launch: Launch): List[String] =
+    launch match {
+      case Launch.RunnerRun => List("stdout", "stderr", "file report.txt")
+      case Launch.Framework => List("loggers", "stderr", "file report.txt")
+    }
 
   Feature("Compatibility with ScalaTest 3.2.20") {
     Scenario("A recording reporter of a Runner.run launch receives what 3.2.20 sends it, with the emitter off") {
@@ -89,9 +97,10 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         val output = runs.ofFixture(launch, arguments)
         val text = output.map(_.reporterText)
 
-        Then("each run's reporters write to stdout, to stderr and to the file")
+        val destinations = reporterDestinations(launch)
+        Then(s"each run's reporters write to ${destinations.mkString(", ")}")
         text.fork.keySet shouldBe text.upstream.keySet
-        text.upstream("file report.txt") should not be empty
+        destinations.filter(name => text.upstream(name).isEmpty || text.fork(name).isEmpty) shouldBe Nil
 
         And("the fixture's own lines are on each run's stdout and stderr")
         output.map(_.stdout.count(_ == CompatibilityFixture.stdoutLine)) shouldBe Compared(1, 1)

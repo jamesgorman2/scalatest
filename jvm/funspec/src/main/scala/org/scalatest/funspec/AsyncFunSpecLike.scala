@@ -150,8 +150,10 @@ trait AsyncFunSpecLike extends AsyncTestSuite with AsyncTestRegistration with In
    */
   protected class ItWord {
 
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(specText: String, testTags: Tag*)(testFun: => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(specText, testTags: _*)(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(specText: String, testTags: Tag*)(testFun: => Future[compatible.Assertion], pos: source.Position): Unit = {
       engine.registerAsyncTest(specText, transformToOutcome(testFun), Resources.itCannotAppearInsideAnotherItOrThey, None, None, pos, testTags: _*)
     }
@@ -275,8 +277,10 @@ trait AsyncFunSpecLike extends AsyncTestSuite with AsyncTestRegistration with In
    */
   protected class TheyWord {
 
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(specText: String, testTags: Tag*)(testFun: => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(specText, testTags: _*)(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(specText: String, testTags: Tag*)(testFun: => Future[compatible.Assertion], pos: source.Position): Unit = {
       engine.registerAsyncTest(specText, transformToOutcome(testFun), Resources.theyCannotAppearInsideAnotherItOrThey, None, None, pos, testTags: _*)
     }

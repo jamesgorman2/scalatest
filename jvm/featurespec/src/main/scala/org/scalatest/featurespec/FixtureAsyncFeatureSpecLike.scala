@@ -139,8 +139,10 @@ trait FixtureAsyncFeatureSpecLike extends org.scalatest.FixtureAsyncTestSuite wi
     //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => applyImpl(testFun, pos) }) } 
     //DOTTY-ONLY }
     
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = {
       engine.registerAsyncTest(Resources.scenario(specText.trim), transformToOutcome(new fixture.NoArgTestWrapper(testFun)), Resources.scenarioCannotAppearInsideAnotherScenario, None, None, pos, testTags: _*)
     }
@@ -189,8 +191,10 @@ trait FixtureAsyncFeatureSpecLike extends org.scalatest.FixtureAsyncTestSuite wi
 
   class ResultOfIgnoreInvocation(specText: String, testTags: Tag*) {
     
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = {
       engine.registerIgnoredAsyncTest(Resources.scenario(specText), transformToOutcome(testFun), Resources.ignoreCannotAppearInsideAScenario, None, pos, testTags: _*)
     }
@@ -204,8 +208,10 @@ trait FixtureAsyncFeatureSpecLike extends org.scalatest.FixtureAsyncTestSuite wi
     //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => applyImpl(testFun, pos) }) } 
     //DOTTY-ONLY }
 
-    // Code compiled against ScalaTest 3.2.20 calls the accessor by this name, which Scala 3.3 no longer gives it.
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = {
       engine.registerIgnoredAsyncTest(Resources.scenario(specText), transformToOutcome(new fixture.NoArgTestWrapper(testFun)), Resources.ignoreCannotAppearInsideAScenario, None, pos, testTags: _*)
     }
