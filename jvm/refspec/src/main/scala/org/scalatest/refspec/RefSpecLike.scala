@@ -48,6 +48,11 @@ trait RefSpecLike extends TestSuite with Informing with Notifying with Alerting 
 
   private final val engine = new Engine(Resources.concurrentSpecMod, "RefSpecLike")
   import engine._
+
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
+    ensureScopesAndTestsRegistered()
+    Some(engine.registeredNodes(true))
+  }
   // Sychronized on thisSuite, only accessed from ensureScopesAndTestsRegistered
   private var scopesRegistered = false
   

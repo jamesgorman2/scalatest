@@ -52,6 +52,11 @@ trait PathAnyFreeSpecLike extends org.scalatest.Suite with OneInstancePerTest wi
   private final val engine = PathEngine.getEngine()
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
+    ensureTestResultsRegistered(thisSuite)
+    Some(engine.registeredNodes(true))
+  }
+
   // SKIP-SCALATESTJS,NATIVE-START
   override def newInstance: org.scalatest.freespec.PathAnyFreeSpecLike = this.getClass.newInstance.asInstanceOf[PathAnyFreeSpecLike]
   // SKIP-SCALATESTJS,NATIVE-END

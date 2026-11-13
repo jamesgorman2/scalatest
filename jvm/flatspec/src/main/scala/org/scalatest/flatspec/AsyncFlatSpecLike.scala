@@ -66,6 +66,9 @@ trait AsyncFlatSpecLike extends AsyncTestSuite with AsyncTestRegistration with S
 
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(true, (text: String) => text, org.scalatest.RegisteredNode.flatSpecTestName))
+
   /**
    * Returns an <code>Informer</code> that during test execution will forward strings passed to its
    * <code>apply</code> method to the current reporter. If invoked in a constructor, it

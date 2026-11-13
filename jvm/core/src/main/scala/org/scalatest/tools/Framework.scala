@@ -255,11 +255,12 @@ class Framework extends SbtFramework {
     presentReminderWithShortStackTraces: Boolean,
     presentReminderWithFullStackTraces: Boolean,
     presentReminderWithoutCanceledTests: Boolean,
-    execService: ExecutorService
+    execService: ExecutorService,
+    reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
   ): Array[Task] = {
     val suiteStartTime = System.currentTimeMillis
     val suiteClass = suite.getClass
-    val report = new SbtReporter(rerunSuiteId, taskDefinition.fullyQualifiedName, taskDefinition.fingerprint, eventHandler, suiteSortingReporter, summaryCounter)
+    val sbtReporter = new SbtReporter(rerunSuiteId, taskDefinition.fullyQualifiedName, taskDefinition.fingerprint, eventHandler, suiteSortingReporter, summaryCounter)
     val formatter = formatterForSuiteStarting(suite)
     val suiteClassName = getSuiteClassName(suite)
 
@@ -304,6 +305,8 @@ class Framework extends SbtFramework {
         // For suiteTags, we need to remove them if there's entry in testTags already, because testTags is more specific.
         Filter(if (tagsToInclude.isEmpty) Some(Set(SELECTED_TAG)) else Some(tagsToInclude + SELECTED_TAG), tagsToExclude, false, new DynaTags(suiteTags.filter(s => !testTags.contains(s._1)).toMap, testTags.toMap))
       }
+
+    val report = reporterOfTopLevelSuite(suite, filter, sbtReporter)
 
     if (!suite.isInstanceOf[DistributedTestRunnerSuite])
       report(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName))))
@@ -400,8 +403,66 @@ class Framework extends SbtFramework {
     presentFilePathname: Boolean,
     presentJson: Boolean,
     configSet: Set[ReporterConfigParam],
-    execService: ExecutorService
+    execService: ExecutorService,
+    reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
   ) extends Task {
+
+    // The constructor of 3.2.20, which the binary compatibility check requires.
+    def this(
+      taskDefinition: TaskDef,
+      loader: ClassLoader,
+      suiteSortingReporter: SuiteSortingReporter,
+      tracker: Tracker,
+      tagsToInclude: Set[String],
+      tagsToExclude: Set[String],
+      selectors: Array[Selector],
+      explicitlySpecified: Boolean,
+      configMap: ConfigMap,
+      summaryCounter: SummaryCounter,
+      statusList: LinkedBlockingQueue[Status],
+      useSbtLogInfoReporter: Boolean,
+      presentAllDurations: Boolean,
+      presentInColor: Boolean,
+      presentShortStackTraces: Boolean,
+      presentFullStackTraces: Boolean,
+      presentUnformatted: Boolean,
+      presentReminder: Boolean,
+      presentReminderWithShortStackTraces: Boolean,
+      presentReminderWithFullStackTraces: Boolean,
+      presentReminderWithoutCanceledTests: Boolean,
+      presentFilePathname: Boolean,
+      presentJson: Boolean,
+      configSet: Set[ReporterConfigParam],
+      execService: ExecutorService
+    ) =
+      this(
+        taskDefinition,
+        loader,
+        suiteSortingReporter,
+        tracker,
+        tagsToInclude,
+        tagsToExclude,
+        selectors,
+        explicitlySpecified,
+        configMap,
+        summaryCounter,
+        statusList,
+        useSbtLogInfoReporter,
+        presentAllDurations,
+        presentInColor,
+        presentShortStackTraces,
+        presentFullStackTraces,
+        presentUnformatted,
+        presentReminder,
+        presentReminderWithShortStackTraces,
+        presentReminderWithFullStackTraces,
+        presentReminderWithoutCanceledTests,
+        presentFilePathname,
+        presentJson,
+        configSet,
+        execService,
+        TestEventLogHandOff.noStructureWrapper
+      )
 
     def loadSuiteClass = {
       try {
@@ -514,7 +575,8 @@ class Framework extends SbtFramework {
           presentReminderWithShortStackTraces,
           presentReminderWithFullStackTraces,
           presentReminderWithoutCanceledTests,
-          execService
+          execService,
+          reporterOfTopLevelSuite
         )
       }
        else
@@ -666,6 +728,7 @@ class Framework extends SbtFramework {
     testEventLogEmitter: Option[TestEventLogEmitter]
   ) extends sbt.testing.Runner {
     private val handOffToTestEventLog = TestEventLogEmitter.handOffTo(testEventLogEmitter)
+    private val reporterOfTopLevelSuite = TestEventLogEmitter.reporterOfTopLevelSuiteFor(testEventLogEmitter)
     val isDone = new AtomicBoolean(false)
     val serverThread = new AtomicReference[Option[Thread]](None)
     val statusList = new LinkedBlockingQueue[Status]()
@@ -743,7 +806,8 @@ class Framework extends SbtFramework {
           presentFilePathname,
           presentJson,
           configSet,
-          execSvc
+          execSvc,
+          reporterOfTopLevelSuite
         )
 
     private def filterWildcard(paths: List[String], taskDefs: Array[TaskDef]): Array[TaskDef] =

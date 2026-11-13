@@ -51,6 +51,9 @@ trait AnyFunSpecLike extends TestSuite with TestRegistration with Informing with
   private final val engine = new Engine(Resources.concurrentSpecMod, "FunSpec")
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(true))
+
   // TODO: Probably make this private final val sourceFileName in a singleton object so it gets compiled in rather than carried around in each instance
   private[scalatest] val sourceFileName = "AnyFunSpecLike.scala"
 

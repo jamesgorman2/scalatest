@@ -52,6 +52,11 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
   private final val engine = PathEngine.getEngine()
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
+    ensureTestResultsRegistered(thisSuite)
+    Some(engine.registeredNodes(true))
+  }
+
   // SKIP-SCALATESTJS,NATIVE-START
   override def newInstance: org.scalatest.funspec.PathAnyFunSpecLike = this.getClass.newInstance.asInstanceOf[PathAnyFunSpecLike]
   // SKIP-SCALATESTJS,NATIVE-END

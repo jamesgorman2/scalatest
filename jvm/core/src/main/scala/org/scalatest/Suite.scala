@@ -1168,14 +1168,15 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
+        val nestedReport = reporterOfNestedSuite(nestedSuite, filter, report)
 
         val suiteStartTime = System.currentTimeMillis
 
-        report(SuiteStarting(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+        nestedReport(SuiteStarting(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status = nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty))
+          val status = nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
@@ -1184,11 +1185,11 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
           status.unreportedException match {
             case Some(ue) =>
-              report(SuiteAborted(tracker.nextOrdinal(), ue.getMessage, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+              nestedReport(SuiteAborted(tracker.nextOrdinal(), ue.getMessage, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
               FailedStatus
 
             case None =>
-              report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+              nestedReport(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
               SucceededStatus
           }
         }
@@ -1203,7 +1204,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
             val formatter = formatterForSuiteAborted(nestedSuite, rawString)
 
             val duration = System.currentTimeMillis - suiteStartTime
-            report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+            nestedReport(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
             if (NonFatal(e.getCause))
               FailedStatus
             else
@@ -1226,7 +1227,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
           }
         case Some(distribute) =>
           for (nestedSuite <- nestedSuitesArray) 
-            statusBuffer += distribute(nestedSuite, args.copy(tracker = tracker.nextTracker()))
+            statusBuffer += distribute(nestedSuite, args.copy(reporter = reporterOfNestedSuite(nestedSuite, filter, reporter), tracker = tracker.nextTracker()))
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)
@@ -1305,6 +1306,19 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
   // MOVE IT
   private[scalatest] def createCatchReporter(reporter: Reporter): Reporter = new WrapperCatchReporter(reporter)
+
+  /**
+   * The scopes and tests of this suite's registration tree, for its structure in a test event log, or `None` for a
+   * suite that has no registration tree. A style trait that keeps one overrides this.
+   */
+  private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
+
+  /**
+   * The reporter a nested suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` are sent to, and that it is
+   * run with, given the one this suite would give it. A suite whose nested suites are top-level suites of a run
+   * that writes a test event log overrides this.
+   */
+  private[scalatest] def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter = reporter
   
   /**
    * The fully qualified class name of the rerunner to rerun this suite.  This implementation will look at this.getClass and see if it is

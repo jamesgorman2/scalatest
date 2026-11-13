@@ -1,40 +1,23 @@
 package org.scalatest.tools
 
-import java.io.File
 import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.GivenWhenThen
-import org.scalatest.events.BuiltEvent
 import org.scalatest.events.EventLogComparison
 import org.scalatest.events.Ordinal
 import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
-import org.scalatest.events.TestRunBuilder
-import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
-import sbt.testing.Event as SbtEvent
-import sbt.testing.EventHandler
-import sbt.testing.Logger
 import sbt.testing.Runner as SbtRunner
-import sbt.testing.SubclassFingerprint
-import sbt.testing.SuiteSelector
-import sbt.testing.Task
-import sbt.testing.TaskDef
 
-final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers {
-
-  private enum Launch(val named: String) {
-    case ByFramework extends Launch("Framework")
-    case ByRunner extends Launch("Runner.run")
-  }
+final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
   private final case class EndedRun(suiteClassName: String, description: String, launch: Launch, ended: String, outcome: RunOutcome)
 
@@ -51,68 +34,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     )
   )
 
-  private final class RecordingLogger extends Logger {
-    private var received = Vector.empty[String]
-    def lines: Vector[String] = synchronized(received)
-    private def record(line: String): Unit = synchronized { received :+= line }
-    def ansiCodesSupported(): Boolean = false
-    def error(message: String): Unit = record(message)
-    def warn(message: String): Unit = record(message)
-    def info(message: String): Unit = record(message)
-    def debug(message: String): Unit = record(message)
-    def trace(throwable: Throwable): Unit = record(String.valueOf(throwable))
-  }
-
-  private val ignoringEvents: EventHandler = (_: SbtEvent) => ()
-
-  private def built(notation: String): Vector[BuiltEvent] =
-    TestRunBuilder.build(TestRunPart.Events(notation)).fold(reason => fail(reason), _.events)
-
-  private def decodedOrFail(lines: Seq[String]): Vector[TestEventLogEvent] =
-    lines.toVector.map(line => TestEventLogDecoder.decode(line).fold(reason => fail(s"$reason, in $line"), identity))
-
-  private def thisProcess: ProcessIdentity = {
-    val current = ProcessIdentity.current
-    assume(current.isRight, s"an emitter needs its process's identity: ${current.left.getOrElse("")}")
-    current.fold(reason => fail(reason), identity)
-  }
-
   private def noProcessHandleMessage(eventLogFile: Path): String = {
     val noProcessHandle = "this JVM has no java.lang.ProcessHandle"
     assume(ProcessIdentity.current == Left(noProcessHandle), "this scenario needs a JVM that has no java.lang.ProcessHandle")
     s"Cannot write the test event log $eventLogFile: $noProcessHandle"
   }
-
-  private val runTimeLimitSeconds = 120L
-
-  // Runner.run blocks while a graphic reporter's window is open, so a run that wrongly opens one fails at the time limit.
-  private def runnerRun(arguments: Seq[String]): Boolean = {
-    val outcome = new AtomicReference[Option[Either[Throwable, Boolean]]](None)
-    val run = new Thread(() => {
-      outcome.set(Some(try Right(Runner.run(arguments.toArray)) catch { case thrown: Throwable => Left(thrown) }))
-    })
-    run.setDaemon(true)
-    run.start()
-    run.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds))
-    outcome.get match {
-      case Some(Right(allTestsPassed)) => allTestsPassed
-      case Some(Left(thrown)) => throw thrown
-      case None =>
-        run.interrupt()
-        java.awt.Window.getWindows.foreach(_.dispose())
-        fail(s"Runner.run did not return within $runTimeLimitSeconds seconds")
-    }
-  }
-
-  private def runnerArgument(eventLogFile: Path): List[String] = TestEventLogArgument.forFile(eventLogFile.toString)
-
-  private def runpathOf(folder: File): String = folder.getPath.replace(" ", "\\ ")
-
-  private def testClassesRunpath: String =
-    runpathOf(new File(classOf[samples.SqrtPropSpec].getProtectionDomain.getCodeSource.getLocation.toURI))
-
-  private def frameworkRunner(arguments: Seq[String], remoteArguments: Seq[String] = Nil): SbtRunner =
-    new Framework().runner(arguments.toArray, remoteArguments.toArray, getClass.getClassLoader)
 
   // Neither thread is a daemon. The one that waits for a sub-process's events ends when it reads RunCompleted.
   private def endThreadsLeftByDoneThrowing(runner: SbtRunner, subProcessServer: Array[String]): Unit = {
@@ -127,37 +53,6 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       socket.close()
       scalaTestRunner.dispatchReporter.dispatchDisposeAndWaitUntilDone()
     }
-  }
-
-  private def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
-
-  private def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Unit = {
-    val fingerprint = new Framework().fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
-    var tasks = runner.tasks(Array(new TaskDef(suiteClassName, fingerprint, true, Array(new SuiteSelector)))).toList
-    while (tasks.nonEmpty) {
-      tasks = tasks.head.execute(ignoringEvents, Array(logger)).toList ::: tasks.tail
-    }
-  }
-
-  private def launched(launch: Launch, suiteClassName: String, arguments: Seq[String]): Unit = {
-    launch match {
-      case Launch.ByFramework =>
-        val runner = frameworkRunner(arguments)
-        execute(runner, suiteClassName, new RecordingLogger)
-        runner.done()
-      case Launch.ByRunner =>
-        runnerRun(List("-R", testClassesRunpath, "-s", suiteClassName) ++ arguments)
-    }
-  }
-
-  // Discovery reads every class of a runpath, so the suite is given a runpath that holds nothing else.
-  private def withRunpathOfOneSuite[A](folder: Path)(body: String => A): A = {
-    val classFile = "samples/discovered/OneTestSpec.class"
-    val copy = folder.resolve(classFile)
-    Files.createDirectories(copy.getParent)
-    val source = getClass.getClassLoader.getResourceAsStream(classFile)
-    try Files.copy(source, copy) finally source.close()
-    body(runpathOf(folder.toFile))
   }
 
   Feature("The run in its test event log") {
@@ -244,20 +139,23 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A Runner.run run of a suite it is given by name writes none of that suite's events") {
+    Scenario("A Runner.run run of a suite it is given by name writes that suite's structure and none of its events") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run runs it by name with the runner argument")
         launched(Launch.ByRunner, "samples.SqrtPropSpec", runnerArgument(eventLogFile))
 
-        Then("the event log is the run's start, its run events assigned to the run, and its end")
+        Then("the event log is the run's start, its run events assigned to the run with the suite's structure between them, and its end")
         EventLogComparison.mismatchWhenIs(
           eventLogOf(eventLogFile),
           built(
             """
             run started
             run: RunStarting(testCount: 1)
+            structure
+              suite "SqrtPropSpec", class "samples.SqrtPropSpec"
+                test "sqrt of a square is the root", label "- sqrt of a square is the root"
             run: RunCompleted
             run ended completed
             """

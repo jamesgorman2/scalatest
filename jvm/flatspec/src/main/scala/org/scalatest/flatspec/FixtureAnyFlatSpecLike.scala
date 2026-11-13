@@ -51,6 +51,9 @@ trait FixtureAnyFlatSpecLike extends org.scalatest.FixtureTestSuite with org.sca
 
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(true, (text: String) => text, org.scalatest.RegisteredNode.flatSpecTestName))
+
   private[scalatest] val sourceFileName = "FixtureAnyFlatSpecLike.scala"
 
   /**

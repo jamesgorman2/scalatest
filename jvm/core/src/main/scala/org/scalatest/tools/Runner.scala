@@ -1001,7 +1001,8 @@ object Runner {
               suffixes,
               chosenStyleSet,
               testSortingReporterTimeout,
-              handOffToTestEventLog
+              handOffToTestEventLog,
+              TestEventLogEmitter.reporterOfTopLevelSuiteFor(testEventLogEmitter)
             )
           }
         }
@@ -1103,7 +1104,8 @@ object Runner {
       suffixes,
       chosenStyleSet,
       testSortingReporterTimeout,
-      TestEventLogHandOff.none
+      TestEventLogHandOff.none,
+      TestEventLogHandOff.noStructureWrapper
     )
 
   private[scalatest] def doRunRunRunDaDoRunRun(
@@ -1128,7 +1130,8 @@ object Runner {
     suffixes: Option[Pattern],
     chosenStyleSet: Set[String],
     testSortingReporterTimeout: Span,
-    handOffToTestEventLog: Event => Unit
+    handOffToTestEventLog: Event => Unit,
+    reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
   ): Unit = {
 
     // TODO: add more, and to RunnerThread too
@@ -1161,6 +1164,10 @@ object Runner {
     // The events SuiteRunner sends for a DiscoverySuite pass through no structure wrapper.
     def testEventLogHandOffFor(suite: Suite): Event => Unit =
       if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
+
+    // A DiscoverySuite is no top-level suite: the suites it nests are, and it gives each its reporter.
+    def reporterOf(suite: Suite, filter: Filter, reporter: Reporter): Reporter =
+      if (suite.isInstanceOf[DiscoverySuite]) reporter else reporterOfTopLevelSuite(suite, filter, reporter)
 
     //
     // Generates SuiteConfigs for Suites found via discovery.
@@ -1203,16 +1210,16 @@ object Runner {
             // In this case, they didn't specify any -w, -m, -s,
             // -j or -b on the command line, so the default is to
             // run any accessible Suites discovered on the runpath
-            List(SuiteConfig(new DiscoverySuite("", accessibleSuites, true, loader), emptyDynaTags, false, false))
+            List(SuiteConfig(new DiscoverySuite("", accessibleSuites, true, loader, reporterOfTopLevelSuite), emptyDynaTags, false, false))
           }
           else {
             val membersOnlyInstances =
               for (membersOnlyName <- membersOnlyList)
-                yield SuiteConfig(new DiscoverySuite(membersOnlyName, accessibleSuites, false, loader), emptyDynaTags, false, false)
+                yield SuiteConfig(new DiscoverySuite(membersOnlyName, accessibleSuites, false, loader, reporterOfTopLevelSuite), emptyDynaTags, false, false)
   
             val wildcardInstances =
               for (wildcardName <- wildcardList)
-                yield SuiteConfig(new DiscoverySuite(wildcardName, accessibleSuites, true, loader), emptyDynaTags, false, false)
+                yield SuiteConfig(new DiscoverySuite(wildcardName, accessibleSuites, true, loader, reporterOfTopLevelSuite), emptyDynaTags, false, false)
   
             val testSpecSuiteParams =
               SuiteDiscoveryHelper.discoverTests(
@@ -1364,7 +1371,7 @@ object Runner {
                   val statuses = for (suiteConfig <- suiteInstances) yield {
                     val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                     val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
-                    val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
+                    val runArgs = Args(reporterOf(suiteConfig.suite, filter, concurrentDispatch), stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
                     distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite))
                   }
                   distributor.waitUntilDone()
@@ -1375,7 +1382,7 @@ object Runner {
                 val statuses = for (suiteConfig <- suiteInstances) yield {
                   val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                   val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
-                  val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
+                  val runArgs = Args(reporterOf(suiteConfig.suite, filter, concurrentDispatch), stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
                   distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite))
                 }
                 distributor.waitUntilDone()
@@ -1390,7 +1397,7 @@ object Runner {
             for (suiteConfig <- suiteInstances) {
               val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
               val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
-              val runArgs = Args(dispatch, stopper, filter, configMap, None, tracker, chosenStyleSet, false, None, None)
+              val runArgs = Args(reporterOf(suiteConfig.suite, filter, dispatch), stopper, filter, configMap, None, tracker, chosenStyleSet, false, None, None)
               val status = new ScalaTestStatefulStatus()
               val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status, testEventLogHandOffFor(suiteConfig.suite))
               suiteRunner.run()

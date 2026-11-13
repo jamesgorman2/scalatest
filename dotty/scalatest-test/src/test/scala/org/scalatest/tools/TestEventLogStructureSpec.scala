@@ -1,0 +1,347 @@
+package org.scalatest.tools
+
+import org.scalatest.GivenWhenThen
+import org.scalatest.events.EventLogComparison
+import org.scalatest.events.TestEventLogDecoder
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should.Matchers
+
+final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
+
+  /**
+   * A suite's structure as a criterion states it, in the event notation, and as the event log's format writes it.
+   *
+   * @param nodesInNotation the nodes below the suite, the outermost unindented
+   * @param nodesInFormat the nodes below the suite, in the order the event holds them, the suite's node ID being 1
+   */
+  private final case class StatedStructure(
+    suiteName: String,
+    suiteClassName: String,
+    nodesInNotation: String,
+    nodesInFormat: List[String]
+  ) {
+
+    def inNotation: String =
+      ("structure" :: s"""  suite "$suiteName", class "$suiteClassName"""" :: nodesInNotation.linesIterator.map("    " + _).toList).mkString("\n")
+
+    def line: String = TestEventLogLine.structure((TestEventLogLine.suite(1, suiteName, suiteClassName) :: nodesInFormat)*)
+  }
+
+  private def runHolding(structure: StatedStructure): String =
+    List("run started", "run: RunStarting", structure.inNotation, "run: RunCompleted", "run ended completed").mkString("\n")
+
+  private def structureLinesOf(lines: Seq[String]): Vector[String] =
+    lines.toVector.filter(_.contains(""""item":"structure"""")).map(TestEventLogLine.withNodesRenumbered)
+
+  /** Registers the scenario of the run that writes a suite's structure, and the scenario of the decoder that reads it. */
+  private def structureScenarios(
+    scenario: String,
+    suite: String,
+    arguments: List[String],
+    holds: String,
+    structure: StatedStructure,
+    launch: Launch = Launch.ByFramework
+  ): Unit = {
+    Scenario(scenario) {
+      thisProcess
+      Given(suite)
+      TemporaryEventLog.in { eventLogFile =>
+        When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
+        launched(launch, structure.suiteClassName, arguments ++ runnerArgument(eventLogFile))
+        val lines = TemporaryEventLog.lines(eventLogFile)
+
+        Then(s"the event log's one structure holds $holds")
+        structureLinesOf(lines) shouldBe Vector(structure.line)
+        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(runHolding(structure))) shouldBe None
+      }
+    }
+
+    Scenario(s"The decoder reads the structure of: $scenario") {
+      When("the decoder is given the line of the suite's structure")
+      val event = TestEventLogDecoder.decode(structure.line)
+
+      Then(s"it yields a structure that holds $holds")
+      EventLogComparison.mismatchWhenIs(event.toSeq, built(structure.inNotation)) shouldBe None
+    }
+  }
+
+  private def scopeHoldingTests(scopeLabel: String, testLabels: String*): List[String] =
+    TestEventLogLine.scope(2, 1, 0, "s", scopeLabel) ::
+      testLabels.toList.zip(List("t", "u")).zipWithIndex.map { case ((label, name), position) =>
+        TestEventLogLine.test(3 + position, 2, position, name, label)
+      }
+
+  private final case class LabelledDeclaration(
+    styles: List[String],
+    declaration: String,
+    sampleNamedAfter: String,
+    holds: String,
+    nodesInNotation: String,
+    nodesInFormat: List[String]
+  )
+
+  private val oneTest = "test \"t\", label \"- t\""
+  private val scopeHoldingOneTest = "scope \"s\", label \"s\"\n  test \"t\", label \"- t\""
+  private val featureHoldingScenarioWithIcon = "scope \"s\", label \"Feature: s\"\n  test \"t\", label \"- Scenario: t\""
+
+  private val labelledDeclarations = List(
+    LabelledDeclaration(
+      List("AnyFunSuite", "AsyncFunSuite", "FixtureAnyFunSuite", "FixtureAsyncFunSuite"),
+      """test("t")""",
+      "WithTest",
+      "test t, labelled '- t'",
+      oneTest,
+      List(TestEventLogLine.test(2, 1, 0, "t", "- t"))
+    ),
+    LabelledDeclaration(
+      List("AnyPropSpec", "FixtureAnyPropSpec"),
+      """property("t")""",
+      "WithProperty",
+      "test t, labelled '- t'",
+      oneTest,
+      List(TestEventLogLine.test(2, 1, 0, "t", "- t"))
+    ),
+    LabelledDeclaration(
+      List("AnyFunSpec", "AsyncFunSpec", "FixtureAnyFunSpec", "FixtureAsyncFunSpec", "PathAnyFunSpec"),
+      """describe("s") { it("t") }""",
+      "WithDescribe",
+      "scope s, labelled 's', holding test t, labelled '- t'",
+      scopeHoldingOneTest,
+      scopeHoldingTests("s", "- t")
+    ),
+    LabelledDeclaration(
+      List("AnyFreeSpec", "AsyncFreeSpec", "FixtureAnyFreeSpec", "FixtureAsyncFreeSpec", "PathAnyFreeSpec"),
+      """"s" - { "t" in }""",
+      "WithDash",
+      "scope s, labelled 's', holding test t, labelled '- t'",
+      scopeHoldingOneTest,
+      scopeHoldingTests("s", "- t")
+    ),
+    LabelledDeclaration(
+      List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
+      """"s" when { "u" should { "t" in } }""",
+      "WithWhenAndShould",
+      "scope s, labelled 's', holding scope u, labelled 'when u', holding test t, labelled '- should t'",
+      "scope \"s\", label \"s\"\n  scope \"u\", label \"when u\"\n    test \"t\", label \"- should t\"",
+      List(
+        TestEventLogLine.scope(2, 1, 0, "s", "s"),
+        TestEventLogLine.scope(3, 2, 0, "u", "when u"),
+        TestEventLogLine.test(4, 3, 0, "t", "- should t")
+      )
+    ),
+    LabelledDeclaration(
+      List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
+      """"s" can { "t" in }""",
+      "WithCan",
+      "scope s, labelled 's', holding test t, labelled '- can t'",
+      "scope \"s\", label \"s\"\n  test \"t\", label \"- can t\"",
+      scopeHoldingTests("s", "- can t")
+    ),
+    LabelledDeclaration(
+      List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
+      """"s" should "t" in; it must "u" in""",
+      "WithSubject",
+      "scope s, labelled 's', holding test t, labelled '- should t', and test u, labelled '- must u'",
+      "scope \"s\", label \"s\"\n  test \"t\", label \"- should t\"\n  test \"u\", label \"- must u\"",
+      scopeHoldingTests("s", "- should t", "- must u")
+    ),
+    LabelledDeclaration(
+      List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
+      """behavior of "s"; it can "t" in""",
+      "WithBehaviorOf",
+      "scope s, labelled 's', holding test t, labelled '- can t'",
+      "scope \"s\", label \"s\"\n  test \"t\", label \"- can t\"",
+      scopeHoldingTests("s", "- can t")
+    ),
+    LabelledDeclaration(
+      List("AnyFeatureSpec", "FixtureAnyFeatureSpec"),
+      """Feature("s") { Scenario("t") }""",
+      "WithScenario",
+      "scope s, labelled 'Feature: s', holding test t, labelled 'Scenario: t'",
+      "scope \"s\", label \"Feature: s\"\n  test \"t\", label \"Scenario: t\"",
+      scopeHoldingTests("Feature: s", "Scenario: t")
+    ),
+    LabelledDeclaration(
+      List("AsyncFeatureSpec", "FixtureAsyncFeatureSpec"),
+      """Feature("s") { Scenario("t") }""",
+      "WithScenario",
+      "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
+      featureHoldingScenarioWithIcon,
+      scopeHoldingTests("Feature: s", "- Scenario: t")
+    ),
+    LabelledDeclaration(
+      List("AnyFeatureSpec", "AsyncFeatureSpec", "FixtureAnyFeatureSpec", "FixtureAsyncFeatureSpec"),
+      """Feature("s") { ignore("t") }""",
+      "WithIgnoredScenario",
+      "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
+      featureHoldingScenarioWithIcon,
+      scopeHoldingTests("Feature: s", "- Scenario: t")
+    ),
+    LabelledDeclaration(
+      List("RefSpec"),
+      "object `s v` { def `t u`: Unit = () }",
+      "WithObject",
+      "scope 's v', labelled 's v', holding test 't u', labelled '- t u'",
+      "scope \"s v\", label \"s v\"\n  test \"t u\", label \"- t u\"",
+      List(TestEventLogLine.scope(2, 1, 0, "s v", "s v"), TestEventLogLine.test(3, 2, 0, "t u", "- t u"))
+    )
+  )
+
+  Feature("Each suite's structure") {
+
+    Launch.values.foreach { launch =>
+      Scenario(s"A suite ${launch.named} runs has its structure in the event log when it starts to run") {
+        thisProcess
+        Given("a suite whose one test passes only where the event log held the suite's structure when the suite started to run")
+        TemporaryEventLog.in { eventLogFile =>
+          When(s"${launch.named} runs it with the runner argument")
+          val allTestsPassed = launched(launch, "samples.ReadsItsStructureSuite", List(s"-DeventLog=$eventLogFile") ++ runnerArgument(eventLogFile))
+
+          Then("its test passes")
+          allTestsPassed shouldBe true
+
+          And("the event log holds the suite's structure")
+          EventLogComparison.mismatchWhenHoldsInOrder(
+            eventLogOf(eventLogFile),
+            built(
+              """
+              structure
+                suite "ReadsItsStructureSuite", class "samples.ReadsItsStructureSuite"
+                  test "reads its structure", label "- reads its structure"
+              """
+            )
+          ) shouldBe None
+        }
+      }
+    }
+
+    List("sequentially" -> Nil, "in parallel" -> List("-P2")).foreach { (how, parallelArguments) =>
+      Scenario(s"A suite Runner.run discovers and runs $how is a top-level suite") {
+        thisProcess
+        TemporaryEventLog.in { eventLogFile =>
+          Given("a runpath holding one suite, whose one test succeeds")
+          withRunpathOfOneSuite(eventLogFile.resolveSibling("runpath")) { runpath =>
+            When(s"Runner.run discovers and runs the runpath's suites $how, with the runner argument")
+            runnerRun(List("-R", runpath) ++ parallelArguments ++ runnerArgument(eventLogFile))
+
+            Then("the event log's one structure is the discovered suite's, with no parent, after the discovery suite's SuiteStarting")
+            And("no structure holds the discovery suite, whose events are assigned to the run")
+            EventLogComparison.mismatchWhenIs(
+              eventLogOf(eventLogFile),
+              built(
+                """
+                run started
+                run: DiscoveryStarting
+                run: DiscoveryCompleted
+                run: RunStarting(testCount: 1)
+                run: SuiteStarting
+                structure
+                  suite "OneTestSpec", class "samples.discovered.OneTestSpec"
+                    test "succeeds", label "- succeeds"
+                run: SuiteCompleted
+                run: RunCompleted
+                run ended completed
+                """
+              )
+            ) shouldBe None
+          }
+        }
+      }
+    }
+
+    structureScenarios(
+      "A suite that nests suites",
+      "a suite with no tests that nests two suites, each with one test",
+      Nil,
+      "the suite, and under it each nested suite in the order nested, holding its test",
+      StatedStructure(
+        "OuterSuites",
+        "samples.OuterSuites",
+        """suite "Inner1Suite", class "samples.Inner1Suite"
+          |  test "inner one", label "- inner one"
+          |suite "Inner2Suite", class "samples.Inner2Suite"
+          |  test "inner two", label "- inner two"""".stripMargin,
+        List(
+          TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
+        )
+      ),
+      // Framework, given a suite by name, runs none of the tests of the suites it nests.
+      Launch.ByRunner
+    )
+
+    structureScenarios(
+      "A suite with a tag excluded and a test ignored",
+      "a suite declaring tests fast, slow and later, of which slow is tagged samples.Slow and later is ignored",
+      List("-l", "samples.Slow"),
+      "fast and later, and not slow",
+      StatedStructure(
+        "FilteredSuite",
+        "samples.FilteredSuite",
+        "test \"fast\", label \"- fast\"\ntest \"later\", label \"- later\"",
+        List(TestEventLogLine.test(2, 1, 0, "fast", "- fast"), TestEventLogLine.test(3, 1, 1, "later", "- later"))
+      )
+    )
+
+    structureScenarios(
+      "A suite whose tests run in random order",
+      "a suite mixing in RandomTestOrder that registers tests a, b and c in that order",
+      Nil,
+      "a, b and c in the order registered",
+      StatedStructure(
+        "ShuffledSuite",
+        "samples.ShuffledSuite",
+        "test \"a\", label \"- a\"\ntest \"b\", label \"- b\"\ntest \"c\", label \"- c\"",
+        List(
+          TestEventLogLine.test(2, 1, 0, "a", "- a"),
+          TestEventLogLine.test(3, 1, 1, "b", "- b"),
+          TestEventLogLine.test(4, 1, 2, "c", "- c")
+        )
+      )
+    )
+
+    structureScenarios(
+      "A suite with no registration tree",
+      "a Suite that overrides testNames as b, a and c, tags c with samples.Slow, and overrides runTest",
+      List("-l", "samples.Slow"),
+      "b, then a, each labelled with its name after '- ', and not c",
+      StatedStructure(
+        "PlainSuite",
+        "samples.PlainSuite",
+        "test \"b\", label \"- b\"\ntest \"a\", label \"- a\"",
+        List(TestEventLogLine.test(2, 1, 0, "b", "- b"), TestEventLogLine.test(3, 1, 1, "a", "- a"))
+      )
+    )
+  }
+
+  Feature("Labels") {
+
+    for (declared <- labelledDeclarations; style <- declared.styles) {
+      structureScenarios(
+        s"${style} declaring ${declared.declaration}",
+        s"a suite of ${style}, declaring ${declared.declaration}",
+        Nil,
+        s"below the suite, ${declared.holds}",
+        StatedStructure(
+          style + declared.sampleNamedAfter,
+          "samples.labels." + style + declared.sampleNamedAfter,
+          declared.nodesInNotation,
+          declared.nodesInFormat
+        )
+      )
+    }
+  }
+
+  Feature("A suite's class name") {
+
+    structureScenarios(
+      "A suite whose constructor throws",
+      "a suite class whose constructor throws",
+      Nil,
+      "the suite alone, with the class that failed to construct",
+      StatedStructure("BrokenCtorSpec", "samples.BrokenCtorSpec", "", Nil)
+    )
+  }
+}

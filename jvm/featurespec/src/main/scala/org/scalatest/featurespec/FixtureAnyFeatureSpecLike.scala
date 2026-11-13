@@ -50,6 +50,9 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
 
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(false, org.scalatest.RegisteredNode.featureName, org.scalatest.RegisteredNode.scenarioName))
+
   private[scalatest] val sourceFileName = "FixtureAnyFeatureSpecLike.scala"
 
   /**

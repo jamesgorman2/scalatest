@@ -92,4 +92,6 @@ sbt-mima-plugin 1.1.4 does not report a change to a package-qualified private cl
 A passing check therefore does not show that a jar of another artifact in the same package, compiled against the earlier release, still links: upstream splits ScalaTest into artifacts that share package `org.scalatest` and call each other through such members.
 
 Where a caller outside the artifact may exist, keep the earlier signature beside the new one, as an overload or an auxiliary constructor.
+
+It does report a change to an unqualified `private` class nested in a public class, which no other artifact can call: a `private class` inside a public class whose constructor gained a parameter failed with `DirectMissingMethodProblem` on `<Outer>#<Inner>.this`. Where no problem filter may be added, keep that class's earlier constructor as an auxiliary constructor too.
 </learning>

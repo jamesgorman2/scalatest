@@ -13,8 +13,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.ConfigMap
+import org.scalatest.Filter
+import org.scalatest.Reporter
+import org.scalatest.Suite
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
+import org.scalatest.events.NodeId
 import org.scalatest.events.Ordinal
 import org.scalatest.events.RunAborted
 import org.scalatest.events.RunCompleted
@@ -121,6 +125,36 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
   private def joined(thread: Thread): Boolean = {
     thread.join(TimeUnit.SECONDS.toMillis(waitLimitSeconds))
     !thread.isAlive
+  }
+
+  private final class RecordingReporter extends Reporter {
+    private var received = Vector.empty[Event]
+    def events: Vector[Event] = received
+    def apply(event: Event): Unit = received :+= event
+  }
+
+  private def structureOf(
+    instance: Suite,
+    name: String,
+    scopesAndTests: List[ScopeOrTest],
+    nestedSuites: List[SuiteStructure] = Nil,
+    testsBeforeNestedSuites: Boolean = false
+  ): SuiteStructure =
+    SuiteStructure(instance, name, s"samples.$name", s"samples.$name", scopesAndTests, nestedSuites, testsBeforeNestedSuites)
+
+  private def test(name: String): ScopeOrTest = ScopeOrTest.Test(name, name, s"- $name")
+
+  private final class TestNamesThrow(thrown: Throwable) extends Suite {
+    override def testNames: Set[String] = throw thrown
+  }
+
+  private final class OneTestSuite extends Suite {
+    override def testNames: Set[String] = Set("only")
+  }
+
+  private val oneTestSuiteLine = {
+    val className = classOf[OneTestSuite].getName
+    TestEventLogLine.structure(TestEventLogLine.suite(1, "TestEventLogEmitterSpec$OneTestSuite", className), TestEventLogLine.test(2, 1, 0, "only", "- only"))
   }
 
   "A started emitter" should {
@@ -380,6 +414,215 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers {
           TemporaryEventLog.lines(eventLogFile).count(_.contains("while interrupted")) shouldBe 1
         }
       }
+    }
+
+    "handed a top-level suite's structure" should {
+      val inner = new Suite {}
+      val outer = new Suite {}
+      val nestedThenScopesAndTests =
+        structureOf(
+          outer,
+          "Outer",
+          List(
+            ScopeOrTest.Scope("s", "s", List(ScopeOrTest.Test("t", "s t", "- t"))),
+            ScopeOrTest.Scope("s", "s", Nil),
+            test("flat")
+          ),
+          List(structureOf(inner, "Inner", List(test("i"))))
+        )
+
+      "write it as one line, the suite first and each node's children after it in declared order, nested suites before scopes and tests" in {
+        val eventLog = new RecordingEventLog
+        TestEventLogEmitter.appendingTo(eventLog).topLevelSuite(nestedThenScopesAndTests)
+        eventLog.writes shouldBe Vector(
+          TestEventLogLine.structure(
+            TestEventLogLine.suite(1, "Outer", "samples.Outer"),
+            TestEventLogLine.nestedSuite(2, 1, 0, "Inner", "samples.Inner"),
+            TestEventLogLine.test(3, 2, 0, "i", "- i"),
+            TestEventLogLine.scope(4, 1, 1, "s", "s"),
+            TestEventLogLine.test(5, 4, 0, "t", "- t"),
+            TestEventLogLine.scope(6, 1, 2, "s", "s"),
+            TestEventLogLine.test(7, 1, 3, "flat", "- flat")
+          ) + "\n"
+        )
+      }
+
+      "write a suite's scopes and tests before its nested suites where the suite runs its tests first" in {
+        val eventLog = new RecordingEventLog
+        TestEventLogEmitter
+          .appendingTo(eventLog)
+          .topLevelSuite(structureOf(outer, "Outer", List(test("flat")), List(structureOf(inner, "Inner", Nil)), testsBeforeNestedSuites = true))
+        eventLog.writes shouldBe Vector(
+          TestEventLogLine.structure(
+            TestEventLogLine.suite(1, "Outer", "samples.Outer"),
+            TestEventLogLine.test(2, 1, 0, "flat", "- flat"),
+            TestEventLogLine.nestedSuite(3, 1, 1, "Inner", "samples.Inner")
+          ) + "\n"
+        )
+      }
+
+      "return the suite's node table, holding the suite's node, suite ID, class name and the instance it was read from" in {
+        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
+        table.instance should be theSameInstanceAs outer
+        (table.node, table.suiteId, table.className) shouldBe ((NodeId(1), "samples.Outer", "samples.Outer"))
+      }
+
+      "return a node table holding each test's node by its test name" in {
+        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
+        table.tests shouldBe Map("s t" -> NodeId(5), "flat" -> NodeId(7))
+      }
+
+      "return a node table holding each scope's node by its path, telling sibling scopes of one name apart by their place" in {
+        val structure =
+          structureOf(outer, "Outer", List(ScopeOrTest.Scope("s", "s", List(ScopeOrTest.Scope("u", "when u", Nil))), ScopeOrTest.Scope("s", "s", Nil)))
+        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(structure)
+        table.scopes shouldBe Map(
+          List(ScopePlace("s", 0)) -> NodeId(2),
+          List(ScopePlace("s", 0), ScopePlace("u", 0)) -> NodeId(3),
+          List(ScopePlace("s", 1)) -> NodeId(4)
+        )
+      }
+
+      "return a node table holding each nested suite's table at its position, with the instance it was read from" in {
+        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
+        table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites)) shouldBe
+          Vector((NodeId(2), "samples.Inner", "samples.Inner", Map("i" -> NodeId(3)), Map.empty, Vector.empty))
+        table.nestedSuites.head.instance should be theSameInstanceAs inner
+      }
+
+      "mint for a later suite no node ID an earlier suite has" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
+        emitter.topLevelSuite(structureOf(inner, "Inner", List(test("i"))))
+        eventLog.writes shouldBe Vector(
+          TestEventLogLine.structure(TestEventLogLine.suite(1, "Outer", "samples.Outer"), TestEventLogLine.test(2, 1, 0, "flat", "- flat")) + "\n",
+          TestEventLogLine.structure(TestEventLogLine.suite(3, "Inner", "samples.Inner"), TestEventLogLine.test(4, 3, 0, "i", "- i")) + "\n"
+        )
+      }
+
+      "write nothing once the event log has ended, and still return the suite's node table" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        emitter.endWithoutRunEnded()
+        val table = emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
+        eventLog.writes shouldBe Vector.empty
+        table.tests shouldBe Map("flat" -> NodeId(2))
+      }
+
+      "not throw where its event log rejects the write, and close the event log" in {
+        val eventLog = new RejectsWrites
+        TestEventLogEmitter.appendingTo(eventLog).topLevelSuite(structureOf(outer, "Outer", Nil))
+        eventLog.isClosed shouldBe true
+      }
+    }
+
+    "handed the structures of top-level suites by several threads at once" should {
+      "write each as one whole line, and give every node of the run its own ID" in {
+        val threadCount = 4
+        val suitesOfEachThread = 25
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val start = new CountDownLatch(1)
+        val threads = (1 to threadCount).map { thread =>
+          new Thread(() => {
+            start.await(waitLimitSeconds, TimeUnit.SECONDS)
+            (1 to suitesOfEachThread).foreach { suite =>
+              emitter.topLevelSuite(structureOf(new Suite {}, s"Suite${suite}OfThread$thread", List(test("a"), test("b"))))
+            }
+          })
+        }
+        threads.foreach(_.start())
+        start.countDown()
+        threads.map(joined) shouldBe Vector.fill(threadCount)(true)
+
+        val writes = eventLog.writes
+        eventLog.hadOverlappingWrites shouldBe false
+        writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
+        val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
+        decoded.filter(_.isLeft) shouldBe Vector.empty
+        val nodeIds = decoded.collect { case Right(TestEventLogEvent.Structure(nodes)) =>
+          nodes.map {
+            case suite: org.scalatest.events.StructureNode.Suite => suite.id
+            case scope: org.scalatest.events.StructureNode.Scope => scope.id
+            case test: org.scalatest.events.StructureNode.Test => test.id
+          }
+        }.flatten
+        nodeIds.map(_.value).sorted shouldBe (1L to threadCount * suitesOfEachThread * 3L).toVector
+      }
+    }
+
+    "asked for the structure wrapper of a top-level suite" should {
+      "have written the suite's structure, as the suite and the filter give it, when it returns the wrapper" in {
+        val eventLog = new RecordingEventLog
+        TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
+        eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
+      }
+
+      "return a wrapper that passes each event to the suite's reporter, the same event, and writes none of them" in {
+        val eventLog = new RecordingEventLog
+        val reporter = new RecordingReporter
+        val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, reporter)
+        val events = Vector(alert("first", "main"), alert("second", "main"))
+        events.foreach(wrapper(_))
+        reporter.events.size shouldBe 2
+        reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
+        eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
+      }
+
+      "end the event log before a structure it cannot read, and return the suite's reporter itself" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val reporter = new RecordingReporter
+        emitter.runEvent(runStarting)
+        val returned = emitter.wrapperOfTopLevelSuite(new TestNamesThrow(new IllegalStateException("no names")), Filter.default, reporter)
+        emitter.runEvent(runCompleted)
+        returned should be theSameInstanceAs reporter
+        eventLog.writes shouldBe Vector(runStartingLine + "\n")
+        eventLog.isClosed shouldBe true
+      }
+
+      "not throw where reading the structure is interrupted, and leave its thread interrupted" in {
+        val eventLog = new RecordingEventLog
+        val emitter = TestEventLogEmitter.appendingTo(eventLog)
+        val wasLeftInterrupted =
+          try {
+            emitter.wrapperOfTopLevelSuite(new TestNamesThrow(new InterruptedException("interrupted while blocked")), Filter.default, new RecordingReporter)
+            Thread.currentThread.isInterrupted
+          } finally {
+            Thread.interrupted()
+          }
+        wasLeftInterrupted shouldBe true
+        eventLog.isClosed shouldBe true
+      }
+
+      "not throw where reading the structure overflows the stack" in {
+        val eventLog = new RecordingEventLog
+        TestEventLogEmitter
+          .appendingTo(eventLog)
+          .wrapperOfTopLevelSuite(new TestNamesThrow(new StackOverflowError), Filter.default, new RecordingReporter)
+        eventLog.isClosed shouldBe true
+      }
+
+      "close the event log, then throw a VirtualMachineError other than a StackOverflowError that reading the structure throws" in {
+        val eventLog = new RecordingEventLog
+        val outOfMemory = new OutOfMemoryError("no heap")
+        val thrown = the[OutOfMemoryError] thrownBy
+          TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new TestNamesThrow(outOfMemory), Filter.default, new RecordingReporter)
+        thrown should be theSameInstanceAs outOfMemory
+        eventLog.isClosed shouldBe true
+      }
+    }
+  }
+
+  "A run that has no emitter" should {
+    "give each top-level suite the reporter it would report to" in {
+      val reporter = new RecordingReporter
+      TestEventLogEmitter.reporterOfTopLevelSuiteFor(None)(new OneTestSuite, Filter.default, reporter) should be theSameInstanceAs reporter
+    }
+
+    "build no object to do so" in {
+      TestEventLogEmitter.reporterOfTopLevelSuiteFor(None) should be theSameInstanceAs TestEventLogHandOff.noStructureWrapper
     }
   }
 }

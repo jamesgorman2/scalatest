@@ -47,6 +47,9 @@ trait AnyPropSpecLike extends TestSuite with TestRegistration with Informing wit
   private final val engine = new Engine(Resources.concurrentPropSpecMod, "PropSpec")
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(true))
+
   /**
    * Returns an <code>Informer</code> that during test execution will forward strings passed to its
    * <code>apply</code> method to the current reporter. If invoked in a constructor, it

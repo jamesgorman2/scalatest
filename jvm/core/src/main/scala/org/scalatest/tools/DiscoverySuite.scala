@@ -27,7 +27,16 @@ import org.scalactic.Requirements._
  *
  * @author Bill Venners
  */
-private[scalatest] class DiscoverySuite(path: String, accessibleSuites: Set[String], wildcard: Boolean, runpathClassLoader: ClassLoader)  extends Suite {
+private[scalatest] class DiscoverySuite(
+  path: String,
+  accessibleSuites: Set[String],
+  wildcard: Boolean,
+  runpathClassLoader: ClassLoader,
+  reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
+) extends Suite {
+
+  def this(path: String, accessibleSuites: Set[String], wildcard: Boolean, runpathClassLoader: ClassLoader) =
+    this(path, accessibleSuites, wildcard, runpathClassLoader, TestEventLogHandOff.noStructureWrapper)
 
   requireNonNull(path, accessibleSuites, runpathClassLoader)
 
@@ -36,6 +45,11 @@ private[scalatest] class DiscoverySuite(path: String, accessibleSuites: Set[Stri
   override val nestedSuites: collection.immutable.IndexedSeq[Suite] =
     for (suiteClassName <- DiscoverySuite.nestedSuiteNames(path, accessibleSuites, wildcard))
       yield DiscoverySuite.getSuiteInstance(suiteClassName, runpathClassLoader)
+
+  // The suites a DiscoverySuite nests are the run's top-level suites.
+  private[scalatest] override def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter =
+    reporterOfTopLevelSuite(nestedSuite, filter, reporter)
+
      // TODO: probably override run to just call runNestedSuites
   override protected def runTests(testName: Option[String], args: Args): Status = {
     requireNonNull(testName, args)
