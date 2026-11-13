@@ -349,3 +349,7 @@ Settles:
 Risks:
 
 - `decisions/test-command.md` "Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged." (Costs: built on evaluator commands that Mill documents as experimental), which a preset module's command must reach
+
+## Deferred
+
+- Showing a test that ran more than once, such as one a retry wrapper reruns, as one line in the human-readable output. Each time it ran is shown as its own line.
