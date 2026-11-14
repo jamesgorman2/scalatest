@@ -46,7 +46,7 @@ private[consolidation] final case class PlacedMessage(event: DecodedEvent, child
 /**
  * What one execution of a node produced, with the nodes shown under it.
  *
- * @param number the execution's number, absent where the node has no execution
+ * @param number the execution's number, absent where no event of the node's own names the execution
  * @param ending the `TestFailed`, `TestCanceled` or `SuiteAborted` whose lines sit under the execution's line
  * @param children the nodes shown under this execution in order: each nested suite once, and each scope or test once
  *                 for each of its executions that ran in this one, holding that execution alone
@@ -71,7 +71,7 @@ private[consolidation] final case class AssembledExecution(
 
 /**
  * A node of a run's test structure as the human-readable output shows it: a suite with all its executions, or a scope
- * or test with one, or with none where it never started.
+ * or test with exactly one, which has no number where the node never started.
  */
 private[consolidation] final case class AssembledNode(node: StructureNode, executions: Vector[AssembledExecution]) {
 
@@ -181,10 +181,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
   // and label it last had.
   private def addStructure(nodes: IndexedSeq[StructureNode]): Unit = {
-    nodes.collect { case suite: StructureNode.Suite if !structure.contains(suite.id) => suite.id }.foreach { suite =>
-      firstScopeOrTestPosition(suite) =
-        nodes.filter(node => RunAssembly.isScopeOrTest(node) && RunAssembly.parentOf(node).contains(suite)).map(RunAssembly.declaredPositionOf).minOption
-    }
+    val suites = nodes.collect { case suite: StructureNode.Suite => suite.id }
+    val firstSeenSuites = suites.filterNot(structure.contains)
     nodes.foreach(addToStructure)
     val suiteOfNode = nodes.foldLeft(Map.empty[NodeId, NodeId]) { (suites, node) =>
       node match {
@@ -192,9 +190,14 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
         case scopeOrTest => RunAssembly.parentOf(scopeOrTest).flatMap(suites.get).fold(suites)(suites.updated(RunAssembly.idOf(scopeOrTest), _))
       }
     }
-    nodes.collect { case suite: StructureNode.Suite => suite.id }.foreach { suite =>
-      latestScopesAndTests(suite) =
-        nodes.filter(node => RunAssembly.isScopeOrTest(node) && suiteOfNode.get(RunAssembly.idOf(node)).contains(suite)).map(RunAssembly.idOf).toSet
+    val scopesAndTests = nodes.filter(RunAssembly.isScopeOrTest)
+    val positionsByParent = scopesAndTests.groupMap(RunAssembly.parentOf)(RunAssembly.declaredPositionOf)
+    val scopesAndTestsBySuite = scopesAndTests.groupMap(node => suiteOfNode.get(RunAssembly.idOf(node)))(RunAssembly.idOf)
+    firstSeenSuites.foreach { suite =>
+      firstScopeOrTestPosition(suite) = positionsByParent.getOrElse(Some(suite), Vector.empty).minOption
+    }
+    suites.foreach { suite =>
+      latestScopesAndTests(suite) = scopesAndTestsBySuite.getOrElse(Some(suite), Vector.empty).toSet
     }
   }
 
