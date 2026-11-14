@@ -1,5 +1,8 @@
 package org.scalatest.mill
 
+import java.io.FileInputStream
+import java.io.FileNotFoundException
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,7 +25,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
   private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
 
   /** A consolidation the reader adds its run to, and the reader's view of the run's process. */
-  private final class Reading(eventLogFile: Path) {
+  private final class Reading(eventLogFile: Path, open: Path => InputStream = path => new FileInputStream(path.toFile)) {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
     val runsAdded: AtomicInteger = new AtomicInteger(0)
@@ -30,7 +33,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     val processExited: AtomicBoolean = new AtomicBoolean(false)
     val processesWatched: mutable.Set[RunProcess] = mutable.Set.empty[RunProcess]
 
-    val reader: EventLogReader = new EventLogReader(eventLogFile, () => addRun(), () => addProcessEndedBeforeAnyRun(), watch, 1.millis)
+    val reader: EventLogReader = new EventLogReader(eventLogFile, () => addRun(), () => addProcessEndedBeforeAnyRun(), watch, 1.millis, open)
 
     private def addRun(): RunFeed = {
       runsAdded.incrementAndGet()
@@ -64,6 +67,17 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
+  /** Opens the file once `failures` opens have failed as a file another process holds fails to open on Windows. */
+  private def openingAfterFailures(failures: Int): Path => InputStream = {
+    val failed = new AtomicInteger(0)
+    path =>
+      if (failed.getAndIncrement() < failures) {
+        throw new FileNotFoundException(s"$path (The process cannot access the file because it is being used by another process)")
+      } else {
+        new FileInputStream(path.toFile)
+      }
+  }
+
   private def write(file: Path, text: String): Unit =
     Files.write(file, text.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
 
@@ -91,6 +105,31 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.runsAdded.get shouldBe 1
           reading.processesEndedBeforeAnyRun.get shouldBe 0
           reading.output.toSeq shouldBe Seq("[core.test]")
+        }
+      }
+    }
+
+    "the event log file cannot be opened at first" should {
+      "keep trying to open it, then read the run" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n$runEndedCompleted\n")
+          val reading = new Reading(file, openingAfterFailures(3))
+          reading.processExited.set(true)
+          reading.reader.start()
+          reading.stateAfterEnd() shouldBe ConsolidationState.Ended
+          reading.runsAdded.get shouldBe 1
+        }
+      }
+    }
+
+    "the event log file never opens" should {
+      "fail with what opening it threw" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n$runEndedCompleted\n")
+          val reading = new Reading(file, openingAfterFailures(Int.MaxValue))
+          reading.processExited.set(true)
+          reading.reader.start()
+          a[FileNotFoundException] should be thrownBy reading.reader.awaitStreamEnd()
         }
       }
     }

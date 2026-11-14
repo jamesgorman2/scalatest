@@ -1,6 +1,8 @@
 package org.scalatest.mill
 
 import java.io.FileInputStream
+import java.io.FileNotFoundException
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import org.scalatest.consolidation.RunEvent
@@ -18,13 +20,15 @@ import scala.concurrent.duration.FiniteDuration
  *
  * @param addRun adds the run, once its event log file exists
  * @param addProcessEndedBeforeAnyRun adds the worker, once it has ended with no event log file
+ * @param open opens the event log file for reading
  */
 private[mill] final class EventLogReader(
     eventLogFile: Path,
     addRun: () => RunFeed,
     addProcessEndedBeforeAnyRun: () => Unit,
     hasExited: RunProcess => Boolean,
-    pollInterval: FiniteDuration
+    pollInterval: FiniteDuration,
+    open: Path => InputStream = path => new FileInputStream(path.toFile)
 ) {
 
   @volatile private var workerEnded: Boolean = false
@@ -76,7 +80,7 @@ private[mill] final class EventLogReader(
   }
 
   private def readRun(feed: RunFeed): Unit = {
-    val input = new FileInputStream(eventLogFile.toFile)
+    val input = openOnceReadable()
     try {
       new RunReading(feed, input).readUntilStreamEnds()
     } finally {
@@ -84,7 +88,24 @@ private[mill] final class EventLogReader(
     }
   }
 
-  private final class RunReading(feed: RunFeed, input: FileInputStream) {
+  // On Windows, opening the file just after the emitter moves it into place can fail for a moment with a sharing
+  // violation, which Java reports as a `FileNotFoundException`.
+  private def openOnceReadable(): InputStream = {
+    var input: Option[InputStream] = None
+    var failedOpens = 0
+    while (input.isEmpty) {
+      try {
+        input = Some(open(eventLogFile))
+      } catch {
+        case _: FileNotFoundException if failedOpens < EventLogReader.retriedOpens =>
+          failedOpens += 1
+          Thread.sleep(pollInterval.toMillis)
+      }
+    }
+    input.get
+  }
+
+  private final class RunReading(feed: RunFeed, input: InputStream) {
 
     private val lines = new EventLogLines
     private val buffer = new Array[Byte](64 * 1024)
@@ -120,4 +141,9 @@ private[mill] final class EventLogReader(
           undecodable = true
       }
   }
+}
+
+private[mill] object EventLogReader {
+
+  private val retriedOpens: Int = 500
 }
