@@ -120,12 +120,25 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
+   * Writes a further `structure` event for a suite, as `writeStructureWhereChanged` does, from the scopes and tests of
+   * a registration tree that the filter keeps. A test a structure of the suite has already filtered keeps what that
+   * filtering said, and any other is filtered by `filtered`, as `Filter.apply` filters one test.
+   */
+  def writeStructureOfTreeWhereChanged(table: SuiteNodeTable, registered: List[RegisteredNode], filtered: String => (Boolean, Boolean)): Unit = {
+    val thrown = synchronized {
+      val filteredTests = table.filterKeepingEarlier(SuiteStructure.testNamesIn(registered), filtered)
+      writeStructureWhereChangedUnderLock(table, SuiteStructure.kept(registered, filteredTests))
+    }
+    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+  }
+
+  /**
    * Adds a test to its suite's latest structure, writing a further `structure` event, where that structure lacks the
    * test and the instance's registration tree, `registered`, holds it. The tree is read only where the structure
    * lacks the test, as where a `runTests` override runs a test the filter drops.
    */
   def addTestWhereLacking(table: SuiteNodeTable, testName: String, registered: => Option[List[RegisteredNode]]): Unit = {
-    if (synchronized(isOpen && !SuiteStructure.holdsTest(table.scopesAndTests, testName))) {
+    if (synchronized(isOpen && !table.latestHoldsTest(testName))) {
       registered.foreach { tree =>
         // The latest structure is read again under the lock, since another instance of the suite may have changed it.
         val thrown = synchronized {
@@ -139,7 +152,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   // Encoding a structure calls no code of the run's, so it is encoded under the lock, where its nodes are minted.
   private def writeStructureWhereChangedUnderLock(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
     if (isOpen && table.scopesAndTests != scopesAndTests) {
-      val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(table.furtherStructure(scopesAndTests, mintNode))))
+      val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode))))
       if (written.isLeft) {
         close()
       }

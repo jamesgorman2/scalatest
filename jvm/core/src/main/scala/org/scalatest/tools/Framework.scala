@@ -520,12 +520,12 @@ class Framework extends SbtFramework {
             case t: Throwable => new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, t)
           }
 
-        // A ConfigMapWrapperSuite constructs its wrapped class when its suite ID is first read, here before it can
-        // start. What that throws reaches the build tool, as in ScalaTest 3.2.20, and the event log alone holds the
-        // suite as aborted.
+        // A ConfigMapWrapperSuite constructs its wrapped class on first use, which is forced here, before the suite
+        // can start, through an accessor no suite can override. What that throws reaches the build tool, as in
+        // ScalaTest 3.2.20, and the event log alone holds the suite as aborted.
         suite match {
           case wrapper: ConfigMapWrapperSuite =>
-            try wrapper.suiteId
+            try wrapper.instanceWithEmptyConfigMap
             catch {
               case thrown: Throwable =>
                 handOffAbortOfSuiteThatCannotStart(thrown)

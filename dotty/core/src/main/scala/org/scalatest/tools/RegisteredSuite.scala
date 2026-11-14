@@ -160,7 +160,7 @@ private[scalatest] final class RegisteredSuite(
   def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = {
     instance.scopesAndTestsOfRegistrationTree.foreach { registered =>
       val tags = Suite.autoTagClassAnnotations(tagsOfTests, instance, SuiteStructure.testNamesIn(registered))
-      emitter.writeStructureWhereChanged(table, SuiteStructure.kept(registered, testName => filter(testName, tags, table.suiteId)))
+      emitter.writeStructureOfTreeWhereChanged(table, registered, testName => filter(testName, tags, table.suiteId))
     }
   }
 

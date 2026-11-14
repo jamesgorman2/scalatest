@@ -18,8 +18,10 @@ private[scalatest] enum ScopeOrTest {
  * A suite's structure after filtering, before its nodes have IDs: the suite, its scopes and tests, and its nested
  * suites, each list in declared order.
  *
- * @param instance the suite instance the structure was read from
+ * @param instance the suite instance the structure is for
  * @param testsBeforeNestedSuites whether the suite's scopes and tests come before its nested suites in declared order
+ * @param filteredTests for a suite with a registration tree, what the filter said of each test of the tree, as
+ *                      `Filter.apply` says it for one test: whether the test is dropped and whether it is ignored
  */
 private[scalatest] final case class SuiteStructure(
   instance: Suite,
@@ -28,7 +30,8 @@ private[scalatest] final case class SuiteStructure(
   className: String,
   scopesAndTests: List[ScopeOrTest],
   nestedSuites: List[SuiteStructure],
-  testsBeforeNestedSuites: Boolean
+  testsBeforeNestedSuites: Boolean,
+  filteredTests: Map[String, (Boolean, Boolean)] = Map.empty
 )
 
 private[scalatest] object SuiteStructure {
@@ -48,11 +51,12 @@ private[scalatest] object SuiteStructure {
       case _ => suite
     }
     val suiteId = readFrom.suiteId
-    val scopesAndTests = readFrom.scopesAndTestsOfRegistrationTree match {
+    val (scopesAndTests, filteredTests) = readFrom.scopesAndTestsOfRegistrationTree match {
       case Some(registered) =>
         val tags = readFrom.tags
-        kept(registered, testName => filter(testName, tags, suiteId))
-      case None => ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId).map((testName, _) => testName))
+        val filteredTests = testNamesIn(registered).map(testName => testName -> filter(testName, tags, suiteId)).toMap
+        (kept(registered, filteredTests), filteredTests)
+      case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId).map((testName, _) => testName)), Map.empty)
     }
     SuiteStructure(
       suite,
@@ -61,7 +65,8 @@ private[scalatest] object SuiteStructure {
       Suite.getSuiteClassName(readFrom),
       scopesAndTests,
       if (filter.excludeNestedSuites) Nil else readFrom.nestedSuites.toList.map(read(_, filter)),
-      readFrom.isInstanceOf[TestsBeforeNestedSuites]
+      readFrom.isInstanceOf[TestsBeforeNestedSuites],
+      filteredTests
     )
   }
 
@@ -101,11 +106,8 @@ private[scalatest] object SuiteStructure {
     Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
   }
 
-  /** Whether the scopes and tests hold a test of this test name. */
-  def holdsTest(scopesAndTests: List[ScopeOrTest], testName: String): Boolean = testsIn(scopesAndTests).exists(_.testName == testName)
-
-  // Recurses once for each scope nested in another.
-  private def testsIn(scopesAndTests: List[ScopeOrTest]): List[ScopeOrTest.Test] =
+  /** The tests among the scopes and tests, and within each scope. It recurses once for each scope nested in another. */
+  def testsIn(scopesAndTests: List[ScopeOrTest]): List[ScopeOrTest.Test] =
     scopesAndTests.flatMap {
       case test: ScopeOrTest.Test => List(test)
       case ScopeOrTest.Scope(_, _, _, nodes) => testsIn(nodes)

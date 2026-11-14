@@ -106,26 +106,86 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     )
   }
 
-  private val configDependentSpec = StatedRun(
+  /** A run of a suite run through ConfigMapWrapperSuite that registers test remote where its config map holds db, and test local where it does not. */
+  private def configDependent(suite: String): StatedRun =
+    StatedRun(
+      Vector(
+        "RunStarting",
+        s"SuiteStarting $suite",
+        "ScopeOpened A config",
+        "TestStarting A config remote",
+        "TestSucceeded A config remote",
+        "ScopeClosed A config",
+        s"SuiteCompleted $suite",
+        "RunCompleted"
+      ),
+      s"""
+      run started
+      run: RunStarting
+      structure
+        suite "$suite", class "samples.$suite"
+          scope "A config", label "A config"
+            test "local", label "- local"
+      suite "$suite": SuiteStarting
+      structure
+        suite "$suite", class "samples.$suite"
+          scope "A config", label "A config"
+            test "remote", label "- remote"
+      scope "A config": ScopeOpened
+      test "remote": TestStarting
+      test "remote": TestSucceeded
+      scope "A config": ScopeClosed
+      suite "$suite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        """"db":"on"""",
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(1, suite, s"samples.$suite"),
+          TestEventLogLine.scope(2, 1, 0, "A config", "A config"),
+          TestEventLogLine.test(3, 2, 0, "local", "- local")
+        ),
+        suiteStarting(1),
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(1, suite, s"samples.$suite"),
+          TestEventLogLine.scope(2, 1, 0, "A config", "A config"),
+          TestEventLogLine.test(4, 2, 0, "remote", "- remote")
+        ),
+        inFirstExecution(2, "ScopeOpened"),
+        inFirstExecution(4, "TestStarting"),
+        inFirstExecution(4, "TestSucceeded"),
+        inFirstExecution(2, "ScopeClosed"),
+        suiteCompleted(1)
+      )
+    )
+
+  private val configDependentSpec = configDependent("ConfigDependentSpec")
+
+  private val asyncConfigDependentSpec = configDependent("AsyncConfigDependentSpec")
+
+  private val nestsConfigDependentSpec = StatedRun(
     Vector(
       "RunStarting",
+      "SuiteStarting NestsConfigDependentSpec",
       "SuiteStarting ConfigDependentSpec",
       "ScopeOpened A config",
       "TestStarting A config remote",
       "TestSucceeded A config remote",
       "ScopeClosed A config",
       "SuiteCompleted ConfigDependentSpec",
+      "SuiteCompleted NestsConfigDependentSpec",
       "RunCompleted"
     ),
     """
-    run started
-    run: RunStarting
     structure
-      suite "ConfigDependentSpec", class "samples.ConfigDependentSpec"
-        scope "A config", label "A config"
-          test "local", label "- local"
+      suite "NestsConfigDependentSpec", class "samples.NestsConfigDependentSpec"
+        suite "ConfigDependentSpec", class "samples.ConfigDependentSpec"
+          scope "A config", label "A config"
+            test "local", label "- local"
+    suite "NestsConfigDependentSpec": SuiteStarting
     suite "ConfigDependentSpec": SuiteStarting
-    structure
+    structure under suite "NestsConfigDependentSpec"
       suite "ConfigDependentSpec", class "samples.ConfigDependentSpec"
         scope "A config", label "A config"
           test "remote", label "- remote"
@@ -134,26 +194,88 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     test "remote": TestSucceeded
     scope "A config": ScopeClosed
     suite "ConfigDependentSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
+    suite "NestsConfigDependentSpec": SuiteCompleted
     """,
-    frameworkRunOf(
-      """"db":"on"""",
+    List(
       TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "ConfigDependentSpec", "samples.ConfigDependentSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A config", "A config"),
-        TestEventLogLine.test(3, 2, 0, "local", "- local")
+        TestEventLogLine.suite(1, "NestsConfigDependentSpec", "samples.NestsConfigDependentSpec"),
+        TestEventLogLine.nestedSuite(2, 1, 0, "ConfigDependentSpec", "samples.ConfigDependentSpec"),
+        TestEventLogLine.scope(3, 2, 0, "A config", "A config"),
+        TestEventLogLine.test(4, 3, 0, "local", "- local")
       ),
       suiteStarting(1),
+      suiteStarting(2),
       TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "ConfigDependentSpec", "samples.ConfigDependentSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A config", "A config"),
-        TestEventLogLine.test(4, 2, 0, "remote", "- remote")
+        TestEventLogLine.nestedSuite(2, 1, 0, "ConfigDependentSpec", "samples.ConfigDependentSpec"),
+        TestEventLogLine.scope(3, 2, 0, "A config", "A config"),
+        TestEventLogLine.test(5, 3, 0, "remote", "- remote")
       ),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(4, "TestStarting"),
-      inFirstExecution(4, "TestSucceeded"),
-      inFirstExecution(2, "ScopeClosed"),
+      inFirstExecution(3, "ScopeOpened"),
+      inFirstExecution(5, "TestStarting"),
+      inFirstExecution(5, "TestSucceeded"),
+      inFirstExecution(3, "ScopeClosed"),
+      suiteCompleted(2),
+      suiteCompleted(1)
+    )
+  )
+
+  private val oneInstancePerTestSuite = StatedRun(
+    Vector(
+      "RunStarting",
+      "SuiteStarting OneInstancePerTestSuite",
+      "TestStarting a",
+      "TestSucceeded a",
+      "TestStarting b",
+      "TestSucceeded b",
+      "SuiteCompleted OneInstancePerTestSuite",
+      "RunCompleted"
+    ),
+    """
+    structure
+      suite "OneInstancePerTestSuite", class "samples.OneInstancePerTestSuite"
+        test "a", label "- a"
+        test "b", label "- b"
+    suite "OneInstancePerTestSuite": SuiteStarting
+    test "a": TestStarting
+    test "a": TestSucceeded
+    test "b": TestStarting
+    test "b": TestSucceeded
+    suite "OneInstancePerTestSuite": SuiteCompleted
+    """,
+    List(
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(1, "OneInstancePerTestSuite", "samples.OneInstancePerTestSuite"),
+        TestEventLogLine.test(2, 1, 0, "a", "- a"),
+        TestEventLogLine.test(3, 1, 1, "b", "- b")
+      ),
+      suiteStarting(1),
+      inFirstExecution(2, "TestStarting"),
+      inFirstExecution(2, "TestSucceeded"),
+      inFirstExecution(3, "TestStarting"),
+      inFirstExecution(3, "TestSucceeded"),
+      suiteCompleted(1)
+    )
+  )
+
+  private val tagsOverrideSuite = StatedRun(
+    Vector("RunStarting", "SuiteStarting TagsOverrideSuite", "TestStarting a", "TestSucceeded a", "SuiteCompleted TagsOverrideSuite", "RunCompleted"),
+    """
+    structure
+      suite "TagsOverrideSuite", class "samples.TagsOverrideSuite"
+        test "a", label "- a"
+    suite "TagsOverrideSuite": SuiteStarting
+    test "a": TestStarting
+    test "a": TestSucceeded
+    suite "TagsOverrideSuite": SuiteCompleted
+    """,
+    List(
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(1, "TagsOverrideSuite", "samples.TagsOverrideSuite"),
+        TestEventLogLine.test(2, 1, 0, "a", "- a")
+      ),
+      suiteStarting(1),
+      inFirstExecution(2, "TestStarting"),
+      inFirstExecution(2, "TestSucceeded"),
       suiteCompleted(1)
     )
   )
@@ -671,6 +793,53 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "the structure holding a, then a's events, then a further structure adding b, before b's events",
       runsADroppedTestSuite,
       arguments = List("-l", "samples.Slow")
+    )
+
+    eventScenarios(
+      "A nested suite's instance that runs registers another tree than its first structure holds",
+      "a Suites nesting a ConfigMapWrapperSuite of a suite declaring scope 'A config' holding test 'remote' where its " +
+        "config map holds db, and test 'local' where it does not",
+      "samples.NestsConfigDependentSpec",
+      "the structure the empty config map gives the nested suite, the suites' SuiteStarting, then a further structure " +
+        "whose root is the nested suite, with its parent and the position the first gave it, before the nested suite's " +
+        "scope and test events",
+      nestsConfigDependentSpec,
+      launch = Launch.ByRunner,
+      arguments = List("-Ddb=on"),
+      isWhole = false,
+      structures = Some(2)
+    )
+
+    eventScenarios(
+      "An async suite's instance that runs registers another tree than its first structure holds",
+      "an AsyncFunSpec run through ConfigMapWrapperSuite, declaring scope 'A config' holding test 'remote' where its " +
+        "config map holds db, and test 'local' where it does not",
+      "samples.AsyncConfigDependentSpec",
+      "the structure the empty config map registers, the suite's SuiteStarting, then a further structure of what the " +
+        "run's config map registers, before the events of the scope and test it holds",
+      asyncConfigDependentSpec,
+      arguments = List("-Ddb=on")
+    )
+
+    eventScenarios(
+      "Each test runs in an instance of its own, each registering the same tree",
+      "an AnyFunSuite mixing in OneInstancePerTest, declaring tests a and b",
+      "samples.OneInstancePerTestSuite",
+      "the suite's one structure, then the events of a and b",
+      oneInstancePerTestSuite,
+      isWhole = false,
+      structures = Some(1)
+    )
+
+    eventScenarios(
+      "A tags override drops a test its registered tags keep",
+      "an AnyFunSuite declaring tests a and b, whose tags override tags b samples.Slow",
+      "samples.TagsOverrideSuite",
+      "the suite's one structure, holding a alone, then a's events",
+      tagsOverrideSuite,
+      arguments = List("-l", "samples.Slow"),
+      isWhole = false,
+      structures = Some(1)
     )
   }
 }

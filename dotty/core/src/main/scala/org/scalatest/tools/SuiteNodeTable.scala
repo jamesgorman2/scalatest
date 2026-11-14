@@ -61,10 +61,11 @@ private[scalatest] object ScopeAndTestIds {
  *
  * Not a case class: the suite instance is user code, whose `equals`, `hashCode` and `toString` must not be called.
  *
- * @param instance the suite instance the suite's structure was read from
+ * @param instance the suite instance the suite's first structure is for
  * @param parent the suite node this one is nested in, where it is nested, and `position` its place among that node's children
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstIds the node IDs of `firstScopesAndTests`
+ * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
  * @param nestedSuites each nested suite's table, at its position in `nestedSuites`
  */
 private[scalatest] final class SuiteNodeTable(
@@ -77,6 +78,7 @@ private[scalatest] final class SuiteNodeTable(
   val position: Option[Int],
   firstScopesAndTests: List[ScopeOrTest],
   firstIds: ScopeAndTestIds,
+  firstFilteredTests: Map[String, (Boolean, Boolean)],
   val nestedSuites: Vector[SuiteNodeTable]
 ) {
 
@@ -86,6 +88,8 @@ private[scalatest] final class SuiteNodeTable(
   private var openedBySuiteStarting = Option.empty[Execution]
   private var ids = firstIds
   private var latestScopesAndTests = firstScopesAndTests
+  private var testNamesOfLatest = SuiteNodeTable.testNamesIn(firstScopesAndTests)
+  private var filteredTests = firstFilteredTests
 
   /** Each test's node, by test name. */
   def tests: Map[String, NodeId] = ids.tests
@@ -99,18 +103,34 @@ private[scalatest] final class SuiteNodeTable(
   /** The scopes and tests of the suite's latest structure. */
   def scopesAndTests: List[ScopeOrTest] = latestScopesAndTests
 
+  /** Whether the suite's latest structure holds a test of this test name. */
+  def latestHoldsTest(testName: String): Boolean = testNamesOfLatest.contains(testName)
+
+  /**
+   * What the filter says of each test of `testNames`, as `Filter.apply` says it for one test. A test a structure of
+   * the suite has already filtered keeps what that filtering said, since the suite's first structure is filtered by the
+   * suite's own `tags`, which a further structure cannot call. Any other test is filtered by `filtered`, which the
+   * table then keeps for later structures.
+   */
+  def filterKeepingEarlier(testNames: List[String], filtered: String => (Boolean, Boolean)): Map[String, (Boolean, Boolean)] = {
+    val filteredNow = testNames.map(testName => testName -> filteredTests.getOrElse(testName, filtered(testName))).toMap
+    filteredTests = filteredTests ++ filteredNow
+    filteredNow
+  }
+
   /**
    * Makes `scopesAndTests` the suite's latest structure, minting a node for each scope and test no earlier structure
    * of the suite held, and returns the nodes of the further `structure` event that holds them: the suite, then its
    * scopes and tests, positioned from 0 among themselves.
    */
-  def furtherStructure(scopesAndTests: List[ScopeOrTest], mint: () => NodeId): Vector[StructureNode] = {
+  def replaceLatestStructure(scopesAndTests: List[ScopeOrTest], mint: () => NodeId): Vector[StructureNode] = {
     val nodes = Vector.newBuilder[StructureNode]
     nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
     val added = new SuiteNodeTable.ScopesAndTests(ids, mint, nodes)
     added.add(scopesAndTests, node, 0, Nil)
     ids = added.ids
     latestScopesAndTests = scopesAndTests
+    testNamesOfLatest = SuiteNodeTable.testNamesIn(scopesAndTests)
     nodes.result()
   }
 
@@ -140,6 +160,8 @@ private[scalatest] final class SuiteNodeTable(
 }
 
 private[scalatest] object SuiteNodeTable {
+
+  private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[String] = SuiteStructure.testsIn(scopesAndTests).map(_.testName).toSet
 
   /**
    * Mints a node for a top-level suite and for each node of its structure. Returns the suite's table, and the
@@ -181,6 +203,7 @@ private[scalatest] object SuiteNodeTable {
         position,
         structure.scopesAndTests,
         scopesAndTests.ids,
+        structure.filteredTests,
         nestedSuites
       )
     }

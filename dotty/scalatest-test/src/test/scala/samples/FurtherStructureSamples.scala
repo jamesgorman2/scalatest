@@ -4,11 +4,14 @@ import org.scalatest.Args
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.ConfigMapWrapperSuite
 import org.scalatest.DoNotDiscover
+import org.scalatest.OneInstancePerTest
 import org.scalatest.Status
 import org.scalatest.SucceededStatus
 import org.scalatest.Suite
+import org.scalatest.Suites
 import org.scalatest.WrapWith
 import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.immutable.ListSet
 
@@ -132,4 +135,54 @@ class RunsADroppedTestSuite extends AnyFunSuite {
     status.succeeds()
     runTest("b", args)
   }
+}
+
+// Nests ConfigDependentSpec, run through ConfigMapWrapperSuite.
+@DoNotDiscover
+class NestsConfigDependentSpec extends Suites(new ConfigMapWrapperSuite(classOf[ConfigDependentSpec]))
+
+// Registers test remote where its config map holds db, and test local where it does not.
+@DoNotDiscover
+@WrapWith(classOf[ConfigMapWrapperSuite])
+class AsyncConfigDependentSpec(configMap: Map[String, Any]) extends AsyncFunSpec {
+
+  describe("A config") {
+    if (configMap.contains("db")) {
+      it("remote") {
+        succeed
+      }
+    } else {
+      it("local") {
+        succeed
+      }
+    }
+  }
+}
+
+// Runs each test in an instance of its own, each registering the same tests.
+@DoNotDiscover
+class OneInstancePerTestSuite extends AnyFunSuite with OneInstancePerTest {
+
+  test("a") {
+    succeed
+  }
+
+  test("b") {
+    succeed
+  }
+}
+
+// Its tags override tags test b samples.Slow, which b is not registered with.
+@DoNotDiscover
+class TagsOverrideSuite extends AnyFunSuite {
+
+  test("a") {
+    succeed
+  }
+
+  test("b") {
+    succeed
+  }
+
+  override def tags: Map[String, Set[String]] = super.tags.updated("b", Set("samples.Slow"))
 }
