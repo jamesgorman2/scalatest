@@ -7,18 +7,18 @@ import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 
-/** Feeds the consolidation library runs a criterion states, and reads its human-readable output with colours marked. */
+/** Feeds runs to the consolidation library and reads its human-readable output, with colours marked. */
 private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val moduleLabel: TestRunLabel = TestRunLabel("core.test")
 
   extension (literal: String) {
 
-    /** The literal with its margin stripped and CRLF line endings, from a CRLF checkout, made LF, as the output's lines are joined with LF. */
+    /** The literal with its margin stripped and its line endings made LF, as the output's are. A CRLF checkout gives it CRLF. */
     def stripExpectedMargin: String = literal.stripMargin.replace("\r\n", "\n")
   }
 
-  /** Each line of the human-readable output, as the sink received it. */
+  /** Collects each line of human-readable output it receives. */
   final class OutputSink extends (String => Unit) {
 
     private val received = mutable.ArrayBuffer.empty[String]
@@ -27,7 +27,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
     def lines: Vector[String] = synchronized(received.toVector)
 
-    /** The lines, one to a line, with each ANSI SGR sequence replaced by a marker naming it. */
+    /** The lines joined with LF, each ANSI SGR sequence replaced by a marker naming it. */
     def markedText: String = lines.map(ConsolidatedRuns.withColoursMarked).mkString("\n")
   }
 
@@ -46,7 +46,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     feed
   }
 
-  /** The one event the notation states, as the test-only builder builds it. */
+  /** The single event the notation describes, built by the test-only builder. */
   def runEvent(notation: String): RunEvent =
     TestRunBuilder.build(TestRunPart.Events(notation)).map(_.items) match {
       case Right(Vector(BuiltRunItem.Event(built))) => RunEvent(built.event)
@@ -54,7 +54,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
       case Left(reason) => fail(reason)
     }
 
-  /** The coloured human-readable output of a consolidation of one run, its event stream ended, with colours marked. */
+  /** The coloured human-readable output of one run whose event stream has ended, with colours marked. */
   def consolidated(eventLog: String): String = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)

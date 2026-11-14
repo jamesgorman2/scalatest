@@ -1,6 +1,6 @@
 package org.scalatest.consolidation
 
-/** The test run label a run's suites are shown under, as the human-readable output writes it between brackets. */
+/** The test run label a run's suites are shown under. The human-readable output writes it in brackets. */
 opaque type TestRunLabel = String
 
 object TestRunLabel {

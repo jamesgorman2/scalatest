@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  /** An event log of one suite holding one node, `<node line>`, whose events the run gives it. */
+  /** An event log of one suite holding the node `nodeLine`, whose events are `nodeEvents`. */
   private def eventLogOf(nodeLine: String, nodeEvents: String): String =
     s"""
     run started
@@ -122,7 +122,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     }
   }
 
-  Feature("The nodes a suite's abort leaves without an outcome of their own") {
+  Feature("Nodes without an outcome of their own when their suite aborts") {
 
     val abortedPartway =
       """
@@ -144,8 +144,8 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       run ended completed
       """
 
-    Scenario("A test its suite's abort kept from starting shows `*** NOT RUN ***`, in red") {
-      Given("an event log of a suite that aborted after one test, before a test that has no leading `- `")
+    Scenario("A test that had not started when its suite aborted shows `*** NOT RUN ***`, in red") {
+      Given("an event log of a suite that aborted before a test whose label has no leading `- ` started")
       When("the library consolidates it")
       val output = consolidatedLines(abortedPartway)
 
@@ -162,7 +162,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       output should contain("      {red}- in progress *** ABORTED ***{reset}")
     }
 
-    Scenario("A scope its suite's abort kept from opening shows its label in green and `*** NOT RUN ***` in red") {
+    Scenario("A scope that had not opened when its suite aborted shows its label in green and `*** NOT RUN ***` in red") {
       Given("an event log of a suite that aborted before a scope opened")
       When("the library consolidates it")
       val output = consolidatedLines(abortedPartway)

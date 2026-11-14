@@ -162,7 +162,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
     }
 
     "ended with colour off" should {
-      "write the text it writes with colour on, with no ANSI escape sequence" in {
+      "write the same text as with colour on, without ANSI escape sequences" in {
         def outputLines(coloured: Boolean): Vector[String] = {
           val output = new OutputSink
           val consolidation = Consolidation.start(output, coloured)

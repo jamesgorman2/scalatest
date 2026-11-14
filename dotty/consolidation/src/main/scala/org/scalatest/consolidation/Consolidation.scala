@@ -12,11 +12,11 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
   @volatile private var currentState: ConsolidationState = ConsolidationState.Open
   private val runs = mutable.ArrayBuffer.empty[RunAssembly]
 
-  /** The consolidation's state now. A failure an operation adds is seen by every read made after it returns. */
+  /** The current state. A read made after an operation returns sees any failure that operation added. */
   def state: ConsolidationState = currentState
 
   /**
-   * Adds a run, whose event stream and captured lines are then fed to the returned feed.
+   * Adds a run. Its event stream and captured lines go to the returned feed.
    *
    * @param label the test run label to show the run's suites under
    * @throws IllegalArgumentException if the consolidation has ended
@@ -30,7 +30,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
     }
 
   /**
-   * Adds a process that ended before any run existed in it, which fails the test command.
+   * Adds a process that ended before any run existed in it. This fails the test command.
    *
    * @throws IllegalArgumentException if the consolidation has ended
    */
@@ -41,7 +41,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
     }
 
   /**
-   * Ends the consolidation, writing the human-readable output. Nothing is written before.
+   * Ends the consolidation and writes the human-readable output. Nothing is written before this.
    *
    * @throws IllegalArgumentException if the consolidation has ended, or a run's event stream has not
    */
@@ -75,7 +75,7 @@ object Consolidation {
   def start(humanReadableOutput: String => Unit, coloured: Boolean): Consolidation = new Consolidation(humanReadableOutput, coloured)
 }
 
-/** Where one run's event stream and captured lines are fed, in the order they were read. */
+/** Receives one run's event stream and captured lines, in the order they were read. */
 final class RunFeed private[consolidation] (consolidation: Consolidation, run: RunAssembly) {
 
   /**
@@ -98,6 +98,6 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
    */
   def add(line: CapturedLine): Unit = consolidation.feed(run.add(line))
 
-  /** Ends the run's event stream: no event of the run follows. */
+  /** Ends the run's event stream. No further event of the run may be added. */
   def endEventStream(): Unit = consolidation.feed(run.endEventStream())
 }

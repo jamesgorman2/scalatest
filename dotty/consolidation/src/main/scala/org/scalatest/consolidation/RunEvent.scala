@@ -5,10 +5,10 @@ import java.time.format.DateTimeParseException
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 
-/** One event of a run's test event log, as **Decode** yields it. Only the run's process can be read from it. */
+/** One event of a run's test event log, as [[RunEvent.decode]] returns it. Only the run's process can be read from it. */
 opaque type RunEvent = TestEventLogEvent
 
-/** The ID the operating system gives a process. */
+/** An operating-system process ID. */
 opaque type Pid = Long
 
 object Pid {
@@ -20,7 +20,7 @@ object Pid {
   }
 }
 
-/** The process a run ran in, which the run's `runStarted` event names. */
+/** The process a run ran in, as its `runStarted` event names it. */
 final case class RunProcess(pid: Pid, startTime: Instant)
 
 object RunEvent {
@@ -51,7 +51,7 @@ object RunEvent {
 
   extension (event: RunEvent) {
 
-    /** The run's process, where this is the run's `runStarted` event. */
+    /** The run's process, if this is its `runStarted` event. */
     def runProcess: Option[RunProcess] =
       event match {
         case TestEventLogEvent.RunStarted(pid, startTime) => Some(RunProcess(Pid(pid), Instant.parse(startTime)))

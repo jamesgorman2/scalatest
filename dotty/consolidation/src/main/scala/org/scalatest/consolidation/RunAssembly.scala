@@ -15,7 +15,7 @@ private[consolidation] final case class Execution(number: Int, parentExecution: 
   def holds(isOfKind: DecodedEvent => Boolean): Boolean = events.exists(isOfKind)
 }
 
-/** What a scope's or test's events make of it. A scope that ran and closed has none. */
+/** The outcome a scope's or test's events give it. A scope that opened and closed has none. */
 private[consolidation] enum Outcome {
   case Succeeded
   case Failed
@@ -42,8 +42,8 @@ private[consolidation] final case class AssembledNode(
 }
 
 /**
- * Builds one run's test structure from its event stream as it arrives. Each node is kept by its ID with its events
- * grouped by execution number, apart from its suite's structure.
+ * Builds one run's test structure from its event stream as the stream arrives. It keeps each node's structure by
+ * node ID, and the node's events separately, grouped by execution number.
  */
 private[consolidation] final class RunAssembly(val label: TestRunLabel) {
 
