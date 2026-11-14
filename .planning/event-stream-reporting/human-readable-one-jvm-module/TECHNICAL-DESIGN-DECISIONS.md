@@ -2,13 +2,16 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
-## A registration takes a suite's `suiteId` from the first read 3.2.20 makes of it in the run, never from a read of its own at registration.
+## A registration takes a suite's `suiteId` and `suiteName` from the first reads 3.2.20 makes of them in the run, and the suite's `structure` is written where the last of them is read.
 
-**Alternatives** Reading `suiteId` where the instance registers calls an overridable member, which user code can make throw or depend on state, at a point where 3.2.20 does not call it (`../SPECIFICATION.md` R-002).
+**Alternatives**
 
-**Reasoning** 3.2.20 reads `suiteId` before the instance's first scope or test event: in the `SuiteStarting` a top-level site or `runNestedSuites` builds, in `Suite.runTests`' filter, or as a send helper builds an event. Taking it there calls nothing 3.2.20 does not, and still fixes the node path in time for its `structure` to precede the node's scope and test events.
+- Reading `suiteId` and `suiteName` where the instance registers calls overridable members, which user code can make throw or depend on state, at a point where 3.2.20 does not call them (`../SPECIFICATION.md` R-002).
+- Writing the `structure` at the first engine site of the run, `runImpl`, needs both before 3.2.20 reads either, since its first `suiteName` read is `Suite.run`'s thread rename and its first `suiteId` read can be `Suite.runTests`' filter.
 
-**Costs** Send sites must build an origin against a registration whose node path is not yet known, and the emitter resolves it on hand-off. Where an event is handed off before any such read, the emitter reads `suiteId` itself.
+**Reasoning** 3.2.20 reads `suiteName` before the instance's first scope or test event, in a `SuiteStarting`, `Suite.run`'s thread rename or a send helper, and reads `suiteId` there too: in `Framework`'s task for a top-level suite, in the `SuiteStarting` `runNestedSuites` or the distributor's `SuiteRunner` builds, in `Suite.runTests`' filter, or as a send helper builds an event. Under `Runner`, a top-level suite's wrapper reads it first, in the suite's structure. Taking each there calls nothing 3.2.20 and the wrapper do not, and still writes the `structure` before the node's scope and test events.
+
+**Costs** Each core site that makes such a read must pass the value to the registration, and send sites must build an origin against a registration whose node path is not yet known. Where an event is handed off before both reads, the emitter reads the missing value itself.
 
 **Settled by** [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
 
@@ -48,7 +51,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 **Alternatives** Encoding each run with core's codec and feeding the library its decoded events makes every library test depend on the event log's format.
 
-**Reasoning** The library takes decoded events, not an event log (`../decisions/architecture-library-and-modules.md` "The consolidation library takes each run's event stream, not its test event log."), and each side of the codec is tested against the format, so the library's tests need only the events. A drift between builder and decoder still fails a test (`TECHNICAL-DESIGN.md` § Testing § Runs the criteria describe).
+**Reasoning** The library takes decoded events, not an event log (`../decisions/architecture-library-and-modules.md` "The consolidation library takes each run's event stream, not its test event log."), and each side of the codec is tested against the format, so the library's tests need only the events. A drift between builder and decoder still fails a test (`technical-design/testing.md` § Testing § Runs the criteria describe).
 
 **Costs** The builder must yield what the decoder yields, and only those comparisons keep the two in step.
 
@@ -60,7 +63,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 **Alternatives** `os.ProcessOutput.Readlines` decodes with the default charset of Mill's JVM and ends a line at a lone `\r`.
 
-**Reasoning** A worker writes in the platform's native encoding, which need not be the default charset of Mill's JVM. Only raw bytes reach the splitter with the worker's encoding and line ends intact (`TECHNICAL-DESIGN.md` § Critical code paths § Capturing a JVM worker's stdout and stderr).
+**Reasoning** A worker writes in the platform's native encoding, which need not be the default charset of Mill's JVM. Only raw bytes reach the splitter with the worker's encoding and line ends intact (`technical-design/test-command.md` § Critical code paths § Capturing a JVM worker's stdout and stderr).
 
 **Costs** Where a module's `forkArgs` set `file.encoding`, `stdout.encoding` or `stderr.encoding`, its non-ASCII output is mis-decoded.
 
@@ -74,7 +77,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 **Alternatives** Sharing `parseArgs`'s arities means rewriting its inline `if` chain as a table, in the parser every run goes through, emitter off included (`../SPECIFICATION.md` R-001).
 
-**Reasoning** The split needs each flag's arity (`TECHNICAL-DESIGN.md` § Critical code paths § A module's own ScalaTest arguments). A table of the splitter's own leaves the parser every run uses as it is, apart from the one branch that accepts the runner argument.
+**Reasoning** The split needs each flag's arity (`technical-design/test-command.md` § Critical code paths § A module's own ScalaTest arguments). A table of the splitter's own leaves the parser every run uses as it is, apart from the one branch that accepts the runner argument.
 
 **Costs** A second arity table, kept in step with `parseArgs` only by that test.
 

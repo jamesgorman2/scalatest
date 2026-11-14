@@ -31,7 +31,7 @@ The tree of a run's nodes as its tests are written, however many times each ran:
 _Avoid_: Test tree, hierarchy, nesting
 
 **Execution**:
-One running of a suite instance, or of a scope or test within it, inside one execution of its parent. A node has one for each time it ran, and none where it never started.
+One running of a suite, scope or test at its place, inside one execution of its parent. A node has one for each time it ran, and none where it never started.
 _Avoid_: Attempt, invocation, retry
 _Context_: A node of the test structure; unrelated to execution mode
 

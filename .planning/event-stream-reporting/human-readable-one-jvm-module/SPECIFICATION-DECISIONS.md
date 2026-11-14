@@ -2,22 +2,34 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## A suite is a node at each place it runs, under the suite or test that ran it, and a test is one node in its suite whichever scope declares it.
+## A suite is a node at each place it runs, under the suite or test that ran it.
 
 **Alternatives**
 
 - Assigning an event whose node its suite's structure lacks to the nearest ancestor that has one puts a test's events on its suite, so the test is never shown as a test (`../SPECIFICATION.md` R-021).
 - A node for each instance that runs gives a test declared by a wrapper and run by the instance it wraps two nodes, one of which never starts and is shown as not run (R-100).
-- One node for every suite sharing a `suiteId` under the innermost enclosing suite merges the helper suites of different tests, and needs the run to match each instance it did not know of against the declared structure.
+- One node for every suite sharing a `suiteId` under the innermost enclosing suite merges the helper suites of different tests.
 
-**Reasoning** A node is a place in the test structure, and the times that place ran are its executions. A suite is known by the suite or test that ran it, its suite ID and its place among the siblings there sharing that ID; a scope by its path in its suite; a test by its suite and its test name. A test is therefore the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, an instance a suite runs with the suite's own ID is that suite, and a suite that one test runs each time the test runs is one suite.
+**Reasoning** A node is a place in the test structure, and the times that place ran are its executions. A suite is known by the suite or test that ran it, its suite ID and its place among the siblings there sharing that ID, so an instance a suite runs outside its tests with the suite's own ID is that suite, and a suite that one test runs each time the test runs is one suite.
 
-**Costs** A helper suite that two tests run is shown twice.
+**Costs** A helper suite that two tests run is shown twice, and a suite user code runs on a thread or `ExecutionContext` of its own shows its tests directly under it, merged with any other such suite sharing its ID.
 
 **Settled by**
 
 - [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 - [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
+
+---
+
+## A test is one node in its suite, whichever scope declares it.
+
+**Alternatives** Knowing a test by its scope path as well gives a test declared in a wrapper's flat list and in the wrapped instance's scoped tree two nodes, one of which never starts and is shown as not run (`../SPECIFICATION.md` R-100).
+
+**Reasoning** A test is known by its suite and its test name, which ScalaTest keeps unique within a suite, so it is the same node whichever declaration the latest structure holds.
+
+**Costs** A test's scope comes only from the latest structure holding it, so every execution of the test shows under the scope that structure gives.
+
+**Settled by** [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
 
 ---
 
@@ -45,7 +57,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Alternatives**
 
-- Carrying `org.scalatest.ConfigMapWrapperSuite`, as 3.2.20's events do, shows the same class on every wrapped suite's abort line (`specification/layout.md` AC-012).
+- Carrying `org.scalatest.ConfigMapWrapperSuite`, as 3.2.20's events do, shows the same class on every wrapped suite's abort line (`specification/layout-lines.md` AC-012).
 
 **Reasoning** The abort line names the class that aborted so a reader can find it, and only the annotated class holds the code that ran.
 

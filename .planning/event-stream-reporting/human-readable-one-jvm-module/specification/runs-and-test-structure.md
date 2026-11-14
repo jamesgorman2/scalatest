@@ -5,5 +5,6 @@ Acceptance criteria for what the human-readable output shows of a run: which sui
 ## Parts
 
 - [runs-and-test-structure-nodes.md](runs-and-test-structure-nodes.md) — the order of suites, scopes and tests, outcomes, nodes that share a name, filtered tests, and failures.
-- [runs-and-test-structure-executions.md](runs-and-test-structure-executions.md) — a suite, scope or test that ran more than once, and a suite whose structure the event log holds more than once.
+- [runs-and-test-structure-executions.md](runs-and-test-structure-executions.md) — a suite, scope or test that ran more than once.
+- [runs-and-test-structure-structures.md](runs-and-test-structure-structures.md) — a suite whose structure the event log holds more than once.
 - [runs-and-test-structure-runs.md](runs-and-test-structure-runs.md) — a run's block, the output captured against the run, and runs that abort or stop.

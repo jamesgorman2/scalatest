@@ -88,9 +88,9 @@ These hold for each run's test structure and for how the human-readable and JSON
 
 ### Nodes
 
-- R-096 A run's test structure has the run at its root, then suites, scopes and tests. A nested suite sits under the suite that nests it, and a suite a test runs sits under that test. Neither a `DiscoverySuite` nor a `DistributedTestRunnerSuite` is a node, so the suites a `DiscoverySuite` discovers are top-level.
-- R-130 The test structure holds each suite, scope and test a run registered, whether or not it ran and however many times, so it does not depend on how the tests ran. A suite, scope or test is one node at its place in its run however many times it ran there, and has one execution for each time.
-- R-104 Suites, scopes or tests registered separately are separate nodes even where they share a name, within a run or across runs.
+- R-096 A run's test structure has the run at its root, then suites, scopes and tests. A suite sits under the suite that nests or runs it, or under the test that runs it. An instance a suite runs outside its tests with that suite's own suite ID is that suite. Neither a `DiscoverySuite` nor a `DistributedTestRunnerSuite` is a node, so the suites a `DiscoverySuite` discovers are top-level.
+- R-130 The test structure holds each suite, scope and test a run registered, whether or not it ran and however many times, so it does not depend on how the tests ran. A suite, scope or test is one node at its place in its run (`.docs/ubiquitous-language.md` **Node**) however many times it ran there, and has one execution for each time.
+- R-104 Suites, scopes or tests registered separately are separate nodes even where they share a name, within a run or across runs. A suite run at two places, as by two tests, is two nodes.
 - R-097 Each `info`, `alert`, `note` and `markup` message attaches to the node that emitted it and, for a suite, scope or test, to the execution that emitted it. A message whose emitting node cannot be identified attaches to the first identifiable ancestor of that node. No message is lost or reordered.
 - R-105 Below a top-level suite, in the human-readable and JSON output, a node's children appear in declared order where it is known, and in descending alphanumeric order by name where it is not.
 
@@ -130,8 +130,8 @@ Output is *captured against* a suite, scope or test when the means that captured
   - on stdout, each line carries the prefix Mill puts on every line the test command's own task writes.
 - R-131 The human-readable output shows a scope or test once for each of its executions, each with what that execution alone produced (its outcome, failure, messages, captured output and duration), and once where it has none.
 - R-133 In the human-readable output, the executions of a scope or test that ran in one execution of its parent scope, or in its suite where its parent is the suite, appear together at the node's declared position (R-105), in the order they started. This overrides R-106 (the format ScalaTest 3.2.20 prints).
-- R-134 In the human-readable output, an execution of a scope or test appears under the execution of its parent scope that it ran in.
-- R-132 The human-readable output shows a suite's name line once, however many times the suite ran. Under it, each of the suite's executions shows what it alone produced (its abort, with the lines under it, and its messages), in the order the executions started. This overrides R-106 (the format ScalaTest 3.2.20 prints).
+- R-134 In the human-readable output, an execution of a suite, scope or test appears under the execution of its parent that it ran in.
+- R-132 The human-readable output shows a suite's name line once under each execution of its parent that ran it, however many times the suite ran in it. Under it, each of the suite's executions shows what it alone produced (its abort, with the lines under it, and its messages), in the order the executions started. This overrides R-106 (the format ScalaTest 3.2.20 prints).
 - R-127 Lowercase characters after the output letters of an `-o` or `-f` format or filter the human-readable output that argument writes, each as its upper-case counterpart does as a ScalaTest 3.2.20 reporter configuration character:
   - `d` durations, `s` short stack traces, `f` full stack traces, `w` no colour and `v` file pathnames;
   - the filters `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes, each hiding those lines.

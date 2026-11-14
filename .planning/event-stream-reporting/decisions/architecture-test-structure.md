@@ -6,10 +6,10 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 
 **Alternatives**
 
-- An ID the emitter mints for each suite instance needs every instance to register itself in a process-wide map, so every run in the JVM pays while any emitter is open, and an instance whose place is learned late must be placed against the declared structure and its events held until then. Holding dropped the events of an instance whose place never reached a wrapper, and placing and holding brought lifecycle bugs.
-- An ID from the `suiteId` alone makes one node of every suite sharing a `suiteId` in a suite, so the helpers of two tests merge, and a node with several parents needs edges in the format and the assembly.
+- An ID the emitter mints for each suite instance needs a process-wide map of instances, which every run in the JVM pays for, and holds the events of an instance placed late.
+- An ID from the `suiteId` alone merges the helper suites of two tests into one node with two parents.
 
-**Reasoning** The engine sets the invocation context, the node and execution the code on a thread runs in, around a suite's run outside its tests, its test bodies, distributor tasks and tasks on its own async `ExecutionContext`, so an instance knows its parent as it starts. Its ID then follows from the parent's node path and its own place under it, with no lookup in the emitter and none but by ID in the consolidation library, and the `structure` holding a node at any place the run declared is written before the node's first event.
+**Reasoning** The engine sets the invocation context, the node and execution the code on a thread runs in, around each top-level suite's run, a suite's run outside its tests, its test bodies, distributor tasks and tasks on its own async `ExecutionContext`, so an instance knows its parent as it starts. Its ID then follows from the parent's node path and its own place under it, and the `structure` holding a node is written before the node's first event.
 
 **Costs** IDs grow with nesting, and a helper suite that two tests run is two nodes.
 
@@ -21,8 +21,8 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 
 **Alternatives**
 
-- Making it a child node gives the delegate of a custom `@WrapWith` wrapper, and every per-test instance of `OneInstancePerTest`, `ParallelTestExecution` and `RandomTestOrder`, a node of its own under the suite, and leaves the tests the wrapper declares as nodes that never start.
-- Naming the sites that run such instances, as the per-test traits and `ConfigMapWrapperSuite`, misses a custom wrapper and any user code that does the same.
+- A child node for each such instance leaves the tests a `@WrapWith` wrapper or a per-test trait's suite declares as nodes that never start.
+- Naming the sites that run such instances misses a custom wrapper and any user code that does the same.
 
 **Reasoning** Such an instance reports the suite's own name, suite ID and test names, so 3.2.20's reporters already see it as that suite. One rule at registration covers every site, with no class-specific code. Where the instance registers other tests than the suite declared, its further `structure` replaces them.
 
@@ -32,21 +32,9 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 
 ---
 
-## A suite started at a place no `structure` declared, beside a declared sibling with its `suiteId`, takes its shape from that sibling in the consolidation library, and the emitter writes no `structure` for it.
-
-**Alternatives** Writing a further `structure` for the place needs the emitter to compare each started instance with the places declared under its parent, which is the reconciliation against declared structure that node paths remove.
-
-**Reasoning** Such a place arises only where more suites with one `suiteId` start in one execution of their parent than the parent declared, as where a `runNestedSuites` override runs `nestedSuites(0)` twice. The declared sibling is the likeliest shape, and the consolidation library reads it from the `structure` it already holds.
-
-**Costs** Where the instance registers other scopes or tests than the declared sibling, the borrowed shape is wrong: borrowed tests that never ran show as not run. An event's node at such a place is held by no `structure` written before it.
-
-**Settled by** [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
-
----
-
 ## A suite instance run where no invocation context is set is not registered, and its events are assigned by their own data.
 
-**Alternatives** Registering such an instance where its run starts needs a process-wide map from instance to node, which every run in the JVM consults, `../SPECIFICATION.md` R-001 runs included, and a way to place an instance whose parent is unknown, which brings back holding.
+**Alternatives** Registering such an instance as its run starts needs a process-wide map of instances, which every run in the JVM consults, `../SPECIFICATION.md` R-001 runs included.
 
 **Reasoning** No context is set only where user code runs an instance on a thread it started or on an `ExecutionContext` it supplied, which the engine cannot see into. Its events still reach the structure wrapper of the enclosing suite or test through `args.reporter`, which assigns them, as it assigns the events user code builds, at or below its own node.
 
@@ -58,9 +46,9 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 
 ## An event core sends for a registered instance is handed to the emitter where it is sent, not by the structure wrapper it reaches.
 
-**Alternatives** Handing every event off at the innermost wrapper it reaches delays the event log and live output while a sorter between send site and wrapper, as under `RandomTestOrder` or `ParallelTestExecution`, holds the event back, and needs state that keeps each event's origin from send to wrapper and is removed when the instance's run ends.
+**Alternatives** Handing every event off at the innermost wrapper it reaches delays the event log while a sorter holds the event back, and keeps each event's origin until a wrapper hands it off.
 
-**Reasoning** The send helper that records the event's origin already holds its node path and execution, so nothing the wrapper adds is needed. The `structure` holding the event's node, where the run declared that place, is written as its instance starts, so the event can be written at once.
+**Reasoning** The send helper that records the event's origin already holds its node path and execution, so nothing the wrapper adds is needed. The `structure` holding the event's node is written before the event, so the event can be written at once.
 
 **Costs** The event log may be ahead of the run's reporters: an event a user's reporter drops, or a sorter still holds when the process dies, is in the event log.
 

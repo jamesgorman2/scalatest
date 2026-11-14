@@ -118,9 +118,9 @@ Feature: Running the module
 
   Rule: The test command runs a module on Scala 3.3 or later whose definition names nothing from the plugin (R-092, `../../SPECIFICATION.md` § Scope)
     Scenario Outline: AC-083 The plugin is added to a build on Scala <version>
-      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala <version>, is the module of `layout.md` AC-002
+      Given a build without the plugin, whose `build.mill` header has no `mvnDeps`, and whose module `core.test`, built with Scala <version>, is the module of `layout-tree.md` AC-002
       When the plugin's header line (`../SPECIFICATION.md` § Scope), at the release `core.test` tests with, is added to its `build.mill`, with nothing else in the build changed, and the test command runs the module
-      Then the human-readable output is the one `layout.md` AC-002 gives
+      Then the human-readable output is the one `layout-tree.md` AC-002 gives
 
       Examples:
         | version |
@@ -213,7 +213,7 @@ Feature: What else reaches the console
 
   Rule: A runner that is not a run adds nothing to the output or the result (R-072)
     Scenario: AC-089 Mill's discovery runner
-      Given suite `SqrtPropSpec` of `layout.md` AC-002
+      Given suite `SqrtPropSpec` of `layout-tree.md` AC-002
       When the test command runs the module
       Then the test command succeeds
       And the human-readable output holds one `SqrtPropSpec:` line and no `Output outside any suite:` line

@@ -121,6 +121,65 @@ Feature: A suite run from a test
         test "second": TestSucceeded
         """
       And it holds no other `structure` holding `HelperSuite`, and no event of a second execution of `A helper` or `helps`
+
+  Rule: A suite a test runs in each of the test's executions is one node, with an execution under each of them (R-130, R-134)
+    Scenario: AC-162 A test run twice runs a helper each time
+      Given suite `RetrySuite` of AC-140, whose test `flaky` also runs a helper before it fails or succeeds
+      When `Framework` runs it with the runner argument
+      Then the event log holds, in this order:
+        """
+        test "flaky": TestStarting
+        structure under test "flaky"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper", in test "flaky" execution 1: ScopeOpened
+        test "helps", in test "flaky" execution 1: TestStarting
+        test "helps", in test "flaky" execution 1: TestSucceeded
+        scope "A helper", in test "flaky" execution 1: ScopeClosed
+        test "flaky": TestFailed
+        test "flaky" execution 2: TestStarting
+        scope "A helper" execution 2, in test "flaky" execution 2, in suite "HelperSuite" execution 2: ScopeOpened
+        test "helps" execution 2, in test "flaky" execution 2, in suite "HelperSuite" execution 2: TestStarting
+        test "helps" execution 2, in test "flaky" execution 2, in suite "HelperSuite" execution 2: TestSucceeded
+        scope "A helper" execution 2, in test "flaky" execution 2: ScopeClosed
+        test "flaky" execution 2: TestSucceeded
+        """
+      And it holds no other `structure` holding `HelperSuite`
+
+  Rule: A suite a test runs inside a task on its suite's own `ExecutionContext` is a nested suite under that test (R-096)
+    Scenario: AC-167 An async test runs a helper inside a `Future`
+      Given suite `AsyncOuterSuite`, class `samples.AsyncOuterSuite`, an `AsyncFunSuite` whose one test, `uses a helper`, labelled `- uses a helper`, runs a helper inside a `Future` on the suite's own `executionContext`, then succeeds
+      When `Framework` runs `AsyncOuterSuite` with the runner argument
+      Then the event log holds, in this order:
+        """
+        test "uses a helper": TestStarting
+        structure under test "uses a helper"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        test "uses a helper": TestSucceeded
+        """
+
+  Rule: A suite a test runs on a thread the test starts is a nested suite under that test, its events assigned by their own data, so its tests sit directly under it (R-096, R-097)
+    Scenario: AC-165 A test runs a helper on a thread of its own
+      Given suite `OuterSuite` of AC-136, whose test runs the helper on a thread it starts, and waits for that thread to end before it succeeds
+      When `Framework` runs `OuterSuite` with the runner argument
+      Then the event log holds, in this order:
+        """
+        test "uses a helper": TestStarting
+        structure under test "uses a helper"
+          suite "HelperSuite", class "samples.HelperSuite"
+            test "A helper helps", label "- A helper helps"
+        test "A helper helps": TestStarting
+        test "A helper helps": TestSucceeded
+        test "uses a helper": TestSucceeded
+        """
+      And no `structure` holds a scope under `HelperSuite`
 ```
 
 ## Nested suites
@@ -167,6 +226,71 @@ Feature: Nested suites run in other ways
         suite "TwiceSuites": SuiteCompleted
         """
       And it holds no other `TestStarting`
+
+  Rule: A suite that starts in one execution of its parent more often than the parent's structure declares it is a further node beside the declared one, and its own `structure` precedes its events (R-096, R-104)
+    Scenario: AC-164 A `runNestedSuites` override runs one nested suite twice
+      Given suite `OuterSuites` of `test-event-log-structure.md` AC-098, which overrides `runNestedSuites` to call `run(None, args)` twice on its first nested suite and never on its second, sending no event itself
+      When `Framework` runs `OuterSuites` with the runner argument
+      Then the event log holds the `structure` AC-098 gives, and then, in this order:
+        """
+        suite "OuterSuites": SuiteStarting
+        test "inner one" #1: TestStarting
+        test "inner one" #1: TestSucceeded
+        structure under suite "OuterSuites"
+          suite "Inner1Suite" #2, class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+        test "inner one" #2: TestStarting
+        test "inner one" #2: TestSucceeded
+        suite "OuterSuites": SuiteCompleted
+        """
+      And it holds no other `structure`
+
+  Rule: Sibling suites sharing a suite ID take their places in the order they start, and a further `structure` precedes the events of one whose tests differ from its place's (R-130)
+    Scenario: AC-168 A `runNestedSuites` override runs two suites sharing an ID in reverse order
+      Given `ModeSuite`, class `samples.ModeSuite`, an `AnyFunSuite` whose one test is named by its constructor's argument and labelled with `- ` before that name
+      And suite `PairSuites`, class `samples.PairSuites`, a `Suites` with no tests nesting `new ModeSuite("fast")` and then `new ModeSuite("slow")`, which overrides `runNestedSuites` to call `run(None, args)` on its nested suites in reverse order, sending no event itself
+      When `Framework` runs `PairSuites` with the runner argument
+      Then the event log holds, in this order:
+        """
+        structure
+          suite "PairSuites", class "samples.PairSuites"
+            suite "ModeSuite", class "samples.ModeSuite"
+              test "fast", label "- fast"
+            suite "ModeSuite", class "samples.ModeSuite"
+              test "slow", label "- slow"
+        suite "PairSuites": SuiteStarting
+        structure under suite "PairSuites"
+          suite "ModeSuite" #1, class "samples.ModeSuite"
+            test "slow", label "- slow"
+        test "slow" #2: TestStarting
+        test "slow" #2: TestSucceeded
+        structure under suite "PairSuites"
+          suite "ModeSuite" #2, class "samples.ModeSuite"
+            test "fast", label "- fast"
+        test "fast" #2: TestStarting
+        test "fast" #2: TestSucceeded
+        suite "PairSuites": SuiteCompleted
+        """
+
+  Rule: A suite run from a top-level suite's `beforeAll` is a nested suite of that suite, whatever reporter it is given (R-096)
+    Scenario: AC-166 A suite's `beforeAll` runs a helper
+      Given suite `SetupSuite`, class `samples.SetupSuite`, an `AnyFunSuite` mixing in `BeforeAndAfterAll`, whose `beforeAll` calls `new HelperSuite().run(None, args)` with `Args` holding a reporter that drops every event, and whose one test, `works`, labelled `- works`, succeeds
+      When `Framework` runs `SetupSuite` with the runner argument
+      Then the event log holds, in this order:
+        """
+        suite "SetupSuite": SuiteStarting
+        structure under suite "SetupSuite"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        test "works": TestStarting
+        test "works": TestSucceeded
+        suite "SetupSuite": SuiteCompleted
+        """
 ```
 
 ## A test run more than once

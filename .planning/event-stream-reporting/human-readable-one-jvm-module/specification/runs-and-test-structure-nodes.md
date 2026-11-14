@@ -117,7 +117,7 @@ Feature: Outcomes
   Rule: A suite whose constructor throws is aborted, and the module's other suites still run (R-099)
     Scenario: AC-068 A suite's constructor throws
       Given suite class `samples.BrokenCtorSpec`, an `AnyFunSuite` whose constructor throws `IllegalStateException("no config")`
-      And suite `SqrtPropSpec` of `layout.md` AC-002
+      And suite `SqrtPropSpec` of `layout-tree.md` AC-002
       When the test command runs the module
       Then the lines for the suite named `BrokenCtorSpec` begin:
         """
@@ -125,7 +125,7 @@ Feature: Outcomes
           samples.BrokenCtorSpec *** ABORTED ***
         """
       And a line under `samples.BrokenCtorSpec *** ABORTED ***` is `java.lang.IllegalStateException: no config`
-      And the lines for `SqrtPropSpec` are those `layout.md` AC-002 gives
+      And the lines for `SqrtPropSpec` are those `layout-tree.md` AC-002 gives
 ```
 
 ## Nodes that share a name
@@ -189,6 +189,46 @@ Feature: Nodes that share a name
       When the library consolidates it
       Then the human-readable output holds two `SameSuite:` lines
       And the lines for one are `SameSuite:` and `- in a`, and for the other `SameSuite:` and `- in b`
+
+  Rule: A suite that starts in one execution of its parent beside more siblings sharing its suite ID than the parent's structure declares sits directly after the last of them, with the scopes and tests its own structure gives it (R-104, R-105)
+    Scenario: AC-163 A nested suite that ran twice in one run of its parent
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuites", class "samples.OuterSuites"
+            suite "Inner1Suite", class "samples.Inner1Suite"
+              test "inner one", label "- inner one"
+              test "inner more", label "- inner more"
+            suite "Inner2Suite", class "samples.Inner2Suite"
+              test "inner two", label "- inner two"
+        suite "OuterSuites": SuiteStarting
+        test "inner one" #1: TestStarting
+        test "inner one" #1: TestSucceeded
+        test "inner more": TestStarting
+        test "inner more": TestSucceeded
+        structure under suite "OuterSuites"
+          suite "Inner1Suite" #2, class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+        test "inner one" #2: TestStarting
+        test "inner one" #2: TestSucceeded
+        test "inner two": TestStarting
+        test "inner two": TestSucceeded
+        suite "OuterSuites": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `OuterSuites` are:
+        """
+        OuterSuites:
+          Inner1Suite:
+            - inner one
+            - inner more
+          Inner1Suite:
+            - inner one
+          Inner2Suite:
+            - inner two
+        """
 ```
 
 ## Filtered tests

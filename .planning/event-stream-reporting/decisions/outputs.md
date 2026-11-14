@@ -2,7 +2,7 @@
 
 Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output holds, newest first.
 
-## A suite, scope or test that ran more than once is one node with many executions, and the human-readable output shows each.
+## A suite, scope or test that ran more than once at one place is one node with many executions, and the human-readable output shows each.
 
 **Alternatives**
 

@@ -24,8 +24,8 @@ Feature: The run in its test event log
 
       Examples:
         | the run                                                                                                                                                                      | launch       | ended     |
-        | suite `SqrtPropSpec` of `layout.md` AC-002                                                                                                                                   | `Framework`  | completed |
-        | suite `SqrtPropSpec` of `layout.md` AC-002                                                                                                                                   | `Runner.run` | completed |
+        | suite `SqrtPropSpec` of `layout-tree.md` AC-002                                                                                                                              | `Framework`  | completed |
+        | suite `SqrtPropSpec` of `layout-tree.md` AC-002                                                                                                                              | `Runner.run` | completed |
         | suite `AbortSuite`, class `samples.AbortSuite`, an `AnyFunSuite` whose one test, `throws on pop`, labelled `- throws on pop`, throws `OutOfMemoryError("Java heap space")`   | `Runner.run` | aborted   |
         | suite `StopSuite`, class `org.scalatest.samples.StopSuite`, an `AnyFunSuite` mixing in `StopOnFailure`, which is private to ScalaTest's package, whose tests `a` and `b`, labelled `- a` and `- b`, run in that order and `a` fails | `Runner.run` | stopped   |
 
@@ -143,7 +143,7 @@ Feature: Each suite's structure
         """
 
     Scenario: AC-099 Suites `Runner` discovers are top-level
-      Given suite `AddSuite`, class `samples.discovered.AddSuite`, an `AnyFunSuite` whose one test, `adds`, labelled `- adds`, succeeds, and suite `SqrtPropSpec` of `layout.md` AC-002 with class `samples.discovered.SqrtPropSpec`, both on the runpath
+      Given suite `AddSuite`, class `samples.discovered.AddSuite`, an `AnyFunSuite` whose one test, `adds`, labelled `- adds`, succeeds, and suite `SqrtPropSpec` of `layout-tree.md` AC-002 with class `samples.discovered.SqrtPropSpec`, both on the runpath
       When `Runner.run` runs with the runner argument, the runpath given with `-R` and no `-s`, so that a `DiscoverySuite` runs them
       Then each of `AddSuite` and `SqrtPropSpec` has its own `structure`, whose root is that suite
       And no `structure` holds a `DiscoverySuite`, and the `DiscoverySuite`'s `SuiteStarting` and `SuiteCompleted` are assigned to `run`
