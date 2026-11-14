@@ -1,0 +1,90 @@
+package build
+
+import mill.*
+import mill.scalalib.*
+import mill.scalalib.publish.*
+
+object Versions {
+  val mill: String = "1.3.1"
+  val scala: String = "3.9.0"
+  // The fork's release, `releaseVersion` in `project/BuildCommons.scala`: the plugin is released with the fork.
+  val fork: String = "3.2.20"
+}
+
+object ScalacOptions {
+  val all: Seq[String] = Seq(
+    "-no-indent",
+    "-old-syntax",
+    "-Werror",
+    "-Wunused:all",
+    "-deprecation",
+    "-feature",
+    "-explain"
+  )
+}
+
+trait PluginScalaModule extends ScalaModule {
+  def scalaVersion: T[String] = Versions.scala
+  def scalacOptions: T[Seq[String]] = ScalacOptions.all
+}
+
+object plugin extends PluginScalaModule, PublishModule {
+  def artifactName: T[String] = "scalatest-mill"
+  def platformSuffix: T[String] = "_mill1"
+  def publishVersion: T[String] = Versions.fork
+
+  // A single colon before each version: `::` would append this module's `_mill1` platform suffix,
+  // which only Mill plugins carry.
+  protected def resolvedDepsWarnNonPlatform: T[Boolean] = false
+  def compileMvnDeps: T[Seq[Dep]] = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
+  def mvnDeps: T[Seq[Dep]] = Seq(
+    mvn"com.edc::scalatest-core:${Versions.fork}",
+    mvn"com.edc::scalatest-consolidation:${Versions.fork}"
+  )
+
+  def pomSettings: T[PomSettings] = PomSettings(
+    description = "ScalaTest's Mill plugin: consolidated test output for Mill builds",
+    organization = "com.edc",
+    url = "https://github.com/jamesgorman2/scalatest",
+    licenses = Seq(License.`Apache-2.0`),
+    versionControl = VersionControl.github("jamesgorman2", "scalatest"),
+    developers = Seq()
+  )
+
+  object integration extends ScalaTests, TestModule.ScalaTest {
+    def scalacOptions: T[Seq[String]] = ScalacOptions.all
+    def mvnDeps: T[Seq[Dep]] = Seq(
+      mvn"com.lihaoyi::mill-testkit:${Versions.mill}",
+      mvn"com.edc::scalatest:${Versions.fork}"
+    )
+
+    def forkEnv: T[Map[String, String]] = Task {
+      val repositories = Seq(
+        publishLocalTestRepo().path.toNIO.toUri.toASCIIString,
+        Task.env.getOrElse("COURSIER_REPOSITORIES", "ivy2Local|central")
+      )
+      super.forkEnv() ++ Map(
+        "MILL_EXECUTABLE_PATH" -> millExecutable.program().path.toString,
+        "COURSIER_REPOSITORIES" -> repositories.mkString("|"),
+        "SCALATEST_MILL_VERSION" -> publishVersion()
+      )
+    }
+
+    object millExecutable extends JavaModule {
+      def mvnDeps: T[Seq[Dep]] = Seq(mvn"com.lihaoyi:mill-runner-launcher_3:${Versions.mill}")
+      def mainClass: T[Option[String]] = Some("mill.launcher.MillLauncherMain")
+
+      // `launcher` and `assembly` write a script that is both shell and batch, with no extension,
+      // which Windows starts only when it is named as a batch file.
+      def program: T[PathRef] = Task {
+        if (scala.util.Properties.isWin) {
+          val batchFile = Task.dest / "mill.bat"
+          os.copy.over(launcher().path, batchFile)
+          PathRef(batchFile)
+        } else {
+          launcher()
+        }
+      }
+    }
+  }
+}

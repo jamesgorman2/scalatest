@@ -486,7 +486,16 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
 - A dependency of a Scala 3 project on a ScalaTest+ artifact excludes upstream's groups. Its upstream ScalaTest would otherwise sit on the classpath beside the fork's, which no longer evicts it.
 - The consolidation library is a JVM-only project of `project/DottyBuild.scala`, depending on its Scala 3 scalatest-core project. `scalatestDotty` aggregates it, so the sbt build publishes it with core, before the plugin's Mill build resolves both.
 - A task of the library's project checks `specification/compatibility-and-library.md` AC-062. It publishes the library and the projects it depends on with `publishLocal`, resolves the published library transitively from the local Ivy repository and Maven Central alone, and fails on any dependency with group `com.lihaoyi` and a name beginning `mill-`.
-- The plugin's Mill build publishes `scalatest-mill` under `com.edc` with `publishLocal`.
+- The plugin's Mill build is `mill-plugin/build.mill`, pinned to Mill 1.3.1 by `mill-plugin/.mill-version` and run through the `mill` and `mill.bat` bootstrap scripts beside it.
+  - Module `plugin` compiles with Scala 3.9.0, Mill 1.3.1's, against `mill-libs` 1.3.1 in `provided` scope. `plugin.publishLocal` publishes `com.edc:scalatest-mill_mill1_3` at the fork's release to the local Ivy repository.
+  - Its dependencies on `scalatest-core_3` and `scalatest-consolidation_3` take a single colon before the version, since `::` would append the plugin's `_mill1` platform suffix.
+  - `plugin.integration` runs a Mill 1.3.1 launcher, built from `mill-runner-launcher_3`, on each fixture build under `plugin/integration/resources/` with `mill.testkit.IntegrationTester`. Its `COURSIER_REPOSITORIES` is the plugin's `publishLocalTestRepo` folder, then `ivy2Local|central`, so a fixture resolves the plugin as this build last compiled it, and the library and the fork from the local Ivy repository.
+  - On Windows the launcher is copied to a `.bat` file: the script Mill's `launcher` and `assembly` write has no extension, and Windows starts it only as a batch file.
+- These commands, in order, publish what the integration tests resolve and then run them:
+  1. At the repository root, `sbt.bat scalatestCompatible/publishLocal scalacticDotty/publishLocal scalatestDotty/publishLocal` (`sbt` off Windows). `scalatestDotty` aggregates core, the style artifacts and the consolidation library but neither `scalactic` nor `scalatest-compatible`, which are published first.
+  2. In `mill-plugin/`, `./mill --no-daemon plugin.integration.testForked` (`mill.bat` on Windows). It compiles and publishes the plugin to its test repository itself.
+
+  `./mill --no-daemon plugin.publishLocal` then publishes the plugin for builds outside the tests.
 
 ## Testing
 
