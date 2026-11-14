@@ -71,7 +71,7 @@ private[consolidation] final case class AssembledExecution(
 
 /**
  * A node of a run's test structure as the human-readable output shows it: a suite with all its executions, or a scope
- * or test with exactly one, which has no number where the node never started.
+ * or test with exactly one, which has no number where no event of the node's own names the execution.
  */
 private[consolidation] final case class AssembledNode(node: StructureNode, executions: Vector[AssembledExecution]) {
 
