@@ -28,40 +28,63 @@ private[scalatest] enum TreeNode {
  * @param execution the execution of the event's own node
  * @param executionOfRun the execution of the run that sent the event, which is its parent's execution
  * @param messagesOfTest for an event of a test's execution, the messages the test hands off during it
- * @param recordedEventsHandedOff whether the event is a test's closing event whose recorded messages the test has
- *                                already handed off one by one
  */
 private[scalatest] final class RecordedOrigin(
   val registration: RegisteredSuite,
   val node: TreeNode,
   val execution: Execution,
   val executionOfRun: Execution,
-  val messagesOfTest: Option[TestExecutionMessages] = None,
-  val recordedEventsHandedOff: Boolean = false
+  val messagesOfTest: Option[TestExecutionMessages] = None
 )
 
 /**
- * The messages a test's informer and documenter hand off during one execution of the test. Each is assigned as the
- * execution's first written event is, and is held until that event is written.
+ * The messages a test's informer and documenter hand off during one execution of the test, kept in the order of the
+ * test's calls among the execution's other events. Each message is assigned as the execution's first written event
+ * is. A message is held while that event is unwritten, and while an event of the execution whose origin was recorded
+ * before the message was handed off is unwritten, as where a reporter ahead of every wrapper holds the event back.
  *
  * Read and written only under the emitter's lock.
  */
 private[scalatest] final class TestExecutionMessages {
 
+  // Each entry is an unwritten event of the execution, `Left`, or a held message, `Right`, in the order of the calls.
   private var assigned = Option.empty[NodeExecution]
-  private var held = Vector.empty[EncodedEvent]
+  private var awaited = Vector.empty[Either[Event, EncodedEvent]]
 
   /** The node and executions of the execution's first written event, once it has been written. */
   def assignment: Option[NodeExecution] = assigned
 
-  def hold(message: EncodedEvent): Unit = held :+= message
+  /** Whether a message handed off now is written at once: nothing of the execution called before it is unwritten. */
+  def writesAtOnce: Boolean = assigned.isDefined && awaited.isEmpty
 
-  /** Takes the assignment of the execution's first written event, and returns the messages held until then. */
-  def assign(execution: NodeExecution): Vector[EncodedEvent] = {
-    val released = held
-    assigned = Some(execution)
-    held = Vector.empty
-    released
+  /** Holds the messages handed off from now on behind an event of the execution, until that event is written. */
+  def awaitWriting(event: Event): Unit = awaited :+= Left(event)
+
+  def hold(message: EncodedEvent): Unit = awaited :+= Right(message)
+
+  /**
+   * Takes an event of the execution that is being written, and its assignment where it is the first. Returns the held
+   * messages to write before the event, and those to write after it.
+   *
+   * A closing event releases every held message, before it. Any other event releases, after it, the held messages up
+   * to the next unwritten event of the execution.
+   */
+  def written(event: Event, execution: NodeExecution, closesTheTest: Boolean): (Vector[EncodedEvent], Vector[EncodedEvent]) = {
+    if (assigned.isEmpty) {
+      assigned = Some(execution)
+    }
+    val others = awaited.filterNot {
+      case Left(unwritten) => unwritten eq event
+      case Right(_) => false
+    }
+    if (closesTheTest) {
+      awaited = Vector.empty
+      (others.collect { case Right(message) => message }, Vector.empty)
+    } else {
+      val (released, rest) = others.span(_.isRight)
+      awaited = rest
+      (Vector.empty, released.collect { case Right(message) => message })
+    }
   }
 }
 
@@ -94,12 +117,16 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = ofTopLevelSuite.getOrElse(this)
 
-  // All three are read and written only under the emitter's lock. The set holds, by identity, the events inner
+  // All four are read and written only under the emitter's lock. The set holds, by identity, the events inner
   // wrappers of this top-level suite's run handed off that had not reached its wrapper when this registration was
-  // removed. It lives here, not in the emitter, so that it is dropped with the top-level suite's wrapper.
+  // removed. The map holds, by identity, each closing event of a test of this top-level suite's run whose messages
+  // the test handed off one by one, with those messages, until a wrapper hands the event off. Both live here, not in
+  // the emitter, so that they are dropped with the top-level suite's wrapper; removing a registration drops neither,
+  // so a closing event sent or passed on after the removal is still written without its recorded messages.
   private var executionOfLatestRun = runOfCreator
   private var isRemoved = false
   private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
+  private val closingEventsWithMessagesHandedOff = new IdentityHashMap[Event, TestExecutionMessages]
 
   /** Starts an execution for a run of the instance. Called under the emitter's lock. */
   def startRunUnderLock(): Execution = {
@@ -128,6 +155,20 @@ private[scalatest] final class RegisteredSuite(
    * was kept. Called under the emitter's lock.
    */
   def takeHandedOffBeforeRemoval(event: Event): Boolean = handedOffBeforeRemoval.remove(event)
+
+  /**
+   * Keeps a closing event of a test of this top-level suite's run, whose messages the test handed off one by one,
+   * with those messages. Called under the emitter's lock.
+   */
+  def keepClosingEventWithMessagesHandedOff(event: Event, messages: TestExecutionMessages): Unit =
+    closingEventsWithMessagesHandedOff.put(event, messages)
+
+  /**
+   * Stops keeping a closing event whose messages its test handed off one by one, and returns those messages where it
+   * was kept. Called under the emitter's lock.
+   */
+  def takeClosingEventWithMessagesHandedOff(event: Event): Option[TestExecutionMessages] =
+    Option(closingEventsWithMessagesHandedOff.remove(event))
 
   def startRun(): Unit = emitter.startRun(this)
 
@@ -214,21 +255,20 @@ private[scalatest] final class RegisteredSuite(
 
     def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
 
-    def record(): RecordedOrigin = recorded(recordedEventsHandedOff = false)
+    def record(): RecordedOrigin = {
+      val ofRun = executionOfItsRun.getOrElse(startRunUnlessStarted())
+      executionOfItsRun = Some(ofRun)
+      new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun, Some(messages))
+    }
 
     override def handOffMessage(message: => Event): Unit = emitter.writeTestMessage(RegisteredSuite.this, messages, message)
 
     override def ofClosingEventWithMessagesHandedOff: EventOrigin = {
+      val ofTestExecution = this
       new RecordingOrigin(RegisteredSuite.this) {
-        def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
-        def record(): RecordedOrigin = recorded(recordedEventsHandedOff = true)
+        def recordFor(event: Event): Unit = emitter.recordOriginOfClosingEventWithMessagesHandedOff(event, ofTestExecution, messages)
+        def record(): RecordedOrigin = ofTestExecution.record()
       }
-    }
-
-    private def recorded(recordedEventsHandedOff: Boolean): RecordedOrigin = {
-      val ofRun = executionOfItsRun.getOrElse(startRunUnlessStarted())
-      executionOfItsRun = Some(ofRun)
-      new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun, Some(messages), recordedEventsHandedOff)
     }
   }
 }

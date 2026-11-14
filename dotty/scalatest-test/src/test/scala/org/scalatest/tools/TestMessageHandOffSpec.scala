@@ -3,10 +3,15 @@ package org.scalatest.tools
 import org.scalatest.EventOrigin
 import org.scalatest.Filter
 import org.scalatest.PathMessageCalls
+import org.scalatest.PathMessageRecordingAlerter
+import org.scalatest.PathMessageRecordingDocumenter
+import org.scalatest.PathMessageRecordingInformer
+import org.scalatest.PathMessageRecordingNotifier
 import org.scalatest.Reporter
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.Tracker
+import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
 import org.scalatest.events.InfoProvided
 import org.scalatest.events.MarkupProvided
@@ -39,6 +44,12 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
 
   private def info(message: String): InfoProvided = InfoProvided(ordinal, message, None, threadName = "main", timeStamp = timeStamp)
 
+  private def note(message: String): NoteProvided = NoteProvided(ordinal, message, None, threadName = "main", timeStamp = timeStamp)
+
+  private def alert(message: String): AlertProvided = AlertProvided(ordinal, message, None, threadName = "main", timeStamp = timeStamp)
+
+  private def markup(message: String): MarkupProvided = MarkupProvided(ordinal, message, None, threadName = "main", timeStamp = timeStamp)
+
   private val threadAndTime = """"threadName":"main","timeStamp":1700000000000}"""
 
   private def testLine(eventName: String, fields: String = ""): String =
@@ -60,6 +71,12 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
 
     /** The lines written after the suite's structure. */
     def eventLines: Vector[String] = eventLog.writes.drop(1).map(_.stripSuffix("\n"))
+
+    /** The event and message of each line written after the suite's structure. */
+    def eventsAndMessages: Vector[String] = eventLines.map { line =>
+      val eventName = """"event":"(\w+)"""".r.findFirstMatchIn(line).map(_.group(1)).getOrElse("")
+      """"(?:message|text)":"([^"]*)"""".r.findFirstMatchIn(line).fold(eventName)(found => s"$eventName ${found.group(1)}")
+    }
   }
 
   private val passingNoEventOn: Reporter = EventLogRecording.passingNoEventOn
@@ -93,6 +110,32 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
         run.eventLines shouldBe Vector(infoLine("held"), testLine("TestSucceeded"))
       }
 
+    "write the messages in the order of the test's calls, where a reporter ahead of every wrapper holds the test's events back" in
+      withRegisteredSuite { run =>
+        val (starting, noted, alerted) = (testStarting, note("second"), alert("third"))
+        run.ofTest.recordFor(starting)
+        run.ofTest.handOffMessage(info("first"))
+        run.ofTest.recordFor(noted)
+        run.ofTest.recordFor(alerted)
+        run.ofTest.handOffMessage(markup("fourth"))
+        run.eventLines shouldBe Vector.empty
+        run.wrapperOfSuite(starting)
+        run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided first")
+        run.wrapperOfSuite(noted)
+        run.wrapperOfSuite(alerted)
+        run.eventsAndMessages shouldBe
+          Vector("TestStarting", "InfoProvided first", "NoteProvided second", "AlertProvided third", "MarkupProvided fourth")
+      }
+
+    "write a message held behind an event that never reaches a wrapper before the test's closing event" in withRegisteredSuite { run =>
+      run.send(testStarting)
+      run.ofTest.recordFor(note("never passed on"))
+      run.ofTest.handOffMessage(info("held"))
+      run.eventsAndMessages shouldBe Vector("TestStarting")
+      run.send(testSucceeded(Vector(info("held"))), run.ofTest.ofClosingEventWithMessagesHandedOff)
+      run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided held", "TestSucceeded")
+    }
+
     "write no message once the test's registration has been removed" in withRegisteredSuite { run =>
       run.send(testStarting)
       run.registration.remove()
@@ -121,6 +164,27 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       run.send(testSucceeded(Vector(info("handed off"))), run.ofTest.ofClosingEventWithMessagesHandedOff)
       run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("handed off"), testLine("TestSucceeded"))
     }
+
+    "write the closing event without the messages it records, where it is sent after the test's registration is removed" in
+      withRegisteredSuite { run =>
+        run.send(testStarting)
+        run.ofTest.handOffMessage(info("handed off"))
+        run.registration.remove()
+        run.send(testSucceeded(Vector(info("handed off"))), run.ofTest.ofClosingEventWithMessagesHandedOff)
+        run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided handed off", "TestSucceeded")
+      }
+
+    "write the messages held for it before it, where its origin was dropped when the test's registration was removed" in
+      withRegisteredSuite { run =>
+        val starting = testStarting
+        val closing = testSucceeded(Vector(info("held")))
+        run.ofTest.recordFor(starting)
+        run.ofTest.handOffMessage(info("held"))
+        run.ofTest.ofClosingEventWithMessagesHandedOff.recordFor(closing)
+        run.registration.remove()
+        run.wrapperOfSuite(closing)
+        run.eventsAndMessages shouldBe Vector("InfoProvided held", "TestSucceeded")
+      }
   }
 
   "A run that writes no test event log" should {
@@ -141,6 +205,16 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
   "A path-style test's call sequence" should {
     val suite = new OneTestSpec
 
+    def messageOf(event: Event): String = {
+      event match {
+        case info: InfoProvided => info.message
+        case note: NoteProvided => note.message
+        case alert: AlertProvided => alert.message
+        case markup: MarkupProvided => markup.text
+        case other => other.toString
+      }
+    }
+
     /** Records an event's message, ordinal and timestamp, as the emitter receives it. */
     final class ReceivingOrigin extends EventOrigin {
       var received = Vector.empty[Event]
@@ -157,12 +231,38 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
         }
     }
 
-    "hand off each call's message in the order of the calls, across the recorders" in {
+    "hand off each call's message in the order of the calls, across the four recorders" in {
       val calls = new PathMessageCalls
-      List("info" -> "first", "note" -> "second", "markup" -> "third").foreach((kind, message) => calls.add(callOf(message, kind)))
+      val informer = PathMessageRecordingInformer(
+        (message, _, _, _, _, _, tracker, _, _, _, _) => InfoProvided(tracker.nextOrdinal(), message, None),
+        calls
+      )
+      val notifier = PathMessageRecordingNotifier(
+        (message, _, _, _, _, _, tracker, _, _, _, _) => NoteProvided(tracker.nextOrdinal(), message, None),
+        calls
+      )
+      val alerter = PathMessageRecordingAlerter(
+        (message, _, _, _, _, _, tracker, _, _, _, _) => AlertProvided(tracker.nextOrdinal(), message, None),
+        calls
+      )
+      val documenter = PathMessageRecordingDocumenter(
+        (message, _, _, _, _, tracker, _, _, _, _) => MarkupProvided(tracker.nextOrdinal(), message, None),
+        calls
+      )
+      informer("first")
+      notifier("second")
+      alerter("third")
+      documenter("fourth")
+      informer("fifth")
       val origin = new ReceivingOrigin
       calls.handOffTo(origin, suite, passingNoEventOn, "t", 1, true)
-      origin.received.map(_.getClass.getSimpleName) shouldBe Vector("InfoProvided", "NoteProvided", "MarkupProvided")
+      origin.received.map(event => (event.getClass.getSimpleName, messageOf(event))) shouldBe Vector(
+        ("InfoProvided", "first"),
+        ("NoteProvided", "second"),
+        ("AlertProvided", "third"),
+        ("MarkupProvided", "fourth"),
+        ("InfoProvided", "fifth")
+      )
     }
 
     "stamp each message with the time of its call" in {
@@ -173,7 +273,9 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       Thread.sleep(20)
       val origin = new ReceivingOrigin
       calls.handOffTo(origin, suite, passingNoEventOn, "t", 1, true)
-      origin.received.map(_.timeStamp).forall(stamp => before <= stamp && stamp <= after) shouldBe true
+      val stamps = origin.received.map(_.timeStamp)
+      stamps should have size 1
+      all(stamps) should (be >= before and be <= after)
     }
 
     "build each message with a tracker of its own, so that each takes the first ordinal" in {

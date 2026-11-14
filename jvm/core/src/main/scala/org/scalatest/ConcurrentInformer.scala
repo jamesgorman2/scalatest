@@ -138,15 +138,30 @@ private[scalatest] object ConcurrentDocumenter {
 private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAwareness {
 
   private var messages = List.empty[(String, Option[Any], RecordedMessageEventFun, Option[Location])]
+  private var recordedEventsTaken = false
 
   // Returns them in order recorded
   private def recordedMessages: List[(String, Option[Any], RecordedMessageEventFun, Option[Location])] =
-    synchronized { messages.reverse }
+    synchronized {
+      recordedEventsTaken = true
+      messages.reverse
+    }
 
-  def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location]): Unit = {
+  def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location]): Unit =
+    apply(message, payload, eventFun, location, MessageRecorder.noHandOff)
+
+  /**
+   * Records a message and hands it off, unless the test's recorded events have been taken for its closing event, after
+   * which nothing is handed off. Recording and handing off under one lock means a message the closing event records
+   * has been handed off before that event is reported, and a message called after it is never handed off.
+   */
+  def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location], handOff: MessageHandOff): Unit = {
     requireNonNull(message, payload)
     synchronized {
       messages ::= (message, payload, eventFun, location)
+      if (!recordedEventsTaken) {
+        handOff(message, payload, location)
+      }
     }
   }
 
@@ -166,8 +181,7 @@ private[scalatest] class MessageRecordingInformer(recorder: MessageRecorder, eve
     // SKIP-SCALATESTJS,NATIVE-END
     //SCALATESTJS,NATIVE-ONLY val stackDepth = 4
     val location = Some(LineInFile(pos.lineNumber, pos.fileName, Some(pos.filePathname)))
-    recorder.apply(message, payload, eventFun, location)
-    handOff(message, payload, location)
+    recorder.apply(message, payload, eventFun, location, handOff)
   }
 }
 
@@ -182,8 +196,7 @@ private[scalatest] class MessageRecordingDocumenter(recorder: MessageRecorder, e
 
   def apply(message: String)(implicit pos: source.Position): Unit = {
     val location = Some(LineInFile(pos.lineNumber, pos.fileName, Some(pos.filePathname)))
-    recorder.apply(message, None, eventFun, location)
-    handOff(message, None, location)
+    recorder.apply(message, None, eventFun, location, handOff)
   }
 }
 

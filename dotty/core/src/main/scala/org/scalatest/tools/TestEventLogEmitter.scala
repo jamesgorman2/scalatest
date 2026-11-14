@@ -177,10 +177,27 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   /**
    * Keeps an event's origin until a structure wrapper hands the event off. An event log that has ended keeps none,
    * and none is kept for a registration that has been removed, so its event is assigned as one with no origin.
+   *
+   * The messages a test hands off after an event of its execution is recorded are held until that event is written.
    */
   def recordOrigin(event: Event, origin: RecordingOrigin): Unit = synchronized {
     if (isOpen && !origin.registration.hasBeenRemoved) {
-      originOfEvent.put(event, origin.record())
+      val recorded = origin.record()
+      originOfEvent.put(event, recorded)
+      recorded.messagesOfTest.foreach(_.awaitWriting(event))
+    }
+  }
+
+  /**
+   * Keeps the origin of a test's closing event, as `recordOrigin` does, and marks the event as one whose recorded
+   * messages the test has handed off one by one. The mark is kept by the top-level suite's registration, and outlives
+   * the origin: an event whose origin was never kept, or was dropped when its registration was removed, is still
+   * written without its recorded messages, and with the test's held messages before it.
+   */
+  def recordOriginOfClosingEventWithMessagesHandedOff(event: Event, origin: RecordingOrigin, messages: TestExecutionMessages): Unit = synchronized {
+    if (isOpen) {
+      origin.registration.topLevel.keepClosingEventWithMessagesHandedOff(event, messages)
+      recordOrigin(event, origin)
     }
   }
 
@@ -229,14 +246,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * in the execution of that node that opened last and has not closed. The messages recorded in a test's closing
    * event are written before it, assigned as it is, unless the test has handed them off one by one.
    *
-   * The first written event of a test's execution also writes the messages the test handed off before it, assigned
-   * as it is: after it, or before it where it closes the test.
+   * An event of a test's execution also writes the messages the test handed off that were held for it, assigned as
+   * the execution's first written event is: after it, or before it where it closes the test.
    *
    * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
   def writeSuiteEvent(wrapper: WrapperNode, event: Event): Unit = {
-    originWhereFirstHandedOff(wrapper, event).foreach { origin =>
-      val recorded = if (origin.exists(_.recordedEventsHandedOff)) Vector.empty else TestEventLogEmitter.recordedIn(event)
+    originWhereFirstHandedOff(wrapper, event).foreach { (origin, messagesHandedOff) =>
+      val recorded = if (messagesHandedOff.isDefined) Vector.empty else TestEventLogEmitter.recordedIn(event)
       // Encoded outside the lock, as `runEvent` encodes.
       val encoded = TestEventLogEmitter.caught(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
       val thrown = synchronized {
@@ -244,9 +261,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           val written = encoded.flatMap { events =>
             TestEventLogEmitter.caught {
               val execution = assign(wrapper, origin, event)
-              val heldMessages = origin.flatMap(_.messagesOfTest).filter(_.assignment.isEmpty).fold(Vector.empty[EncodedEvent])(_.assign(execution))
-              val inOrder = if (TestEventLogEmitter.closesItsScopeOrTest(event)) heldMessages ++ events else events ++ heldMessages
-              inOrder.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
+              val messagesOfTest = origin.flatMap(_.messagesOfTest).orElse(messagesHandedOff)
+              val (before, after) = messagesOfTest.fold((Vector.empty[EncodedEvent], Vector.empty[EncodedEvent])) {
+                _.written(event, execution, TestEventLogEmitter.closesItsScopeOrTest(event))
+              }
+              val messageExecution = messagesOfTest.flatMap(_.assignment).getOrElse(execution)
+              before.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
+              events.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
+              after.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
             }
           }
           if (written.isLeft) {
@@ -264,7 +286,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   /**
    * Writes a message a test's informer or documenter handed off as the test called it, and that no reporter receives
    * as an event of its own. It is assigned as the first written event of the test's execution is, and held until
-   * that event is written. A registration that has been removed writes no message.
+   * that event, and every event of the execution whose origin was recorded before the message, is written. A
+   * registration that has been removed writes no message.
    *
    * What building, encoding or writing the message throws is kept from the caller as `runEvent` keeps it.
    */
@@ -274,7 +297,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     val thrown = synchronized {
       if (isOpen && !registration.hasBeenRemoved) {
         val written = encoded.flatMap { one =>
-          messages.assignment match {
+          messages.assignment.filter(_ => messages.writesAtOnce) match {
             case Some(execution) => TestEventLogEmitter.caught(write(TestEventLogEncoder.line(one, Some(execution))))
             case None => Right(messages.hold(one))
           }
@@ -291,12 +314,13 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   // Returns `Some` of the event's origin, itself `None` where the event has no origin, where this wrapper is to hand
-  // the event off, and `None` where it is not.
+  // the event off, and `None` where it is not. Beside the origin it returns, for a test's closing event whose messages
+  // the test handed off one by one, those messages.
   // The top-level suite's wrapper is the last an event reaches, so it forgets the event. Once the top-level suite's
   // registration is removed, inner wrappers hand nothing off and that wrapper writes the event: an inner wrapper that
   // wrote it would have to keep it for that wrapper to skip, for good where it never reaches that wrapper. An event
   // an inner wrapper handed off before the removal is kept by the top-level suite's registration instead.
-  private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Option[RecordedOrigin]] = synchronized {
+  private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[(Option[RecordedOrigin], Option[TestExecutionMessages])] = synchronized {
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
     if (!isOpen) {
       None
@@ -313,7 +337,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       if (!isLastWrapper) {
         handedOffByAnInnerWrapper.put(event, wrapper.registration)
       }
-      Some(Option(originOfEvent.remove(event)))
+      Some((Option(originOfEvent.remove(event)), wrapper.registration.topLevel.takeClosingEventWithMessagesHandedOff(event)))
     }
   }
 

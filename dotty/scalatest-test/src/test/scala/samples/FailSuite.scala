@@ -7,7 +7,7 @@ class FailSuite extends org.scalatest.funsuite.AnyFunSuite {
     fail("boom")
   }
 }
-
+// Tests expect fail("boom") on line 7, and the lines of the samples below, so FailSuite comes first and names its types in full.
 import org.scalatest.DoNotDiscover
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.prop.TableDrivenPropertyChecks
