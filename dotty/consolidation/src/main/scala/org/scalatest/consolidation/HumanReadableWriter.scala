@@ -32,31 +32,38 @@ private[consolidation] object HumanReadableWriter {
       linesOf("[" + label.value + "]", 0, AnsiCyan) ++ suites.flatMap(nodeLines(_, 1))
     }
 
+  // A suite shows its name line once, then what each of its executions produced. A scope or test shows a line for
+  // each execution.
   private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
     node.node match {
       case suite: StructureNode.Suite =>
-        linesOf(suiteNameLine(suite.name), depth, AnsiGreen) ++
-          contentLines(node, depth + 1) ++ suiteEndingLines(suite, node, depth + 1) ++ countLines(node, depth + 1)
+        linesOf(suiteNameLine(suite.name), depth, AnsiGreen) ++ node.executions.flatMap { execution =>
+          contentLines(execution, depth + 1) ++ suiteEndingLines(suite, execution, depth + 1) ++ countLines(execution, depth + 1)
+        }
       case scope: StructureNode.Scope =>
-        linesOf(scopeLine(scope, node.outcome), depth) ++ contentLines(node, depth + 1) ++ countLines(node, depth + 1)
+        node.executions.flatMap { execution =>
+          linesOf(scopeLine(scope, execution.outcome), depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
+        }
       case test: StructureNode.Test =>
-        testLines(test, node, depth) ++ node.messages.flatMap(message => messageLines(message.event, depth + 1))
+        node.executions.flatMap { execution =>
+          testLines(test, execution, depth) ++ execution.messages.flatMap(message => messageLines(message.event, depth + 1))
+        }
     }
 
-  // A collapsed node shows its messages alone. Any other shows each of its messages after the children that had
+  // A collapsed execution shows its messages alone. Any other shows each of its messages after the children that had
   // started when it arrived.
-  private def contentLines(node: AssembledNode, depth: Int): Vector[OutputLine] = {
+  private def contentLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
     def messagesAfter(childrenBefore: Int): Vector[OutputLine] =
-      node.messages.filter(_.childrenBefore == childrenBefore).flatMap(message => messageLines(message.event, depth))
-    if (node.isCollapsed)
-      node.messages.flatMap(message => messageLines(message.event, depth))
+      execution.messages.filter(_.childrenBefore == childrenBefore).flatMap(message => messageLines(message.event, depth))
+    if (execution.isCollapsed)
+      execution.messages.flatMap(message => messageLines(message.event, depth))
     else
-      node.children.indices.toVector.flatMap(index => messagesAfter(index) ++ nodeLines(node.children(index), depth)) ++
-        messagesAfter(node.children.size)
+      execution.children.indices.toVector.flatMap(index => messagesAfter(index) ++ nodeLines(execution.children(index), depth)) ++
+        messagesAfter(execution.children.size)
   }
 
-  private def countLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
-    if (node.isCollapsed && node.children.nonEmpty) linesOf(countLine(node.descendants), depth, AnsiRed)
+  private def countLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] =
+    if (execution.isCollapsed && execution.children.nonEmpty) linesOf(countLine(execution.descendants), depth, AnsiRed)
     else Vector.empty
 
   private def countLine(hidden: Vector[AssembledNode]): String = {
@@ -72,8 +79,8 @@ private[consolidation] object HumanReadableWriter {
   private def suiteNameLine(name: String): String =
     StringReporter.stringToPrintWhenNoError(Resources.suiteStarting _, formatterOf(name + ":"), name, None, None, false, false).mkString
 
-  private def suiteEndingLines(suite: StructureNode.Suite, node: AssembledNode, depth: Int): Vector[OutputLine] =
-    (node.outcome, node.ending) match {
+  private def suiteEndingLines(suite: StructureNode.Suite, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
+    (execution.outcome, execution.ending) match {
       case (Some(Outcome.NotRun), _) =>
         linesOf(Resources.specTextAndNote(suite.className, notRunNote), depth, AnsiRed)
       case (Some(Outcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
@@ -98,8 +105,8 @@ private[consolidation] object HumanReadableWriter {
   private def scopeText(scope: StructureNode.Scope): String =
     StringReporter.stringToPrintWhenNoError(Resources.scopeOpened, formatterOf(scope.label), "", None, Some(scope.name), false, false).mkString
 
-  private def testLines(test: StructureNode.Test, node: AssembledNode, depth: Int): Vector[OutputLine] =
-    (node.outcome, node.ending) match {
+  private def testLines(test: StructureNode.Test, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
+    (execution.outcome, execution.ending) match {
       case (Some(Outcome.Failed), Some(failed: DecodedEvent.TestFailed)) =>
         val lines = linesOnError(Resources.failedNote, Resources.testFailed _, failed.message, failed.throwable, failed.analysis, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, failed.throwable, depth + 1, AnsiRed)
