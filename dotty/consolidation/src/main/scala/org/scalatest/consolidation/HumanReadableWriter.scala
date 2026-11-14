@@ -15,21 +15,19 @@ private[consolidation] final case class Segment(text: String, colour: AnsiColor)
   def rendered(coloured: Boolean): String = if (coloured) colour.code + text + StringReporter.ansiReset else text
 }
 
-/** One line of human-readable output: its depth in the tree, then its text in one or more colours. */
 private[consolidation] final case class OutputLine(depth: Int, segments: Vector[Segment]) {
 
   def rendered(coloured: Boolean): String = ("  " * depth) + segments.map(_.rendered(coloured)).mkString
 }
 
-/** Lays out the human-readable output: each test run label, then its runs' suites, scopes and tests under it. */
 private[consolidation] object HumanReadableWriter {
 
   private val notRunNote = "*** NOT RUN ***"
 
   def lines(runs: Seq[RunAssembly]): Vector[OutputLine] =
-    runs.groupBy(_.label).toVector.sortBy(_._1).flatMap { (label, runsUnderLabel) =>
+    runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsUnderLabel) =>
       val suites = runsUnderLabel.toVector.flatMap(_.topLevelSuites).sortBy(_.name)
-      OutputLine(0, Vector(Segment("[" + label + "]", AnsiCyan))) +: suites.flatMap(suiteLines(_, 1))
+      OutputLine(0, Vector(Segment("[" + label.value + "]", AnsiCyan))) +: suites.flatMap(suiteLines(_, 1))
     }
 
   private def suiteLines(suite: AssembledNode, depth: Int): Vector[OutputLine] =

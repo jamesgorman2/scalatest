@@ -8,7 +8,6 @@ import org.scalatest.events.NodeId
 import org.scalatest.events.StructureNode
 import org.scalatest.events.TestEventLogEvent
 
-/** The events of one execution of a node, in the order they arrived. */
 private[consolidation] final case class Execution(number: Int, parentExecution: Option[Int], events: Vector[DecodedEvent]) {
 
   def added(event: DecodedEvent): Execution = copy(events = events :+ event)
@@ -46,7 +45,7 @@ private[consolidation] final case class AssembledNode(
  * Builds one run's test structure from its event stream as it arrives. Each node is kept by its ID with its events
  * grouped by execution number, apart from its suite's structure.
  */
-private[consolidation] final class RunAssembly(val label: String) {
+private[consolidation] final class RunAssembly(val label: TestRunLabel) {
 
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
   private val executions = mutable.Map.empty[NodeId, SortedMap[Int, Execution]]
@@ -56,7 +55,7 @@ private[consolidation] final class RunAssembly(val label: String) {
   def isEventStreamOpen: Boolean = eventStreamOpen
 
   def add(event: TestEventLogEvent): Unit = {
-    require(eventStreamOpen, s"the event stream of a run under $label has ended")
+    require(eventStreamOpen, s"the event stream of a run under ${label.value} has ended")
     event match {
       case TestEventLogEvent.Structure(nodes) =>
         nodes.foreach(node => structure(RunAssembly.idOf(node)) = node)
@@ -96,7 +95,6 @@ private[consolidation] final class RunAssembly(val label: String) {
 
 private[consolidation] object RunAssembly {
 
-  /** Whether the event reports a failure, which fails the test command. */
   def reportsFailure(event: TestEventLogEvent): Boolean =
     event match {
       case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.TestFailed | _: DecodedEvent.TestCanceled | _: DecodedEvent.SuiteAborted) => true

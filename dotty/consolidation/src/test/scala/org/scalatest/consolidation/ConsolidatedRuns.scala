@@ -10,7 +10,7 @@ import org.scalatest.events.TestRunPart
 /** Feeds the consolidation library runs a criterion states, and reads its human-readable output with colours marked. */
 private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
-  val moduleLabel: String = "core.test"
+  val moduleLabel: TestRunLabel = TestRunLabel("core.test")
 
   /** Each line of the human-readable output, as the sink received it. */
   final class OutputSink extends (String => Unit) {
@@ -39,6 +39,14 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     }
     feed
   }
+
+  /** The one event the notation states, as the test-only builder builds it. */
+  def runEvent(notation: String): RunEvent =
+    TestRunBuilder.build(TestRunPart.Events(notation)).map(_.items) match {
+      case Right(Vector(BuiltRunItem.Event(built))) => RunEvent(built.event)
+      case Right(items) => fail(s"expected one event, but the notation built $items")
+      case Left(reason) => fail(reason)
+    }
 
   /** The coloured human-readable output of a consolidation of one run, its event stream ended, with colours marked. */
   def consolidated(eventLog: String): String = {

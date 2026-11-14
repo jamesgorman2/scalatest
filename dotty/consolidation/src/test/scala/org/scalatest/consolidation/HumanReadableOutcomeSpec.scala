@@ -190,7 +190,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     }
   }
 
-  Feature("Outcomes") {
+  Feature("No line shows an outcome rolled up from the nodes below it") {
 
     Scenario("A failed test leaves its scope, suite and label without a suffix") {
       Given("an event log of a scope holding a test that failed and one that succeeded")

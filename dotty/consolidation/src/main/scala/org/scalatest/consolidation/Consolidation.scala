@@ -21,7 +21,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
    * @param label the test run label to show the run's suites under
    * @throws IllegalArgumentException if the consolidation has ended
    */
-  def addRun(label: String): RunFeed =
+  def addRun(label: TestRunLabel): RunFeed =
     synchronized {
       requireOpen()
       val run = new RunAssembly(label)

@@ -107,10 +107,13 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it under the test run label `core.test`")
-      val output = consolidatedLines(eventLog)
+      val output = consolidated(eventLog)
 
-      Then("the first line is the label")
-      output.head shouldBe "{cyan}[core.test]{reset}"
+      Then("the first line is the label, with the suite under it")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SqrtPropSpec:{reset}
+          |    {green}- sqrt of a square is the root{reset}""".stripMargin
     }
   }
 

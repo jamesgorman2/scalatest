@@ -157,7 +157,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
         val feed = consolidation.addRun(moduleLabel)
         feed.endEventStream()
-        an[IllegalArgumentException] should be thrownBy feed.add(RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").toOption.get)
+        an[IllegalArgumentException] should be thrownBy feed.add(runEvent("run ended completed"))
       }
     }
 
@@ -171,8 +171,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
             suiteWithTest(
               """test "adds": TestStarting
                 |test "adds": TestFailed""".stripMargin
-            ),
-            TestRunPart.CapturedLine(org.scalatest.events.CapturedStream.Stdout, "adding")
+            )
           ).endEventStream()
           consolidation.end()
           output.lines
@@ -190,8 +189,8 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "it holds the run's start" should {
       "be decoded to an event naming the run's process" in {
-        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}""").map(_.runStarted) shouldBe
-          Right(Some(RunProcess(4242L, Instant.parse("2026-01-02T03:04:05.678Z"))))
+        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}""").map(_.runProcess) shouldBe
+          Right(Some(RunProcess(Pid(4242L), Instant.parse("2026-01-02T03:04:05.678Z"))))
       }
     }
 
@@ -204,7 +203,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "it holds another event" should {
       "be decoded to an event naming no process" in {
-        RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").map(_.runStarted) shouldBe Right(None)
+        RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").map(_.runProcess) shouldBe Right(None)
       }
     }
 

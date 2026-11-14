@@ -8,8 +8,20 @@ import org.scalatest.events.TestEventLogEvent
 /** One event of a run's test event log, as **Decode** yields it. Only the run's process can be read from it. */
 opaque type RunEvent = TestEventLogEvent
 
+/** The ID the operating system gives a process. */
+opaque type Pid = Long
+
+object Pid {
+
+  def apply(value: Long): Pid = value
+
+  extension (pid: Pid) {
+    def value: Long = pid
+  }
+}
+
 /** The process a run ran in, which the run's `runStarted` event names. */
-final case class RunProcess(pid: Long, startTime: Instant)
+final case class RunProcess(pid: Pid, startTime: Instant)
 
 object RunEvent {
 
@@ -40,9 +52,9 @@ object RunEvent {
   extension (event: RunEvent) {
 
     /** The run's process, where this is the run's `runStarted` event. */
-    def runStarted: Option[RunProcess] =
+    def runProcess: Option[RunProcess] =
       event match {
-        case TestEventLogEvent.RunStarted(pid, startTime) => Some(RunProcess(pid, Instant.parse(startTime)))
+        case TestEventLogEvent.RunStarted(pid, startTime) => Some(RunProcess(Pid(pid), Instant.parse(startTime)))
         case _ => None
       }
 
