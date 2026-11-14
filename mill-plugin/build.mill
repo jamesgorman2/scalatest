@@ -7,7 +7,7 @@ import mill.scalalib.publish.*
 object Versions {
   val mill: String = "1.3.1"
   val scala: String = "3.9.0"
-  // The fork's release, `releaseVersion` in `project/BuildCommons.scala`: the plugin is released with the fork.
+  // The fork's `releaseVersion` (`project/BuildCommons.scala`): the plugin is released with the fork.
   val fork: String = "3.2.20"
 }
 
@@ -73,8 +73,8 @@ object plugin extends PluginScalaModule, PublishModule {
       def mvnDeps: T[Seq[Dep]] = Seq(mvn"com.lihaoyi:mill-runner-launcher_3:${Versions.mill}")
       def mainClass: T[Option[String]] = Some("mill.launcher.MillLauncherMain")
 
-      // `launcher` writes a script that is both shell and batch, with no extension,
-      // which Windows starts only when it is named as a batch file.
+      // `launcher` writes an extensionless script, valid as both shell and batch.
+      // Windows starts it only from a `.bat` file.
       def program: T[PathRef] = Task {
         if (scala.util.Properties.isWin) {
           val batchFile = Task.dest / "mill.bat"

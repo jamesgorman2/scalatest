@@ -1,6 +1,6 @@
 ---
 kind: mill-build-tooling
-description: How Mill 1.x, its bootstrap scripts and its testkit misbehave on Windows or report their state. Read before running Mill from GitBash on Windows, writing Mill integration tests, or inspecting a meta-build's classpath.
+description: How Mill 1.x, its bootstrap scripts and its testkit misbehave on Windows, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing Mill integration tests, or inspecting a meta-build's classpath.
 ---
 
 <learning>
@@ -12,9 +12,9 @@ On Windows, Mill's `sh` bootstrap script `mill`, run from GitBash, stops with `T
 <learning>
 date: 2026-11-14
 ---
-On Windows, `mill.testkit.IntegrationTester` (Mill 1.3.1) cannot start a Mill executable built by `JavaModule.assembly` (`out.jar`) or `JavaModule.launcher` (`run`). `launcher` writes an extensionless script valid as shell and batch at once; `assembly` writes a jar with such a script prepended, so the `.jar` name is no help. `CreateProcess` rejects both, and `os.call` fails with `CreateProcess error=193, %1 is not a valid Win32 application`.
+On Windows, `mill.testkit.IntegrationTester` (Mill 1.3.1) cannot start a Mill executable built by `JavaModule.assembly` (`out.jar`) or `JavaModule.launcher` (`run`). `launcher` writes an extensionless script, valid as both shell and batch; `assembly` writes a jar with such a script prepended. `CreateProcess` rejects both, and `os.call` fails with `CreateProcess error=193, %1 is not a valid Win32 application`.
 
-Copy the `launcher` script to a file ending `.bat` in a task of its own, and pass that path as the tester's `millExecutable`. Off Windows, pass the `launcher` script itself.
+In a separate task, copy the `launcher` script to a `.bat` file, and pass that path as the tester's `millExecutable`. Off Windows, pass the `launcher` script itself.
 </learning>
 
 <learning>
@@ -24,5 +24,5 @@ date: 2026-11-14
 
 `show` prints each `PathRef` as `ref:v0:<hash>:<path>` or `qref:v1:<hash>:<path>`; on Windows the path holds a drive colon. Read the output with `upickle.default.read[Seq[mill.api.PathRef]]`, never by splitting on `:`.
 
-A jar from a Maven-layout repository, such as a `publishLocalTestRepo` folder, sits under one folder per group part (`com/edc/…`); one from the local Ivy repository, under one folder for the whole group (`com.edc/…`).
+A Maven-layout repository, such as a `publishLocalTestRepo` folder, stores a jar under one folder per group part (`com/edc/…`); the local Ivy repository, under one folder for the whole group (`com.edc/…`).
 </learning>
