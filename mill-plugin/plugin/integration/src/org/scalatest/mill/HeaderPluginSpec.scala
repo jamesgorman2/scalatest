@@ -52,7 +52,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers {
           }
         }
 
-        "compiles core.test against the fork's scalatest" in {
+        "resolves core.test's scalatest and scalactic from the fork" in {
           withTester(fixture) { tester =>
             val entries = classpath(tester.eval(Seq("show", "core.test.compileClasspath")))
             val scalatestJars = entries.filter(entry => entry.last.startsWith("scalatest") || entry.last.startsWith("scalactic"))
