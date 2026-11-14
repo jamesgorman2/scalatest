@@ -83,7 +83,7 @@ private[consolidation] object HumanReadableWriter {
         Vector(OutputLine(depth, Resources.specTextAndNote(suite.className, notRunNote), AnsiRed))
       case (Some(Outcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
         val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, suite.className, Some(suite.name), None)
-        OutputLine(depth, lines.head, AnsiRed) +: linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
+        linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
       case _ =>
         Vector.empty
     }
@@ -107,10 +107,10 @@ private[consolidation] object HumanReadableWriter {
     (node.outcome, node.ending) match {
       case (Some(Outcome.Failed), Some(failed: DecodedEvent.TestFailed)) =>
         val lines = linesOnError(Resources.failedNote, Resources.testFailed _, failed.message, failed.throwable, failed.analysis, test.label, None, Some(test.name))
-        OutputLine(depth, lines.head, AnsiRed) +: linesUnder(lines.tail, failed.throwable, depth + 1, AnsiRed)
+        linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, failed.throwable, depth + 1, AnsiRed)
       case (Some(Outcome.Canceled), Some(canceled: DecodedEvent.TestCanceled)) =>
         val lines = linesOnError(Resources.canceledNote, Resources.testCanceled _, canceled.message, canceled.throwable, Vector.empty, test.label, None, Some(test.name))
-        OutputLine(depth, lines.head, AnsiYellow) +: linesUnder(lines.tail, canceled.throwable, depth + 1, AnsiYellow)
+        linesOf(lines.head, depth, AnsiYellow) ++ linesUnder(lines.tail, canceled.throwable, depth + 1, AnsiYellow)
       case (outcome, _) =>
         Vector(OutputLine(depth, testLine(test, outcome)))
     }
@@ -142,7 +142,7 @@ private[consolidation] object HumanReadableWriter {
       case alert: DecodedEvent.AlertProvided =>
         markedMessageLines("[alert] ", Resources.alertProvidedNote, Resources.alertProvided _, alert.message, alert.throwable, depth, AnsiYellow)
       case markup: DecodedEvent.MarkupProvided =>
-        StringReporter.stringToPrintWhenMarkup(formatterOf("[markup] " + markup.text), None, None, markup.text, false).map(OutputLine(depth, _, AnsiGreen))
+        StringReporter.stringToPrintWhenMarkup(formatterOf("[markup] " + markup.text), None, None, markup.text, false).flatMap(linesOf(_, depth, AnsiGreen))
       case _ =>
         Vector.empty
     }
@@ -157,7 +157,7 @@ private[consolidation] object HumanReadableWriter {
     colour: AnsiColor
   ): Vector[OutputLine] = {
     val lines = linesOnError(note, errorMessage, message, throwable, Vector.empty, mark + message, None, None)
-    OutputLine(depth, mark + message, colour) +: linesUnder(lines.tail, throwable, depth + 1, colour)
+    linesOf(mark + message, depth, colour) ++ linesUnder(lines.tail, throwable, depth + 1, colour)
   }
 
   // An event's first line, then its message, analysis and stack trace lines, with `S` and `F` off.
@@ -176,13 +176,18 @@ private[consolidation] object HumanReadableWriter {
     )
 
   // The lines under an event's first line. They end with its stack trace lines, in which each frame line sits under
-  // its throwable's first line or `Cause:` line, and each of those sits where the message lines do.
+  // its throwable's first line or `Cause:` line, and each of those sits where the message lines do. A stack trace line
+  // is taken for a frame line before it is split, so a message's continuation starting `at ` stays with its message.
   private def linesUnder(lines: Vector[String], throwable: Option[ThrowableView], depth: Int, colour: AnsiColor): Vector[OutputLine] = {
     val stackTraceLineCount = StringReporter.stackTraceLines(throwable, false, false).size
     val (messageLines, stackTraceLines) = lines.splitAt(lines.size - stackTraceLineCount)
-    messageLines.map(OutputLine(depth, _, colour)) ++
-      stackTraceLines.map(line => OutputLine(if (isFrameLine(line)) depth + 1 else depth, line, colour))
+    messageLines.flatMap(linesOf(_, depth, colour)) ++
+      stackTraceLines.flatMap(line => linesOf(line, if (isFrameLine(line)) depth + 1 else depth, colour))
   }
+
+  // A text holding line breaks, such as a multi-line message, gives one output line per line of text, all at its depth.
+  private def linesOf(text: String, depth: Int, colour: AnsiColor): Vector[OutputLine] =
+    text.split("\n").toVector.map(line => OutputLine(depth, line.stripSuffix("\r"), colour))
 
   // A class name holds no space, so neither a throwable's first line nor its `Cause:` line starts with `at ` or is `...`.
   private def isFrameLine(line: String): Boolean = line.startsWith("at ") || line == "..."

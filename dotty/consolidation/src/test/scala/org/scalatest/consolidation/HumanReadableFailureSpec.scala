@@ -68,6 +68,30 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
 
+    Scenario("Each line of a throwable's multi-line message sits where its first line does, though it starts like a frame") {
+      Given("an event log of a test that fails with a throwable whose message's second line starts with `at `")
+      val eventLog = testEndingWith(
+        """test "have size 0": TestFailed(throwable: java.lang.RuntimeException "database unreachable\nat host db-1" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"])"""
+      )
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the message's second line sits under the test's line with the throwable's first line, and the frame lines under both")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFlatSpec:{reset}
+          |    {green}A Stack{reset}
+          |      {red}- must have size 0 *** FAILED ***{reset}
+          |        {red}java.lang.RuntimeException: database unreachable{reset}
+          |        {red}at host db-1{reset}
+          |          {red}at samples.StackFlatSpec.check(StackFlatSpec.scala:9){reset}
+          |          {red}...{reset}
+          |        {green}[info] checked{reset}
+          |        {green}[note] a note{reset}
+          |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
+    }
+
     Scenario("A cancel whose throwable is a `StackDepth` shows its message with the failed code's file and line, and no throwable line") {
       Given("an event log of a test cancelled with a `TestCanceledException`")
       val eventLog = testEndingWith(

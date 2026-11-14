@@ -44,6 +44,26 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
           |      {green}[markup] *markup*{reset}""".stripExpectedMargin
     }
 
+    Scenario("Each line of a multi-line message sits where its first line does, whichever line break separates them") {
+      Given("an event log of a test whose info holds three lines, separated by a CRLF and an LF")
+      val eventLog = testWithMessages("""test "is empty": InfoProvided(message: "checked size\r\nand order\nand contents")""")
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("each line of the info sits under the test's line, with no carriage return left in it")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}
+          |      {green}[info] checked size{reset}
+          |      {green}and order{reset}
+          |      {green}and contents{reset}
+          |      {green}[note] a note{reset}
+          |      {yellow}[alert] an alert{reset}
+          |      {green}[markup] *markup*{reset}""".stripExpectedMargin
+    }
+
     Scenario("A message's throwable sits under the message, with its cause") {
       Given("an event log of a test whose info carries a throwable with a cause")
       val eventLog = testWithMessages(

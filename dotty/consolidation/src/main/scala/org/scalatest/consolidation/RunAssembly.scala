@@ -77,6 +77,7 @@ private[consolidation] final case class AssembledNode(
 private[consolidation] final class RunAssembly(val label: TestRunLabel) {
 
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
+  private val childIds = mutable.Map.empty[NodeId, mutable.Set[NodeId]]
   private val executions = mutable.Map.empty[NodeId, SortedMap[Int, Execution]]
   private val startedSuites = mutable.Set.empty[NodeId]
   private var capturedLines = Vector.empty[CapturedLine]
@@ -88,7 +89,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     require(eventStreamOpen, s"the event stream of a run under ${label.value} has ended")
     event match {
       case TestEventLogEvent.Structure(nodes) =>
-        nodes.foreach(node => structure(RunAssembly.idOf(node)) = node)
+        nodes.foreach(addToStructure)
       case TestEventLogEvent.ScalaTestEvent(Some(nodeExecution), decoded) =>
         addToExecution(nodeExecution, decoded)
       case _: TestEventLogEvent.ScalaTestEvent | _: TestEventLogEvent.RunStarted | _: TestEventLogEvent.RunEnded =>
@@ -122,6 +123,13 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     childrenByParent.getOrElse(None, Vector.empty).map(assembled(_, false))
   }
 
+  private def addToStructure(node: StructureNode): Unit = {
+    val id = RunAssembly.idOf(node)
+    structure.get(id).flatMap(RunAssembly.parentOf).foreach(previousParent => childIds.get(previousParent).foreach(_ -= id))
+    structure(id) = node
+    RunAssembly.parentOf(node).foreach(parent => childIds.getOrElseUpdate(parent, mutable.Set.empty) += id)
+  }
+
   private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
     val nodeExecutions = executions.getOrElse(nodeExecution.node, SortedMap.empty[Int, Execution])
     val execution = nodeExecutions.getOrElse(
@@ -138,14 +146,14 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   // A scope or test has started in its parent's execution once it has an execution run in that one. A nested suite
   // has started once it, or a node below it, has an execution.
   private def childrenStarted(parent: NodeId, parentExecution: Int): Set[NodeId] =
-    structure.values.iterator
-      .filter(RunAssembly.parentOf(_).contains(parent))
-      .map {
-        case suite: StructureNode.Suite => suite.id -> startedSuites.contains(suite.id)
-        case child => RunAssembly.idOf(child) -> hasExecutionIn(RunAssembly.idOf(child), parentExecution)
-      }
-      .collect { case (child, true) => child }
-      .toSet
+    childIds.get(parent).fold(Set.empty[NodeId]) { children =>
+      children.iterator.filter { child =>
+        structure(child) match {
+          case _: StructureNode.Suite => startedSuites.contains(child)
+          case _ => hasExecutionIn(child, parentExecution)
+        }
+      }.toSet
+    }
 
   private def hasExecutionIn(child: NodeId, parentExecution: Int): Boolean =
     executions.get(child).exists(_.values.exists(_.parentExecution.contains(parentExecution)))
