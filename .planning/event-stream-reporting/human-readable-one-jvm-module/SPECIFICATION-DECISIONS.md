@@ -10,9 +10,9 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - A node for each instance that runs gives a test declared by a wrapper and run by the instance it wraps two nodes, one of which never starts and is shown as not run (R-100).
 - One node for every suite sharing a `suiteId` under the innermost enclosing suite merges the helper suites of different tests.
 
-**Reasoning** A node is a place in the test structure, and the times that place ran are its executions. A suite is known by the suite or test that ran it, its suite ID and its place among the siblings there sharing that ID, so an instance a suite runs outside its tests with the suite's own ID is that suite, and a suite that one test runs each time the test runs is one suite.
+**Reasoning** A node is a place in the test structure, and the times that place ran are its executions. A suite is known by the suite or test that ran it, its suite ID and its place among the siblings there sharing that ID. So an instance a suite runs outside its tests with the suite's own ID is that suite, and a suite that one test runs each time the test runs is one suite.
 
-**Costs** A helper suite that two tests run is shown twice, and a suite user code runs on a thread or `ExecutionContext` of its own shows its tests directly under it, merged with any other such suite sharing its ID.
+**Costs** A helper suite that two tests run is shown twice. A suite user code runs on a thread or `ExecutionContext` of its own shows its tests directly under it, merged with any other such suite sharing its ID.
 
 **Settled by**
 

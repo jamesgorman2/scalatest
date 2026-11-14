@@ -9,7 +9,7 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 - An ID the emitter mints for each suite instance needs a process-wide map of instances, which every run in the JVM pays for, and holds the events of an instance placed late.
 - An ID from the `suiteId` alone merges the helper suites of two tests into one node with two parents.
 
-**Reasoning** The engine sets the invocation context, the node and execution the code on a thread runs in, around each top-level suite's run, a suite's run outside its tests, its test bodies, distributor tasks and tasks on its own async `ExecutionContext`, so an instance knows its parent as it starts. Its ID then follows from the parent's node path and its own place under it, and the `structure` holding a node is written before the node's first event.
+**Reasoning** The engine sets the invocation context, the node and execution the code on a thread runs in, around each top-level suite's run, a suite's run outside its tests, its test bodies, distributor tasks and tasks on its own async `ExecutionContext`. An instance therefore knows its parent as it starts. Its ID then follows from the parent's node path and its own place under it, and the `structure` holding a node is written before the node's first event.
 
 **Costs** IDs grow with nesting, and a helper suite that two tests run is two nodes.
 

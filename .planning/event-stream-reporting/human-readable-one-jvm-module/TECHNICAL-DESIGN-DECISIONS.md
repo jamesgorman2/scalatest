@@ -9,7 +9,12 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 - Reading `suiteId` and `suiteName` where the instance registers calls overridable members, which user code can make throw or depend on state, at a point where 3.2.20 does not call them (`../SPECIFICATION.md` R-002).
 - Writing the `structure` at the first engine site of the run, `runImpl`, needs both before 3.2.20 reads either, since its first `suiteName` read is `Suite.run`'s thread rename and its first `suiteId` read can be `Suite.runTests`' filter.
 
-**Reasoning** 3.2.20 reads `suiteName` before the instance's first scope or test event, in a `SuiteStarting`, `Suite.run`'s thread rename or a send helper, and reads `suiteId` there too: in `Framework`'s task for a top-level suite, in the `SuiteStarting` `runNestedSuites` or the distributor's `SuiteRunner` builds, in `Suite.runTests`' filter, or as a send helper builds an event. Under `Runner`, a top-level suite's wrapper reads it first, in the suite's structure. Taking each there calls nothing 3.2.20 and the wrapper do not, and still writes the `structure` before the node's scope and test events.
+**Reasoning** 3.2.20 reads both before the instance's first scope or test event:
+
+- `suiteName` in a `SuiteStarting`, `Suite.run`'s thread rename or a send helper;
+- `suiteId` in `Framework`'s task for a top-level suite, in the `SuiteStarting` that `runNestedSuites` or the distributor's `SuiteRunner` builds, in `Suite.runTests`' filter, or as a send helper builds an event.
+
+Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite's structure. Taking each there calls nothing 3.2.20 and the wrapper do not, and still writes the `structure` before the node's scope and test events.
 
 **Costs** Each core site that makes such a read must pass the value to the registration, and send sites must build an origin against a registration whose node path is not yet known. Where an event is handed off before both reads, the emitter reads the missing value itself.
 

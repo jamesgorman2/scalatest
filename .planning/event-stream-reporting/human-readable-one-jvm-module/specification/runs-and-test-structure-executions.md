@@ -1,4 +1,4 @@
-# Consolidated human-readable output for one JVM module: executions and structures that change
+# Consolidated human-readable output for one JVM module: executions
 
 Acceptance criteria for what the human-readable output shows of a suite, scope or test that ran more than once. Part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events and executions among them; [layout.md](layout.md) gives where each line sits and its text and colour.
 

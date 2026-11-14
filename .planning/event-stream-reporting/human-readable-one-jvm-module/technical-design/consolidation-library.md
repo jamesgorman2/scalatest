@@ -8,7 +8,7 @@ Technical design of how assembly places messages and executions in the test stru
 
 This serves `../specification/layout-messages.md` AC-034 and AC-160.
 
-- Assembly records, with each message assigned to a suite, scope or test, which of that node's children had sent the first event of an execution under the message's own execution (§ A node's executions and its suite's latest structure) when the message arrived.
+- For each message assigned to a suite, scope or test, assembly records which of that node's children, when the message arrived, had sent the first event of an execution under the message's own execution (§ A node's executions and its suite's latest structure).
 - The human-readable writer places the message from that record.
 
 ### A node's executions and its suite's latest structure
@@ -24,8 +24,8 @@ This serves `../specification/runs-and-test-structure-executions.md` AC-141 to A
   - the nested suites its first `structure` gave it, by `position`, before or after the scopes and tests as that structure had them;
   - then each nested suite a later `structure` event added, in the order those events arrived.
 
-  A test's children are the suites it ran, in the order their `structure` events arrived. In either, a suite a later `structure` adds beside siblings sharing its `suiteId` sits directly after the last of them.
-- Each event gives its execution path (`test-event-log.md` § The test event log on the JVM § Executions). Assembly reads it against the `structure` latest when the event arrived, which gives the scopes above each test on the path, and puts the node's execution under the execution the path names for the node's parent, the scope, suite or test directly above it.
+  A test's children are the suites it ran, in the order their `structure` events arrived. Under a suite or a test, a suite a later `structure` adds beside siblings sharing its `suiteId` sits directly after the last of them.
+- Each event gives its execution path (`test-event-log.md` § The test event log on the JVM § Executions). Assembly reads it against the latest `structure` when the event arrived, which gives the scopes above each test on the path, and puts the node's execution under the execution the path names for the node's parent, the scope, suite or test directly above it.
   - It reads nothing from the order of scope events: under `RandomTestOrder`, a distributor or `AsyncEngine`, a scope can close before its tests start.
   - A node shows each execution that its own events name or that the execution paths of the events below it name.
   - A nested suite's execution sits under the execution of its parent that the paths of its events, and of the events below it, name, so a suite a test runs in each of its executions shows under each.
