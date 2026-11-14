@@ -23,9 +23,10 @@ Its decisions are in [TECHNICAL-DESIGN-DECISIONS.md](TECHNICAL-DESIGN-DECISIONS.
 
 ### The test command's entry point
 
-- The test command is the `test` command of a top-level `ExternalModule` object in a named package of the plugin. Beside it, `package object scalatest extends mill.api.ExternalModule.Alias(<that object>)` gives it the prefix `scalatest`, as Mill 1.3.1's `package object spotless extends ExternalModule.Alias(SpotlessModule)` does (`libs/javalib/src/mill/javalib/spotless/package.scala`).
-- Mill's selector parser accepts a single-segment prefix before `/` (`core/api/src/mill/api/internal/ParseArgs.scala` `selector`). It resolves prefix `scalatest` by loading class `scalatest$`, then `scalatest.package$`, the package object, from the meta-build's class loader (`core/resolve/src/mill/resolve/Resolve.scala` `resolveRootModule`, at Mill tag `1.3.1`).
-- That resolution was read from source, not run. An integration test runs `mill scalatest/test core.test` on a fixture build that adds the plugin by its header line.
+- The test command is the `test` command of the top-level `ExternalModule` object `org.scalatest.mill.TestCommandModule`. Beside it, the package object of package `scalatest`, `object package extends mill.api.ExternalModule.Alias(TestCommandModule)`, gives it the prefix `scalatest`, as Mill 1.3.1's `package object spotless extends ExternalModule.Alias(SpotlessModule)` does (`libs/javalib/src/mill/javalib/spotless/package.scala`).
+  - The package object names Mill's and the plugin's types from `_root_`. An import in its file is cyclic, since the package object's members are in scope where the file's imports resolve.
+- Mill's selector parser accepts a single-segment prefix before `/` (`core/api/src/mill/api/internal/ParseArgs.scala` `selector`). It resolves prefix `scalatest` by loading class `scalatest$`, then `scalatest.package$`, the package object, from the meta-build's class loader (`core/resolve/src/mill/resolve/Resolve.scala` `resolveRootModule`, at Mill tag `1.3.1`). The plugin's integration tests run `mill scalatest/test core.test` on fixture builds that add the plugin by their header line.
+- The command takes its arguments as a `mainargs.Leftover[String]`, so that an argument beginning `-` reaches it rather than Mill's argument parser.
 
 ### The run's PID and process start time
 
@@ -220,6 +221,8 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
   - the `AlertProvided`s that `Runner.readMemoryFiles` sends for `-A`;
   - the events `Framework` relays from a sub-process sbt forks;
   - the run events of the reruns that `Runner`'s `-g` graphical reporter starts through `RunnerJFrame`, `SuiteRerunner` and `TestRerunner`.
+- The event log file is `scalatest-event-log.jsonl` in the worker's `processFolder`. Mill names no file there so.
+- The folder the test command owns for a module is `modules/<module path>` in the command's own folder, beside its `test.dest`: `out/org.scalatest.mill.TestCommandModule/modules/core.test` for `core.test`. Mill clears `test.dest` but not its siblings, and the test command clears the module's folder before it runs discovery. The module's one worker's `processFolder` is that folder.
 - Event log reading polls each file every 10 ms, the only interval measured (`../research/jvm-file-channel.md` § 2).
 - The handle **Decode** returns (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is `org.scalatest.consolidation.RunEvent`, a public opaque type in the library over core's decoded event, whose classes are `private[scalatest]`. **Decode** is `RunEvent.decode`. It also rejects a `runStarted` event whose start time `Instant.parse` cannot parse.
 - **Start** is `org.scalatest.consolidation.Consolidation.start`. The `Consolidation` it returns has the other operations:
@@ -512,7 +515,7 @@ The group change of `../ARCHITECTURE.md` § Modules reaches both builds. Every a
   - On Windows the launcher is copied to a `.bat` file, because Windows starts the extensionless script Mill's `launcher` writes only as a batch file. `CreateProcess` also rejects `assembly`'s jar, which has a script prepended.
 - These commands, in order, publish what the integration tests resolve and then run them:
   1. At the repository root, `sbt.bat scalatestCompatible/publishLocal scalacticDotty/publishLocal scalatestDotty/publishLocal` (`sbt` off Windows). `scalatestDotty` aggregates core, the style artifacts and the consolidation library but neither `scalactic` nor `scalatest-compatible`, which are published first.
-  2. In `mill-plugin/`, `./mill --no-daemon plugin.integration.testForked` (`mill.bat` on Windows). It compiles and publishes the plugin to its test repository itself.
+  2. In `mill-plugin/`, `./mill --no-daemon plugin.test.testForked + plugin.integration.testForked` (`mill.bat` on Windows). `plugin.test` holds the plugin's unit tests. The integration tests compile and publish the plugin to their test repository themselves.
 
   `./mill --no-daemon plugin.publishLocal` then publishes the plugin for builds outside the tests.
 

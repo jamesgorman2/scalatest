@@ -1,0 +1,151 @@
+package org.scalatest.mill
+
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ConsolidationState
+import org.scalatest.consolidation.RunFeed
+import org.scalatest.consolidation.RunProcess
+import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import scala.collection.mutable
+import scala.concurrent.duration.DurationInt
+
+final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
+
+  private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
+  private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
+
+  /** A consolidation the reader adds its run to, and the reader's view of the run's process. */
+  private final class Reading(eventLogFile: Path) {
+    val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
+    val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
+    val runsAdded: AtomicInteger = new AtomicInteger(0)
+    val processExited: AtomicBoolean = new AtomicBoolean(false)
+    val processesWatched: mutable.Set[RunProcess] = mutable.Set.empty[RunProcess]
+
+    val reader: EventLogReader = new EventLogReader(eventLogFile, () => addRun(), watch, 1.millis)
+
+    private def addRun(): RunFeed = {
+      runsAdded.incrementAndGet()
+      consolidation.addRun(TestRunLabel("core.test"))
+    }
+
+    private def watch(process: RunProcess): Boolean = {
+      processesWatched.synchronized(processesWatched += process)
+      processExited.get
+    }
+
+    /** The consolidation's state once the reader's run has ended and the consolidation has. */
+    def stateAfterEnd(): ConsolidationState = {
+      reader.awaitStreamEnd()
+      consolidation.end()
+      consolidation.state
+    }
+  }
+
+  private def withEventLogFile[A](test: Path => A): A = {
+    val folder = Files.createTempDirectory("event-log-reader")
+    try {
+      test(folder.resolve("scalatest-event-log.jsonl"))
+    } finally {
+      Files.walk(folder).sorted(java.util.Comparator.reverseOrder()).forEach(path => Files.delete(path))
+    }
+  }
+
+  private def write(file: Path, text: String): Unit =
+    Files.write(file, text.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+
+  "An event log reader" when {
+    "its worker ends with no event log file" should {
+      "add no run" in {
+        withEventLogFile { file =>
+          val reading = new Reading(file)
+          reading.reader.start()
+          reading.stateAfterEnd() shouldBe ConsolidationState.Ended
+          reading.runsAdded.get shouldBe 0
+        }
+      }
+    }
+
+    "the event log holds a run that completes, and its process has exited" should {
+      "add the run, with its every event, and end its event stream" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n$runEndedCompleted\n")
+          val reading = new Reading(file)
+          reading.processExited.set(true)
+          reading.reader.start()
+          reading.stateAfterEnd() shouldBe ConsolidationState.Ended
+          reading.runsAdded.get shouldBe 1
+          reading.output.toSeq shouldBe Seq("[core.test]")
+        }
+      }
+    }
+
+    "the run's process is still running" should {
+      "keep reading events the run appends until the process exits" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n")
+          val reading = new Reading(file)
+          reading.reader.start()
+          Thread.sleep(50)
+          write(file, s"$runEndedCompleted\n")
+          reading.processExited.set(true)
+          reading.stateAfterEnd() shouldBe ConsolidationState.Ended
+        }
+      }
+
+      "watch the process its runStarted event names" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n$runEndedCompleted\n")
+          val reading = new Reading(file)
+          reading.processExited.set(true)
+          reading.reader.start()
+          reading.stateAfterEnd()
+          reading.processesWatched.map(_.pid.value) shouldBe Set(4242L)
+          reading.processesWatched.map(_.startTime.toString) shouldBe Set("2026-11-14T01:02:03.456Z")
+        }
+      }
+    }
+
+    "the run's process exits without the run's runEnded event" should {
+      "end the run's event stream, so that the run does not finish" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n")
+          val reading = new Reading(file)
+          reading.processExited.set(true)
+          reading.reader.start()
+          reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
+    "the event log's last line is torn" should {
+      "add no event for it" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\n${runEndedCompleted.take(20)}")
+          val reading = new Reading(file)
+          reading.processExited.set(true)
+          reading.reader.start()
+          reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
+    "a line cannot be decoded" should {
+      "end the run's event stream there, though the process still runs" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
+          val reading = new Reading(file)
+          reading.reader.start()
+          reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+//| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
+package build
+
+import mill.*
+import mill.scalajslib.*
+import mill.scalalib.*
+
+object core extends ScalaModule {
+  def scalaVersion = "3.3.8"
+
+  object test extends ScalaTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+    def testParallelism = false
+  }
+}
+
+object util extends ScalaModule {
+  def scalaVersion = "3.3.8"
+
+  object test extends ScalaTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+    def testParallelism = false
+  }
+}
+
+object coreJS extends ScalaJSModule {
+  def scalaVersion = "3.3.8"
+  def scalaJSVersion = "1.20.2"
+
+  object test extends ScalaJSTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+  }
+}

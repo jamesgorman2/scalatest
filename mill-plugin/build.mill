@@ -51,6 +51,10 @@ object plugin extends PluginScalaModule, PublishModule {
     developers = Seq()
   )
 
+  object test extends ScalaTests, TestModule.ScalaTest {
+    def mvnDeps: T[Seq[Dep]] = Seq(mvn"com.edc::scalatest:${Versions.fork}")
+  }
+
   object integration extends ScalaTests, TestModule.ScalaTest {
     def mvnDeps: T[Seq[Dep]] = Seq(
       mvn"com.lihaoyi::mill-testkit:${Versions.mill}",

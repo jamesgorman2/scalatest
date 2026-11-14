@@ -1,0 +1,94 @@
+package org.scalatest.mill
+
+import mill.testkit.IntegrationTester
+
+/** Runs Mill on copies of the fixture builds under the integration tests' resources. */
+trait FixtureBuilds {
+
+  protected val pluginVersion: String = sys.env("SCALATEST_MILL_VERSION")
+  protected val fixtures: os.Path = os.Path(sys.env("MILL_TEST_RESOURCE_DIR"))
+  private val millExecutable: os.Path = os.Path(sys.env("MILL_EXECUTABLE_PATH"))
+
+  /** The build header line that adds the plugin. */
+  protected def pluginHeaderLine: String = s"""//| mvnDeps: ["com.edc::scalatest-mill::$pluginVersion"]"""
+
+  protected def withTester[A](fixture: String)(test: IntegrationTester => A): A = {
+    val tester = IntegrationTester(daemonMode = false, workspaceSourcePath = fixtures / fixture, millExecutable = millExecutable)
+    try {
+      test(tester)
+    } finally {
+      tester.close()
+    }
+  }
+
+  /** Adds the plugin to the tester's copy of a build whose header has no `mvnDeps`. */
+  protected def addPlugin(tester: IntegrationTester): Unit = {
+    val buildFile = tester.workspacePath / "build.mill"
+    os.write.over(buildFile, s"$pluginHeaderLine\n${os.read(buildFile)}")
+  }
+
+  protected def runTestCommand(tester: IntegrationTester, arguments: String*): TestCommandResult =
+    TestCommandResult(tester.eval(Seq("scalatest/test") ++ arguments))
+
+  /**
+   * Runs the test command with Mill's ticker on, as Mill runs by default. The tester turns it off, and with it the
+   * prefix Mill puts on each line a task writes.
+   */
+  protected def runTestCommandWithTicker(tester: IntegrationTester, arguments: String*): TestCommandResult =
+    TestCommandResult(tester.eval(Seq("--ticker", "true", "scalatest/test") ++ arguments))
+
+  /** Whether any test worker was started in the tester's workspace: Mill writes each worker's `testargs`. */
+  protected def anyTestWorkerStarted(tester: IntegrationTester): Boolean =
+    os.exists(tester.workspacePath / "out") && os.walk(tester.workspacePath / "out").exists(_.last == "testargs")
+}
+
+/** What one `mill scalatest/test` wrote. */
+final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
+
+  def succeeded: Boolean = eval.isSuccess
+
+  /** Each stdout line, with ANSI escape sequences removed. */
+  def stdoutLines: Seq[String] = eval.out.linesIterator.map(TestCommandResult.withoutEscapes).toSeq
+
+  /**
+   * The stdout lines of the human-readable output, as written: from the first that, without Mill's prefix, is a test
+   * run label, and each indented line after it.
+   */
+  def humanReadableStdoutLines: Seq[String] =
+    stdoutLines
+      .dropWhile(line => !TestCommandResult.withoutMillPrefix(line).startsWith("["))
+      .takeWhile { line =>
+        val unprefixed = TestCommandResult.withoutMillPrefix(line)
+        unprefixed.startsWith("[") || unprefixed.startsWith(" ")
+      }
+
+  /** The human-readable output, without Mill's prefix. */
+  def humanReadableOutput: Seq[String] = humanReadableStdoutLines.map(TestCommandResult.withoutMillPrefix)
+
+  /** The line `nodeLine` of the human-readable output and every line under it, with its indentation removed. */
+  def linesFor(nodeLine: String): Seq[String] = {
+    val output = humanReadableOutput
+    val start = output.indexWhere(_.trim == nodeLine)
+    if (start < 0) {
+      Nil
+    } else {
+      val indentation = output(start).takeWhile(_ == ' ').length
+      val under = output.drop(start + 1).takeWhile(line => line.takeWhile(_ == ' ').length > indentation)
+      (output(start) +: under).map(_.drop(indentation))
+    }
+  }
+
+  def debugString: String = eval.debugString
+}
+
+object TestCommandResult {
+
+  /** Mill's prefix on a line its task writes, such as `1] `. */
+  val millPrefix: scala.util.matching.Regex = """^[0-9][0-9-]*\] """.r
+
+  private val escapeSequence = "\u001b\\[[0-9;]*[A-Za-z]".r
+
+  private def withoutEscapes(line: String): String = escapeSequence.replaceAllIn(line, "")
+
+  private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
+}

@@ -5,19 +5,7 @@ import mill.testkit.IntegrationTester
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should
 
-final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers {
-  private val pluginVersion: String = sys.env("SCALATEST_MILL_VERSION")
-  private val fixtures: os.Path = os.Path(sys.env("MILL_TEST_RESOURCE_DIR"))
-  private val millExecutable: os.Path = os.Path(sys.env("MILL_EXECUTABLE_PATH"))
-
-  private def withTester[A](fixture: os.Path)(test: IntegrationTester => A): A = {
-    val tester = IntegrationTester(daemonMode = false, workspaceSourcePath = fixture, millExecutable = millExecutable)
-    try {
-      test(tester)
-    } finally {
-      tester.close()
-    }
-  }
+final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with FixtureBuilds {
 
   private def classpath(result: IntegrationTester.EvalResult): Seq[Seq[String]] = {
     withClue(result.debugString) {
@@ -36,11 +24,11 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers {
   "A build whose header adds the plugin by one line" - {
     for (scala <- Seq("3.3", "3.9")) {
       s"with a test module on Scala $scala" - {
-        val fixture = fixtures / s"scala-$scala"
+        val fixture = s"scala-$scala"
 
         "has that line, naming the plugin's own version, as its whole header" in {
-          val header = os.read.lines(fixture / "build.mill").takeWhile(_.startsWith("//|"))
-          header shouldBe Seq(s"""//| mvnDeps: ["com.edc::scalatest-mill::$pluginVersion"]""")
+          val header = os.read.lines(fixtures / fixture / "build.mill").takeWhile(_.startsWith("//|"))
+          header shouldBe Seq(pluginHeaderLine)
         }
 
         "loads with the plugin, scalatest-core and the consolidation library on its meta-build's classpath" in {
