@@ -19,6 +19,10 @@ Please visit [Download and Setup](https://www.scala-sbt.org/1.x/docs/Setup.html)
 
 Please visit [Quick Start](http://www.scalatest.org/quick_start) for steps to get started quickly.
 
+### Mill plugin
+
+[mill-plugin/README.md](mill-plugin/README.md) describes how to publish this fork and its Mill plugin, run the plugin's tests, and use the plugin's test command in a Mill build.
+
 
 Building ScalaTest
 ------------------
