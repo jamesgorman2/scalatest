@@ -32,6 +32,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
   private def shouldFail(result: TestCommandResult): Unit =
     withClue(result.debugString) {
       result.succeeded shouldBe false
+      (result.eval.out + result.eval.err) should include("The tests of core.test failed")
     }
 
   Feature("Of runs that complete, the test command fails where one reports a failure, and not otherwise") {
@@ -108,6 +109,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
       And("no line on the console outside the human-readable output holds have size 0")
       withClue(result.debugString) {
+        result.humanReadableOutput.exists(_.contains("have size 0")) shouldBe true
         result.consoleLinesOutsideHumanReadableOutput.filter(_.contains("have size 0")) shouldBe empty
       }
     }
