@@ -896,8 +896,8 @@ class Framework extends SbtFramework {
 
         execSvc.shutdown()
 
-        // A run writing its test event log returns no summary: Mill's worker prints what done returns, and the test
-        // command captures the worker's stdout against the run.
+        // Under the runner argument, done returns no summary: Mill's worker prints what done returns to its stdout,
+        // which the test command captures into the run's block.
         if (testEventLogEmitter.isDefined) ""
         else
           StringReporter.summaryFragments(

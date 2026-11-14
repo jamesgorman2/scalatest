@@ -8,9 +8,9 @@ import org.scalatest.consolidation.TestRunLabel
 import scala.concurrent.duration.DurationInt
 
 /**
- * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue, and adds the
- * worker's run, with the lines captured from its stdout and stderr, to a consolidation, or the worker itself where no
- * run existed in it.
+ * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue. Adds the worker's
+ * run, with the lines captured from its stdout and stderr, to a consolidation, or the worker itself where no run
+ * existed in it.
  */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,

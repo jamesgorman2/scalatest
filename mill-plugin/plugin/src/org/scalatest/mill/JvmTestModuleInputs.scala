@@ -36,7 +36,7 @@ private[mill] final case class JvmTestModuleInputs(
 
   /**
    * A `TestModuleUtil` whose workers and discovery receive `arguments` as their ScalaTest arguments. Its workers log at
-   * the module's `testLogLevel`, raised to `Info`, at which Mill writes no `Running Test Class` line to their stderr.
+   * the module's `testLogLevel` raised to at least `Info`, so Mill writes no `Running Test Class` line to their stderr.
    */
   def testModuleUtil(arguments: Seq[String], ctx: TaskCtx): TestModuleUtil =
     new TestModuleUtil(

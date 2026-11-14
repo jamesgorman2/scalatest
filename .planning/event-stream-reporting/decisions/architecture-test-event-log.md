@@ -6,12 +6,12 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Alternatives**
 
-- The plugin dropping the summary lines from a worker's captured stdout needs text matching, which the output's definition of done forbids.
+- The plugin dropping the summary lines from a worker's captured stdout needs text matching, which the feature rules out.
 - Leaving the summary in the captured stdout puts it in the run's block, against `../SPECIFICATION.md` R-045 and AC-088.
 
-**Reasoning** Mill's worker prints the result of `done()` to its stdout, which the test command captures into the run's block, so the summary can be kept out of the block only by not returning it. Mill 1.3.1 prints the result only when it is not empty, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it. `MasterRunner.done` on Scala.js and Native returns `""` under the argument as well when those runtimes land.
+**Reasoning** Mill's worker prints what `done()` returns to its stdout, and the test command captures that stdout into the run's block. Not returning the summary is the only way to keep it out of the block without text matching. Mill 1.3.1 prints nothing for an empty result, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it. When Scala.js and Native land, their `MasterRunner.done` returns `""` under the argument too.
 
-**Costs** The change is in the framework's `done`, in `jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`, which each runtime's runner must repeat.
+**Costs** Each runtime's runner must repeat the change to `done` in `jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`.
 
 **Settled by** [Consolidated human-readable output for one JVM module - Process capture and the console](https://github.com/jamesgorman2/scalatest/issues/94).
 

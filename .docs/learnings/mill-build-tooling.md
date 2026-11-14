@@ -64,7 +64,7 @@ Read the process's own output, `evalResult.result.out.text()` and `evalResult.re
 <learning>
 date: 2026-11-14
 ---
-A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `ScalaTests` test module's classpath. A Mill plugin that takes Mill through `compileMvnDeps` therefore has no Mill or os-lib classes in its unit tests: a test naming `os.*` fails with `Not found: os`.
+A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `ScalaTests` test module's classpath. A Mill plugin that depends on Mill through `compileMvnDeps` therefore has no Mill or os-lib classes in its unit tests: a test naming `os.*` fails with `Not found: os`.
 
 Keep classes under unit test free of Mill and os-lib types, and do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Test that wiring under testkit.
 </learning>

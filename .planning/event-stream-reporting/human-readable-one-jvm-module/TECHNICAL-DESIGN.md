@@ -73,7 +73,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
   - A lone `\r` stays in the line's text.
   - Lines of the two streams enter the sequence in the order their splitters completed them. `../SPECIFICATION.md` R-043 asks no more.
 - When its stream ends, a splitter appends the line it still holds, if it holds any bytes. Mill's call returns only once both reader threads have finished (`../research/mill-worker-channels.md` § 2.3), so the sequence is complete when the call returns.
-- Mill's worker prints to stdout what its runner's `done` returns (`libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` `handleRunnerDone`, at Mill tag `1.3.1`). Given the runner argument, `org.scalatest.tools.Framework`'s `done` returns an empty string rather than ScalaTest's end-of-run summary, which Mill then does not print, so the summary is never captured (`../SPECIFICATION.md` R-045).
+- Mill's worker prints to stdout what its runner's `done` returns (`libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` `handleRunnerDone`, at Mill tag `1.3.1`). Given the runner argument, `org.scalatest.tools.Framework`'s `done` returns an empty string in place of ScalaTest's end-of-run summary. Mill prints nothing for an empty string, so the summary is never captured (`../SPECIFICATION.md` R-045).
 - A worker writes a piped stdout and stderr in the platform's native encoding unless its `forkArgs` set `file.encoding`, `stdout.encoding` or `stderr.encoding`. The splitter decodes with the charset Mill's JVM names in its `native.encoding` system property, or `Charset.defaultCharset()` where that property is absent, and replaces malformed bytes with U+FFFD rather than dropping them.
 
 ### The test command's result
