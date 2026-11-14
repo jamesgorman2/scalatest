@@ -55,13 +55,13 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
 
     Scenario("A multi-line, non-ASCII failure message") {
       Given("a suite whose test fails with a multi-line, non-ASCII message")
-      And("a run of it through Framework with the runner argument, whose test event log is decoded with core's codec")
+      And("a Framework run of it with the runner argument, producing a test event log")
       val eventLog = eventLogOfFrameworkRun(classOf[samples.UnicodeSuite].getName)
 
       When("the library consolidates it")
       val output = consolidatedFrom(eventLog)
 
-      Then("the lines under the test's failed line begin with the message, its last line naming the failed code's file and line")
+      Then("the lines under the failed test are the message, ending with the failing code's file and line")
       val failedLine = output.indexOf("    - reports *** FAILED ***")
       withClue(output.mkString("\n")) {
         failedLine should be >= 0
