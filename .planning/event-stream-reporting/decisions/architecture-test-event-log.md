@@ -2,6 +2,21 @@
 
 Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, what carries it on each runtime, how it is turned on and how its end is known, newest first.
 
+## Under the runner argument, `Framework.done` returns an empty string in place of ScalaTest's end-of-run summary.
+
+**Alternatives**
+
+- The plugin dropping the summary lines from a worker's captured stdout needs text matching, which the output's definition of done forbids.
+- Leaving the summary in the captured stdout puts it in the run's block, against `../SPECIFICATION.md` R-045 and AC-088.
+
+**Reasoning** Mill's worker prints the result of `done()` to its stdout, which the test command captures into the run's block, so the summary can be kept out of the block only by not returning it. Mill 1.3.1 prints the result only when it is not empty, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it. `MasterRunner.done` on Scala.js and Native returns `""` under the argument as well when those runtimes land.
+
+**Costs** The change is in the framework's `done`, in `jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`, which each runtime's runner must repeat.
+
+**Settled by** [Consolidated human-readable output for one JVM module - Process capture and the console](https://github.com/jamesgorman2/scalatest/issues/94).
+
+---
+
 ## Each side of core's codec is tested on its own against the test event log's written format, not by round trip.
 
 **Alternatives**
