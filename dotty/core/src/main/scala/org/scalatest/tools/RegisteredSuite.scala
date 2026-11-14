@@ -4,6 +4,7 @@ import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
 import org.scalatest.EventOrigin
+import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.ScopePlace
 import org.scalatest.Status
@@ -101,7 +102,10 @@ private[scalatest] final class RegisteredSuite(
   def originAt(scopes: List[ScopePlace]): EventOrigin =
     new OriginInRun(if (scopes.isEmpty) TreeNode.OfSuite else TreeNode.Scope(scopes))
 
-  def startTestExecution(testName: String): EventOrigin = new OriginOfTestExecution(testName)
+  def startTestExecution(testName: String): EventOrigin = {
+    emitter.addTestWhereLacking(table, testName, instance.scopesAndTestsOfRegistrationTree)
+    new OriginOfTestExecution(testName)
+  }
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
     new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeSuiteEvent)
@@ -114,6 +118,22 @@ private[scalatest] final class RegisteredSuite(
     RegisteredSuites.add(instance, registration)
     registration
   }
+
+  def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration = {
+    val registration = new RegisteredSuite(emitter, table, instance, Some(topLevel), None)
+    RegisteredSuites.add(instance, registration)
+    registration
+  }
+
+  def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = {
+    instance.scopesAndTestsOfRegistrationTree.foreach { registered =>
+      val tags = Suite.autoTagClassAnnotations(tagsOfTests, instance, SuiteStructure.testNamesIn(registered))
+      emitter.writeStructureWhereChanged(table, SuiteStructure.kept(registered, testName => filter(testName, tags, table.suiteId)))
+    }
+  }
+
+  def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit =
+    emitter.writeStructureWhereChanged(table, SuiteStructure.ofTestNames(keptTestNames))
 
   def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
     table.nestedSuites.lift(position) match {

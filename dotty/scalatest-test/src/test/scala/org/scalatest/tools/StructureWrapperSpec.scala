@@ -15,7 +15,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
 
   private val suite = new Suite {}
   private val table =
-    new SuiteNodeTable(suite, NodeId(1), "samples.OneSuite", "samples.OneSuite", Map.empty, Map.empty, Map.empty, Vector.empty)
+    new SuiteNodeTable(suite, NodeId(1), "OneSuite", "samples.OneSuite", "samples.OneSuite", None, None, Nil, ScopeAndTestIds.none, Vector.empty)
   private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), table, suite, None, None)
   private val node = WrapperNode.NestedSuite(registration)
 

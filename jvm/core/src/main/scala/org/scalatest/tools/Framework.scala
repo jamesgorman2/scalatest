@@ -520,6 +520,20 @@ class Framework extends SbtFramework {
             case t: Throwable => new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, t)
           }
 
+        // A ConfigMapWrapperSuite constructs its wrapped class when its suite ID is first read, here before it can
+        // start. What that throws reaches the build tool, as in ScalaTest 3.2.20, and the event log alone holds the
+        // suite as aborted.
+        suite match {
+          case wrapper: ConfigMapWrapperSuite =>
+            try wrapper.suiteId
+            catch {
+              case thrown: Throwable =>
+                handOffAbortOfSuiteThatCannotStart(thrown)
+                throw thrown
+            }
+          case _ => ()
+        }
+
         if (useSbtLogInfoReporter) {
           val sbtLogInfoReporter =
             new FilterReporter(
@@ -584,6 +598,32 @@ class Framework extends SbtFramework {
       }
        else
          throw new IllegalArgumentException("Class " + taskDefinition.fullyQualifiedName + " is neither accessible org.scalatest.Suite nor runnable.")
+    }
+
+    /**
+     * Gives the test event log the structure of a suite that threw before it could start, and the `SuiteStarting`
+     * and `SuiteAborted` `runSuite` would send for it as a `DeferredAbortedSuite`. No reporter receives them, and
+     * they take no ordinal from the run's tracker, so the run's reporters receive what ScalaTest 3.2.20 sends them.
+     */
+    private def handOffAbortOfSuiteThatCannotStart(thrown: Throwable): Unit = {
+      val aborted = new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, thrown)
+      val passingNoEventOn: Reporter = (_: Event) => ()
+      val report = reporterOfTopLevelSuite(aborted, Filter.default, passingNoEventOn)
+      if (report ne passingNoEventOn) {
+        val tracker = new Tracker
+        val suiteClassName = getSuiteClassName(aborted)
+        val message =
+          if (thrown.getMessage == null)
+            thrown.getClass.getName + " encountered when attempting to run suite " + aborted.suiteId
+          else
+            thrown.getMessage
+        try {
+          report(SuiteStarting(tracker.nextOrdinal(), aborted.suiteName, aborted.suiteId, Some(suiteClassName), formatterForSuiteStarting(aborted), Some(TopOfClass(suiteClassName))))
+          report(SuiteAborted(tracker.nextOrdinal(), message, aborted.suiteName, aborted.suiteId, Some(aborted.suiteName), Some(thrown), Some(0L), formatterForSuiteAborted(aborted, message), Some(SeeStackDepthException)))
+        } finally {
+          SuiteRegistration.madeTaking(report, passingNoEventOn).remove()
+        }
+      }
     }
 
     def taskDef = taskDefinition

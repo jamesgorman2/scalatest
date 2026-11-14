@@ -1,5 +1,6 @@
 package org.scalatest.tools
 
+import org.scalatest.ConfigMapWrapperSuite
 import org.scalatest.Filter
 import org.scalatest.RegisteredNode
 import org.scalatest.RegisteredScope
@@ -39,31 +40,43 @@ private[scalatest] object SuiteStructure {
    * nested suite, any of which may throw. It recurses once for each suite nested in another, as running them does.
    */
   def read(suite: Suite, filter: Filter): SuiteStructure = {
-    val suiteId = suite.suiteId
-    val scopesAndTests = suite.scopesAndTestsOfRegistrationTree match {
+    // A ConfigMapWrapperSuite forwards each of these to the instance of its wrapped class it constructs with an empty
+    // config map, which ScalaTest 3.2.20 already constructs before the suite starts. That instance alone has a
+    // registration tree and the wrapped class's name.
+    val readFrom = suite match {
+      case wrapper: ConfigMapWrapperSuite => wrapper.instanceWithEmptyConfigMap
+      case _ => suite
+    }
+    val suiteId = readFrom.suiteId
+    val scopesAndTests = readFrom.scopesAndTestsOfRegistrationTree match {
       case Some(registered) =>
-        val tags = suite.tags
+        val tags = readFrom.tags
         kept(registered, testName => filter(testName, tags, suiteId))
-      case None =>
-        filter(suite.testNames, suite.tags, suiteId).map { (testName, _) =>
-          val test = RegisteredNode.unregisteredTest(testName)
-          ScopeOrTest.Test(test.name, test.testName, test.label)
-        }
+      case None => ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId).map((testName, _) => testName))
     }
     SuiteStructure(
       suite,
-      suite.suiteName,
+      readFrom.suiteName,
       suiteId,
-      Suite.getSuiteClassName(suite),
+      Suite.getSuiteClassName(readFrom),
       scopesAndTests,
-      if (filter.excludeNestedSuites) Nil else suite.nestedSuites.toList.map(read(_, filter)),
-      suite.isInstanceOf[TestsBeforeNestedSuites]
+      if (filter.excludeNestedSuites) Nil else readFrom.nestedSuites.toList.map(read(_, filter)),
+      readFrom.isInstanceOf[TestsBeforeNestedSuites]
     )
   }
 
-  // Keeps every scope, as the engine opens a scope whose tests the filter all drops, and the tests the filter keeps.
-  // `filtered` returns, as `Filter.apply` does for one test, whether the test is dropped and whether it is ignored.
-  private def kept(registered: List[RegisteredNode], filtered: String => (Boolean, Boolean)): List[ScopeOrTest] = {
+  /** The tests of a suite with no registration tree, in the order given, each labelled as `Suite.runTests` labels a test it ignores. */
+  def ofTestNames(testNames: Seq[String]): List[ScopeOrTest] =
+    testNames.toList.map { testName =>
+      val test = RegisteredNode.unregisteredTest(testName)
+      ScopeOrTest.Test(test.name, test.testName, test.label)
+    }
+
+  /**
+   * Keeps every scope, as the engine opens a scope whose tests the filter all drops, and the tests the filter keeps.
+   * `filtered` returns, as `Filter.apply` does for one test, whether the test is dropped and whether it is ignored.
+   */
+  def kept(registered: List[RegisteredNode], filtered: String => (Boolean, Boolean)): List[ScopeOrTest] = {
     registered.flatMap {
       case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, kept(nodes, filtered)))
       case RegisteredTest(name, testName, label, labelWhenIgnored) =>
@@ -71,4 +84,37 @@ private[scalatest] object SuiteStructure {
         if (isDropped) None else Some(ScopeOrTest.Test(name, testName, if (isIgnored) labelWhenIgnored else label))
     }
   }
+
+  /**
+   * The scopes of a registration tree, and of its tests those `latest` holds, as `latest` holds them, and the test
+   * named `added`. It is `None` where the tree holds no test of that name.
+   */
+  def withTestAdded(registered: List[RegisteredNode], latest: List[ScopeOrTest], added: String): Option[List[ScopeOrTest]] = {
+    val latestTests = testsIn(latest).map(test => test.testName -> test).toMap
+    // Recurses once for each scope nested in another, as registering them does.
+    def nodesIn(nodes: List[RegisteredNode]): List[ScopeOrTest] =
+      nodes.flatMap {
+        case RegisteredScope(name, text, label, scopesAndTests) => Some(ScopeOrTest.Scope(name, text, label, nodesIn(scopesAndTests)))
+        case RegisteredTest(name, testName, label, _) =>
+          latestTests.get(testName).orElse(Option.when(testName == added)(ScopeOrTest.Test(name, testName, label)))
+      }
+    Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
+  }
+
+  /** Whether the scopes and tests hold a test of this test name. */
+  def holdsTest(scopesAndTests: List[ScopeOrTest], testName: String): Boolean = testsIn(scopesAndTests).exists(_.testName == testName)
+
+  // Recurses once for each scope nested in another.
+  private def testsIn(scopesAndTests: List[ScopeOrTest]): List[ScopeOrTest.Test] =
+    scopesAndTests.flatMap {
+      case test: ScopeOrTest.Test => List(test)
+      case ScopeOrTest.Scope(_, _, _, nodes) => testsIn(nodes)
+    }
+
+  /** The test names of a registration tree. */
+  def testNamesIn(registered: List[RegisteredNode]): List[String] =
+    registered.flatMap {
+      case RegisteredScope(_, _, _, nodes) => testNamesIn(nodes)
+      case test: RegisteredTest => List(test.testName)
+    }
 }

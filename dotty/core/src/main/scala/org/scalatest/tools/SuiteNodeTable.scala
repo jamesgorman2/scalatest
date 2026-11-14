@@ -43,34 +43,78 @@ private[scalatest] final class NodeExecutions {
   def latest: Option[Execution] = started
 }
 
+/** The node IDs of a suite's scopes and tests: each test's by test name, each scope's by its path, and each one's parent. */
+private[scalatest] final case class ScopeAndTestIds(
+  tests: Map[String, NodeId],
+  scopes: Map[List[ScopePlace], NodeId],
+  parents: Map[NodeId, NodeId]
+)
+
+private[scalatest] object ScopeAndTestIds {
+  val none: ScopeAndTestIds = ScopeAndTestIds(Map.empty, Map.empty, Map.empty)
+}
+
 /**
  * The node IDs a run's test event log gives one suite node: the suite's own, and those of its tests, scopes and
- * nested suites. It also keeps the executions of the suite and of its scopes and tests.
+ * nested suites. It also keeps the suite's latest structure, and the executions of the suite and of its scopes and
+ * tests.
  *
  * Not a case class: the suite instance is user code, whose `equals`, `hashCode` and `toString` must not be called.
  *
  * @param instance the suite instance the suite's structure was read from
- * @param tests each test's node, by test name
- * @param scopes each scope's node, by its path: the place of each scope from the suite down to it
- * @param parents the parent of each scope and test
+ * @param parent the suite node this one is nested in, where it is nested, and `position` its place among that node's children
+ * @param firstScopesAndTests the scopes and tests of the suite's first structure
+ * @param firstIds the node IDs of `firstScopesAndTests`
  * @param nestedSuites each nested suite's table, at its position in `nestedSuites`
  */
 private[scalatest] final class SuiteNodeTable(
   val instance: Suite,
   val node: NodeId,
+  val name: String,
   val suiteId: String,
   val className: String,
-  val tests: Map[String, NodeId],
-  val scopes: Map[List[ScopePlace], NodeId],
-  val parents: Map[NodeId, NodeId],
+  val parent: Option[NodeId],
+  val position: Option[Int],
+  firstScopesAndTests: List[ScopeOrTest],
+  firstIds: ScopeAndTestIds,
   val nestedSuites: Vector[SuiteNodeTable]
 ) {
 
-  // Both are read and written only under the emitter's lock.
+  // All are read and written only under the emitter's lock. The IDs are those of every scope and test any structure
+  // of the suite has held, so that each keeps its ID in a later structure.
   private val executionsOfNodes = mutable.HashMap.empty[NodeId, NodeExecutions]
   private var openedBySuiteStarting = Option.empty[Execution]
+  private var ids = firstIds
+  private var latestScopesAndTests = firstScopesAndTests
 
-  /** The node of a scope or test, or none for the suite itself and for a scope or test the suite's structure does not hold. */
+  /** Each test's node, by test name. */
+  def tests: Map[String, NodeId] = ids.tests
+
+  /** Each scope's node, by its path: the place of each scope from the suite down to it. */
+  def scopes: Map[List[ScopePlace], NodeId] = ids.scopes
+
+  /** The parent of each scope and test. */
+  def parents: Map[NodeId, NodeId] = ids.parents
+
+  /** The scopes and tests of the suite's latest structure. */
+  def scopesAndTests: List[ScopeOrTest] = latestScopesAndTests
+
+  /**
+   * Makes `scopesAndTests` the suite's latest structure, minting a node for each scope and test no earlier structure
+   * of the suite held, and returns the nodes of the further `structure` event that holds them: the suite, then its
+   * scopes and tests, positioned from 0 among themselves.
+   */
+  def furtherStructure(scopesAndTests: List[ScopeOrTest], mint: () => NodeId): Vector[StructureNode] = {
+    val nodes = Vector.newBuilder[StructureNode]
+    nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
+    val added = new SuiteNodeTable.ScopesAndTests(ids, mint, nodes)
+    added.add(scopesAndTests, node, 0, Nil)
+    ids = added.ids
+    latestScopesAndTests = scopesAndTests
+    nodes.result()
+  }
+
+  /** The node of a scope or test, or none for the suite itself and for a scope or test no structure of the suite holds. */
   def scopeOrTest(treeNode: TreeNode): Option[NodeId] = {
     treeNode match {
       case TreeNode.OfSuite => None
@@ -115,7 +159,7 @@ private[scalatest] object SuiteNodeTable {
     def suite(structure: SuiteStructure, parent: Option[NodeId], position: Option[Int]): SuiteNodeTable = {
       val id = mint()
       nodes += StructureNode.Suite(id, parent, position, structure.name, structure.suiteId, structure.className)
-      val scopesAndTests = new ScopesAndTests
+      val scopesAndTests = new ScopesAndTests(ScopeAndTestIds.none, mint, nodes)
       def nestedSuitesFrom(firstPosition: Int): Vector[SuiteNodeTable] =
         structure.nestedSuites.toVector.zipWithIndex.map((nested, index) => suite(nested, Some(id), Some(firstPosition + index)))
       val nestedSuites =
@@ -130,40 +174,42 @@ private[scalatest] object SuiteNodeTable {
       new SuiteNodeTable(
         structure.instance,
         id,
+        structure.name,
         structure.suiteId,
         structure.className,
-        scopesAndTests.tests.result(),
-        scopesAndTests.scopes.result(),
-        scopesAndTests.parents.result(),
+        parent,
+        position,
+        structure.scopesAndTests,
+        scopesAndTests.ids,
         nestedSuites
       )
     }
+  }
 
-    private final class ScopesAndTests {
+  /** Adds scopes and tests to a structure's nodes, each taking the ID `known` holds for it, where it holds one, and a minted one otherwise. */
+  private final class ScopesAndTests(known: ScopeAndTestIds, mint: () => NodeId, nodes: mutable.Builder[StructureNode, Vector[StructureNode]]) {
 
-      val tests = Map.newBuilder[String, NodeId]
-      val scopes = Map.newBuilder[List[ScopePlace], NodeId]
-      val parents = Map.newBuilder[NodeId, NodeId]
+    private var added = known
 
-      // Recurses once for each scope nested in another, as registering them does.
-      def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
-        children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
-          case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label), index)) =>
-            val id = mint()
-            nodes += StructureNode.Test(id, parent, firstPosition + index, name, label)
-            tests += testName -> id
-            parents += id -> parent
-            scopesSoFarByText
-          case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), index)) =>
-            val id = mint()
-            val place = scopesSoFarByText.getOrElse(text, 0)
-            val path = pathOfParent :+ ScopePlace(text, place)
-            nodes += StructureNode.Scope(id, parent, firstPosition + index, name, label)
-            scopes += path -> id
-            parents += id -> parent
-            add(scopesAndTests, id, 0, path)
-            scopesSoFarByText.updated(text, place + 1)
-        }
+    /** The IDs `known` holds, with those of the scopes and tests added, each under the parent it was added under. */
+    def ids: ScopeAndTestIds = added
+
+    // Recurses once for each scope nested in another, as registering them does.
+    def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
+      children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
+        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label), index)) =>
+          val id = added.tests.getOrElse(testName, mint())
+          nodes += StructureNode.Test(id, parent, firstPosition + index, name, label)
+          added = added.copy(tests = added.tests.updated(testName, id), parents = added.parents.updated(id, parent))
+          scopesSoFarByText
+        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), index)) =>
+          val place = scopesSoFarByText.getOrElse(text, 0)
+          val path = pathOfParent :+ ScopePlace(text, place)
+          val id = added.scopes.getOrElse(path, mint())
+          nodes += StructureNode.Scope(id, parent, firstPosition + index, name, label)
+          added = added.copy(scopes = added.scopes.updated(path, id), parents = added.parents.updated(id, parent))
+          add(scopesAndTests, id, 0, path)
+          scopesSoFarByText.updated(text, place + 1)
       }
     }
   }

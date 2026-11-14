@@ -85,6 +85,9 @@ final class ConfigMapWrapperSuite(clazz: Class[_ <: Suite]) extends Suite {
     constructor.newInstance(Map.empty)
   }
 
+  /** The instance of the wrapped class constructed with an empty config map, which this suite forwards its members to. */
+  private[scalatest] def instanceWithEmptyConfigMap: Suite = wrappedSuite
+
   override def suiteId = wrappedSuite.suiteId
 
   override def suiteName = wrappedSuite.suiteName
@@ -140,7 +143,7 @@ final class ConfigMapWrapperSuite(clazz: Class[_ <: Suite]) extends Suite {
   override def run(testName: Option[String], args: Args): Status = {
     val constructor = clazz.getConstructor(classOf[Map[_, _]])
     val suite = constructor.newInstance(args.configMap)
-    suite.run(testName, args)
+    SuiteRegistration.of(this).registerInstanceRunInItsPlace(suite).removedOnceRun(suite.run(testName, args))
   }
 }
   // TODO: Check the testName throwing an IAE behavior

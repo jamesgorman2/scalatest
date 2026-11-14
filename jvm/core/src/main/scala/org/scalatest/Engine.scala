@@ -529,6 +529,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val newArgs = if (report eq reporter) args else args.copy(reporter = report)
     val registration = SuiteRegistration.of(theSuite)
+    registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
 
     val statusBuffer = new ListBuffer[Status]()
 
@@ -570,6 +571,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val registration = SuiteRegistration.of(theSuite)
     registration.startRun()
+    registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
     val origin = registration.originAt(Nil)
 
     val informerForThisSuite =
@@ -1169,6 +1171,7 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
     val newArgs = if (report eq reporter) args else args.copy(reporter = report)
     val registration = SuiteRegistration.of(theSuite)
     registration.startRun()
+    registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
     val origin = registration.originAt(Nil)
 
     val informerForThisSuite =

@@ -56,10 +56,29 @@ private[scalatest] abstract class SuiteRegistration {
   def registerInstanceOfTest(instance: Suite): SuiteRegistration
 
   /**
+   * Registers `instance`, which this suite instance constructed to run in its own place, against the suite's node.
+   * The caller removes the returned registration.
+   */
+  def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration
+
+  /**
    * Registers a nested suite the instance is about to run, against the node at its position in `nestedSuites`, and
    * returns the reporter the nested suite is started and run with: its structure wrapper over `reporter`.
    */
   def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter
+
+  /**
+   * Writes a further structure of the suite where the scopes and tests of the instance's registration tree, kept by
+   * `filter`, differ from those of the suite's latest structure. `tagsOfTests` are the tags the instance registered
+   * its tests with. It calls no member of the instance that a suite outside ScalaTest can override.
+   */
+  def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit
+
+  /**
+   * Writes a further structure of the suite where the tests of an instance with no registration tree, those the
+   * filter keeps in the order run, differ from those of the suite's latest structure.
+   */
+  def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit
 
   /** Removes this registration. Called where the instance's run throws. */
   def remove(): Unit
@@ -111,7 +130,10 @@ private[scalatest] object SuiteRegistration {
     def reporterOfTest(testName: String, reporter: Reporter): Reporter = reporter
     def reporterAheadOf(reporter: Reporter): Reporter = reporter
     def registerInstanceOfTest(instance: Suite): SuiteRegistration = none
+    def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration = none
     def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = reporter
+    def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = ()
+    def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = ()
     def remove(): Unit = ()
     def removeWhenCompleted(status: Status): Unit = ()
   }

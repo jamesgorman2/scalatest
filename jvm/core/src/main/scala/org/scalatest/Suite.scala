@@ -1031,7 +1031,9 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         }
 
       case None =>
-        for ((tn, ignoreTest) <- filter(theTestNames, tags, suiteId)) {
+        val keptTests = filter(theTestNames, tags, suiteId)
+        registration.updateStructureFromTestNames(keptTests.map((testName, _) => testName))
+        for ((tn, ignoreTest) <- keptTests) {
           if (!stopper.stopRequested) {
             if (ignoreTest)
               reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
@@ -2143,7 +2145,11 @@ used for test events like succeeded/failed, etc.
       None
   }
 
-  def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite) = {
+  def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite): Map[String, Set[String]] =
+    autoTagClassAnnotations(tags, theSuite, theSuite.testNames)
+
+  /** Applies the suite class's tag annotations to `testNames`, which are read only where the class has such an annotation. */
+  def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite, testNames: => Iterable[String]): Map[String, Set[String]] = {
     // SKIP-SCALATESTJS,NATIVE-START
     val suiteTags = for {
       a <- theSuite.getClass.getAnnotations
@@ -2153,7 +2159,7 @@ used for test events like succeeded/failed, etc.
 
     val autoTestTags =
       if (suiteTags.size > 0)
-        Map() ++ theSuite.testNames.map(tn => (tn, suiteTags.toSet))
+        Map() ++ testNames.map(tn => (tn, suiteTags.toSet))
       else
         Map.empty[String, Set[String]]
 
