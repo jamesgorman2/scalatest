@@ -44,8 +44,8 @@ private[consolidation] object HumanReadableWriter {
       linesOf("[" + label.value + "]", 0, AnsiCyan) ++ suites.flatMap(nodeLines(_, 1)) ++ runsUnderLabel.toVector.flatMap(runBlockLines(_, 1))
     }
 
-  // A run's block holds its messages, then its captured lines, then how it ended where it aborted or stopped. A run
-  // with none of these shows no block.
+  // A run's block holds its messages, then its captured lines, then, if the run aborted or stopped, how it ended. A
+  // run with none of these shows no block.
   private def runBlockLines(run: RunAssembly, depth: Int): Vector[OutputLine] = {
     val content =
       run.runMessages.flatMap(messageLines(_, depth + 1)) ++ run.capturedLines.flatMap(capturedLineLines(_, depth + 1)) ++ runEndLines(run, depth + 1)

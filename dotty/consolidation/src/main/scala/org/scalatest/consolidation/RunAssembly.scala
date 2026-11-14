@@ -119,7 +119,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   /** The run's first `RunAborted`, whose message and throwable explain an aborted run's end. */
   def runAborted: Option[DecodedEvent.RunAborted] = abort
 
-  /** The lines captured from the run's processes, both streams in the one order they were fed. */
+  /** The lines captured from the run's processes, stdout and stderr interleaved in the order they were fed. */
   def capturedLines: Vector[CapturedLine] = lines
 
   def add(event: TestEventLogEvent): Unit = {
@@ -257,8 +257,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   private def parentExecutionOf(id: NodeId, number: Option[Int]): Option[Int] =
     number.flatMap(executionNumber => executions.get(id).flatMap(_.get(executionNumber))).flatMap(_.parentExecution)
 
-  // A run's own event shows no line, except as one of its messages or as its first `RunAborted`. Among such events are
-  // a `DiscoverySuite`'s, which the emitter assigns to the run.
+  // An event assigned to the run rather than to a node shows no line, unless it is a message or the run's first
+  // `RunAborted`. These include a `DiscoverySuite`'s events, which the emitter assigns to the run.
   private def addToRun(event: DecodedEvent): Unit =
     event match {
       case aborted: DecodedEvent.RunAborted => if (abort.isEmpty) abort = Some(aborted)
@@ -367,8 +367,9 @@ private[consolidation] object RunAssembly {
       case _ => false
     }
 
-  // A scope or test open when its suite or its run aborted is aborted, as is a suite open when its run aborted. A run
-  // that stopped aborts what it left open alike.
+  // Marks as aborted:
+  // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
+  // - a suite still open when its run aborted or stopped.
   private def outcomeOf(
     node: StructureNode,
     execution: Option[Execution],

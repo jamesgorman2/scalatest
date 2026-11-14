@@ -57,7 +57,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   /** The coloured human-readable output of one run whose event stream has ended, with colours marked. */
   def consolidated(eventLog: String): String = consolidated(TestRunPart.Events(eventLog))
 
-  /** The coloured human-readable output of one run, built from its parts, whose event stream has ended, with colours marked. */
+  /** The coloured human-readable output, with colours marked, of one run built from its parts whose event stream has ended. */
   def consolidated(parts: TestRunPart*): String = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)

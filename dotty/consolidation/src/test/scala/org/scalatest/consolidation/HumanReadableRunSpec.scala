@@ -34,7 +34,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    [stdout] dividing now""".stripExpectedMargin
     }
 
-    Scenario("Captured lines of both streams keep the one order they were fed") {
+    Scenario("Captured stdout and stderr lines keep the order they were fed") {
       Given("an event log of a run that starts and completes, with stderr, stdout and stderr lines fed in turn")
       val parts = Vector(
         TestRunPart.Events("run started"),
@@ -47,7 +47,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates it")
       val output = consolidated(parts*)
 
-      Then("each line shows its stream and nothing but the line, in the order fed, stderr lines yellow")
+      Then("each line shows its stream and text, in the order fed, with stderr lines yellow")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Output outside any suite:{reset}
@@ -174,7 +174,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    {red}*** RUN STOPPED ***{reset}""".stripExpectedMargin
     }
 
-    Scenario("A run that ends aborted without a RunAborted shows its abort alone") {
+    Scenario("A run that ends aborted without a RunAborted shows only its abort line") {
       Given("an event log of a run that starts and ends aborted")
       When("the library consolidates it")
       val output = consolidated("run started\nrun ended aborted")
