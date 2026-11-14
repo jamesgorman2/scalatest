@@ -12,6 +12,12 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val moduleLabel: TestRunLabel = TestRunLabel("core.test")
 
+  extension (literal: String) {
+
+    /** The literal with its margin stripped and CRLF line endings, from a CRLF checkout, made LF, as the output's lines are joined with LF. */
+    def stripExpectedMargin: String = literal.stripMargin.replace("\r\n", "\n")
+  }
+
   /** Each line of the human-readable output, as the sink received it. */
   final class OutputSink extends (String => Unit) {
 

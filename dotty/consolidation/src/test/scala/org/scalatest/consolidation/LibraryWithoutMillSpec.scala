@@ -49,7 +49,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
       output.markedText shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SqrtPropSpec:{reset}
-          |    {green}- sqrt of a square is the root{reset}""".stripMargin
+          |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
     }
   }
 }

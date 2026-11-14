@@ -42,7 +42,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |    {green}Inner1Suite:{reset}
           |      {green}- inner one{reset}
           |    {green}Inner2Suite:{reset}
-          |      {green}- inner two{reset}""".stripMargin
+          |      {green}- inner two{reset}""".stripExpectedMargin
     }
 
     Scenario("A scope's or test's line shows its label, with or without a leading `- `, never its name") {
@@ -88,7 +88,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |        {green}- should have size 0{reset}
           |  {green}ShopFeatureSpec:{reset}
           |    {green}Feature: Checkout{reset}
-          |      {green}Scenario: paying by card{reset}""".stripMargin
+          |      {green}Scenario: paying by card{reset}""".stripExpectedMargin
     }
 
     Scenario("A test run label heads its run's suites, unindented and in cyan") {
@@ -113,7 +113,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SqrtPropSpec:{reset}
-          |    {green}- sqrt of a square is the root{reset}""".stripMargin
+          |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
     }
   }
 
@@ -159,7 +159,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |  {green}MidSuite:{reset}
           |    {green}- mid{reset}
           |  {green}ZetaSuite:{reset}
-          |    {green}- zeta{reset}""".stripMargin
+          |    {green}- zeta{reset}""".stripExpectedMargin
     }
 
     Scenario("Below a top-level suite, a node's children appear in declared order, whatever their names and the order they ran in") {
@@ -200,7 +200,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |      {green}- z{reset}
           |      {green}- a{reset}
           |    {green}A{reset}
-          |      {green}- m{reset}""".stripMargin
+          |      {green}- m{reset}""".stripExpectedMargin
     }
   }
 
@@ -240,7 +240,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |    {green}A Stack{reset}
           |      {green}- is empty{reset}
           |    {green}A Stack{reset}
-          |      {green}- pops{reset}""".stripMargin
+          |      {green}- pops{reset}""".stripExpectedMargin
     }
 
     Scenario("Two suites that share a name are not merged") {

@@ -22,7 +22,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
   private def outputWithNodeLine(nodeLine: String): String =
     s"""{cyan}[core.test]{reset}
        |  {green}OutcomeSpec:{reset}
-       |    $nodeLine""".stripMargin
+       |    $nodeLine""".stripExpectedMargin
 
   Feature("A scope's or test's line: its label, then its outcome's suffix") {
 
@@ -105,7 +105,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       Then("the scope's line is its label, in green")
       consolidated(eventLog) shouldBe outputWithNodeLine(
         """{green}A calculator{reset}
-          |      {green}- adds{reset}""".stripMargin
+          |      {green}- adds{reset}""".stripExpectedMargin
       )
     }
 
