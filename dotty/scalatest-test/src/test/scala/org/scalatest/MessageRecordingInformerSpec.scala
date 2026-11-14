@@ -24,7 +24,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
   /** A hand-off that keeps each message handed to it. */
   private final class KeptHandOff {
     @volatile var messages = Vector.empty[String]
-    val handOff: MessageRecorder.MessageHandOff = (message, _, _) => messages :+= message
+    val handOff: MessageRecorder.MessageHandOff = (message, _, _) => () => messages :+= message
   }
 
   "A test's informer and documenter" should {
@@ -50,7 +50,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
       val handOffStarted = new CountDownLatch(1)
       val handOffMayFinish = new CountDownLatch(1)
       @volatile var handedOff = Vector.empty[String]
-      val informer = MessageRecordingInformer(recorder, infoOf, (message, _, _) => {
+      val informer = MessageRecordingInformer(recorder, infoOf, (message, _, _) => () => {
         handOffStarted.countDown()
         handOffMayFinish.await()
         handedOff :+= message
@@ -70,6 +70,36 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
       caller.join(10000)
       taken shouldBe Some(Vector("called"))
       handedOff shouldBe Vector("called")
+    }
+
+    "prepare a message's hand-off without holding the lock that records messages and takes the recorded events" in {
+      val recorder = new MessageRecorder(noEventReporter)
+      val preparingStarted = new CountDownLatch(1)
+      val preparingMayFinish = new CountDownLatch(1)
+      @volatile var handedOff = Vector.empty[String]
+      val handOff: MessageRecorder.MessageHandOff = (message, _, _) => {
+        if (message == "slow to prepare") {
+          preparingStarted.countDown()
+          preparingMayFinish.await()
+        }
+        () => handedOff :+= message
+      }
+      val slowCaller = new Thread(() => MessageRecordingInformer(recorder, infoOf, handOff)("slow to prepare"))
+      slowCaller.start()
+      preparingStarted.await(10, TimeUnit.SECONDS) shouldBe true
+
+      @volatile var taken = Option.empty[Vector[String]]
+      val otherThread = new Thread(() => {
+        MessageRecordingDocumenter(recorder, markupOf, handOff)("from another thread")
+        taken = Some(recorder.recordedEvents(false, false).toVector.collect { case markup: MarkupProvided => markup.text })
+      })
+      otherThread.start()
+      otherThread.join(10000)
+      taken shouldBe Some(Vector("from another thread"))
+
+      preparingMayFinish.countDown()
+      slowCaller.join(10000)
+      handedOff shouldBe Vector("from another thread")
     }
   }
 }

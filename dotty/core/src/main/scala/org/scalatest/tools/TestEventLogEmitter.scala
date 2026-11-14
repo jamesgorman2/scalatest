@@ -289,11 +289,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * that event, and every event of the execution whose origin was recorded before the message, is written. A
    * registration that has been removed writes no message.
    *
-   * What building, encoding or writing the message throws is kept from the caller as `runEvent` keeps it.
+   * The message comes built and encoded by `TestEventLogEmitter.encodedTestMessage`, outside the lock, as `runEvent`
+   * encodes. What building, encoding or writing it threw is kept from the caller as `runEvent` keeps it.
    */
-  def writeTestMessage(registration: RegisteredSuite, messages: TestExecutionMessages, message: => Event): Unit = {
-    // Built and encoded outside the lock, as `runEvent` encodes.
-    val encoded = TestEventLogEmitter.caught(TestEventLogEncoder.encoded(message))
+  def writeTestMessage(registration: RegisteredSuite, messages: TestExecutionMessages, encoded: Either[Throwable, EncodedEvent]): Unit = {
     val thrown = synchronized {
       if (isOpen && !registration.hasBeenRemoved) {
         val written = encoded.flatMap { one =>
@@ -481,6 +480,9 @@ private[scalatest] object TestEventLogEmitter {
   }
 
   /** Runs a hand-off, keeping what it throws from the caller as `runEvent` keeps what encoding or writing throws. */
+  /** Builds and encodes a test's message for `writeTestMessage`, keeping what either throws. */
+  def encodedTestMessage(message: => Event): Either[Throwable, EncodedEvent] = caught(TestEventLogEncoder.encoded(message))
+
   def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(rethrowIfUncontained)
 
   /**

@@ -19,7 +19,13 @@ private[scalatest] abstract class EventOrigin {
    * Hands a message of a test's execution to the emitter as the test calls it, and to no reporter. The message is
    * built only where the run writes a test event log. Called with the origin a test execution's start returned.
    */
-  def handOffMessage(message: => Event): Unit = ()
+  def handOffMessage(message: => Event): Unit = preparedHandOffOfMessage(message)()
+
+  /**
+   * Prepares `handOffMessage` without handing the message off: builds and encodes the message where the run writes a
+   * test event log, and returns the step that hands it to the emitter. Elsewhere it builds nothing.
+   */
+  def preparedHandOffOfMessage(message: => Event): () => Unit = EventOrigin.nothingToHandOff
 
   /**
    * The origin of a test's closing event, whose recorded messages the test has already handed off one by one, so the
@@ -29,6 +35,9 @@ private[scalatest] abstract class EventOrigin {
 }
 
 private[scalatest] object EventOrigin {
+
+  /** The prepared hand-off of a message that is handed to no emitter. */
+  val nothingToHandOff: () => Unit = () => ()
 
   /** The origin of every event of a run that writes no test event log. It records nothing. */
   val none: EventOrigin = new EventOrigin {

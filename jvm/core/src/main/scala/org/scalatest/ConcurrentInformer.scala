@@ -154,13 +154,17 @@ private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAware
    * Records a message and hands it off, unless the test's recorded events have been taken for its closing event, after
    * which nothing is handed off. Recording and handing off under one lock means a message the closing event records
    * has been handed off before that event is reported, and a message called after it is never handed off.
+   *
+   * The hand-off is prepared before the lock is taken, since preparing it builds the message's event, which calls the
+   * suite's own methods, and encodes it. Only the prepared hand-off runs under the lock.
    */
   def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location], handOff: MessageHandOff): Unit = {
     requireNonNull(message, payload)
+    val preparedHandOff = handOff(message, payload, location)
     synchronized {
       messages ::= (message, payload, eventFun, location)
       if (!recordedEventsTaken) {
-        handOff(message, payload, location)
+        preparedHandOff()
       }
     }
   }
@@ -216,10 +220,13 @@ private[scalatest] object MessageRecorder {
   // and an optional location.
   type ConcurrentMessageFiringFun = (String, Option[Any], Boolean, Option[Location]) => Unit
 
-  // The message, its payload and its location, handed to the emitter of a run's test event log as a test records it.
-  type MessageHandOff = (String, Option[Any], Option[Location]) => Unit
+  // Prepares the hand-off of a message, its payload and its location to the emitter of a run's test event log as a
+  // test records it, and returns the prepared hand-off, which the recorder runs under its lock.
+  type MessageHandOff = (String, Option[Any], Option[Location]) => PreparedHandOff
 
-  val noHandOff: MessageHandOff = (_, _, _) => ()
+  type PreparedHandOff = () => Unit
+
+  val noHandOff: MessageHandOff = (_, _, _) => EventOrigin.nothingToHandOff
 
   // Builds the event of a message a path-style test recorded, from what the run that replays the test gives it: the
   // suite, the reporter, the tracker, the test's name, the indentation and whether to include an icon.

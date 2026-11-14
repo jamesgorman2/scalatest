@@ -261,7 +261,10 @@ private[scalatest] final class RegisteredSuite(
       new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun, Some(messages))
     }
 
-    override def handOffMessage(message: => Event): Unit = emitter.writeTestMessage(RegisteredSuite.this, messages, message)
+    override def preparedHandOffOfMessage(message: => Event): () => Unit = {
+      val encoded = TestEventLogEmitter.encodedTestMessage(message)
+      () => emitter.writeTestMessage(RegisteredSuite.this, messages, encoded)
+    }
 
     override def ofClosingEventWithMessagesHandedOff: EventOrigin = {
       val ofTestExecution = this

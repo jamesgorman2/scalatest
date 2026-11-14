@@ -150,6 +150,20 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       run.eventLines shouldBe Vector(testLine("TestStarting"))
     }
 
+    "build and encode the message when its hand-off is prepared, and write it only when the prepared hand-off runs" in
+      withRegisteredSuite { run =>
+        run.send(testStarting)
+        var built = false
+        val preparedHandOff = run.ofTest.preparedHandOffOfMessage {
+          built = true
+          info("prepared")
+        }
+        built shouldBe true
+        run.eventLines shouldBe Vector(testLine("TestStarting"))
+        preparedHandOff()
+        run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("prepared"))
+      }
+
     "keep from the test what building the message throws, and end the event log" in withRegisteredSuite { run =>
       run.send(testStarting)
       noException should be thrownBy run.ofTest.handOffMessage(throw new IllegalStateException("cannot build"))
@@ -190,10 +204,10 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
   "A run that writes no test event log" should {
     "never build a message a test hands off" in {
       var built = false
-      EventOrigin.none.handOffMessage {
+      EventOrigin.none.preparedHandOffOfMessage {
         built = true
         info("never built")
-      }
+      }()
       built shouldBe false
     }
 

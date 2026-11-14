@@ -269,7 +269,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
         messageRecorderForThisTest,
         (message, payload, isConstructingThread, testWasPending, testWasCanceled, location) => createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, isConstructingThread, includeIcon),
         (message, payload, location) =>
-          origin.handOffMessage(createInfoProvided(theSuite, report, new Tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, true, includeIcon))
+          origin.preparedHandOffOfMessage(createInfoProvided(theSuite, report, new Tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, true, includeIcon))
       )
 
     val updaterForThisTest =
@@ -291,7 +291,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
         messageRecorderForThisTest,
         (message, None, isConstructingThread, testWasPending, testWasCanceled, location) => createMarkupProvided(theSuite, report, tracker, Some(testName), message, theTest.indentationLevel + 1, location, isConstructingThread),
         (message, _, location) =>
-          origin.handOffMessage(createMarkupProvided(theSuite, report, new Tracker, Some(testName), message, theTest.indentationLevel + 1, location, true))
+          origin.preparedHandOffOfMessage(createMarkupProvided(theSuite, report, new Tracker, Some(testName), message, theTest.indentationLevel + 1, location, true))
       )
 
     val oldInformer = atomicInformer.getAndSet(informerForThisTest)
