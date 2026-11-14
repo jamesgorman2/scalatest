@@ -558,6 +558,10 @@ A drift between builder and decoder in what a criterion fixes then fails those t
 
 Each test of human-readable output compares the whole output, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour.
 
+### Mill's console output
+
+The plugin's integration tests assert that Mill's list of failed tests and ScalaTest's end-of-run summary do not reach the console. They cannot assert the same of Mill's runner progress: without a terminal Mill prints no progress prompt, even under `testForked` with `--ticker true`, so its absence proves nothing. Suppressing the progress is covered by construction (§ Stdout, the reading of `Task.log.prompt`) and by `../research/mill-runner-progress-without-trait.md`, which observed it under pseudo-terminals.
+
 ### Comparison with ScalaTest 3.2.20
 
 This serves `specification/compatibility-and-library.md` AC-056 and AC-057, `specification/test-event-log-events.md` AC-113, AC-114, AC-116 and AC-117, and `specification/runs-and-test-structure-nodes.md` AC-073.

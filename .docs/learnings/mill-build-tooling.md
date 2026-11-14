@@ -41,6 +41,8 @@ date: 2026-11-14
 `mill.testkit.IntegrationTester` (Mill 1.3.1) runs Mill with `--ticker false`. Without the ticker, Mill puts no prefix such as `1] ` on the lines a task writes, so a test of what a user sees at a console misses the prefix.
 
 To test the prefix, pass `--ticker true` ahead of the task in the arguments to `eval`; Mill takes the later flag.
+
+`--ticker true` does not make Mill draw its progress prompt: without a terminal, Mill prints no prompt, and the only status line is the final one (`146/146, 1 FAILED] …`). A test cannot assert that Mill's runner progress is absent; observe it under a pseudo-terminal.
 </learning>
 
 <learning>
