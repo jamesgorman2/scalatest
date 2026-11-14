@@ -29,7 +29,7 @@ Every artifact is published only to the local Ivy repository, `~/.ivy2/local`. P
    ./mill --no-daemon plugin.publishLocal
    ```
 
-   On Windows, run `mill.bat`, from GitBash too. The bootstrap scripts run Mill 1.3.1, which `mill-plugin/.mill-version` pins.
+   On Windows, replace `./mill` with `./mill.bat` in GitBash, `.\mill.bat` in PowerShell, or `mill.bat` in cmd. This applies to every `./mill` command below. The bootstrap scripts run Mill 1.3.1, which `mill-plugin/.mill-version` pins.
 
 ## Testing the plugin
 
