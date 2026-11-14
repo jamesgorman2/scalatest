@@ -89,16 +89,16 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     val rejectedArguments = Seq(
-      "an output letter other than H" -> Seq("-oP"),
-      "another output letter other than H" -> Seq("-oJ"),
-      "an output letter other than H, beside H" -> Seq("-oHP"),
-      "a formatting character" -> Seq("-oHd"),
-      "a lowercase character that is no formatting or filtering character" -> Seq("-oHy"),
-      "an -f" -> Seq("-fH", "report.txt"),
-      "an -f, beside -oH" -> Seq("-oH", "-fJ", "report.txt")
+      "an output letter other than H" -> (Seq("-oP"), "-oP"),
+      "another output letter other than H" -> (Seq("-oJ"), "-oJ"),
+      "an output letter other than H, beside H" -> (Seq("-oHP"), "-oHP"),
+      "a formatting character" -> (Seq("-oHd"), "-oHd"),
+      "a lowercase character that is no formatting or filtering character" -> (Seq("-oHy"), "-oHy"),
+      "an -f" -> (Seq("-fH", "report.txt"), "-fH"),
+      "an -f, beside -oH" -> (Seq("-oH", "-fJ", "report.txt"), "-fJ")
     )
 
-    for ((what, outputArguments) <- rejectedArguments) {
+    for ((what, (outputArguments, rejected)) <- rejectedArguments) {
       Scenario(s"${outputArguments.mkString(" ")}, holding $what, fails the test command") {
         Given("CalculatorSuite")
         When(s"the test command runs core.test with ${outputArguments.mkString(" ")}")
@@ -107,6 +107,12 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
           Then("the test command fails before any test starts")
           shouldFailBeforeAnyTestStarts(tester, result)
+
+          And(s"the console names $rejected as the argument the test command rejects")
+          withClue(result.debugString) {
+            (result.eval.out + result.eval.err) should include(
+              s"The test command takes one output argument, -oH or -o, but was given: $rejected")
+          }
 
           And("the console holds no line of human-readable output")
           result.humanReadableOutput shouldBe empty
