@@ -52,7 +52,6 @@ object plugin extends PluginScalaModule, PublishModule {
   )
 
   object integration extends ScalaTests, TestModule.ScalaTest {
-    def scalacOptions: T[Seq[String]] = ScalacOptions.all
     def mvnDeps: T[Seq[Dep]] = Seq(
       mvn"com.lihaoyi::mill-testkit:${Versions.mill}",
       mvn"com.edc::scalatest:${Versions.fork}"
@@ -74,7 +73,7 @@ object plugin extends PluginScalaModule, PublishModule {
       def mvnDeps: T[Seq[Dep]] = Seq(mvn"com.lihaoyi:mill-runner-launcher_3:${Versions.mill}")
       def mainClass: T[Option[String]] = Some("mill.launcher.MillLauncherMain")
 
-      // `launcher` and `assembly` write a script that is both shell and batch, with no extension,
+      // `launcher` writes a script that is both shell and batch, with no extension,
       // which Windows starts only when it is named as a batch file.
       def program: T[PathRef] = Task {
         if (scala.util.Properties.isWin) {

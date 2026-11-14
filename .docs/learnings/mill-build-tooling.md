@@ -12,7 +12,7 @@ On Windows, Mill's `sh` bootstrap script `mill`, run from GitBash, stops with `T
 <learning>
 date: 2026-11-14
 ---
-On Windows, `mill.testkit.IntegrationTester` (Mill 1.3.1) cannot start a Mill executable built by `JavaModule.assembly` (`out.jar`) or `JavaModule.launcher` (`run`). Both are extensionless scripts valid as shell and batch at once, and `os.call` fails with `CreateProcess error=193, %1 is not a valid Win32 application`.
+On Windows, `mill.testkit.IntegrationTester` (Mill 1.3.1) cannot start a Mill executable built by `JavaModule.assembly` (`out.jar`) or `JavaModule.launcher` (`run`). `launcher` writes an extensionless script valid as shell and batch at once; `assembly` writes a jar with such a script prepended, so the `.jar` name is no help. `CreateProcess` rejects both, and `os.call` fails with `CreateProcess error=193, %1 is not a valid Win32 application`.
 
 Copy the `launcher` script to a file ending `.bat` in a task of its own, and pass that path as the tester's `millExecutable`. Off Windows, pass the `launcher` script itself.
 </learning>
