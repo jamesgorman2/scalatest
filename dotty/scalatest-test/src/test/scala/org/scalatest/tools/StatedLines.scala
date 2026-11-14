@@ -9,10 +9,10 @@ import org.scalatest.events.JsonValue
  */
 private[tools] object StatedLines {
 
-  // A stated line holds these so that it decodes, with values no criterion fixes.
+  // A stated line holds these only so that it decodes. No criterion fixes their values, so they are not compared.
   private val keysNoCriterionFixes = Set("threadName", "timeStamp", "pid", "startTime")
 
-  /** Returns why the written lines are not the stated ones, one for one. */
+  /** Returns why the written lines are not the stated ones, one for one, or none where they are. */
   def mismatchWhenIs(written: Seq[String], stated: Seq[String]): Option[String] = {
     if (written.size != stated.size) {
       Some(s"the event log has ${written.size} lines where ${stated.size} are stated:\n${written.mkString("\n")}")
@@ -23,7 +23,10 @@ private[tools] object StatedLines {
     }
   }
 
-  /** Returns the first stated line that no written line after those matching the stated lines before it holds. */
+  /**
+   * Matches each stated line, in order, against the written lines after the one the stated line before it matched.
+   * Returns why the first stated line with no match is missing, or none where every stated line matches.
+   */
   def mismatchWhenHoldsInOrder(written: Seq[String], stated: Seq[String]): Option[String] = {
     val (_, missing) = stated.foldLeft((written, Option.empty[String])) {
       case ((unmatched, None), statedLine) =>

@@ -12,7 +12,7 @@ private[scalatest] final case class ScopePlace(text: String, placeAmongScopesOfI
  */
 private[scalatest] abstract class EventOrigin {
 
-  /** Records this origin beside the event, where the run's test event log is written, and never on the event. Called before the event is reported. */
+  /** Records this origin against the event with the emitter of the run's test event log, leaving the event unchanged. Called before the event is reported. */
   def recordFor(event: Event): Unit
 }
 

@@ -23,7 +23,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 ---
 
-## A wrapper tells an event another wrapper has handed to the emitter by the event's identity in a set the emitter keeps until the run's top-level registration is removed, and that registration keeps after.
+## A wrapper tells an event another wrapper has handed to the emitter by the event's identity in a set, kept by the emitter until the top-level suite's registration is removed and by that registration after.
 
 **Alternatives**
 
@@ -32,7 +32,7 @@ Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
 **Reasoning** `../SPECIFICATION.md` R-002 forbids changing an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it.
 
-**Costs** Each event costs one insert and one remove under the emitter's write lock, and a handed-off event that never reaches its top-level suite's wrapper stays in the emitter's set until that suite's registration is removed, and then in the registration's set while the suite's wrapper is reachable. Where a reporter between wrappers forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
+**Costs** Each event costs one insert and one remove under the emitter's write lock. A handed-off event that never reaches its top-level suite's wrapper stays in the emitter's set until that suite's registration is removed, then in the registration's set while the suite's wrapper is reachable. Where a reporter between wrappers forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
 
 **Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
 

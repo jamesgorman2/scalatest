@@ -370,7 +370,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     }
   }
 
-  // The places of the scopes from the suite down to a branch, as a test event log names the branch's scope.
+  // The place of each scope from the suite down to a branch: the path by which a test event log names the branch's scope.
   private def scopePlacesTo(branch: Branch): List[ScopePlace] =
     branch match {
       case scope @ DescriptionBranch(parent, descriptionText, _, _) =>

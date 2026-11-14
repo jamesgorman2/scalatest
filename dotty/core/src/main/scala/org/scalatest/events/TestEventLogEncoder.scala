@@ -25,8 +25,8 @@ private[scalatest] object TestEventLogEncoder {
   def event(event: Event, execution: Option[NodeExecution]): String = line(encoded(event), execution)
 
   /**
-   * Encodes all of an event but what it is assigned to. This calls the methods of the event's throwables and config
-   * map values, which are the run's own code.
+   * Encodes an event without the node and executions it is assigned to. This calls the methods of the event's
+   * throwables and config map values, which are the run's own code.
    */
   def encoded(event: Event): EncodedEvent = {
     val (eventName, eventFields) = nameAndFields(event)

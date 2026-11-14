@@ -61,7 +61,6 @@ A suite compiled against 3.2.20 therefore links to those private members' 3.2.20
 List a trait's accessors with `javap -p` on the 3.2.20 jar and on the rebuilt classes, and compare the lines holding `inline$`.
 </learning>
 
-
 <learning>
 date: 2026-11-14
 ---
@@ -78,13 +77,13 @@ date: 2026-11-14
 ---
 `Runner.run` renames the thread it is called on to `ScalaTest-run` until it returns. It constructs the suites it discovers on that thread, in `DiscoverySuite`'s constructor, after the rename.
 
-Code that must recognise the thread of a run, such as a sample suite whose constructor behaves differently under one test, cannot go by a name the caller gave the thread. The thread's group is unchanged: start `Runner.run` on a thread of a named `ThreadGroup` and compare `Thread.currentThread.getThreadGroup.getName`.
+Code that must recognise the thread of a run, such as a sample suite whose constructor behaves differently under one test, cannot rely on a name the caller gave the thread. The thread's group is unchanged: start `Runner.run` on a thread of a named `ThreadGroup` and compare `Thread.currentThread.getThreadGroup.getName`.
 </learning>
 
 <learning>
 date: 2026-11-14
 ---
-`Suite.runTests`, which runs a suite that has no registration tree and overrides `testNames` and `runTest` itself, gives the `TestIgnored` of a test the filter ignores the location `Suite.getTopOfMethod(thisSuite, testName)`. That looks up a public method named as the test by reflection, and throws `IllegalArgumentException: Test not found: <name>` where the suite has none. The suite's `run` then throws, and the suite is reported with `SuiteAborted` and no `TestIgnored`.
+For a suite with no registration tree, one that overrides `testNames` and `runTest` itself, `Suite.runTests` gives the `TestIgnored` of a test the filter ignores the location `Suite.getTopOfMethod(thisSuite, testName)`. That looks up, by reflection, a public method named as the test, and throws `IllegalArgumentException: Test not found: <name>` where the suite has none. The suite's `run` then throws, and the suite is reported with `SuiteAborted` and no `TestIgnored`.
 
-A hand-written `Suite` whose test names are not method names can have no ignored test. To have one report `TestIgnored`, give it a public no-argument method of the ignored test's name.
+A hand-written `Suite` whose test names are not method names cannot have an ignored test. To have one report `TestIgnored`, give it a public no-argument method of the ignored test's name.
 </learning>

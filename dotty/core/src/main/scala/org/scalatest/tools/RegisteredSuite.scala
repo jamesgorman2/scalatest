@@ -58,9 +58,9 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = ofTopLevelSuite.getOrElse(this)
 
-  // All three are read and written only under the emitter's lock. The set holds, by identity, the events an inner
-  // wrapper of a top-level suite's run had handed off that had not reached the top-level suite's wrapper when its
-  // registration was removed. It is kept here, not in the emitter, so that it goes with the top-level suite's wrapper.
+  // All three are read and written only under the emitter's lock. The set holds, by identity, the events inner
+  // wrappers of this top-level suite's run handed off that had not reached its wrapper when this registration was
+  // removed. It lives here, not in the emitter, so that it is dropped with the top-level suite's wrapper.
   private var executionOfLatestRun = Option.empty[Execution]
   private var isRemoved = false
   private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
@@ -118,8 +118,8 @@ private[scalatest] final class RegisteredSuite(
     emitter.forget(this)
   }
 
-  // `whenCompleted` is the method of a Status the suite's own `run` may have built. Where it throws, nothing will
-  // call back, so the registration is removed at once.
+  // The suite's own `run` may have built the Status, so `whenCompleted` may be user code. Where it throws, nothing
+  // will call back, so the registration is removed at once.
   def removeWhenCompleted(status: Status): Unit = {
     try status.whenCompleted(_ => remove())
     catch {
@@ -183,7 +183,7 @@ private[scalatest] object RegisteredSuites extends SuiteRegistrations {
   // Read and written only under this object's lock.
   private var openEventLogs = 0
 
-  /** Counts an emitter whose event log has opened. The first has every site look its suite instance up here. */
+  /** Counts an emitter whose event log has opened. The first makes every site look its suite instances up here. */
   def eventLogOpened(): Unit = synchronized {
     openEventLogs += 1
     if (openEventLogs == 1) {
@@ -191,7 +191,7 @@ private[scalatest] object RegisteredSuites extends SuiteRegistrations {
     }
   }
 
-  /** Counts out an emitter whose event log has closed. After the last, every site finds no registration again. */
+  /** Stops counting an emitter whose event log has closed. After the last, every site finds no registration again. */
   def eventLogClosed(): Unit = synchronized {
     openEventLogs -= 1
     if (openEventLogs == 0) {

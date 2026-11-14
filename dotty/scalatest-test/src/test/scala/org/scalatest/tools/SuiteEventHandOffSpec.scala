@@ -316,7 +316,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  "An emitter handed an event by a structure wrapper once the run's registration is removed" should {
+  "An emitter handed an event by a structure wrapper once its top-level suite's registration is removed" should {
     val structureOfScopedSuite =
       TestEventLogLine.structure(
         TestEventLogLine.suite(1, "SuiteEventHandOffSpec$ScopedSuite", "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),

@@ -44,10 +44,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private var isOpen = true
   private val mintedNodes = new AtomicLong(0L)
-  // Both are read and written only under this emitter's lock, and keyed by the event's identity: an event's
-  // `equals` compares its fields, which hold the run's own objects. An event an inner wrapper handed off is kept
-  // with that wrapper's registration. The registry's lock is taken under this one, to count the event log closed,
-  // and never the other way round.
+  // Both are read and written only under this emitter's lock. Both are keyed by the event's identity, since an
+  // event's `equals` compares its fields, which hold the run's own objects. The second maps each event an inner
+  // wrapper handed off to that wrapper's registration. `RegisteredSuites`' lock is taken under this one, only to
+  // count the event log closed, and never the other way round.
   private val originOfEvent = new IdentityHashMap[Event, RecordedOrigin]
   private val handedOffByAnInnerWrapper = new IdentityHashMap[Event, RegisteredSuite]
 
@@ -121,19 +121,21 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Marks a registration removed, and drops what this emitter keeps for it: the origins it recorded for events no
-   * wrapper has handed off and, for a top-level suite's registration, the events the wrappers of its run handed off
-   * that have not reached its own wrapper. An event whose reporter does not pass it on reaches no further wrapper,
-   * and would otherwise be kept, with its suite instance, until the event log closes.
+   * Marks a registration removed, and drops what this emitter keeps for it:
+   *  - the origins it recorded for events no wrapper has handed off;
+   *  - for a top-level suite's registration, the events the wrappers of its run handed off that have not reached its
+   *    own wrapper.
+   * An event whose reporter does not pass it on reaches no further wrapper, and would otherwise be kept, with its
+   * suite instance, until the event log closes.
    *
-   * Those handed-off events move to the top-level suite's registration, which its wrapper holds. An event among them
-   * may still reach that wrapper, as an alert a thread the run started sends or one a reporter between the wrappers
-   * held back, and the wrapper then writes nothing: an inner wrapper has written it.
+   * The dropped handed-off events move to the top-level suite's registration, which its wrapper holds. One may still
+   * reach that wrapper, as an alert from a thread the run started or an event a reporter between the wrappers held
+   * back. The wrapper then writes nothing, since an inner wrapper has written it.
    *
-   * A nested suite's handed-off events are kept until its top-level suite's registration is removed: a reporter that
-   * holds events back, such as a `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's
-   * run has completed. After that, an event sent late is kept by none of them: no origin is recorded for it, and only
-   * the top-level suite's wrapper writes it.
+   * A nested suite's handed-off events stay here until its top-level suite's registration is removed, since a
+   * reporter that holds events back, such as a `TestSortingReporter`, may pass one on to the outer wrappers after the
+   * nested suite's run has completed. After that removal, nothing is kept for an event sent late: no origin is
+   * recorded for it, and only the top-level suite's wrapper writes it.
    */
   def forget(registration: RegisteredSuite): Unit = synchronized {
     registration.markRemoved()
@@ -158,8 +160,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * handed it off: an event reaches the wrapper of its test, of its suite and of each suite around that one, and
    * only the first of them writes it.
    *
-   * The event is assigned to the node its origin names, in the executions its origin names. An event with no
-   * origin, which is one that no engine site of a registered suite instance sent, is assigned to the wrapper's node,
+   * The event is assigned to the node and executions its origin names. An event with no origin, one that no engine
+   * site of a registered suite instance sent, is assigned to the wrapper's node,
    * in the execution of that node that opened last and has not closed. The messages recorded in a test's closing
    * event are written before it, assigned as it is.
    *
@@ -191,11 +193,12 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Returns the event's origin, if it has one, where no wrapper has handed the event off, and nothing where one has.
-  // The wrapper of a top-level suite is the last wrapper an event reaches, so it forgets the event. Once the
-  // top-level suite's registration is removed, an inner wrapper hands nothing off: keeping the event would retain it
-  // where it reaches no further wrapper, and without it the top-level suite's wrapper could not tell it was written.
-  // An event an inner wrapper handed off before the removal is kept by the top-level suite's registration instead.
+  // Returns `Some` of the event's origin, itself `None` where the event has no origin, where this wrapper is to hand
+  // the event off, and `None` where it is not.
+  // The top-level suite's wrapper is the last an event reaches, so it forgets the event. Once the top-level suite's
+  // registration is removed, inner wrappers hand nothing off and that wrapper writes the event: an inner wrapper that
+  // wrote it would have to keep it for that wrapper to skip, for good where it never reaches that wrapper. An event
+  // an inner wrapper handed off before the removal is kept by the top-level suite's registration instead.
   private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Option[RecordedOrigin]] = synchronized {
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
     if (!isOpen) {
