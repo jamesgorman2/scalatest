@@ -12,7 +12,7 @@ import org.scalatest.DoNotDiscover
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-/** A suite named as `FailSuite` is, whose test `t` fails otherwise. */
+/** A suite with `FailSuite`'s name, whose test `t` fails in another way. */
 abstract class NamedFailSuite extends AnyFunSuite {
   override def suiteName: String = "FailSuite"
 }

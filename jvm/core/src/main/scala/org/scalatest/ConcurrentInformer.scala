@@ -151,12 +151,12 @@ private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAware
     apply(message, payload, eventFun, location, MessageRecorder.noHandOff)
 
   /**
-   * Records a message and hands it off, unless the test's recorded events have been taken for its closing event, after
-   * which nothing is handed off. Recording and handing off under one lock means a message the closing event records
-   * has been handed off before that event is reported, and a message called after it is never handed off.
+   * Records a message and, unless the test's recorded events have been taken for its closing event, hands it off.
+   * Recording and handing off under one lock means a message the closing event records has been handed off before
+   * that event is reported, and a message called after it is never handed off.
    *
-   * The hand-off is prepared before the lock is taken, since preparing it builds the message's event, which calls the
-   * suite's own methods, and encodes it. Only the prepared hand-off runs under the lock.
+   * The hand-off is prepared before the lock is taken: preparing builds the message's event, which calls the suite's
+   * own methods, and encodes it. Only the prepared hand-off runs under the lock.
    */
   def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location], handOff: MessageHandOff): Unit = {
     requireNonNull(message, payload)
@@ -220,8 +220,8 @@ private[scalatest] object MessageRecorder {
   // and an optional location.
   type ConcurrentMessageFiringFun = (String, Option[Any], Boolean, Option[Location]) => Unit
 
-  // Prepares the hand-off of a message, its payload and its location to the emitter of a run's test event log as a
-  // test records it, and returns the prepared hand-off, which the recorder runs under its lock.
+  // Prepares the hand-off of a message, with its payload and location, to the emitter of a run's test event log as a
+  // test records it. The recorder runs the returned hand-off under its lock.
   type MessageHandOff = (String, Option[Any], Option[Location]) => PreparedHandOff
 
   type PreparedHandOff = () => Unit

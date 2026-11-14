@@ -38,17 +38,17 @@ private[scalatest] final class RecordedOrigin(
 )
 
 /**
- * The messages a test's informer and documenter hand off during one execution of the test, kept in the order of the
- * test's calls among the execution's other events. Each message is assigned as the execution's first written event
- * is. A message is held while that event is unwritten, and while an event of the execution whose origin was recorded
- * before the message was handed off is unwritten, as where a reporter ahead of every wrapper holds the event back.
+ * The messages a test's informer and documenter hand off during one execution of the test, kept in call order among
+ * the execution's other events. Each message is assigned as the execution's first written event is. A message is
+ * held until that event, and every event of the execution whose origin was recorded before the message, is written.
+ * A reporter ahead of every wrapper may hold such an event back.
  *
  * Read and written only under the emitter's lock.
  */
 private[scalatest] final class TestExecutionMessages {
 
-  // Each entry is an unwritten event of the execution, `Left`, or a held message, `Right`, in the order of the calls.
   private var assigned = Option.empty[NodeExecution]
+  // Each entry is an unwritten event of the execution, `Left`, or a held message, `Right`, in call order.
   private var awaited = Vector.empty[Either[Event, EncodedEvent]]
 
   /** The node and executions of the execution's first written event, once it has been written. */
@@ -117,12 +117,14 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = ofTopLevelSuite.getOrElse(this)
 
-  // All four are read and written only under the emitter's lock. The set holds, by identity, the events inner
-  // wrappers of this top-level suite's run handed off that had not reached its wrapper when this registration was
-  // removed. The map holds, by identity, each closing event of a test of this top-level suite's run whose messages
-  // the test handed off one by one, with those messages, until a wrapper hands the event off. Both live here, not in
-  // the emitter, so that they are dropped with the top-level suite's wrapper; removing a registration drops neither,
-  // so a closing event sent or passed on after the removal is still written without its recorded messages.
+  // All four are read and written only under the emitter's lock. Both collections hold events by identity:
+  //  - the set holds the events inner wrappers of this top-level suite's run handed off that had not reached its
+  //    wrapper when this registration was removed;
+  //  - the map holds each closing event of a test of this run whose messages the test handed off one by one, with
+  //    those messages, until a wrapper hands the event off.
+  // Both live here, not in the emitter, so that they are dropped with the top-level suite's wrapper. Removing a
+  // registration drops neither, so a closing event sent or passed on after the removal is still written without its
+  // recorded messages.
   private var executionOfLatestRun = runOfCreator
   private var isRemoved = false
   private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
