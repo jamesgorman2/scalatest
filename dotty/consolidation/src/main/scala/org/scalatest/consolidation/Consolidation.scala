@@ -86,7 +86,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
   def add(event: RunEvent): Unit =
     consolidation.feed {
       run.add(event.decoded)
-      if (RunAssembly.reportsFailure(event.decoded)) {
+      if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsOtherThanCompleted(event.decoded)) {
         consolidation.fail()
       }
     }
@@ -98,6 +98,15 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
    */
   def add(line: CapturedLine): Unit = consolidation.feed(run.add(line))
 
-  /** Ends the run's event stream. No further event of the run may be added. */
-  def endEventStream(): Unit = consolidation.feed(run.endEventStream())
+  /**
+   * Ends the run's event stream. No further event of the run may be added. A run whose stream ends without its
+   * `runEnded` event does not finish, which fails the test command.
+   */
+  def endEventStream(): Unit =
+    consolidation.feed {
+      run.endEventStream()
+      if (run.outcome.isEmpty) {
+        consolidation.fail()
+      }
+    }
 }

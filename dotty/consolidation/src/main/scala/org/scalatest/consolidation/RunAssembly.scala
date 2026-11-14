@@ -5,6 +5,7 @@ import scala.collection.mutable
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
+import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
 import org.scalatest.events.TestEventLogEvent
 
@@ -101,10 +102,25 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   private val firstScopeOrTestPosition = mutable.Map.empty[NodeId, Option[Int]]
   private val executions = mutable.Map.empty[NodeId, SortedMap[Int, Execution]]
   private val startedSuites = mutable.Set.empty[NodeId]
-  private var capturedLines = Vector.empty[CapturedLine]
+  private var lines = Vector.empty[CapturedLine]
+  private var messages = Vector.empty[DecodedEvent]
+  private var abort = Option.empty[DecodedEvent.RunAborted]
+  private var ending = Option.empty[RunOutcome]
   private var eventStreamOpen = true
 
   def isEventStreamOpen: Boolean = eventStreamOpen
+
+  /** How the run ended, from its `runEnded` event alone: absent until that event arrives. */
+  def outcome: Option[RunOutcome] = ending
+
+  /** The messages attached to the run rather than to a node, in the order they arrived. */
+  def runMessages: Vector[DecodedEvent] = messages
+
+  /** The run's first `RunAborted`, whose message and throwable explain an aborted run's end. */
+  def runAborted: Option[DecodedEvent.RunAborted] = abort
+
+  /** The lines captured from the run's processes, both streams in the one order they were fed. */
+  def capturedLines: Vector[CapturedLine] = lines
 
   def add(event: TestEventLogEvent): Unit = {
     require(eventStreamOpen, s"the event stream of a run under ${label.value} has ended")
@@ -113,17 +129,22 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
         addStructure(nodes)
       case TestEventLogEvent.ScalaTestEvent(Some(nodeExecution), decoded) =>
         addToExecution(nodeExecution, decoded)
-      case _: TestEventLogEvent.ScalaTestEvent | _: TestEventLogEvent.RunStarted | _: TestEventLogEvent.RunEnded =>
+      case TestEventLogEvent.ScalaTestEvent(None, decoded) =>
+        addToRun(decoded)
+      case TestEventLogEvent.RunEnded(runOutcome) =>
+        ending = Some(runOutcome)
+      case _: TestEventLogEvent.RunStarted =>
         ()
     }
   }
 
-  def add(line: CapturedLine): Unit = capturedLines :+= line
+  def add(line: CapturedLine): Unit = lines :+= line
 
   def endEventStream(): Unit = eventStreamOpen = false
 
   /** The run's top-level suites, in the order the event stream first held them. */
   def topLevelSuites: Vector[AssembledNode] = {
+    val runEndedAbnormally = RunAssembly.isAbnormal(ending)
     val childrenByParent = structure.values.toVector.groupBy(RunAssembly.parentOf)
 
     def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
@@ -168,7 +189,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
       val started = execution.nonEmpty || children.exists(_.started)
       AssembledExecution(
         execution.map(_.number),
-        RunAssembly.outcomeOf(node, execution, abortedSuiteAround, started),
+        RunAssembly.outcomeOf(node, execution, abortedSuiteAround || runEndedAbnormally, runEndedAbnormally, started),
         execution.flatMap(RunAssembly.endingOf),
         execution.fold(Vector.empty[PlacedMessage])(_.messages.map(RunAssembly.placed(_, children))),
         children
@@ -236,6 +257,15 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   private def parentExecutionOf(id: NodeId, number: Option[Int]): Option[Int] =
     number.flatMap(executionNumber => executions.get(id).flatMap(_.get(executionNumber))).flatMap(_.parentExecution)
 
+  // A run's own event shows no line, except as one of its messages or as its first `RunAborted`. Among such events are
+  // a `DiscoverySuite`'s, which the emitter assigns to the run.
+  private def addToRun(event: DecodedEvent): Unit =
+    event match {
+      case aborted: DecodedEvent.RunAborted => if (abort.isEmpty) abort = Some(aborted)
+      case message if RunAssembly.isMessage(message) => messages :+= message
+      case _ => ()
+    }
+
   private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
     val nodeExecutions = executions.getOrElse(nodeExecution.node, SortedMap.empty[Int, Execution])
     val execution = nodeExecutions.getOrElse(
@@ -279,6 +309,15 @@ private[consolidation] object RunAssembly {
       case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.TestFailed | _: DecodedEvent.TestCanceled | _: DecodedEvent.SuiteAborted) => true
       case _ => false
     }
+
+  /** Whether the event gives its run an outcome other than completed. */
+  def endsOtherThanCompleted(event: TestEventLogEvent): Boolean =
+    event match {
+      case TestEventLogEvent.RunEnded(outcome) => isAbnormal(Some(outcome))
+      case _ => false
+    }
+
+  private def isAbnormal(outcome: Option[RunOutcome]): Boolean = outcome.exists(_ != RunOutcome.Completed)
 
   private def isMessage(event: DecodedEvent): Boolean =
     event match {
@@ -328,36 +367,45 @@ private[consolidation] object RunAssembly {
       case _ => false
     }
 
-  private def outcomeOf(node: StructureNode, execution: Option[Execution], insideAbortedSuite: Boolean, started: Boolean): Option[Outcome] =
+  // A scope or test open when its suite or its run aborted is aborted, as is a suite open when its run aborted. A run
+  // that stopped aborts what it left open alike.
+  private def outcomeOf(
+    node: StructureNode,
+    execution: Option[Execution],
+    openScopeOrTestAborted: Boolean,
+    runEndedAbnormally: Boolean,
+    started: Boolean
+  ): Option[Outcome] =
     (node, execution) match {
-      case (_: StructureNode.Suite, _) => suiteOutcome(node, execution, started)
+      case (_: StructureNode.Suite, _) => suiteOutcome(node, execution, runEndedAbnormally, started)
       case (_, None) => Some(Outcome.NotRun)
-      case (_: StructureNode.Scope, Some(execution)) => scopeOutcome(execution, insideAbortedSuite)
-      case (_: StructureNode.Test, Some(execution)) => testOutcome(execution, insideAbortedSuite)
+      case (_: StructureNode.Scope, Some(execution)) => scopeOutcome(execution, openScopeOrTestAborted)
+      case (_: StructureNode.Test, Some(execution)) => testOutcome(execution, openScopeOrTestAborted)
     }
 
-  private def suiteOutcome(node: StructureNode, execution: Option[Execution], started: Boolean): Option[Outcome] =
+  private def suiteOutcome(node: StructureNode, execution: Option[Execution], runEndedAbnormally: Boolean, started: Boolean): Option[Outcome] =
     if (!started) Some(Outcome.NotRun)
     else if (isAbortedSuite(node, execution)) Some(Outcome.Aborted)
+    else if (runEndedAbnormally && !execution.exists(_.holds(_.isInstanceOf[DecodedEvent.SuiteCompleted]))) Some(Outcome.Aborted)
     else None
 
-  private def scopeOutcome(execution: Execution, insideAbortedSuite: Boolean): Option[Outcome] =
+  private def scopeOutcome(execution: Execution, openScopeOrTestAborted: Boolean): Option[Outcome] =
     if (execution.holds(_.isInstanceOf[DecodedEvent.ScopePending]))
       Some(Outcome.Pending)
     else if (execution.holds(_.isInstanceOf[DecodedEvent.ScopeClosed]))
       None
     else
-      abortedWhereOpen(insideAbortedSuite)
+      abortedWhereOpen(openScopeOrTestAborted)
 
-  private def testOutcome(execution: Execution, insideAbortedSuite: Boolean): Option[Outcome] =
+  private def testOutcome(execution: Execution, openScopeOrTestAborted: Boolean): Option[Outcome] =
     execution.events.collectFirst {
       case _: DecodedEvent.TestSucceeded => Outcome.Succeeded
       case _: DecodedEvent.TestFailed => Outcome.Failed
       case _: DecodedEvent.TestIgnored => Outcome.Ignored
       case _: DecodedEvent.TestPending => Outcome.Pending
       case _: DecodedEvent.TestCanceled => Outcome.Canceled
-    }.orElse(abortedWhereOpen(insideAbortedSuite))
+    }.orElse(abortedWhereOpen(openScopeOrTestAborted))
 
-  private def abortedWhereOpen(insideAbortedSuite: Boolean): Option[Outcome] =
-    if (insideAbortedSuite) Some(Outcome.Aborted) else None
+  private def abortedWhereOpen(openScopeOrTestAborted: Boolean): Option[Outcome] =
+    if (openScopeOrTestAborted) Some(Outcome.Aborted) else None
 }

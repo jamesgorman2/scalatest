@@ -3,6 +3,7 @@ package org.scalatest.consolidation
 import org.scalatest.Resources
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.IndentedText
+import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
 import org.scalatest.tools.AnsiColor
 import org.scalatest.tools.AnsiCyan
@@ -12,9 +13,16 @@ import org.scalatest.tools.AnsiYellow
 import org.scalatest.tools.StringReporter
 import org.scalatest.tools.ThrowableView
 
-private[consolidation] final case class Segment(text: String, colour: AnsiColor) {
+/** A piece of a line in one colour, or uncoloured where `colour` is absent. */
+private[consolidation] final case class Segment(text: String, colour: Option[AnsiColor]) {
 
-  def rendered(coloured: Boolean): String = if (coloured) colour.code + text + StringReporter.ansiReset else text
+  def rendered(coloured: Boolean): String =
+    colour.filter(_ => coloured).fold(text)(colour => colour.code + text + StringReporter.ansiReset)
+}
+
+private[consolidation] object Segment {
+
+  def apply(text: String, colour: AnsiColor): Segment = Segment(text, Some(colour))
 }
 
 private[consolidation] final case class OutputLine(depth: Int, segments: Vector[Segment]) {
@@ -26,11 +34,48 @@ private[consolidation] object HumanReadableWriter {
 
   private val notRunNote = "*** NOT RUN ***"
 
+  private val runStoppedLine = "*** RUN STOPPED ***"
+
+  private val runBlockHeading = "Output outside any suite:"
+
   def lines(runs: Seq[RunAssembly]): Vector[OutputLine] =
     runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsUnderLabel) =>
       val suites = runsUnderLabel.toVector.flatMap(_.topLevelSuites).sortBy(_.name)
-      linesOf("[" + label.value + "]", 0, AnsiCyan) ++ suites.flatMap(nodeLines(_, 1))
+      linesOf("[" + label.value + "]", 0, AnsiCyan) ++ suites.flatMap(nodeLines(_, 1)) ++ runsUnderLabel.toVector.flatMap(runBlockLines(_, 1))
     }
+
+  // A run's block holds its messages, then its captured lines, then how it ended where it aborted or stopped. A run
+  // with none of these shows no block.
+  private def runBlockLines(run: RunAssembly, depth: Int): Vector[OutputLine] = {
+    val content =
+      run.runMessages.flatMap(messageLines(_, depth + 1)) ++ run.capturedLines.flatMap(capturedLineLines(_, depth + 1)) ++ runEndLines(run, depth + 1)
+    if (content.isEmpty) Vector.empty else linesOf(runBlockHeading, depth, AnsiCyan) ++ content
+  }
+
+  private def capturedLineLines(line: CapturedLine, depth: Int): Vector[OutputLine] =
+    line match {
+      case CapturedLine.Stdout(text) => linesOf(Vector(Segment("[stdout] " + text, None)), depth)
+      case CapturedLine.Stderr(text) => linesOf("[stderr] " + text, depth, AnsiYellow)
+    }
+
+  private def runEndLines(run: RunAssembly, depth: Int): Vector[OutputLine] =
+    run.outcome match {
+      case Some(RunOutcome.Aborted) =>
+        linesOf(Resources.runAborted, depth, AnsiRed) ++ run.runAborted.fold(Vector.empty[OutputLine])(runAbortLines(_, depth + 1))
+      case Some(RunOutcome.Stopped) =>
+        linesOf(runStoppedLine, depth, AnsiRed)
+      case _ =>
+        Vector.empty
+    }
+
+  // ScalaTest 3.2.20 prints a run abort's message on the line after `*** RUN ABORTED ***`, then the lines it prints
+  // under any error event's first line.
+  private def runAbortLines(aborted: DecodedEvent.RunAborted, depth: Int): Vector[OutputLine] = {
+    val lines = StringReporter.stringsToPrintOnError(
+      Resources.abortedNote, _ => Resources.runAborted, aborted.message, aborted.throwable, Vector.empty, None, None, None, None, false, false, false, false, false
+    )
+    linesUnder(Vector(aborted.message).filter(_.nonEmpty) ++ lines.tail, aborted.throwable, depth, AnsiRed)
+  }
 
   // A suite shows its name line once, then what each of its executions produced. A scope or test shows a line for
   // each execution.
@@ -86,6 +131,8 @@ private[consolidation] object HumanReadableWriter {
       case (Some(Outcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
         val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, suite.className, Some(suite.name), None)
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
+      case (Some(Outcome.Aborted), _) =>
+        linesOf(Resources.specTextAndNote(suite.className, Resources.abortedNote), depth, AnsiRed)
       case _ =>
         Vector.empty
     }
