@@ -43,9 +43,8 @@ private[scalatest] object SuiteStructure {
    * nested suite, any of which may throw. It recurses once for each suite nested in another, as running them does.
    */
   def read(suite: Suite, filter: Filter): SuiteStructure = {
-    // A ConfigMapWrapperSuite forwards each of these to the instance of its wrapped class it constructs with an empty
-    // config map, which ScalaTest 3.2.20 already constructs before the suite starts. That instance alone has a
-    // registration tree and the wrapped class's name.
+    // A ConfigMapWrapperSuite forwards each of these to its wrapped class's instance built with an empty config map,
+    // which is built before the suite starts. Only that instance has a registration tree and the wrapped class's name.
     val readFrom = suite match {
       case wrapper: ConfigMapWrapperSuite => wrapper.instanceWithEmptyConfigMap
       case _ => suite
@@ -91,8 +90,8 @@ private[scalatest] object SuiteStructure {
   }
 
   /**
-   * The scopes of a registration tree, and of its tests those `latest` holds, as `latest` holds them, and the test
-   * named `added`. It is `None` where the tree holds no test of that name.
+   * A registration tree's scopes, holding only the tests `latest` holds, as `latest` holds them, and the test named
+   * `added`. `None` where the tree holds no test of that name.
    */
   def withTestAdded(registered: List[RegisteredNode], latest: List[ScopeOrTest], added: String): Option[List[ScopeOrTest]] = {
     val latestTests = testsIn(latest).map(test => test.testName -> test).toMap

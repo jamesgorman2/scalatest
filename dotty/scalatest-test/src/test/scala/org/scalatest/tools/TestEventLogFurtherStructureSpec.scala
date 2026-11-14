@@ -545,7 +545,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
         }
         structures.foreach { count =>
-          And(s"it holds $count structure")
+          And(s"it holds $count structure${if (count == 1) "" else "s"}")
           structuresIn(lines) shouldBe count
         }
       }
@@ -796,7 +796,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     )
 
     eventScenarios(
-      "A nested suite's instance that runs registers another tree than its first structure holds",
+      "A nested suite's instance that runs registers a different tree from its first structure",
       "a Suites nesting a ConfigMapWrapperSuite of a suite declaring scope 'A config' holding test 'remote' where its " +
         "config map holds db, and test 'local' where it does not",
       "samples.NestsConfigDependentSpec",
@@ -811,7 +811,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     )
 
     eventScenarios(
-      "An async suite's instance that runs registers another tree than its first structure holds",
+      "An async suite's instance that runs registers a different tree from its first structure",
       "an AsyncFunSpec run through ConfigMapWrapperSuite, declaring scope 'A config' holding test 'remote' where its " +
         "config map holds db, and test 'local' where it does not",
       "samples.AsyncConfigDependentSpec",
@@ -833,7 +833,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
     eventScenarios(
       "A tags override drops a test its registered tags keep",
-      "an AnyFunSuite declaring tests a and b, whose tags override tags b samples.Slow",
+      "an AnyFunSuite declaring tests a and b, whose tags override tags b with samples.Slow",
       "samples.TagsOverrideSuite",
       "the suite's one structure, holding a alone, then a's events",
       tagsOverrideSuite,

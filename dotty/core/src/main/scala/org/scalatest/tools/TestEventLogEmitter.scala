@@ -108,8 +108,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Writes a further `structure` event for a suite, where `scopesAndTests` differ from those of its latest structure,
-   * and makes them its latest. A scope or test an earlier structure of the suite held keeps its node.
+   * Where `scopesAndTests` differ from the suite's latest structure, writes them as a further `structure` event and
+   * makes them the latest. A scope or test an earlier structure of the suite held keeps its node.
    *
    * It writes under the lock, so that two instances of one suite that run at once mint no node twice. What writing
    * throws is kept from the caller as `runEvent` keeps it.
@@ -120,9 +120,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Writes a further `structure` event for a suite, as `writeStructureWhereChanged` does, from the scopes and tests of
-   * a registration tree that the filter keeps. A test a structure of the suite has already filtered keeps what that
-   * filtering said, and any other is filtered by `filtered`, as `Filter.apply` filters one test.
+   * Writes a further `structure` event, as `writeStructureWhereChanged` does, from the scopes and tests of a
+   * registration tree that the filter keeps. A test an earlier structure of the suite filtered keeps that result. Any
+   * other is filtered by `filtered`, as `Filter.apply` filters one test.
    */
   def writeStructureOfTreeWhereChanged(table: SuiteNodeTable, registered: List[RegisteredNode], filtered: String => (Boolean, Boolean)): Unit = {
     val thrown = synchronized {
@@ -133,9 +133,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Adds a test to its suite's latest structure, writing a further `structure` event, where that structure lacks the
-   * test and the instance's registration tree, `registered`, holds it. The tree is read only where the structure
-   * lacks the test, as where a `runTests` override runs a test the filter drops.
+   * Where the suite's latest structure lacks a test that the instance's registration tree, `registered`, holds, adds
+   * the test and writes a further `structure` event. The tree is read only where the structure lacks the test, as
+   * when a `runTests` override runs a test the filter drops.
    */
   def addTestWhereLacking(table: SuiteNodeTable, testName: String, registered: => Option[List[RegisteredNode]]): Unit = {
     if (synchronized(isOpen && !table.latestHoldsTest(testName))) {
@@ -149,7 +149,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Encoding a structure calls no code of the run's, so it is encoded under the lock, where its nodes are minted.
+  // Encoding a structure calls no user code, so it is encoded under the lock that mints its nodes.
   private def writeStructureWhereChangedUnderLock(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
     if (isOpen && table.scopesAndTests != scopesAndTests) {
       val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode))))

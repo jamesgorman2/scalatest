@@ -172,7 +172,7 @@ class OneInstancePerTestSuite extends AnyFunSuite with OneInstancePerTest {
   }
 }
 
-// Its tags override tags test b samples.Slow, which b is not registered with.
+// Its tags override tags test b with samples.Slow, which b is not registered with.
 @DoNotDiscover
 class TagsOverrideSuite extends AnyFunSuite {
 

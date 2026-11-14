@@ -16,8 +16,8 @@ class ConfigSpec(configMap: Map[String, Any]) extends AnyFunSpec {
   }
 }
 
-// Its constructor throws, given a config map without db, only on a thread of the group a test names for it, so that
-// it constructs wherever else it is discovered.
+// Its constructor throws, given a config map without db, only on a thread in the thread group a test names, so that
+// discovery elsewhere constructs it.
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigWithoutDbFailsSpec(configMap: Map[String, Any]) extends AnyFunSpec {
 

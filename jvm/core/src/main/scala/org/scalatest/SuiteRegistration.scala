@@ -68,7 +68,7 @@ private[scalatest] abstract class SuiteRegistration {
   def registerInstanceOfTest(instance: Suite): SuiteRegistration
 
   /**
-   * Registers `instance`, which this suite instance constructed to run in its own place, against the suite's node.
+   * Registers `instance`, which this suite instance constructed to run in its place, against the suite's node.
    * The caller removes the returned registration.
    */
   def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration
@@ -80,15 +80,16 @@ private[scalatest] abstract class SuiteRegistration {
   def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter
 
   /**
-   * Writes a further structure of the suite where the scopes and tests of the instance's registration tree, kept by
-   * `filter`, differ from those of the suite's latest structure. `tagsOfTests` are the tags the instance registered
-   * its tests with. It calls no member of the instance that a suite outside ScalaTest can override.
+   * Writes a further structure of the suite where the scopes and tests the filter keeps from the instance's
+   * registration tree differ from the suite's latest structure. A test an earlier structure of the suite filtered
+   * keeps that result. Any other is filtered by `filter` over `tagsOfTests`, the tags the instance registered its
+   * tests with. Calls no member of the instance that a suite outside ScalaTest can override.
    */
   def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit
 
   /**
-   * Writes a further structure of the suite where the tests of an instance with no registration tree, those the
-   * filter keeps in the order run, differ from those of the suite's latest structure.
+   * For an instance with no registration tree, writes a further structure of the suite where the tests the filter
+   * keeps, in the order run, differ from the suite's latest structure.
    */
   def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit
 

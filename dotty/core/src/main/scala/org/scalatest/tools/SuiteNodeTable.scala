@@ -62,7 +62,8 @@ private[scalatest] object ScopeAndTestIds {
  * Not a case class: the suite instance is user code, whose `equals`, `hashCode` and `toString` must not be called.
  *
  * @param instance the suite instance the suite's first structure is for
- * @param parent the suite node this one is nested in, where it is nested, and `position` its place among that node's children
+ * @param parent the suite node this one is nested in, if any
+ * @param position its place among that node's children, if nested
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstIds the node IDs of `firstScopesAndTests`
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
@@ -107,10 +108,10 @@ private[scalatest] final class SuiteNodeTable(
   def latestHoldsTest(testName: String): Boolean = testNamesOfLatest.contains(testName)
 
   /**
-   * What the filter says of each test of `testNames`, as `Filter.apply` says it for one test. A test a structure of
-   * the suite has already filtered keeps what that filtering said, since the suite's first structure is filtered by the
-   * suite's own `tags`, which a further structure cannot call. Any other test is filtered by `filtered`, which the
-   * table then keeps for later structures.
+   * What the filter says of each test of `testNames`, as `Filter.apply` says it for one test. A test an earlier
+   * structure of the suite filtered keeps that result, since the first structure is filtered by the suite's own
+   * `tags`, which a further structure cannot call. Any other test is filtered by `filtered`, and the table keeps the
+   * result for later structures.
    */
   def filterKeepingEarlier(testNames: List[String], filtered: String => (Boolean, Boolean)): Map[String, (Boolean, Boolean)] = {
     val filteredNow = testNames.map(testName => testName -> filteredTests.getOrElse(testName, filtered(testName))).toMap
@@ -120,8 +121,8 @@ private[scalatest] final class SuiteNodeTable(
 
   /**
    * Makes `scopesAndTests` the suite's latest structure, minting a node for each scope and test no earlier structure
-   * of the suite held, and returns the nodes of the further `structure` event that holds them: the suite, then its
-   * scopes and tests, positioned from 0 among themselves.
+   * of the suite held. Returns the nodes of the further `structure` event that holds them: the suite, then its scopes
+   * and tests, positioned from 0 among themselves.
    */
   def replaceLatestStructure(scopesAndTests: List[ScopeOrTest], mint: () => NodeId): Vector[StructureNode] = {
     val nodes = Vector.newBuilder[StructureNode]
