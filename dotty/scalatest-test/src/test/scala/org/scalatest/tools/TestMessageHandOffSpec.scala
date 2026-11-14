@@ -31,8 +31,12 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
   private val suiteName = "OneTestSpec"
   private val suiteId = "samples.OneTestSpec"
 
-  // Its structure gives the suite node 1 and its test t node 2.
+  // Its structure gives the suite node 1 and its test t node 2. Its names are those the events this spec builds carry.
   private final class OneTestSpec extends AnyFunSpec {
+    override def suiteName: String = TestMessageHandOffSpec.this.suiteName
+
+    override def suiteId: String = TestMessageHandOffSpec.this.suiteId
+
     it("t") {}
   }
 

@@ -105,3 +105,18 @@ Scalactic's `source.Position.filePathname`, and so a `StackDepthException`'s `fa
 
 A test that expects a pathname ending in the file's name therefore fails in a build that does not set the variable. Compare the pathname with the one the run's reporters receive, never with a path built from the file's name.
 </learning>
+
+<learning>
+date: 2026-11-14
+---
+Under `org.scalatest.tools.Framework`, a run's reporters receive none of the test, scope or named-message events of a suite that sent no `SuiteStarting`. `Framework` reports through a `SuiteSortingReporter`, which routes those events by suite ID and drops those of a suite ID it holds no slot for. This hits:
+
+- a suite a test creates and runs with its own `Args`, such as `new HelperSuite().run(None, args)`;
+- nested suites run by a `runNestedSuites` override that sends no `SuiteStarting` for them.
+
+A reporter placed ahead of the sorter, inside the suite's `Args`, still receives them.
+
+Such a helper also runs none of its tests when the task selects only its outer suite: `Framework`'s filter then requires `Suite.SELECTED_TAG`, given only to the suite IDs the task's selectors name. Add a `NestedSuiteSelector` for the helper's suite ID to run them.
+
+Take the expected reported events of such a run from 3.2.20, never from what the code sends.
+</learning>

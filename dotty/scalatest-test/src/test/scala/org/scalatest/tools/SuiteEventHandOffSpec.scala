@@ -34,8 +34,12 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   private val suiteId = "samples.ScopedSuite"
 
   // Its structure gives the suite node 1, the first scope s node 2, its test t node 3, the second scope s node 4,
-  // its test u node 5, and test flat node 6.
+  // its test u node 5, and test flat node 6. Its names are those the events this spec builds carry.
   private final class ScopedSuite extends AnyFunSpec {
+    override def suiteName: String = SuiteEventHandOffSpec.this.suiteName
+
+    override def suiteId: String = SuiteEventHandOffSpec.this.suiteId
+
     describe("s") {
       it("t") {}
     }
@@ -247,7 +251,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.registration.startTestExecution("s t").recordFor(starting)
       run.wrapperOfSuite(starting)
       run.wrapperOfSuite(starting)
-      run.eventLines shouldBe Vector(scopeOrTestLine(3, 1, 1, "TestStarting"), suiteLine(1, "TestStarting"))
+      run.eventLines shouldBe Vector(scopeOrTestLine(3, 1, 1, "TestStarting"), scopeOrTestLine(3, 1, 1, "TestStarting"))
     }
   }
 
@@ -269,7 +273,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val registrationOfOuter = SuiteRegistration.madeWith(wrapperOfOuter)
       val wrapperOfInner = registrationOfOuter.registerNestedSuite(0, inner, wrapperOfOuter)
       try {
-        wrapperOfInner(suiteStarting)
+        wrapperOfInner(SuiteStarting(ordinal, inner.suiteName, inner.suiteId, Some(inner.suiteId), threadName = "main", timeStamp = timeStamp))
         eventLog.writes.drop(1).map(_.stripSuffix("\n")) shouldBe
           Vector(s"""{"item":"event","node":2,"execution":1,"event":"SuiteStarting",$threadAndTime""")
       } finally {
@@ -319,7 +323,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   "An emitter handed an event by a structure wrapper once its top-level suite's registration is removed" should {
     val structureOfScopedSuite =
       TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "SuiteEventHandOffSpec$ScopedSuite", "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),
+        TestEventLogLine.suiteWithId(1, suiteName, suiteId, "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),
         TestEventLogLine.scope(2, 1, 0, "s", "s"),
         TestEventLogLine.test(3, 2, 0, "t", "- t"),
         TestEventLogLine.scope(4, 1, 1, "s", "s"),
@@ -365,9 +369,10 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val eventLog = new RecordingEventLog
       val emitter = TestEventLogEmitter.appendingTo(eventLog)
       val removed = new RegisteredRun(eventLog, emitter, new RecordingReporter, new ScopedSuite)
-      val kept = new RegisteredRun(eventLog, emitter, new RecordingReporter, new OneTestSuite)
+      val oneTestSuite = new OneTestSuite
+      val kept = new RegisteredRun(eventLog, emitter, new RecordingReporter, oneTestSuite)
       try {
-        val inFlight = testStarting("only")
+        val inFlight = TestStarting(ordinal, oneTestSuite.suiteName, oneTestSuite.suiteId, Some(oneTestSuite.suiteId), "only", "only", threadName = "main", timeStamp = timeStamp)
         kept.registration.reporterOfTest("only", passingNoEventOn)(inFlight)
         removed.registration.remove()
         kept.wrapperOfSuite(inFlight)
@@ -394,8 +399,9 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val topLevel = new OneNestedSuite
       val wrapperOfTopLevel = emitter.wrapperOfTopLevelSuite(topLevel, Filter.default, new RecordingReporter)
       val registrationOfTopLevel = SuiteRegistration.madeWith(wrapperOfTopLevel)
-      val wrapperOfNested = registrationOfTopLevel.registerNestedSuite(0, topLevel.nestedSuites.head, passingNoEventOn)
-      val inFlight = suiteStarting
+      val nested = topLevel.nestedSuites.head
+      val wrapperOfNested = registrationOfTopLevel.registerNestedSuite(0, nested, passingNoEventOn)
+      val inFlight = SuiteStarting(ordinal, nested.suiteName, nested.suiteId, Some(nested.suiteId), threadName = "main", timeStamp = timeStamp)
       wrapperOfNested(inFlight)
       SuiteRegistration.madeWith(wrapperOfNested).remove()
       registrationOfTopLevel.remove()

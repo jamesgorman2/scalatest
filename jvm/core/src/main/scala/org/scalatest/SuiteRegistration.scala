@@ -63,6 +63,9 @@ private[scalatest] abstract class SuiteRegistration {
   /** The reporter a test is run with: the test's structure wrapper over `reporter`. */
   def reporterOfTest(testName: String, reporter: Reporter): Reporter
 
+  /** The reporter a site that made this registration runs the instance with: the suite's structure wrapper over `reporter`. */
+  def reporterOfSuite(reporter: Reporter): Reporter
+
   /**
    * The suite's structure wrapper over `reporter`, a reporter that holds the suite's events back, such as a
    * `TestSortingReporter`. The wrapper hands each event off as it is sent, before `reporter` can hold it back.
@@ -102,6 +105,15 @@ private[scalatest] abstract class SuiteRegistration {
    */
   def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit
 
+  /**
+   * Keeps the suite name the site read for the instance's run, as 3.2.20 reads it there, for a registration that
+   * does not yet know the suite node of the instance.
+   */
+  def suiteNameRead(suiteName: String): Unit
+
+  /** Keeps the suite ID the site read for the instance's run, as `suiteNameRead` keeps its suite name. */
+  def suiteIdRead(suiteId: String): Unit
+
   /** Removes this registration. Called where the instance's run throws. */
   def remove(): Unit
 
@@ -133,6 +145,12 @@ private[scalatest] abstract class SuiteRegistrations {
 
   /** The instance's registration, or `SuiteRegistration.none` where it has none or several. */
   def of(suite: Suite): SuiteRegistration
+
+  /**
+   * Registers an instance that has no registration, not yet knowing its suite node, and returns that registration.
+   * None where the instance has one or several.
+   */
+  def registeredUnlessRegistered(suite: Suite): Option[SuiteRegistration]
 }
 
 /** A reporter that knows the registration made with it: a structure wrapper, in a run that writes a test event log. */
@@ -150,18 +168,22 @@ private[scalatest] object SuiteRegistration {
     def originAt(scopes: List[ScopePlace]): EventOrigin = EventOrigin.none
     def startTestExecution(testName: String): EventOrigin = EventOrigin.none
     def reporterOfTest(testName: String, reporter: Reporter): Reporter = reporter
+    def reporterOfSuite(reporter: Reporter): Reporter = reporter
     def reporterAheadOf(reporter: Reporter): Reporter = reporter
     def registerInstanceOfTest(instance: Suite): SuiteRegistration = none
     def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration = none
     def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = reporter
     def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = ()
     def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = ()
+    def suiteNameRead(suiteName: String): Unit = ()
+    def suiteIdRead(suiteId: String): Unit = ()
     def remove(): Unit = ()
     def removeWhenCompleted(status: Status): Unit = ()
   }
 
   private val noRegistrations: SuiteRegistrations = new SuiteRegistrations {
     def of(suite: Suite): SuiteRegistration = none
+    def registeredUnlessRegistered(suite: Suite): Option[SuiteRegistration] = None
   }
 
   // A suite instance cannot carry its registration, and `Args` reaches user code, so the sites find it here.
@@ -174,6 +196,20 @@ private[scalatest] object SuiteRegistration {
   def lookUpNowhere(): Unit = registrations.set(noRegistrations)
 
   def of(suite: Suite): SuiteRegistration = registrations.get.of(suite)
+
+  /**
+   * Runs an instance with the `Args` it is given. Where no site has registered the instance, as for one user code
+   * creates and runs, it first registers the instance, not yet knowing its suite node, and runs it with its suite's
+   * structure wrapper over `args.reporter`. It then removes that registration where the run throws, and otherwise
+   * once its `Status` completes.
+   */
+  def runRegistered(suite: Suite, args: Args)(run: Args => Status): Status = {
+    val made = if (args eq null) None else registrations.get.registeredUnlessRegistered(suite)
+    made match {
+      case Some(registration) => registration.removedOnceRun(run(args.copy(reporter = registration.reporterOfSuite(args.reporter))))
+      case None => run(args)
+    }
+  }
 
   /** The registration made with a suite's structure wrapper, or `none` for any other reporter. */
   def madeWith(reporter: Reporter): SuiteRegistration =

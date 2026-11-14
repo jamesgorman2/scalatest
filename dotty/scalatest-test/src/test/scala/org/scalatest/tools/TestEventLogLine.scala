@@ -19,6 +19,14 @@ private[tools] object TestEventLogLine {
   def nestedSuite(id: Long, parent: Long, position: Int, name: String, className: String): String =
     s"""{"id":$id,"kind":"suite","parent":$parent,"position":$position,"name":"$name","suiteId":"$className","className":"$className"}"""
 
+  /** A top-level suite whose suite ID is not its class name. */
+  def suiteWithId(id: Long, name: String, suiteId: String, className: String): String =
+    s"""{"id":$id,"kind":"suite","name":"$name","suiteId":"$suiteId","className":"$className"}"""
+
+  /** A nested suite with no declared position, as one minted after its parent's first structure. Its suite ID is its class name. */
+  def suiteUnder(id: Long, parent: Long, name: String, className: String): String =
+    s"""{"id":$id,"kind":"suite","parent":$parent,"name":"$name","suiteId":"$className","className":"$className"}"""
+
   def scope(id: Long, parent: Long, position: Int, name: String, label: String): String =
     s"""{"id":$id,"kind":"scope","parent":$parent,"position":$position,"name":"$name","label":"$label"}"""
 

@@ -408,7 +408,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
       "return the suite's node table, holding the suite's node, suite ID, class name and the instance it was read from" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
-        table.instance should be theSameInstanceAs outer
+        table.instance.get should be theSameInstanceAs outer
         (table.node, table.suiteId, table.className) shouldBe ((NodeId(1), "samples.Outer", "samples.Outer"))
       }
 
@@ -444,7 +444,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
         table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites)) shouldBe
           Vector((NodeId(2), "samples.Inner", "samples.Inner", Map("i" -> NodeId(3)), Map.empty, Vector.empty))
-        table.nestedSuites.head.instance should be theSameInstanceAs inner
+        table.nestedSuites.head.instance.get should be theSameInstanceAs inner
       }
 
       "mint for a later suite no node ID an earlier suite has" in {

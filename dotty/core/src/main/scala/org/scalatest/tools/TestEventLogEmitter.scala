@@ -13,10 +13,15 @@ import org.scalatest.Filter
 import org.scalatest.RegisteredNode
 import org.scalatest.Reporter
 import org.scalatest.Suite
+import org.scalatest.events.AlertProvided
 import org.scalatest.events.EncodedEvent
 import org.scalatest.events.Event
+import org.scalatest.events.InfoProvided
+import org.scalatest.events.MarkupProvided
+import org.scalatest.events.NameInfo
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
+import org.scalatest.events.NoteProvided
 import org.scalatest.events.RecordableEvent
 import org.scalatest.events.RunAborted
 import org.scalatest.events.RunCompleted
@@ -242,44 +247,144 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * only the first of them writes it.
    *
    * The event is assigned to the node and executions its origin names. An event with no origin, one that no engine
-   * site of a registered suite instance sent, is assigned to the wrapper's node, in the execution of that node that
-   * opened last and has not closed. The messages recorded in a test's closing event are written before it, assigned
-   * as it is, unless the test has handed them off one by one.
+   * site of a registered suite instance sent, is assigned from its own data: to the suite its suite ID names, at or
+   * below the wrapper's suite, and to the test its test name names in that suite. A suite or test no structure holds
+   * is first given a node in a further structure. A message that names no suite is assigned to the wrapper's node.
+   * The messages recorded in a test's closing event are written before it, assigned as it is, unless the test has
+   * handed them off one by one.
    *
    * An event of a test's execution also writes the messages held for it, assigned as the execution's first written
    * event is: after it, or before it where it closes the test.
    *
+   * An event an unplaced instance holds, or whose origin it recorded, places that instance below the wrapper's suite
+   * (`placeInstanceOf`).
+   *
    * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
   def writeSuiteEvent(wrapper: WrapperNode, event: Event): Unit = {
-    originWhereFirstHandedOff(wrapper, event).foreach { (origin, messagesHandedOff) =>
-      val recorded = if (messagesHandedOff.isDefined) Vector.empty else TestEventLogEmitter.recordedIn(event)
-      // Encoded outside the lock, as `runEvent` encodes.
-      val encoded = TestEventLogEmitter.caught(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
-      val thrown = synchronized {
-        if (isOpen) {
-          val written = encoded.flatMap { events =>
-            TestEventLogEmitter.caught {
-              val execution = assign(wrapper, origin, event)
-              val messagesOfTest = origin.flatMap(_.messagesOfTest).orElse(messagesHandedOff)
-              val (before, after) = messagesOfTest.fold((Vector.empty[EncodedEvent], Vector.empty[EncodedEvent])) {
-                _.written(event, execution, TestEventLogEmitter.closesItsScopeOrTest(event))
+    synchronized(if (isOpen) placeInstanceOf(wrapper, event) else Right(false)) match {
+      case Left(thrown) => TestEventLogEmitter.rethrowIfUncontained(thrown)
+      case Right(true) => ()
+      case Right(false) =>
+        originWhereFirstHandedOff(wrapper, event).foreach { (origin, messagesHandedOff) =>
+          // Encoded outside the lock, as `runEvent` encodes.
+          val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff.isDefined)
+          val thrown = synchronized(if (isOpen) writeUnderLock(wrapper, origin, messagesHandedOff, event, encoded) else encoded.left.toOption)
+          thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+        }
+    }
+  }
+
+  // Writes an event a wrapper handed off, closing the event log where it cannot be written.
+  private def writeUnderLock(
+    wrapper: WrapperNode,
+    origin: Option[RecordedOrigin],
+    messagesHandedOff: Option[TestExecutionMessages],
+    event: Event,
+    encoded: Either[Throwable, Vector[EncodedEvent]]
+  ): Option[Throwable] = {
+    val written = encoded.flatMap { events =>
+      TestEventLogEmitter.caught {
+        val execution = assign(wrapper, origin, event)
+        val messagesOfTest = origin.flatMap(_.messagesOfTest).orElse(messagesHandedOff)
+        val (before, after) = messagesOfTest.fold((Vector.empty[EncodedEvent], Vector.empty[EncodedEvent])) {
+          _.written(event, execution, TestEventLogEmitter.closesItsScopeOrTest(event))
+        }
+        val messageExecution = messagesOfTest.flatMap(_.assignment).getOrElse(execution)
+        before.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
+        events.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
+        after.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
+      }
+    }
+    if (written.isLeft) {
+      close()
+    }
+    written.left.toOption
+  }
+
+  /**
+   * Called under the lock. Where an unplaced instance holds the event, or recorded its origin, places that instance,
+   * and each unplaced instance it awaits, below the wrapper's suite. The outermost of them takes:
+   *  - the wrapper's suite's table, where its suite ID is that suite's;
+   *  - else the table of a nested suite of that suite with its suite ID: the one read from this instance, else the
+   *    first in declared order that has not ended;
+   *  - else a nested suite node minted directly under that suite.
+   * Each instance awaiting a placed one is then placed below it in the same way, or with its table where it was
+   * created to run one test or in its creator's place. The instances' structures are written, where a suite node is
+   * new or its tree differs from the table, and then every event they held, in the order handed off.
+   *
+   * Returns `Right(true)` where the event is held, and so written here or still held, and `Right(false)` where the
+   * caller is to write it.
+   */
+  private def placeInstanceOf(wrapper: WrapperNode, event: Event): Either[Throwable, Boolean] = UnplacedSuites.synchronized {
+    UnplacedSuites.ownerOf(event) match {
+      case None => Right(false)
+      case Some(owner) =>
+        val isHeld = UnplacedSuites.holds(event)
+        val (outermost, placedAround) = TestEventLogEmitter.outermostUnplaced(owner, wrapper.registration)
+        if (!outermost.isPlaceable) {
+          Right(true)
+        } else {
+          val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
+          val written = placedWithThoseAwaitingIt(outermost, placedAround).flatMap { held =>
+            held.sortBy(_.order).foldLeft(Right(()): Either[Throwable, Unit]) { (soFar, one) =>
+              soFar.flatMap { _ =>
+                if (handedOffByAnInnerWrapper.containsKey(one.event)) {
+                  Right(())
+                } else {
+                  if (!(isLastWrapper && (one.event eq event))) {
+                    handedOffByAnInnerWrapper.put(one.event, one.wrapper.registration)
+                  }
+                  writeUnderLock(one.wrapper, one.origin, one.messagesHandedOff, one.event, one.encoded).toLeft(())
+                }
               }
-              val messageExecution = messagesOfTest.flatMap(_.assignment).getOrElse(execution)
-              before.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
-              events.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
-              after.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
             }
           }
-          if (written.isLeft) {
-            close()
+          written.map(_ => isHeld)
+        }
+    }
+  }
+
+  // Called under both locks. Places `outermost` below `placedAround`, then each instance awaiting a placed one.
+  // Returns the events they held.
+  private def placedWithThoseAwaitingIt(outermost: RegisteredSuite, placedAround: RegisteredSuite): Either[Throwable, Vector[HeldEvent]] = {
+    TestEventLogEmitter.caught {
+      val held = Vector.newBuilder[HeldEvent]
+      var toPlace = List((outermost, placedAround))
+      while (toPlace.nonEmpty) {
+        val (registration, around) = toPlace.head
+        toPlace = toPlace.tail
+        if (!registration.isPlaced && registration.isPlaceable) {
+          val (table, isNew) = registration.awaited match {
+            case Some(Awaiting.TableOf(creator)) => (creator.table, false)
+            case _ => tableToPlace(registration, around.table)
           }
-          written.left.toOption
-        } else {
-          encoded.left.toOption
+          val (placed, pendingStructure, unencodable) = registration.place(this, table, around.topLevel)
+          unencodable.foreach(thrown => throw thrown)
+          val scopesAndTests = pendingStructure.fold(table.scopesAndTests)(_.scopesAndTestsFor(table))
+          if (isNew || table.scopesAndTests != scopesAndTests) {
+            write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode)))
+          }
+          placed.origins.foreach((event, origin) => originOfEvent.put(event, origin))
+          held ++= placed.held
+          toPlace = toPlace ++ registration.awaitingThisOne.map((_, registration))
         }
       }
-      thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+      held.result()
+    }
+  }
+
+  // Called under both locks. The table an unplaced instance takes below the suite of `around`, and whether it is new.
+  private def tableToPlace(registration: RegisteredSuite, around: SuiteNodeTable): (SuiteNodeTable, Boolean) = {
+    val suiteId = registration.suiteIdOfRun.getOrElse(around.suiteId)
+    if (around.suiteId == suiteId) {
+      (around, false)
+    } else {
+      val sharingItsId = around.childSuites.filter(_.suiteId == suiteId)
+      sharingItsId.find(_.instance.exists(registration.isOf)).orElse(sharingItsId.find(!_.hasEnded)) match {
+        case Some(nested) => (nested, false)
+        case None => (registration.mintedBelow(around, mintNode), true)
+      }
     }
   }
 
@@ -340,13 +445,45 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Called under the lock. Numbers the executions the event names, where the event is the first to name them.
+  // Called under the lock. Numbers the executions the event names, where the event is the first to name them. An
+  // origin whose instance could not be placed names no node, so its event is assigned as one with no origin.
   private def assign(wrapper: WrapperNode, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
-    val table = origin.fold(wrapper.registration.table)(_.registration.table)
-    // A scope or test the suite's structure does not hold has no node, so its event is assigned to the suite.
-    table.scopeOrTest(origin.fold(wrapper.treeNode)(_.node)) match {
-      case Some(scopeOrTest) => assignToScopeOrTest(table, scopeOrTest, origin, event)
-      case None => assignToSuite(table, origin, event)
+    origin.filter(_.registration.isPlaced) match {
+      case Some(recorded) =>
+        val table = recorded.registration.table
+        // A scope or test the suite's structure does not hold has no node, so its event is assigned to the suite.
+        table.scopeOrTest(recorded.node) match {
+          case Some(scopeOrTest) => assignToScopeOrTest(table, scopeOrTest, Some(recorded), event)
+          case None => assignToSuite(table, Some(recorded), event)
+        }
+      case None => assignFromItsOwnData(wrapper, event)
+    }
+  }
+
+  // Called under the lock. The suite an event's data names is found at or below the wrapper's suite, else anywhere in
+  // the wrapper's top-level suite, and is otherwise given a node nested directly in the wrapper's suite. A test its
+  // suite's table lacks is given a node directly under the suite. Either node is written in a further structure.
+  private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): NodeExecution = {
+    val ofWrapper = wrapper.registration.table
+    TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
+      case None =>
+        ofWrapper.scopeOrTest(wrapper.treeNode) match {
+          case Some(scopeOrTest) => assignToScopeOrTest(ofWrapper, scopeOrTest, None, event)
+          case None => assignToSuite(ofWrapper, None, event)
+        }
+      case Some(names) =>
+        val found = TestEventLogEmitter.tableAtOrBelow(ofWrapper, names.suiteId)
+          .orElse(TestEventLogEmitter.tableAtOrBelow(wrapper.registration.topLevel.table, names.suiteId))
+        val table = found.getOrElse(ofWrapper.mintNestedSuite(None, names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId), mintNode))
+        val lackedTest = names.testName.filterNot(table.tests.contains)
+        if (found.isEmpty || lackedTest.isDefined) {
+          val scopesAndTests = table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList)
+          write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode)))
+        }
+        names.testName.flatMap(table.tests.get) match {
+          case Some(test) => assignToScopeOrTest(table, test, None, event)
+          case None => assignToSuite(table, None, event)
+        }
     }
   }
 
@@ -384,6 +521,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
       executions.close(execution)
       table.forgetUnrunExecution(execution)
+      table.markEnded()
     }
     assigned
   }
@@ -448,7 +586,7 @@ private[scalatest] object TestEventLogEmitter {
     executions.openedLast.getOrElse(if (opensAnExecution) new Execution else executions.latest.getOrElse(new Execution))
   }
 
-  private def closesItsScopeOrTest(event: Event): Boolean = {
+  def closesItsScopeOrTest(event: Event): Boolean = {
     event match {
       case _: TestSucceeded | _: TestFailed | _: TestPending | _: TestCanceled | _: TestIgnored => true
       case _: ScopeClosed | _: ScopePending => true
@@ -513,10 +651,87 @@ private[scalatest] object TestEventLogEmitter {
     new TestEventLogEmitter(eventLog)
   }
 
-  private def caught[A](body: => A): Either[Throwable, A] =
+  /** An event as a structure wrapper hands it off, with the messages its closing event records unless the test handed them off one by one. */
+  def encodedWithRecorded(event: Event, messagesHandedOff: Boolean): Either[Throwable, Vector[EncodedEvent]] = {
+    val recorded = if (messagesHandedOff) Vector.empty else recordedIn(event)
+    caught(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
+  }
+
+  /** Whether the event is one a site that runs a nested suite sends for it: its `SuiteStarting`, `SuiteCompleted` or `SuiteAborted`. */
+  def isSuiteEvent(event: Event): Boolean = {
+    event match {
+      case _: SuiteStarting | _: SuiteCompleted | _: SuiteAborted => true
+      case _ => false
+    }
+  }
+
+  /** The names an event carries of its suite, and of its test where it is a test's. */
+  final case class NamesInEvent(suiteName: String, suiteId: String, suiteClassName: Option[String], testName: Option[String])
+
+  /** The names an event carries: none for a run's event, or a message whose `nameInfo` is `None`. */
+  def namesIn(event: Event): Option[NamesInEvent] = {
+    def of(nameInfo: NameInfo): NamesInEvent = NamesInEvent(nameInfo.suiteName, nameInfo.suiteId, nameInfo.suiteClassName, nameInfo.testName)
+    event match {
+      case e: TestStarting => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
+      case e: TestSucceeded => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
+      case e: TestFailed => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
+      case e: TestIgnored => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
+      case e: TestPending => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
+      case e: TestCanceled => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
+      case e: SuiteStarting => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, None))
+      case e: SuiteCompleted => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, None))
+      case e: SuiteAborted => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, None))
+      case e: ScopeOpened => Some(of(e.nameInfo).copy(testName = None))
+      case e: ScopeClosed => Some(of(e.nameInfo).copy(testName = None))
+      case e: ScopePending => Some(of(e.nameInfo).copy(testName = None))
+      case e: InfoProvided => e.nameInfo.map(of)
+      case e: NoteProvided => e.nameInfo.map(of)
+      case e: AlertProvided => e.nameInfo.map(of)
+      case e: MarkupProvided => e.nameInfo.map(of)
+      case _ => None
+    }
+  }
+
+  /** Whether the event is the `SuiteAborted` of a `DistributedTestRunnerSuite`, which runs one test: it is assigned to that test's node. */
+  private def isAbortOfDistributedTest(event: Event): Boolean = {
+    event match {
+      case aborted: SuiteAborted => aborted.suiteClassName.contains(classOf[DistributedTestRunnerSuite].getName)
+      case _ => false
+    }
+  }
+
+  // The table of the suite of this suite ID at or below `table`: `table` itself, else the first that has not ended of
+  // those nested within it, else the first of them. Recurses once for each suite nested in another.
+  private def tableAtOrBelow(table: SuiteNodeTable, suiteId: String): Option[SuiteNodeTable] = {
+    def nestedWithin(suite: SuiteNodeTable): Vector[SuiteNodeTable] = suite.childSuites.flatMap(nested => nested +: nestedWithin(nested))
+    if (table.suiteId == suiteId) {
+      Some(table)
+    } else {
+      val sharingItsId = nestedWithin(table).filter(_.suiteId == suiteId)
+      sharingItsId.find(!_.hasEnded).orElse(sharingItsId.headOption)
+    }
+  }
+
+  /**
+   * Called under `UnplacedSuites`' lock. The outermost unplaced instance `owner` awaits, and the placed instance it is
+   * placed below: the one it awaits, where that is placed, else the one whose wrapper the event reached.
+   */
+  private def outermostUnplaced(owner: RegisteredSuite, ofWrapper: RegisteredSuite): (RegisteredSuite, RegisteredSuite) = {
+    @annotation.tailrec
+    def from(unplaced: RegisteredSuite, passed: Set[RegisteredSuite]): (RegisteredSuite, RegisteredSuite) = {
+      unplaced.awaited.map(_.registration) match {
+        case Some(awaited) if awaited.isPlaced => (unplaced, awaited)
+        case Some(awaited) if !passed.contains(awaited) => from(awaited, passed + awaited)
+        case _ => (unplaced, ofWrapper)
+      }
+    }
+    from(owner, Set(owner))
+  }
+
+  def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }
 
-  private def rethrowIfUncontained(thrown: Throwable): Unit = {
+  def rethrowIfUncontained(thrown: Throwable): Unit = {
     thrown match {
       case _: InterruptedException => Thread.currentThread().interrupt()
       case uncontained if !isContained(uncontained) => throw uncontained

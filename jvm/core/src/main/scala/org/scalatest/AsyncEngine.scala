@@ -559,6 +559,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     runTest: (String, Args) => Status
   ): Status = {
     requireNonNull(testName, passedInArgs)
+    SuiteRegistration.runRegistered(theSuite, passedInArgs) { passedInArgs =>
 
     val args =
       if (!parallelAsyncTestExecution) {
@@ -614,6 +615,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       }
     new CompositeStatus(Set.empty ++ statusList)
   }
+  }
 
   def runImpl(
     theSuite: Suite,
@@ -622,6 +624,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     parallelAsyncTestExecution: Boolean,
     superRun: (Option[String], Args) => Status
   ): Status = {
+    SuiteRegistration.runRegistered(theSuite, passedInArgs) { passedInArgs =>
 
     val registration = SuiteRegistration.of(theSuite)
     val args =
@@ -707,6 +710,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     // SKIP-SCALATESTJS,NATIVE-END
 
     status
+  }
   }
 
   /*

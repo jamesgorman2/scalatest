@@ -183,6 +183,7 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
    * @return a <code>Status</code> object that indicates when all tests and nested suites started by this method have completed, and whether or not a failure occurred.
    */
   abstract override def run(testName: Option[String], args: Args): Status = {
+    SuiteRegistration.runRegistered(this, args) { args =>
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
         super.run(testName, args.copy(reporter = SuiteRegistration.of(this).reporterOfTest(name, createTestSpecificReporter(sorter, name))))
@@ -215,6 +216,7 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
         }
         status
     }
+  }
   }
 
   private[scalatest] def createTestSpecificReporter(testSorter: DistributedTestSorter, testName: String): Reporter = {

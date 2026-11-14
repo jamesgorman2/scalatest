@@ -1004,7 +1004,8 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
-    import args._
+    SuiteRegistration.runRegistered(thisSuite, args) { registeredArgs =>
+    import registeredArgs._
 
     val theTestNames = testNames
 
@@ -1012,8 +1013,16 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     // so that exceptions are caught and transformed
     // into error messages on the standard error stream.
     val report = wrapReporterIfNecessary(thisSuite, reporter)
-    val newArgs = args.copy(reporter = report)
+    val newArgs = registeredArgs.copy(reporter = report)
     val registration = SuiteRegistration.of(thisSuite)
+
+    // Read in the order 3.2.20 passes them to the filter, so that the registration keeps the suite ID it read.
+    def tagsAndSuiteId: (Map[String, Set[String]], String) = {
+      val theTags = tags
+      val theSuiteId = suiteId
+      registration.suiteIdRead(theSuiteId)
+      (theTags, theSuiteId)
+    }
 
     val statusBuffer = new ListBuffer[Status]()
 
@@ -1022,7 +1031,8 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     testName match {
 
       case Some(tn) =>
-        val (filterTest, ignoreTest) = filter(tn, tags, suiteId)
+        val (theTags, theSuiteId) = tagsAndSuiteId
+        val (filterTest, ignoreTest) = filter(tn, theTags, theSuiteId)
         if (!filterTest) {
           if (ignoreTest)
             reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
@@ -1031,7 +1041,8 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         }
 
       case None =>
-        val keptTests = filter(theTestNames, tags, suiteId)
+        val (theTags, theSuiteId) = tagsAndSuiteId
+        val keptTests = filter(theTestNames, theTags, theSuiteId)
         registration.updateStructureFromTestNames(keptTests.map((testName, _) => testName))
         for ((tn, ignoreTest) <- keptTests) {
           if (!stopper.stopRequested) {
@@ -1043,6 +1054,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)
+    }
   }
 
   /**
@@ -1100,14 +1112,17 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
-    import args._
+    SuiteRegistration.runRegistered(thisSuite, args) { registeredArgs =>
+    import registeredArgs._
 
     val originalThreadName = Thread.currentThread.getName
     try {
-      Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, suiteName))
+      val theSuiteName = suiteName
+      SuiteRegistration.of(thisSuite).suiteNameRead(theSuiteName)
+      Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, theSuiteName))
 
       val report = wrapReporterIfNecessary(thisSuite, reporter)
-      val newArgs = args.copy(reporter = report)
+      val newArgs = registeredArgs.copy(reporter = report)
 
       val nestedSuitesStatus = 
         testName match {
@@ -1123,6 +1138,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       new CompositeStatus(Set(nestedSuitesStatus, testsStatus))
     }
     finally Thread.currentThread.setName(originalThreadName)
+    }
   }
 
   /**

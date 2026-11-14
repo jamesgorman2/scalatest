@@ -18,23 +18,33 @@ private[scalatest] final class Execution
 private[scalatest] final class NodeExecutions {
 
   private val numbers = new IdentityHashMap[Execution, Integer]
+  private val countedAs = new IdentityHashMap[Execution, Execution]
   private var open = List.empty[Execution]
   private var started = Option.empty[Execution]
 
   /** The execution's number among the node's. An execution not yet numbered takes the next, and is then the node's latest, and open. */
   def number(execution: Execution): Int = {
-    Option(numbers.get(execution)) match {
+    val counted = countedOnce(execution)
+    Option(numbers.get(counted)) match {
       case Some(number) => number
       case None =>
         val number = numbers.size + 1
-        numbers.put(execution, number)
-        open = execution :: open
-        started = Some(execution)
+        numbers.put(counted, number)
+        open = counted :: open
+        started = Some(counted)
         number
     }
   }
 
-  def close(execution: Execution): Unit = open = open.filterNot(_ eq execution)
+  def close(execution: Execution): Unit = {
+    val counted = countedOnce(execution)
+    open = open.filterNot(_ eq counted)
+  }
+
+  /** Counts `later` as `earlier` from now on, as where a run started before its instance was placed takes the execution its suite's `SuiteStarting` opened. */
+  def countAsOne(later: Execution, earlier: Execution): Unit = countedAs.put(later, earlier)
+
+  private def countedOnce(execution: Execution): Execution = Option(countedAs.get(execution)).getOrElse(execution)
 
   /** The execution that opened last and has not closed. */
   def openedLast: Option[Execution] = open.headOption
@@ -61,16 +71,16 @@ private[scalatest] object ScopeAndTestIds {
  *
  * Not a case class: the suite instance is user code, whose `equals`, `hashCode` and `toString` must not be called.
  *
- * @param instance the suite instance the suite's first structure is for
+ * @param instance the suite instance the suite's first structure is for, none where the node was minted for an event's suite ID
  * @param parent the suite node this one is nested in, if any
- * @param position its place among that node's children, if nested
+ * @param position its place among that node's children, if it has one: a nested suite node minted after its parent's first structure has none
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstIds the node IDs of `firstScopesAndTests`
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
  * @param nestedSuites each nested suite's table, at its position in `nestedSuites`
  */
 private[scalatest] final class SuiteNodeTable(
-  val instance: Suite,
+  val instance: Option[Suite],
   val node: NodeId,
   val name: String,
   val suiteId: String,
@@ -91,6 +101,26 @@ private[scalatest] final class SuiteNodeTable(
   private var latestScopesAndTests = firstScopesAndTests
   private var testNamesOfLatest = SuiteNodeTable.testNamesIn(firstScopesAndTests)
   private var filteredTests = firstFilteredTests
+  private var nestedSuitesMinted = Vector.empty[SuiteNodeTable]
+  private var hasEndedOnce = false
+
+  /** The tables of its nested suites: those of its first structure in declared order, then those minted later, in the order minted. */
+  def childSuites: Vector[SuiteNodeTable] = nestedSuites ++ nestedSuitesMinted
+
+  /** Whether an event has ended an execution of the suite: a `SuiteCompleted` or `SuiteAborted`. */
+  def hasEnded: Boolean = hasEndedOnce
+
+  def markEnded(): Unit = hasEndedOnce = true
+
+  /**
+   * Mints a suite node nested directly in this one, after its other children. Its first structure holds the suite
+   * alone, and is the caller's to write.
+   */
+  def mintNestedSuite(instance: Option[Suite], name: String, suiteId: String, className: String, mint: () => NodeId): SuiteNodeTable = {
+    val nested = new SuiteNodeTable(instance, mint(), name, suiteId, className, Some(node), None, Nil, ScopeAndTestIds.none, Map.empty, Vector.empty)
+    nestedSuitesMinted :+= nested
+    nested
+  }
 
   /** Each test's node, by test name. */
   def tests: Map[String, NodeId] = ids.tests
@@ -153,8 +183,11 @@ private[scalatest] final class SuiteNodeTable(
   def forgetUnrunExecution(execution: Execution): Unit = openedBySuiteStarting = openedBySuiteStarting.filterNot(_ eq execution)
 
   /** The execution of a run that starts: the one the suite's `SuiteStarting` opened where no run has taken it, and otherwise a new one. */
-  def takeExecutionForStartingRun(): Execution = {
-    val execution = openedBySuiteStarting.getOrElse(new Execution)
+  def takeExecutionForStartingRun(): Execution = takeRunOpenedBySuiteStarting().getOrElse(new Execution)
+
+  /** The execution the suite's `SuiteStarting` opened, where no run has taken it, which the caller's run takes. */
+  def takeRunOpenedBySuiteStarting(): Option[Execution] = {
+    val execution = openedBySuiteStarting
     openedBySuiteStarting = None
     execution
   }
@@ -195,7 +228,7 @@ private[scalatest] object SuiteNodeTable {
           before
         }
       new SuiteNodeTable(
-        structure.instance,
+        Some(structure.instance),
         id,
         structure.name,
         structure.suiteId,

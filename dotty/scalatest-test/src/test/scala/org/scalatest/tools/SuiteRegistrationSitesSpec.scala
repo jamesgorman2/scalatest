@@ -57,12 +57,12 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
     override def run(testName: Option[String], args: Args): Status = {
       registrationInRun = Some(SuiteRegistration.of(this))
-      runIsGivenAStructureWrapper = args.reporter.isInstanceOf[StructureWrapper]
+      runIsGivenAStructureWrapper = isWrapperOfPlacedInstance(args.reporter)
       super.run(testName, args)
     }
 
     override protected def runTest(testName: String, args: Args): Status = {
-      testIsGivenAStructureWrapper = args.reporter.isInstanceOf[StructureWrapper]
+      testIsGivenAStructureWrapper = isWrapperOfPlacedInstance(args.reporter)
       super.runTest(testName, args)
     }
 
@@ -92,7 +92,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
 
     override protected def runTest(testName: String, args: Args): Status = {
-      testIsGivenAStructureWrapper = args.reporter.isInstanceOf[StructureWrapper]
+      testIsGivenAStructureWrapper = isWrapperOfPlacedInstance(args.reporter)
       super.runTest(testName, args)
     }
 
@@ -165,6 +165,22 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   private def hasNoRegistration(suite: Suite): Boolean = SuiteRegistration.of(suite) eq SuiteRegistration.none
 
+  // Where another emitter of the process is open, an instance a run that writes no test event log runs registers
+  // itself, unplaced, and is never placed, so its events reach no event log.
+  private def isPlaced(registration: SuiteRegistration): Boolean = {
+    registration match {
+      case registered: RegisteredSuite => registered.isPlaced
+      case _ => false
+    }
+  }
+
+  private def isWrapperOfPlacedInstance(reporter: Reporter): Boolean = {
+    reporter match {
+      case wrapper: StructureWrapper => wrapper.isOfPlacedInstance
+      case _ => false
+    }
+  }
+
   "A top-level suite of a run that writes a test event log" should {
     "be registered while it runs, and not once its run has returned a completed Status" in {
       val suite = new Probe
@@ -230,10 +246,10 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   "A top-level suite of a run that writes no test event log" should {
-    "have no registration, and be run, as its tests are, with no structure wrapper" in {
+    "have no placed registration, and be run, as its tests are, with no structure wrapper of a placed instance" in {
       val suite = new Probe
       runAsTopLevelSuite(suite, None)
-      (suite.registrationInRun, suite.registrationInTest).toList.flatten.foreach(_ should be theSameInstanceAs SuiteRegistration.none)
+      (suite.registrationInRun, suite.registrationInTest).toList.flatten.map(isPlaced) shouldBe List(false, false)
       (suite.registrationInRun.isDefined, suite.registrationInTest.isDefined) shouldBe ((true, true))
       (suite.runIsGivenAStructureWrapper, suite.testIsGivenAStructureWrapper) shouldBe ((false, false))
     }
@@ -284,10 +300,10 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
         (wasRegisteredOnceItsRunHadReturned.get, hasNoRegistration(nested)) shouldBe ((Some(true), true))
       }
 
-      "have no registration and no structure wrapper where the run writes no test event log" in {
+      "have no placed registration and no structure wrapper of a placed instance where the run writes no test event log" in {
         val nested = new Probe
         runAsTopLevelSuite(nest(List(nested)), None, distributor = distributor)
-        nested.registrationInRun.get should be theSameInstanceAs SuiteRegistration.none
+        isPlaced(nested.registrationInRun.get) shouldBe false
         nested.runIsGivenAStructureWrapper shouldBe false
       }
     }
@@ -338,9 +354,9 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
         runForOneTest.map(hasNoRegistration) shouldBe Vector(true)
       }
 
-      "have no registration where the run writes no test event log" in {
+      "have no placed registration where the run writes no test event log" in {
         val (_, ranItsTest) = PerTestInstances.recordedIn(runAsTopLevelSuite(probe(), None, distributor = distributor))
-        ranItsTest.map((_, registration) => registration eq SuiteRegistration.none) shouldBe Vector(true)
+        ranItsTest.map((_, registration) => isPlaced(registration)) shouldBe Vector(false)
       }
     }
   }
@@ -595,9 +611,9 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       }
     }
 
-    "have no registration while it runs without the runner argument" in {
+    "have no placed registration while it runs without the runner argument" in {
       val ran = RegistrationProbeSuite.instancesRunIn(launched(Launch.ByFramework, classOf[RegistrationProbeSuite].getName, Nil))
-      ran.map((_, registrationAsItRan) => registrationAsItRan eq SuiteRegistration.none) shouldBe Vector(true)
+      ran.map((_, registrationAsItRan) => isPlaced(registrationAsItRan)) shouldBe Vector(false)
     }
   }
 }

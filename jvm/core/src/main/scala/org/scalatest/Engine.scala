@@ -526,6 +526,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     runTest: (String, Args) => Status
   ): Status = {
     requireNonNull(testName, args)
+    SuiteRegistration.runRegistered(theSuite, args) { args =>
 
     import args._
 
@@ -557,6 +558,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     }
     new CompositeStatus(Set.empty ++ statusBuffer)
   }
+  }
 
   def runImpl(
     theSuite: Suite,
@@ -564,6 +566,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     args: Args,
     superRun: (Option[String], Args) => Status
   ): Status = {
+    SuiteRegistration.runRegistered(theSuite, args) { args =>
     import args._
 
     // Set the flag that indicates registration is closed (because run has now been invoked),
@@ -636,6 +639,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
       if (shouldBeDocumenterForThisSuite ne documenterForThisSuite)
         throw new ConcurrentModificationException(Resources.concurrentDocumenterMod(theSuite.getClass.getName))
     }
+  }
   }
 
   /*
@@ -1166,6 +1170,7 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
     includeIcon: Boolean,
     runTest: (String, Args) => Status
   ): Status = {
+    SuiteRegistration.runRegistered(theSuite, args) { args =>
     import args._
 
     // All but one line of code copied from runImpl. Factor out duplication later...
@@ -1241,6 +1246,7 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
       if (shouldBeDocumenterForThisSuite ne documenterForThisSuite)
         throw new ConcurrentModificationException(Resources.concurrentDocumenterMod(theSuite.getClass.getName))
     }
+  }
   }
    
   def handleIgnoredTest(testText: String, f: () => Outcome, testRegistrationClosedMessageFun: => String, sourceFileName: String, methodName: String, stackDepth: Int, adjustment: Int, location: Option[Location], pos: Option[source.Position], testTags: Tag*): Unit = {
