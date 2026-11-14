@@ -419,6 +419,8 @@ trait DottyBuild { this: BuildCommons =>
       mimaFailOnNoPrevious := false,
       // Not a project dependency: the common test project is not published, so the POM must not name it.
       Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
+      // Core's Framework implements sbt's test interface, which core declares optional.
+      libraryDependencies += "org.scala-sbt" % "test-interface" % "1.0" % Test,
       // Published one at a time, dependencies first: on Windows, bundling a project
       // holds its dependencies' jars open, so a dependency bundled later cannot replace its jar.
       millDependencies := Def.sequential(
