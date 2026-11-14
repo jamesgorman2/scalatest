@@ -101,6 +101,28 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
   }
 
+  Feature("A run's block holds the worker's output whatever the module's testLogLevel") {
+
+    Scenario("A module whose testLogLevel is Debug") {
+      Given("CalculatorSuite, in a module whose testLogLevel is Debug, at which Mill prints Running Test Class")
+      When("the test command runs core.test")
+      val result = withSuites("CalculatorSuite") { tester =>
+        addToTestModule(tester, "def testLogLevel = mill.api.daemon.internal.TestReporter.LogLevel.Debug")
+        runTestCommand(tester, "core.test")
+      }
+      val console = result.stdoutLines ++ result.eval.err.linesIterator
+
+      Then("the run's block holds the test's line")
+      withClue(result.debugString) {
+        result.linesFor("Output outside any suite:").map(_.trim) should contain("[stdout] dividing now")
+      }
+
+      And("no line of the human-readable output or of the console holds Running Test Class")
+      result.humanReadableOutput.filter(_.contains("Running Test Class")) shouldBe empty
+      console.filter(_.contains("Running Test Class")) shouldBe empty
+    }
+  }
+
   Feature("Human-readable output on stdout is coloured where Mill colours its own console output") {
 
     Scenario("The same text with colour on and off") {

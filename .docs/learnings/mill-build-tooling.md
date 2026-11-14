@@ -58,7 +58,7 @@ date: 2026-11-14
 ---
 `mill.testkit.IntegrationTester.EvalResult`'s `out` and `err` (Mill 1.3.1) strip every ANSI escape sequence and trim the text, so a test of colour that reads them sees none, even under `--color true`.
 
-Read the process's own output, `result.out.text()` and `result.err.text()`, to test colour.
+Read the process's own output, `evalResult.result.out.text()` and `evalResult.result.err.text()`, to test colour.
 </learning>
 
 <learning>
