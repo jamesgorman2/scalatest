@@ -62,7 +62,7 @@ private[mill] final class JvmTestModuleRun(
   }
 
   // The worker's stdout and stderr are kept off the console. Mill's worker writes ScalaTest's end-of-run summary there.
-  // The call's result is left unread, a failure included: the consolidation decides the test command's result.
+  // The worker's result is ignored, even a failure: the consolidation decides the test command's result.
   private def startWorker(testClasses: Seq[String]): Unit = {
     val util = inputs.testModuleUtil(RunnerArgument.forEventLogFile(eventLogFile.toNIO), ctx)
     val queue = util.prepareTestClassesFolder(testClasses, processFolder)

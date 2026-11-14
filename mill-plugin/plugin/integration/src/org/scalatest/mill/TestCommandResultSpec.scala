@@ -35,10 +35,10 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       (result.eval.out + result.eval.err) should include("The tests of core.test failed")
     }
 
-  Feature("Of runs that complete, the test command fails where one reports a failure, and not otherwise") {
+  Feature("A completed run fails the test command only where it reports a failure") {
 
     Scenario("A test succeeds") {
-      Given("ResultSuite, mixing in BeforeAndAfterAll, in which test succeeds succeeds")
+      Given("ResultSuite, mixing in BeforeAndAfterAll, whose test \"succeeds\" succeeds")
       When("the test command runs core.test")
       val result = resultSuite("ResultSucceeds.scala")
       Then("the test command succeeds")
@@ -46,7 +46,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     }
 
     Scenario("Tests are ignored and pending, and another succeeds") {
-      Given("ResultSuite, in which test ignored is ignored, pending is pending, and succeeds succeeds")
+      Given("ResultSuite, whose test \"ignored\" is ignored, \"pending\" is pending, and \"succeeds\" succeeds")
       When("the test command runs core.test")
       val result = resultSuite("ResultIgnoredAndPending.scala")
       Then("the test command succeeds")
@@ -54,7 +54,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     }
 
     Scenario("A test is cancelled, and another succeeds") {
-      Given("ResultSuite, in which test cancelled is cancelled, and succeeds succeeds")
+      Given("ResultSuite, whose test \"cancelled\" is cancelled, and \"succeeds\" succeeds")
       When("the test command runs core.test")
       val result = resultSuite("ResultCancelled.scala")
       Then("the test command fails")
@@ -62,7 +62,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     }
 
     Scenario("A test fails, and another succeeds") {
-      Given("ResultSuite, in which test fails fails, and succeeds succeeds")
+      Given("ResultSuite, whose test \"fails\" fails, and \"succeeds\" succeeds")
       When("the test command runs core.test")
       val result = resultSuite("ResultFails.scala")
       Then("the test command fails")
@@ -70,7 +70,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     }
 
     Scenario("beforeAll throws, so the suite aborts") {
-      Given("ResultSuite, in which test succeeds succeeds where it runs, and beforeAll throws")
+      Given("ResultSuite, whose beforeAll throws, and whose test \"succeeds\" would succeed")
       When("the test command runs core.test")
       val result = resultSuite("ResultBeforeAllThrows.scala")
       Then("the test command fails")
@@ -81,7 +81,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
   Feature("A worker that dies fails the test command, whether or not a run existed in it") {
 
     Scenario("A test calls System.exit(0)") {
-      Given("ExitSuite, whose test exits calls System.exit(0)")
+      Given("ExitSuite, whose test \"exits\" calls System.exit(0)")
       When("the test command runs core.test")
       val result = runResultFixture("ExitSuite.scala" -> "ExitSuite")()
       Then("the test command fails")
@@ -100,14 +100,14 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
   Feature("The test command's failure lists no test") {
 
     Scenario("A failed test is not named outside the human-readable output") {
-      Given("StackFlatSpec, whose test have size 0 fails")
+      Given("StackFlatSpec, whose test \"have size 0\" fails")
       When("the test command runs core.test")
       val result = runResultFixture("StackFlatSpec.scala" -> "StackFlatSpec")()
 
       Then("the test command fails")
       shouldFail(result)
 
-      And("no line on the console outside the human-readable output holds have size 0")
+      And("the human-readable output names \"have size 0\", and no other console line does")
       withClue(result.debugString) {
         result.humanReadableOutput.exists(_.contains("have size 0")) shouldBe true
         result.consoleLinesOutsideHumanReadableOutput.filter(_.contains("have size 0")) shouldBe empty
@@ -123,7 +123,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       "org.scalatest:scalatest 3.2.20" -> "upstream-scalatest"
     ).foreach { case (framework, fixture) =>
       Scenario(s"The module tests with $framework") {
-        Given(s"core.test tests with $framework, and its one suite, FrameworkSuite, has one test, runs, which succeeds")
+        Given(s"core.test tests with $framework, and its one suite, FrameworkSuite, has one test, \"runs\", which succeeds")
         When("the test command runs core.test")
         val result = withTester(fixture) { tester =>
           runTestCommand(tester, "core.test")

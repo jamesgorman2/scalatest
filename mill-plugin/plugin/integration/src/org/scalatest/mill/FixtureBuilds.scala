@@ -62,7 +62,7 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
         unprefixed.startsWith("[") || unprefixed.startsWith(" ")
       }
 
-  /** Each line on the console, stdout's then stderr's, that is not a line of the human-readable output. */
+  /** The console's lines outside the human-readable output, stdout's then stderr's. */
   def consoleLinesOutsideHumanReadableOutput: Seq[String] = {
     val start = stdoutLines.indexOfSlice(humanReadableStdoutLines)
     val outsideOnStdout =
