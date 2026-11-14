@@ -26,14 +26,20 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
     val runsAdded: AtomicInteger = new AtomicInteger(0)
+    val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
     val processExited: AtomicBoolean = new AtomicBoolean(false)
     val processesWatched: mutable.Set[RunProcess] = mutable.Set.empty[RunProcess]
 
-    val reader: EventLogReader = new EventLogReader(eventLogFile, () => addRun(), watch, 1.millis)
+    val reader: EventLogReader = new EventLogReader(eventLogFile, () => addRun(), () => addProcessEndedBeforeAnyRun(), watch, 1.millis)
 
     private def addRun(): RunFeed = {
       runsAdded.incrementAndGet()
       consolidation.addRun(TestRunLabel("core.test"))
+    }
+
+    private def addProcessEndedBeforeAnyRun(): Unit = {
+      processesEndedBeforeAnyRun.incrementAndGet()
+      consolidation.addProcessEndedBeforeAnyRun()
     }
 
     private def watch(process: RunProcess): Boolean = {
@@ -63,12 +69,13 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
 
   "An event log reader" when {
     "its worker ends with no event log file" should {
-      "add no run" in {
+      "add no run, but add the worker as a process that ended before any run existed in it" in {
         withEventLogFile { file =>
           val reading = new Reading(file)
           reading.reader.start()
-          reading.stateAfterEnd() shouldBe ConsolidationState.Ended
+          reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
           reading.runsAdded.get shouldBe 0
+          reading.processesEndedBeforeAnyRun.get shouldBe 1
         }
       }
     }
@@ -82,6 +89,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
           reading.runsAdded.get shouldBe 1
+          reading.processesEndedBeforeAnyRun.get shouldBe 0
           reading.output.toSeq shouldBe Seq("[core.test]")
         }
       }

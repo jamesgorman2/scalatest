@@ -4,6 +4,7 @@ import mill.api.BuildCtx
 import mill.api.Evaluator
 import mill.api.TaskCtx
 import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.TestRunLabel
 
 private[mill] object TestCommand {
@@ -18,6 +19,9 @@ private[mill] object TestCommand {
       run.run(consolidation)
     }
     consolidation.end()
+    if (consolidation.state == ConsolidationState.EndedFailed) {
+      ctx.fail(s"The tests of ${module.path} failed")
+    }
   }
 
   private def moduleFolder(ctx: TaskCtx, modulePath: String): os.Path = ctx.dest / os.up / "modules" / modulePath

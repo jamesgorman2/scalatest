@@ -62,6 +62,14 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
         unprefixed.startsWith("[") || unprefixed.startsWith(" ")
       }
 
+  /** Each line on the console, stdout's then stderr's, that is not a line of the human-readable output. */
+  def consoleLinesOutsideHumanReadableOutput: Seq[String] = {
+    val start = stdoutLines.indexOfSlice(humanReadableStdoutLines)
+    val outsideOnStdout =
+      if (humanReadableStdoutLines.isEmpty) stdoutLines else stdoutLines.patch(start, Nil, humanReadableStdoutLines.size)
+    outsideOnStdout ++ eval.err.linesIterator.map(TestCommandResult.withoutEscapes)
+  }
+
   /** The human-readable output, without Mill's prefix. */
   def humanReadableOutput: Seq[String] = humanReadableStdoutLines.map(TestCommandResult.withoutMillPrefix)
 

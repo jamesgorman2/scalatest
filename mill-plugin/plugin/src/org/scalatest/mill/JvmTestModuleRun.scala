@@ -9,7 +9,7 @@ import scala.concurrent.duration.DurationInt
 
 /**
  * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue, and adds the
- * worker's run to a consolidation.
+ * worker's run to a consolidation, or the worker itself where no run existed in it.
  */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
@@ -25,7 +25,13 @@ private[mill] final class JvmTestModuleRun(
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     val testClasses = discoveredTestClasses()
-    val reader = new EventLogReader(eventLogFile.toNIO, () => consolidation.addRun(label), ProcessExit.hasExited, 10.millis)
+    val reader = new EventLogReader(
+      eventLogFile.toNIO,
+      () => consolidation.addRun(label),
+      () => consolidation.addProcessEndedBeforeAnyRun(),
+      ProcessExit.hasExited,
+      10.millis
+    )
     reader.start()
     try {
       startWorker(testClasses)
@@ -56,6 +62,7 @@ private[mill] final class JvmTestModuleRun(
   }
 
   // The worker's stdout and stderr are kept off the console. Mill's worker writes ScalaTest's end-of-run summary there.
+  // The call's result is left unread, a failure included: the consolidation decides the test command's result.
   private def startWorker(testClasses: Seq[String]): Unit = {
     val util = inputs.testModuleUtil(RunnerArgument.forEventLogFile(eventLogFile.toNIO), ctx)
     val queue = util.prepareTestClassesFolder(testClasses, processFolder)
