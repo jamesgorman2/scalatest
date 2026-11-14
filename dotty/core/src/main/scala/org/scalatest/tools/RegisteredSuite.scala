@@ -47,8 +47,8 @@ private[scalatest] abstract class RecordingOrigin(val registration: RegisteredSu
  * The registration of a suite instance against its suite's node table, in a run that writes a test event log.
  *
  * @param ofTopLevelSuite the registration of the top-level suite this instance runs within, or none where it is that suite
- * @param runOfCreator for an instance another instance of the suite created to run one test in, the execution of the
- *                     creator's run, which the instance's run takes in place of starting its own
+ * @param runOfCreator for an instance created by another instance of the suite to run one test, the execution of the
+ *                     creator's run. The instance's run uses it instead of starting its own.
  */
 private[scalatest] final class RegisteredSuite(
   emitter: TestEventLogEmitter,

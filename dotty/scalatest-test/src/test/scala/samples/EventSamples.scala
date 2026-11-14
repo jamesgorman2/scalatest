@@ -306,7 +306,7 @@ class ParFunSuite extends AnyFunSuite with ParallelTestExecution {
   }
 }
 
-// Throws where the DistributedTestRunnerSuite running its test runs it for that test.
+// Its run throws when given a test name, as when the DistributedTestRunnerSuite running its test runs it.
 @DoNotDiscover
 class ParAbortSuite extends AnyFunSuite with ParallelTestExecution {
 

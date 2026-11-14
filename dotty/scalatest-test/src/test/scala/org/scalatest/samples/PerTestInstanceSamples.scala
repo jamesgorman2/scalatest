@@ -31,8 +31,8 @@ object PerTestInstances {
   def recordRanItsTest(suite: Suite): Unit = ranItsTest.add(suite -> SuiteRegistration.of(suite))
 
   /**
-   * Returns each instance run for one test in the runs `launch` starts, and each that ran its test, with the
-   * registration it had as it ran it. One caller records at a time.
+   * Returns the instances run for one test in the runs `launch` starts, and those that ran their test, each with the
+   * registration it had as it ran it. Callers record one at a time.
    */
   def recordedIn(launch: => Unit): (Vector[Suite], Vector[(Suite, SuiteRegistration)]) = synchronized {
     runForOneTest.clear()
@@ -42,7 +42,7 @@ object PerTestInstances {
   }
 }
 
-// Records each instance run for one test, and throws there where the suite says so.
+// Records each instance run for one test, and throws from that run where throwsWhenRunForOneTest is true.
 trait RecordsItsInstancesOfTests extends SuiteMixin { this: Suite =>
 
   protected def throwsWhenRunForOneTest: Boolean = false
@@ -182,7 +182,7 @@ class ScopedQueueingAsyncFunSpec extends AsyncFunSpec {
   }
 }
 
-// Each sends, through the reporter its runTests is given, a message that names no suite or test, and runs no test.
+// Each one's runTests runs no test, and sends a message naming no suite or test through the reporter it is given.
 
 @DoNotDiscover
 class SendsFromRunTestsParallelSuite extends AnyFunSuite with ParallelTestExecution {

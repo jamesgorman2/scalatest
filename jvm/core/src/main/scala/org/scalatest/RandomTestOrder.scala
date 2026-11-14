@@ -193,8 +193,8 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
         // Random shuffle the deferred suite list, before executing them.
         val deferredRuns = Random.shuffle(suiteRunQueue.asScala.toList)
         deferredRuns.zipWithIndex.foreach { case (DeferredSuiteRun(suite, testName, statefulStatus, _), position) =>
-          // Each registration is otherwise removed once its statefulStatus completes, which never happens for this
-          // instance, nor for those whose runs the throw leaves unstarted.
+          // A registration is otherwise removed once its statefulStatus completes. Where this run throws, neither its
+          // statefulStatus nor those of the instances not yet run ever complete.
           val status =
             try suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
             catch {

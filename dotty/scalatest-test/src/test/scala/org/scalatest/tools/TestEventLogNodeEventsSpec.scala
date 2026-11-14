@@ -1419,10 +1419,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   )
 
   /**
-   * Registers the scenario of a run whose tests hand off their events in an order the run does not fix, and the
-   * scenario of the decoder that reads the event log of each order.
+   * Registers two scenarios: a run whose tests hand off their events in no fixed order, and the decoder reading the
+   * event log of each order.
    *
-   * @param runs the run in each order its tests may hand off their events, every one telling its reporters the same
+   * @param runs the run in each order its tests may hand off their events. Every one tells its reporters the same.
    */
   private def eventScenariosInAnyOrder(
     scenario: String,

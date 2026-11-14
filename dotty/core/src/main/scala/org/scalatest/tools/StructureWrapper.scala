@@ -52,8 +52,8 @@ private[scalatest] final class StructureWrapper(
   }
 
   /**
-   * The registration the site that runs a suite made as it took this wrapper, or none where no site took it in place
-   * of the suite's reporter: a test's wrapper, or one put ahead of a sorter.
+   * The registration the site that runs a suite made as it took this wrapper. None for a wrapper no site took in place
+   * of the suite's reporter: a test's wrapper, or a suite's wrapper ahead of a sorter.
    */
   def registrationOfItsSuite: SuiteRegistration = {
     node match {

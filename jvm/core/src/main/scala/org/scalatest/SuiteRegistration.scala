@@ -44,14 +44,14 @@ private[scalatest] abstract class SuiteRegistration {
 
   /**
    * The suite's structure wrapper over `reporter`, a reporter that holds the suite's events back, such as a
-   * `TestSortingReporter`, so that each event is handed off as it is sent.
+   * `TestSortingReporter`. The wrapper hands each event off as it is sent, before `reporter` can hold it back.
    */
   def reporterAheadOf(reporter: Reporter): Reporter
 
   /**
-   * Registers an instance that the suite's instance created to run one test in, against the suite's node, in the
-   * execution of the run in flight. The instance's run starts no execution of its own. The caller removes the
-   * returned registration.
+   * Registers `instance`, which this suite instance created to run one test, against the suite's node and in the
+   * execution of the current run. The instance's run starts no execution of its own. The caller removes the returned
+   * registration.
    */
   def registerInstanceOfTest(instance: Suite): SuiteRegistration
 
