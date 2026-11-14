@@ -39,17 +39,40 @@ final case class RunOutput(
   events: Seq[String],
   loggerLines: Seq[String],
   summary: Seq[String],
-  stdout: Seq[String],
-  stderr: Seq[String],
+  stdout: String,
+  stderr: String,
   files: Map[String, Seq[String]],
   threadNames: Set[String]
 ) {
+  // The fixture's own line is removed as text, not as a line: a reporter may write an event over several writes, and
+  // the fixture's line can land between two of them.
   def reporterText: Map[String, Seq[String]] =
     Map(
-      "stdout" -> stdout.filterNot(_ == CompatibilityFixture.stdoutLine),
-      "stderr" -> stderr.filterNot(_ == CompatibilityFixture.stderrLine),
+      "stdout" -> RunOutput.withoutFirst(CompatibilityFixture.stdoutLine, stdout).linesIterator.toList,
+      "stderr" -> RunOutput.withoutFirst(CompatibilityFixture.stderrLine, stderr).linesIterator.toList,
       "loggers" -> loggerLines
     ) ++ files.map((name, lines) => ("file " + name) -> lines)
+}
+
+object RunOutput {
+
+  /** How many times a line, with its line separator, is written within the text, wherever it begins. */
+  def timesWritten(line: String, text: String): Int = {
+    val written = line + System.lineSeparator
+    var count = 0
+    var from = text.indexOf(written)
+    while (from >= 0) {
+      count += 1
+      from = text.indexOf(written, from + written.length)
+    }
+    count
+  }
+
+  private def withoutFirst(line: String, text: String): String = {
+    val written = line + System.lineSeparator
+    val at = text.indexOf(written)
+    if (at < 0) text else text.substring(0, at) + text.substring(at + written.length)
+  }
 }
 
 final case class ComparisonClasspaths(fixture: String, upstream: String, fork: String, testInterface: String, runsDirectory: Path) {
@@ -160,8 +183,8 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
       lines(events),
       lines(loggerLines),
       lines(summary),
-      lines(directory.resolve("stdout.txt")),
-      lines(directory.resolve("stderr.txt")),
+      text(directory.resolve("stdout.txt")),
+      text(directory.resolve("stderr.txt")),
       filesIn(workingDirectory).map(file => file.getFileName.toString -> lines(file)).toMap,
       lines(threads).toSet
     )
@@ -206,10 +229,12 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     try entries.iterator.asScala.toList finally entries.close()
   }
 
-  private def lines(file: Path): Seq[String] =
+  private def lines(file: Path): Seq[String] = text(file).linesIterator.toList
+
+  private def text(file: Path): String =
     if (Files.exists(file)) {
-      new String(Files.readAllBytes(file), StandardCharsets.UTF_8).linesIterator.toList
+      new String(Files.readAllBytes(file), StandardCharsets.UTF_8)
     } else {
-      Nil
+      ""
     }
 }

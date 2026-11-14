@@ -22,7 +22,7 @@ private[scalatest] final class NodeExecutions {
   private var started = Option.empty[Execution]
 
   /** The execution's number among the node's. An execution not yet numbered takes the next, and is then the node's latest, and open. */
-  def numberOf(execution: Execution): Int = {
+  def number(execution: Execution): Int = {
     Option(numbers.get(execution)) match {
       case Some(number) => number
       case None =>
@@ -85,10 +85,10 @@ private[scalatest] final class SuiteNodeTable(
   def awaitRun(execution: Execution): Unit = openedBySuiteStarting = Some(execution)
 
   /** Forgets the execution the suite's `SuiteStarting` opened, where that execution has closed with no run. */
-  def closedWithoutRun(execution: Execution): Unit = openedBySuiteStarting = openedBySuiteStarting.filterNot(_ eq execution)
+  def forgetUnrunExecution(execution: Execution): Unit = openedBySuiteStarting = openedBySuiteStarting.filterNot(_ eq execution)
 
   /** The execution of a run that starts: the one the suite's `SuiteStarting` opened where no run has taken it, and otherwise a new one. */
-  def executionOfStartingRun(): Execution = {
+  def takeExecutionForStartingRun(): Execution = {
     val execution = openedBySuiteStarting.getOrElse(new Execution)
     openedBySuiteStarting = None
     execution

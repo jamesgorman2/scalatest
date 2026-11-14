@@ -1,5 +1,7 @@
 package org.scalatest.tools
 
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
 import org.scalatest.EventOrigin
 import org.scalatest.Reporter
@@ -38,7 +40,7 @@ private[scalatest] final class RecordedOrigin(
 private[scalatest] abstract class RecordingOrigin(val registration: RegisteredSuite) extends EventOrigin {
 
   /** Called under the emitter's lock. */
-  def recorded(): RecordedOrigin
+  def record(): RecordedOrigin
 }
 
 /**
@@ -56,25 +58,40 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = ofTopLevelSuite.getOrElse(this)
 
-  // Both are read and written only under the emitter's lock.
+  // All three are read and written only under the emitter's lock. The set holds, by identity, the events an inner
+  // wrapper of a top-level suite's run had handed off that had not reached the top-level suite's wrapper when its
+  // registration was removed. It is kept here, not in the emitter, so that it goes with the top-level suite's wrapper.
   private var executionOfLatestRun = Option.empty[Execution]
   private var isRemoved = false
+  private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
 
   /** Starts an execution for a run of the instance. Called under the emitter's lock. */
   def startRunUnderLock(): Execution = {
-    val execution = table.executionOfStartingRun()
+    val execution = table.takeExecutionForStartingRun()
     executionOfLatestRun = Some(execution)
     execution
   }
 
   /** The execution of the instance's latest run, starting one where no site has. Called under the emitter's lock. */
-  def executionOfRun(): Execution = executionOfLatestRun.getOrElse(startRunUnderLock())
+  def startRunUnlessStarted(): Execution = executionOfLatestRun.getOrElse(startRunUnderLock())
 
   /** Marks this registration removed. Called under the emitter's lock. */
   def markRemoved(): Unit = isRemoved = true
 
   /** Whether this registration has been removed. Called under the emitter's lock. */
   def hasBeenRemoved: Boolean = isRemoved
+
+  /**
+   * Keeps an event an inner wrapper of this top-level suite's run handed off, which had not reached this suite's
+   * wrapper when this registration was removed. Called under the emitter's lock.
+   */
+  def keepHandedOffBeforeRemoval(event: Event): Unit = handedOffBeforeRemoval.add(event)
+
+  /**
+   * Stops keeping an event an inner wrapper handed off before this registration was removed, and returns whether it
+   * was kept. Called under the emitter's lock.
+   */
+  def takeHandedOffBeforeRemoval(event: Event): Boolean = handedOffBeforeRemoval.remove(event)
 
   def startRun(): Unit = emitter.startRun(this)
 
@@ -84,14 +101,14 @@ private[scalatest] final class RegisteredSuite(
   def startTestExecution(testName: String): EventOrigin = new OriginOfTestExecution(testName)
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.suiteEvent)
+    new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeSuiteEvent)
 
   def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
     table.nestedSuites.lift(position) match {
       case Some(tableOfNestedSuite) =>
         val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite, Some(topLevel))
         RegisteredSuites.add(nestedSuite, registration)
-        new StructureWrapper(reporter, WrapperNode.NestedSuite(registration), emitter.suiteEvent)
+        new StructureWrapper(reporter, WrapperNode.NestedSuite(registration), emitter.writeSuiteEvent)
       case None => reporter
     }
   }
@@ -117,8 +134,8 @@ private[scalatest] final class RegisteredSuite(
 
     def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
 
-    def recorded(): RecordedOrigin = {
-      val execution = executionOfRun()
+    def record(): RecordedOrigin = {
+      val execution = startRunUnlessStarted()
       new RecordedOrigin(RegisteredSuite.this, node, execution, execution)
     }
   }
@@ -132,8 +149,8 @@ private[scalatest] final class RegisteredSuite(
 
     def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
 
-    def recorded(): RecordedOrigin = {
-      val ofRun = executionOfItsRun.getOrElse(executionOfRun())
+    def record(): RecordedOrigin = {
+      val ofRun = executionOfItsRun.getOrElse(startRunUnlessStarted())
       executionOfItsRun = Some(ofRun)
       new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun)
     }

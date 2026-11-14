@@ -123,8 +123,8 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         destinations.filter(name => text.upstream(name).isEmpty || text.fork(name).isEmpty) shouldBe Nil
 
         And("each run writes the fixture's own lines once, one to stdout and one to stderr")
-        output.map(_.stdout.count(_ == CompatibilityFixture.stdoutLine)) shouldBe Compared(1, 1)
-        output.map(_.stderr.count(_ == CompatibilityFixture.stderrLine)) shouldBe Compared(1, 1)
+        output.map(run => RunOutput.timesWritten(CompatibilityFixture.stdoutLine, run.stdout)) shouldBe Compared(1, 1)
+        output.map(run => RunOutput.timesWritten(CompatibilityFixture.stderrLine, run.stderr)) shouldBe Compared(1, 1)
 
         And("each reporter writes on this fork every line it writes on 3.2.20")
         text.upstream.keys.toList.sorted.flatMap { name =>

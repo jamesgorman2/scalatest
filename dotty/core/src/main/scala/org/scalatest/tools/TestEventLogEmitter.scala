@@ -87,7 +87,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       case Right(structure) =>
         val registration = new RegisteredSuite(this, topLevelSuite(structure), suite, None)
         RegisteredSuites.add(suite, registration)
-        new StructureWrapper(reporter, WrapperNode.TopLevelSuite(registration), suiteEvent)
+        new StructureWrapper(reporter, WrapperNode.TopLevelSuite(registration), writeSuiteEvent)
       case Left(thrown) =>
         endWithoutRunEnded()
         TestEventLogEmitter.rethrowIfUncontained(thrown)
@@ -116,7 +116,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    */
   def recordOrigin(event: Event, origin: RecordingOrigin): Unit = synchronized {
     if (isOpen && !origin.registration.hasBeenRemoved) {
-      originOfEvent.put(event, origin.recorded())
+      originOfEvent.put(event, origin.record())
     }
   }
 
@@ -126,16 +126,27 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * that have not reached its own wrapper. An event whose reporter does not pass it on reaches no further wrapper,
    * and would otherwise be kept, with its suite instance, until the event log closes.
    *
+   * Those handed-off events move to the top-level suite's registration, which its wrapper holds. An event among them
+   * may still reach that wrapper, as an alert a thread the run started sends or one a reporter between the wrappers
+   * held back, and the wrapper then writes nothing: an inner wrapper has written it.
+   *
    * A nested suite's handed-off events are kept until its top-level suite's registration is removed: a reporter that
    * holds events back, such as a `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's
-   * run has completed. After that, an event sent late, as by a thread the run started, is kept by none of them: no
-   * origin is recorded for it, and only the top-level suite's wrapper writes it.
+   * run has completed. After that, an event sent late is kept by none of them: no origin is recorded for it, and only
+   * the top-level suite's wrapper writes it.
    */
   def forget(registration: RegisteredSuite): Unit = synchronized {
     registration.markRemoved()
     originOfEvent.values.removeIf(_.registration eq registration)
     if (registration.topLevel eq registration) {
-      handedOffByAnInnerWrapper.values.removeIf(_.topLevel eq registration)
+      val handedOff = handedOffByAnInnerWrapper.entrySet.iterator
+      while (handedOff.hasNext) {
+        val entry = handedOff.next()
+        if (entry.getValue.topLevel eq registration) {
+          registration.keepHandedOffBeforeRemoval(entry.getKey)
+          handedOff.remove()
+        }
+      }
     }
   }
 
@@ -154,7 +165,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    *
    * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
-  def suiteEvent(wrapper: WrapperNode, event: Event): Unit = {
+  def writeSuiteEvent(wrapper: WrapperNode, event: Event): Unit = {
     originWhereFirstHandedOff(wrapper, event).foreach { origin =>
       // Encoded outside the lock, as `runEvent` encodes.
       val encoded = TestEventLogEmitter.caught {
@@ -164,7 +175,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         if (isOpen) {
           val written = encoded.flatMap { events =>
             TestEventLogEmitter.caught {
-              val execution = Some(assigned(wrapper, origin, event))
+              val execution = Some(assign(wrapper, origin, event))
               events.foreach(one => write(TestEventLogEncoder.line(one, execution)))
             }
           }
@@ -184,9 +195,12 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   // The wrapper of a top-level suite is the last wrapper an event reaches, so it forgets the event. Once the
   // top-level suite's registration is removed, an inner wrapper hands nothing off: keeping the event would retain it
   // where it reaches no further wrapper, and without it the top-level suite's wrapper could not tell it was written.
+  // An event an inner wrapper handed off before the removal is kept by the top-level suite's registration instead.
   private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Option[RecordedOrigin]] = synchronized {
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
     if (!isOpen) {
+      None
+    } else if (isLastWrapper && wrapper.registration.takeHandedOffBeforeRemoval(event)) {
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
       None
@@ -204,16 +218,16 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   // Called under the lock. Numbers the executions the event names, where the event is the first to name them.
-  private def assigned(wrapper: WrapperNode, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+  private def assign(wrapper: WrapperNode, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
     val table = origin.fold(wrapper.registration.table)(_.registration.table)
     // A scope or test the suite's structure does not hold has no node, so its event is assigned to the suite.
     table.scopeOrTest(origin.fold(wrapper.treeNode)(_.node)) match {
-      case Some(scopeOrTest) => assignedToScopeOrTest(table, scopeOrTest, origin, event)
-      case None => assignedToSuite(table, origin, event)
+      case Some(scopeOrTest) => assignToScopeOrTest(table, scopeOrTest, origin, event)
+      case None => assignToSuite(table, origin, event)
     }
   }
 
-  private def assignedToScopeOrTest(table: SuiteNodeTable, node: NodeId, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+  private def assignToScopeOrTest(table: SuiteNodeTable, node: NodeId, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
     val executions = table.executionsOf(node)
     val executionsOfParent = table.executionsOf(table.parents(node))
     val (execution, executionOfParent) = origin match {
@@ -224,14 +238,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           executionsOfParent.openedLast.orElse(executionsOfParent.latest).getOrElse(new Execution)
         )
     }
-    val assigned = NodeExecution(node, executions.numberOf(execution), Some(executionsOfParent.numberOf(executionOfParent)))
+    val assigned = NodeExecution(node, executions.number(execution), Some(executionsOfParent.number(executionOfParent)))
     if (TestEventLogEmitter.closesItsScopeOrTest(event)) {
       executions.close(execution)
     }
     assigned
   }
 
-  private def assignedToSuite(table: SuiteNodeTable, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+  private def assignToSuite(table: SuiteNodeTable, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
     val executions = table.executionsOf(table.node)
     val execution = origin match {
       case Some(recorded) => recorded.executionOfRun
@@ -243,10 +257,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         }
         withNoOrigin
     }
-    val assigned = NodeExecution(table.node, executions.numberOf(execution), None)
+    val assigned = NodeExecution(table.node, executions.number(execution), None)
     if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
       executions.close(execution)
-      table.closedWithoutRun(execution)
+      table.forgetUnrunExecution(execution)
     }
     assigned
   }

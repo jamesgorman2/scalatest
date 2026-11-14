@@ -84,3 +84,11 @@ private[tools] trait EventLogRecording { this: Matchers =>
     decoded.collect { case Right(event) => event }
   }
 }
+
+private[tools] object EventLogRecording {
+
+  /** A reporter that passes no event on. */
+  val passingNoEventOn: Reporter = new Reporter {
+    def apply(event: Event): Unit = ()
+  }
+}

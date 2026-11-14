@@ -20,15 +20,12 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.samples.MarkupDocSpec
 import org.scalatest.samples.RegistrationProbeSuite
+import org.scalatest.tools.EventLogRecording.passingNoEventOn
 import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Promise
 
 final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with TestEventLogRuns with EventLogRecording {
-
-  private val ignoringEvents: Reporter = new Reporter {
-    def apply(event: Event): Unit = ()
-  }
 
   // Records, as its run starts and as its test runs, its registration and whether it is given a structure wrapper.
   private class Probe extends AnyFunSuite {
@@ -86,7 +83,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   private def emitter: TestEventLogEmitter = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
 
   // Runs a top-level suite as Runner does, with the emitter's function for its reporter where there is an emitter.
-  private def runAsTopLevelSuite(suite: Suite, emitter: Option[TestEventLogEmitter], reporter: Reporter = ignoringEvents): ScalaTestStatefulStatus = {
+  private def runAsTopLevelSuite(suite: Suite, emitter: Option[TestEventLogEmitter], reporter: Reporter = passingNoEventOn): ScalaTestStatefulStatus = {
     val status = new ScalaTestStatefulStatus
     new SuiteRunner(suite, Args(reporter), status, TestEventLogHandOff.none, TestEventLogEmitter.reporterOfTopLevelSuiteFor(emitter)).run()
     status
@@ -121,7 +118,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val suite = new Probe
       val other = new Probe
       val anEmitter = emitter
-      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, org.scalatest.Filter.default, ignoringEvents)
+      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, org.scalatest.Filter.default, passingNoEventOn)
       try {
         new SuiteRunner(other, Args(wrapper), new ScalaTestStatefulStatus).run()
         SuiteRegistration.of(suite) should be theSameInstanceAs SuiteRegistration.madeWith(wrapper)
@@ -231,7 +228,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
       val eventLog = new RecordingEventLog
       val suite = new samples.StepwiseOuterSuites
-      val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
       try {
         suite.run(None, Args(wrapper))
       } finally {
@@ -262,7 +259,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     "send the events of its second run in a second execution of each of its scopes and tests" in {
       val eventLog = new RecordingEventLog
       val suite = new samples.StackPathFunSpec
-      val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
       try {
         suite.run(None, Args(wrapper))
         suite.run(None, Args(wrapper))
@@ -298,10 +295,10 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     "record that its markup is its suite's own as it sends it" in {
       val anEmitter = emitter
       val suite = new MarkupDocSpec
-      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
       try {
         // Sent to a reporter that is no structure wrapper, so the emitter keeps the origin until the registration is removed.
-        suite.run(None, Args(ignoringEvents))
+        suite.run(None, Args(passingNoEventOn))
         anEmitter.keptEventCount shouldBe 1
       } finally {
         SuiteRegistration.madeWith(wrapper).remove()
@@ -314,7 +311,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     "not wait for a thread that holds the lock instances are registered and removed under" in {
       val anEmitter = emitter
       val suite = new Probe
-      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+      val wrapper = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
       val lookedUp = new AtomicReference(Option.empty[SuiteRegistration])
       val lookup = new Thread(() => lookedUp.set(Some(SuiteRegistration.of(suite))))
       try {

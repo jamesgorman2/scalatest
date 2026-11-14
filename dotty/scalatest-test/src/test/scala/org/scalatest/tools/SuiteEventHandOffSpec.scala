@@ -23,6 +23,7 @@ import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.EventLogRecording.passingNoEventOn
 import org.scalatest.wordspec.AnyWordSpec
 
 final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLogRecording {
@@ -50,9 +51,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   // reporter that passes no event on.
   private final class PassesNoEventOnSpec extends AnyFunSpec {
     override def run(testName: Option[String], args: Args): Status = {
-      val passingNoEventOn = new Reporter {
-        def apply(event: Event): Unit = ()
-      }
       super.run(testName, args.copy(reporter = passingNoEventOn))
     }
 
@@ -315,7 +313,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  "An emitter handed an event its suite's run sends once the run's registration is removed" should {
+  "An emitter handed an event by a structure wrapper once the run's registration is removed" should {
     val structureOfScopedSuite =
       TestEventLogLine.structure(
         TestEventLogLine.suite(1, "SuiteEventHandOffSpec$ScopedSuite", "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),
@@ -326,10 +324,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         TestEventLogLine.test(6, 1, 2, "flat", "- flat")
       )
 
-    "neither write nor keep the event, where it reaches a test's wrapper whose reporter passes no event on" in withRegisteredSuite { run =>
-      val passingNoEventOn = new Reporter {
-        def apply(event: Event): Unit = ()
-      }
+    "neither write nor keep an event sent after the removal, where it reaches a test's wrapper whose reporter passes no event on" in withRegisteredSuite { run =>
       val wrapperOfTest = run.registration.reporterOfTest("s t", passingNoEventOn)
       run.registration.remove()
       val sentLate = info("sent late")
@@ -339,7 +334,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.emitter.keptEventCount shouldBe 0
     }
 
-    "write the event once, assigned to the suite, where it reaches a test's wrapper and then its suite's" in withRegisteredSuite { run =>
+    "write an event sent after the removal once, assigned to the suite, where it reaches a test's wrapper and then its suite's" in withRegisteredSuite { run =>
       run.registration.remove()
       val sentLate = info("sent late")
       run.registration.startTestExecution("s t").recordFor(sentLate)
@@ -349,6 +344,19 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         List(structureOfScopedSuite, TestEventLogLine.suiteEvent(1, 1, "InfoProvided", """"message":"sent late","""))
       ) shouldBe None
     }
+
+    "write an event once, assigned to its test, where its test's wrapper handed it off before the removal and it then reaches its suite's wrapper" in
+      withRegisteredSuite { run =>
+        val inFlight = testStarting("s t")
+        run.registration.startTestExecution("s t").recordFor(inFlight)
+        run.registration.reporterOfTest("s t", passingNoEventOn)(inFlight)
+        run.registration.remove()
+        run.wrapperOfSuite(inFlight)
+        StatedLines.mismatchWhenIs(
+          run.eventLog.writes.map(_.stripSuffix("\n")),
+          List(structureOfScopedSuite, TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"))
+        ) shouldBe None
+      }
   }
 
   "An emitter handed a test's closing event that records messages" should {

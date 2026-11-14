@@ -83,15 +83,12 @@ object FrameworkRunInItsOwnJvm extends Assertions with TestEventLogRuns {
 object SuiteLookupsInTheirOwnJvm {
 
   def main(arguments: Array[String]): Unit = {
-    val ignoringEvents = new Reporter {
-      def apply(event: Event): Unit = ()
-    }
     val suite = new Suite {}
     def report(step: String): Unit =
       println(s"$step: ${if (SuiteRegistration.of(suite) eq SuiteRegistration.none) "not registered" else "registered"}")
 
     val first = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
-    first.wrapperOfTopLevelSuite(suite, Filter.default, ignoringEvents)
+    first.wrapperOfTopLevelSuite(suite, Filter.default, EventLogRecording.passingNoEventOn)
     report("with one event log open")
     val second = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
     first.endWithoutRunEnded()
