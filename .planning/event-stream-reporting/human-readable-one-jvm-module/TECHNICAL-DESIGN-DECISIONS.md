@@ -2,39 +2,33 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
-## An event's node is found from the suite instance that sent it, recorded beside the event in the emitter, never through `args.reporter`.
+## A registration takes a suite's `suiteId` from the first read 3.2.20 makes of it in the run, never from a read of its own at registration.
 
-**Alternatives**
+**Alternatives** Reading `suiteId` where the instance registers calls an overridable member, which user code can make throw or depend on state, at a point where 3.2.20 does not call it (`../SPECIFICATION.md` R-002).
 
-- Keying by `suiteId` and test name alone is ambiguous where two distinct instances of one class run at once, as when the class is nested twice under `-P`.
-- Unwrapping known reporter chains fails outright for `RandomTestOrder`, which runs each deferred per-test instance with the suite-level `Args` rather than those given to `runTest`, and on an unknown reporter silently falls back to the suite's node.
-- A thread-local fails where the distributor runs the test on another thread.
-- Carrying the node ID in `Args.configMap` shows it to user code, risking `../SPECIFICATION.md` R-002.
-- Tracking a wrapper's open scopes by the order of `ScopeOpened` and `ScopeClosed` cannot tell sibling scopes of one text apart, and holds only while every scope's events arrive in nesting order.
+**Reasoning** 3.2.20 reads `suiteId` before the instance's first scope or test event: in the `SuiteStarting` a top-level site or `runNestedSuites` builds, in `Suite.runTests`' filter, or as a send helper builds an event. Taking it there calls nothing 3.2.20 does not, and still fixes the node path in time for its `structure` to precede the node's scope and test events.
 
-**Reasoning** No reporter chain reliably carries a node's wrapper, since core and user code replace `args.reporter` before a test runs. The suite instance reaches every engine site that sends an event, together with the test name or branch the event is for. The site therefore records them against the event, and the wrapper that hands the event off needs only to name a node table (`TECHNICAL-DESIGN.md` § The test event log on the JVM § An event's node). An instance no core site created registers itself when its run starts.
+**Costs** Send sites must build an origin against a registration whose node path is not yet known, and the emitter resolves it on hand-off. Where an event is handed off before any such read, the emitter reads `suiteId` itself.
 
-**Costs** Each site that creates or first runs a suite instance must register it and later remove it, and every engine site that sends an event must record its origin. The origin of an event that reaches no wrapper stays in the emitter's state until the run ends.
-
-**Settled by**
-
-- [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
-- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
+**Settled by** [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
 
 ---
 
-## A wrapper tells an event another wrapper has handed to the emitter by the event's identity in a set, kept by the emitter until the top-level suite's registration is removed and by that registration after.
+## A wrapper tells an event the emitter already has by the event's identity in a set, kept by the emitter until the top-level suite's run completes and by that suite's wrapper after.
 
 **Alternatives**
 
 - A thread-local flag, set while a wrapper forwards, breaks where a reporter between wrappers holds events back and releases them later, as ScalaTest's `TestSortingReporter` or a user's buffering reporter does.
 - Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting the next wrapper it reaches hand it off.
 
-**Reasoning** `../SPECIFICATION.md` R-002 forbids changing an event, and the reporters between wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it.
+**Reasoning** `../SPECIFICATION.md` R-002 forbids changing an event, and the reporters between a send site and the wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it.
 
-**Costs** Each event costs one insert and one remove under the emitter's write lock. A handed-off event that never reaches its top-level suite's wrapper stays in the emitter's set until that suite's registration is removed, then in the registration's set while the suite's wrapper is reachable. Where a reporter between wrappers forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
+**Costs** Each event costs one insert and one remove under the emitter's write lock. An event that never reaches its top-level suite's wrapper stays in the emitter's set until that suite's run completes, then in the wrapper's set while the wrapper is reachable. Where a reporter forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
 
-**Settled by** [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+**Settled by**
+
+- [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
+- [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
 
 ---
 

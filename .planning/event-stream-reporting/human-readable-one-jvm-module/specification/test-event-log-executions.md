@@ -9,7 +9,7 @@ Each run below is launched outside Mill. In each criterion, no event is assigned
 ```gherkin
 Feature: A suite that runs another instance of itself
 
-  Rule: An instance a suite runs that shares the suite's ID is that suite: what it registers is the suite's further structure, and its events are assigned to the suite's own nodes (R-096, R-130)
+  Rule: An instance a suite runs outside its tests that shares the suite's ID is that suite: what it registers is the suite's further structure, and its events are assigned to the suite's own nodes (R-096, R-130)
     Scenario: AC-135 A custom `@WrapWith` wrapper runs the class it wraps
       Given suite `StackSpec`, class `samples.StackSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[samples.DelegatingSuite])`, declaring scope `A Stack`, labelled `A Stack`, holding test `pops`, labelled `- pops`, which succeeds
       And `samples.DelegatingSuite`, a `Suite` whose constructor takes the annotated class and builds an instance of it, which gives that instance's `suiteName`, `suiteId` and `testNames` as its own, and overrides `run` to call that instance's `run` with the arguments it was given
@@ -41,7 +41,7 @@ Feature: A suite that runs another instance of itself
 ```gherkin
 Feature: A suite run from a test
 
-  Rule: A suite a test runs whose suite ID differs from the innermost enclosing suite's is one nested suite under that suite, never under the test, and has no `SuiteStarting` (R-096, R-130)
+  Rule: A suite a test runs is a nested suite under that test, and has no `SuiteStarting` (R-096, R-130)
     Scenario: AC-136 A test runs a helper
       Given suite `OuterSuite`, class `samples.OuterSuite`, an `AnyFunSuite` whose one test, `uses a helper`, labelled `- uses a helper`, runs a helper, then succeeds
       When `Framework` runs `OuterSuite` with the runner argument
@@ -52,7 +52,7 @@ Feature: A suite run from a test
             test "uses a helper", label "- uses a helper"
         suite "OuterSuite": SuiteStarting
         test "uses a helper": TestStarting
-        structure under suite "OuterSuite"
+        structure under test "uses a helper"
           suite "HelperSuite", class "samples.HelperSuite"
             scope "A helper", label "A helper"
               test "helps", label "- helps"
@@ -77,14 +77,14 @@ Feature: A suite run from a test
             suite "User2Suite", class "samples.User2Suite"
               test "uses two", label "- uses two"
         test "uses one": TestStarting
-        structure under suite "User1Suite"
+        structure under test "uses one"
           suite "HelperSuite", class "samples.HelperSuite"
             scope "A helper", label "A helper"
               test "helps", label "- helps"
         test "helps" #1: TestStarting
         test "uses one": TestSucceeded
         test "uses two": TestStarting
-        structure under suite "User2Suite"
+        structure under test "uses two"
           suite "HelperSuite", class "samples.HelperSuite"
             scope "A helper", label "A helper"
               test "helps", label "- helps"
@@ -93,30 +93,34 @@ Feature: A suite run from a test
         """
       And it holds no other `structure` holding `HelperSuite`
 
-  Rule: Such a suite is one node however many times an instance with its suite ID is run under the innermost enclosing suite, each run a further execution of its scopes and tests, whose events carry the execution of their parent that they ran in (R-130, R-134)
+  Rule: The suites two tests run are two nodes, each with its own executions, whose events carry the execution of each ancestor that they ran in (R-130, R-134)
     Scenario: AC-137 Two tests each run a helper
       Given suite `OuterSuite` of AC-136, with its one test replaced by tests `first` and `second`, labelled `- first` and `- second`, each of which runs a helper, then succeeds
       When `Framework` runs `OuterSuite` with the runner argument
       Then the event log holds, in this order:
         """
         test "first": TestStarting
-        structure under suite "OuterSuite"
+        structure under test "first"
           suite "HelperSuite", class "samples.HelperSuite"
             scope "A helper", label "A helper"
               test "helps", label "- helps"
-        scope "A helper": ScopeOpened
-        test "helps", parent execution 1: TestStarting
-        test "helps", parent execution 1: TestSucceeded
-        scope "A helper": ScopeClosed
+        scope "A helper" #1: ScopeOpened
+        test "helps" #1, in test "first" execution 1: TestStarting
+        test "helps" #1, in test "first" execution 1: TestSucceeded
+        scope "A helper" #1: ScopeClosed
         test "first": TestSucceeded
         test "second": TestStarting
-        scope "A helper" execution 2: ScopeOpened
-        test "helps" execution 2, parent execution 2: TestStarting
-        test "helps" execution 2, parent execution 2: TestSucceeded
-        scope "A helper" execution 2: ScopeClosed
+        structure under test "second"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper" #2: ScopeOpened
+        test "helps" #2, in test "second" execution 1: TestStarting
+        test "helps" #2, in test "second" execution 1: TestSucceeded
+        scope "A helper" #2: ScopeClosed
         test "second": TestSucceeded
         """
-      And it holds no other `structure` holding `HelperSuite`
+      And it holds no other `structure` holding `HelperSuite`, and no event of a second execution of `A helper` or `helps`
 ```
 
 ## Nested suites

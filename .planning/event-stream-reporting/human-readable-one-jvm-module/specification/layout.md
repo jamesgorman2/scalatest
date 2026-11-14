@@ -55,6 +55,38 @@ Feature: The tree of the human-readable output
             - inner two
         """
 
+  Rule: A suite a test ran sits under the test's line (R-096, R-106)
+    Scenario: AC-158 A test runs a helper suite
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "uses a helper", label "- uses a helper"
+        suite "OuterSuite": SuiteStarting
+        test "uses a helper": TestStarting
+        structure under test "uses a helper"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        test "uses a helper": TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `OuterSuite` are:
+        """
+        OuterSuite:
+          - uses a helper
+            HelperSuite:
+              A helper
+                - helps
+        """
+
   Rule: A scope's or test's line shows the label its suite's last structure to hold it gives it, never its name
     Scenario: AC-004 Labels with and without a leading `- `
       Given an event log holding:

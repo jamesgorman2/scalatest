@@ -15,7 +15,7 @@ Terms are defined in `.docs/ubiquitous-language.md`. R-numbers are those of `SPE
 - Strings escape `"`, `\` and control characters. An unpaired UTF-16 surrogate, which a Java string can hold and UTF-8 cannot encode, is written as a `\uXXXX` escape (RFC 8259 § 8.2, https://www.rfc-editor.org/rfc/rfc8259#section-8.2).
 ## Nodes
 
-This section gives the layout of a suite and of every nested suite, scope and test below it. § Run records gives a run's.
+This section gives the layout of a suite and of every nested suite, scope and test below it, a suite a test ran included. § Run records gives a run's.
 
 Every event a run reports contributes its data to one node or to its run's record, each message as its own item (§ Messages). No node holds an ordinal, formatter, rerunner or payload, or an event's copy of its suite's name, ID or class name (R-108); nor does a run record. Neither a `DiscoverySuite` nor a `DistributedTestRunnerSuite` is a node (R-096), so their `SuiteStarting` and `SuiteCompleted` contribute to none; a `DistributedTestRunnerSuite`'s `SuiteAborted` contributes to the one test it ran, which is then aborted.
 
@@ -38,7 +38,7 @@ A node's keys, in order: `kind`, `name`, `label`, `suiteId`, `location`, `outcom
 - `endedAt` — the closing event's. For a node aborted without a closing event of its own, that of the `SuiteAborted` or `RunAborted` that aborted it, and absent where there is none.
 - `duration` — for a suite or test, its closing event's, absent where that event carries none, as `TestIgnored` never does. For a scope, and for a node aborted without a closing event of its own, `endedAt - startedAt`, absent unless both are present. A node that never ran has none (R-103).
 - `threadName` — suites and tests only: the opening event's, else the closing event's.
-- `contents` — always present, `[]` when empty: the node's children and messages in the one sequence R-109 gives, children in the order R-105 gives. Each child or message states its own `kind`.
+- `contents` — always present, `[]` when empty: the node's children and messages in the one sequence R-109 gives, children in the order R-105 gives. A suite's children are its nested suites, scopes and tests, a scope's its scopes and tests, and a test's the suites it ran. Each child or message states its own `kind`.
 - `output` — the output captured against the node (R-012, R-122), as `{ "stdout": …, "stderr": … }`. Absent where none was captured against it.
 
 A not-run test class (R-095) is a node with `kind` `suite`, `outcome` `aborted`, `reason` `notRun` and `contents` `[]`. For class `p.B`, its `suiteId` and `location.className` are `p.B`. It has no times, `threadName`, `message` or `throwable`.

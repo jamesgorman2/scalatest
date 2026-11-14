@@ -27,17 +27,21 @@ _Avoid_: Project, subproject, target
 ## Test structure
 
 **Test structure**:
-The tree of a run's nodes as its tests are written, however many times each ran: the run at its root, containing suites, which contain nested suites, scopes and tests.
+The tree of a run's nodes as its tests are written, however many times each ran: the run at its root, containing suites, which contain nested suites, scopes and tests. A test also contains the suites it ran.
 _Avoid_: Test tree, hierarchy, nesting
 
 **Execution**:
-One running of a suite, scope or test within a run. A node has one for each time it ran, and none where it never started.
+One running of a suite instance, or of a scope or test within it, inside one execution of its parent. A node has one for each time it ran, and none where it never started.
 _Avoid_: Attempt, invocation, retry
 _Context_: A node of the test structure; unrelated to execution mode
 
 **Node**:
-A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, the consolidation is the root, a test run label is also a node, and a run is not: its top-level suites sit directly under its test run label.
+A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. A node is one place in the test structure, and the times that place ran are its executions. A suite's place is its `suiteId` under the suite or test that ran it, and where siblings share that `suiteId`, its order among them: declared order in a `structure`, start order within one execution of the parent in the run. A scope's is its path in its suite, and a test's its name in its suite. Two suites with one `suiteId` at different places are two nodes. In consolidated output, the consolidation is the root, a test run label is also a node, and a run is not: its top-level suites sit directly under its test run label.
 _Avoid_: Element, item, entry, test case
+
+**Node path**:
+A node's ID in its run's test event log: its parent's node path followed by the node's place under that parent. Stable for the run, so the node's `structure` and events name it alike.
+_Avoid_: Invocation path, minted ID
 
 **Name**:
 A node's own text as written in the source file: a suite's suite name, or a scope's or test's text without the text of the scopes around it. ScalaTest's test name, which joins a test's scopes' text with its own, is not a node's name.

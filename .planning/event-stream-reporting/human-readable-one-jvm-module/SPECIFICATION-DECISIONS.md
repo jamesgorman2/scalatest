@@ -2,18 +2,22 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## A suite, scope or test is one node however it is reached.
+## A suite is a node at each place it runs, under the suite or test that ran it, and a test is one node in its suite whichever scope declares it.
 
 **Alternatives**
 
 - Assigning an event whose node its suite's structure lacks to the nearest ancestor that has one puts a test's events on its suite, so the test is never shown as a test (`../SPECIFICATION.md` R-021).
 - A node for each instance that runs gives a test declared by a wrapper and run by the instance it wraps two nodes, one of which never starts and is shown as not run (R-100).
+- One node for every suite sharing a `suiteId` under the innermost enclosing suite merges the helper suites of different tests, and needs the run to match each instance it did not know of against the declared structure.
 
-**Reasoning** A node is known by where it sits and what its events name. A suite is known by its parent, its suite ID and its place among the siblings sharing that ID, and a test by its suite and its test name. A test is therefore the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, and a suite run from several tests is one suite.
+**Reasoning** A node is a place in the test structure, and the times that place ran are its executions. A suite is known by the suite or test that ran it, its suite ID and its place among the siblings there sharing that ID; a scope by its path in its suite; a test by its suite and its test name. A test is therefore the same node whether a wrapper's flat list or the wrapped instance's scoped tree declares it, an instance a suite runs with the suite's own ID is that suite, and a suite that one test runs each time the test runs is one suite.
 
-**Costs** A suite's structure can arrive more than once, so a node's place is known only once the run's event stream ends.
+**Costs** A helper suite that two tests run is shown twice.
 
-**Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
+**Settled by**
+
+- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
+- [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
 
 ---
 

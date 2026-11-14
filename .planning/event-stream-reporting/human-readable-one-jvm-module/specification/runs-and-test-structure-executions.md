@@ -93,10 +93,10 @@ Feature: Nodes that ran more than once
         suite "OverlapFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
         scope "A Stack" execution 2: ScopeOpened
-        test "pops", parent execution 1: TestStarting
-        test "pops" execution 2, parent execution 2: TestStarting
-        test "pops" execution 2, parent execution 2: TestSucceeded
-        test "pops", parent execution 1: TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        test "pops", in scope "A Stack" execution 1: TestStarting
+        test "pops" execution 2, in scope "A Stack" execution 2: TestStarting
+        test "pops" execution 2, in scope "A Stack" execution 2: TestSucceeded
+        test "pops", in scope "A Stack" execution 1: TestFailed(throwable: java.lang.IllegalStateException "not empty")
         scope "A Stack" execution 2: ScopeClosed
         scope "A Stack": ScopeClosed
         suite "OverlapFunSpec": SuiteCompleted
@@ -150,8 +150,50 @@ Feature: Nodes that ran more than once
             - grows *** NOT RUN ***
         """
 
-  Rule: A suite shows its name line once however many times it ran, and no abort line where no event is assigned to it but a node below it has an execution (R-100, R-132)
-    Scenario: AC-143 A suite that two tests each ran
+  Rule: A suite shows its name line once under each execution of its parent that ran it, and no abort line where no event is assigned to it but a node below it has an execution (R-100, R-132)
+    Scenario: AC-143 A suite that a test ran in each of its two executions
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "flaky", label "- flaky"
+        suite "OuterSuite": SuiteStarting
+        test "flaky": TestStarting
+        structure under test "flaky"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        test "flaky": TestFailed
+        test "flaky" execution 2: TestStarting
+        scope "A helper" execution 2, in suite "HelperSuite" execution 2: ScopeOpened
+        test "helps" execution 2: TestStarting
+        test "helps" execution 2: TestSucceeded
+        scope "A helper" execution 2: ScopeClosed
+        test "flaky" execution 2: TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then, with every stack frame left out, the lines for `OuterSuite` are:
+        """
+        OuterSuite:
+          - flaky *** FAILED ***
+            HelperSuite:
+              A helper
+                - helps
+          - flaky
+            HelperSuite:
+              A helper
+                - helps
+        """
+
+  Rule: A suite that each of two tests ran is two nodes, one under each test's line (R-096, R-130)
+    Scenario: AC-159 A suite that two tests each ran
       Given an event log holding:
         """
         run started
@@ -161,20 +203,24 @@ Feature: Nodes that ran more than once
             test "second", label "- second"
         suite "OuterSuite": SuiteStarting
         test "first": TestStarting
-        structure under suite "OuterSuite"
+        structure under test "first"
           suite "HelperSuite", class "samples.HelperSuite"
             scope "A helper", label "A helper"
               test "helps", label "- helps"
-        scope "A helper": ScopeOpened
-        test "helps": TestStarting
-        test "helps": TestSucceeded
-        scope "A helper": ScopeClosed
+        scope "A helper" #1: ScopeOpened
+        test "helps" #1: TestStarting
+        test "helps" #1: TestSucceeded
+        scope "A helper" #1: ScopeClosed
         test "first": TestSucceeded
         test "second": TestStarting
-        scope "A helper" execution 2: ScopeOpened
-        test "helps" execution 2: TestStarting
-        test "helps" execution 2: TestSucceeded
-        scope "A helper" execution 2: ScopeClosed
+        structure under test "second"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper" #2: ScopeOpened
+        test "helps" #2: TestStarting
+        test "helps" #2: TestSucceeded
+        scope "A helper" #2: ScopeClosed
         test "second": TestSucceeded
         suite "OuterSuite": SuiteCompleted
         run ended completed
@@ -184,12 +230,13 @@ Feature: Nodes that ran more than once
         """
         OuterSuite:
           - first
+            HelperSuite:
+              A helper
+                - helps
           - second
-          HelperSuite:
-            A helper
-              - helps
-            A helper
-              - helps
+            HelperSuite:
+              A helper
+                - helps
         """
 ```
 
