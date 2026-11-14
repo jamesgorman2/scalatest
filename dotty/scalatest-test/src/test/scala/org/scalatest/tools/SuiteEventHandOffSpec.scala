@@ -361,7 +361,34 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         ) shouldBe None
       }
 
-    "keep none of an event a nested suite's wrapper handed off once the nested and top-level registrations are removed, and write it once when it reaches the top-level suite's wrapper" in {
+    "write an event once, where a top-level suite's test wrapper handed it off and another top-level suite's registration is removed before it reaches its own suite's wrapper" in {
+      val eventLog = new RecordingEventLog
+      val emitter = TestEventLogEmitter.appendingTo(eventLog)
+      val removed = new RegisteredRun(eventLog, emitter, new RecordingReporter, new ScopedSuite)
+      val kept = new RegisteredRun(eventLog, emitter, new RecordingReporter, new OneTestSuite)
+      try {
+        val inFlight = testStarting("only")
+        kept.registration.reporterOfTest("only", passingNoEventOn)(inFlight)
+        removed.registration.remove()
+        kept.wrapperOfSuite(inFlight)
+        StatedLines.mismatchWhenIs(
+          eventLog.writes.map(_.stripSuffix("\n")),
+          List(
+            structureOfScopedSuite,
+            TestEventLogLine.structure(
+              TestEventLogLine.suite(7, "SuiteEventHandOffSpec$OneTestSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite"),
+              TestEventLogLine.test(8, 7, 0, "only", "- only")
+            ),
+            TestEventLogLine.scopeOrTestEvent(8, 1, 1, "TestStarting")
+          )
+        ) shouldBe None
+      } finally {
+        removed.registration.remove()
+        kept.registration.remove()
+      }
+    }
+
+    "keep no event a nested suite's wrapper handed off, after the nested and top-level registrations are removed, and write that event once when it reaches the top-level suite's wrapper" in {
       val eventLog = new RecordingEventLog
       val emitter = TestEventLogEmitter.appendingTo(eventLog)
       val topLevel = new OneNestedSuite
