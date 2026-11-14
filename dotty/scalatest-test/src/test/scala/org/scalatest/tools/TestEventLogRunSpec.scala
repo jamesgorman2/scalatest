@@ -361,6 +361,26 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
+    Scenario("A Framework run given the runner argument returns no end-of-run summary") {
+      thisProcess
+      Given("a suite whose one property succeeds")
+      TemporaryEventLog.in { eventLogFile =>
+        When("Framework runs it with no argument, and again with the runner argument alone")
+        val runnerWithoutArgument = frameworkRunner(Nil)
+        execute(runnerWithoutArgument, "samples.SqrtPropSpec", new RecordingLogger)
+        val summaryWithoutArgument = runnerWithoutArgument.done()
+        val runnerWithArgument = frameworkRunner(runnerArgument(eventLogFile))
+        execute(runnerWithArgument, "samples.SqrtPropSpec", new RecordingLogger)
+        val summaryWithArgument = runnerWithArgument.done()
+
+        Then("done returns the end-of-run summary without the runner argument")
+        summaryWithoutArgument should include("Run completed in")
+
+        And("done returns nothing with it")
+        summaryWithArgument shouldBe ""
+      }
+    }
+
     Scenario("Runner.run rejects the graphic reporter with the runner argument") {
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run is given -g and the runner argument")

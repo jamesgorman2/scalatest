@@ -1,6 +1,7 @@
 package org.scalatest.mill
 
 import mill.testkit.IntegrationTester
+import scala.util.matching.Regex
 
 /** Runs Mill on copies of the fixture builds under the integration tests' resources. */
 trait FixtureBuilds {
@@ -12,8 +13,8 @@ trait FixtureBuilds {
   /** The build header line that adds the plugin. */
   protected def pluginHeaderLine: String = s"""//| mvnDeps: ["com.edc::scalatest-mill::$pluginVersion"]"""
 
-  protected def withTester[A](fixture: String)(test: IntegrationTester => A): A = {
-    val tester = IntegrationTester(daemonMode = false, workspaceSourcePath = fixtures / fixture, millExecutable = millExecutable)
+  protected def withTester[A](fixture: String, daemonMode: Boolean = false)(test: IntegrationTester => A): A = {
+    val tester = IntegrationTester(daemonMode = daemonMode, workspaceSourcePath = fixtures / fixture, millExecutable = millExecutable)
     try {
       test(tester)
     } finally {
@@ -73,6 +74,19 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
   /** The human-readable output, without Mill's prefix. */
   def humanReadableOutput: Seq[String] = humanReadableStdoutLines.map(TestCommandResult.withoutMillPrefix)
 
+  /**
+   * The human-readable output, without Mill's prefix, with each ANSI SGR sequence replaced by a marker naming it, such
+   * as `{red}` or `{reset}`.
+   */
+  def humanReadableOutputMarkingColours: Seq[String] = {
+    // `eval.out` has its ANSI escape sequences stripped; the process's own output keeps them.
+    val written = eval.result.out.text().linesIterator.toSeq
+    val start = written.map(TestCommandResult.withoutEscapes).indexOfSlice(humanReadableStdoutLines)
+    written
+      .slice(start, start + humanReadableStdoutLines.size)
+      .map(line => TestCommandResult.withColourMarkers(TestCommandResult.withoutMillPrefix(line)))
+  }
+
   /** The line `nodeLine` of the human-readable output and every line under it, with its indentation removed. */
   def linesFor(nodeLine: String): Seq[String] = {
     val output = humanReadableOutput
@@ -97,6 +111,17 @@ object TestCommandResult {
   private val escapeSequence = "\u001b\\[[0-9;]*[A-Za-z]".r
 
   private def withoutEscapes(line: String): String = escapeSequence.replaceAllIn(line, "")
+
+  private val sgrSequence = "\u001b\\[([0-9;]*)m".r
+
+  private val colourMarkers: Map[String, String] =
+    Map("0" -> "{reset}", "31" -> "{red}", "32" -> "{green}", "33" -> "{yellow}", "36" -> "{cyan}")
+
+  private def withColourMarkers(line: String): String =
+    sgrSequence.replaceAllIn(
+      line,
+      sequence => Regex.quoteReplacement(colourMarkers.getOrElse(sequence.group(1), s"{sgr ${sequence.group(1)}}"))
+    )
 
   private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
 }

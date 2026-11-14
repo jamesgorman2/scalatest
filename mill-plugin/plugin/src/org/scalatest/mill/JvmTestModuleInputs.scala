@@ -34,7 +34,10 @@ private[mill] final case class JvmTestModuleInputs(
     discoveredClasses: Option[Seq[(String, Int)]]
 ) {
 
-  /** A `TestModuleUtil` whose workers and discovery receive `arguments` as their ScalaTest arguments. */
+  /**
+   * A `TestModuleUtil` whose workers and discovery receive `arguments` as their ScalaTest arguments. Its workers log at
+   * the module's `testLogLevel`, raised to `Info`, at which Mill writes no `Running Test Class` line to their stderr.
+   */
   def testModuleUtil(arguments: Seq[String], ctx: TaskCtx): TestModuleUtil =
     new TestModuleUtil(
       useArgsFile,
@@ -54,7 +57,7 @@ private[mill] final case class JvmTestModuleInputs(
       testReportXml,
       javaHome,
       testParallelism,
-      testLogLevel,
+      if (testLogLevel.level < TestReporter.LogLevel.Info.level) TestReporter.LogLevel.Info else testLogLevel,
       propagateEnv,
       jvmWorker,
       discoveredClasses

@@ -9,7 +9,8 @@ import scala.concurrent.duration.DurationInt
 
 /**
  * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue, and adds the
- * worker's run to a consolidation, or the worker itself where no run existed in it.
+ * worker's run, with the lines captured from its stdout and stderr, to a consolidation, or the worker itself where no
+ * run existed in it.
  */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
@@ -25,16 +26,21 @@ private[mill] final class JvmTestModuleRun(
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     val testClasses = discoveredTestClasses()
+    val capture = new WorkerOutputCapture(WorkerOutputCapture.workerCharset)
     val reader = new EventLogReader(
       eventLogFile.toNIO,
-      () => consolidation.addRun(label),
+      () => {
+        val feed = consolidation.addRun(label)
+        capture.addTo(feed.add)
+        feed
+      },
       () => consolidation.addProcessEndedBeforeAnyRun(),
       ProcessExit.hasExited,
       10.millis
     )
     reader.start()
     try {
-      startWorker(testClasses)
+      startWorker(testClasses, capture)
     } finally {
       reader.awaitStreamEnd()
     }
@@ -61,20 +67,19 @@ private[mill] final class JvmTestModuleRun(
     }
   }
 
-  // The worker's stdout and stderr are kept off the console. Mill's worker writes ScalaTest's end-of-run summary there.
   // The worker's result is ignored, even a failure: the consolidation decides the test command's result.
-  private def startWorker(testClasses: Seq[String]): Unit = {
+  // Mill's call spawns the worker on this thread, reading `os.Inherit` here, and returns once both streams are read.
+  private def startWorker(testClasses: Seq[String], capture: WorkerOutputCapture): Unit = {
     val util = inputs.testModuleUtil(RunnerArgument.forEventLogFile(eventLogFile.toNIO), ctx)
     val queue = util.prepareTestClassesFolder(testClasses, processFolder)
     val claimFolder = processFolder / "claim"
     os.makeDir.all(claimFolder)
-    val discarded = os.ProcessOutput.ReadBytes((_, _) => ())
-    os.Inherit.out.withValue(discarded) {
-      os.Inherit.err.withValue(discarded) {
+    os.Inherit.out.withValue(os.ProcessOutput.ReadBytes(capture.stdout)) {
+      os.Inherit.err.withValue(os.ProcessOutput.ReadBytes(capture.stderr)) {
         util.callTestRunnerSubprocess(processFolder, processFolder / "result.log", Right((None, queue, claimFolder)), () => ())(using ctx)
       }
     }
-    ()
+    capture.endStreams()
   }
 }
 

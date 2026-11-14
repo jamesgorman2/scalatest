@@ -896,7 +896,10 @@ class Framework extends SbtFramework {
 
         execSvc.shutdown()
 
-        val fragments: Vector[Fragment] =
+        // A run writing its test event log returns no summary: Mill's worker prints what done returns, and the test
+        // command captures the worker's stdout against the run.
+        if (testEventLogEmitter.isDefined) ""
+        else
           StringReporter.summaryFragments(
             true,
             Some(duration),
@@ -908,8 +911,7 @@ class Framework extends SbtFramework {
             presentReminderWithFullStackTraces,
             presentReminderWithoutCanceledTests,
             presentFilePathname
-          )
-        fragments.map(_.toPossiblyColoredText(presentInColor)).mkString("\n")
+          ).map(_.toPossiblyColoredText(presentInColor)).mkString("\n")
       }
       finally {
         // A done that throws before it sends RunCompleted must not leave the run's test event log open.

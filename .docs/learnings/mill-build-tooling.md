@@ -52,3 +52,19 @@ A Scala 3 file declaring `package <name>` and that package's package object, suc
 
 Write no import in that file; name each type from `_root_`, such as `_root_.mill.api.ExternalModule.Alias`.
 </learning>
+
+<learning>
+date: 2026-11-14
+---
+`mill.testkit.IntegrationTester.EvalResult`'s `out` and `err` (Mill 1.3.1) strip every ANSI escape sequence and trim the text, so a test of colour that reads them sees none, even under `--color true`.
+
+Read the process's own output, `result.out.text()` and `result.err.text()`, to test colour.
+</learning>
+
+<learning>
+date: 2026-11-14
+---
+A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `ScalaTests` test module's classpath. A Mill plugin that takes Mill through `compileMvnDeps` therefore has no Mill or os-lib classes in its unit tests: a test naming `os.*` fails with `Not found: os`.
+
+Keep classes under unit test free of Mill and os-lib types, and do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Test that wiring under testkit.
+</learning>
