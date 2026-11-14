@@ -13,6 +13,7 @@ import org.scalatest.Filter
 import org.scalatest.RegisteredNode
 import org.scalatest.Reporter
 import org.scalatest.Suite
+import org.scalatest.events.EncodedEvent
 import org.scalatest.events.Event
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
@@ -213,22 +214,26 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * The event is assigned to the node and executions its origin names. An event with no origin, one that no engine
    * site of a registered suite instance sent, is assigned to the wrapper's node,
    * in the execution of that node that opened last and has not closed. The messages recorded in a test's closing
-   * event are written before it, assigned as it is.
+   * event are written before it, assigned as it is, unless the test has handed them off one by one.
+   *
+   * The first written event of a test's execution also writes the messages the test handed off before it, assigned
+   * as it is: after it, or before it where it closes the test.
    *
    * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
   def writeSuiteEvent(wrapper: WrapperNode, event: Event): Unit = {
     originWhereFirstHandedOff(wrapper, event).foreach { origin =>
+      val recorded = if (origin.exists(_.recordedEventsHandedOff)) Vector.empty else TestEventLogEmitter.recordedIn(event)
       // Encoded outside the lock, as `runEvent` encodes.
-      val encoded = TestEventLogEmitter.caught {
-        TestEventLogEmitter.recordedIn(event).map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event)
-      }
+      val encoded = TestEventLogEmitter.caught(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
       val thrown = synchronized {
         if (isOpen) {
           val written = encoded.flatMap { events =>
             TestEventLogEmitter.caught {
-              val execution = Some(assign(wrapper, origin, event))
-              events.foreach(one => write(TestEventLogEncoder.line(one, execution)))
+              val execution = assign(wrapper, origin, event)
+              val heldMessages = origin.flatMap(_.messagesOfTest).filter(_.assignment.isEmpty).fold(Vector.empty[EncodedEvent])(_.assign(execution))
+              val inOrder = if (TestEventLogEmitter.closesItsScopeOrTest(event)) heldMessages ++ events else events ++ heldMessages
+              inOrder.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
             }
           }
           if (written.isLeft) {
@@ -241,6 +246,35 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       }
       thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
     }
+  }
+
+  /**
+   * Writes a message a test's informer or documenter handed off as the test called it, and that no reporter receives
+   * as an event of its own. It is assigned as the first written event of the test's execution is, and held until
+   * that event is written. A registration that has been removed writes no message.
+   *
+   * What building, encoding or writing the message throws is kept from the caller as `runEvent` keeps it.
+   */
+  def writeTestMessage(registration: RegisteredSuite, messages: TestExecutionMessages, message: => Event): Unit = {
+    // Built and encoded outside the lock, as `runEvent` encodes.
+    val encoded = TestEventLogEmitter.caught(TestEventLogEncoder.encoded(message))
+    val thrown = synchronized {
+      if (isOpen && !registration.hasBeenRemoved) {
+        val written = encoded.flatMap { one =>
+          messages.assignment match {
+            case Some(execution) => TestEventLogEmitter.caught(write(TestEventLogEncoder.line(one, Some(execution))))
+            case None => Right(messages.hold(one))
+          }
+        }
+        if (written.isLeft) {
+          close()
+        }
+        written.left.toOption
+      } else {
+        encoded.left.toOption
+      }
+    }
+    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
   // Returns `Some` of the event's origin, itself `None` where the event has no origin, where this wrapper is to hand

@@ -258,6 +258,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     val origin = SuiteRegistration.of(theSuite).startTestExecution(testName)
 
     reportTestStarting(theSuite, report, tracker, testName, theTest.testText, theSuite.rerunner, theTest.location, origin)
+    val originOfClosingEvent = origin.ofClosingEventWithMessagesHandedOff
 
     val testTextWithOptionalPrefix = prependChildPrefix(theTest.parent, theTest.testText)
     val formatter = getIndentedTextForTest(testTextWithOptionalPrefix, theTest.indentationLevel, includeIcon)
@@ -266,7 +267,9 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     val informerForThisTest =
       MessageRecordingInformer(
         messageRecorderForThisTest,
-        (message, payload, isConstructingThread, testWasPending, testWasCanceled, location) => createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, isConstructingThread, includeIcon)
+        (message, payload, isConstructingThread, testWasPending, testWasCanceled, location) => createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, isConstructingThread, includeIcon),
+        (message, payload, location) =>
+          origin.handOffMessage(createInfoProvided(theSuite, report, new Tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, true, includeIcon))
       )
 
     val updaterForThisTest =
@@ -286,7 +289,9 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     val documenterForThisTest =
       MessageRecordingDocumenter(
         messageRecorderForThisTest,
-        (message, None, isConstructingThread, testWasPending, testWasCanceled, location) => createMarkupProvided(theSuite, report, tracker, Some(testName), message, theTest.indentationLevel + 1, location, isConstructingThread)
+        (message, None, isConstructingThread, testWasPending, testWasCanceled, location) => createMarkupProvided(theSuite, report, tracker, Some(testName), message, theTest.indentationLevel + 1, location, isConstructingThread),
+        (message, _, location) =>
+          origin.handOffMessage(createMarkupProvided(theSuite, report, new Tracker, Some(testName), message, theTest.indentationLevel + 1, location, true))
       )
 
     val oldInformer = atomicInformer.getAndSet(informerForThisTest)
@@ -303,25 +308,25 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
               val duration = System.currentTimeMillis - testStartTime
               val durationToReport = theTest.recordedDuration.getOrElse(duration)
               val recordEvents = messageRecorderForThisTest.recordedEvents(false, false) // TODO: zap this
-              reportTestSucceeded(theSuite, report, tracker, testName, theTest.testText, recordEvents, durationToReport, formatter, theSuite.rerunner, theTest.location, origin)
+              reportTestSucceeded(theSuite, report, tracker, testName, theTest.testText, recordEvents, durationToReport, formatter, theSuite.rerunner, theTest.location, originOfClosingEvent)
 
             case Pending =>
               val duration = System.currentTimeMillis - testStartTime
               // testWasPending = true so info's printed out in the finally clause show up yellow
               val recordEvents = messageRecorderForThisTest.recordedEvents(true, false) // TODO: Zap this
-              reportTestPending(theSuite, report, tracker, testName, theTest.testText, recordEvents, duration, formatter, theTest.location, origin)
+              reportTestPending(theSuite, report, tracker, testName, theTest.testText, recordEvents, duration, formatter, theTest.location, originOfClosingEvent)
 
             case Canceled(e) =>
               val duration = System.currentTimeMillis - testStartTime
               // testWasCanceled = true so info's printed out in the finally clause show up yellow
               val recordEvents = messageRecorderForThisTest.recordedEvents(false, true) // TODO: zap this
-              reportTestCanceled(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, duration, formatter, theTest.location, origin)
+              reportTestCanceled(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, duration, formatter, theTest.location, originOfClosingEvent)
 
             case Failed(e) =>
               val duration = System.currentTimeMillis - testStartTime
               val durationToReport = theTest.recordedDuration.getOrElse(duration)
               val recordEvents = messageRecorderForThisTest.recordedEvents(false, false) // TODO: Zap this
-              reportTestFailed(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, durationToReport, formatter,  Some(SeeStackDepthException), origin)
+              reportTestFailed(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, durationToReport, formatter,  Some(SeeStackDepthException), originOfClosingEvent)
           }
         // We will only get here if an exception that should cause a Suite to abort rather than a test
         // to fail has happened. In that case, it will be reported as a suite abort, because of this line of code:

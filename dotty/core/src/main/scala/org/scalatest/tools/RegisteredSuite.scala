@@ -11,7 +11,9 @@ import org.scalatest.Status
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.SuiteRegistrations
+import org.scalatest.events.EncodedEvent
 import org.scalatest.events.Event
+import org.scalatest.events.NodeExecution
 
 /** The suite, scope or test of a suite's registration tree that an event is for. */
 private[scalatest] enum TreeNode {
@@ -25,13 +27,43 @@ private[scalatest] enum TreeNode {
  *
  * @param execution the execution of the event's own node
  * @param executionOfRun the execution of the run that sent the event, which is its parent's execution
+ * @param messagesOfTest for an event of a test's execution, the messages the test hands off during it
+ * @param recordedEventsHandedOff whether the event is a test's closing event whose recorded messages the test has
+ *                                already handed off one by one
  */
 private[scalatest] final class RecordedOrigin(
   val registration: RegisteredSuite,
   val node: TreeNode,
   val execution: Execution,
-  val executionOfRun: Execution
+  val executionOfRun: Execution,
+  val messagesOfTest: Option[TestExecutionMessages] = None,
+  val recordedEventsHandedOff: Boolean = false
 )
+
+/**
+ * The messages a test's informer and documenter hand off during one execution of the test. Each is assigned as the
+ * execution's first written event is, and is held until that event is written.
+ *
+ * Read and written only under the emitter's lock.
+ */
+private[scalatest] final class TestExecutionMessages {
+
+  private var assigned = Option.empty[NodeExecution]
+  private var held = Vector.empty[EncodedEvent]
+
+  /** The node and executions of the execution's first written event, once it has been written. */
+  def assignment: Option[NodeExecution] = assigned
+
+  def hold(message: EncodedEvent): Unit = held :+= message
+
+  /** Takes the assignment of the execution's first written event, and returns the messages held until then. */
+  def assign(execution: NodeExecution): Vector[EncodedEvent] = {
+    val released = held
+    assigned = Some(execution)
+    held = Vector.empty
+    released
+  }
+}
 
 /**
  * The origin of the events one engine site sends. The emitter asks it for what to keep beside each of them.
@@ -176,15 +208,27 @@ private[scalatest] final class RegisteredSuite(
   private final class OriginOfTestExecution(testName: String) extends RecordingOrigin(RegisteredSuite.this) {
 
     private val execution = new Execution
+    private val messages = new TestExecutionMessages
     // Read and written only under the emitter's lock.
     private var executionOfItsRun = Option.empty[Execution]
 
     def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
 
-    def record(): RecordedOrigin = {
+    def record(): RecordedOrigin = recorded(recordedEventsHandedOff = false)
+
+    override def handOffMessage(message: => Event): Unit = emitter.writeTestMessage(RegisteredSuite.this, messages, message)
+
+    override def ofClosingEventWithMessagesHandedOff: EventOrigin = {
+      new RecordingOrigin(RegisteredSuite.this) {
+        def recordFor(event: Event): Unit = emitter.recordOrigin(event, this)
+        def record(): RecordedOrigin = recorded(recordedEventsHandedOff = true)
+      }
+    }
+
+    private def recorded(recordedEventsHandedOff: Boolean): RecordedOrigin = {
       val ofRun = executionOfItsRun.getOrElse(startRunUnlessStarted())
       executionOfItsRun = Some(ofRun)
-      new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun)
+      new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun, Some(messages), recordedEventsHandedOff)
     }
   }
 }

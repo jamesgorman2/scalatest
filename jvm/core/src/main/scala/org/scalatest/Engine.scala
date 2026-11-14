@@ -268,6 +268,8 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     val origin = SuiteRegistration.of(theSuite).startTestExecution(testName)
 
     reportTestStarting(theSuite, report, tracker, testName, theTest.testText, theSuite.rerunner, theTest.location, origin)
+    val originOfClosingEvent = origin.ofClosingEventWithMessagesHandedOff
+    theTest.recordedMessages.foreach(_.calls.handOffTo(origin, theSuite, report, testName, theTest.indentationLevel + 1, includeIcon))
 
     val testTextWithOptionalPrefix = prependChildPrefix(theTest.parent, theTest.testText)
     val formatter = getIndentedTextForTest(testTextWithOptionalPrefix, theTest.indentationLevel, includeIcon)
@@ -276,7 +278,9 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     val informerForThisTest =
       MessageRecordingInformer(
         messageRecorderForThisTest,
-        (message, payload, isConstructingThread, testWasPending, testWasCanceled, location) => createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, isConstructingThread, includeIcon)
+        (message, payload, isConstructingThread, testWasPending, testWasCanceled, location) => createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, isConstructingThread, includeIcon),
+        (message, payload, location) =>
+          origin.handOffMessage(createInfoProvided(theSuite, report, new Tracker, Some(testName), message, payload, theTest.indentationLevel + 1, location, true, includeIcon))
       )
 
     val updaterForThisTest =
@@ -296,7 +300,9 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     val documenterForThisTest =
       MessageRecordingDocumenter(
         messageRecorderForThisTest,
-        (message, None, isConstructingThread, testWasPending, testWasCanceled, location) => createMarkupProvided(theSuite, report, tracker, Some(testName), message, theTest.indentationLevel + 1, location, isConstructingThread)
+        (message, None, isConstructingThread, testWasPending, testWasCanceled, location) => createMarkupProvided(theSuite, report, tracker, Some(testName), message, theTest.indentationLevel + 1, location, isConstructingThread),
+        (message, _, location) =>
+          origin.handOffMessage(createMarkupProvided(theSuite, report, new Tracker, Some(testName), message, theTest.indentationLevel + 1, location, true))
       )
 
     val oldInformer = atomicInformer.getAndSet(informerForThisTest)
@@ -315,7 +321,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
                             theTest.recordedMessages.get.recordedEvents(false, theSuite, report, tracker, testName, theTest.indentationLevel + 1, includeIcon)
                           else
                             Vector.empty)
-      reportTestSucceeded(theSuite, report, tracker, testName, theTest.testText, recordEvents, durationToReport, formatter, theSuite.rerunner, theTest.location, origin)
+      reportTestSucceeded(theSuite, report, tracker, testName, theTest.testText, recordEvents, durationToReport, formatter, theSuite.rerunner, theTest.location, originOfClosingEvent)
       SucceededStatus
     }
     catch {
@@ -327,7 +333,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
                              theTest.recordedMessages.get.recordedEvents(true, theSuite, report, tracker, testName, theTest.indentationLevel + 1, includeIcon)
                            else
                              Vector.empty)
-        reportTestPending(theSuite, report, tracker, testName, theTest.testText, recordEvents, duration, formatter, theTest.location, origin)
+        reportTestPending(theSuite, report, tracker, testName, theTest.testText, recordEvents, duration, formatter, theTest.location, originOfClosingEvent)
         SucceededStatus
       case e: TestCanceledException =>
         val duration = System.currentTimeMillis - testStartTime
@@ -337,7 +343,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
                              theTest.recordedMessages.get.recordedEvents(false, theSuite, report, tracker, testName, theTest.indentationLevel + 1, includeIcon)
                            else
                              Vector.empty)
-        reportTestCanceled(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, duration, formatter, theTest.location, origin)
+        reportTestCanceled(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, duration, formatter, theTest.location, originOfClosingEvent)
         SucceededStatus
       case e if !anExceptionThatShouldCauseAnAbort(e) =>
         val duration = System.currentTimeMillis - testStartTime
@@ -347,7 +353,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
                              theTest.recordedMessages.get.recordedEvents(false, theSuite, report, tracker, testName, theTest.indentationLevel + 1, includeIcon)
                            else
                              Vector.empty)
-        reportTestFailed(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, durationToReport, formatter,  Some(SeeStackDepthException), origin)
+        reportTestFailed(theSuite, report, e, testName, theTest.testText, recordEvents, theSuite.rerunner, tracker, durationToReport, formatter,  Some(SeeStackDepthException), originOfClosingEvent)
         FailedStatus
       case e: Throwable => throw e
     }
@@ -997,10 +1003,12 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
       if (isInTargetPath(nextPath, targetPath)) {
         // Default value of None indicates successful test
           //theTest.indentationLevel + 1
+        val callsOfThisTest = new PathMessageCalls
         val informerForThisTest =
           PathMessageRecordingInformer( // TODO: Put locations into path traits!
             (message, payload, wasConstructingThread, testWasPending, theSuite, report, tracker, testName, indentation, includeIcon, thread) =>
-              createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, indentation, None, wasConstructingThread, includeIcon)
+              createInfoProvided(theSuite, report, tracker, Some(testName), message, payload, indentation, None, wasConstructingThread, includeIcon),
+            callsOfThisTest
           )
 
         val oldInformer = atomicInformer.getAndSet(informerForThisTest)
@@ -1008,7 +1016,8 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
         val updaterForThisTest =
           PathMessageRecordingNotifier( // TODO: Put locations into path traits!
             (message, payload, wasConstructingThread, testWasPending, theSuite, report, tracker, testName, indentation, includeIcon, thread) =>
-              createNoteProvided(theSuite, report, tracker, Some(testName), message, payload, indentation, None, wasConstructingThread, includeIcon)
+              createNoteProvided(theSuite, report, tracker, Some(testName), message, payload, indentation, None, wasConstructingThread, includeIcon),
+            callsOfThisTest
           )
 
         val oldNotifier = atomicNotifier.getAndSet(updaterForThisTest)
@@ -1016,7 +1025,8 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
         val alerterForThisTest =
           PathMessageRecordingAlerter( // TODO: Put locations into path traits!
             (message, payload, wasConstructingThread, testWasPending, theSuite, report, tracker, testName, indentation, includeIcon, thread) =>
-              createAlertProvided(theSuite, report, tracker, Some(testName), message, payload, indentation, None, wasConstructingThread, includeIcon)
+              createAlertProvided(theSuite, report, tracker, Some(testName), message, payload, indentation, None, wasConstructingThread, includeIcon),
+            callsOfThisTest
           )
 
         val oldAlerter = atomicAlerter.getAndSet(alerterForThisTest)
@@ -1024,7 +1034,8 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
         val documenterForThisTest =
           PathMessageRecordingDocumenter( // TODO: Put locations into path traits!
             (message, wasConstructingThread, testWasPending, theSuite, report, tracker, testName, indentation, includeIcon, thread) =>
-              createMarkupProvided(theSuite, report, tracker, Some(testName), message, indentation, None, wasConstructingThread, includeIcon)
+              createMarkupProvided(theSuite, report, tracker, Some(testName), message, indentation, None, wasConstructingThread, includeIcon),
+            callsOfThisTest
           )
 
         val oldDocumenter = atomicDocumenter.getAndSet(documenterForThisTest)

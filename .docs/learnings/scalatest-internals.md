@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, or on a run asked to stop; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, or on a failure's source pathname; and before changing a style trait's private registration members.
 ---
 
 <learning>
@@ -96,4 +96,12 @@ In ScalaTest 3.2.20, `AsyncEngine.runTestsImpl` puts a `TestSortingReporter` ove
 An async suite mixing in `OneInstancePerTest` gets no such sorter: `OneInstancePerTest.runTests` sets `runTestInNewInstance` before `runTestsImpl` runs, and `runTestsImpl` creates a sorter only where that flag is unset. Its per-test instances are run with no test sorter, so `AsyncEngine.runImpl`'s `TestSpecificReporter` branch is not reached through `OneInstancePerTest`.
 
 To test what an async suite's reporters receive while a test is pending, give the suite an `ExecutionContext` that queues its tasks, and run them after `run` returns. The default `SerialExecutionContext` runs them before `run` returns.
+</learning>
+
+<learning>
+date: 2026-11-14
+---
+Scalactic's `source.Position.filePathname`, and so a `StackDepthException`'s `failedCodeFilePathname`, holds the source file's path only where the environment variable `SCALACTIC_FILL_FILE_PATHNAMES` is `yes` when the calling code is compiled. Otherwise it holds the text `Please set the environment variable SCALACTIC_FILL_FILE_PATHNAMES to yes at compile time to enable this feature.`
+
+A test that expects a pathname ending in the file's name therefore fails in a build that does not set the variable. Compare the pathname with the one the run's reporters receive, never with a path built from the file's name.
 </learning>

@@ -14,6 +14,18 @@ private[scalatest] abstract class EventOrigin {
 
   /** Records this origin against the event with the emitter of the run's test event log, leaving the event unchanged. Called before the event is reported. */
   def recordFor(event: Event): Unit
+
+  /**
+   * Hands a message of a test's execution to the emitter as the test calls it, and to no reporter. The message is
+   * built only where the run writes a test event log. Called with the origin a test execution's start returned.
+   */
+  def handOffMessage(message: => Event): Unit = ()
+
+  /**
+   * The origin of a test's closing event, whose recorded messages the test has already handed off one by one, so the
+   * emitter writes the closing event without them.
+   */
+  def ofClosingEventWithMessagesHandedOff: EventOrigin = this
 }
 
 private[scalatest] object EventOrigin {
