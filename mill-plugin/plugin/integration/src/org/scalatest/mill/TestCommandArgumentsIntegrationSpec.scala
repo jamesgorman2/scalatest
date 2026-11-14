@@ -93,7 +93,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       "another output letter other than H" -> (Seq("-oJ"), "-oJ"),
       "an output letter other than H, beside H" -> (Seq("-oHP"), "-oHP"),
       "a formatting character" -> (Seq("-oHd"), "-oHd"),
-      "a lowercase character that is no formatting or filtering character" -> (Seq("-oHy"), "-oHy"),
+      "a lowercase character that is neither a formatting nor a filtering character" -> (Seq("-oHy"), "-oHy"),
       "an -f" -> (Seq("-fH", "report.txt"), "-fH"),
       "an -f, beside -oH" -> (Seq("-oH", "-fJ", "report.txt"), "-fJ")
     )
@@ -156,7 +156,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
     }
 
-    Scenario("A tag the module's own arguments exclude is shown only as ScalaTest reports it") {
+    Scenario("A test whose tag the module's own arguments exclude is not shown") {
       Given("SpeedSuite, whose test slow is tagged samples.Slow and writes slow ran, in a module whose own ScalaTest arguments are -l samples.Slow")
       When("the test command runs core.test")
       val result = withSuites("-l", "samples.Slow")("SpeedSuite") { tester =>

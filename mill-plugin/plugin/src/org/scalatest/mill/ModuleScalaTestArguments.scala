@@ -5,12 +5,12 @@ import org.scalatest.consolidation.ScalaTestArgument
 /** Which of a module's own ScalaTest arguments a run receives. */
 private[mill] object ModuleScalaTestArguments {
 
-  /** The flags whose arguments a run receives. Every other flag's are withheld, among them every reporter's. */
+  /** The flags a run receives, with their values. Every other flag, including every reporter's, is withheld. */
   val allowedFlags: Set[String] = Set("-D", "-n", "-l", "-P", "-m", "-w", "-F", "-T", "-t", "-z", "-S", "-W")
 
   /**
-   * The arguments a run receives, each with its values, in the order given; or, where any argument's flag ScalaTest's
-   * runner does not recognise, the failure naming the first such argument.
+   * The allowed arguments, with their values, in the order given; or a failure naming the first argument whose flag
+   * ScalaTest's runner does not recognise.
    */
   def forRun(moduleArguments: Seq[String]): Either[String, Seq[String]] = {
     val split = ScalaTestArgument.split(moduleArguments)

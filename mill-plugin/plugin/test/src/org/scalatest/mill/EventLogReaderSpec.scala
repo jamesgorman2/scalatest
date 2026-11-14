@@ -67,7 +67,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  /** Opens the file once `failures` opens have failed as a file another process holds fails to open on Windows. */
+  /** Opens the file, after failing `failures` times as Windows does while another process holds it. */
   private def openingAfterFailures(failures: Int): Path => InputStream = {
     val failed = new AtomicInteger(0)
     path =>

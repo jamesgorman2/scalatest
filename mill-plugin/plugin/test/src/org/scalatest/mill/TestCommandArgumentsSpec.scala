@@ -29,7 +29,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
     }
 
     "given no module selector" should {
-      "keep none, leaving the module selectors to be checked" in {
+      "return no module selectors, leaving their check to module selection" in {
         TestCommandArguments.parse(Seq("-oH")) shouldBe Right(TestCommandArguments(Nil, humanReadableOnStdout = true))
       }
     }
