@@ -63,6 +63,9 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     override def testNames: Set[String] = Set("only")
   }
 
+  // Its structure gives the suite node 1, its nested OneTestSuite node 2 and that suite's test only node 3.
+  private final class OneNestedSuite extends org.scalatest.Suites(new OneTestSuite)
+
   private def suiteStarting: Event = SuiteStarting(ordinal, suiteName, suiteId, Some(suiteId), threadName = "main", timeStamp = timeStamp)
 
   private def suiteCompleted: Event = SuiteCompleted(ordinal, suiteName, suiteId, Some(suiteId), threadName = "main", timeStamp = timeStamp)
@@ -357,6 +360,32 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           List(structureOfScopedSuite, TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"))
         ) shouldBe None
       }
+
+    "keep none of an event a nested suite's wrapper handed off once the nested and top-level registrations are removed, and write it once when it reaches the top-level suite's wrapper" in {
+      val eventLog = new RecordingEventLog
+      val emitter = TestEventLogEmitter.appendingTo(eventLog)
+      val topLevel = new OneNestedSuite
+      val wrapperOfTopLevel = emitter.wrapperOfTopLevelSuite(topLevel, Filter.default, new RecordingReporter)
+      val registrationOfTopLevel = SuiteRegistration.madeWith(wrapperOfTopLevel)
+      val wrapperOfNested = registrationOfTopLevel.registerNestedSuite(0, topLevel.nestedSuites.head, passingNoEventOn)
+      val inFlight = suiteStarting
+      wrapperOfNested(inFlight)
+      SuiteRegistration.madeWith(wrapperOfNested).remove()
+      registrationOfTopLevel.remove()
+      emitter.keptEventCount shouldBe 0
+      wrapperOfTopLevel(inFlight)
+      StatedLines.mismatchWhenIs(
+        eventLog.writes.map(_.stripSuffix("\n")),
+        List(
+          TestEventLogLine.structure(
+            TestEventLogLine.suite(1, "SuiteEventHandOffSpec$OneNestedSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneNestedSuite"),
+            TestEventLogLine.nestedSuite(2, 1, 0, "SuiteEventHandOffSpec$OneTestSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite"),
+            TestEventLogLine.test(3, 2, 0, "only", "- only")
+          ),
+          TestEventLogLine.suiteEvent(2, 1, "SuiteStarting")
+        )
+      ) shouldBe None
+    }
   }
 
   "An emitter handed a test's closing event that records messages" should {
