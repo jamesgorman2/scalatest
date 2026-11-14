@@ -244,7 +244,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
   Feature("Each line of a multi-line label sits where its first line does") {
 
     Scenario("A test that succeeded shows each line of its label at its depth, each in green") {
-      Given("an event log of a test whose label holds two lines, which succeeded")
+      Given("an event log of a succeeding test whose label holds two lines")
       val eventLog = eventLogOf(
         """test "adds", label "- adds\nand carries"""",
         """test "adds": TestStarting

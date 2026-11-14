@@ -11,7 +11,7 @@ import org.scalatest.events.TestEventLogEvent
 /** An `info`, `note`, `alert` or `markup` message, with the children of its node that had started in its execution when it arrived. */
 private[consolidation] final case class ReceivedMessage(event: DecodedEvent, childrenStarted: Set[NodeId])
 
-/** One execution of a node: its messages, in the order they arrived, apart from its other events. */
+/** One execution of a node: its events, with its messages kept apart in the order they arrived. */
 private[consolidation] final case class Execution(
   number: Int,
   parentExecution: Option[Int],
@@ -62,7 +62,7 @@ private[consolidation] final case class AssembledNode(
       case test: StructureNode.Test => test.name
     }
 
-  /** Whether the node is aborted and no node below it started, so that the nodes below it are shown only as a count. */
+  /** Whether the node aborted or did not run and no node below it started, so the nodes below it show only as a count. */
   def isCollapsed: Boolean =
     outcome.exists(outcome => outcome == Outcome.Aborted || outcome == Outcome.NotRun) && !children.exists(_.started)
 
@@ -143,7 +143,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     markSuitesStarted(nodeExecution.node)
   }
 
-  // A scope or test has started in its parent's execution once it has an execution run in that one. A nested suite
+  // A scope or test has started in its parent's execution once it has an execution inside that one. A nested suite
   // has started once it, or a node below it, has an execution.
   private def childrenStarted(parent: NodeId, parentExecution: Int): Set[NodeId] =
     childIds.get(parent).fold(Set.empty[NodeId]) { children =>

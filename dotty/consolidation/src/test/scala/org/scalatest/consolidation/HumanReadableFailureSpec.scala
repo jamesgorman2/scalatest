@@ -68,7 +68,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
 
-    Scenario("Each line of a throwable's multi-line message sits where its first line does, though it starts like a frame") {
+    Scenario("Each line of a throwable's multi-line message sits where its first line does, even one that starts like a frame line") {
       Given("an event log of a test that fails with a throwable whose message's second line starts with `at `")
       val eventLog = testEndingWith(
         """test "have size 0": TestFailed(throwable: java.lang.RuntimeException "database unreachable\nat host db-1" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"])"""

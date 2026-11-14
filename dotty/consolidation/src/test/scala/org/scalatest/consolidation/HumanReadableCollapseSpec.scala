@@ -6,9 +6,9 @@ import org.scalatest.matchers.should.Matchers
 
 final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  Feature("A subtree whose nodes below its aborted root never started collapses into its root") {
+  Feature("An aborted node whose descendants never started shows them only as a count") {
 
-    Scenario("The count line gives how many suites, scopes and tests sit at any depth below the root") {
+    Scenario("The count line counts the suites, scopes and tests at every depth below the root") {
       Given("an event log of a suite that aborts before any of its 2 nested suites, 1 scope and 3 tests starts")
       val eventLog =
         """
@@ -63,7 +63,7 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
           |        {red}...{reset}""".stripExpectedMargin
     }
 
-    Scenario("A scope open when its suite aborted, none of whose children started, collapses inside a suite that partly ran") {
+    Scenario("A scope open when its suite aborted, with no started children, collapses inside a suite that partly ran") {
       Given("an event log of a suite that aborts after its first test, while a scope is open whose tests never started")
       val eventLog =
         """

@@ -26,7 +26,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
   Feature("Messages sit under the node they attach to, each marked with its kind") {
 
-    Scenario("A test's messages sit under it in the order they arrived, info, note and markup in green and alerts in yellow") {
+    Scenario("A test's messages sit under it in arrival order: info, note and markup in green, alerts in yellow") {
       Given("an event log of a test that sends an info, a note, an alert and a markup message, then succeeds")
       val eventLog = testWithMessages("""test "is empty": InfoProvided(message: "checked size")""")
 

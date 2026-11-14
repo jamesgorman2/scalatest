@@ -124,7 +124,7 @@ private[consolidation] object HumanReadableWriter {
         Segment(StringReporter.stringToPrintWhenNoError(Resources.testSucceeded, formatterOf(test.label), "", Some(test.name), None, false, false).mkString, AnsiGreen)
     }
 
-  // A message's own line is marked with its kind in place of 3.2.20's icon. The lines under it are 3.2.20's.
+  // A message's own line is marked with its kind in place of ScalaTest 3.2.20's icon. The lines under it are as 3.2.20 prints them.
   private def messageLines(message: DecodedEvent, depth: Int): Vector[OutputLine] =
     message match {
       case info: DecodedEvent.InfoProvided =>
@@ -152,7 +152,7 @@ private[consolidation] object HumanReadableWriter {
     linesOf(mark + message, depth, colour) ++ linesUnder(lines.tail, throwable, depth + 1, colour)
   }
 
-  // An event's first line, then its message, analysis and stack trace lines, with `S` and `F` off.
+  // An event's first line, then its message, analysis and stack trace lines, with the `S` and `F` reporter options off.
   private def linesOnError(
     note: String,
     errorMessage: Any => String,
@@ -167,9 +167,9 @@ private[consolidation] object HumanReadableWriter {
       note, errorMessage, message, throwable, analysis.toVector, formatterOf(text), suiteName, testName, None, false, false, false, false, false
     )
 
-  // The lines under an event's first line. They end with its stack trace lines, in which each frame line sits under
-  // its throwable's first line or `Cause:` line, and each of those sits where the message lines do. A stack trace line
-  // is taken for a frame line before it is split, so a message's continuation starting `at ` stays with its message.
+  // The lines under an event's first line: its message lines, then its stack trace lines. A throwable's first line and
+  // each `Cause:` line sit at the message lines' depth, and each frame line one deeper. A line is classed as a frame
+  // line before it is split, so a throwable message's continuation starting `at ` stays at its first line's depth.
   private def linesUnder(lines: Vector[String], throwable: Option[ThrowableView], depth: Int, colour: AnsiColor): Vector[OutputLine] = {
     val stackTraceLineCount = StringReporter.stackTraceLines(throwable, false, false).size
     val (messageLines, stackTraceLines) = lines.splitAt(lines.size - stackTraceLineCount)
@@ -180,9 +180,10 @@ private[consolidation] object HumanReadableWriter {
   private def linesOf(text: String, depth: Int, colour: AnsiColor): Vector[OutputLine] =
     linesOf(Vector(Segment(text, colour)), depth)
 
-  // Segments holding line breaks, such as a multi-line label or message, give one output line per line of text, all at
-  // their depth. Each piece of a segment keeps the segment's colour, so no colour runs across a break, and a segment
-  // after the last break, such as an outcome's note, stays on the last line. Line breaks ending the text add no line.
+  // One output line per line of text, all at `depth`, splitting segments at line breaks, such as in a multi-line label:
+  // - each piece keeps its segment's colour, so no colour runs across a break;
+  // - a segment after the last break, such as an outcome's note, stays on the last line;
+  // - trailing line breaks add no line.
   private def linesOf(segments: Vector[Segment], depth: Int): Vector[OutputLine] = {
     val segmentsByLine = segments.foldLeft(Vector(Vector.empty[Segment])) { (lines, segment) =>
       val pieces = segment.text.split("\n", -1).toVector.map(piece => Segment(piece.stripSuffix("\r"), segment.colour))
