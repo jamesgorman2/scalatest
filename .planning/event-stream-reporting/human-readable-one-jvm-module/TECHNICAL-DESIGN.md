@@ -78,6 +78,7 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 
 This serves `specification/test-command.md` AC-084 to AC-087 and AC-157.
 
+- **Start** is `org.scalatest.consolidation.Consolidation.start`, and the consolidation it returns holds the other operations. **Add a run** returns a `RunFeed`, to which the caller adds the run's events and captured lines and which it tells when the run's event stream has ended.
 - The library keeps the consolidation state (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**) readable from any thread without a lock: event log reading adds events on its own thread while the test command's thread reads the state.
   - Each operation that makes the state failed does so before it returns, so a read made after that operation returns sees the failure.
   - The events that report a failure (`../SPECIFICATION.md` R-046) are `TestFailed`, `TestCanceled` and `SuiteAborted`. A `RunAborted` or `RunStopped` is not among them (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "What the library takes").
@@ -215,7 +216,7 @@ In ScalaTest 3.2.20 the `org.scalatest.tools.StringReporter` companion builds ea
   - the events `Framework` relays from a sub-process sbt forks;
   - the run events of the reruns that `Runner`'s `-g` graphical reporter starts through `RunnerJFrame`, `SuiteRerunner` and `TestRerunner`.
 - Event log reading polls each file every 10 ms, the only interval measured (`../research/jvm-file-channel.md` § 2).
-- The handle **Decode** returns (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is a public opaque type in the library over core's decoded event, whose classes are `private[scalatest]`.
+- The handle **Decode** returns (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is `org.scalatest.consolidation.RunEvent`, a public opaque type in the library over core's decoded event, whose classes are `private[scalatest]`. **Decode** is `RunEvent.decode`, which also refuses a `runStarted` event whose start time `Instant.parse` cannot read.
 - A suite's structure takes each scope's and test's label from the style's registration tree, before any of them runs. The structure precedes the suite's first event (`specification/test-event-log-structure.md` AC-096), and a test that never starts (AC-097) or never closes (`TestStarting` carries `MotionToSuppress`) has no event giving its label. `SuperEngine.registeredNodes` and `AsyncSuperEngine.registeredNodes` build each label as `runTestImpl` and `runTestsInBranch` do, at indentation level 0, where the formatter adds no indentation:
   - a test's from `Suite.getIndentedTextForTest` over its text with its parent's child prefix, with the `includeIcon` its style's `runTest` passes, or `true` for a test the filter ignores, as `TestIgnored`'s formatter has it. That flag is `false` only in `AnyFeatureSpecLike` and `FixtureAnyFeatureSpecLike` (`specification/test-event-log-structure.md` AC-103);
   - a scope's from `getIndentedTextForInfo` over its text with its parent's child prefix, with no icon.
