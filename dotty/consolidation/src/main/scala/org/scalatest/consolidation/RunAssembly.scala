@@ -48,8 +48,8 @@ private[consolidation] final case class PlacedMessage(event: DecodedEvent, child
  *
  * @param number the execution's number, absent where no event of the node's own names the execution
  * @param ending the `TestFailed`, `TestCanceled` or `SuiteAborted` whose lines sit under the execution's line
- * @param children the nodes shown under this execution in order: each nested suite once, and each scope or test once
- *                 for each of its executions that ran in this one, holding that execution alone
+ * @param children the nodes shown under this execution, in order: each nested suite once, and a scope or test once
+ *                 for each of its executions that ran in this one, holding only that execution
  */
 private[consolidation] final case class AssembledExecution(
   number: Option[Int],
@@ -71,7 +71,7 @@ private[consolidation] final case class AssembledExecution(
 
 /**
  * A node of a run's test structure as the human-readable output shows it: a suite with all its executions, or a scope
- * or test with exactly one, which has no number where no event of the node's own names the execution.
+ * or test with exactly one. That execution has no number where no event of the node's own names it.
  */
 private[consolidation] final case class AssembledNode(node: StructureNode, executions: Vector[AssembledExecution]) {
 
@@ -133,8 +133,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     def shownChildrenOf(id: NodeId): Vector[StructureNode] =
       orderedChildren(id, childrenOf(id).filter(child => !isDropped(child) || started(RunAssembly.idOf(child))))
 
-    // A node's own execution numbers, with those of its children's executions' parents: a node shows an execution
-    // that one of its children ran in, though no event of its own carries that number.
+    // A node's own execution numbers, plus the parent execution numbers its children's events give: a node shows an
+    // execution its children ran in even where no event of its own carries that number.
     def executionNumbersOf(id: NodeId): Vector[Option[Int]] = {
       val parentNumbers = childrenOf(id).flatMap(child => executionsOf(RunAssembly.idOf(child)).flatMap(_.parentExecution))
       val numbers = (executionsOf(id).map(_.number) ++ parentNumbers).distinct.sorted
@@ -146,8 +146,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
       AssembledNode(suite, numbers.map(number => assembledExecution(suite, number, number == numbers.last, insideAbortedSuite)))
     }
 
-    // Each scope or test is shown under the execution of its parent its execution ran in. One with no execution, or
-    // shown only for an execution its children ran in, is shown under its parent's latest execution.
+    // A scope's or test's execution is shown under the parent execution it ran in. A scope or test with no execution,
+    // and an execution that no event of its own names, are shown under the parent's latest execution.
     def assembledUnder(child: StructureNode, parentNumber: Option[Int], parentIsLatest: Boolean, insideAbortedSuite: Boolean): Vector[AssembledNode] =
       child match {
         case suite: StructureNode.Suite =>
@@ -218,9 +218,9 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
       case scopeOrTest => RunAssembly.parentOf(scopeOrTest).flatMap(structure.get).flatMap(suiteOf)
     }
 
-  // A node's scopes and tests by declared position, each the latest structure drops after any it holds at that
-  // position. A suite's nested suites sit before or after them, as its first structure had them; those a later
-  // structure added follow, in the order they arrived.
+  // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
+  // one it holds. A suite's nested suites sit before or after them, as its first structure placed them. Those a later
+  // structure added come last, in the order they arrived.
   private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): Vector[StructureNode] = {
     val scopesAndTests = children.filter(RunAssembly.isScopeOrTest).sortBy(child => (RunAssembly.declaredPositionOf(child), isDropped(child)))
     val suites = children.collect { case suite: StructureNode.Suite => suite }

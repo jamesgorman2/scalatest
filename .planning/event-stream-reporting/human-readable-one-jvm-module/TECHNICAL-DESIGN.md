@@ -110,7 +110,11 @@ This serves `specification/runs-and-test-structure-executions.md` AC-141 to AC-1
   - then each nested suite a later `structure` event added, in the order those events arrived.
 - A scope's or test's event gives its parent's execution number with its own (§ The test event log on the JVM § Executions). Assembly puts the node's execution under that execution of its parent.
   - It reads nothing from the order of scope events: under `RandomTestOrder`, a distributor or `AsyncEngine`, a scope can close before its tests start.
-  - A node shows each execution its own events or its children's parent execution numbers name. A nested suite, a scope or test with no execution, and an execution of a scope or test that no event of its own names each sit under its parent's latest execution.
+  - A node shows each execution that its own events name or that its children's events give as their parent execution.
+  - These sit under the parent's latest execution:
+    - a nested suite;
+    - a scope or test with no execution;
+    - an execution of a scope or test that no event of its own names.
 
 ### The human-readable writer's reuse of `StringReporter`'s formatting
 
