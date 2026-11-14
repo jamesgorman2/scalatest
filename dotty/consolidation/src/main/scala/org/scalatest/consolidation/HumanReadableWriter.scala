@@ -22,11 +22,6 @@ private[consolidation] final case class OutputLine(depth: Int, segments: Vector[
   def rendered(coloured: Boolean): String = ("  " * depth) + segments.map(_.rendered(coloured)).mkString
 }
 
-private[consolidation] object OutputLine {
-
-  def apply(depth: Int, text: String, colour: AnsiColor): OutputLine = OutputLine(depth, Vector(Segment(text, colour)))
-}
-
 private[consolidation] object HumanReadableWriter {
 
   private val notRunNote = "*** NOT RUN ***"
@@ -34,16 +29,16 @@ private[consolidation] object HumanReadableWriter {
   def lines(runs: Seq[RunAssembly]): Vector[OutputLine] =
     runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsUnderLabel) =>
       val suites = runsUnderLabel.toVector.flatMap(_.topLevelSuites).sortBy(_.name)
-      OutputLine(0, "[" + label.value + "]", AnsiCyan) +: suites.flatMap(nodeLines(_, 1))
+      linesOf("[" + label.value + "]", 0, AnsiCyan) ++ suites.flatMap(nodeLines(_, 1))
     }
 
   private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
     node.node match {
       case suite: StructureNode.Suite =>
-        OutputLine(depth, suiteNameLine(suite.name), AnsiGreen) +:
-          (contentLines(node, depth + 1) ++ suiteEndingLines(suite, node, depth + 1) ++ countLines(node, depth + 1))
+        linesOf(suiteNameLine(suite.name), depth, AnsiGreen) ++
+          contentLines(node, depth + 1) ++ suiteEndingLines(suite, node, depth + 1) ++ countLines(node, depth + 1)
       case scope: StructureNode.Scope =>
-        OutputLine(depth, scopeLine(scope, node.outcome)) +: (contentLines(node, depth + 1) ++ countLines(node, depth + 1))
+        linesOf(scopeLine(scope, node.outcome), depth) ++ contentLines(node, depth + 1) ++ countLines(node, depth + 1)
       case test: StructureNode.Test =>
         testLines(test, node, depth) ++ node.messages.flatMap(message => messageLines(message.event, depth + 1))
     }
@@ -61,7 +56,7 @@ private[consolidation] object HumanReadableWriter {
   }
 
   private def countLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
-    if (node.isCollapsed && node.children.nonEmpty) Vector(OutputLine(depth, countLine(node.descendants), AnsiRed))
+    if (node.isCollapsed && node.children.nonEmpty) linesOf(countLine(node.descendants), depth, AnsiRed)
     else Vector.empty
 
   private def countLine(hidden: Vector[AssembledNode]): String = {
@@ -80,7 +75,7 @@ private[consolidation] object HumanReadableWriter {
   private def suiteEndingLines(suite: StructureNode.Suite, node: AssembledNode, depth: Int): Vector[OutputLine] =
     (node.outcome, node.ending) match {
       case (Some(Outcome.NotRun), _) =>
-        Vector(OutputLine(depth, Resources.specTextAndNote(suite.className, notRunNote), AnsiRed))
+        linesOf(Resources.specTextAndNote(suite.className, notRunNote), depth, AnsiRed)
       case (Some(Outcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
         val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, suite.className, Some(suite.name), None)
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
@@ -112,25 +107,22 @@ private[consolidation] object HumanReadableWriter {
         val lines = linesOnError(Resources.canceledNote, Resources.testCanceled _, canceled.message, canceled.throwable, Vector.empty, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiYellow) ++ linesUnder(lines.tail, canceled.throwable, depth + 1, AnsiYellow)
       case (outcome, _) =>
-        Vector(OutputLine(depth, testLine(test, outcome)))
+        linesOf(Vector(testLine(test, outcome)), depth)
     }
 
-  private def testLine(test: StructureNode.Test, outcome: Option[Outcome]): Vector[Segment] = {
-    val (text, colour) =
-      outcome match {
-        case Some(Outcome.Ignored) =>
-          (Resources.specTextAndNote(test.label, Resources.ignoredNote), AnsiYellow)
-        case Some(Outcome.Pending) =>
-          (Resources.specTextAndNote(test.label, Resources.pendingNote), AnsiYellow)
-        case Some(Outcome.Aborted) =>
-          (Resources.specTextAndNote(test.label, Resources.abortedNote), AnsiRed)
-        case Some(Outcome.NotRun) =>
-          (Resources.specTextAndNote(test.label, notRunNote), AnsiRed)
-        case _ =>
-          (StringReporter.stringToPrintWhenNoError(Resources.testSucceeded, formatterOf(test.label), "", Some(test.name), None, false, false).mkString, AnsiGreen)
-      }
-    Vector(Segment(text, colour))
-  }
+  private def testLine(test: StructureNode.Test, outcome: Option[Outcome]): Segment =
+    outcome match {
+      case Some(Outcome.Ignored) =>
+        Segment(Resources.specTextAndNote(test.label, Resources.ignoredNote), AnsiYellow)
+      case Some(Outcome.Pending) =>
+        Segment(Resources.specTextAndNote(test.label, Resources.pendingNote), AnsiYellow)
+      case Some(Outcome.Aborted) =>
+        Segment(Resources.specTextAndNote(test.label, Resources.abortedNote), AnsiRed)
+      case Some(Outcome.NotRun) =>
+        Segment(Resources.specTextAndNote(test.label, notRunNote), AnsiRed)
+      case _ =>
+        Segment(StringReporter.stringToPrintWhenNoError(Resources.testSucceeded, formatterOf(test.label), "", Some(test.name), None, false, false).mkString, AnsiGreen)
+    }
 
   // A message's own line is marked with its kind in place of 3.2.20's icon. The lines under it are 3.2.20's.
   private def messageLines(message: DecodedEvent, depth: Int): Vector[OutputLine] =
@@ -185,9 +177,20 @@ private[consolidation] object HumanReadableWriter {
       stackTraceLines.flatMap(line => linesOf(line, if (isFrameLine(line)) depth + 1 else depth, colour))
   }
 
-  // A text holding line breaks, such as a multi-line message, gives one output line per line of text, all at its depth.
   private def linesOf(text: String, depth: Int, colour: AnsiColor): Vector[OutputLine] =
-    text.split("\n").toVector.map(line => OutputLine(depth, line.stripSuffix("\r"), colour))
+    linesOf(Vector(Segment(text, colour)), depth)
+
+  // Segments holding line breaks, such as a multi-line label or message, give one output line per line of text, all at
+  // their depth. Each piece of a segment keeps the segment's colour, so no colour runs across a break, and a segment
+  // after the last break, such as an outcome's note, stays on the last line. Line breaks ending the text add no line.
+  private def linesOf(segments: Vector[Segment], depth: Int): Vector[OutputLine] = {
+    val segmentsByLine = segments.foldLeft(Vector(Vector.empty[Segment])) { (lines, segment) =>
+      val pieces = segment.text.split("\n", -1).toVector.map(piece => Segment(piece.stripSuffix("\r"), segment.colour))
+      (lines.init :+ (lines.last :+ pieces.head)) ++ pieces.tail.map(Vector(_))
+    }
+    val withoutTrailingBlankLines = segmentsByLine.reverse.dropWhile(_.forall(_.text.isEmpty)).reverse
+    (if (withoutTrailingBlankLines.isEmpty) segmentsByLine.take(1) else withoutTrailingBlankLines).map(OutputLine(depth, _))
+  }
 
   // A class name holds no space, so neither a throwable's first line nor its `Cause:` line starts with `at ` or is `...`.
   private def isFrameLine(line: String): Boolean = line.startsWith("at ") || line == "..."

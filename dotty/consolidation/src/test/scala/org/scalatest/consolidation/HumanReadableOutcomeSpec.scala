@@ -240,4 +240,55 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
           |      {green}- pops{reset}""".stripExpectedMargin
     }
   }
+
+  Feature("Each line of a multi-line label sits where its first line does") {
+
+    Scenario("A test that succeeded shows each line of its label at its depth, each in green") {
+      Given("an event log of a test whose label holds two lines, which succeeded")
+      val eventLog = eventLogOf(
+        """test "adds", label "- adds\nand carries"""",
+        """test "adds": TestStarting
+          |    test "adds": TestSucceeded""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("each line of the test's label sits at the test's depth, coloured on its own")
+      consolidated(eventLog) shouldBe outputWithNodeLine(
+        """{green}- adds{reset}
+          |    {green}and carries{reset}""".stripExpectedMargin
+      )
+    }
+
+    Scenario("A scope open when its suite aborted shows each line of its label in green, and `*** ABORTED ***` on the last") {
+      Given("an event log of a suite that aborted while a scope whose label holds two lines was open")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "AbortedSpec", class "samples.AbortedSpec"
+            scope "A calculator", label "A calculator\nin base 2"
+              test "adds", label "- adds"
+        suite "AbortedSpec": SuiteStarting
+        scope "A calculator": ScopeOpened
+        test "adds": TestStarting
+        test "adds": TestSucceeded
+        suite "AbortedSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("each line of the scope's label sits at the scope's depth in green, and the last carries `*** ABORTED ***` in red")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}AbortedSpec:{reset}
+          |    {green}A calculator{reset}
+          |    {green}in base 2{reset}{red} *** ABORTED ***{reset}
+          |      {green}- adds{reset}
+          |    {red}samples.AbortedSpec *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: database unreachable{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
+  }
 }
