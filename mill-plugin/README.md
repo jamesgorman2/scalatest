@@ -2,7 +2,7 @@
 
 The plugin `com.edc:scalatest-mill_mill1_3` adds the test command `mill scalatest/test`. It runs one JVM test module's tests and writes their consolidated human-readable output to stdout.
 
-Every release of the plugin is a release of this fork. The plugin, the fork's ScalaTest artifacts and the consolidation library share one version, the fork's release: `3.2.20`.
+Each plugin release is a release of this fork. The plugin, the fork's ScalaTest artifacts and the consolidation library share one version, `3.2.20`.
 
 ## What it supports
 
@@ -29,7 +29,9 @@ Every artifact is published only to the local Ivy repository, `~/.ivy2/local`. P
    ./mill --no-daemon plugin.publishLocal
    ```
 
-   On Windows, replace `./mill` with `./mill.bat` in GitBash, `.\mill.bat` in PowerShell, or `mill.bat` in cmd. This applies to every `./mill` command below. The bootstrap scripts run Mill 1.3.1, which `mill-plugin/.mill-version` pins.
+   On Windows, replace `./mill` with `./mill.bat` in GitBash, `.\mill.bat` in PowerShell, or `mill.bat` in cmd. This applies to every `./mill` command below.
+
+   The bootstrap scripts run Mill 1.3.1, as pinned in `mill-plugin/.mill-version`.
 
 ## Testing the plugin
 
@@ -51,7 +53,7 @@ The build runs Mill 1.3.1. Add the plugin to the header of its `build.mill`:
 
 If the header already has `mvnDeps`, add `"com.edc::scalatest-mill::3.2.20"` to it.
 
-A test module the test command runs depends on this fork's `scalatest` at the plugin's release, and is built with Scala 3.3 or later:
+A test module run by the test command must depend on this fork's `scalatest` at the plugin's release and be built with Scala 3.3 or later:
 
 ```scala
 //| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
@@ -83,7 +85,8 @@ For example, `mill scalatest/test core.test`.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
 
-The module's own ScalaTest arguments, its `testArgsDefault`, reach the run only for these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`. Every other flag, including every reporter's, is withheld.
+The module's own ScalaTest arguments (`testArgsDefault`) reach the run only if they are one of these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`.
+Every other flag, including every reporter flag, is withheld.
 
 The test command fails before any test starts when:
 
