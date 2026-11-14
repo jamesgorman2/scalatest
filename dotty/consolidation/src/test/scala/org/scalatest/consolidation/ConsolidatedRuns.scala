@@ -62,9 +62,6 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     consolidation.end()
     output.markedText
   }
-
-  /** The marked lines of [[consolidated]]. */
-  def consolidatedLines(eventLog: String): Vector[String] = consolidated(eventLog).split("\n").toVector
 }
 
 private[consolidation] object ConsolidatedRuns {

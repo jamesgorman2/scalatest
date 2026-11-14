@@ -144,49 +144,62 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       run ended completed
       """
 
+    val abortedPartwayOutput =
+      """{cyan}[core.test]{reset}
+        |  {green}PartlyRunSpec:{reset}
+        |    {green}- ran{reset}
+        |    {green}Open{reset}{red} *** ABORTED ***{reset}
+        |      {red}- in progress *** ABORTED ***{reset}
+        |    {green}Never opened{reset}{red} *** NOT RUN ***{reset}
+        |      {red}(1 test not run){reset}
+        |    {red}never reached *** NOT RUN ***{reset}
+        |    {red}samples.PartlyRunSpec *** ABORTED ***{reset}
+        |      {red}java.lang.RuntimeException: database unreachable{reset}
+        |        {red}...{reset}""".stripExpectedMargin
+
     Scenario("A test that had not started when its suite aborted shows `*** NOT RUN ***`, in red") {
       Given("an event log of a suite that aborted before a test whose label has no leading `- ` started")
       When("the library consolidates it")
-      val output = consolidatedLines(abortedPartway)
+      val output = consolidated(abortedPartway)
 
       Then("the test's line is its label and `*** NOT RUN ***`, in red")
-      output should contain("    {red}never reached *** NOT RUN ***{reset}")
+      output shouldBe abortedPartwayOutput
     }
 
     Scenario("A test open when its suite aborted shows `*** ABORTED ***`, in red") {
       Given("an event log of a suite that aborted while a test was running")
       When("the library consolidates it")
-      val output = consolidatedLines(abortedPartway)
+      val output = consolidated(abortedPartway)
 
       Then("the test's line is its label and `*** ABORTED ***`, in red")
-      output should contain("      {red}- in progress *** ABORTED ***{reset}")
+      output shouldBe abortedPartwayOutput
     }
 
     Scenario("A scope that had not opened when its suite aborted shows its label in green and `*** NOT RUN ***` in red") {
       Given("an event log of a suite that aborted before a scope opened")
       When("the library consolidates it")
-      val output = consolidatedLines(abortedPartway)
+      val output = consolidated(abortedPartway)
 
       Then("the scope's line is its label in green, then `*** NOT RUN ***` in red")
-      output should contain("    {green}Never opened{reset}{red} *** NOT RUN ***{reset}")
+      output shouldBe abortedPartwayOutput
     }
 
     Scenario("A scope open when its suite aborted shows its label in green and `*** ABORTED ***` in red") {
       Given("an event log of a suite that aborted while a scope was open")
       When("the library consolidates it")
-      val output = consolidatedLines(abortedPartway)
+      val output = consolidated(abortedPartway)
 
       Then("the scope's line is its label in green, then `*** ABORTED ***` in red")
-      output should contain("    {green}Open{reset}{red} *** ABORTED ***{reset}")
+      output shouldBe abortedPartwayOutput
     }
 
     Scenario("A test that completed before its suite aborted keeps its own outcome") {
       Given("an event log of a suite that aborted after one test succeeded")
       When("the library consolidates it")
-      val output = consolidatedLines(abortedPartway)
+      val output = consolidated(abortedPartway)
 
       Then("the test's line is its label, in green")
-      output should contain("    {green}- ran{reset}")
+      output shouldBe abortedPartwayOutput
     }
   }
 
@@ -214,13 +227,17 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidatedLines(eventLog)
+      val output = consolidated(eventLog)
 
-      Then("the label's, the suite's and the scope's lines carry no suffix")
-      output should contain allOf ("{cyan}[core.test]{reset}", "  {green}FailingFunSpec:{reset}", "    {green}A Stack{reset}")
-
-      And("the test's line is `- is empty *** FAILED ***`")
-      output should contain("      {red}- is empty *** FAILED ***{reset}")
+      Then("the label's, the suite's and the scope's lines carry no suffix, and only the test's line shows `*** FAILED ***`")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}FailingFunSpec:{reset}
+          |    {green}A Stack{reset}
+          |      {red}- is empty *** FAILED ***{reset}
+          |        {red}java.lang.IllegalStateException: not empty{reset}
+          |          {red}...{reset}
+          |      {green}- pops{reset}""".stripExpectedMargin
     }
   }
 }
