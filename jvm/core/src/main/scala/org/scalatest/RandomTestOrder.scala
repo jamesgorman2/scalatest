@@ -39,7 +39,7 @@ import scala.util.{Failure, Success}
  */
 trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
 
-  private[scalatest] case class DeferredSuiteRun(suite: Suite with RandomTestOrder, testName: String, status: ScalaTestStatefulStatus)
+  private[scalatest] case class DeferredSuiteRun(suite: Suite with RandomTestOrder, testName: String, status: ScalaTestStatefulStatus, registration: SuiteRegistration)
 
   private val suiteRunQueue = new ConcurrentLinkedQueue[DeferredSuiteRun]
 
@@ -88,8 +88,9 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
       // defer the suite execution
       val status = new ScalaTestStatefulStatus
       val testSpecificInstance = newInstance
-      SuiteRegistration.of(this).registerInstanceOfTest(testSpecificInstance).removeWhenCompleted(status)
-      suiteRunQueue.add(DeferredSuiteRun(testSpecificInstance, testName, status))
+      val registration = SuiteRegistration.of(this).registerInstanceOfTest(testSpecificInstance)
+      registration.removeWhenCompleted(status)
+      suiteRunQueue.add(DeferredSuiteRun(testSpecificInstance, testName, status, registration))
       status
     }
     else {
@@ -190,13 +191,15 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
         val newArgs = args.copy(reporter = SuiteRegistration.of(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
         val status = super.run(testName, newArgs)
         // Random shuffle the deferred suite list, before executing them.
-        Random.shuffle(suiteRunQueue.asScala.toList).map { case DeferredSuiteRun(suite, testName, statefulStatus) =>
-          // Its registration is otherwise removed once statefulStatus completes, which it never does where the run throws.
+        val deferredRuns = Random.shuffle(suiteRunQueue.asScala.toList)
+        deferredRuns.zipWithIndex.foreach { case (DeferredSuiteRun(suite, testName, statefulStatus, _), position) =>
+          // Each registration is otherwise removed once its statefulStatus completes, which never happens for this
+          // instance, nor for those whose runs the throw leaves unstarted.
           val status =
             try suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
             catch {
               case thrown: Throwable =>
-                SuiteRegistration.of(suite).remove()
+                deferredRuns.drop(position).foreach(_.registration.remove())
                 throw thrown
             }
           status.whenCompleted { tri => 

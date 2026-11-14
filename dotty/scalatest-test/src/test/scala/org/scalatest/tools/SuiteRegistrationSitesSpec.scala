@@ -31,6 +31,7 @@ import org.scalatest.samples.ParallelTestExecutionThrowingProbe
 import org.scalatest.samples.PerTestInstances
 import org.scalatest.samples.RandomTestOrderProbe
 import org.scalatest.samples.RandomTestOrderThrowingProbe
+import org.scalatest.samples.RandomTestOrderTwoTestsThrowingProbe
 import org.scalatest.samples.ScopedParallelFunSpec
 import org.scalatest.samples.ScopedQueueingAsyncFunSpec
 import org.scalatest.samples.ScopedRandomOrderFunSpec
@@ -43,6 +44,7 @@ import org.scalatest.tools.EventLogRecording.passingNoEventOn
 import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Promise
+import scala.jdk.CollectionConverters.*
 
 final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with TestEventLogRuns with EventLogRecording {
 
@@ -353,6 +355,15 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   )
 
   perTestInstanceSites("RandomTestOrder.runTest", () => new RandomTestOrderProbe, () => new RandomTestOrderThrowingProbe, None)
+
+  "The suite instances RandomTestOrder.runTest creates to run its tests" should {
+    "not be registered once the run of one of them has thrown, including those whose runs it leaves unrun" in {
+      val suite = new RandomTestOrderTwoTestsThrowingProbe
+      val (runForOneTest, _) = PerTestInstances.recordedIn(runAsTopLevelSuite(suite, Some(emitter)))
+      val instancesOfTests = suite.instancesOfTests.asScala.toVector
+      (runForOneTest.size, instancesOfTests.size, instancesOfTests.map(hasNoRegistration)) shouldBe ((1, 2, Vector(true, true)))
+    }
+  }
 
   "A suite mixing in OneInstancePerTest" should {
     "send each test's events from the instance it runs the test in to the test's node, in the execution of the run that created that instance" in {

@@ -97,6 +97,29 @@ class RandomTestOrderThrowingProbe extends RandomTestOrderProbe {
   override protected def throwsWhenRunForOneTest: Boolean = true
 }
 
+// Its run for each test throws, so the first such run leaves the instances of the other tests unrun.
+@DoNotDiscover
+class RandomTestOrderTwoTestsThrowingProbe extends AnyFunSuite with RandomTestOrder with RecordsItsInstancesOfTests {
+
+  val instancesOfTests = new ConcurrentLinkedQueue[Suite]
+
+  override protected def throwsWhenRunForOneTest: Boolean = true
+
+  override def newInstance: Suite with RandomTestOrder = {
+    val instance = super.newInstance
+    instancesOfTests.add(instance)
+    instance
+  }
+
+  test("first") {
+    succeed
+  }
+
+  test("second") {
+    succeed
+  }
+}
+
 @DoNotDiscover
 class StackPerTestFunSpec extends AnyFunSpec with OneInstancePerTest {
 
