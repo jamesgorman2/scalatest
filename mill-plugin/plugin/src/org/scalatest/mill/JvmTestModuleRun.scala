@@ -11,10 +11,13 @@ import scala.concurrent.duration.DurationInt
  * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue. Adds the worker's
  * run, with the lines captured from its stdout and stderr, to a consolidation, or the worker itself where no run
  * existed in it.
+ *
+ * Discovery and the worker each receive `scalaTestArguments`; the worker receives the runner argument after them.
  */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
     inputs: JvmTestModuleInputs,
+    scalaTestArguments: Seq[String],
     moduleFolder: os.Path,
     ctx: TaskCtx
 ) {
@@ -54,7 +57,7 @@ private[mill] final class JvmTestModuleRun(
           inputs.testClasspath.map(_.path),
           inputs.testFramework,
           Nil,
-          Nil,
+          scalaTestArguments,
           inputs.discoveredClasses
         ),
         javaHome = inputs.javaHome
@@ -70,7 +73,7 @@ private[mill] final class JvmTestModuleRun(
   // The worker's result is ignored, even a failure: the consolidation decides the test command's result.
   // Mill's call spawns the worker on this thread, reading `os.Inherit` here, and returns once both streams are read.
   private def startWorker(testClasses: Seq[String], capture: WorkerOutputCapture): Unit = {
-    val util = inputs.testModuleUtil(RunnerArgument.forEventLogFile(eventLogFile.toNIO), ctx)
+    val util = inputs.testModuleUtil(scalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), ctx)
     val queue = util.prepareTestClassesFolder(testClasses, processFolder)
     val claimFolder = processFolder / "claim"
     os.makeDir.all(claimFolder)

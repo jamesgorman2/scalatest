@@ -40,7 +40,7 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
 
 ### A module's own ScalaTest arguments
 
-The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../SPECIFICATION.md` R-125 allows.
+The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../SPECIFICATION.md` R-125 allows. Discovery receives the same arguments, as `testForked`'s does, without the runner argument.
 
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
 - Core's argument splitter (`../ARCHITECTURE.md` § Modules § ScalaTest core) is `org.scalatest.tools.ArgumentSplitter`, in core's Scala 3 JVM sources only. It returns the arguments in the order given, each as one of two kinds:

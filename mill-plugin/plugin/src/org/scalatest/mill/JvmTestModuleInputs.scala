@@ -11,8 +11,12 @@ import mill.javalib.TestModule
 import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.InternalJvmWorkerApi
 
-/** The values of a JVM test module's tasks that Mill's own `testForked` builds its `TestModuleUtil` from. */
+/**
+ * The values of a JVM test module's tasks that Mill's own `testForked` builds its `TestModuleUtil` from, and the
+ * module's own ScalaTest arguments, `testArgsDefault`.
+ */
 private[mill] final case class JvmTestModuleInputs(
+    testArgs: Seq[String],
     useArgsFile: Boolean,
     forkArgs: Seq[String],
     scalalibClasspath: Seq[PathRef],
@@ -77,6 +81,7 @@ private[mill] object JvmTestModuleInputs {
     val discoveredClasses = discoveredClassesTask(module)
     Task.Anon {
       JvmTestModuleInputs(
+        module.testArgsDefault(),
         module.testUseArgsFile(),
         module.forkArgs(),
         module.jvmWorker().scalalibClasspath(),

@@ -12,7 +12,8 @@ object TestCommandModule extends ExternalModule {
   /**
    * Runs one JVM test module's tests and writes their human-readable output to stdout.
    *
-   * @param arguments the module selector
+   * @param arguments the module selector, and optionally the output argument `-oH`, or a bare `-o` for no output on
+   *   stdout
    */
   def test(evaluator: Evaluator, arguments: mainargs.Leftover[String]): Task.Command[Unit] =
     Task.Command(exclusive = true) {

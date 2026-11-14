@@ -16,12 +16,14 @@ private[mill] final case class SelectedTestModule(module: TestModule) {
 
 private[mill] object SelectedTestModule {
 
-  def resolve(evaluator: Evaluator, arguments: Seq[String]): Either[String, SelectedTestModule] =
-    arguments match {
-      case Seq(selector) if !selector.startsWith("-") =>
+  def resolve(evaluator: Evaluator, moduleSelectors: Seq[String]): Either[String, SelectedTestModule] =
+    moduleSelectors match {
+      case Seq(selector) =>
         resolveSelector(evaluator, selector)
+      case Seq() =>
+        Left("The test command takes one module selector, but was given none")
       case _ =>
-        Left(s"The test command takes one module selector, but was given: ${arguments.mkString(" ")}")
+        Left(s"The test command takes one module selector, but was given: ${moduleSelectors.mkString(" ")}")
     }
 
   private def resolveSelector(evaluator: Evaluator, selector: String): Either[String, SelectedTestModule] =

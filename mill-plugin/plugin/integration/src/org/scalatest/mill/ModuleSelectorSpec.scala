@@ -37,7 +37,7 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
       (
         "no module selector",
         Seq("-oH"),
-        "The test command takes one module selector, but was given: -oH"
+        "The test command takes one module selector, but was given none"
       )
     )
 

@@ -11,11 +11,15 @@ import org.scalatest.consolidation.TestRunLabel
 private[mill] object TestCommand {
 
   def run(evaluator: Evaluator, arguments: Seq[String], ctx: TaskCtx): Unit = {
-    val module = SelectedTestModule.resolve(evaluator, arguments).fold(ctx.fail, identity)
+    val commandArguments = TestCommandArguments.parse(arguments).fold(ctx.fail, identity)
+    val module = SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors).fold(ctx.fail, identity)
     val inputs = JvmTestModuleInputs.evaluate(evaluator, module.module, ctx.log).fold(ctx.fail, identity)
+    val scalaTestArguments = ModuleScalaTestArguments.forRun(inputs.testArgs).fold(ctx.fail, identity)
     val output = ctx.log.streams.out
-    val consolidation = Consolidation.start(line => output.println(line), coloured = MillColour.colours(ctx.log))
-    val run = new JvmTestModuleRun(TestRunLabel(module.path), inputs, moduleFolder(ctx, module.path), ctx)
+    val humanReadableOutput: String => Unit =
+      if (commandArguments.humanReadableOnStdout) line => output.println(line) else _ => ()
+    val consolidation = Consolidation.start(humanReadableOutput, coloured = MillColour.colours(ctx.log))
+    val run = new JvmTestModuleRun(TestRunLabel(module.path), inputs, scalaTestArguments, moduleFolder(ctx, module.path), ctx)
     BuildCtx.withFilesystemCheckerDisabled {
       run.run(consolidation)
     }
