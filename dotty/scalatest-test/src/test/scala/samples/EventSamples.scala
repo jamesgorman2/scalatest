@@ -5,6 +5,7 @@ import org.scalatest.Args
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.DoNotDiscover
+import org.scalatest.ParallelTestExecution
 import org.scalatest.Reporter
 import org.scalatest.Status
 import org.scalatest.SucceededStatus
@@ -290,5 +291,33 @@ class KeepsItsRunsReporterAsyncSpec extends AsyncFunSpec {
 
   it("u") {
     Future.successful(succeed)
+  }
+}
+
+@DoNotDiscover
+class ParFunSuite extends AnyFunSuite with ParallelTestExecution {
+
+  test("a") {
+    succeed
+  }
+
+  test("b") {
+    succeed
+  }
+}
+
+// Throws where the DistributedTestRunnerSuite running its test runs it for that test.
+@DoNotDiscover
+class ParAbortSuite extends AnyFunSuite with ParallelTestExecution {
+
+  override def run(testName: Option[String], args: Args): Status = {
+    if (testName.isDefined) {
+      throw new RuntimeException("no fixture")
+    }
+    super.run(testName, args)
+  }
+
+  test("a") {
+    succeed
   }
 }

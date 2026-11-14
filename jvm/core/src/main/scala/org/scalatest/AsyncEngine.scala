@@ -567,7 +567,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                 case _ => Span(Suite.defaultTestSortingReporterTimeoutInSeconds, Seconds)
               }
             val testSortingReporter = new TestSortingReporter(theSuite.suiteId, passedInArgs.reporter, testSortingTimeout, theSuite.expectedTestCount(passedInArgs.filter), passedInArgs.distributedSuiteSorter, System.err)
-            passedInArgs.copy(reporter = testSortingReporter, distributedTestSorter = Some(testSortingReporter))
+            passedInArgs.copy(reporter = SuiteRegistration.of(theSuite).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           }
           else
             passedInArgs
@@ -617,10 +617,11 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     superRun: (Option[String], Args) => Status
   ): Status = {
 
+    val registration = SuiteRegistration.of(theSuite)
     val args =
       if (!parallelAsyncTestExecution)
         (testName, passedInArgs.distributedTestSorter) match {
-          case (Some(name), Some(sorter)) => passedInArgs.copy(reporter = new TestSpecificReporter(sorter, name))
+          case (Some(name), Some(sorter)) => passedInArgs.copy(reporter = registration.reporterOfTest(name, new TestSpecificReporter(sorter, name)))
           case _ => passedInArgs
         }
       else
@@ -637,7 +638,6 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       updateAtomic(oldBundle, Bundle(currentBranch, testNamesList, testsMap, tagsMap, true))
 
     val report = wrapReporterIfNecessary(theSuite, reporter)
-    val registration = SuiteRegistration.of(theSuite)
     registration.startRun()
     val origin = registration.originAt(Nil)
 

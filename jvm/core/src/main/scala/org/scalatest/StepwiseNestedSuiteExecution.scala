@@ -67,14 +67,7 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status =
-            try nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty))
-            catch {
-              case thrown: Throwable =>
-                nestedRegistration.remove()
-                throw thrown
-            }
-          nestedRegistration.removeWhenCompleted(status)
+          val status = nestedRegistration.removedOnceRun(nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)

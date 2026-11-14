@@ -87,3 +87,13 @@ For a suite with no registration tree, one that overrides `testNames` and `runTe
 
 A hand-written `Suite` whose test names are not method names cannot have an ignored test. To have one report `TestIgnored`, give it a public no-argument method of the ignored test's name.
 </learning>
+
+<learning>
+date: 2026-11-14
+---
+In ScalaTest 3.2.20, `AsyncEngine.runTestsImpl` puts a `TestSortingReporter` over the reporter of every async suite whose tests run one after another, not only of suites mixing in `ParallelTestExecution` or `RandomTestOrder`. A scope's `ScopeClosed` is sent as soon as its tests have been started, before an asynchronous test completes, and the sorter holds it back until the test's events have passed. A reporter placed ahead of that sorter therefore receives `ScopeClosed` between a pending test's `TestStarting` and its closing event.
+
+An async suite mixing in `OneInstancePerTest` gets no such sorter: `OneInstancePerTest.runTests` sets `runTestInNewInstance` before `runTestsImpl` runs, and `runTestsImpl` creates a sorter only where that flag is unset. Its per-test instances are run with no test sorter, so `AsyncEngine.runImpl`'s `TestSpecificReporter` branch is not reached through `OneInstancePerTest`.
+
+To test what an async suite's reporters receive while a test is pending, give the suite an `ExecutionContext` that queues its tasks, and run them after `run` returns. The default `SerialExecutionContext` runs them before `run` returns.
+</learning>

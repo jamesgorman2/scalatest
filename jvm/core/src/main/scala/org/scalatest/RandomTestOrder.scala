@@ -87,7 +87,9 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
 
       // defer the suite execution
       val status = new ScalaTestStatefulStatus
-      suiteRunQueue.add(DeferredSuiteRun(newInstance, testName, status))
+      val testSpecificInstance = newInstance
+      SuiteRegistration.of(this).registerInstanceOfTest(testSpecificInstance).removeWhenCompleted(status)
+      suiteRunQueue.add(DeferredSuiteRun(testSpecificInstance, testName, status))
       status
     }
     else {
@@ -182,14 +184,21 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
   abstract override def run(testName: Option[String], args: Args): Status = {
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
-        super.run(testName, args.copy(reporter = createTestSpecificReporter(sorter, name)))
+        super.run(testName, args.copy(reporter = SuiteRegistration.of(this).reporterOfTest(name, createTestSpecificReporter(sorter, name))))
       case _ =>
         val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-        val newArgs = args.copy(reporter = testSortingReporter, distributedTestSorter = Some(testSortingReporter))
+        val newArgs = args.copy(reporter = SuiteRegistration.of(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
         val status = super.run(testName, newArgs)
         // Random shuffle the deferred suite list, before executing them.
         Random.shuffle(suiteRunQueue.asScala.toList).map { case DeferredSuiteRun(suite, testName, statefulStatus) =>
-          val status = suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
+          // Its registration is otherwise removed once statefulStatus completes, which it never does where the run throws.
+          val status =
+            try suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
+            catch {
+              case thrown: Throwable =>
+                SuiteRegistration.of(suite).remove()
+                throw thrown
+            }
           status.whenCompleted { tri => 
             tri match {
               case Success(result) =>

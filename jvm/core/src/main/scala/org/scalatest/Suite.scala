@@ -1179,14 +1179,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status =
-            try nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty))
-            catch {
-              case thrown: Throwable =>
-                nestedRegistration.remove()
-                throw thrown
-            }
-          nestedRegistration.removeWhenCompleted(status)
+          val status = nestedRegistration.removedOnceRun(nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
@@ -1236,8 +1229,12 @@ trait Suite extends Assertions with Serializable { thisSuite =>
               statusBuffer += callExecuteOnSuite(nestedSuitesArray(position), position)
           }
         case Some(distribute) =>
-          for (nestedSuite <- nestedSuitesArray) 
-            statusBuffer += distributeNestedSuite(distribute, nestedSuite, args.copy(tracker = tracker.nextTracker()))
+          for (position <- nestedSuitesArray.indices) {
+            val nestedSuite = nestedSuitesArray(position)
+            val nestedReport = registration.registerNestedSuite(position, nestedSuite, reporter)
+            val nestedArgs = args.copy(reporter = nestedReport, tracker = tracker.nextTracker())
+            statusBuffer += SuiteRegistration.madeTaking(nestedReport, reporter).removedOnceRun(distributeNestedSuite(distribute, nestedSuite, nestedArgs))
+          }
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)

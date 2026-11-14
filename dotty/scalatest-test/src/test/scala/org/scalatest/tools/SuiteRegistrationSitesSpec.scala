@@ -5,6 +5,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Args
+import org.scalatest.DistributedTestSorter
+import org.scalatest.Distributor
 import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
@@ -14,11 +16,28 @@ import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.Suites
 import org.scalatest.events.Event
+import org.scalatest.events.NodeId
+import org.scalatest.events.TestEventLogDecoder
+import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.SuiteCompleted
 import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.samples.MarkupDocSpec
+import org.scalatest.samples.OneInstancePerTestProbe
+import org.scalatest.samples.OneInstancePerTestThrowingProbe
+import org.scalatest.samples.ParallelTestExecutionProbe
+import org.scalatest.samples.ParallelTestExecutionThrowingProbe
+import org.scalatest.samples.PerTestInstances
+import org.scalatest.samples.RandomTestOrderProbe
+import org.scalatest.samples.RandomTestOrderThrowingProbe
+import org.scalatest.samples.ScopedParallelFunSpec
+import org.scalatest.samples.ScopedQueueingAsyncFunSpec
+import org.scalatest.samples.ScopedRandomOrderFunSpec
+import org.scalatest.samples.SendsFromRunTestsAsyncSuite
+import org.scalatest.samples.SendsFromRunTestsParallelSuite
+import org.scalatest.samples.SendsFromRunTestsRandomOrderSuite
+import org.scalatest.samples.StackPerTestFunSpec
 import org.scalatest.samples.RegistrationProbeSuite
 import org.scalatest.tools.EventLogRecording.passingNoEventOn
 import org.scalatest.wordspec.AnyWordSpec
@@ -83,10 +102,61 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   private def emitter: TestEventLogEmitter = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
 
   // Runs a top-level suite as Runner does, with the emitter's function for its reporter where there is an emitter.
-  private def runAsTopLevelSuite(suite: Suite, emitter: Option[TestEventLogEmitter], reporter: Reporter = passingNoEventOn): ScalaTestStatefulStatus = {
+  private def runAsTopLevelSuite(
+    suite: Suite,
+    emitter: Option[TestEventLogEmitter],
+    reporter: Reporter = passingNoEventOn,
+    distributor: Option[Distributor] = None
+  ): ScalaTestStatefulStatus = {
     val status = new ScalaTestStatefulStatus
-    new SuiteRunner(suite, Args(reporter), status, TestEventLogHandOff.none, TestEventLogEmitter.reporterOfTopLevelSuiteFor(emitter)).run()
+    val args = Args(reporter, distributor = distributor)
+    new SuiteRunner(suite, args, status, TestEventLogHandOff.none, TestEventLogEmitter.reporterOfTopLevelSuiteFor(emitter)).run()
     status
+  }
+
+  // Runs each suite it is handed at once, on the thread that hands it over.
+  private object RunningEachSuiteAtOnce extends Distributor {
+    def apply(suite: Suite, args: Args): Status = {
+      val status = new ScalaTestStatefulStatus
+      new SuiteRunner(suite, args, status).run()
+      status
+    }
+  }
+
+  // Runs the suites it is handed only when asked to.
+  private final class RunningEachSuiteWhenAsked extends Distributor {
+    private var handedOver = Vector.empty[() => Unit]
+
+    def apply(suite: Suite, args: Args): Status = {
+      val status = new ScalaTestStatefulStatus
+      handedOver :+= (() => new SuiteRunner(suite, args, status).run())
+      status
+    }
+
+    def runHandedOver(): Unit = {
+      val toRun = handedOver
+      handedOver = Vector.empty
+      toRun.foreach(run => run())
+    }
+  }
+
+  // Passes no event on, so that an event that reaches it reaches no wrapper after it.
+  private val sortingNoEventOn: DistributedTestSorter = new DistributedTestSorter {
+    def distributingTest(testName: String): Unit = ()
+    def apply(testName: String, event: Event): Unit = ()
+    def completedTest(testName: String): Unit = ()
+  }
+
+  // Runs a suite registered as a top-level suite of an emitter writing to an event log of its own, and returns the lines it writes.
+  private def linesWrittenRunning(suite: Suite)(run: Reporter => Unit): List[String] = {
+    val eventLog = new RecordingEventLog
+    val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
+    try {
+      run(wrapper)
+    } finally {
+      SuiteRegistration.madeWith(wrapper).remove()
+    }
+    eventLog.writes.map(_.stripSuffix("\n")).toList
   }
 
   private def isRegistered(registration: Option[SuiteRegistration]): Boolean = registration.exists(_ ne SuiteRegistration.none)
@@ -167,11 +237,11 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  private def nestedSuiteSites(nesting: String, nest: Seq[Suite] => Suite): Unit = {
+  private def nestedSuiteSites(nesting: String, nest: Seq[Suite] => Suite, distributor: Option[Distributor] = None): Unit = {
     s"A suite that $nesting runs" should {
       "be registered while it runs, with a structure wrapper for its reporter, and not once its run has returned" in {
         val nested = List(new Probe, new Probe)
-        runAsTopLevelSuite(nest(nested), Some(emitter))
+        runAsTopLevelSuite(nest(nested), Some(emitter), distributor = distributor)
         nested.map(suite => (isRegistered(suite.registrationInRun), isRegistered(suite.registrationInTest), suite.runIsGivenAStructureWrapper)) shouldBe
           List((true, true, true), (true, true, true))
         nested.map(hasNoRegistration) shouldBe List(true, true)
@@ -179,17 +249,18 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
       "be registered apart from the suite nested beside it" in {
         val nested = List(new Probe, new Probe)
-        runAsTopLevelSuite(nest(nested), Some(emitter))
+        runAsTopLevelSuite(nest(nested), Some(emitter), distributor = distributor)
         nested.head.registrationInRun.get should not be theSameInstanceAs(nested.last.registrationInRun.get)
       }
 
       "not be registered once its run has thrown" in {
         val nested = new ProbeWhoseRunThrows(new IllegalStateException("thrown by run"))
-        runAsTopLevelSuite(nest(List(nested)), Some(emitter))
+        runAsTopLevelSuite(nest(List(nested)), Some(emitter), distributor = distributor)
         (isRegistered(nested.registrationInTest), hasNoRegistration(nested)) shouldBe ((true, true))
       }
 
-      "stay registered once its run has returned, until the Status that run returned completes" in {
+      // A distributor's runner sends the nested suite's SuiteCompleted only once that Status completes.
+      if (distributor.isEmpty) "stay registered once its run has returned, until the Status that run returned completes" in {
         val mayComplete = Promise[Unit]()
         val nested = new AsyncProbe(mayComplete)
         val wasRegisteredOnceItsRunHadReturned = new AtomicReference(Option.empty[Boolean])
@@ -213,7 +284,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
       "have no registration and no structure wrapper where the run writes no test event log" in {
         val nested = new Probe
-        runAsTopLevelSuite(nest(List(nested)), None)
+        runAsTopLevelSuite(nest(List(nested)), None, distributor = distributor)
         nested.registrationInRun.get should be theSameInstanceAs SuiteRegistration.none
         nested.runIsGivenAStructureWrapper shouldBe false
       }
@@ -223,6 +294,164 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   nestedSuiteSites("Suite.runNestedSuites", nested => new Suites(nested*))
 
   nestedSuiteSites("StepwiseNestedSuiteExecution.runNestedSuites", nested => new Suites(nested*) with StepwiseNestedSuiteExecution)
+
+  nestedSuiteSites("Suite.runNestedSuites hands to a distributor, which", nested => new Suites(nested*), Some(RunningEachSuiteAtOnce))
+
+  "A suite whose nested suites Suite.runNestedSuites hands to a distributor" should {
+    "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
+      val suite = new samples.OuterSuites
+      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper, distributor = Some(RunningEachSuiteAtOnce))))
+      val stated = List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(1, "OuterSuites", "samples.OuterSuites"),
+          TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
+        ),
+        TestEventLogLine.suiteEvent(2, 1, "SuiteStarting"),
+        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
+        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
+        TestEventLogLine.suiteEvent(2, 1, "SuiteCompleted"),
+        TestEventLogLine.suiteEvent(4, 1, "SuiteStarting"),
+        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestStarting"),
+        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestSucceeded"),
+        TestEventLogLine.suiteEvent(4, 1, "SuiteCompleted")
+      )
+      StatedLines.mismatchWhenIs(lines, stated) shouldBe None
+    }
+  }
+
+  private def perTestInstanceSites(site: String, probe: () => Suite, throwingProbe: () => Suite, distributor: Option[Distributor]): Unit = {
+    s"A suite instance $site creates to run one test" should {
+      "be registered while its test runs, and not once its run has completed" in {
+        val suite = probe()
+        val (_, ranItsTest) = PerTestInstances.recordedIn(runAsTopLevelSuite(suite, Some(emitter), distributor = distributor))
+        ranItsTest.map((instance, registration) => (instance ne suite, isRegistered(Some(registration)), hasNoRegistration(instance))) shouldBe
+          Vector((true, true, true))
+      }
+
+      "not be registered once its run has thrown" in {
+        val (runForOneTest, _) = PerTestInstances.recordedIn(runAsTopLevelSuite(throwingProbe(), Some(emitter), distributor = distributor))
+        runForOneTest.map(hasNoRegistration) shouldBe Vector(true)
+      }
+
+      "have no registration where the run writes no test event log" in {
+        val (_, ranItsTest) = PerTestInstances.recordedIn(runAsTopLevelSuite(probe(), None, distributor = distributor))
+        ranItsTest.map((_, registration) => registration eq SuiteRegistration.none) shouldBe Vector(true)
+      }
+    }
+  }
+
+  perTestInstanceSites("OneInstancePerTest.runTest", () => new OneInstancePerTestProbe, () => new OneInstancePerTestThrowingProbe, None)
+
+  perTestInstanceSites(
+    "ParallelTestExecution.runTest",
+    () => new ParallelTestExecutionProbe,
+    () => new ParallelTestExecutionThrowingProbe,
+    Some(RunningEachSuiteAtOnce)
+  )
+
+  perTestInstanceSites("RandomTestOrder.runTest", () => new RandomTestOrderProbe, () => new RandomTestOrderThrowingProbe, None)
+
+  "A suite mixing in OneInstancePerTest" should {
+    "send each test's events from the instance it runs the test in to the test's node, in the execution of the run that created that instance" in {
+      val suite = new StackPerTestFunSpec
+      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
+      val stated = List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(1, "StackPerTestFunSpec", "org.scalatest.samples.StackPerTestFunSpec"),
+          TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
+          TestEventLogLine.test(4, 2, 1, "pops", "- pops")
+        ),
+        TestEventLogLine.scopeOrTestEvent(2, 1, 1, "ScopeOpened"),
+        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
+        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
+        TestEventLogLine.scopeOrTestEvent(4, 1, 1, "TestStarting"),
+        TestEventLogLine.scopeOrTestEvent(4, 1, 1, "TestSucceeded"),
+        TestEventLogLine.scopeOrTestEvent(2, 1, 1, "ScopeClosed")
+      )
+      StatedLines.mismatchWhenIs(lines, stated) shouldBe None
+    }
+  }
+
+  "A suite whose scope's events a TestSortingReporter holds back until its test completes" should {
+    def scopeAndItsTest(suite: Suite, eventsInOrderHandedOff: List[(Long, String)]): List[String] = {
+      TestEventLogLine.structure(
+        TestEventLogLine.suite(1, suite.suiteName, suite.getClass.getName),
+        TestEventLogLine.scope(2, 1, 0, "s", "s"),
+        TestEventLogLine.test(3, 2, 0, "t", "- t")
+      ) :: eventsInOrderHandedOff.map((node, eventName) => TestEventLogLine.scopeOrTestEvent(node, 1, 1, eventName))
+    }
+
+    val scopeClosedBeforeItsTest = List(2L -> "ScopeOpened", 2L -> "ScopeClosed", 3L -> "TestStarting", 3L -> "TestSucceeded")
+
+    "hand the scope's events off as they are sent, where it mixes in RandomTestOrder" in {
+      val suite = new ScopedRandomOrderFunSpec
+      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
+      StatedLines.mismatchWhenIs(lines, scopeAndItsTest(suite, scopeClosedBeforeItsTest)) shouldBe None
+    }
+
+    "hand the scope's events off as they are sent, where it mixes in ParallelTestExecution and its test runs once its run has returned" in {
+      val suite = new ScopedParallelFunSpec
+      val distributor = new RunningEachSuiteWhenAsked
+      val lines = linesWrittenRunning(suite) { wrapper =>
+        suite.run(None, Args(wrapper, distributor = Some(distributor)))
+        distributor.runHandedOver()
+      }
+      StatedLines.mismatchWhenIs(lines, scopeAndItsTest(suite, scopeClosedBeforeItsTest)) shouldBe None
+    }
+
+    "hand the scope's events off as they are sent, where it is of an async style and its test completes once its run has returned" in {
+      val suite = new ScopedQueueingAsyncFunSpec
+      val lines = linesWrittenRunning(suite) { wrapper =>
+        suite.run(None, Args(wrapper))
+        suite.queueing.runQueued()
+      }
+      val scopeClosedWhileItsTestRuns = List(2L -> "ScopeOpened", 3L -> "TestStarting", 2L -> "ScopeClosed", 3L -> "TestSucceeded")
+      StatedLines.mismatchWhenIs(lines, scopeAndItsTest(suite, scopeClosedWhileItsTestRuns)) shouldBe None
+    }
+  }
+
+  "A suite run for one test with a test sorter" should {
+    List(
+      "mixes in ParallelTestExecution" -> (() => new SendsFromRunTestsParallelSuite),
+      "mixes in RandomTestOrder" -> (() => new SendsFromRunTestsRandomOrderSuite),
+      "is of an async style" -> (() => new SendsFromRunTestsAsyncSuite)
+    ).foreach { (kind, sample) =>
+      s"hand off, assigned to that test, a message sent through the reporter its runTests is given, where it $kind" in {
+        val suite = sample()
+        val lines = linesWrittenRunning(suite)(wrapper => suite.run(Some("t"), Args(wrapper, distributedTestSorter = Some(sortingNoEventOn))))
+        val stated = List(
+          TestEventLogLine.structure(TestEventLogLine.suite(1, suite.suiteName, suite.getClass.getName), TestEventLogLine.test(2, 1, 0, "t", "- t")),
+          TestEventLogLine.scopeOrTestEvent(2, 1, 1, "InfoProvided", """"message":"sent by runTests",""")
+        )
+        StatedLines.mismatchWhenIs(lines, stated) shouldBe None
+      }
+    }
+  }
+
+  "A suite instance with two registrations" should {
+    "be given no structure wrapper ahead of its sorter or for the instances it runs its tests in, so that its events reach the emitter through the wrapper it reports to" in {
+      val eventLog = new RecordingEventLog
+      val anEmitter = TestEventLogEmitter.appendingTo(eventLog)
+      val suite = new ScopedRandomOrderFunSpec
+      val first = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
+      val second = anEmitter.wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
+      try {
+        suite.run(None, Args(first))
+      } finally {
+        SuiteRegistration.madeWith(first).remove()
+        SuiteRegistration.madeWith(second).remove()
+      }
+      val nodesOfFirstStructure = Set(1L, 2L, 3L).map(NodeId(_))
+      val events = eventLog.writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n"))).collect {
+        case Right(TestEventLogEvent.ScalaTestEvent(execution, event)) => (execution.exists(assigned => nodesOfFirstStructure.contains(assigned.node)), event.getClass.getSimpleName)
+      }
+      events shouldBe Vector(true -> "ScopeOpened", true -> "TestStarting", true -> "TestSucceeded", true -> "ScopeClosed")
+    }
+  }
 
   "A suite whose nested suites StepwiseNestedSuiteExecution.runNestedSuites runs" should {
     "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {

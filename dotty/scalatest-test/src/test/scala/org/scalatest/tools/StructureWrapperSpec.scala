@@ -16,7 +16,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
   private val suite = new Suite {}
   private val table =
     new SuiteNodeTable(suite, NodeId(1), "samples.OneSuite", "samples.OneSuite", Map.empty, Map.empty, Map.empty, Vector.empty)
-  private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), table, suite, None)
+  private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), table, suite, None, None)
   private val node = WrapperNode.NestedSuite(registration)
 
   private def alert(message: String): Event = AlertProvided(new Ordinal(1), message, None)
@@ -70,6 +70,11 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
     "give no registration where it is a test's wrapper" in {
       val ofTest = new StructureWrapper(new Recording().reporter, WrapperNode.Test(registration, "a test"), new Recording().handOff)
       ofTest.registrationOfItsSuite should be theSameInstanceAs SuiteRegistration.none
+    }
+
+    "give no registration where it is a suite's wrapper ahead of a sorter" in {
+      val aheadOfSorter = new StructureWrapper(new Recording().reporter, WrapperNode.SuiteAheadOfSorter(registration), new Recording().handOff)
+      aheadOfSorter.registrationOfItsSuite should be theSameInstanceAs SuiteRegistration.none
     }
 
     "pass an event on where its hand-off throws an exception" in {

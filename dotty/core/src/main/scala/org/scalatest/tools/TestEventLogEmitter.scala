@@ -85,7 +85,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     // Read outside the lock: reading calls the suite's own methods.
     TestEventLogEmitter.caught(SuiteStructure.read(suite, filter)) match {
       case Right(structure) =>
-        val registration = new RegisteredSuite(this, topLevelSuite(structure), suite, None)
+        val registration = new RegisteredSuite(this, topLevelSuite(structure), suite, None, None)
         RegisteredSuites.add(suite, registration)
         new StructureWrapper(reporter, WrapperNode.TopLevelSuite(registration), writeSuiteEvent)
       case Left(thrown) =>
@@ -108,6 +108,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   /** Starts an execution for a run of a registered suite instance. */
   def startRun(registration: RegisteredSuite): Unit = synchronized {
     registration.startRunUnderLock()
+  }
+
+  /** Returns the execution of a registered suite instance's latest run, starting one where no site has. */
+  def startRunUnlessStarted(registration: RegisteredSuite): Execution = synchronized {
+    registration.startRunUnlessStarted()
   }
 
   /**

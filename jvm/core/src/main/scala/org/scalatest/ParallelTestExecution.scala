@@ -84,7 +84,7 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
         args.distributor match {  // This is the initial instance
           case Some(distributor) =>
             val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-            args.copy(reporter = testSortingReporter, distributedTestSorter = Some(testSortingReporter))
+            args.copy(reporter = SuiteRegistration.of(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           case None =>
             args
         }
@@ -155,7 +155,10 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
             sorter.distributingTest(testName)
 
           // It will be oneInstance, testName, args.copy(reporter = ...)
-          distribute(new DistributedTestRunnerSuite(newInstance, testName, args), args.copy(tracker = args.tracker.nextTracker()))
+          val testSpecificInstance = newInstance
+          SuiteRegistration.of(this).registerInstanceOfTest(testSpecificInstance).removedOnceRun {
+            distribute(new DistributedTestRunnerSuite(testSpecificInstance, testName, args), args.copy(tracker = args.tracker.nextTracker()))
+          }
         }
         else {
           // In test-specific (distributed) instance, so just run the test. (RTINI was
@@ -258,7 +261,7 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
   abstract override def run(testName: Option[String], args: Args): Status = {
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
-        super.run(testName, args.copy(reporter = createTestSpecificReporter(sorter, name)))
+        super.run(testName, args.copy(reporter = SuiteRegistration.of(this).reporterOfTest(name, createTestSpecificReporter(sorter, name))))
       case _ =>
         super.run(testName, args)
     }

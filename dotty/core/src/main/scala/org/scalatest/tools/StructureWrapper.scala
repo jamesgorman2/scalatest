@@ -9,6 +9,8 @@ import org.scalatest.events.Event
 private[scalatest] enum WrapperNode {
   case TopLevelSuite(ofSuite: RegisteredSuite)
   case NestedSuite(ofSuite: RegisteredSuite)
+  /** A suite's, put ahead of a reporter that holds the suite's events back. */
+  case SuiteAheadOfSorter(ofSuite: RegisteredSuite)
   case Test(ofSuite: RegisteredSuite, testName: String)
 
   /** The registration of the node's suite. */
@@ -16,6 +18,7 @@ private[scalatest] enum WrapperNode {
     this match {
       case TopLevelSuite(ofSuite) => ofSuite
       case NestedSuite(ofSuite) => ofSuite
+      case SuiteAheadOfSorter(ofSuite) => ofSuite
       case Test(ofSuite, _) => ofSuite
     }
   }
@@ -48,10 +51,13 @@ private[scalatest] final class StructureWrapper(
     wrapped(event)
   }
 
-  /** The registration the site that runs a suite made as it took this wrapper, or none where this is a test's wrapper. */
+  /**
+   * The registration the site that runs a suite made as it took this wrapper, or none where no site took it in place
+   * of the suite's reporter: a test's wrapper, or one put ahead of a sorter.
+   */
   def registrationOfItsSuite: SuiteRegistration = {
     node match {
-      case WrapperNode.Test(_, _) => SuiteRegistration.none
+      case WrapperNode.Test(_, _) | WrapperNode.SuiteAheadOfSorter(_) => SuiteRegistration.none
       case ofSuite => ofSuite.registration
     }
   }

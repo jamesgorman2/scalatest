@@ -47,12 +47,15 @@ private[scalatest] abstract class RecordingOrigin(val registration: RegisteredSu
  * The registration of a suite instance against its suite's node table, in a run that writes a test event log.
  *
  * @param ofTopLevelSuite the registration of the top-level suite this instance runs within, or none where it is that suite
+ * @param runOfCreator for an instance another instance of the suite created to run one test in, the execution of the
+ *                     creator's run, which the instance's run takes in place of starting its own
  */
 private[scalatest] final class RegisteredSuite(
   emitter: TestEventLogEmitter,
   val table: SuiteNodeTable,
   instance: Suite,
-  ofTopLevelSuite: Option[RegisteredSuite]
+  ofTopLevelSuite: Option[RegisteredSuite],
+  runOfCreator: Option[Execution]
 ) extends SuiteRegistration {
 
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
@@ -61,13 +64,13 @@ private[scalatest] final class RegisteredSuite(
   // All three are read and written only under the emitter's lock. The set holds, by identity, the events inner
   // wrappers of this top-level suite's run handed off that had not reached its wrapper when this registration was
   // removed. It lives here, not in the emitter, so that it is dropped with the top-level suite's wrapper.
-  private var executionOfLatestRun = Option.empty[Execution]
+  private var executionOfLatestRun = runOfCreator
   private var isRemoved = false
   private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
 
   /** Starts an execution for a run of the instance. Called under the emitter's lock. */
   def startRunUnderLock(): Execution = {
-    val execution = table.takeExecutionForStartingRun()
+    val execution = runOfCreator.getOrElse(table.takeExecutionForStartingRun())
     executionOfLatestRun = Some(execution)
     execution
   }
@@ -103,10 +106,19 @@ private[scalatest] final class RegisteredSuite(
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
     new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeSuiteEvent)
 
+  def reporterAheadOf(reporter: Reporter): Reporter =
+    new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), emitter.writeSuiteEvent)
+
+  def registerInstanceOfTest(instance: Suite): SuiteRegistration = {
+    val registration = new RegisteredSuite(emitter, table, instance, Some(topLevel), Some(emitter.startRunUnlessStarted(this)))
+    RegisteredSuites.add(instance, registration)
+    registration
+  }
+
   def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
     table.nestedSuites.lift(position) match {
       case Some(tableOfNestedSuite) =>
-        val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite, Some(topLevel))
+        val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite, Some(topLevel), None)
         RegisteredSuites.add(nestedSuite, registration)
         new StructureWrapper(reporter, WrapperNode.NestedSuite(registration), emitter.writeSuiteEvent)
       case None => reporter

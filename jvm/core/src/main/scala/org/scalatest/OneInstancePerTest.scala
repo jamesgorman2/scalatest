@@ -125,7 +125,7 @@ trait OneInstancePerTest extends SuiteMixin {
     if (args.runTestInNewInstance) {
       // In initial instance, so create a new test-specific instance for this test and invoke run on it.
       val oneInstance = newInstance
-      oneInstance.run(Some(testName), args)
+      SuiteRegistration.of(this).registerInstanceOfTest(oneInstance).removedOnceRun(oneInstance.run(Some(testName), args))
     }
     else // Therefore, in test-specific instance, so run the test.
       super.runTest(testName, args)

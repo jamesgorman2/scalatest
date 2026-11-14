@@ -1286,6 +1286,190 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     Nil
   )
 
+  private def runnerRunOf(testCount: Int, lines: String*): List[String] =
+    runStarted :: TestEventLogLine.runEvent("RunStarting", s""""testCount":$testCount,"configMap":{},""") :: lines.toList ::: List(runCompleted, runEndedCompleted)
+
+  /** One event, in the notation and as the format writes it. */
+  private final case class StatedEvent(inNotation: String, inFormat: String)
+
+  private def startingAndSucceededOf(test: String, node: Long): List[StatedEvent] = {
+    List("TestStarting", "TestSucceeded").map(eventName => StatedEvent(s"""test "$test": $eventName""", inFirstExecution(node, eventName)))
+  }
+
+  // Every order of the sequences' events that keeps each sequence's own events in order.
+  // Recurses once for each event.
+  private def interleavings(sequences: List[List[StatedEvent]]): List[List[StatedEvent]] = {
+    sequences.filter(_.nonEmpty) match {
+      case Nil => List(Nil)
+      case remaining =>
+        remaining.indices.toList.flatMap { index =>
+          interleavings(remaining.updated(index, remaining(index).tail)).map(remaining(index).head :: _)
+        }
+    }
+  }
+
+  private def notationOf(events: List[StatedEvent]): String = events.map(_.inNotation).mkString("\n")
+
+  private val parFunSuiteRuns = interleavings(List(startingAndSucceededOf("a", 2), startingAndSucceededOf("b", 3))).map { order =>
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting ParFunSuite",
+        "TestStarting a",
+        "TestSucceeded a",
+        "TestStarting b",
+        "TestSucceeded b",
+        "SuiteCompleted ParFunSuite",
+        "RunCompleted"
+      ),
+      s"""
+      |run started
+      |run: RunStarting(testCount: 2)
+      |structure
+      |  suite "ParFunSuite", class "samples.ParFunSuite"
+      |    test "a", label "- a"
+      |    test "b", label "- b"
+      |suite "ParFunSuite": SuiteStarting
+      |${notationOf(order)}
+      |suite "ParFunSuite": SuiteCompleted
+      |run: RunCompleted
+      |run ended completed
+      |""".stripMargin,
+      runnerRunOf(
+        2,
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite(1, "ParFunSuite", "samples.ParFunSuite"),
+          TestEventLogLine.test(2, 1, 0, "a", "- a"),
+          TestEventLogLine.test(3, 1, 1, "b", "- b")
+        ) :: suiteStarting(1) :: order.map(_.inFormat)) ::: List(suiteCompleted(1))*
+      )
+    )
+  }
+
+  // Each test runs in an instance of its own, one after another, in any order.
+  private val shuffledSuiteRuns = List("a" -> 2L, "b" -> 3L, "c" -> 4L).permutations.toList.map { tests =>
+    val order = tests.flatMap((test, node) => startingAndSucceededOf(test, node))
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting ShuffledSuite",
+        "TestStarting a",
+        "TestSucceeded a",
+        "TestStarting b",
+        "TestSucceeded b",
+        "TestStarting c",
+        "TestSucceeded c",
+        "SuiteCompleted ShuffledSuite",
+        "RunCompleted"
+      ),
+      s"""
+      |run started
+      |run: RunStarting
+      |structure
+      |  suite "ShuffledSuite", class "samples.ShuffledSuite"
+      |    test "a", label "- a"
+      |    test "b", label "- b"
+      |    test "c", label "- c"
+      |suite "ShuffledSuite": SuiteStarting
+      |${notationOf(order)}
+      |suite "ShuffledSuite": SuiteCompleted
+      |run: RunCompleted
+      |run ended completed
+      |""".stripMargin,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite(1, "ShuffledSuite", "samples.ShuffledSuite"),
+          TestEventLogLine.test(2, 1, 0, "a", "- a"),
+          TestEventLogLine.test(3, 1, 1, "b", "- b"),
+          TestEventLogLine.test(4, 1, 2, "c", "- c")
+        ) :: suiteStarting(1) :: order.map(_.inFormat)) ::: List(suiteCompleted(1))*
+      )
+    )
+  }
+
+  private val abortedRunningOneTest = "Exception encountered when invoking run on a nested suite - no fixture"
+
+  private val parAbortSuite = StatedRun(
+    Vector(
+      "RunStarting",
+      "SuiteStarting ParAbortSuite",
+      s"SuiteAborted DistributedTestRunnerSuite: $abortedRunningOneTest",
+      "SuiteCompleted ParAbortSuite",
+      "RunCompleted"
+    ),
+    s"""
+    run started
+    run: RunStarting(testCount: 1)
+    structure
+      suite "ParAbortSuite", class "samples.ParAbortSuite"
+        test "a", label "- a"
+    suite "ParAbortSuite": SuiteStarting
+    test "a": SuiteAborted(message: "$abortedRunningOneTest", throwable: java.lang.RuntimeException "no fixture")
+    suite "ParAbortSuite": SuiteCompleted
+    run: RunCompleted
+    run ended completed
+    """,
+    runnerRunOf(
+      1,
+      TestEventLogLine.structure(TestEventLogLine.suite(1, "ParAbortSuite", "samples.ParAbortSuite"), TestEventLogLine.test(2, 1, 0, "a", "- a")),
+      suiteStarting(1),
+      inFirstExecution(2, "SuiteAborted", s""""message":"$abortedRunningOneTest",""" + thrown("java.lang.RuntimeException", "no fixture")),
+      suiteCompleted(1)
+    )
+  )
+
+  /**
+   * Registers the scenario of a run whose tests hand off their events in an order the run does not fix, and the
+   * scenario of the decoder that reads the event log of each order.
+   *
+   * @param runs the run in each order its tests may hand off their events, every one telling its reporters the same
+   */
+  private def eventScenariosInAnyOrder(
+    scenario: String,
+    suite: String,
+    suiteClassName: String,
+    eventLogHolds: String,
+    runs: List[StatedRun],
+    launch: Launch,
+    arguments: List[String]
+  ): Unit = {
+    val reportedInEveryOrder = runs.map(_.reported).distinct
+    Scenario(scenario) {
+      thisProcess
+      reportedInEveryOrder should have size 1
+      Given(suite)
+      When(s"${launch.named} runs it without the runner argument")
+      val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments))
+
+      Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
+      reportedWithoutTheArgument shouldBe reportedInEveryOrder.head
+
+      TemporaryEventLog.in { eventLogFile =>
+        When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
+        val reportedWithTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile)))
+        val lines = TemporaryEventLog.lines(eventLogFile)
+
+        Then("the run's reporters are told the same")
+        reportedWithTheArgument shouldBe reportedInEveryOrder.head
+
+        And(s"the event log is $eventLogHolds, in one of the orders the tests may run in")
+        val runInOrderWritten = runs.filter(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat).isEmpty)
+        withClue(s"The event log is:\n${lines.mkString("\n")}\n") {
+          runInOrderWritten should have size 1
+        }
+        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(runInOrderWritten.head.eventLogInNotation)) shouldBe None
+      }
+    }
+
+    Scenario(s"The decoder reads the event log of: $scenario") {
+      When("the decoder is given the lines of that event log, in each order the tests may run in")
+      val mismatches = runs.flatMap(run => EventLogComparison.mismatchWhenIs(decodedOrFail(run.eventLogInFormat), built(run.eventLogInNotation)))
+
+      Then(s"it yields $eventLogHolds")
+      mismatches shouldBe Nil
+    }
+  }
+
   private def slowSuiteAlertedBy(alert: String): List[String] = {
     List(
       TestEventLogLine.structure(TestEventLogLine.suite(1, "SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(2, 1, 0, "sleeps", "- sleeps")),
@@ -1443,6 +1627,37 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       "the suite's structure and events, with a TestIgnored assigned to later and no event assigned to slow",
       filteredSuite,
       arguments = List("-l", "samples.Slow")
+    )
+
+    eventScenariosInAnyOrder(
+      "Tests run in parallel by Runner",
+      "an AnyFunSuite mixing in ParallelTestExecution, whose tests a and b succeed",
+      "samples.ParFunSuite",
+      "one structure holding the suite and no DistributedTestRunnerSuite, then the suite's events, " +
+        "with one TestStarting and one TestSucceeded assigned to each of a and b",
+      parFunSuiteRuns,
+      Launch.ByRunner,
+      List("-P2")
+    )
+
+    eventScenariosInAnyOrder(
+      "The events of tests in random order are assigned to their own nodes",
+      "an AnyFunSuite mixing in RandomTestOrder, registering tests a, b and c in that order, each succeeding",
+      "samples.ShuffledSuite",
+      "the suite's structure, then its events, with one TestStarting and one TestSucceeded assigned to each of a, b and c",
+      shuffledSuiteRuns,
+      Launch.ByFramework,
+      Nil
+    )
+
+    eventScenarios(
+      "The suite running one test in parallel throws",
+      "an AnyFunSuite mixing in ParallelTestExecution, whose one test is a, and whose run throws when given a test name",
+      "samples.ParAbortSuite",
+      "the suite's structure and events, with the SuiteAborted of the suite that ran a assigned to a",
+      parAbortSuite,
+      launch = Launch.ByRunner,
+      arguments = List("-P2")
     )
   }
 

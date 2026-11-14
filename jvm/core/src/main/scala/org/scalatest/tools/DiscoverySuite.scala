@@ -56,16 +56,7 @@ private[scalatest] class DiscoverySuite(
       case concurrent: ConcurrentDistributor => concurrent.apply(nestedSuite, args, TestEventLogHandOff.none, reporterOfTopLevelSuite)
       case other =>
         val reporter = reporterOfTopLevelSuite(nestedSuite, args.filter, args.reporter)
-        val registration = SuiteRegistration.madeTaking(reporter, args.reporter)
-        val status =
-          try other(nestedSuite, args.copy(reporter = reporter))
-          catch {
-            case thrown: Throwable =>
-              registration.remove()
-              throw thrown
-          }
-        registration.removeWhenCompleted(status)
-        status
+        SuiteRegistration.madeTaking(reporter, args.reporter).removedOnceRun(other(nestedSuite, args.copy(reporter = reporter)))
     }
   }
 
