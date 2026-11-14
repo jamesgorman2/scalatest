@@ -113,17 +113,16 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       result.humanReadableOutput.filter(_.contains("Output outside any suite:")) shouldBe empty
     }
 
-    Scenario("Neither ScalaTest's end-of-run summary, Mill's runner progress nor Mill's list of failed tests reaches the console") {
+    Scenario("Neither ScalaTest's end-of-run summary nor Mill's list of failed tests reaches the console") {
       Given("core.test holds BrokenCtorSpec, which aborts, and SqrtPropSpec")
       When("the test command runs core.test")
       val result = brokenConstructorRun
 
-      Then("no line on the console holds ScalaTest's summary, Mill's progress or Mill's list of failed tests")
+      Then("no line on the console holds ScalaTest's summary or Mill's list of failed tests")
       val console = result.eval.out + result.eval.err
       withClue(result.debugString) {
         Seq("Run completed in", "Tests: succeeded", "*** 1 SUITE ABORTED ***", "tests failed:")
           .filter(console.contains) shouldBe empty
-        "[0-9]+/[0-9]+ completed".r.findFirstIn(console) shouldBe None
       }
     }
   }

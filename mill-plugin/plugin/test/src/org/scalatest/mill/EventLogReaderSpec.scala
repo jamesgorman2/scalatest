@@ -99,8 +99,10 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
         }
       }
+    }
 
-      "watch the process its runStarted event names" in {
+    "the event log holds a runStarted event" should {
+      "watch the process the event names" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n$runEndedCompleted\n")
           val reading = new Reading(file)
