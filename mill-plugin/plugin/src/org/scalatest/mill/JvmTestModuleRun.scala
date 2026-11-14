@@ -73,6 +73,6 @@ private[mill] final class JvmTestModuleRun(
 
 private[mill] object JvmTestModuleRun {
 
-  /** The event log file's name in a worker's `processFolder`. Mill names no file there so. */
+  /** The event log file's name in a worker's `processFolder`. Mill uses no file of that name there. */
   val eventLogFileName: String = "scalatest-event-log.jsonl"
 }
