@@ -343,9 +343,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * at its send site or by another wrapper: an event reaches the wrapper of its test, of its suite and of each suite
    * around that one, and only the first of them that finds it not handed off writes it.
    *
-   * The event is assigned as one with no origin, from its own data: to the suite its suite ID names, at or below the
-   * wrapper's suite, and to the test its test name names in that suite. A suite or test no structure holds is first
-   * given a node in a further structure. A message that names no suite is assigned to the wrapper's node. The
+   * The event is assigned as one with no origin, from its own data: to the suite its suite ID names, the wrapper's own
+   * suite or one at or below the wrapper's node, and to the test its test name names in that suite. A suite no table
+   * at or below the wrapper's node holds is first given a node directly under the wrapper's node, and a test its
+   * suite's table lacks a node directly under its suite, in a further structure. A message that names no suite is
+   * assigned to the wrapper's node. The
    * messages recorded in a test's closing event are written before it, assigned as it is, unless the test has handed
    * them off one by one.
    *
@@ -447,21 +449,23 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Called under the lock. The suite an event's data names is found at or below the wrapper's suite, else anywhere in
-  // the wrapper's top-level suite, and is otherwise given a node nested directly in the wrapper's suite. A test its
-  // suite's table lacks is given a node directly under the suite. Either node is written in a further structure.
+  // Called under the lock. The suite an event's data names is the wrapper's own suite, else one at or below the
+  // wrapper's node, and is otherwise given a node directly under the wrapper's node. A test its suite's table lacks is
+  // given a node directly under the suite. Either node is written in a further structure.
   private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): NodeExecution = {
     val ofWrapper = wrapper.registration.table.get
+    val wrapperNode = ofWrapper.scopeOrTest(wrapper.treeNode)
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
       case None =>
-        ofWrapper.scopeOrTest(wrapper.treeNode) match {
-          case Some(scopeOrTest) => assignToScopeOrTest(ofWrapper, scopeOrTest, None, event)
+        wrapperNode match {
+          case Some(test) => assignToScopeOrTest(ofWrapper, test, None, event)
           case None => assignToSuite(ofWrapper, None, event)
         }
       case Some(names) =>
-        val found = TestEventLogEmitter.tableAtOrBelow(ofWrapper, names.suiteId)
-          .orElse(wrapper.registration.topLevel.table.flatMap(TestEventLogEmitter.tableAtOrBelow(_, names.suiteId)))
-        val table = found.getOrElse(ofWrapper.addNestedSuite(names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId)))
+        val found = TestEventLogEmitter.tableNamed(ofWrapper, wrapperNode, names.suiteId)
+        val table = found.getOrElse {
+          ofWrapper.addSuiteUnder(wrapperNode.getOrElse(ofWrapper.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId))
+        }
         val lackedTest = names.testName.filterNot(table.tests.contains)
         if (found.isEmpty || lackedTest.isDefined) {
           val scopesAndTests = table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList)
@@ -672,14 +676,17 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  // The table of the suite of this suite ID at or below `table`: `table` itself, else the first that has not ended of
-  // those nested within it, else the first of them. Recurses once for each suite nested in another.
-  private def tableAtOrBelow(table: SuiteNodeTable, suiteId: String): Option[SuiteNodeTable] = {
+  // The table of the suite of this suite ID that an event a wrapper hands off names: the wrapper's own suite, `table`,
+  // where it has that suite ID, else the first that has not ended of the suites at or below the wrapper's node, else
+  // the first of them. The wrapper's node is `test` where the wrapper is a test's, and otherwise its suite's. Recurses
+  // once for each suite nested in another.
+  private def tableNamed(table: SuiteNodeTable, test: Option[NodeId], suiteId: String): Option[SuiteNodeTable] = {
     def nestedWithin(suite: SuiteNodeTable): Vector[SuiteNodeTable] = suite.childSuites.flatMap(nested => nested +: nestedWithin(nested))
     if (table.suiteId == suiteId) {
       Some(table)
     } else {
-      val sharingItsId = nestedWithin(table).filter(_.suiteId == suiteId)
+      val underWrapper = test.fold(table.childSuites)(node => table.childSuites.filter(_.parent.contains(node)))
+      val sharingItsId = underWrapper.flatMap(nested => nested +: nestedWithin(nested)).filter(_.suiteId == suiteId)
       sharingItsId.find(!_.hasEnded).orElse(sharingItsId.headOption)
     }
   }

@@ -249,7 +249,47 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.wrapperOfTest("flat")(testStarting("flat"))
       run.eventLines.last shouldBe line(flat, List(2, 1), "TestStarting")
     }
+
+    "assign an event that reaches a test's wrapper naming another test of the test's suite to that other test" in withRegisteredSuite { run =>
+      run.wrapperOfTest("flat")(testStarting("s t"))
+      run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+    }
+
+    "give a suite that no suite at or below a test's wrapper has a node directly under the test, in a structure written before the event" in
+      withRegisteredSuite { run =>
+        val other = flat.suite("samples.Other")
+        run.wrapperOfTest("flat")(otherTestStarting)
+        run.eventLines shouldBe Vector(otherStructure(other), line(other.test("x"), List(1, 1, 1, 1), "TestStarting"))
+      }
+
+    "give a suite a node under a test's wrapper where only a suite outside the test has its suite ID" in withRegisteredSuite { run =>
+      val besideTheTest = top.suite("samples.Other")
+      val underTheTest = flat.suite("samples.Other")
+      run.wrapperOfSuite(otherTestStarting)
+      run.wrapperOfTest("flat")(otherTestStarting)
+      run.eventLines shouldBe Vector(
+        otherStructure(besideTheTest),
+        line(besideTheTest.test("x"), List(1, 1, 1), "TestStarting"),
+        otherStructure(underTheTest),
+        line(underTheTest.test("x"), List(1, 1, 1, 1), "TestStarting")
+      )
+    }
+
+    "give a test its suite's structure lacks a node directly under the suite, in a further structure written before the event" in
+      withRegisteredSuite { run =>
+        run.wrapperOfSuite(testStarting("lacked"))
+        run.eventLines.last shouldBe line(top.test("lacked"), List(1, 1), "TestStarting")
+        run.eventLines.init.last should include(TestEventLogLine.test(top.test("lacked"), top, 3, "lacked", "- lacked"))
+      }
   }
+
+  // A test of a suite no structure of the run holds.
+  private def otherTestStarting: Event =
+    TestStarting(ordinal, "Other", "samples.Other", Some("samples.Other"), "x", "x", threadName = "main", timeStamp = timeStamp)
+
+  // The structure of that suite, at `node`, holding its one test.
+  private def otherStructure(node: NodePath): String =
+    TestEventLogLine.structure(TestEventLogLine.suiteUnder(node, "Other", "samples.Other"), TestEventLogLine.test(node.test("x"), node, 0, "x", "- x"))
 
   "An emitter handed an event at its send site" should {
     "write the event as it is handed off, assigned to the test its origin names, and not again when it reaches its suite's wrapper" in

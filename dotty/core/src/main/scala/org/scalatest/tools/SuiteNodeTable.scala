@@ -150,12 +150,12 @@ private[scalatest] final class SuiteNodeTable(
   def markEnded(): Unit = hasEndedOnce = true
 
   /**
-   * Adds a suite node nested directly in this one, after its other children. Its first structure holds the suite
-   * alone, and is the caller's to write.
+   * Adds a suite node directly under `parentNode`, this suite's node or that of one of its tests, after the suites
+   * already under it. Its first structure holds the suite alone, and is the caller's to write.
    */
-  def addNestedSuite(name: String, suiteId: String, className: String): SuiteNodeTable = {
-    val id = SuiteNodeTable.nestedSuiteId(node, suiteId, childSuites.filter(_.parent.contains(node)).map(_.suiteId))
-    addSuite(id, node, name, suiteId, className)
+  def addSuiteUnder(parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
+    val id = SuiteNodeTable.nestedSuiteId(parentNode, suiteId, childSuites.filter(_.parent.contains(parentNode)).map(_.suiteId))
+    addSuite(id, parentNode, name, suiteId, className)
   }
 
   /**

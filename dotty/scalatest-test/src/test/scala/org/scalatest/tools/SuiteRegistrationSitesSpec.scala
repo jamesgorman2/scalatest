@@ -252,6 +252,22 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
+  "A suite a test runs on a thread the test starts, in a run that writes a test event log" should {
+    "find no registration, in its run or in its test, and run its test with no structure wrapper" in {
+      val helper = new Probe
+      val outer = new AnyFunSuite {
+        test("runs a helper on a thread of its own") {
+          val helping = new Thread(() => { helper.run(None, Args(passingNoEventOn)); () })
+          helping.start()
+          helping.join()
+        }
+      }
+      runAsTopLevelSuite(outer, Some(emitter))
+      (helper.registrationInRun, helper.registrationInTest, helper.testRunsInATest) shouldBe ((Some(SuiteRegistration.none), Some(SuiteRegistration.none), false))
+      helper.testIsGivenAStructureWrapper shouldBe false
+    }
+  }
+
   private def nestedSuiteSites(nesting: String, nest: Seq[Suite] => Suite, distributor: Option[Distributor] = None): Unit = {
     s"A suite that $nesting runs" should {
       "run in the context of a registration of its own, with a structure wrapper for its reporter" in {
