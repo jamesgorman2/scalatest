@@ -8,9 +8,9 @@ import org.scalatest.events.TestEventLogEvent
 import java.util.IdentityHashMap
 
 /**
- * Writes an event of a test event log as `compatibility.recorders.EventFieldsRecordingReporter` writes the event a
- * reporter receives: the node it is assigned to, named by its suite's ID and its test's name, then each field the
- * event log keeps of it.
+ * Writes an event of a test event log as `compatibility.recorders.EventFieldsRecordingReporter` writes the events it
+ * receives: the node it is assigned to, named by its suite's ID and its test's name, then each field the event log
+ * keeps of it.
  */
 object EventLogFields {
 
@@ -106,8 +106,9 @@ object EventLogFields {
 }
 
 /**
- * Which of the recording's orders the emitter received its events in: the whole run's, or only each suite's, where
- * the recording reporter sits behind `Framework`'s `SuiteSortingReporter`, which reorders events across suites.
+ * How far the recording shows the order in which the emitter received its events: across the whole run, or only
+ * within each suite. It is only within each suite where the recording reporter sits behind `Framework`'s
+ * `SuiteSortingReporter`, which reorders events across suites.
  */
 enum EmitterOrder {
   case AcrossTheRun
@@ -117,7 +118,7 @@ enum EmitterOrder {
 /**
  * Checks that a test event log holds every event the emitter received, and every event recorded in one, with the
  * fields `compatibility.recorders.EventFieldsRecordingReporter` recorded of it in the same run. The events received
- * must be in the event log in the emitter's order, as far as the recording gives it; a recorded event may be
+ * must be in the event log in the emitter's order, as far as the recording shows it; a recorded event may be
  * anywhere in it.
  */
 object EventLogCoverage {
@@ -150,7 +151,7 @@ object EventLogCoverage {
           after(group) = index + 1
           None
         case None =>
-          val elsewhere = if (withTimeStamps.contains(event)) ", though it is earlier" else ""
+          val elsewhere = if (withTimeStamps.contains(event)) ", though the log holds it earlier" else ""
           Some(s"received, not in the event log in the emitter's order$elsewhere: $event")
       }
     }

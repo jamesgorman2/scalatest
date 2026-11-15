@@ -39,7 +39,7 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
     "in the event log in another order" should {
       "be missing from the place received" in {
         EventLogCoverage.missing(received, List(testStarting, suiteStarting), EmitterOrder.AcrossTheRun) shouldBe
-          List("received, not in the event log in the emitter's order, though it is earlier: " + EventLogFields.of(testStarting, withTimeStamp = true))
+          List("received, not in the event log in the emitter's order, though the log holds it earlier: " + EventLogFields.of(testStarting, withTimeStamp = true))
       }
     }
     "in the event log in each suite's order, though not the run's" should {
@@ -54,7 +54,7 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
       }
       "be missing where the emitter's order is the run's" in {
         EventLogCoverage.missing(receivedFromTwoSuites, List(otherSuiteStarting, suiteStarting, testStarting), EmitterOrder.AcrossTheRun) shouldBe
-          List("received, not in the event log in the emitter's order, though it is earlier: " + EventLogFields.of(otherSuiteStarting, withTimeStamp = true))
+          List("received, not in the event log in the emitter's order, though the log holds it earlier: " + EventLogFields.of(otherSuiteStarting, withTimeStamp = true))
       }
     }
   }

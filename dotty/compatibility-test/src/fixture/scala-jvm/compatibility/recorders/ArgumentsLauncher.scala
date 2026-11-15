@@ -5,8 +5,8 @@ import org.scalatest.tools.Runner
 
 /**
  * Gives an argument list to `Runner.run` or to `Framework`'s runner, as its first argument names, and records whether
- * it was accepted. `Framework`'s runner is given no task, so only its arguments are checked. `Runner.run` exits the
- * JVM with status 1, having printed why, for an argument list its first check rejects.
+ * it was accepted. `Framework`'s runner is given no task, so only its arguments are checked. For an argument list its
+ * first check rejects, `Runner.run` prints why and exits the JVM with status 1.
  */
 object ArgumentsLauncher {
 

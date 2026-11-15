@@ -64,11 +64,11 @@ _Avoid_: Source order
 ## Output
 
 **Reporter**:
-Anything that reports on the events a run creates, as ScalaTest's `Reporter` does: a standard-output, `-f` or `-C` reporter, a reporter ScalaTest builds in, or the emitter. A `-C` reporter is one kind, not the meaning.
+Anything that reports on a run's events through ScalaTest's `Reporter`: a reporter a runner argument such as `-o`, `-f` or `-C` configures, a reporter ScalaTest adds itself, or the emitter. A `-C` reporter is one kind, not the meaning.
 _Avoid_: Listener
 
 **Emitter**:
-The reporter that, when the run is given the runner argument, writes the run's test event log. It receives each event as core sends it, before any other reporter reorders it.
+The reporter that writes a run's test event log when the run is given the runner argument. It receives each event as core sends it, before any other reporter reorders it.
 _Avoid_: Event log reporter, writer
 
 **`J` reporter**:

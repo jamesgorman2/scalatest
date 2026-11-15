@@ -86,7 +86,7 @@ final class DispatchReporterHandOffSpec extends AnyWordSpec with Matchers with E
       handedOff.asScala.toVector shouldBe receivedRunCompleted
     }
 
-    "hand off no closing run event it reports as relayed from another process" in {
+    "hand off no closing run event relayed from another process" in {
       val handedOff = new ConcurrentLinkedQueue[Event]
       val reporter = new RecordingReporter
       val dispatch = new DispatchReporter(List(reporter))

@@ -98,7 +98,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         val logged = decoded(output.eventLog).collect { case event: TestEventLogEvent.ScalaTestEvent => event }
 
         Then(s"the event log holds each event the emitter receives, with the fields the reporter records, in the emitter's order ${emitterOrderDescribed(launch)}")
-        And("it holds each event recorded in one, with the same fields but its timestamp")
+        And("it holds each event recorded in one, with the same fields apart from its timestamp")
         output.eventFields.count(_.startsWith("received ")) should be > 0
         output.eventFields.count(_.startsWith("recorded ")) should be > 0
         EventLogCoverage.missing(output.eventFields, logged, emitterOrderIn(launch)) shouldBe Nil
@@ -283,7 +283,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     List("-o", "-f")
   )
 
-  // Runner.run on 3.2.20 opens the graphic reporter's window and waits for it to be closed.
+  // Only Framework is given -g: Runner.run on 3.2.20 opens the graphic reporter's window and waits for it to be closed.
   private def argumentListsOf(launch: Launch): List[List[String]] =
     launch match {
       case Launch.RunnerRun => argumentListsOfBothLaunches

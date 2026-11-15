@@ -170,7 +170,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
   def ofArguments(launch: Launch, arguments: Seq[String]): Compared[ArgumentsOutcome] =
     ofArgumentsNamingAFile(launch, _ => arguments)
 
-  /** Gives the launch the argument list the function makes of the path of a file of the run's own, without running any suite. */
+  /** Gives the launch the argument list that `arguments` builds from a file path in the run's own directory, without running any suite. */
   def ofArgumentsNamingAFile(launch: Launch, arguments: Path => Seq[String]): Compared[ArgumentsOutcome] = {
     def outcomeOn(library: Library): ArgumentsOutcome = {
       val directory = newRunDirectory("arguments", library)

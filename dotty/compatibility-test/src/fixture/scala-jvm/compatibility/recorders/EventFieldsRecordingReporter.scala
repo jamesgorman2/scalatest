@@ -8,9 +8,9 @@ import org.scalatest.exceptions.StackDepth
 import java.util.IdentityHashMap
 
 /**
- * Records, for each event it receives and each event recorded in one, the node it names and every field a test event
- * log keeps of it, timestamps, durations and thread names included. A recorded event is written without its
- * timestamp, which a test event log takes from the time the test called it.
+ * Records each event it receives, and each event recorded in one, as the node the event names and every field a test
+ * event log keeps of it, including timestamps, durations and thread names. A recorded event is written without its
+ * timestamp, because a test event log takes that from when the test made the call that recorded it.
  *
  * Each line is `received <node> <event>` or `recorded <node> <event>`, where the node is `run`, `suite "<suite ID>"`
  * or `test "<suite ID>" "<test name>"`.

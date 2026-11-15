@@ -15,8 +15,8 @@ private[scalatest] object TestEventLogHandOff {
   val none: Event => Unit = (_: Event) => ()
 
   /**
-   * Whether `DispatchReporter`, not the site that sends it, hands the event off: a closing run event, which reaches
-   * reporters with the summary `DispatchReporter` gives it.
+   * Whether `DispatchReporter`, not the send site, hands the event off. It does for a closing run event, so that the
+   * event handed off carries the summary `DispatchReporter` gives it.
    */
   def isHandedOffByDispatchReporter(event: Event): Boolean =
     event match {

@@ -57,14 +57,17 @@ private[scalatest] class DispatchReporter(
 
   private val testEventLogHandOff: AtomicReference[Event => Unit] = new AtomicReference[Event => Unit](TestEventLogHandOff.none)
 
-  /** Takes the hand-off of the events this reporter raises or completes: its slowpoke alerts and the closing run events. */
+  /**
+   * Registers the function that hands off to the test event log the events this reporter creates or completes: its
+   * slowpoke alerts, and the closing run events given to `reportAndHandOff`.
+   */
   def registerTestEventLogHandOff(handOffToTestEventLog: Event => Unit): Unit =
     testEventLogHandOff.set(handOffToTestEventLog)
 
   /**
-   * Reports a closing run event of this reporter's own run and, once every reporter has it, hands off the event they
-   * received, which carries the run's summary. It returns once the event is handed off and throws what the hand-off
-   * throws, so that a hand-off throws to its send site, not on the dispatcher's thread. Closing run events relayed from
+   * Reports a closing run event of this reporter's own run. Once every reporter has it, hands off the event they
+   * received, which carries the run's summary. Returns once the event is handed off, and throws what the hand-off
+   * throws, so that the send site receives it rather than the dispatcher's thread. Closing run events relayed from
    * another process are reported with `apply`, which hands nothing off.
    */
   def reportAndHandOff(closingRunEvent: Event): Unit = {
