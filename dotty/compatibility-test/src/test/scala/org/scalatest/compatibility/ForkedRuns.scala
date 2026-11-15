@@ -28,20 +28,6 @@ enum Emitter {
   case On
 }
 
-final case class Compared[A](upstream: A, fork: A) {
-  def map[B](f: A => B): Compared[B] = Compared(f(upstream), f(fork))
-}
-
-object Compared {
-  def firstDifference(lines: Compared[Seq[String]]): Option[String] =
-    lines.upstream.map(Option(_)).zipAll(lines.fork.map(Option(_)), None, None).zipWithIndex.collectFirst {
-      case ((upstreamLine, forkLine), index) if upstreamLine != forkLine =>
-        s"line ${index + 1}: 3.2.20 wrote ${described(upstreamLine)}, the fork wrote ${described(forkLine)}"
-    }
-
-  private def described(line: Option[String]): String = line.fold("no line")(text => s"[$text]")
-}
-
 final case class RunOutput(
   events: Seq[String],
   loggerLines: Seq[String],
@@ -110,47 +96,6 @@ object ComparisonClasspaths {
       Paths.get(properties.getProperty("runsDirectory"))
     )
   }
-}
-
-object CompatibilityFixture {
-  val stdoutLine: String = "a line on stdout"
-  val stderrLine: String = "a line on stderr"
-
-  val suiteClassNames: Seq[String] =
-    List(
-      "AnyFunSuiteSpec",
-      "AsyncFunSuiteSpec",
-      "FixtureAnyFunSuiteSpec",
-      "FixtureAsyncFunSuiteSpec",
-      "AnyPropSpecSpec",
-      "FixtureAnyPropSpecSpec",
-      "AnyFunSpecSpec",
-      "AsyncFunSpecSpec",
-      "FixtureAnyFunSpecSpec",
-      "FixtureAsyncFunSpecSpec",
-      "PathAnyFunSpecSpec",
-      "AnyFreeSpecSpec",
-      "AsyncFreeSpecSpec",
-      "FixtureAnyFreeSpecSpec",
-      "FixtureAsyncFreeSpecSpec",
-      "PathAnyFreeSpecSpec",
-      "AnyWordSpecSpec",
-      "AsyncWordSpecSpec",
-      "FixtureAnyWordSpecSpec",
-      "FixtureAsyncWordSpecSpec",
-      "AnyFlatSpecSpec",
-      "AsyncFlatSpecSpec",
-      "FixtureAnyFlatSpecSpec",
-      "FixtureAsyncFlatSpecSpec",
-      "AnyFeatureSpecSpec",
-      "AsyncFeatureSpecSpec",
-      "FixtureAnyFeatureSpecSpec",
-      "FixtureAsyncFeatureSpecSpec",
-      "RefSpecSpec",
-      "NestingSpec",
-      "BeforeAllThrowsSpec",
-      "ConfigMapWrappedSpec"
-    ).map("compatibility.fixture." + _)
 }
 
 final class ForkedRuns(classpaths: ComparisonClasspaths) {

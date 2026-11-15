@@ -1453,6 +1453,7 @@ trait DottyBuild { this: BuildCommons =>
       // ScalaTest 3.2.20 asks for the Scala 3.1 library, which code compiled by Scala 3.3 cannot link against.
       dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       CompatibilityFixture / unmanagedSourceDirectories += (CompatibilityFixture / sourceDirectory).value / "scala-jvm",
+      Test / unmanagedSourceDirectories ++= Seq(sourceDirectory.value / "normalisation" / "scala", sourceDirectory.value / "comparison" / "scala"),
       // ScalaTest leaves the test interface to the build tool, so the fixture configuration takes sbt's own.
       CompatibilityFixture / unmanagedJars += Attributed.blank(testInterfaceJar),
       Test / resourceGenerators += Def.task {

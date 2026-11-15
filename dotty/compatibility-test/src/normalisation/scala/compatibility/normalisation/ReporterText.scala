@@ -1,4 +1,4 @@
-package org.scalatest.compatibility
+package compatibility.normalisation
 
 object ReporterText {
 

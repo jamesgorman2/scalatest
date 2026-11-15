@@ -1,5 +1,6 @@
 package org.scalatest.compatibility
 
+import compatibility.normalisation.ReporterText
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -1,5 +1,6 @@
 package org.scalatest.compatibility
 
+import compatibility.normalisation.ReporterText
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
