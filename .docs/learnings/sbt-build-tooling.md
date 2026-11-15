@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
+description: How sbt, its plugins, incremental compilation and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
 ---
 
 <learning>
@@ -94,4 +94,12 @@ A passing check therefore does not show that a jar of another artifact in the sa
 Where a caller outside the artifact may exist, keep the earlier signature beside the new one, as an overload or an auxiliary constructor.
 
 It does report a change to an unqualified `private` class nested in a public class, which no other artifact can call: a `private class` inside a public class whose constructor gained a parameter failed with `DirectMissingMethodProblem` on `<Outer>#<Inner>.this`. Where no problem filter may be added, keep that class's earlier constructor as an auxiliary constructor too.
+</learning>
+
+<learning>
+date: 2026-11-15
+---
+In an sbt build of a Scala 3 project, an incremental compile can fail after a type changes kind, from an opaque type to a class or the reverse. An opaque type lives in the enclosing file's `<File>$package` class, so the stale analysis still references it there. On Windows this failed with `Required: <package>.<File>$package.<Type> … could not resolve reference`.
+
+Run `sbt.bat <project>/clean` and recompile before suspecting the code. When a type changes kind in a Scala 3 project, clean it first.
 </learning>
