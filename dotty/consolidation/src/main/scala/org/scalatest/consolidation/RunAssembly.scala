@@ -270,7 +270,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     val nodeExecutions = executions.getOrElse(nodeExecution.node, SortedMap.empty[Int, Execution])
     val execution = nodeExecutions.getOrElse(
       nodeExecution.execution,
-      Execution(nodeExecution.execution, nodeExecution.executions.init.lastOption, Vector.empty, Vector.empty)
+      Execution(nodeExecution.execution, parentExecutionOf(nodeExecution), Vector.empty, Vector.empty)
     )
     val updated =
       if (RunAssembly.isMessage(event)) execution.added(ReceivedMessage(event, childrenStarted(nodeExecution.node, nodeExecution.execution)))
@@ -278,6 +278,18 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     executions(nodeExecution.node) = nodeExecutions.updated(nodeExecution.execution, updated)
     markSuitesStarted(nodeExecution.node)
   }
+
+  // The parent's place in the execution path is its depth below the top-level suite, each scope between a test and its
+  // suite counted. A suite keeps no parent execution: its executions are shown together under its parent's latest.
+  private def parentExecutionOf(nodeExecution: NodeExecution): Option[Int] =
+    structure
+      .get(nodeExecution.node)
+      .filter(RunAssembly.isScopeOrTest)
+      .flatMap(RunAssembly.parentOf)
+      .flatMap(parent => nodeExecution.executions.lift(depthOf(parent)))
+
+  private def depthOf(id: NodeId): Int =
+    structure.get(id).flatMap(RunAssembly.parentOf).fold(0)(parent => depthOf(parent) + 1)
 
   // A scope or test has started in its parent's execution once it has an execution inside that one. A nested suite
   // has started once it, or a node below it, has an execution.

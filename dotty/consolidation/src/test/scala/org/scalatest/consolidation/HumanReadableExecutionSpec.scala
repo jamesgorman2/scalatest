@@ -124,7 +124,6 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("A test's execution sits under the scope execution its events name, though the scope's executions overlap") {
-      pending
       Given("an event log of a scope opened twice before either execution of its test starts")
       val eventLog =
         """
@@ -136,10 +135,10 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         suite "OverlapFunSpec": SuiteStarting
         scope "A Stack": ScopeOpened
         scope "A Stack" execution 2: ScopeOpened
-        test "pops", parent execution 1: TestStarting
-        test "pops" execution 2, parent execution 2: TestStarting
-        test "pops" execution 2, parent execution 2: TestSucceeded
-        test "pops", parent execution 1: TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        test "pops", in scope "A Stack" execution 1: TestStarting
+        test "pops" execution 2, in scope "A Stack" execution 2: TestStarting
+        test "pops" execution 2, in scope "A Stack" execution 2: TestSucceeded
+        test "pops", in scope "A Stack" execution 1: TestFailed(throwable: java.lang.IllegalStateException "not empty")
         scope "A Stack" execution 2: ScopeClosed
         scope "A Stack": ScopeClosed
         suite "OverlapFunSpec": SuiteCompleted
