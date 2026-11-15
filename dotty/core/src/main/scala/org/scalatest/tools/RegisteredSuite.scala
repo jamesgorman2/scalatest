@@ -11,11 +11,10 @@ import org.scalatest.Status
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.SuiteStart
-import org.scalatest.events.EncodedEvent
 import org.scalatest.events.Event
-import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
 import org.scalatest.events.NodePlace
+import org.scalatest.events.SuiteStarting
 
 /** The suite, scope or test of a suite's registration tree that an event is for. */
 private[scalatest] enum TreeNode {
@@ -25,80 +24,45 @@ private[scalatest] enum TreeNode {
 }
 
 /**
- * An event's origin as the emitter keeps it until the event is handed off.
+ * One execution of a scope of a registered instance's run, which `runTestsInBranch` starts each time it opens the
+ * scope, within the execution of the scope above it, where it has one.
  *
- * @param execution the execution of the event's own node
- * @param executionOfRun the execution of the run that sent the event, which is its parent's execution
- * @param messagesOfTest for an event of a test's execution, the messages the test hands off during it
+ * @param places the scope's path, from its suite down
  */
-private[scalatest] final class RecordedOrigin(
-  val registration: RegisteredSuite,
-  val node: TreeNode,
-  val execution: Execution,
-  val executionOfRun: Execution,
-  val messagesOfTest: Option[TestExecutionMessages] = None
-)
+private[scalatest] final class ScopeExecution(val places: List[ScopePlace], val above: Option[ScopeExecution]) {
 
-/**
- * The messages a test's informer and documenter hand off during one execution of the test, kept in call order among
- * the execution's other events. Each message is assigned as the execution's first written event is. A message is
- * held until that event, and every event of the execution whose origin was recorded before the message, is written.
- * A reporter ahead of every wrapper may hold such an event back.
- *
- * Read and written only under the emitter's lock.
- */
-private[scalatest] final class TestExecutionMessages {
+  val execution = new Execution
 
-  private var assigned = Option.empty[NodeExecution]
-  // Each entry is an unwritten event of the execution, `Left`, or a held message, `Right`, in call order.
-  private var awaited = Vector.empty[Either[Event, EncodedEvent]]
-
-  /** The node and executions of the execution's first written event, once it has been written. */
-  def assignment: Option[NodeExecution] = assigned
-
-  /** Whether a message handed off now is written at once: nothing of the execution called before it is unwritten. */
-  def writesAtOnce: Boolean = assigned.isDefined && awaited.isEmpty
-
-  /** Holds the messages handed off from now on behind an event of the execution, until that event is written. */
-  def awaitWriting(event: Event): Unit = awaited :+= Left(event)
-
-  def hold(message: EncodedEvent): Unit = awaited :+= Right(message)
+  // Read and written only under the emitter's lock.
+  private var executionOfItsRun = Option.empty[Execution]
 
   /**
-   * Takes an event of the execution that is being written, and its assignment where it is the first. Returns the held
-   * messages to write before the event, and those to write after it.
-   *
-   * A closing event releases every held message, before it. Any other event releases, after it, the held messages up
-   * to the next unwritten event of the execution.
+   * The execution of the run the scope opened in: that of the scope above it, else `latestRun`, taken as an event
+   * naming the scope is first handed off. Called under the emitter's lock.
    */
-  def written(event: Event, execution: NodeExecution, closesTheTest: Boolean): (Vector[EncodedEvent], Vector[EncodedEvent]) = {
-    if (assigned.isEmpty) {
-      assigned = Some(execution)
-    }
-    val others = awaited.filterNot {
-      case Left(unwritten) => unwritten eq event
-      case Right(_) => false
-    }
-    if (closesTheTest) {
-      awaited = Vector.empty
-      (others.collect { case Right(message) => message }, Vector.empty)
-    } else {
-      val (released, rest) = others.span(_.isRight)
-      awaited = rest
-      (Vector.empty, released.collect { case Right(message) => message })
-    }
+  def executionOfRun(latestRun: => Execution): Execution = {
+    val ofRun = executionOfItsRun.getOrElse(above.fold(latestRun)(_.executionOfRun(latestRun)))
+    executionOfItsRun = Some(ofRun)
+    ofRun
   }
+
+  /** This execution and that of each scope above it, by the scope's path. */
+  def byPath: Map[List[ScopePlace], Execution] = above.fold(Map.empty[List[ScopePlace], Execution])(_.byPath).updated(places, execution)
 }
 
 /**
- * The origin of the events one engine site sends. The emitter asks it for what to keep beside each of them.
+ * The origin of the events one engine site sends for a registered suite instance. A send site hands each event off
+ * with it, and the emitter writes the event then.
  *
  * @param registration the registration of the instance that sends the events
+ * @param node the suite, scope or test of its registration tree the events are for
  */
-private[scalatest] abstract class RecordingOrigin(val registration: RegisteredSuite) extends EventOrigin {
+private[scalatest] abstract class OriginInRegisteredSuite(val registration: RegisteredSuite, val node: TreeNode) extends EventOrigin {
 
-  /** Called under the emitter's lock. */
-  def record(): RecordedOrigin
+  /** The executions the origin names for `event`. Called under the emitter's lock, once the instance's node is fixed. */
+  def executionsOf(event: Event): NamedExecutions
+
+  def handOff(event: Event): Unit = registration.emitter.handOff(this, event, messagesHandedOff = false)
 }
 
 /** The invocation context of a registered suite instance's run, or of one execution of one of its tests. */
@@ -110,8 +74,12 @@ private[scalatest] sealed abstract class ContextOfRegisteredSuite extends Invoca
   def register(suite: Suite): SuiteRegistration = new RegisteredSuite(registration.emitter, suite, Some(this))
 }
 
-/** The invocation context of a registered suite instance's run, outside its tests. */
-private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite) extends ContextOfRegisteredSuite {
+/**
+ * The invocation context of a registered suite instance's run, outside its tests.
+ *
+ * @param scope the execution of the scope the code runs in, where it runs in one
+ */
+private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite, val scope: Option[ScopeExecution] = None) extends ContextOfRegisteredSuite {
 
   def registrationOf(suite: Suite): Option[SuiteRegistration] = Option.when(registration.isOf(suite))(registration)
 }
@@ -133,8 +101,8 @@ private[scalatest] final class InExecutionOfTest(val registration: RegisteredSui
  *    among the suites of that suite ID started in the execution it started in. It takes the node table a structure
  *    gives that path, where one does.
  *
- * An instance with no node table, as where no structure declared its place, records no origin, and its wrappers hand
- * nothing off: its events are assigned by the wrappers around it, from their own data.
+ * An instance with no node table, as where no structure declared its place, hands no event off at a send site, and
+ * its wrappers hand nothing off: its events are assigned by the wrappers around it, from their own data.
  *
  * Its state is read and written only under the emitter's lock.
  *
@@ -149,7 +117,9 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = startedIn.fold(this)(_.registration.topLevel)
 
-  private val runContext = new InRunOfSuite(this)
+  // An instance whose run started in a scope of a suite's run runs in that scope: where it is that suite, as a
+  // per-test instance is, its tests name that scope's execution.
+  private val runContext = new InRunOfSuite(this, startedIn.collect { case inRun: InRunOfSuite => inRun.scope }.flatten)
 
   // Read without the lock, to tell whether to take it. Set only under it.
   @volatile private var nodeIsFixed = false
@@ -164,21 +134,25 @@ private[scalatest] final class RegisteredSuite(
   // Where this instance's run is that of the suite it started in, that suite's registration.
   private var runOfSuite = Option.empty[RegisteredSuite]
   private var executionOfLatestRun = Option.empty[Execution]
+  // Whether the latest run's execution was opened by the instance's SuiteStarting, for its run to take.
+  private var latestRunOpenedBySuiteStarting = false
+  // The execution of each suite above the instance's node, from the top-level suite down, in which its run started.
+  private var executionsOfSuitesAbove = Vector.empty[Execution]
   private var startsARunOnceNodeIsFixed = false
   // The scopes and tests of the instance's run, as the filter keeps them, written once the node is fixed.
   private var structureAwaitingNode = Option.empty[SuiteNodeTable => List[ScopeOrTest]]
 
   // Kept on the top-level suite's registration alone. Each holds events by identity:
-  //  - the set holds the events inner wrappers of this top-level suite's run handed off that had not reached its
-  //    wrapper when this registration was removed;
-  //  - the map holds each closing event of a test of this run whose messages the test handed off one by one, with
-  //    those messages, until a wrapper hands the event off.
-  // Both live here, not in the emitter, so that they are dropped with the top-level suite's wrapper. Removing the
-  // registration drops neither, so a closing event sent or passed on after the removal is still written without its
-  // recorded messages.
+  //  - the first holds the events handed off for this top-level suite's run, at their send sites or by inner
+  //    wrappers, that had not reached its wrapper when this registration was removed;
+  //  - the second holds each closing event of a test of this run, sent after the removal, whose messages the test
+  //    handed off one by one, until the top-level suite's wrapper hands the event off.
+  // Both live here, not in the emitter, so that they are dropped with the top-level suite's wrapper.
   private var isRemoved = false
-  private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
-  private val closingEventsWithMessagesHandedOff = new IdentityHashMap[Event, TestExecutionMessages]
+  private val handedOffBeforeRemoval = identitySet()
+  private val closingEventsWithMessagesHandedOff = identitySet()
+
+  private def identitySet(): java.util.Set[Event] = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
 
   /** Whether this registration's own instance is `suite`. */
   def isOf(suite: Suite): Boolean = instance eq suite
@@ -196,30 +170,28 @@ private[scalatest] final class RegisteredSuite(
   def hasBeenRemoved: Boolean = topLevel.isRemoved
 
   /**
-   * Keeps an event an inner wrapper of this top-level suite's run handed off, which had not reached this suite's
-   * wrapper when this registration was removed. Called under the emitter's lock.
+   * Keeps an event handed off for this top-level suite's run, at its send site or by an inner wrapper, which had not
+   * reached this suite's wrapper when this registration was removed. Called under the emitter's lock.
    */
   def keepHandedOffBeforeRemoval(event: Event): Unit = handedOffBeforeRemoval.add(event)
 
   /**
-   * Stops keeping an event an inner wrapper handed off before this registration was removed, and returns whether it
-   * was kept. Called under the emitter's lock.
+   * Stops keeping an event handed off before this registration was removed, and returns whether it was kept. Called
+   * under the emitter's lock.
    */
   def takeHandedOffBeforeRemoval(event: Event): Boolean = handedOffBeforeRemoval.remove(event)
 
   /**
-   * Keeps a closing event of a test of this top-level suite's run, whose messages the test handed off one by one,
-   * with those messages. Called under the emitter's lock.
+   * Keeps a closing event of a test of this top-level suite's run, sent after this registration was removed, whose
+   * messages the test handed off one by one. Called under the emitter's lock.
    */
-  def keepClosingEventWithMessagesHandedOff(event: Event, messages: TestExecutionMessages): Unit =
-    closingEventsWithMessagesHandedOff.put(event, messages)
+  def keepClosingEventWithMessagesHandedOff(event: Event): Unit = closingEventsWithMessagesHandedOff.add(event)
 
   /**
-   * Stops keeping a closing event whose messages its test handed off one by one, and returns those messages where it
-   * was kept. Called under the emitter's lock.
+   * Stops keeping a closing event whose messages its test handed off one by one, and returns whether it was kept.
+   * Called under the emitter's lock.
    */
-  def takeClosingEventWithMessagesHandedOff(event: Event): Option[TestExecutionMessages] =
-    Option(closingEventsWithMessagesHandedOff.remove(event))
+  def takeClosingEventWithMessagesHandedOff(event: Event): Boolean = closingEventsWithMessagesHandedOff.remove(event)
 
   /**
    * Makes this the registration of a top-level suite, whose node table the emitter built from the suite's structure.
@@ -308,11 +280,14 @@ private[scalatest] final class RegisteredSuite(
         runOfSuite = Some(outer.runOfSuite.getOrElse(outer))
         nodePath = outer.nodePath
         tableOfNode = outer.tableOfNode
+        executionsOfSuitesAbove = outer.executionsOfSuitesAbove
       case Some(inRun: InRunOfSuite) =>
         val outer = inRun.registration
-        val index = outer.executionOfRun().indexOfStartingSuite(ofRun)
+        val executionOfOuter = outer.executionOfRun()
+        val index = executionOfOuter.indexOfStartingSuite(ofRun)
         nodePath = outer.nodePath.map(path => NodeId(path.places :+ NodePlace.Suite(ofRun, index)))
         tableOfNode = outer.tableOfNode.flatMap(_.childSuites.find(child => nodePath.contains(child.node)))
+        executionsOfSuitesAbove = outer.executionsOfSuitesAbove :+ executionOfOuter
       case Some(inTest: InExecutionOfTest) =>
         val index = inTest.execution.indexOfStartingSuite(ofRun)
         nodePath = inTest.registration.nodePath.map(path => NodeId(path.places :+ NodePlace.Test(inTest.testName) :+ NodePlace.Suite(ofRun, index)))
@@ -321,19 +296,39 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  /** Starts an execution for a run of the instance, whose node is fixed. Called under the emitter's lock. */
+  /**
+   * Starts an execution for a run of the instance, whose node is fixed: the one the instance's `SuiteStarting` opened,
+   * where no run has taken it. Called under the emitter's lock.
+   */
   def startRunUnderLock(): Execution = {
     runOfSuite match {
       case Some(suite) => suite.executionOfRun()
-      case None =>
-        val execution = tableOfNode.fold(new Execution)(_.takeExecutionForStartingRun())
-        executionOfLatestRun = Some(execution)
-        execution
+      case None if latestRunOpenedBySuiteStarting =>
+        latestRunOpenedBySuiteStarting = false
+        executionOfRun()
+      case None => newRun()
     }
   }
 
+  private def newRun(): Execution = {
+    val execution = tableOfNode.fold(new Execution)(_.takeExecutionForStartingRun())
+    executionOfLatestRun = Some(execution)
+    execution
+  }
+
   /** The execution of the instance's latest run, starting one where no site has. Called under the emitter's lock. */
-  def executionOfRun(): Execution = runOfSuite.fold(executionOfLatestRun.getOrElse(startRunUnderLock()))(_.executionOfRun())
+  def executionOfRun(): Execution = runOfSuite.fold(executionOfLatestRun.getOrElse(newRun()))(_.executionOfRun())
+
+  // The execution the instance's SuiteStarting opens, which its run then takes. Called under the emitter's lock.
+  private def executionOpenedBySuiteStarting(): Execution = {
+    runOfSuite match {
+      case Some(suite) => suite.executionOfRun()
+      case None =>
+        val execution = newRun()
+        latestRunOpenedBySuiteStarting = true
+        execution
+    }
+  }
 
   /** Starts a run where the node is fixed, and otherwise once it is. Called under the emitter's lock. */
   def startRunOnceNodeIsFixed(): Unit = {
@@ -359,12 +354,23 @@ private[scalatest] final class RegisteredSuite(
 
   def startRun(): Unit = emitter.startRun(this)
 
-  def originAt(scopes: List[ScopePlace]): EventOrigin =
-    new OriginInRun(if (scopes.isEmpty) TreeNode.OfSuite else TreeNode.Scope(scopes))
+  // The execution of the scope this instance's run runs in on this thread, where it runs in one.
+  private def scopeInContext: Option[ScopeExecution] =
+    InvocationContext.get.collect { case inRun: InRunOfSuite if inRun.registration eq this => inRun.scope }.flatten
+
+  def originAt(scopes: List[ScopePlace]): EventOrigin = {
+    if (scopes.isEmpty) {
+      new OriginOfSuite
+    } else {
+      new OriginOfScope(new ScopeExecution(scopes, scopeInContext.filter(_.places == scopes.init)))
+    }
+  }
+
+  def originOfStartAndEnd: EventOrigin = new OriginOfStartAndEnd
 
   def startTestExecution(testName: String): EventOrigin = {
     emitter.addTestWhereLacking(this, testName, instance.scopesAndTestsOfRegistrationTree)
-    new OriginOfTestExecution(testName)
+    new OriginOfTestExecution(testName, scopeInContext)
   }
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
@@ -384,6 +390,7 @@ private[scalatest] final class RegisteredSuite(
         suiteNameRead(suiteName)
         suiteIdRead(suiteId)
       }
+      override protected def originOfStartAndEnd: EventOrigin = RegisteredSuite.this.originOfStartAndEnd
       def run(run: => Status): Status = runningInItsContext(run)
     }
   }
@@ -448,58 +455,64 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  // An event of the instance's own carries the names its send helper read.
-  private def recordOrigin(event: Event, origin: RecordingOrigin, messages: Option[TestExecutionMessages]): Unit = {
-    if (!nodeIsFixed) {
-      emitter.fixNode(this, TestEventLogEmitter.namesIn(event).map(_.suiteId))
-    }
-    messages match {
-      case Some(handedOff) => emitter.recordOriginOfClosingEventWithMessagesHandedOff(event, origin, handedOff)
-      case None => emitter.recordOrigin(event, origin)
+  private def executionsInRun(ofRun: Execution, ofScopes: Map[List[ScopePlace], Execution], ofOwnNode: Option[Execution]): NamedExecutions =
+    NamedExecutions(executionsOfSuitesAbove, ofRun, ofScopes, ofOwnNode)
+
+  // The origin of the suite-level events of the instance's run, which take the run's execution.
+  private final class OriginOfSuite extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.OfSuite) {
+
+    def executionsOf(event: Event): NamedExecutions = executionsInRun(executionOfRun(), Map.empty, None)
+
+    override def runningInItsExecution[A](body: => A): A = runningInItsContext(body)
+  }
+
+  // The origin of the instance's SuiteStarting, SuiteCompleted and SuiteAborted. Its SuiteStarting opens the execution
+  // its run takes.
+  private final class OriginOfStartAndEnd extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.OfSuite) {
+
+    def executionsOf(event: Event): NamedExecutions = {
+      val ofRun = if (event.isInstanceOf[SuiteStarting]) executionOpenedBySuiteStarting() else executionOfRun()
+      executionsInRun(ofRun, Map.empty, None)
     }
   }
 
-  // The origin of the events of the suite itself or of one of its scopes, each of which takes the run's execution.
-  private final class OriginInRun(node: TreeNode) extends RecordingOrigin(RegisteredSuite.this) {
+  // The origin of the events of one execution of a scope, and of the messages registered in it.
+  private final class OriginOfScope(scope: ScopeExecution) extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.Scope(scope.places)) {
 
-    def recordFor(event: Event): Unit = recordOrigin(event, this, None)
+    def executionsOf(event: Event): NamedExecutions =
+      executionsInRun(scope.executionOfRun(executionOfRun()), scope.byPath, Some(scope.execution))
 
-    def record(): RecordedOrigin = {
-      val execution = executionOfRun()
-      new RecordedOrigin(RegisteredSuite.this, node, execution, execution)
-    }
+    override def runningInItsExecution[A](body: => A): A = InvocationContext.within(new InRunOfSuite(RegisteredSuite.this, Some(scope)))(body)
   }
 
-  // The origin of the events of one execution of a test, which ran in the run in flight when its first event was sent.
-  private final class OriginOfTestExecution(testName: String) extends RecordingOrigin(RegisteredSuite.this) {
+  // The origin of the events of one execution of a test, which ran in the scope execution `scope`, where it ran in a
+  // scope, and in the run in flight when its first event was handed off.
+  private final class OriginOfTestExecution(testName: String, scope: Option[ScopeExecution])
+      extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.Test(testName)) {
 
     private val execution = new Execution
-    private val messages = new TestExecutionMessages
     // Read and written only under the emitter's lock.
     private var executionOfItsRun = Option.empty[Execution]
 
-    def recordFor(event: Event): Unit = recordOrigin(event, this, None)
-
-    def record(): RecordedOrigin = {
-      val ofRun = executionOfItsRun.getOrElse(executionOfRun())
+    def executionsOf(event: Event): NamedExecutions = {
+      val ofRun = executionOfItsRun.getOrElse(scope.fold(executionOfRun())(_.executionOfRun(executionOfRun())))
       executionOfItsRun = Some(ofRun)
-      new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun, Some(messages))
+      executionsInRun(ofRun, scope.fold(Map.empty[List[ScopePlace], Execution])(_.byPath), Some(execution))
     }
 
     override def preparedHandOffOfMessage(message: => Event): () => Unit = {
-      val encoded = TestEventLogEmitter.encodedTestMessage(message)
-      () => emitter.writeTestMessage(RegisteredSuite.this, messages, encoded)
+      val built = TestEventLogEmitter.builtTestMessage(message)
+      () => emitter.writeTestMessage(this, built)
     }
 
     override def ofClosingEventWithMessagesHandedOff: EventOrigin = {
       val ofTestExecution = this
-      new RecordingOrigin(RegisteredSuite.this) {
-        def recordFor(event: Event): Unit = recordOrigin(event, ofTestExecution, Some(messages))
-        def record(): RecordedOrigin = ofTestExecution.record()
+      new EventOrigin {
+        def handOff(event: Event): Unit = emitter.handOff(ofTestExecution, event, messagesHandedOff = true)
       }
     }
 
-    override def runningTheTest[A](body: => A): A =
+    override def runningInItsExecution[A](body: => A): A =
       InvocationContext.within(new InExecutionOfTest(RegisteredSuite.this, testName, execution))(body)
   }
 }

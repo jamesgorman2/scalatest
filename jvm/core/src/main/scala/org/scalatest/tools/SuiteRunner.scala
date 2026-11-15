@@ -57,7 +57,7 @@ private[scalatest] class SuiteRunner(
       val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)
       def send(event: Event): Unit = {
         handOffToTestEventLog(event)
-        reporter(event)
+        start.report(event)
       }
 
       if (!suite.isInstanceOf[DistributedTestRunnerSuite]) {

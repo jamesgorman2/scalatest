@@ -52,11 +52,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   private var isOpen = true
   // How many top-level suites of each suite ID the run has written. Read and written only under this emitter's lock.
   private val topLevelSuitesOfSuiteId = scala.collection.mutable.HashMap.empty[String, Int]
-  // Both are read and written only under this emitter's lock. Both are keyed by the event's identity, since an
-  // event's `equals` compares its fields, which hold the run's own objects. The second maps each event an inner
-  // wrapper handed off to that wrapper's registration.
-  private val originOfEvent = new IdentityHashMap[Event, RecordedOrigin]
-  private val handedOffByAnInnerWrapper = new IdentityHashMap[Event, RegisteredSuite]
+  // The events handed off at a send site or by an inner wrapper that have not reached their top-level suite's
+  // wrapper, each mapped to that suite's registration. Keyed by the event's identity, since an event's `equals`
+  // compares its fields, which hold the run's own objects. Read and written only under this emitter's lock.
+  private val handedOff = new IdentityHashMap[Event, RegisteredSuite]
 
   /**
    * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
@@ -230,80 +229,87 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Keeps an event's origin until a structure wrapper hands the event off. An event log that has ended keeps none,
-   * and none is kept for a registration that has been removed, or whose instance has no node table, so its event is
-   * assigned as one with no origin.
+   * Writes an event a send site hands off with its origin, assigned to the node and executions the origin names, and
+   * keeps it so that no structure wrapper it reaches hands it off again. The messages recorded in a test's closing
+   * event are written before it, assigned as it is, unless `messagesHandedOff` says the test handed them off one by
+   * one.
    *
-   * The messages a test hands off after an event of its execution is recorded are held until that event is written.
+   * The node of the origin's suite instance is fixed first, where it is not yet. Nothing is handed off where the event
+   * log has ended, the instance has no node table, or its top-level suite's registration has been removed: a wrapper
+   * the event reaches then hands it off as an event with no origin. Such a closing event, sent after the removal,
+   * whose messages the test handed off, is marked so that the top-level suite's wrapper writes it without them.
+   *
+   * The event is encoded outside the lock, as `runEvent` encodes. What encoding or writing throws is kept from the
+   * caller as `runEvent` keeps it.
    */
-  def recordOrigin(event: Event, origin: RecordingOrigin): Unit = synchronized {
-    if (isOpen && !origin.registration.hasBeenRemoved && origin.registration.isNodeFixed && origin.registration.table.isDefined) {
-      val recorded = origin.record()
-      originOfEvent.put(event, recorded)
-      recorded.messagesOfTest.foreach(_.awaitWriting(event))
+  def handOff(origin: OriginInRegisteredSuite, event: Event, messagesHandedOff: Boolean): Unit = {
+    val registration = origin.registration
+    if (!registration.isNodeFixed) {
+      fixNode(registration, TestEventLogEmitter.namesIn(event).map(_.suiteId))
+    }
+    if (synchronized(handsOffAtSendSite(registration, event, messagesHandedOff))) {
+      val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
+      val thrown = synchronized {
+        if (handsOffAtSendSite(registration, event, messagesHandedOff)) {
+          handedOff.put(event, registration.topLevel)
+          writeUnderLock(encoded, assignWithOrigin(origin, event))
+        } else {
+          None
+        }
+      }
+      thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
     }
   }
 
-  /**
-   * Keeps the origin of a test's closing event, as `recordOrigin` does, and marks the event as one whose recorded
-   * messages the test has handed off one by one. The top-level suite's registration keeps the mark, which outlives
-   * the origin. An event whose origin was never kept, or was dropped when its registration was removed, is still
-   * written without its recorded messages, and with the test's held messages before it.
-   */
-  def recordOriginOfClosingEventWithMessagesHandedOff(event: Event, origin: RecordingOrigin, messages: TestExecutionMessages): Unit = synchronized {
-    if (isOpen) {
-      origin.registration.topLevel.keepClosingEventWithMessagesHandedOff(event, messages)
-      recordOrigin(event, origin)
+  // Called under the lock.
+  private def handsOffAtSendSite(registration: RegisteredSuite, event: Event, messagesHandedOff: Boolean): Boolean = {
+    val hasTable = isOpen && registration.isNodeFixed && registration.table.isDefined
+    if (hasTable && registration.hasBeenRemoved && messagesHandedOff) {
+      registration.topLevel.keepClosingEventWithMessagesHandedOff(event)
     }
+    hasTable && !registration.hasBeenRemoved
   }
 
   /**
-   * Marks a top-level suite's registration removed, once the suite's run has completed, and drops what this emitter
-   * keeps for its run:
-   *  - the origins the instances of its run recorded for events no wrapper has handed off;
-   *  - the events the wrappers of its run handed off that have not reached its own wrapper.
-   * An event whose reporter does not pass it on reaches no further wrapper, and would otherwise be kept, with its
-   * suite instance, until the event log closes.
+   * Marks a top-level suite's registration removed, once the suite's run has completed, and stops keeping the events
+   * handed off for its run, at their send sites or by its inner wrappers, that have not reached its own wrapper. An
+   * event whose reporter does not pass it on reaches no further wrapper, and would otherwise be kept until the event
+   * log closes.
    *
-   * The dropped handed-off events move to the top-level suite's registration, which its wrapper holds. One may still
-   * reach that wrapper, as an alert from a thread the run started or an event a reporter between the wrappers held
-   * back. The wrapper then writes nothing, since an inner wrapper has written it.
+   * Those events move to the top-level suite's registration, which its wrapper holds. One may still reach that
+   * wrapper, as an alert from a thread the run started or an event a reporter between the wrappers held back. The
+   * wrapper then writes nothing, since it has been written.
    *
    * A nested suite's handed-off events stay here until then, since a reporter that holds events back, such as a
    * `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's run has completed. After the
-   * removal, nothing is kept for an event sent late: no origin is recorded for it, and only the top-level suite's
-   * wrapper writes it.
+   * removal, nothing is handed off for an event sent late until it reaches the top-level suite's wrapper, which writes
+   * it.
    */
   def forget(registration: RegisteredSuite): Unit = synchronized {
     registration.markRemoved()
-    originOfEvent.values.removeIf(_.registration.topLevel eq registration)
-    val handedOff = handedOffByAnInnerWrapper.entrySet.iterator
-    while (handedOff.hasNext) {
-      val entry = handedOff.next()
-      if (entry.getValue.topLevel eq registration) {
+    val kept = handedOff.entrySet.iterator
+    while (kept.hasNext) {
+      val entry = kept.next()
+      if (entry.getValue eq registration) {
         registration.keepHandedOffBeforeRemoval(entry.getKey)
-        handedOff.remove()
+        kept.remove()
       }
     }
   }
 
-  /** How many events this emitter keeps an origin for, or keeps as handed off by an inner wrapper. */
-  def keptEventCount: Int = synchronized(originOfEvent.size + handedOffByAnInnerWrapper.size)
+  /** How many events this emitter keeps as handed off, for a top-level suite whose run has not completed. */
+  def keptEventCount: Int = synchronized(handedOff.size)
 
   /**
-   * Takes an event a structure wrapper received, with the wrapper's node, and writes it unless another wrapper has
-   * handed it off: an event reaches the wrapper of its test, of its suite and of each suite around that one, and
-   * only the first of them writes it.
+   * Takes an event a structure wrapper received, with the wrapper's node, and writes it unless it has been handed off,
+   * at its send site or by another wrapper: an event reaches the wrapper of its test, of its suite and of each suite
+   * around that one, and only the first of them that finds it not handed off writes it.
    *
-   * The event is assigned to the node and executions its origin names. An event with no origin, one that no engine
-   * site of a registered suite instance sent, is assigned from its own data: to the suite its suite ID names, at or
-   * below the wrapper's suite, and to the test its test name names in that suite. A suite or test no structure holds
-   * is first given a node in a further structure. A message that names no suite is assigned to the wrapper's node.
-   * The messages recorded in a test's closing event are written before it, assigned as it is, unless the test has
-   * handed them off one by one.
-   *
-   * An event of a test's execution also writes the messages held for it, assigned as the execution's first written
-   * event is: after it, or before it where it closes the test.
+   * The event has no origin, so it is assigned from its own data: to the suite its suite ID names, at or below the
+   * wrapper's suite, and to the test its test name names in that suite. A suite or test no structure holds is first
+   * given a node in a further structure. A message that names no suite is assigned to the wrapper's node. The
+   * messages recorded in a test's closing event are written before it, assigned as it is, unless the test has handed
+   * them off one by one.
    *
    * The node of the wrapper's suite instance is fixed first, where it is not yet and may have a node table. A wrapper
    * of an instance that has no node table hands nothing off, so the event is handed off by a wrapper around it.
@@ -314,33 +320,21 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     if (!wrapper.registration.isNodeFixed && synchronized(isOpen && wrapper.registration.canHaveTable)) {
       fixNode(wrapper.registration, None)
     }
-    originWhereFirstHandedOff(wrapper, event).foreach { (origin, messagesHandedOff) =>
+    messagesHandedOffWhereFirstHandedOff(wrapper, event).foreach { messagesHandedOff =>
       // Encoded outside the lock, as `runEvent` encodes.
-      val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff.isDefined)
-      val thrown = synchronized(if (isOpen) writeUnderLock(wrapper, origin, messagesHandedOff, event, encoded) else encoded.left.toOption)
+      val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
+      val thrown = synchronized(if (isOpen) writeUnderLock(encoded, assignFromItsOwnData(wrapper, event)) else encoded.left.toOption)
       thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
     }
   }
 
-  // Writes an event a wrapper handed off, closing the event log where it cannot be written.
-  private def writeUnderLock(
-    wrapper: WrapperNode,
-    origin: Option[RecordedOrigin],
-    messagesHandedOff: Option[TestExecutionMessages],
-    event: Event,
-    encoded: Either[Throwable, Vector[EncodedEvent]]
-  ): Option[Throwable] = {
+  // Writes the lines of an event and of the messages its closing event records, each assigned as `assigned` gives,
+  // closing the event log where they cannot be written.
+  private def writeUnderLock(encoded: Either[Throwable, Vector[EncodedEvent]], assigned: => NodeExecution): Option[Throwable] = {
     val written = encoded.flatMap { events =>
       TestEventLogEmitter.caught {
-        val execution = assign(wrapper, origin, event)
-        val messagesOfTest = origin.flatMap(_.messagesOfTest).orElse(messagesHandedOff)
-        val (before, after) = messagesOfTest.fold((Vector.empty[EncodedEvent], Vector.empty[EncodedEvent])) {
-          _.written(event, execution, TestEventLogEmitter.closesItsScopeOrTest(event))
-        }
-        val messageExecution = messagesOfTest.flatMap(_.assignment).getOrElse(execution)
-        before.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
+        val execution = assigned
         events.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
-        after.foreach(one => write(TestEventLogEncoder.line(one, Some(messageExecution))))
       }
     }
     if (written.isLeft) {
@@ -351,41 +345,37 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   /**
    * Writes a message a test's informer or documenter handed off as the test called it, and that no reporter receives
-   * as an event of its own. It is assigned as the first written event of the test's execution is, and held until
-   * that event, and every event of the execution whose origin was recorded before the message, is written. A
-   * registration that has been removed, or whose instance has no node table, writes no message.
+   * as an event of its own, assigned to the test in the execution `origin` names. A registration that has been
+   * removed, or whose instance has no node table, writes no message.
    *
-   * `TestEventLogEmitter.encodedTestMessage` builds and encodes the message outside the lock, as `runEvent` encodes.
+   * `TestEventLogEmitter.builtTestMessage` builds and encodes the message outside the lock, as `runEvent` encodes.
    * What building, encoding or writing it throws is kept from the caller as `runEvent` keeps it.
    */
-  def writeTestMessage(registration: RegisteredSuite, messages: TestExecutionMessages, encoded: Either[Throwable, EncodedEvent]): Unit = {
+  def writeTestMessage(origin: OriginInRegisteredSuite, built: Either[Throwable, (Event, EncodedEvent)]): Unit = {
+    val registration = origin.registration
     val thrown = synchronized {
-      if (isOpen && !registration.hasBeenRemoved && registration.table.isDefined) {
-        val written = encoded.flatMap { one =>
-          messages.assignment.filter(_ => messages.writesAtOnce) match {
-            case Some(execution) => TestEventLogEmitter.caught(write(TestEventLogEncoder.line(one, Some(execution))))
-            case None => Right(messages.hold(one))
-          }
+      if (isOpen && registration.isNodeFixed && registration.table.isDefined && !registration.hasBeenRemoved) {
+        built match {
+          case Right((message, encoded)) => writeUnderLock(Right(Vector(encoded)), assignWithOrigin(origin, message))
+          case Left(thrownByBuild) =>
+            close()
+            Some(thrownByBuild)
         }
-        if (written.isLeft) {
-          close()
-        }
-        written.left.toOption
       } else {
-        encoded.left.toOption
+        built.left.toOption
       }
     }
     thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
-  // Returns `Some` of the event's origin, itself `None` where the event has no origin, where this wrapper is to hand
-  // the event off, and `None` where it is not. For a test's closing event whose messages the test handed off one by
-  // one, it also returns those messages. A wrapper of an instance with no node table hands nothing off.
+  // Returns `Some`, holding whether the event is a test's closing event whose messages the test handed off one by
+  // one, where this wrapper is to hand the event off, and `None` where it is not. A wrapper of an instance with no
+  // node table hands nothing off.
   // The top-level suite's wrapper is the last an event reaches, so it forgets the event. Once the top-level suite's
   // registration is removed, inner wrappers hand nothing off and that wrapper writes the event: an inner wrapper that
   // wrote it would have to keep it for that wrapper to skip, for good where it never reaches that wrapper. An event
-  // an inner wrapper handed off before the removal is kept by the top-level suite's registration instead.
-  private def originWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[(Option[RecordedOrigin], Option[TestExecutionMessages])] = synchronized {
+  // handed off before the removal is kept by the top-level suite's registration instead.
+  private def messagesHandedOffWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Boolean] = synchronized {
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
     if (!isOpen || wrapper.registration.table.isEmpty) {
       None
@@ -393,29 +383,28 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
       None
-    } else if (handedOffByAnInnerWrapper.containsKey(event)) {
+    } else if (handedOff.containsKey(event)) {
       if (isLastWrapper) {
-        handedOffByAnInnerWrapper.remove(event)
+        handedOff.remove(event)
       }
       None
     } else {
       if (!isLastWrapper) {
-        handedOffByAnInnerWrapper.put(event, wrapper.registration)
+        handedOff.put(event, wrapper.registration.topLevel)
       }
-      Some((Option(originOfEvent.remove(event)), wrapper.registration.topLevel.takeClosingEventWithMessagesHandedOff(event)))
+      Some(wrapper.registration.topLevel.takeClosingEventWithMessagesHandedOff(event))
     }
   }
 
-  // Called under the lock. Numbers the executions the event names, where the event is the first to name them.
-  private def assign(wrapper: WrapperNode, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
-    origin.flatMap(recorded => recorded.registration.table.map((recorded, _))) match {
-      case Some((recorded, table)) =>
-        // A scope or test the suite's structure does not hold has no node, so its event is assigned to the suite.
-        table.scopeOrTest(recorded.node) match {
-          case Some(scopeOrTest) => assignToScopeOrTest(table, scopeOrTest, Some(recorded), event)
-          case None => assignToSuite(table, Some(recorded), event)
-        }
-      case None => assignFromItsOwnData(wrapper, event)
+  // Called under the lock, where the origin's instance has a node table. Numbers the executions the origin names,
+  // where the event is the first to name them. A scope or test the suite's structure does not hold has no node, so
+  // its event is assigned to the suite.
+  private def assignWithOrigin(origin: OriginInRegisteredSuite, event: Event): NodeExecution = {
+    val table = origin.registration.table.get
+    val named = Some(origin.executionsOf(event))
+    table.scopeOrTest(origin.node) match {
+      case Some(scopeOrTest) => assignToScopeOrTest(table, scopeOrTest, named, event)
+      case None => assignToSuite(table, named, event)
     }
   }
 
@@ -446,24 +435,21 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Where the event has an origin, its suite's execution is that of the run that sent it.
-  private def assignToScopeOrTest(table: SuiteNodeTable, node: NodeId, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+  // Where the event has an origin, its node's execution and those above it are those the origin names.
+  private def assignToScopeOrTest(table: SuiteNodeTable, node: NodeId, named: Option[NamedExecutions], event: Event): NodeExecution = {
     val executions = table.executionsOf(node)
-    val (execution, executionOfSuite) = origin match {
-      case Some(recorded) => (recorded.execution, Some(recorded.executionOfRun))
-      case None => (TestEventLogEmitter.executionWithNoOrigin(executions, event), None)
-    }
-    val assigned = NodeExecution(node, table.executionPathAbove(node, executionOfSuite) :+ executions.number(execution))
+    val execution = named.flatMap(_.ofOwnNode).getOrElse(TestEventLogEmitter.executionWithNoOrigin(executions, event))
+    val assigned = NodeExecution(node, table.executionPathAbove(node, named) :+ executions.number(execution))
     if (TestEventLogEmitter.closesItsScopeOrTest(event)) {
       executions.close(execution)
     }
     assigned
   }
 
-  private def assignToSuite(table: SuiteNodeTable, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
+  private def assignToSuite(table: SuiteNodeTable, named: Option[NamedExecutions], event: Event): NodeExecution = {
     val executions = table.executionsOf(table.node)
-    val execution = origin match {
-      case Some(recorded) => recorded.executionOfRun
+    val execution = named match {
+      case Some(fromOrigin) => fromOrigin.ofSuite
       case None =>
         val opensAnExecution = executions.openedLast.isEmpty && event.isInstanceOf[SuiteStarting]
         val withNoOrigin = TestEventLogEmitter.executionWithNoOrigin(executions, event)
@@ -472,7 +458,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         }
         withNoOrigin
     }
-    val assigned = NodeExecution(table.node, table.executionPathAboveSuite :+ executions.number(execution))
+    val assigned = NodeExecution(table.node, table.executionPathAboveSuite(named) :+ executions.number(execution))
     if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
       executions.close(execution)
       table.forgetUnrunExecution(execution)
@@ -511,8 +497,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def close(): Unit = {
     isOpen = false
-    originOfEvent.clear()
-    handedOffByAnInnerWrapper.clear()
+    handedOff.clear()
     try eventLog.close() catch { case contained: Throwable if TestEventLogEmitter.isContained(contained) => () }
   }
 }
@@ -572,7 +557,12 @@ private[scalatest] object TestEventLogEmitter {
   }
 
   /** Builds and encodes a test's message for `writeTestMessage`, keeping what either throws. */
-  def encodedTestMessage(message: => Event): Either[Throwable, EncodedEvent] = caught(TestEventLogEncoder.encoded(message))
+  def builtTestMessage(message: => Event): Either[Throwable, (Event, EncodedEvent)] = {
+    caught {
+      val built = message
+      (built, TestEventLogEncoder.encoded(built))
+    }
+  }
 
   /** Runs a hand-off, keeping what it throws from the caller as `runEvent` keeps what encoding or writing throws. */
   def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(rethrowIfUncontained)

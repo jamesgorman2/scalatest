@@ -493,12 +493,12 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   "A DocSpec" should {
-    "record that its markup is its suite's own as it sends it" in {
+    "hand its markup off as its suite's own as it sends it" in {
       val anEmitter = emitter
       val suite = new MarkupDocSpec
       val started = new StartedTopLevelSuite(anEmitter, suite)
       try {
-        // Sent to a reporter that is no structure wrapper, so the emitter keeps the origin until the registration is removed.
+        // Sent to a reporter that is no structure wrapper, so the emitter keeps the handed-off markup until the registration is removed.
         started.runningInItsContext(suite.run(None, Args(passingNoEventOn)))
         anEmitter.keptEventCount shouldBe 1
       } finally {

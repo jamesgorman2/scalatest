@@ -11,8 +11,11 @@ private[scalatest] final case class ScopePlace(text: String, placeAmongScopesOfI
  */
 private[scalatest] abstract class EventOrigin {
 
-  /** Records this origin against the event with the emitter of the run's test event log, leaving the event unchanged. Called before the event is reported. */
-  def recordFor(event: Event): Unit
+  /**
+   * Hands the event to the emitter of the run's test event log with this origin, leaving the event unchanged. The
+   * emitter writes it then. Called before the event is reported.
+   */
+  def handOff(event: Event): Unit
 
   /**
    * Hands a message of a test's execution to the emitter as the test calls it, and to no reporter. The message is
@@ -33,10 +36,11 @@ private[scalatest] abstract class EventOrigin {
   def ofClosingEventWithMessagesHandedOff: EventOrigin = this
 
   /**
-   * Runs a test's body in the invocation context of the test execution this origin is of, so that a suite the body
-   * runs starts in that context. Called with the origin a test execution's start returned.
+   * Runs `body` in the invocation context of the execution this origin is of: a test execution's, so that a suite the
+   * test's body runs starts in it, or a scope execution's, so that a test or scope `body` runs names it. Called with
+   * the origin a test execution's or a scope's start returned.
    */
-  def runningTheTest[A](body: => A): A = body
+  def runningInItsExecution[A](body: => A): A = body
 }
 
 private[scalatest] object EventOrigin {
@@ -46,7 +50,7 @@ private[scalatest] object EventOrigin {
 
   /** The origin of every event of a run that writes no test event log. It records nothing. */
   val none: EventOrigin = new EventOrigin {
-    def recordFor(event: Event): Unit = ()
+    def handOff(event: Event): Unit = ()
   }
 }
 
@@ -100,8 +104,18 @@ private[scalatest] abstract class SuiteRegistration {
   /** Starts an execution for a run of the instance. Called by the first engine site the run reaches. */
   def startRun(): Unit
 
-  /** The origin of an event of the suite itself, where `scopes` is empty, and otherwise of the scope at that path from the suite down. */
+  /**
+   * The origin of an event of the suite itself, where `scopes` is empty. Otherwise it starts an execution of the scope
+   * at that path from the suite down, within the execution of the scope above it that the invocation context names,
+   * and returns the origin of that execution's events.
+   */
   def originAt(scopes: List[ScopePlace]): EventOrigin
+
+  /**
+   * The origin of the instance's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`, sent by the site that
+   * registered it as a nested suite. Its `SuiteStarting` opens the execution the instance's run takes.
+   */
+  def originOfStartAndEnd: EventOrigin
 
   /** Starts an execution of a test, and returns the origin of that execution's events. */
   def startTestExecution(testName: String): EventOrigin
@@ -172,6 +186,7 @@ private[scalatest] object SuiteRegistration {
   val none: SuiteRegistration = new SuiteRegistration {
     def startRun(): Unit = ()
     def originAt(scopes: List[ScopePlace]): EventOrigin = EventOrigin.none
+    def originOfStartAndEnd: EventOrigin = EventOrigin.none
     def startTestExecution(testName: String): EventOrigin = EventOrigin.none
     def reporterOfTest(testName: String, reporter: Reporter): Reporter = reporter
     def reporterOfSuite(reporter: Reporter): Reporter = reporter
@@ -219,6 +234,18 @@ private[scalatest] abstract class SuiteStart {
   /** Takes the suite name and suite ID the site read as it built the suite's `SuiteStarting`. */
   def namesRead(suiteName: String, suiteId: String): Unit
 
+  /** The origin of the suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`: none where its registration records none. */
+  protected def originOfStartAndEnd: EventOrigin = EventOrigin.none
+
+  /**
+   * Reports the suite's `SuiteStarting`, `SuiteCompleted` or `SuiteAborted` to `reporter`, first handing it off with
+   * the suite's origin where its registration records one.
+   */
+  final def report(event: Event): Unit = {
+    originOfStartAndEnd.handOff(event)
+    reporter(event)
+  }
+
   /** Runs the suite, through `run`, in the context the suite starts in. */
   def run(run: => Status): Status
 }
@@ -235,18 +262,21 @@ private[scalatest] object SuiteStart {
 
   /**
    * The start of a suite in the context the site finds. Where that context is the suite's run, it keeps the names
-   * the site reads.
+   * the site reads, and the suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` take its registration's
+   * origin, wherever they are reported from.
    */
-  def inTheContextItFinds(suite: Suite, suiteReporter: Reporter): SuiteStart =
+  def inTheContextItFinds(suite: Suite, suiteReporter: Reporter): SuiteStart = {
+    val registration = SuiteRegistration.inContext(suite)
     new SuiteStart {
       def reporter: Reporter = suiteReporter
       def namesRead(suiteName: String, suiteId: String): Unit = {
-        val registration = SuiteRegistration.inContext(suite)
         registration.suiteNameRead(suiteName)
         registration.suiteIdRead(suiteId)
       }
+      override protected def originOfStartAndEnd: EventOrigin = registration.originOfStartAndEnd
       def run(run: => Status): Status = run
     }
+  }
 
   /** The start of a suite in the context the site finds, which keeps no names. */
   def inTheContextItFinds(suiteReporter: Reporter): SuiteStart =

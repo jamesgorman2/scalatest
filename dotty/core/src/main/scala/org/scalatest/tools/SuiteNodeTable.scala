@@ -64,6 +64,17 @@ private[scalatest] final class NodeExecutions {
   def numberOfCurrent: Int = number(openedLast.orElse(latest).getOrElse(new Execution))
 }
 
+/**
+ * The executions an event's origin names: that of each suite above its suite, from the top-level suite down, its
+ * suite's, that of each scope it ran in, by the scope's path, and its own node's where that is a scope or test.
+ */
+private[scalatest] final case class NamedExecutions(
+  ofSuitesAbove: Vector[Execution],
+  ofSuite: Execution,
+  ofScopes: Map[List[ScopePlace], Execution],
+  ofOwnNode: Option[Execution]
+)
+
 /** The node IDs of a suite's scopes and tests: each test's by test name, each scope's by its path, and each one's parent. */
 private[scalatest] final case class ScopeAndTestIds(
   tests: Map[String, NodeId],
@@ -197,23 +208,33 @@ private[scalatest] final class SuiteNodeTable(
 
   def executionsOf(node: NodeId): NodeExecutions = executionsOfNodes.getOrElseUpdate(node, new NodeExecutions)
 
-  /** The execution path of an event of this suite, without the suite's own execution: the current execution of each suite above it, from its top-level suite down. */
-  def executionPathAboveSuite: Vector[Int] = {
+  /**
+   * The execution path of an event of this suite, without the suite's own execution: for each suite above it, from
+   * its top-level suite down, the execution `named` gives it where it names one for each, else its current one.
+   */
+  def executionPathAboveSuite(named: Option[NamedExecutions]): Vector[Int] = {
     val suitesAbove = Iterator.unfold(parentSuite)(above => above.map(table => (table, table.parentSuite))).toVector.reverse
-    suitesAbove.map(table => table.executionsOf(table.node).numberOfCurrent)
+    val namedAbove = named.map(_.ofSuitesAbove).filter(_.size == suitesAbove.size).fold(suitesAbove.map(_ => Option.empty[Execution]))(_.map(Some(_)))
+    suitesAbove.zip(namedAbove).map { (table, execution) =>
+      val ofSuite = table.executionsOf(table.node)
+      execution.fold(ofSuite.numberOfCurrent)(ofSuite.number)
+    }
   }
 
   /**
    * The execution path of an event of one of this suite's scopes or tests, without the node's own execution. The
-   * suite's execution is `executionOfSuite`, else the suite's current one. Each suite above it, and each scope between
-   * it and the node, takes its current execution. A test's scopes are those its latest structure puts it in.
+   * suite and each scope between it and the node take the execution `named` gives them, and otherwise their current
+   * one, as each suite above it does. A test's scopes are those its latest structure puts it in.
    */
-  def executionPathAbove(scopeOrTest: NodeId, executionOfSuite: Option[Execution]): Vector[Int] = {
+  def executionPathAbove(scopeOrTest: NodeId, named: Option[NamedExecutions]): Vector[Int] = {
     def scopeAbove(below: NodeId): Option[NodeId] = parents.get(below).filter(_ != node)
     val scopesAbove = Iterator.unfold(scopeAbove(scopeOrTest))(scope => scope.map(id => (id, scopeAbove(id)))).toVector.reverse
-    val ofSuite = executionsOf(node)
-    val suiteNumber = executionOfSuite.fold(ofSuite.numberOfCurrent)(ofSuite.number)
-    (executionPathAboveSuite :+ suiteNumber) ++ scopesAbove.map(scope => executionsOf(scope).numberOfCurrent)
+    val namedScopes = named.fold(Map.empty[NodeId, Execution])(_.ofScopes.flatMap((path, execution) => scopes.get(path).map(_ -> execution)))
+    def numberOf(node: NodeId, execution: Option[Execution]): Int = {
+      val executions = executionsOf(node)
+      execution.fold(executions.numberOfCurrent)(executions.number)
+    }
+    (executionPathAboveSuite(named) :+ numberOf(node, named.map(_.ofSuite))) ++ scopesAbove.map(scope => numberOf(scope, namedScopes.get(scope)))
   }
 
   /** Keeps the execution the suite's `SuiteStarting` opened for the suite's next run to take. */
