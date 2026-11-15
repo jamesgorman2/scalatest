@@ -457,7 +457,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
       case None =>
         wrapperNode match {
-          case Some(test) => assignToScopeOrTest(ofWrapper, test, None, event)
+          case Some(scopeOrTest) => assignToScopeOrTest(ofWrapper, scopeOrTest, None, event)
           case None => assignToSuite(ofWrapper, None, event)
         }
       case Some(names) =>
