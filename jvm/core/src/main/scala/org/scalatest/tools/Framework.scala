@@ -789,10 +789,11 @@ class Framework extends SbtFramework {
     if (detectSlowpokes)
       dispatchReporter.registerSlowpokeReporter(suiteSortingReporter)
 
-    dispatchReporter.registerSlowpokeAlertHandOff(handOffToTestEventLog)
+    dispatchReporter.registerTestEventLogHandOff(handOffToTestEventLog)
 
     private def sendRunEvent(event: Event): Unit = {
-      handOffToTestEventLog(event)
+      if (!TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+        handOffToTestEventLog(event)
       dispatchReporter(event)
     }
 

@@ -55,10 +55,11 @@ private[scalatest] class DispatchReporter(
   def registerSlowpokeReporter(reporter: SuiteSortingReporter): Unit =
     slowpokeReporter.getAndSet(Some(reporter))
 
-  private val slowpokeAlertHandOff: AtomicReference[Event => Unit] = new AtomicReference[Event => Unit](TestEventLogHandOff.none)
+  private val testEventLogHandOff: AtomicReference[Event => Unit] = new AtomicReference[Event => Unit](TestEventLogHandOff.none)
 
-  def registerSlowpokeAlertHandOff(handOffToTestEventLog: Event => Unit): Unit =
-    slowpokeAlertHandOff.set(handOffToTestEventLog)
+  /** Takes the hand-off of the events this reporter raises or completes: its slowpoke alerts and the closing run events. */
+  def registerTestEventLogHandOff(handOffToTestEventLog: Event => Unit): Unit =
+    testEventLogHandOff.set(handOffToTestEventLog)
 
   private case object Dispose
 
@@ -91,7 +92,7 @@ private[scalatest] class DispatchReporter(
                 throwable = None,
                 formatter = Some(IndentedText(Resources.alertFormattedText(fullMessage), fullMessage, 0))
               )
-            slowpokeAlertHandOff.get.apply(alertEvent)
+            testEventLogHandOff.get.apply(alertEvent)
             thisDispatchReporter.apply(alertEvent)
             slowpokeReporter.get match {
               case Some(slowpokeRep) => slowpokeRep.slowpokeEvent(alertEvent)
@@ -252,6 +253,8 @@ private[scalatest] class DispatchReporter(
                     event
                   case _ => event
                 }
+              if (TestEventLogHandOff.isHandedOffByDispatchReporter(updatedEvent))
+                testEventLogHandOff.get.apply(updatedEvent)
               for (report <- reporters)
                 report(updatedEvent)
             }

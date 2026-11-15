@@ -978,7 +978,7 @@ object Runner {
             slowpokeDetectionPeriod,
             handOffToTestEventLog
           ) { (loader, dispatchReporter) =>
-            dispatchReporter.registerSlowpokeAlertHandOff(handOffToTestEventLog)
+            dispatchReporter.registerTestEventLogHandOff(handOffToTestEventLog)
             doRunRunRunDaDoRunRun(
               dispatchReporter,
               suitesList,
@@ -1157,7 +1157,8 @@ object Runner {
     var tracker = new Tracker(new Ordinal(runStamp))
 
     def sendRunEvent(event: Event): Unit = {
-      handOffToTestEventLog(event)
+      if (!TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+        handOffToTestEventLog(event)
       dispatch(event)
     }
 

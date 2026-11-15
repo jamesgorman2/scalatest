@@ -41,7 +41,7 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
 - A send site hands its event off by calling a function, an `Event => Unit`, before it reports the event. A run without the runner argument is given a function that does nothing. The function reaches each site as follows:
   - `Runner.doRunRunRunDaDoRunRun` and `Framework`'s runner take it as a parameter.
   - `SuiteRunner` takes it as a constructor parameter. `Runner` supplies it for a `DiscoverySuite`, through `ConcurrentDistributor` under `-P`.
-  - `DispatchReporter` takes it through `registerSlowpokeAlertHandOff`, as it takes `Framework`'s `SuiteSortingReporter` through `registerSlowpokeReporter`.
+  - `DispatchReporter` takes it through `registerTestEventLogHandOff`, as it takes `Framework`'s `SuiteSortingReporter` through `registerSlowpokeReporter`.
 - The emitter's one write lock (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin) is taken by:
   - the run's own thread;
   - the dispatcher's thread;
@@ -59,9 +59,10 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
   - when a top-level suite's run completes, moves the events of that run still in its set to the suite's wrapper (§ Wrappers);
   - on closing the file, drops every event it keeps.
 - The places that hand off an event sent outside every structure wrapper (`../../ARCHITECTURE.md` § Modules § ScalaTest core, Emitter):
-  - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction, and `RunCompleted` in `done`.
+  - `org.scalatest.tools.Framework`'s runner: `RunStarting` in its construction.
   - `org.scalatest.DispatchReporter`'s slowpoke timer under `-W`: its `AlertProvided`, which has `nameInfo = None` (`../specification/test-event-log-structure.md` AC-121). The timer also passes that same event to the `SuiteSortingReporter` that `Framework` registers with `registerSlowpokeReporter`. From there it reaches at most a task's `SbtLogInfoReporter`, through no wrapper, and is not handed off again.
-  - `org.scalatest.tools.Runner.doRunRunRunDaDoRunRun` and its catches: `RunStarting`, `RunCompleted`, `RunStopped`, `RunAborted`, `DiscoveryStarting` and `DiscoveryCompleted`.
+  - `org.scalatest.DispatchReporter`'s propagator: each `RunCompleted`, `RunStopped` and `RunAborted` it reports, which `Runner` and `Framework` send it. 3.2.20's `DispatchReporter` gives such an event without a summary the run's summary, counted from the events it has dispatched, so the event its reporters receive is made there. Their senders do not hand it off.
+  - `org.scalatest.tools.Runner.doRunRunRunDaDoRunRun` and its catches: `RunStarting`, `DiscoveryStarting` and `DiscoveryCompleted`.
   - `org.scalatest.tools.Runner.withClassLoaderAndDispatchReporter`'s catch, for the run `Runner.run` starts without `-g`: the `RunAborted` it gives the pass-fail reporter. It catches what `ReporterFactory.getDispatchReporter` throws, as where a custom reporter class cannot be loaded, and what `doRunRunRunDaDoRunRun` throws outside its own `try`, as where a `-A` file cannot be read. `Runner.run` passes it the hand-off through an overload. `RunnerJFrame` calls the 3.2.20 signature, which hands nothing off.
   - `org.scalatest.tools.SuiteRunner` running each `DiscoverySuite` that `Runner.genDiscoSuites` builds: that suite's `SuiteStarting`, its `SuiteCompleted`, and the `SuiteAborted` it sends in its `Failure(ue)` branch and its `NotAllowedException` and `RuntimeException` catches.
 - Not handed off (`../SPECIFICATION.md` § Scope § Out of scope):
