@@ -3,21 +3,15 @@ package org.scalatest.tools
 import java.io.ByteArrayOutputStream
 import org.scalatest.Reporter
 import org.scalatest.Suite
-import org.scalatest.SuiteRegistration
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
-import org.scalatest.events.NodeId
-import org.scalatest.events.NodePlace
 import org.scalatest.events.Ordinal
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 final class StructureWrapperSpec extends AnyWordSpec with Matchers {
 
-  private val suite = new Suite {}
-  private val table =
-    new SuiteNodeTable(Some(suite), NodeId(Vector(NodePlace.Suite("samples.OneSuite", 0))), "OneSuite", "samples.OneSuite", "samples.OneSuite", None, None, Nil, ScopeAndTestIds.none, Map.empty)
-  private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), table, suite, None, None)
+  private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), new Suite {}, None)
   private val node = WrapperNode.NestedSuite(registration)
 
   private def alert(message: String): Event = AlertProvided(new Ordinal(1), message, None)
@@ -59,23 +53,6 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
         recorded should be theSameInstanceAs sent
       }
       steps.collect { case ("handed off", named, _) => named }.foreach(_ should be theSameInstanceAs node)
-    }
-
-    "give the registration of its suite where it is a suite's wrapper" in {
-      val ofTopLevelSuite = new StructureWrapper(new Recording().reporter, WrapperNode.TopLevelSuite(registration), new Recording().handOff)
-      val ofNestedSuite = new StructureWrapper(new Recording().reporter, WrapperNode.NestedSuite(registration), new Recording().handOff)
-      ofTopLevelSuite.registrationOfItsSuite should be theSameInstanceAs registration
-      ofNestedSuite.registrationOfItsSuite should be theSameInstanceAs registration
-    }
-
-    "give no registration where it is a test's wrapper" in {
-      val ofTest = new StructureWrapper(new Recording().reporter, WrapperNode.Test(registration, "a test"), new Recording().handOff)
-      ofTest.registrationOfItsSuite should be theSameInstanceAs SuiteRegistration.none
-    }
-
-    "give no registration where it is a suite's wrapper ahead of a sorter" in {
-      val aheadOfSorter = new StructureWrapper(new Recording().reporter, WrapperNode.SuiteAheadOfSorter(registration), new Recording().handOff)
-      aheadOfSorter.registrationOfItsSuite should be theSameInstanceAs SuiteRegistration.none
     }
 
     "pass an event on where its hand-off throws an exception" in {

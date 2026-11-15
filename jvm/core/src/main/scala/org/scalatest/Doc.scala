@@ -134,7 +134,7 @@ println("&&&&&&&&&&&")
     val statusBuffer = new ListBuffer[Status]()
 
     val (_, registeredSuites) = atomic.get.unpack
-    val origin = SuiteRegistration.of(thisDoc).originAt(Nil)
+    val origin = SuiteRegistration.inContext(thisDoc).originAt(Nil)
     snippets foreach {
       case Markup(text) =>
         reportMarkupProvided(thisDoc, reporter, tracker, None, trimMarkup(Doc.stripMargin(text)), 0, None, true, true, origin)

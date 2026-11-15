@@ -9,57 +9,34 @@ import org.scalatest.RandomTestOrder
 import org.scalatest.Status
 import org.scalatest.SucceededStatus
 import org.scalatest.Suite
-import org.scalatest.SuiteMixin
 import org.scalatest.SuiteRegistration
 import org.scalatest.events.InfoProvided
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.tools.RegistrationInContext
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
-/** The instances of a suite run for one test, each with the registration it had as its test ran. */
+/** The instances of a suite that ran one test each, each with the registration it had as it ran it. */
 object PerTestInstances {
 
-  private val runForOneTest = new ConcurrentLinkedQueue[Suite]
   private val ranItsTest = new ConcurrentLinkedQueue[(Suite, SuiteRegistration)]
 
-  def recordRunForOneTest(suite: Suite): Unit = runForOneTest.add(suite)
+  def recordRanItsTest(suite: Suite): Unit = ranItsTest.add(suite -> RegistrationInContext.ofCallingThread)
 
-  def recordRanItsTest(suite: Suite): Unit = ranItsTest.add(suite -> SuiteRegistration.of(suite))
-
-  /**
-   * Returns the instances run for one test in the runs `launch` starts, and those that ran their test, each with the
-   * registration it had as it ran it. Callers record one at a time.
-   */
-  def recordedIn(launch: => Unit): (Vector[Suite], Vector[(Suite, SuiteRegistration)]) = synchronized {
-    runForOneTest.clear()
+  /** Returns the instances that ran a test in the runs `launch` starts, each with the registration it had as it ran it. Callers record one at a time. */
+  def recordedIn(launch: => Unit): Vector[(Suite, SuiteRegistration)] = synchronized {
     ranItsTest.clear()
     launch
-    (runForOneTest.asScala.toVector, ranItsTest.asScala.toVector)
-  }
-}
-
-// Records each instance run for one test, and throws from that run where throwsWhenRunForOneTest is true.
-trait RecordsItsInstancesOfTests extends SuiteMixin { this: Suite =>
-
-  protected def throwsWhenRunForOneTest: Boolean = false
-
-  abstract override def run(testName: Option[String], args: Args): Status = {
-    if (testName.isDefined) {
-      PerTestInstances.recordRunForOneTest(this)
-      if (throwsWhenRunForOneTest) {
-        throw new RuntimeException("no fixture")
-      }
-    }
-    super.run(testName, args)
+    ranItsTest.asScala.toVector
   }
 }
 
 @DoNotDiscover
-class OneInstancePerTestProbe extends AnyFunSuite with OneInstancePerTest with RecordsItsInstancesOfTests {
+class OneInstancePerTestProbe extends AnyFunSuite with OneInstancePerTest {
 
   test("probes") {
     PerTestInstances.recordRanItsTest(this)
@@ -67,12 +44,7 @@ class OneInstancePerTestProbe extends AnyFunSuite with OneInstancePerTest with R
 }
 
 @DoNotDiscover
-class OneInstancePerTestThrowingProbe extends OneInstancePerTestProbe {
-  override protected def throwsWhenRunForOneTest: Boolean = true
-}
-
-@DoNotDiscover
-class ParallelTestExecutionProbe extends AnyFunSuite with ParallelTestExecution with RecordsItsInstancesOfTests {
+class ParallelTestExecutionProbe extends AnyFunSuite with ParallelTestExecution {
 
   test("probes") {
     PerTestInstances.recordRanItsTest(this)
@@ -80,43 +52,10 @@ class ParallelTestExecutionProbe extends AnyFunSuite with ParallelTestExecution 
 }
 
 @DoNotDiscover
-class ParallelTestExecutionThrowingProbe extends ParallelTestExecutionProbe {
-  override protected def throwsWhenRunForOneTest: Boolean = true
-}
-
-@DoNotDiscover
-class RandomTestOrderProbe extends AnyFunSuite with RandomTestOrder with RecordsItsInstancesOfTests {
+class RandomTestOrderProbe extends AnyFunSuite with RandomTestOrder {
 
   test("probes") {
     PerTestInstances.recordRanItsTest(this)
-  }
-}
-
-@DoNotDiscover
-class RandomTestOrderThrowingProbe extends RandomTestOrderProbe {
-  override protected def throwsWhenRunForOneTest: Boolean = true
-}
-
-// Its run for each test throws, so the first such run leaves the instances of the other tests unrun.
-@DoNotDiscover
-class RandomTestOrderTwoTestsThrowingProbe extends AnyFunSuite with RandomTestOrder with RecordsItsInstancesOfTests {
-
-  val instancesOfTests = new ConcurrentLinkedQueue[Suite]
-
-  override protected def throwsWhenRunForOneTest: Boolean = true
-
-  override def newInstance: Suite with RandomTestOrder = {
-    val instance = super.newInstance
-    instancesOfTests.add(instance)
-    instance
-  }
-
-  test("first") {
-    succeed
-  }
-
-  test("second") {
-    succeed
   }
 }
 

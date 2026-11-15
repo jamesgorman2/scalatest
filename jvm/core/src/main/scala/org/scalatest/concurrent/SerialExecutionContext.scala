@@ -19,6 +19,7 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.scalatest.InvocationContext
 import org.scalatest.Outcome
 
 /*
@@ -38,7 +39,7 @@ private[scalatest] class SerialExecutionContext extends ExecutionContext {
   private final val queue = new org.scalatest.LinkedBlockingQueue[Runnable]
 
   def execute(runnable: Runnable): Unit = {
-    queue.put(runnable)
+    queue.put(InvocationContext.carriedTo(runnable))
     // If this is a thread different than the main test thread, we'll
     // notify the main test thread in case it is sitting in the wait
     // in runNow.

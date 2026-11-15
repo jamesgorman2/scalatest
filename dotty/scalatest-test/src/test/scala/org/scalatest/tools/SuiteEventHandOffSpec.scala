@@ -1,13 +1,13 @@
 package org.scalatest.tools
 
 import org.scalatest.Args
-import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
 import org.scalatest.ScopePlace
 import org.scalatest.Status
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
+import org.scalatest.SuiteStart
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.Event
 import org.scalatest.events.InfoProvided
@@ -96,19 +96,30 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
   /** A top-level suite registered with an emitter, with what its events are sent through. */
   private final class RegisteredRun(val eventLog: RecordingEventLog, val emitter: TestEventLogEmitter, val reporter: RecordingReporter, suite: Suite) {
-    val wrapperOfSuite: Reporter = emitter.wrapperOfTopLevelSuite(suite, Filter.default, reporter)
-    val registration: SuiteRegistration = SuiteRegistration.madeWith(wrapperOfSuite)
+    private val started = new StartedTopLevelSuite(emitter, suite, reporter)
+    val wrapperOfSuite: Reporter = started.wrapper
+    val registration: SuiteRegistration = started.registration
 
     def wrapperOfTest(testName: String): Reporter = registration.reporterOfTest(testName, wrapperOfSuite)
+
+    /** Completes the suite's run, which removes its registration. */
+    def complete(): Unit = started.complete()
 
     /** The lines written after the suite's structure. */
     def eventLines: Vector[String] = eventLog.writes.drop(1).map(_.stripSuffix("\n"))
   }
 
+  /** How the site that runs a nested suite starts it, in the context the site runs in, having read its names for its `SuiteStarting`. */
+  private def startOfNested(nested: Suite, reporter: Reporter): SuiteStart = {
+    val start = SuiteStart.ofNestedSuite(nested, reporter)
+    start.namesRead(nested.suiteName, nested.suiteId)
+    start
+  }
+
   private def withRegisteredSuite[A](body: RegisteredRun => A): A = {
     val eventLog = new RecordingEventLog
     val run = new RegisteredRun(eventLog, TestEventLogEmitter.appendingTo(eventLog), new RecordingReporter, new ScopedSuite)
-    try body(run) finally run.registration.remove()
+    try body(run) finally run.complete()
   }
 
   "An emitter handed an event that has no origin" should {
@@ -270,16 +281,14 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val eventLog = new RecordingEventLog
       val inner = new OneTestSuite
       val outer = new org.scalatest.Suites(inner)
-      val wrapperOfOuter = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(outer, Filter.default, new RecordingReporter)
-      val registrationOfOuter = SuiteRegistration.madeWith(wrapperOfOuter)
-      val wrapperOfInner = registrationOfOuter.registerNestedSuite(0, inner, wrapperOfOuter)
+      val ofOuter = new StartedTopLevelSuite(TestEventLogEmitter.appendingTo(eventLog), outer, new RecordingReporter)
+      val wrapperOfInner = ofOuter.runningInItsContext(startOfNested(inner, ofOuter.wrapper)).reporter
       try {
         wrapperOfInner(SuiteStarting(ordinal, inner.suiteName, inner.suiteId, Some(inner.suiteId), threadName = "main", timeStamp = timeStamp))
         eventLog.writes.drop(1).map(_.stripSuffix("\n")) shouldBe
           Vector(line(NodePath.topLevel(outer.suiteId).suite(inner.suiteId), List(1, 1), "SuiteStarting"))
       } finally {
-        SuiteRegistration.madeWith(wrapperOfInner).remove()
-        registrationOfOuter.remove()
+        ofOuter.complete()
       }
     }
 
@@ -300,7 +309,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         Args(new RecordingReporter),
         new ScalaTestStatefulStatus,
         TestEventLogHandOff.none,
-        TestEventLogEmitter.reporterOfTopLevelSuiteFor(Some(emitter))
+        TestEventLogEmitter.startOfTopLevelSuiteFor(Some(emitter))
       ).run()
       body(eventLog, emitter)
     }
@@ -336,7 +345,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
     "neither write nor keep an event sent after the removal, where it reaches a test's wrapper whose reporter passes no event on" in withRegisteredSuite { run =>
       val wrapperOfTest = run.registration.reporterOfTest("s t", passingNoEventOn)
-      run.registration.remove()
+      run.complete()
       val sentLate = info("sent late")
       run.registration.startTestExecution("s t").recordFor(sentLate)
       wrapperOfTest(sentLate)
@@ -345,7 +354,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
 
     "write an event sent after the removal once, assigned to the suite, where it reaches a test's wrapper and then its suite's" in withRegisteredSuite { run =>
-      run.registration.remove()
+      run.complete()
       val sentLate = info("sent late")
       run.registration.startTestExecution("s t").recordFor(sentLate)
       run.wrapperOfTest("s t")(sentLate)
@@ -360,7 +369,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         val inFlight = testStarting("s t")
         run.registration.startTestExecution("s t").recordFor(inFlight)
         run.registration.reporterOfTest("s t", passingNoEventOn)(inFlight)
-        run.registration.remove()
+        run.complete()
         run.wrapperOfSuite(inFlight)
         StatedLines.mismatchWhenIs(
           run.eventLog.writes.map(_.stripSuffix("\n")),
@@ -379,7 +388,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       try {
         val inFlight = TestStarting(ordinal, oneTestSuite.suiteName, oneTestSuite.suiteId, Some(oneTestSuite.suiteId), "only", "only", threadName = "main", timeStamp = timeStamp)
         kept.registration.reporterOfTest("only", passingNoEventOn)(inFlight)
-        removed.registration.remove()
+        removed.complete()
         kept.wrapperOfSuite(inFlight)
         StatedLines.mismatchWhenIs(
           eventLog.writes.map(_.stripSuffix("\n")),
@@ -393,25 +402,23 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           )
         ) shouldBe None
       } finally {
-        removed.registration.remove()
-        kept.registration.remove()
+        removed.complete()
+        kept.complete()
       }
     }
 
-    "keep no event a nested suite's wrapper handed off, after the nested and top-level registrations are removed, and write that event once when it reaches the top-level suite's wrapper" in {
+    "keep no event a nested suite's wrapper handed off, once the top-level suite's registration is removed, and write that event once when it reaches the top-level suite's wrapper" in {
       val eventLog = new RecordingEventLog
       val emitter = TestEventLogEmitter.appendingTo(eventLog)
       val topLevel = new OneNestedSuite
-      val wrapperOfTopLevel = emitter.wrapperOfTopLevelSuite(topLevel, Filter.default, new RecordingReporter)
-      val registrationOfTopLevel = SuiteRegistration.madeWith(wrapperOfTopLevel)
+      val ofTopLevel = new StartedTopLevelSuite(emitter, topLevel, new RecordingReporter)
       val nested = topLevel.nestedSuites.head
-      val wrapperOfNested = registrationOfTopLevel.registerNestedSuite(0, nested, passingNoEventOn)
+      val wrapperOfNested = ofTopLevel.runningInItsContext(startOfNested(nested, passingNoEventOn)).reporter
       val inFlight = SuiteStarting(ordinal, nested.suiteName, nested.suiteId, Some(nested.suiteId), threadName = "main", timeStamp = timeStamp)
       wrapperOfNested(inFlight)
-      SuiteRegistration.madeWith(wrapperOfNested).remove()
-      registrationOfTopLevel.remove()
+      ofTopLevel.complete()
       emitter.keptEventCount shouldBe 0
-      wrapperOfTopLevel(inFlight)
+      ofTopLevel.wrapper(inFlight)
       val topLevelPath = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OneNestedSuite")
       val nestedPath = topLevelPath.suite("org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite")
       StatedLines.mismatchWhenIs(
@@ -486,14 +493,14 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     "write each as one whole line, each assigned to its own suite's test, in the executions its thread sent it in" in {
       val threadCount = 4
       val executionsOfEachThread = 25
-      val registrations = new java.util.concurrent.ConcurrentLinkedQueue[SuiteRegistration]
+      val started = new java.util.concurrent.ConcurrentLinkedQueue[StartedTopLevelSuite]
       val decoded =
         try {
           wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, _) =>
-            val wrapperOfSuite = emitter.wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
-            val registration = SuiteRegistration.madeWith(wrapperOfSuite)
-            registrations.add(registration)
-            val wrapperOfTest = registration.reporterOfTest("only", wrapperOfSuite)
+            val ofSuite = new StartedTopLevelSuite(emitter, new OneTestSuite, new RecordingReporter)
+            started.add(ofSuite)
+            val registration = ofSuite.registration
+            val wrapperOfTest = registration.reporterOfTest("only", ofSuite.wrapper)
             (1 to executionsOfEachThread).foreach { _ =>
               val ofTest = registration.startTestExecution("only")
               List(testStarting("only"), testSucceeded("only")).foreach { event =>
@@ -503,7 +510,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
             }
           }
         } finally {
-          registrations.forEach(_.remove())
+          started.forEach(_.complete())
         }
       val testOfSuite = decoded.collect { case TestEventLogEvent.Structure(nodes) =>
         nodes.collect { case test: org.scalatest.events.StructureNode.Test => test.id }.head

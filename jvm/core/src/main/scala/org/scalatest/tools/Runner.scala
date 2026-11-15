@@ -1002,7 +1002,7 @@ object Runner {
               chosenStyleSet,
               testSortingReporterTimeout,
               handOffToTestEventLog,
-              TestEventLogEmitter.reporterOfTopLevelSuiteFor(testEventLogEmitter)
+              TestEventLogEmitter.startOfTopLevelSuiteFor(testEventLogEmitter)
             )
           }
         }
@@ -1105,7 +1105,7 @@ object Runner {
       chosenStyleSet,
       testSortingReporterTimeout,
       TestEventLogHandOff.none,
-      TestEventLogHandOff.noStructureWrapper
+      TestEventLogHandOff.startWithoutEventLog
     )
 
   private[scalatest] def doRunRunRunDaDoRunRun(
@@ -1131,7 +1131,7 @@ object Runner {
     chosenStyleSet: Set[String],
     testSortingReporterTimeout: Span,
     handOffToTestEventLog: Event => Unit,
-    reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
+    startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ): Unit = {
 
     // TODO: add more, and to RunnerThread too
@@ -1165,9 +1165,9 @@ object Runner {
     def testEventLogHandOffFor(suite: Suite): Event => Unit =
       if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
 
-    // A DiscoverySuite is no top-level suite: the suites it nests are, and it gives each its reporter.
-    def reporterOfTopLevelSuiteFor(suite: Suite): (Suite, Filter, Reporter) => Reporter =
-      if (suite.isInstanceOf[DiscoverySuite]) TestEventLogHandOff.noStructureWrapper else reporterOfTopLevelSuite
+    // A DiscoverySuite is no top-level suite, and runs in no invocation context: the suites it nests are top-level, and it starts each.
+    def startOfTopLevelSuiteFor(suite: Suite): (Suite, Filter, Reporter) => SuiteStart =
+      if (suite.isInstanceOf[DiscoverySuite]) TestEventLogHandOff.startWithoutEventLog else startOfTopLevelSuite
 
     //
     // Generates SuiteConfigs for Suites found via discovery.
@@ -1210,16 +1210,16 @@ object Runner {
             // In this case, they didn't specify any -w, -m, -s,
             // -j or -b on the command line, so the default is to
             // run any accessible Suites discovered on the runpath
-            List(SuiteConfig(new DiscoverySuite("", accessibleSuites, true, loader, reporterOfTopLevelSuite), emptyDynaTags, false, false))
+            List(SuiteConfig(new DiscoverySuite("", accessibleSuites, true, loader, startOfTopLevelSuite), emptyDynaTags, false, false))
           }
           else {
             val membersOnlyInstances =
               for (membersOnlyName <- membersOnlyList)
-                yield SuiteConfig(new DiscoverySuite(membersOnlyName, accessibleSuites, false, loader, reporterOfTopLevelSuite), emptyDynaTags, false, false)
+                yield SuiteConfig(new DiscoverySuite(membersOnlyName, accessibleSuites, false, loader, startOfTopLevelSuite), emptyDynaTags, false, false)
   
             val wildcardInstances =
               for (wildcardName <- wildcardList)
-                yield SuiteConfig(new DiscoverySuite(wildcardName, accessibleSuites, true, loader, reporterOfTopLevelSuite), emptyDynaTags, false, false)
+                yield SuiteConfig(new DiscoverySuite(wildcardName, accessibleSuites, true, loader, startOfTopLevelSuite), emptyDynaTags, false, false)
   
             val testSpecSuiteParams =
               SuiteDiscoveryHelper.discoverTests(
@@ -1372,7 +1372,7 @@ object Runner {
                     val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                     val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
                     val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
-                    distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite), reporterOfTopLevelSuiteFor(suiteConfig.suite))
+                    distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite), startOfTopLevelSuiteFor(suiteConfig.suite))
                   }
                   distributor.waitUntilDone()
                   (new CompositeStatus(statuses.toSet)).waitUntilCompleted()
@@ -1383,7 +1383,7 @@ object Runner {
                   val tagsToInclude = if (suiteConfig.requireSelectedTag) tagsToIncludeSet ++ Set(SELECTED_TAG) else tagsToIncludeSet
                   val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
                   val runArgs = Args(concurrentDispatch, stopper, filter, configMap, Some(distributor), tracker.nextTracker(), chosenStyleSet, false, None, distributedSuiteSorter)
-                  distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite), reporterOfTopLevelSuiteFor(suiteConfig.suite))
+                  distributor.apply(suiteConfig.suite, runArgs, testEventLogHandOffFor(suiteConfig.suite), startOfTopLevelSuiteFor(suiteConfig.suite))
                 }
                 distributor.waitUntilDone()
                 (new CompositeStatus(statuses.toSet)).waitUntilCompleted()
@@ -1399,7 +1399,7 @@ object Runner {
               val filter = Filter(if (tagsToInclude.isEmpty) None else Some(tagsToInclude), tagsToExcludeSet, suiteConfig.excludeNestedSuites, suiteConfig.dynaTags)
               val runArgs = Args(dispatch, stopper, filter, configMap, None, tracker, chosenStyleSet, false, None, None)
               val status = new ScalaTestStatefulStatus()
-              val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status, testEventLogHandOffFor(suiteConfig.suite), reporterOfTopLevelSuiteFor(suiteConfig.suite))
+              val suiteRunner = new SuiteRunner(suiteConfig.suite, runArgs, status, testEventLogHandOffFor(suiteConfig.suite), startOfTopLevelSuiteFor(suiteConfig.suite))
               suiteRunner.run()
               status.waitUntilCompleted()
             }

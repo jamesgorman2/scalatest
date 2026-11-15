@@ -1,6 +1,5 @@
 package org.scalatest.tools
 
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
@@ -12,10 +11,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Assertions
-import org.scalatest.Filter
 import org.scalatest.Reporter
-import org.scalatest.Suite
-import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
 import org.scalatest.events.BuiltEvent
 import org.scalatest.events.TestEventLogDecoder
@@ -73,31 +69,6 @@ private[tools] final case class JvmOutput(stdout: Vector[String], stderr: Vector
 object FrameworkRunInItsOwnJvm extends Assertions with TestEventLogRuns {
 
   def main(arguments: Array[String]): Unit = launched(Launch.ByFramework, arguments.head, arguments.tail.toSeq)
-}
-
-/**
- * The main class of a JVM that registers one suite instance, then closes and opens event logs, printing after each
- * step whether a site would find the instance's registration. The registration is never removed, and only a JVM
- * of its own has no other event log open.
- */
-object SuiteLookupsInTheirOwnJvm {
-
-  def main(arguments: Array[String]): Unit = {
-    val suite = new Suite {}
-    def report(step: String): Unit =
-      println(s"$step: ${if (SuiteRegistration.of(suite) eq SuiteRegistration.none) "not registered" else "registered"}")
-
-    val first = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
-    first.wrapperOfTopLevelSuite(suite, Filter.default, EventLogRecording.passingNoEventOn)
-    report("with one event log open")
-    val second = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
-    first.endWithoutRunEnded()
-    report("with the first of two event logs closed")
-    second.endWithoutRunEnded()
-    report("with both closed")
-    TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
-    report("with another opened")
-  }
 }
 
 /** Launches runs given the runner argument, and reads the event logs they write. */

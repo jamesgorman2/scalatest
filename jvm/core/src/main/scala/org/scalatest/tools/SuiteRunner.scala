@@ -30,11 +30,11 @@ private[scalatest] class SuiteRunner(
   suiteArgs: Args,
   status: ScalaTestStatefulStatus,
   handOffToTestEventLog: Event => Unit,
-  reporterOfSuite: (Suite, Filter, Reporter) => Reporter
+  startOfSuite: (Suite, Filter, Reporter) => SuiteStart
 ) extends Runnable {
 
   def this(suite: Suite, args: Args, status: ScalaTestStatefulStatus, handOffToTestEventLog: Event => Unit) =
-    this(suite, args, status, handOffToTestEventLog, TestEventLogHandOff.noStructureWrapper)
+    this(suite, args, status, handOffToTestEventLog, TestEventLogHandOff.startInTheContextItFinds)
 
   def this(suite: Suite, args: Args, status: ScalaTestStatefulStatus) =
     this(suite, args, status, TestEventLogHandOff.none)
@@ -52,19 +52,25 @@ private[scalatest] class SuiteRunner(
       val suiteStartTime = System.currentTimeMillis
 
       // Asked for only once the suite is to start: a suite a stop keeps from starting gets no reporter of its own.
-      val reporter = reporterOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
+      val start = startOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
+      val reporter = start.reporter
       val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)
-      val registration = SuiteRegistration.madeTaking(reporter, suiteArgs.reporter)
       def send(event: Event): Unit = {
         handOffToTestEventLog(event)
         reporter(event)
       }
 
-      if (!suite.isInstanceOf[DistributedTestRunnerSuite])
-        send(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner))
-        
+      if (!suite.isInstanceOf[DistributedTestRunnerSuite]) {
+        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
+        val ordinal = tracker.nextOrdinal()
+        val theSuiteName = suite.suiteName
+        val theSuiteId = suite.suiteId
+        start.namesRead(theSuiteName, theSuiteId)
+        send(SuiteStarting(ordinal, theSuiteName, theSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner))
+      }
+
       try {
-        val runStatus = registration.removedOnceRun(suite.run(None, args))
+        val runStatus = start.run(suite.run(None, args))
 
         // Must wait until runStatus completed before dispatching SuiteCompleted, because if parallel test execution is mixed in,
         // the main thread will return before the tests are done. And the HTMLReporter uses SuiteCompleted to

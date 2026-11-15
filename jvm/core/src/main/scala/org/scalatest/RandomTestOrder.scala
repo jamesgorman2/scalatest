@@ -39,7 +39,7 @@ import scala.util.{Failure, Success}
  */
 trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
 
-  private[scalatest] case class DeferredSuiteRun(suite: Suite with RandomTestOrder, testName: String, status: ScalaTestStatefulStatus, registration: SuiteRegistration)
+  private[scalatest] case class DeferredSuiteRun(suite: Suite with RandomTestOrder, testName: String, status: ScalaTestStatefulStatus)
 
   private val suiteRunQueue = new ConcurrentLinkedQueue[DeferredSuiteRun]
 
@@ -87,10 +87,7 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
 
       // defer the suite execution
       val status = new ScalaTestStatefulStatus
-      val testSpecificInstance = newInstance
-      val registration = SuiteRegistration.of(this).registerInstanceOfTest(testSpecificInstance)
-      registration.removeWhenCompleted(status)
-      suiteRunQueue.add(DeferredSuiteRun(testSpecificInstance, testName, status, registration))
+      suiteRunQueue.add(DeferredSuiteRun(newInstance, testName, status))
       status
     }
     else {
@@ -183,26 +180,19 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
    * @return a <code>Status</code> object that indicates when all tests and nested suites started by this method have completed, and whether or not a failure occurred.
    */
   abstract override def run(testName: Option[String], args: Args): Status = {
-    SuiteRegistration.runRegistered(this, args) { args =>
+    SuiteRegistration.registeredRun(this, args) { (registration, args) =>
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
-        super.run(testName, args.copy(reporter = SuiteRegistration.of(this).reporterOfTest(name, createTestSpecificReporter(sorter, name))))
+        super.run(testName, args.copy(reporter = registration.reporterOfTest(name, createTestSpecificReporter(sorter, name))))
       case _ =>
-        val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-        val newArgs = args.copy(reporter = SuiteRegistration.of(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
+        val theSuiteId = suiteId
+        registration.suiteIdRead(theSuiteId)
+        val testSortingReporter = new TestSortingReporter(theSuiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
+        val newArgs = args.copy(reporter = registration.reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
         val status = super.run(testName, newArgs)
         // Random shuffle the deferred suite list, before executing them.
-        val deferredRuns = Random.shuffle(suiteRunQueue.asScala.toList)
-        deferredRuns.zipWithIndex.foreach { case (DeferredSuiteRun(suite, testName, statefulStatus, _), position) =>
-          // A registration is otherwise removed once its statefulStatus completes. Where this run throws, neither its
-          // statefulStatus nor those of the instances not yet run ever complete.
-          val status =
-            try suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
-            catch {
-              case thrown: Throwable =>
-                deferredRuns.drop(position).foreach(_.registration.remove())
-                throw thrown
-            }
+        Random.shuffle(suiteRunQueue.asScala.toList).foreach { case DeferredSuiteRun(suite, testName, statefulStatus) =>
+          val status = suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
           status.whenCompleted { tri => 
             tri match {
               case Success(result) =>

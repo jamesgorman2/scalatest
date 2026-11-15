@@ -7,7 +7,11 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import org.scalatest.Filter
 import org.scalatest.Reporter
+import org.scalatest.ScalaTestStatefulStatus
+import org.scalatest.Suite
+import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
@@ -45,6 +49,34 @@ private[tools] trait EventLogRecording { this: Matchers =>
     }
 
     override def close(): Unit = closed.set(true)
+  }
+
+  /**
+   * A top-level suite an emitter has started, as a site that installs its wrapper starts it. Its run lasts until
+   * `complete` is called, which removes its registration.
+   */
+  protected final class StartedTopLevelSuite(emitter: TestEventLogEmitter, suite: Suite, reporter: Reporter = EventLogRecording.passingNoEventOn) {
+    private val runOfSuite = new ScalaTestStatefulStatus
+    private val start = emitter.startOfTopLevelSuite(suite, Filter.default, reporter)
+
+    /** The suite's structure wrapper. */
+    val wrapper: Reporter = start.reporter
+
+    /** The registration of the suite's run. */
+    val registration: SuiteRegistration = {
+      var inItsRun = SuiteRegistration.none
+      start.run {
+        inItsRun = SuiteRegistration.inContext(suite)
+        runOfSuite
+      }
+      inItsRun
+    }
+
+    /** Runs `body` in the invocation context of the suite's run, as the site that started the suite runs it. */
+    def runningInItsContext[A](body: => A): A = registration.runningInItsContext(body)
+
+    /** Completes the suite's run. */
+    def complete(): Unit = runOfSuite.setCompleted()
   }
 
   protected final class RecordingReporter extends Reporter {

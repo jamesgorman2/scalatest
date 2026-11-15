@@ -84,7 +84,7 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
         args.distributor match {  // This is the initial instance
           case Some(distributor) =>
             val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-            args.copy(reporter = SuiteRegistration.of(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
+            args.copy(reporter = SuiteRegistration.inContext(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           case None =>
             args
         }
@@ -155,10 +155,7 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
             sorter.distributingTest(testName)
 
           // It will be oneInstance, testName, args.copy(reporter = ...)
-          val testSpecificInstance = newInstance
-          SuiteRegistration.of(this).registerInstanceOfTest(testSpecificInstance).removedOnceRun {
-            distribute(new DistributedTestRunnerSuite(testSpecificInstance, testName, args), args.copy(tracker = args.tracker.nextTracker()))
-          }
+          distribute(new DistributedTestRunnerSuite(newInstance, testName, args), args.copy(tracker = args.tracker.nextTracker()))
         }
         else {
           // In test-specific (distributed) instance, so just run the test. (RTINI was
@@ -259,11 +256,13 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
    * @return a <code>Status</code> object that indicates when all tests and nested suites started by this method have completed, and whether or not a failure occurred.
    */
   abstract override def run(testName: Option[String], args: Args): Status = {
+    SuiteRegistration.registeredRun(this, args) { (registration, args) =>
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
-        super.run(testName, args.copy(reporter = SuiteRegistration.of(this).reporterOfTest(name, createTestSpecificReporter(sorter, name))))
+        super.run(testName, args.copy(reporter = registration.reporterOfTest(name, createTestSpecificReporter(sorter, name))))
       case _ =>
         super.run(testName, args)
+    }
     }
   }
 

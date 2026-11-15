@@ -70,7 +70,7 @@ private[scalatest] trait DocSpecLike extends Suite with Informing with Notifying
 
   protected override def runNestedSuites(args: Args): Status = {
     import args._
-    val origin = SuiteRegistration.of(thisSuite).originAt(Nil)
+    val origin = SuiteRegistration.inContext(thisSuite).originAt(Nil)
     for (snippet <- doc) {
       snippet match {
         case SuiteSnippet(suite) =>

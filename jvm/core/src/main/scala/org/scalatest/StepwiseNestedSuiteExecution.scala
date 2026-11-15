@@ -50,24 +50,28 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
     import args._
 
     val suiteReport = wrapReporterIfNecessary(thisSuite, reporter)
-    val registration = SuiteRegistration.of(thisSuite)
 
-    def callExecuteOnSuite(nestedSuite: Suite, position: Int): Status = {
+    def callExecuteOnSuite(nestedSuite: Suite): Status = {
 
       if (!stopper.stopRequested) {
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
-        val report = registration.registerNestedSuite(position, nestedSuite, suiteReport)
-        val nestedRegistration = SuiteRegistration.madeTaking(report, suiteReport)
+        val start = SuiteStart.ofNestedSuite(nestedSuite, suiteReport)
+        val report = start.reporter
 
         val suiteStartTime = System.currentTimeMillis
 
-        report(SuiteStarting(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
+        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
+        val ordinal = tracker.nextOrdinal()
+        val nestedSuiteName = nestedSuite.suiteName
+        val nestedSuiteId = nestedSuite.suiteId
+        start.namesRead(nestedSuiteName, nestedSuiteId)
+        report(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status = nestedRegistration.removedOnceRun(nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty)))
+          val status = start.run(nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
@@ -107,10 +111,9 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
     
     val statusBuffer = new ListBuffer[Status]()
     if (!filter.excludeNestedSuites) {
-      var position = 0
       for (nestedSuite <- nestedSuites) {
         if (!stopper.stopRequested) {
-          val st = callExecuteOnSuite(nestedSuite, position)
+          val st = callExecuteOnSuite(nestedSuite)
           // The distributor is being passed down with stepwise execution,
           // so it may run in parallel. Make sure all is done before moving on.
           // SKIP-SCALATESTJS,NATIVE-START
@@ -118,7 +121,6 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
           // SKIP-SCALATESTJS,NATIVE-END
           statusBuffer += st
         }
-        position += 1
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)

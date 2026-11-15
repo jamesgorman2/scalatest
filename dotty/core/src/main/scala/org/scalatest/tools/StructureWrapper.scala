@@ -1,8 +1,6 @@
 package org.scalatest.tools
 
 import org.scalatest.Reporter
-import org.scalatest.ReporterOfRegisteredSuite
-import org.scalatest.SuiteRegistration
 import org.scalatest.events.Event
 
 /** The node a structure wrapper hands its events off for: a suite's, or that of one of the suite's tests. */
@@ -47,25 +45,10 @@ private[scalatest] final class StructureWrapper(
   wrapped: Reporter,
   node: WrapperNode,
   handOff: (WrapperNode, Event) => Unit
-) extends ReporterOfRegisteredSuite {
-
-  /** Whether the wrapper's suite instance is placed: one that hands events to an emitter, not one holding them until its suite node is known. */
-  def isOfPlacedInstance: Boolean = node.registration.isPlaced
+) extends Reporter {
 
   def apply(event: Event): Unit = {
     TestEventLogEmitter.keptFromCaller(handOff(node, event))
     wrapped(event)
-  }
-
-  /**
-   * The registration the site that runs a suite made as it took this wrapper. None for a wrapper no site took in place
-   * of the suite's reporter: a test's wrapper, a suite's wrapper ahead of a sorter, or the wrapper of a suite that
-   * registered itself, whose own site removes the registration.
-   */
-  def registrationOfItsSuite: SuiteRegistration = {
-    node match {
-      case WrapperNode.Test(_, _) | WrapperNode.SuiteAheadOfSorter(_) | WrapperNode.SelfRegisteredSuite(_) => SuiteRegistration.none
-      case ofSuite => ofSuite.registration
-    }
   }
 }

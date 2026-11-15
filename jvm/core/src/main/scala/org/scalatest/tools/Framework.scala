@@ -256,7 +256,7 @@ class Framework extends SbtFramework {
     presentReminderWithFullStackTraces: Boolean,
     presentReminderWithoutCanceledTests: Boolean,
     execService: ExecutorService,
-    reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
+    startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ): Array[Task] = {
     val suiteStartTime = System.currentTimeMillis
     val suiteClass = suite.getClass
@@ -306,8 +306,8 @@ class Framework extends SbtFramework {
         Filter(if (tagsToInclude.isEmpty) Some(Set(SELECTED_TAG)) else Some(tagsToInclude + SELECTED_TAG), tagsToExclude, false, new DynaTags(suiteTags.filter(s => !testTags.contains(s._1)).toMap, testTags.toMap))
       }
 
-    val report = reporterOfTopLevelSuite(suite, filter, sbtReporter)
-    val registration = SuiteRegistration.madeTaking(report, sbtReporter)
+    val start = startOfTopLevelSuite(suite, filter, sbtReporter)
+    val report = start.reporter
 
     if (!suite.isInstanceOf[DistributedTestRunnerSuite])
       report(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName))))
@@ -322,7 +322,7 @@ class Framework extends SbtFramework {
 
     try {
 
-      val status = suite.run(None, args.copy(distributor = distributor))
+      val status = start.run(suite.run(None, args.copy(distributor = distributor)))
       statusList.put(status)
       val formatter = formatterForSuiteCompleted(suite)
       val duration = System.currentTimeMillis - suiteStartTime
@@ -370,8 +370,6 @@ class Framework extends SbtFramework {
       }
     }
     finally {
-      // The suite's run has thrown, or the Status it returned has completed.
-      registration.remove()
       statefulStatus match {
         case Some(s) => s.setCompleted()
         case None => // Do nothing
@@ -407,7 +405,7 @@ class Framework extends SbtFramework {
     presentJson: Boolean,
     configSet: Set[ReporterConfigParam],
     execService: ExecutorService,
-    reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
+    startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ) extends Task {
 
     // The constructor of 3.2.20, which the binary compatibility check requires.
@@ -464,7 +462,7 @@ class Framework extends SbtFramework {
         presentJson,
         configSet,
         execService,
-        TestEventLogHandOff.noStructureWrapper
+        TestEventLogHandOff.startWithoutEventLog
       )
 
     def loadSuiteClass = {
@@ -593,7 +591,7 @@ class Framework extends SbtFramework {
           presentReminderWithFullStackTraces,
           presentReminderWithoutCanceledTests,
           execService,
-          reporterOfTopLevelSuite
+          startOfTopLevelSuite
         )
       }
        else
@@ -608,7 +606,8 @@ class Framework extends SbtFramework {
     private def handOffAbortOfSuiteThatCannotStart(thrown: Throwable): Unit = {
       val aborted = new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, thrown)
       val passingNoEventOn: Reporter = (_: Event) => ()
-      val report = reporterOfTopLevelSuite(aborted, Filter.default, passingNoEventOn)
+      val start = startOfTopLevelSuite(aborted, Filter.default, passingNoEventOn)
+      val report = start.reporter
       if (report ne passingNoEventOn) {
         val tracker = new Tracker
         val suiteClassName = getSuiteClassName(aborted)
@@ -617,11 +616,11 @@ class Framework extends SbtFramework {
             thrown.getClass.getName + " encountered when attempting to run suite " + aborted.suiteId
           else
             thrown.getMessage
-        try {
+        // Run as the suite's own run, which ends once both events are handed off.
+        start.run {
           report(SuiteStarting(tracker.nextOrdinal(), aborted.suiteName, aborted.suiteId, Some(suiteClassName), formatterForSuiteStarting(aborted), Some(TopOfClass(suiteClassName))))
           report(SuiteAborted(tracker.nextOrdinal(), message, aborted.suiteName, aborted.suiteId, Some(aborted.suiteName), Some(thrown), Some(0L), formatterForSuiteAborted(aborted, message), Some(SeeStackDepthException)))
-        } finally {
-          SuiteRegistration.madeTaking(report, passingNoEventOn).remove()
+          SucceededStatus
         }
       }
     }
@@ -771,7 +770,7 @@ class Framework extends SbtFramework {
     testEventLogEmitter: Option[TestEventLogEmitter]
   ) extends sbt.testing.Runner {
     private val handOffToTestEventLog = TestEventLogEmitter.handOffTo(testEventLogEmitter)
-    private val reporterOfTopLevelSuite = TestEventLogEmitter.reporterOfTopLevelSuiteFor(testEventLogEmitter)
+    private val startOfTopLevelSuite = TestEventLogEmitter.startOfTopLevelSuiteFor(testEventLogEmitter)
     val isDone = new AtomicBoolean(false)
     val serverThread = new AtomicReference[Option[Thread]](None)
     val statusList = new LinkedBlockingQueue[Status]()
@@ -850,7 +849,7 @@ class Framework extends SbtFramework {
           presentJson,
           configSet,
           execSvc,
-          reporterOfTopLevelSuite
+          startOfTopLevelSuite
         )
 
     private def filterWildcard(paths: List[String], taskDefs: Array[TaskDef]): Array[TaskDef] =

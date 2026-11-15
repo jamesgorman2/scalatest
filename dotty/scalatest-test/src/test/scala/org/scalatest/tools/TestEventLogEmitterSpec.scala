@@ -14,7 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.ConfigMap
 import org.scalatest.Filter
+import org.scalatest.InvocationContext
 import org.scalatest.ScopePlace
+import org.scalatest.SucceededStatus
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.events.AlertProvided
@@ -416,9 +418,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         )
       }
 
-      "return the suite's node table, holding the suite's node, suite ID, class name and the instance it was read from" in {
+      "return the suite's node table, holding the suite's node, suite ID and class name" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
-        table.instance.get should be theSameInstanceAs outer
         (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), "samples.Outer", "samples.Outer"))
       }
 
@@ -457,7 +458,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         )
       }
 
-      "return a node table holding each nested suite's table at its position, with the instance it was read from" in {
+      "return a node table holding each nested suite's table at its position" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
         table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites)) shouldBe
           Vector(
@@ -470,7 +471,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
               Vector.empty
             )
           )
-        table.nestedSuites.head.instance.get should be theSameInstanceAs inner
       }
 
       "give a later top-level suite of an earlier one's suite ID the next index, so that no two nodes share a path" in {
@@ -528,36 +528,49 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       }
     }
 
-    "asked for the structure wrapper of a top-level suite" should {
-      "have written the suite's structure, as the suite and the filter give it, when it returns the wrapper" in {
+    "asked how a top-level suite starts" should {
+      "have written the suite's structure, as the suite and the filter give it, when it returns" in {
         val eventLog = new RecordingEventLog
-        val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
-        SuiteRegistration.madeWith(wrapper).remove()
+        TestEventLogEmitter.appendingTo(eventLog).startOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
         eventLog.writes shouldBe Vector(oneTestSuiteLine + "\n")
       }
 
-      "return a wrapper that passes each event unchanged to the suite's reporter" in {
+      "start it with a wrapper that passes each event unchanged to the suite's reporter" in {
         val reporter = new RecordingReporter
         val suite = new OneTestSuite
-        val wrapper = TestEventLogEmitter.appendingTo(new RecordingEventLog).wrapperOfTopLevelSuite(suite, Filter.default, reporter)
-        try {
-          val events = Vector(alert("first", "main"), alert("second", "main"))
-          events.foreach(wrapper(_))
-          reporter.events.size shouldBe 2
-          reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
-        } finally {
-          SuiteRegistration.madeWith(wrapper).remove()
-        }
+        val wrapper = TestEventLogEmitter.appendingTo(new RecordingEventLog).startOfTopLevelSuite(suite, Filter.default, reporter).reporter
+        val events = Vector(alert("first", "main"), alert("second", "main"))
+        events.foreach(wrapper(_))
+        reporter.events.size shouldBe 2
+        reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
       }
 
-      "end the event log before a structure it cannot read, and return the suite's reporter itself" in {
+      "start it in the context of its registration, and restore the context around it once its run returns" in {
+        val suite = new OneTestSuite
+        val start = TestEventLogEmitter.appendingTo(new RecordingEventLog).startOfTopLevelSuite(suite, Filter.default, new RecordingReporter)
+        var inItsRun = SuiteRegistration.none
+        start.run {
+          inItsRun = SuiteRegistration.inContext(suite)
+          SucceededStatus
+        }
+        (inItsRun ne SuiteRegistration.none, InvocationContext.get) shouldBe ((true, None))
+      }
+
+      "end the event log before a structure it cannot read, and start the suite with its reporter itself, in no context" in {
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val reporter = new RecordingReporter
         emitter.runEvent(runStarting)
-        val returned = emitter.wrapperOfTopLevelSuite(new TestNamesThrow(new IllegalStateException("no names")), Filter.default, reporter)
+        val suite = new TestNamesThrow(new IllegalStateException("no names"))
+        val start = emitter.startOfTopLevelSuite(suite, Filter.default, reporter)
         emitter.runEvent(runCompleted)
-        returned should be theSameInstanceAs reporter
+        var inItsRun = Option.empty[SuiteRegistration]
+        start.run {
+          inItsRun = Some(SuiteRegistration.inContext(suite))
+          SucceededStatus
+        }
+        start.reporter should be theSameInstanceAs reporter
+        inItsRun shouldBe Some(SuiteRegistration.none)
         eventLog.writes shouldBe Vector(runStartingLine + "\n")
         eventLog.isClosed shouldBe true
       }
@@ -567,7 +580,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val wasLeftInterrupted =
           try {
-            emitter.wrapperOfTopLevelSuite(new TestNamesThrow(new InterruptedException("interrupted while blocked")), Filter.default, new RecordingReporter)
+            emitter.startOfTopLevelSuite(new TestNamesThrow(new InterruptedException("interrupted while blocked")), Filter.default, new RecordingReporter)
             Thread.currentThread.isInterrupted
           } finally {
             Thread.interrupted()
@@ -580,7 +593,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         TestEventLogEmitter
           .appendingTo(eventLog)
-          .wrapperOfTopLevelSuite(new TestNamesThrow(new StackOverflowError), Filter.default, new RecordingReporter)
+          .startOfTopLevelSuite(new TestNamesThrow(new StackOverflowError), Filter.default, new RecordingReporter)
         eventLog.isClosed shouldBe true
       }
 
@@ -588,7 +601,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         val outOfMemory = new OutOfMemoryError("no heap")
         val thrown = the[OutOfMemoryError] thrownBy
-          TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new TestNamesThrow(outOfMemory), Filter.default, new RecordingReporter)
+          TestEventLogEmitter.appendingTo(eventLog).startOfTopLevelSuite(new TestNamesThrow(outOfMemory), Filter.default, new RecordingReporter)
         thrown should be theSameInstanceAs outOfMemory
         eventLog.isClosed shouldBe true
       }
@@ -596,13 +609,13 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
   }
 
   "A run that has no emitter" should {
-    "give each top-level suite the reporter it would report to" in {
+    "start each top-level suite with the reporter it would report to" in {
       val reporter = new RecordingReporter
-      TestEventLogEmitter.reporterOfTopLevelSuiteFor(None)(new OneTestSuite, Filter.default, reporter) should be theSameInstanceAs reporter
+      TestEventLogEmitter.startOfTopLevelSuiteFor(None)(new OneTestSuite, Filter.default, reporter).reporter should be theSameInstanceAs reporter
     }
 
-    "build no object to do so" in {
-      TestEventLogEmitter.reporterOfTopLevelSuiteFor(None) should be theSameInstanceAs TestEventLogHandOff.noStructureWrapper
+    "build no function to do so" in {
+      TestEventLogEmitter.startOfTopLevelSuiteFor(None) should be theSameInstanceAs TestEventLogHandOff.startWithoutEventLog
     }
   }
 }

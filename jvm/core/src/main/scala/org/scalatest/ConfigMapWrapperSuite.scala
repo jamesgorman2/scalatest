@@ -143,7 +143,7 @@ final class ConfigMapWrapperSuite(clazz: Class[_ <: Suite]) extends Suite {
   override def run(testName: Option[String], args: Args): Status = {
     val constructor = clazz.getConstructor(classOf[Map[_, _]])
     val suite = constructor.newInstance(args.configMap)
-    SuiteRegistration.of(this).registerInstanceRunInItsPlace(suite).removedOnceRun(suite.run(testName, args))
+    suite.run(testName, args)
   }
 }
   // TODO: Check the testName throwing an IAE behavior

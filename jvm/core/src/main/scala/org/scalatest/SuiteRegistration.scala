@@ -1,6 +1,5 @@
 package org.scalatest
 
-import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.events.Event
 
 /** A scope among its parent's scopes: the text it is registered with, and its place, from 0, among those of that text. */
@@ -32,6 +31,12 @@ private[scalatest] abstract class EventOrigin {
    * emitter writes the closing event without them.
    */
   def ofClosingEventWithMessagesHandedOff: EventOrigin = this
+
+  /**
+   * Runs a test's body in the invocation context of the test execution this origin is of, so that a suite the body
+   * runs starts in that context. Called with the origin a test execution's start returned.
+   */
+  def runningTheTest[A](body: => A): A = body
 }
 
 private[scalatest] object EventOrigin {
@@ -46,8 +51,49 @@ private[scalatest] object EventOrigin {
 }
 
 /**
- * One registration of a suite instance, by the site that runs it, against the suite's node in a run's test event
- * log. The engine sites that send the instance's events find it by the instance.
+ * The invocation context the code on a thread runs in, in a run that writes a test event log: a suite instance's run,
+ * outside its tests, or one execution of a test. A suite instance whose run starts in it is registered in it.
+ */
+private[scalatest] abstract class InvocationContext {
+
+  /** The registration of `suite` this context is the run of, where it is one. */
+  def registrationOf(suite: Suite): Option[SuiteRegistration]
+
+  /** Registers `suite`, an instance whose run starts in this context. */
+  def register(suite: Suite): SuiteRegistration
+}
+
+private[scalatest] object InvocationContext {
+
+  // Set only while a run's emitter is on, and cleared around a top-level suite of a run that writes no test event log.
+  private val current = new ThreadLocal[InvocationContext]
+
+  /** The context the code on this thread runs in, where one is set. */
+  def get: Option[InvocationContext] = Option(current.get)
+
+  /** Runs `body` in `context`, then restores the context this thread had. */
+  def within[A](context: InvocationContext)(body: => A): A = replacedBy(context)(body)
+
+  /** Runs `body` in no context, then restores the context this thread had. */
+  def cleared[A](body: => A): A = replacedBy(null)(body)
+
+  /** `runnable`, run on another thread in the context this thread runs in now. */
+  def carriedTo(runnable: Runnable): Runnable = {
+    val context = current.get
+    if (context eq null) runnable else () => replacedBy(context)(runnable.run())
+  }
+
+  private def replacedBy[A](context: InvocationContext)(body: => A): A = {
+    val previous = current.get
+    current.set(context)
+    try body finally current.set(previous)
+  }
+}
+
+/**
+ * One registration of a suite instance's run against the suite's node in a run's test event log. The first site of
+ * the run that finds an invocation context set registers the instance in it, and runs the rest of the run in the
+ * context of that registration, where each later site finds it.
  */
 private[scalatest] abstract class SuiteRegistration {
 
@@ -63,7 +109,7 @@ private[scalatest] abstract class SuiteRegistration {
   /** The reporter a test is run with: the test's structure wrapper over `reporter`. */
   def reporterOfTest(testName: String, reporter: Reporter): Reporter
 
-  /** The reporter a site that made this registration runs the instance with: the suite's structure wrapper over `reporter`. */
+  /** The reporter the site that registered the instance runs it with: the suite's structure wrapper over `reporter`. */
   def reporterOfSuite(reporter: Reporter): Reporter
 
   /**
@@ -73,29 +119,20 @@ private[scalatest] abstract class SuiteRegistration {
   def reporterAheadOf(reporter: Reporter): Reporter
 
   /**
-   * Registers `instance`, which this suite instance created to run one test, against the suite's node and in the
-   * execution of the current run. The instance's run starts no execution of its own. The caller removes the returned
-   * registration.
+   * How the site that registered this instance as a nested suite starts it: with the suite's structure wrapper over
+   * `reporter`, and in the context of this registration.
    */
-  def registerInstanceOfTest(instance: Suite): SuiteRegistration
+  def startWith(reporter: Reporter): SuiteStart
 
-  /**
-   * Registers `instance`, which this suite instance constructed to run in its place, against the suite's node.
-   * The caller removes the returned registration.
-   */
-  def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration
-
-  /**
-   * Registers a nested suite the instance is about to run, against the node at its position in `nestedSuites`, and
-   * returns the reporter the nested suite is started and run with: its structure wrapper over `reporter`.
-   */
-  def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter
+  /** Runs `body` in the invocation context of this registration's run. */
+  def runningInItsContext[A](body: => A): A
 
   /**
    * Writes a further structure of the suite where the scopes and tests the filter keeps from the instance's
    * registration tree differ from the suite's latest structure. A test an earlier structure of the suite filtered
    * keeps that result. Any other is filtered by `filter` over `tagsOfTests`, the tags the instance registered its
-   * tests with. Calls no member of the instance that a suite outside ScalaTest can override.
+   * tests with. Calls no member of the instance that a suite outside ScalaTest can override. Where the suite ID of
+   * the run is not yet known, the structure is written once it is.
    */
   def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit
 
@@ -105,32 +142,21 @@ private[scalatest] abstract class SuiteRegistration {
    */
   def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit
 
-  /**
-   * Keeps the suite name the site read for the instance's run, as 3.2.20 reads it there, for a registration that
-   * does not yet know the suite node of the instance.
-   */
+  /** Keeps the suite name a site read for the instance's run, where it is the first read of it. */
   def suiteNameRead(suiteName: String): Unit
 
-  /** Keeps the suite ID the site read for the instance's run, as `suiteNameRead` keeps its suite name. */
+  /** Keeps the suite ID a site read for the instance's run, where it is the first read of it, which fixes its node. */
   def suiteIdRead(suiteId: String): Unit
 
-  /** Removes this registration. Called where the instance's run throws. */
-  def remove(): Unit
-
-  /** Removes this registration once the `Status` the instance's run returned completes. */
-  def removeWhenCompleted(status: Status): Unit
-
-  /** Runs the instance, removing this registration where the run throws, and otherwise once its `Status` completes. */
-  final def removedOnceRun(run: => Status): Status = {
-    val status =
-      try run
-      catch {
-        case thrown: Throwable =>
-          remove()
-          throw thrown
-      }
-    removeWhenCompleted(status)
-    status
+  /**
+   * What `filter` says of one test of `suite`, the instance of this registration's run. It reads the suite's tags and
+   * suite ID in the order 3.2.20 passes them to the filter, and keeps the suite ID it read.
+   */
+  final def filtered(filter: Filter, testName: String, suite: Suite): (Boolean, Boolean) = {
+    val theTags = suite.tags
+    val theSuiteId = suite.suiteId
+    suiteIdRead(theSuiteId)
+    filter(testName, theTags, theSuiteId)
   }
 
   /** The `Args` a test is run with: `args`, reporting to the test's structure wrapper. */
@@ -140,29 +166,9 @@ private[scalatest] abstract class SuiteRegistration {
   }
 }
 
-/** The registrations of a process's suite instances. */
-private[scalatest] abstract class SuiteRegistrations {
-
-  /** The instance's registration, or `SuiteRegistration.none` where it has none or several. */
-  def of(suite: Suite): SuiteRegistration
-
-  /**
-   * Registers an instance that has no registration, not yet knowing its suite node, and returns that registration.
-   * None where the instance has one or several.
-   */
-  def registeredUnlessRegistered(suite: Suite): Option[SuiteRegistration]
-}
-
-/** A reporter that knows the registration made with it: a structure wrapper, in a run that writes a test event log. */
-private[scalatest] trait ReporterOfRegisteredSuite extends Reporter {
-
-  /** The registration a site made as it took this reporter for a suite, or `SuiteRegistration.none` where it took it for a test. */
-  def registrationOfItsSuite: SuiteRegistration
-}
-
 private[scalatest] object SuiteRegistration {
 
-  /** The registration of every suite instance of a run that writes no test event log. It registers and wraps nothing. */
+  /** The registration of every suite instance whose run finds no invocation context. It registers and wraps nothing. */
   val none: SuiteRegistration = new SuiteRegistration {
     def startRun(): Unit = ()
     def originAt(scopes: List[ScopePlace]): EventOrigin = EventOrigin.none
@@ -170,59 +176,84 @@ private[scalatest] object SuiteRegistration {
     def reporterOfTest(testName: String, reporter: Reporter): Reporter = reporter
     def reporterOfSuite(reporter: Reporter): Reporter = reporter
     def reporterAheadOf(reporter: Reporter): Reporter = reporter
-    def registerInstanceOfTest(instance: Suite): SuiteRegistration = none
-    def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration = none
-    def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = reporter
+    def startWith(reporter: Reporter): SuiteStart = SuiteStart.inTheContextItFinds(reporter)
+    def runningInItsContext[A](body: => A): A = body
     def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = ()
     def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = ()
     def suiteNameRead(suiteName: String): Unit = ()
     def suiteIdRead(suiteId: String): Unit = ()
-    def remove(): Unit = ()
-    def removeWhenCompleted(status: Status): Unit = ()
   }
 
-  private val noRegistrations: SuiteRegistrations = new SuiteRegistrations {
-    def of(suite: Suite): SuiteRegistration = none
-    def registeredUnlessRegistered(suite: Suite): Option[SuiteRegistration] = None
-  }
-
-  // A suite instance cannot carry its registration, and `Args` reaches user code, so the sites find it here.
-  private val registrations = new AtomicReference[SuiteRegistrations](noRegistrations)
-
-  /** Makes `registered` the registrations every site looks in. Called when a process that writes no test event log starts to write one. */
-  def lookUpIn(registered: SuiteRegistrations): Unit = registrations.set(registered)
-
-  /** Has every site find no registration again. Called when a process closes the last test event log it was writing. */
-  def lookUpNowhere(): Unit = registrations.set(noRegistrations)
-
-  def of(suite: Suite): SuiteRegistration = registrations.get.of(suite)
+  /** The registration of `suite` the invocation context this thread runs in is the run of, else `none`. */
+  def inContext(suite: Suite): SuiteRegistration = InvocationContext.get.flatMap(_.registrationOf(suite)).getOrElse(none)
 
   /**
-   * Runs an instance with the `Args` it is given. Where no site has registered the instance, as for one user code
-   * creates and runs, it first registers the instance, not yet knowing its suite node, and runs it with its suite's
-   * structure wrapper over `args.reporter`. It then removes that registration where the run throws, and otherwise
-   * once its `Status` completes.
+   * Runs `suite` from a site that registers it where no earlier site of its run has: `run` takes the registration of
+   * the run and the `Args` to run with.
+   *  - Where the context is that registration's run, `run` takes it and `args`.
+   *  - Where another context is set, the suite is registered in it, and `run` runs in the new registration's context,
+   *    with its suite's structure wrapper over `args.reporter`.
+   *  - Where none is set, `run` takes `none` and `args`.
    */
-  def runRegistered(suite: Suite, args: Args)(run: Args => Status): Status = {
-    val made = if (args eq null) None else registrations.get.registeredUnlessRegistered(suite)
-    made match {
-      case Some(registration) => registration.removedOnceRun(run(args.copy(reporter = registration.reporterOfSuite(args.reporter))))
-      case None => run(args)
+  def registeredRun(suite: Suite, args: Args)(run: (SuiteRegistration, Args) => Status): Status = {
+    InvocationContext.get match {
+      case None => run(none, args)
+      case Some(context) =>
+        context.registrationOf(suite) match {
+          case Some(registration) => run(registration, args)
+          case None =>
+            val registration = context.register(suite)
+            val registeredArgs = if (args eq null) args else args.copy(reporter = registration.reporterOfSuite(args.reporter))
+            registration.runningInItsContext(run(registration, registeredArgs))
+        }
     }
   }
+}
 
-  /** The registration made with a suite's structure wrapper, or `none` for any other reporter. */
-  def madeWith(reporter: Reporter): SuiteRegistration =
-    reporter match {
-      case ofRegisteredSuite: ReporterOfRegisteredSuite => ofRegisteredSuite.registrationOfItsSuite
-      case _ => none
+/** How a site starts a suite it runs: the reporter it gives the suite, and the invocation context it runs the suite in. */
+private[scalatest] abstract class SuiteStart {
+
+  /** The reporter the suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted` are sent to, and that the suite is run with. */
+  def reporter: Reporter
+
+  /** Takes the suite name and suite ID the site read as it built the suite's `SuiteStarting`. */
+  def namesRead(suiteName: String, suiteId: String): Unit
+
+  /** Runs the suite, through `run`, in the context the suite starts in. */
+  def run(run: => Status): Status
+}
+
+private[scalatest] object SuiteStart {
+
+  /** The start of a top-level suite of a run that writes no test event log: it runs in no context. */
+  def withoutEventLog(suiteReporter: Reporter): SuiteStart =
+    new SuiteStart {
+      def reporter: Reporter = suiteReporter
+      def namesRead(suiteName: String, suiteId: String): Unit = ()
+      def run(run: => Status): Status = InvocationContext.cleared(run)
     }
 
-  /**
-   * The registration a site made as it took a suite's structure wrapper, `taken`, in place of the reporter it would
-   * have given the suite. Where the site took that reporter itself there is none: the reporter may be the structure
-   * wrapper of the suite around this one, whose registration is not the site's to remove.
-   */
-  def madeTaking(taken: Reporter, inPlaceOf: Reporter): SuiteRegistration =
-    if (taken eq inPlaceOf) none else madeWith(taken)
+  /** The start of a suite in the context the site finds, which takes the names it reads where it is the suite's run. */
+  def inTheContextItFinds(suite: Suite, suiteReporter: Reporter): SuiteStart =
+    new SuiteStart {
+      def reporter: Reporter = suiteReporter
+      def namesRead(suiteName: String, suiteId: String): Unit = {
+        val registration = SuiteRegistration.inContext(suite)
+        registration.suiteNameRead(suiteName)
+        registration.suiteIdRead(suiteId)
+      }
+      def run(run: => Status): Status = run
+    }
+
+  /** The start of a suite in the context the site finds, which keeps no names. */
+  def inTheContextItFinds(suiteReporter: Reporter): SuiteStart =
+    new SuiteStart {
+      def reporter: Reporter = suiteReporter
+      def namesRead(suiteName: String, suiteId: String): Unit = ()
+      def run(run: => Status): Status = run
+    }
+
+  /** The start of a nested suite: registered in the context the site runs in, where one is set. */
+  def ofNestedSuite(nestedSuite: Suite, reporter: Reporter): SuiteStart =
+    InvocationContext.get.fold(inTheContextItFinds(reporter))(_.register(nestedSuite).startWith(reporter))
 }

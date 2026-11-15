@@ -2,20 +2,20 @@ package org.scalatest.tools
 
 import java.util.Collections
 import java.util.IdentityHashMap
-import java.util.concurrent.ConcurrentHashMap
 import org.scalatest.EventOrigin
 import org.scalatest.Filter
-import org.scalatest.RegisteredNode
+import org.scalatest.InvocationContext
 import org.scalatest.Reporter
 import org.scalatest.ScopePlace
 import org.scalatest.Status
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
-import org.scalatest.SuiteRegistrations
+import org.scalatest.SuiteStart
 import org.scalatest.events.EncodedEvent
 import org.scalatest.events.Event
 import org.scalatest.events.NodeExecution
-import scala.jdk.CollectionConverters.*
+import org.scalatest.events.NodeId
+import org.scalatest.events.NodePlace
 
 /** The suite, scope or test of a suite's registration tree that an event is for. */
 private[scalatest] enum TreeNode {
@@ -97,147 +97,99 @@ private[scalatest] final class TestExecutionMessages {
  */
 private[scalatest] abstract class RecordingOrigin(val registration: RegisteredSuite) extends EventOrigin {
 
-  /** Called under the emitter's lock, or under `UnplacedSuites`' lock while the registration is unplaced. */
+  /** Called under the emitter's lock. */
   def record(): RecordedOrigin
 }
 
-/** Where an unplaced instance is placed: with the table of the instance that created it, or below the suite node of the instance that runs it. */
-private[scalatest] enum Awaiting {
-  case TableOf(creator: RegisteredSuite)
-  case Below(outer: RegisteredSuite)
+/** The invocation context of a registered suite instance's run, or of one execution of one of its tests. */
+private[scalatest] sealed abstract class ContextOfRegisteredSuite extends InvocationContext {
 
-  def registration: RegisteredSuite = {
-    this match {
-      case TableOf(creator) => creator
-      case Below(outer) => outer
-    }
-  }
+  /** The registration whose run, or whose test's execution, this context is. */
+  def registration: RegisteredSuite
+
+  def register(suite: Suite): SuiteRegistration = new RegisteredSuite(registration.emitter, suite, Some(this))
 }
 
-/** The scopes and tests an unplaced instance's run read, from which its structure is written once it is placed. */
-private[scalatest] enum PendingStructure {
-  case OfTree(registered: List[RegisteredNode], tags: Map[String, Set[String]], filter: Filter)
-  case OfTestNames(testNames: List[String])
+/** The invocation context of a registered suite instance's run, outside its tests. */
+private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite) extends ContextOfRegisteredSuite {
 
-  /** The scopes and tests the structure holds, as the filter keeps them. Called under the emitter's lock. */
-  def scopesAndTestsFor(table: SuiteNodeTable): List[ScopeOrTest] = {
-    this match {
-      case OfTree(registered, tags, filter) =>
-        SuiteStructure.kept(registered, table.filterKeepingEarlier(SuiteStructure.testNamesIn(registered), testName => filter(testName, tags, table.suiteId)))
-      case OfTestNames(testNames) => SuiteStructure.ofTestNames(testNames)
-    }
-  }
+  def registrationOf(suite: Suite): Option[SuiteRegistration] = Option.when(registration.isOf(suite))(registration)
+}
+
+/** The invocation context of one execution of a test of a registered suite instance. */
+private[scalatest] final class InExecutionOfTest(val registration: RegisteredSuite, val testName: String, val execution: Execution)
+    extends ContextOfRegisteredSuite {
+
+  def registrationOf(suite: Suite): Option[SuiteRegistration] = None
 }
 
 /**
- * An event a wrapper of an unplaced instance handed off, held until the instance is placed.
+ * The registration of a suite instance's run in a run that writes a test event log. A top-level suite's is made, with
+ * its node, by the site that installs its wrapper. Any other's is made by the first site of its run that finds an
+ * invocation context set, and fixes its node once its suite ID is known:
+ *  - where its run started in the run of a suite, outside that suite's tests, and its suite ID is that suite's, it is
+ *    that suite: it takes that suite's node, and its run is that suite's;
+ *  - otherwise its node path is the path of the suite or test it started in, followed by its suite ID and its index
+ *    among the suites of that suite ID started in the execution it started in. It takes the node table a structure
+ *    gives that path, where one does.
  *
- * @param order the place of the hand-off among every hand-off of an unplaced instance in the process
- * @param messagesHandedOff for a test's closing event whose messages the test handed off one by one, those messages
+ * An instance with no node table, as where no structure declared its place, records no origin, and its wrappers hand
+ * nothing off: its events are assigned by the wrappers around it, from their own data.
+ *
+ * Its state is read and written only under the emitter's lock.
+ *
+ * @param startedIn the context its run started in, none for a top-level suite
  */
-private[scalatest] final class HeldEvent(
-  val order: Long,
-  val wrapper: WrapperNode,
-  val event: Event,
-  val origin: Option[RecordedOrigin],
-  val messagesHandedOff: Option[TestExecutionMessages],
-  val encoded: Either[Throwable, Vector[EncodedEvent]]
-)
-
-/** What placing an instance moves to its emitter: its held events and the origins it recorded for events no wrapper has handed off. */
-private[scalatest] final class PlacedEvents(val held: Vector[HeldEvent], val origins: Vector[(Event, RecordedOrigin)])
-
-/**
- * The registration of a suite instance against its suite's node table, in a run that writes a test event log. An
- * instance no site registered against a table is *unplaced*: it has no emitter and no table until an event it sent
- * reaches a structure wrapper of a placed instance. Until then it holds the events its wrappers hand off.
- *
- * While a registration is unplaced its own state is read and written only under `UnplacedSuites`' lock. Placing it
- * takes the emitter's lock, then that one.
- *
- * @param runOfCreator for an instance created by another instance of the suite to run one test, the execution of the
- *                     creator's run. The instance's run uses it instead of starting its own.
- * @param awaiting for an unplaced instance a site of another unplaced instance registered, where it is placed
- */
-private[scalatest] final class RegisteredSuite private (
+private[scalatest] final class RegisteredSuite(
+  val emitter: TestEventLogEmitter,
   instance: Suite,
-  placedAtRegistration: Option[RegisteredSuite.Placement],
-  runOfCreator: Option[Execution],
-  awaiting: Option[Awaiting]
+  startedIn: Option[ContextOfRegisteredSuite]
 ) extends SuiteRegistration {
 
-  /**
-   * @param ofTopLevelSuite the registration of the top-level suite this instance runs within, or none where it is that suite
-   */
-  def this(emitter: TestEventLogEmitter, table: SuiteNodeTable, instance: Suite, ofTopLevelSuite: Option[RegisteredSuite], runOfCreator: Option[Execution]) =
-    this(instance, Some(RegisteredSuite.Placement(emitter, table, ofTopLevelSuite)), runOfCreator, None)
+  /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
+  val topLevel: RegisteredSuite = startedIn.fold(this)(_.registration.topLevel)
 
-  @volatile private var placement = placedAtRegistration
+  private val runContext = new InRunOfSuite(this)
 
-  // All four are read and written only under the emitter's lock once placed. Both collections hold events by identity:
+  // Read without the lock, to tell whether to take it. Set only under it.
+  @volatile private var nodeIsFixed = false
+  private var nodePath = Option.empty[NodeId]
+  private var tableOfNode = Option.empty[SuiteNodeTable]
+  private var suiteIdOfRun = Option.empty[String]
+  private var suiteNameOfRun = Option.empty[String]
+  // The registration of the suite this instance is, whose run this instance's run is.
+  private var runOfSuite = Option.empty[RegisteredSuite]
+  private var executionOfLatestRun = Option.empty[Execution]
+  private var startsARunOnceNodeIsFixed = false
+  // The scopes and tests of the instance's run, as the filter keeps them, written once the node is fixed.
+  private var structureAwaitingNode = Option.empty[SuiteNodeTable => List[ScopeOrTest]]
+
+  // Kept on the top-level suite's registration alone. Each holds events by identity:
   //  - the set holds the events inner wrappers of this top-level suite's run handed off that had not reached its
   //    wrapper when this registration was removed;
   //  - the map holds each closing event of a test of this run whose messages the test handed off one by one, with
-  //    those messages, until a wrapper hands the event off. While this registration is unplaced, it holds the closing
-  //    events of its own tests.
-  // Both live here, not in the emitter, so that they are dropped with the top-level suite's wrapper. Removing a
+  //    those messages, until a wrapper hands the event off.
+  // Both live here, not in the emitter, so that they are dropped with the top-level suite's wrapper. Removing the
   // registration drops neither, so a closing event sent or passed on after the removal is still written without its
   // recorded messages.
-  private var executionOfLatestRun = runOfCreator
   private var isRemoved = false
   private val handedOffBeforeRemoval = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
   private val closingEventsWithMessagesHandedOff = new IdentityHashMap[Event, TestExecutionMessages]
 
-  // Read and written only under `UnplacedSuites`' lock, and only while unplaced.
-  private var held = Vector.empty[HeldEvent]
-  private val origins = new IdentityHashMap[Event, RecordedOrigin]
-  private var awaitedBy = List.empty[RegisteredSuite]
-  private var placedBelow = Option.empty[RegisteredSuite]
-  private var suiteIdRead = Option.empty[String]
-  private var suiteNameRead = Option.empty[String]
-  private var pendingStructure = Option.empty[PendingStructure]
-  private var firstRunWhileUnplaced = Option.empty[Execution]
-  private var unencodable = Option.empty[Throwable]
+  /** Whether this registration's own instance is `suite`. */
+  def isOf(suite: Suite): Boolean = instance eq suite
 
-  def isPlaced: Boolean = placement.isDefined
+  /** Whether the node of the instance's run is fixed. */
+  def isNodeFixed: Boolean = nodeIsFixed
 
-  /** The emitter of a placed instance. */
-  def emitter: TestEventLogEmitter = placement.get.emitter
+  /** The node table of the instance's node, where it has one. Called under the emitter's lock. */
+  def table: Option[SuiteNodeTable] = tableOfNode
 
-  /** The node table of a placed instance. */
-  def table: SuiteNodeTable = placement.get.table
+  /** Marks the top-level suite's registration removed. Called under the emitter's lock. */
+  def markRemoved(): Unit = topLevel.isRemoved = true
 
-  /** The registration of the top-level suite a placed instance runs within: its own where it is that suite. */
-  def topLevel: RegisteredSuite = placement.get.ofTopLevelSuite.getOrElse(this)
-
-  // Runs `unplaced` under `UnplacedSuites`' lock where this registration is unplaced, and returns `None` where it is placed.
-  private def whileUnplaced[A](unplaced: => A): Option[A] = UnplacedSuites.synchronized(if (placement.isEmpty) Some(unplaced) else None)
-
-  /** Starts an execution for a run of the instance. Called under the emitter's lock, or `UnplacedSuites`' while unplaced. */
-  def startRunUnderLock(): Execution = {
-    val execution = runOfCreator.getOrElse {
-      placement match {
-        case Some(placed) => placed.table.takeExecutionForStartingRun()
-        case None =>
-          val started = new Execution
-          if (firstRunWhileUnplaced.isEmpty) {
-            firstRunWhileUnplaced = Some(started)
-          }
-          started
-      }
-    }
-    executionOfLatestRun = Some(execution)
-    execution
-  }
-
-  /** The execution of the instance's latest run, starting one where no site has. Called under the lock `startRunUnderLock` is. */
-  def startRunUnlessStarted(): Execution = executionOfLatestRun.getOrElse(startRunUnderLock())
-
-  /** Marks this registration removed. Called under the emitter's lock. */
-  def markRemoved(): Unit = isRemoved = true
-
-  /** Whether this registration has been removed. Called under the emitter's lock. */
-  def hasBeenRemoved: Boolean = isRemoved
+  /** Whether the top-level suite's registration has been removed. Called under the emitter's lock. */
+  def hasBeenRemoved: Boolean = topLevel.isRemoved
 
   /**
    * Keeps an event an inner wrapper of this top-level suite's run handed off, which had not reached this suite's
@@ -265,261 +217,208 @@ private[scalatest] final class RegisteredSuite private (
   def takeClosingEventWithMessagesHandedOff(event: Event): Option[TestExecutionMessages] =
     Option(closingEventsWithMessagesHandedOff.remove(event))
 
-  def startRun(): Unit = whileUnplaced(startRunUnderLock()).fold(emitter.startRun(this))(_ => ())
+  /**
+   * Makes this the registration of a top-level suite, whose node table the emitter built from the suite's structure.
+   * Called before the registration is shared.
+   */
+  def fixAsTopLevelSuite(table: SuiteNodeTable): Unit = {
+    nodePath = Some(table.node)
+    tableOfNode = Some(table)
+    suiteIdOfRun = Some(table.suiteId)
+    suiteNameOfRun = Some(table.name)
+    nodeIsFixed = true
+  }
+
+  /**
+   * The registrations, outermost first, of this instance and of each instance whose run it started in, whose nodes
+   * are not fixed, each with the suite ID its run read, if any. Called under the emitter's lock.
+   */
+  def unfixedFromOutermost: List[(RegisteredSuite, Option[String])] = {
+    val outer = startedIn.map(_.registration.unfixedFromOutermost).getOrElse(Nil)
+    if (nodeIsFixed) outer else outer :+ (this -> suiteIdOfRun)
+  }
+
+  /** Fixes the node of the instance's run from its suite ID, where it is not yet fixed. Called under the emitter's lock, outermost first. */
+  def fixNode(suiteId: String): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
+    if (nodeIsFixed) {
+      None
+    } else {
+      val ofRun = suiteIdOfRun.getOrElse(suiteId)
+      suiteIdOfRun = Some(ofRun)
+      startedIn match {
+        case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfRun.contains(ofRun) =>
+          val outer = inRun.registration
+          runOfSuite = Some(outer.runOfSuite.getOrElse(outer))
+          nodePath = outer.nodePath
+          tableOfNode = outer.tableOfNode
+        case Some(inRun: InRunOfSuite) =>
+          val outer = inRun.registration
+          val index = outer.executionOfRun().indexOfStartingSuite(ofRun)
+          nodePath = outer.nodePath.map(path => NodeId(path.places :+ NodePlace.Suite(ofRun, index)))
+          tableOfNode = outer.tableOfNode.flatMap(_.childSuites.find(child => nodePath.contains(child.node)))
+        case Some(inTest: InExecutionOfTest) =>
+          val index = inTest.execution.indexOfStartingSuite(ofRun)
+          nodePath = inTest.registration.nodePath.map(path => NodeId(path.places :+ NodePlace.Test(inTest.testName) :+ NodePlace.Suite(ofRun, index)))
+          tableOfNode = None
+        case None => ()
+      }
+      nodeIsFixed = true
+      if (startsARunOnceNodeIsFixed) {
+        startRunUnderLock()
+      }
+      val awaiting = structureAwaitingNode
+      structureAwaitingNode = None
+      for (scopesAndTestsFor <- awaiting; table <- tableOfNode) yield (table, scopesAndTestsFor(table))
+    }
+  }
+
+  /** Starts an execution for a run of the instance, whose node is fixed. Called under the emitter's lock. */
+  def startRunUnderLock(): Execution = {
+    runOfSuite match {
+      case Some(suite) => suite.executionOfRun()
+      case None =>
+        val execution = tableOfNode.fold(new Execution)(_.takeExecutionForStartingRun())
+        executionOfLatestRun = Some(execution)
+        execution
+    }
+  }
+
+  /** The execution of the instance's latest run, starting one where no site has. Called under the emitter's lock. */
+  def executionOfRun(): Execution = runOfSuite.fold(executionOfLatestRun.getOrElse(startRunUnderLock()))(_.executionOfRun())
+
+  /** Starts a run where the node is fixed, and otherwise once it is. Called under the emitter's lock. */
+  def startRunOnceNodeIsFixed(): Unit = {
+    if (nodeIsFixed) {
+      startRunUnderLock()
+    } else {
+      startsARunOnceNodeIsFixed = true
+    }
+  }
+
+  /** Writes the run's structure where the node is fixed, and otherwise once it is. Called under the emitter's lock. */
+  def structureOnceNodeIsFixed(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
+    if (nodeIsFixed) {
+      tableOfNode.map(table => (table, scopesAndTestsFor(table)))
+    } else {
+      structureAwaitingNode = Some(scopesAndTestsFor)
+      None
+    }
+  }
+
+  /** The suite ID the instance's run read, where it has read one. Called under the emitter's lock. */
+  def suiteIdOfItsRun: Option[String] = suiteIdOfRun
+
+  /** Calls the instance's own `suiteId`. Called outside the emitter's lock: it is user code. */
+  def readSuiteIdOfInstance(): String = instance.suiteId
+
+  /** Keeps the suite name the instance's run read first. Called under the emitter's lock. */
+  def keepSuiteName(suiteName: String): Unit = {
+    if (suiteNameOfRun.isEmpty) {
+      suiteNameOfRun = Some(suiteName)
+    }
+  }
+
+  def startRun(): Unit = emitter.startRun(this)
 
   def originAt(scopes: List[ScopePlace]): EventOrigin =
     new OriginInRun(if (scopes.isEmpty) TreeNode.OfSuite else TreeNode.Scope(scopes))
 
   def startTestExecution(testName: String): EventOrigin = {
-    if (isPlaced) {
-      emitter.addTestWhereLacking(table, testName, instance.scopesAndTestsOfRegistrationTree)
-    }
+    emitter.addTestWhereLacking(this, testName, instance.scopesAndTestsOfRegistrationTree)
     new OriginOfTestExecution(testName)
   }
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.Test(this, testName), handOff)
+    new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeSuiteEvent)
 
   def reporterAheadOf(reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), handOff)
+    new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), emitter.writeSuiteEvent)
 
   def reporterOfSuite(reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.SelfRegisteredSuite(this), handOff)
+    new StructureWrapper(reporter, WrapperNode.SelfRegisteredSuite(this), emitter.writeSuiteEvent)
 
-  def registerInstanceOfTest(instance: Suite): SuiteRegistration = {
-    val registration = whileUnplaced(new RegisteredSuite(instance, None, Some(startRunUnlessStarted()), Some(Awaiting.TableOf(this))))
-      .getOrElse(new RegisteredSuite(emitter, table, instance, Some(topLevel), Some(emitter.startRunUnlessStarted(this))))
-    added(instance, registration)
-  }
-
-  def registerInstanceRunInItsPlace(instance: Suite): SuiteRegistration = {
-    val registration = whileUnplaced(new RegisteredSuite(instance, None, None, Some(Awaiting.TableOf(this))))
-      .getOrElse(new RegisteredSuite(emitter, table, instance, Some(topLevel), None))
-    added(instance, registration)
-  }
-
-  // An unplaced registration awaiting this one is placed when this one is.
-  private def added(instance: Suite, registration: RegisteredSuite): RegisteredSuite = {
-    if (!registration.isPlaced) {
-      UnplacedSuites.synchronized { awaitedBy = registration :: awaitedBy }
+  def startWith(reporter: Reporter): SuiteStart = {
+    val wrapper = new StructureWrapper(reporter, WrapperNode.NestedSuite(this), emitter.writeSuiteEvent)
+    new SuiteStart {
+      def reporter: Reporter = wrapper
+      def namesRead(suiteName: String, suiteId: String): Unit = {
+        suiteNameRead(suiteName)
+        suiteIdRead(suiteId)
+      }
+      def run(run: => Status): Status = runningInItsContext(run)
     }
-    RegisteredSuites.add(instance, registration)
-    registration
   }
+
+  /**
+   * How the site that installs a top-level suite's wrapper starts the suite: with that wrapper over `reporter`, in
+   * the context of this registration. The registration is removed where the suite's run throws, and otherwise once
+   * the `Status` it returns completes.
+   */
+  def startAsTopLevelSuite(reporter: Reporter): SuiteStart = {
+    val wrapper = new StructureWrapper(reporter, WrapperNode.TopLevelSuite(this), emitter.writeSuiteEvent)
+    new SuiteStart {
+      def reporter: Reporter = wrapper
+      def namesRead(suiteName: String, suiteId: String): Unit = ()
+      def run(run: => Status): Status = {
+        val status =
+          try runningInItsContext(run)
+          catch {
+            case thrown: Throwable =>
+              emitter.forget(RegisteredSuite.this)
+              throw thrown
+          }
+        removedWhenCompleted(status)
+        status
+      }
+    }
+  }
+
+  // The suite's own `run` may have built the Status, so `whenCompleted` may be user code. Where it throws, nothing
+  // will call back, so the registration is removed at once.
+  private def removedWhenCompleted(status: Status): Unit = {
+    try status.whenCompleted(_ => emitter.forget(this))
+    catch {
+      case thrown: Throwable =>
+        emitter.forget(this)
+        TestEventLogEmitter.keptFromCaller(throw thrown)
+    }
+  }
+
+  def runningInItsContext[A](body: => A): A = InvocationContext.within(runContext)(body)
 
   def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = {
     instance.scopesAndTestsOfRegistrationTree.foreach { registered =>
       val tags = Suite.autoTagClassAnnotations(tagsOfTests, instance, SuiteStructure.testNamesIn(registered))
-      whileUnplaced { pendingStructure = Some(PendingStructure.OfTree(registered, tags, filter)) }.getOrElse {
-        emitter.writeStructureOfTreeWhereChanged(table, registered, testName => filter(testName, tags, table.suiteId))
+      emitter.writeStructureOnceNodeIsFixed(this) { table =>
+        SuiteStructure.kept(registered, table.filterKeepingEarlier(SuiteStructure.testNamesIn(registered), testName => filter(testName, tags, table.suiteId)))
       }
     }
   }
 
   def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = {
     val testNames = keptTestNames.toList
-    whileUnplaced { pendingStructure = Some(PendingStructure.OfTestNames(testNames)) }.getOrElse {
-      emitter.writeStructureWhereChanged(table, SuiteStructure.ofTestNames(testNames))
+    emitter.writeStructureOnceNodeIsFixed(this)(_ => SuiteStructure.ofTestNames(testNames))
+  }
+
+  def suiteNameRead(suiteName: String): Unit = emitter.keepSuiteName(this, suiteName)
+
+  def suiteIdRead(suiteId: String): Unit = {
+    if (!nodeIsFixed) {
+      emitter.fixNode(this, Some(suiteId))
     }
   }
 
-  def registerNestedSuite(position: Int, nestedSuite: Suite, reporter: Reporter): Reporter = {
-    whileUnplaced(new RegisteredSuite(nestedSuite, None, None, Some(Awaiting.Below(this)))) match {
-      case Some(unplaced) =>
-        new StructureWrapper(reporter, WrapperNode.NestedSuite(added(nestedSuite, unplaced)), unplaced.handOff)
-      case None =>
-        table.nestedSuites.lift(position) match {
-          case Some(tableOfNestedSuite) =>
-            val registration = new RegisteredSuite(emitter, tableOfNestedSuite, nestedSuite, Some(topLevel), None)
-            RegisteredSuites.add(nestedSuite, registration)
-            new StructureWrapper(reporter, WrapperNode.NestedSuite(registration), registration.handOff)
-          case None => reporter
-        }
-    }
-  }
-
-  def suiteNameRead(suiteName: String): Unit = whileUnplaced(if (suiteNameRead.isEmpty) suiteNameRead = Some(suiteName))
-
-  def suiteIdRead(suiteId: String): Unit = whileUnplaced(if (suiteIdRead.isEmpty) suiteIdRead = Some(suiteId))
-
-  def remove(): Unit = {
-    RegisteredSuites.remove(instance, this)
-    whileUnplaced(dropWhileUnplaced()).getOrElse(emitter.forget(this))
-  }
-
-  // The suite's own `run` may have built the Status, so `whenCompleted` may be user code. Where it throws, nothing
-  // will call back, so the registration is removed at once.
-  def removeWhenCompleted(status: Status): Unit = {
-    try status.whenCompleted(_ => remove())
-    catch {
-      case thrown: Throwable =>
-        remove()
-        TestEventLogEmitter.keptFromCaller(throw thrown)
-    }
-  }
-
-  /** Hands off an event one of this instance's structure wrappers received: to the emitter once placed, and otherwise held. */
-  def handOff(wrapper: WrapperNode, event: Event): Unit = {
-    placement match {
-      case Some(placed) => placed.emitter.writeSuiteEvent(wrapper, event)
-      case None => holdUnlessPlaced(wrapper, event)
-    }
-  }
-
-  // Encoding calls the event's own throwables, so it is done outside every lock, once it is known how to encode.
-  private def holdUnlessPlaced(wrapper: WrapperNode, event: Event): Unit = {
-    val toEncode = UnplacedSuites.synchronized {
-      if (isPlaced) {
-        Left(true)
-      } else if (isRemoved || UnplacedSuites.heldByAnInnerWrapper(event, this)) {
-        Left(false)
-      } else {
-        Right(UnplacedSuites.originOwnerOf(event).exists(_.closingEventsWithMessagesHandedOff.containsKey(event)))
-      }
-    }
-    toEncode match {
-      case Left(isPlacedNow) =>
-        if (isPlacedNow) {
-          emitter.writeSuiteEvent(wrapper, event)
-        }
-      case Right(messagesHandedOff) =>
-        val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
-        val held = UnplacedSuites.synchronized {
-          if (isPlaced) {
-            false
-          } else {
-            if (!isRemoved && !UnplacedSuites.heldByAnInnerWrapper(event, this)) {
-              hold(wrapper, event, encoded)
-            }
-            true
-          }
-        }
-        if (!held) {
-          emitter.writeSuiteEvent(wrapper, event)
-        }
-    }
-  }
-
-  // Called under `UnplacedSuites`' lock. An event whose origin another unplaced instance recorded is that instance's,
-  // which is then placed with this one.
-  private def hold(wrapper: WrapperNode, event: Event, encoded: Either[Throwable, Vector[EncodedEvent]]): Unit = {
-    val owner = UnplacedSuites.originOwnerOf(event)
-    owner.filterNot(_ eq this).foreach(_.awaitPlacementBelow(this))
-    val origin = owner.flatMap(recorder => Option(recorder.origins.remove(event)))
-    val messagesHandedOff = owner.flatMap(recorder => Option(recorder.closingEventsWithMessagesHandedOff.remove(event)))
-    if (wrapper.isInstanceOf[WrapperNode.NestedSuite] && TestEventLogEmitter.isSuiteEvent(event)) {
-      learnNames(event)
-    }
-    held :+= new HeldEvent(UnplacedSuites.nextOrder(), wrapper, event, origin, messagesHandedOff, encoded)
-    UnplacedSuites.keepHeld(event, this)
-  }
-
-  /**
-   * Where this unplaced instance awaits no other, has it placed below `outer`, an unplaced instance whose wrapper one
-   * of its events reached. Called under `UnplacedSuites`' lock.
-   */
-  def awaitPlacementBelow(outer: RegisteredSuite): Unit = {
-    if (awaiting.isEmpty && placedBelow.isEmpty && !(outer eq this) && !isPlaced) {
-      placedBelow = Some(outer)
-      outer.awaitedBy = this :: outer.awaitedBy
-    }
-  }
-
-  /** What this unplaced instance awaits, if anything: the registration it is placed with or below. Called under `UnplacedSuites`' lock. */
-  def awaited: Option[Awaiting] = awaiting.orElse(placedBelow.map(Awaiting.Below(_)))
-
-  // Called under `UnplacedSuites`' lock: the names of an event of this instance's own, which its run's sites read.
-  private def learnNames(event: Event): Unit = {
-    TestEventLogEmitter.namesIn(event).foreach { names =>
-      if (suiteIdRead.isEmpty) {
-        suiteIdRead = Some(names.suiteId)
-      }
-      if (suiteNameRead.isEmpty) {
-        suiteNameRead = Some(names.suiteName)
-      }
-    }
-  }
-
-  /** Records an event's origin: with the emitter once placed, and otherwise until this instance is placed. */
+  // An event of the instance's own carries the names its send helper read.
   private def recordOrigin(event: Event, origin: RecordingOrigin, messages: Option[TestExecutionMessages]): Unit = {
-    whileUnplaced {
-      if (!isRemoved) {
-        messages.foreach(closingEventsWithMessagesHandedOff.put(event, _))
-        val recorded = origin.record()
-        origins.put(event, recorded)
-        UnplacedSuites.keepOrigin(event, this)
-        recorded.messagesOfTest.foreach(_.awaitWriting(event))
-        learnNames(event)
-      }
-    }.getOrElse {
-      messages match {
-        case Some(handedOff) => emitter.recordOriginOfClosingEventWithMessagesHandedOff(event, origin, handedOff)
-        case None => emitter.recordOrigin(event, origin)
-      }
+    if (!nodeIsFixed) {
+      val names = TestEventLogEmitter.namesIn(event)
+      names.foreach(read => suiteNameRead(read.suiteName))
+      emitter.fixNode(this, names.map(_.suiteId))
     }
-  }
-
-  // Runs under the test's recorder lock, so it neither builds nor encodes: the message comes encoded. While this
-  // registration is unplaced, the message is held until its test's execution is written.
-  private def writeTestMessage(messages: TestExecutionMessages, encoded: Either[Throwable, EncodedEvent]): Unit = {
-    whileUnplaced {
-      if (!isRemoved) {
-        encoded.fold(thrown => if (unencodable.isEmpty) unencodable = Some(thrown), messages.hold)
-      }
-    }.getOrElse(emitter.writeTestMessage(this, messages, encoded))
-  }
-
-  // Called under `UnplacedSuites`' lock.
-  private def dropWhileUnplaced(): Unit = {
-    isRemoved = true
-    held.foreach(one => UnplacedSuites.forget(one.event))
-    origins.keySet.forEach(UnplacedSuites.forget(_))
-    held = Vector.empty
-    origins.clear()
-    closingEventsWithMessagesHandedOff.clear()
-  }
-
-  /** The suite ID this unplaced instance's run read, once a site has read it. Called under `UnplacedSuites`' lock. */
-  def suiteIdOfRun: Option[String] = suiteIdRead
-
-  /** Whether this unplaced instance can be placed. Called under `UnplacedSuites`' lock. */
-  def isPlaceable: Boolean = !isRemoved && (awaiting.exists(_.isInstanceOf[Awaiting.TableOf]) || suiteIdRead.isDefined)
-
-  /** The unplaced instances that are placed with or below this one. Called under `UnplacedSuites`' lock. */
-  def awaitingThisOne: List[RegisteredSuite] = awaitedBy.reverse
-
-  /** The suite name the instance's run read, where a site has read it, else its suite ID. Called under `UnplacedSuites`' lock. */
-  def suiteNameOfRun: String = suiteNameRead.orElse(suiteIdRead).getOrElse("")
-
-  /** Whether this registration's own instance is `suite`. */
-  def isOf(suite: Suite): Boolean = instance eq suite
-
-  /**
-   * Adds a suite node for this unplaced instance, nested directly in `parent`, with the suite ID and name its run
-   * read and its own class name. Called under the emitter's lock and `UnplacedSuites`' lock.
-   */
-  def nestedSuiteBelow(parent: SuiteNodeTable): SuiteNodeTable =
-    parent.addNestedSuite(Some(instance), suiteNameOfRun, suiteIdRead.getOrElse(parent.suiteId), Suite.getSuiteClassName(instance))
-
-  /**
-   * Places this unplaced instance: from now on its events go to `emitter`, assigned to the nodes of `table`. Returns
-   * the events it held and the origins it recorded, and the structure its run read, if any. The run it started while
-   * unplaced takes the execution the suite's `SuiteStarting` opened, where no run has taken it. Called under the
-   * emitter's lock and `UnplacedSuites`' lock.
-   */
-  def place(emitter: TestEventLogEmitter, table: SuiteNodeTable, ofTopLevelSuite: RegisteredSuite): (PlacedEvents, Option[PendingStructure], Option[Throwable]) = {
-    placement = Some(RegisteredSuite.Placement(emitter, table, Some(ofTopLevelSuite)))
-    closingEventsWithMessagesHandedOff.forEach((event, messages) => ofTopLevelSuite.keepClosingEventWithMessagesHandedOff(event, messages))
-    closingEventsWithMessagesHandedOff.clear()
-    if (runOfCreator.isEmpty) {
-      firstRunWhileUnplaced.foreach(run => table.takeRunOpenedBySuiteStarting().foreach(table.executionsOf(table.node).countAsOne(run, _)))
+    messages match {
+      case Some(handedOff) => emitter.recordOriginOfClosingEventWithMessagesHandedOff(event, origin, handedOff)
+      case None => emitter.recordOrigin(event, origin)
     }
-    val placed = new PlacedEvents(held, origins.entrySet.asScala.toVector.map(entry => (entry.getKey, entry.getValue)))
-    held.foreach(one => UnplacedSuites.forget(one.event))
-    origins.keySet.forEach(UnplacedSuites.forget(_))
-    held = Vector.empty
-    origins.clear()
-    (placed, pendingStructure, unencodable)
   }
 
   // The origin of the events of the suite itself or of one of its scopes, each of which takes the run's execution.
@@ -528,7 +427,7 @@ private[scalatest] final class RegisteredSuite private (
     def recordFor(event: Event): Unit = recordOrigin(event, this, None)
 
     def record(): RecordedOrigin = {
-      val execution = startRunUnlessStarted()
+      val execution = executionOfRun()
       new RecordedOrigin(RegisteredSuite.this, node, execution, execution)
     }
   }
@@ -538,20 +437,20 @@ private[scalatest] final class RegisteredSuite private (
 
     private val execution = new Execution
     private val messages = new TestExecutionMessages
-    // Read and written only under the emitter's lock, or `UnplacedSuites`' while unplaced.
+    // Read and written only under the emitter's lock.
     private var executionOfItsRun = Option.empty[Execution]
 
     def recordFor(event: Event): Unit = recordOrigin(event, this, None)
 
     def record(): RecordedOrigin = {
-      val ofRun = executionOfItsRun.getOrElse(startRunUnlessStarted())
+      val ofRun = executionOfItsRun.getOrElse(executionOfRun())
       executionOfItsRun = Some(ofRun)
       new RecordedOrigin(RegisteredSuite.this, TreeNode.Test(testName), execution, ofRun, Some(messages))
     }
 
     override def preparedHandOffOfMessage(message: => Event): () => Unit = {
       val encoded = TestEventLogEmitter.encodedTestMessage(message)
-      () => writeTestMessage(messages, encoded)
+      () => emitter.writeTestMessage(RegisteredSuite.this, messages, encoded)
     }
 
     override def ofClosingEventWithMessagesHandedOff: EventOrigin = {
@@ -561,140 +460,8 @@ private[scalatest] final class RegisteredSuite private (
         def record(): RecordedOrigin = ofTestExecution.record()
       }
     }
+
+    override def runningTheTest[A](body: => A): A =
+      InvocationContext.within(new InExecutionOfTest(RegisteredSuite.this, testName, execution))(body)
   }
-}
-
-private[scalatest] object RegisteredSuite {
-
-  /** Where a placed instance's events go: its emitter, its node table, and the top-level suite it runs within, if not itself. */
-  final case class Placement(emitter: TestEventLogEmitter, table: SuiteNodeTable, ofTopLevelSuite: Option[RegisteredSuite])
-
-  /** A new unplaced registration of an instance no site has registered against a table. The caller adds it to `RegisteredSuites`. */
-  def unplaced(instance: Suite): RegisteredSuite = new RegisteredSuite(instance, None, None, None)
-}
-
-/**
- * The events and origins every unplaced instance of the process holds, by event. An unplaced instance belongs to no
- * emitter until it is placed, so this state belongs to the process. Its lock is taken under an emitter's lock, never
- * the other way round.
- */
-private[scalatest] object UnplacedSuites {
-
-  // Read and written only under this object's lock. Both are keyed by the event's identity.
-  private val heldBy = new IdentityHashMap[Event, RegisteredSuite]
-  private val originRecordedBy = new IdentityHashMap[Event, RegisteredSuite]
-  private var handOffs = 0L
-
-  def nextOrder(): Long = {
-    handOffs += 1
-    handOffs
-  }
-
-  def keepHeld(event: Event, registration: RegisteredSuite): Unit = {
-    originRecordedBy.remove(event)
-    heldBy.put(event, registration)
-  }
-
-  def keepOrigin(event: Event, registration: RegisteredSuite): Unit = originRecordedBy.put(event, registration)
-
-  def forget(event: Event): Unit = {
-    heldBy.remove(event)
-    originRecordedBy.remove(event)
-  }
-
-  /** The unplaced instance that recorded the event's origin, where no wrapper has handed it off. */
-  def originOwnerOf(event: Event): Option[RegisteredSuite] = Option(originRecordedBy.get(event))
-
-  /**
-   * Whether an unplaced instance holds the event, handed off by one of its wrappers. Where that instance is not
-   * `outer`, whose wrapper the event now reaches, it is placed with `outer`.
-   */
-  def heldByAnInnerWrapper(event: Event, outer: RegisteredSuite): Boolean = {
-    Option(heldBy.get(event)) match {
-      case Some(holder) =>
-        holder.awaitPlacementBelow(outer)
-        true
-      case None => false
-    }
-  }
-
-  /** The unplaced instance whose event this is: the one that holds it, or that recorded its origin. */
-  def ownerOf(event: Event): Option[RegisteredSuite] = Option(heldBy.get(event)).orElse(originOwnerOf(event))
-
-  /** Whether an unplaced instance holds the event, rather than only having recorded its origin. */
-  def holds(event: Event): Boolean = heldBy.containsKey(event)
-}
-
-/**
- * The registrations of this process's suite instances, by instance. A suite instance cannot carry its registration,
- * and no argument reaches every site that sends its events, so every run that writes a test event log registers here.
- *
- * A lookup takes no lock: every test of every run of the process makes one. Registering, removing and counting the
- * open event logs take this object's lock.
- */
-private[scalatest] object RegisteredSuites extends SuiteRegistrations {
-
-  // A suite instance as a key: a suite's own `equals` and `hashCode` are user code.
-  private final class Identity(val instance: Suite) {
-    override def hashCode: Int = System.identityHashCode(instance)
-
-    override def equals(other: Any): Boolean = {
-      other match {
-        case identity: Identity => identity.instance eq instance
-        case _ => false
-      }
-    }
-  }
-
-  // Each value is immutable, and replaced only under this object's lock.
-  private val registrationsOf = new ConcurrentHashMap[Identity, List[RegisteredSuite]]
-  // Read and written only under this object's lock.
-  private var openEventLogs = 0
-
-  /** Counts an emitter whose event log has opened. The first makes every site look its suite instances up here. */
-  def eventLogOpened(): Unit = synchronized {
-    openEventLogs += 1
-    if (openEventLogs == 1) {
-      SuiteRegistration.lookUpIn(this)
-    }
-  }
-
-  /** Stops counting an emitter whose event log has closed. After the last, every site finds no registration again. */
-  def eventLogClosed(): Unit = synchronized {
-    openEventLogs -= 1
-    if (openEventLogs == 0) {
-      SuiteRegistration.lookUpNowhere()
-    }
-  }
-
-  def add(instance: Suite, registration: RegisteredSuite): Unit = synchronized {
-    registrationsOf.put(new Identity(instance), registration :: registered(instance))
-  }
-
-  def remove(instance: Suite, registration: RegisteredSuite): Unit = synchronized {
-    registered(instance).filterNot(_ eq registration) match {
-      case Nil => registrationsOf.remove(new Identity(instance))
-      case remaining => registrationsOf.put(new Identity(instance), remaining)
-    }
-  }
-
-  def of(suite: Suite): SuiteRegistration = {
-    registered(suite) match {
-      case registration :: Nil => registration
-      case _ => SuiteRegistration.none
-    }
-  }
-
-  def registeredUnlessRegistered(suite: Suite): Option[SuiteRegistration] = synchronized {
-    if (registered(suite).isEmpty) {
-      val registration = RegisteredSuite.unplaced(suite)
-      add(suite, registration)
-      Some(registration)
-    } else {
-      None
-    }
-  }
-
-  private def registered(instance: Suite): List[RegisteredSuite] =
-    Option(registrationsOf.get(new Identity(instance))).getOrElse(Nil)
 }

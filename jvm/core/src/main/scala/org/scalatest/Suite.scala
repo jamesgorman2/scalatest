@@ -1004,7 +1004,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
-    SuiteRegistration.runRegistered(thisSuite, args) { registeredArgs =>
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, registeredArgs) =>
     import registeredArgs._
 
     val theTestNames = testNames
@@ -1014,7 +1014,6 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     // into error messages on the standard error stream.
     val report = wrapReporterIfNecessary(thisSuite, reporter)
     val newArgs = registeredArgs.copy(reporter = report)
-    val registration = SuiteRegistration.of(thisSuite)
 
     // Read in the order 3.2.20 passes them to the filter, so that the registration keeps the suite ID it read.
     def tagsAndSuiteId: (Map[String, Set[String]], String) = {
@@ -1112,13 +1111,13 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
-    SuiteRegistration.runRegistered(thisSuite, args) { registeredArgs =>
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, registeredArgs) =>
     import registeredArgs._
 
     val originalThreadName = Thread.currentThread.getName
     try {
       val theSuiteName = suiteName
-      SuiteRegistration.of(thisSuite).suiteNameRead(theSuiteName)
+      registration.suiteNameRead(theSuiteName)
       Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, theSuiteName))
 
       val report = wrapReporterIfNecessary(thisSuite, reporter)
@@ -1179,25 +1178,29 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     import args._
 
     val report = wrapReporterIfNecessary(thisSuite, reporter)
-    val registration = SuiteRegistration.of(thisSuite)
 
-    def callExecuteOnSuite(nestedSuite: Suite, position: Int): Status = {
+    def callExecuteOnSuite(nestedSuite: Suite): Status = {
 
       if (!stopper.stopRequested) {
 
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
-        val nestedReport = reporterOfNestedSuite(nestedSuite, filter, registration.registerNestedSuite(position, nestedSuite, report))
-        val nestedRegistration = SuiteRegistration.madeTaking(nestedReport, report)
+        val start = startOfNestedSuite(nestedSuite, filter, report)
+        val nestedReport = start.reporter
 
         val suiteStartTime = System.currentTimeMillis
 
-        nestedReport(SuiteStarting(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
+        val ordinal = tracker.nextOrdinal()
+        val nestedSuiteName = nestedSuite.suiteName
+        val nestedSuiteId = nestedSuite.suiteId
+        start.namesRead(nestedSuiteName, nestedSuiteId)
+        nestedReport(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status = nestedRegistration.removedOnceRun(nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty)))
+          val status = start.run(nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
@@ -1242,16 +1245,16 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       val nestedSuitesArray = nestedSuites.toArray
       distributor match {
         case None =>
-          for (position <- nestedSuitesArray.indices) {
+          for (nestedSuite <- nestedSuitesArray) {
             if (!stopper.stopRequested)
-              statusBuffer += callExecuteOnSuite(nestedSuitesArray(position), position)
+              statusBuffer += callExecuteOnSuite(nestedSuite)
           }
         case Some(distribute) =>
-          for (position <- nestedSuitesArray.indices) {
-            val nestedSuite = nestedSuitesArray(position)
-            val nestedReport = registration.registerNestedSuite(position, nestedSuite, reporter)
-            val nestedArgs = args.copy(reporter = nestedReport, tracker = tracker.nextTracker())
-            statusBuffer += SuiteRegistration.madeTaking(nestedReport, reporter).removedOnceRun(distributeNestedSuite(distribute, nestedSuite, nestedArgs))
+          for (nestedSuite <- nestedSuitesArray) {
+            // The distributor runs the nested suite in the context it is handed the suite in.
+            val start = SuiteStart.ofNestedSuite(nestedSuite, reporter)
+            val nestedArgs = args.copy(reporter = start.reporter, tracker = tracker.nextTracker())
+            statusBuffer += start.run(distributeNestedSuite(distribute, nestedSuite, nestedArgs))
           }
       }
     }
@@ -1339,11 +1342,13 @@ trait Suite extends Assertions with Serializable { thisSuite =>
   private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
 
   /**
-   * The reporter of a nested suite that this suite runs itself: the one its `SuiteStarting`, `SuiteCompleted` and
-   * `SuiteAborted` are sent to, and the one it is run with. `reporter` is the one this suite would give it. A suite
-   * whose nested suites are top-level suites of a run that writes a test event log overrides this.
+   * How this suite starts a nested suite it runs itself: the reporter its `SuiteStarting`, `SuiteCompleted` and
+   * `SuiteAborted` are sent to and it is run with, and the invocation context it runs in. `reporter` is the one this
+   * suite would give it. A suite whose nested suites are top-level suites of a run that writes a test event log
+   * overrides this.
    */
-  private[scalatest] def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter = reporter
+  private[scalatest] def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): SuiteStart =
+    SuiteStart.ofNestedSuite(nestedSuite, reporter)
 
   /**
    * Hands a nested suite to the distributor that runs it. A suite whose nested suites are top-level suites of a run

@@ -1,7 +1,6 @@
 package org.scalatest.tools
 
 import org.scalatest.EventOrigin
-import org.scalatest.Filter
 import org.scalatest.PathMessageCalls
 import org.scalatest.PathMessageRecordingAlerter
 import org.scalatest.PathMessageRecordingDocumenter
@@ -63,9 +62,13 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
 
   /** A top-level suite registered with an emitter, with the origin of one execution of its test. */
   private final class RegisteredRun(val eventLog: RecordingEventLog, val emitter: TestEventLogEmitter) {
-    val wrapperOfSuite: Reporter = emitter.wrapperOfTopLevelSuite(new OneTestSpec, Filter.default, passingNoEventOn)
-    val registration: SuiteRegistration = SuiteRegistration.madeWith(wrapperOfSuite)
+    private val started = new StartedTopLevelSuite(emitter, new OneTestSpec)
+    val wrapperOfSuite: Reporter = started.wrapper
+    val registration: SuiteRegistration = started.registration
     val ofTest: EventOrigin = registration.startTestExecution("t")
+
+    /** Completes the suite's run, which removes its registration. */
+    def complete(): Unit = started.complete()
 
     /** Records the event's origin as the test's engine site does, and has the suite's wrapper hand it off. */
     def send(event: Event, origin: EventOrigin = ofTest): Unit = {
@@ -88,7 +91,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
   private def withRegisteredSuite[A](body: RegisteredRun => A): A = {
     val eventLog = new RecordingEventLog
     val run = new RegisteredRun(eventLog, TestEventLogEmitter.appendingTo(eventLog))
-    try body(run) finally run.registration.remove()
+    try body(run) finally run.complete()
   }
 
   "An emitter handed a test's message as the test calls it" should {
@@ -142,7 +145,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
 
     "write no message once the test's registration has been removed" in withRegisteredSuite { run =>
       run.send(testStarting)
-      run.registration.remove()
+      run.complete()
       run.ofTest.handOffMessage(info("after the removal"))
       run.eventLines shouldBe Vector(testLine("TestStarting"))
     }
@@ -187,7 +190,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       withRegisteredSuite { run =>
         run.send(testStarting)
         run.ofTest.handOffMessage(info("handed off"))
-        run.registration.remove()
+        run.complete()
         run.send(testSucceeded(Vector(info("handed off"))), run.ofTest.ofClosingEventWithMessagesHandedOff)
         run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided handed off", "TestSucceeded")
       }
@@ -199,7 +202,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
         run.ofTest.recordFor(starting)
         run.ofTest.handOffMessage(info("held"))
         run.ofTest.ofClosingEventWithMessagesHandedOff.recordFor(closing)
-        run.registration.remove()
+        run.complete()
         run.wrapperOfSuite(closing)
         run.eventsAndMessages shouldBe Vector("InfoProvided held", "TestSucceeded")
       }

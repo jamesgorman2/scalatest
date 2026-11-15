@@ -10,6 +10,7 @@ import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
 import org.scalatest.Stopper
 import org.scalatest.Suite
+import org.scalatest.SuiteStart
 import org.scalatest.events.Event
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -24,14 +25,14 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     def apply(event: Event): Unit = synchronized { received :+= event }
   }
 
-  // Records each suite it is asked to give a reporter, and gives each the one reporter it holds.
+  // Records each suite it is asked to start, and starts each with the one reporter it holds.
   private final class ReporterOfSuite {
     private var asked = Vector.empty[(Suite, Filter, Reporter)]
     val handedOut = new RecordingReporter
     def askedFor: Vector[(Suite, Filter, Reporter)] = synchronized(asked)
-    val function: (Suite, Filter, Reporter) => Reporter = (suite, filter, reporter) => {
+    val function: (Suite, Filter, Reporter) => SuiteStart = (suite, filter, reporter) => {
       synchronized { asked :+= ((suite, filter, reporter)) }
-      handedOut
+      SuiteStart.inTheContextItFinds(handedOut)
     }
   }
 

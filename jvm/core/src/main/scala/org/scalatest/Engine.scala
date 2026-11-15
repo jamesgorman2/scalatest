@@ -265,7 +265,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
       throw new IllegalArgumentException("No test in this suite has name: \"" + testName + "\"")
 
     val theTest = atomic.get.testsMap(testName)
-    val origin = SuiteRegistration.of(theSuite).startTestExecution(testName)
+    val origin = SuiteRegistration.inContext(theSuite).startTestExecution(testName)
 
     reportTestStarting(theSuite, report, tracker, testName, theTest.testText, theSuite.rerunner, theTest.location, origin)
     val originOfClosingEvent = origin.ofClosingEventWithMessagesHandedOff
@@ -312,7 +312,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
 
     try {
 
-      invokeWithFixture(theTest).toUnit
+      origin.runningTheTest(invokeWithFixture(theTest)).toUnit
 
       val duration = System.currentTimeMillis - testStartTime
       val durationToReport = theTest.recordedDuration.getOrElse(duration)
@@ -430,7 +430,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
         if (!stopper.stopRequested) {
           node match {
             case testLeaf @ TestLeaf(_, testName, testText, _, _, _, _, _) =>
-              val (filterTest, ignoreTest) = args.filter(testName, theSuite.tags, theSuite.suiteId)
+              val (filterTest, ignoreTest) = registration.filtered(args.filter, testName, theSuite)
               if (!filterTest)
                 if (ignoreTest) {
                   val testTextWithOptionalPrefix = prependChildPrefix(branch, testText)
@@ -526,7 +526,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     runTest: (String, Args) => Status
   ): Status = {
     requireNonNull(testName, args)
-    SuiteRegistration.runRegistered(theSuite, args) { args =>
+    SuiteRegistration.registeredRun(theSuite, args) { (registration, args) =>
 
     import args._
 
@@ -535,7 +535,6 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     // into error messages on the standard error stream.
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val newArgs = if (report eq reporter) args else args.copy(reporter = report)
-    val registration = SuiteRegistration.of(theSuite)
     registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
 
     val statusBuffer = new ListBuffer[Status]()
@@ -544,7 +543,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     // by testNames.
     testName match {
       case Some(tn) =>
-        val (filterTest, ignoreTest) = filter(tn, theSuite.tags, theSuite.suiteId)
+        val (filterTest, ignoreTest) = registration.filtered(filter, tn, theSuite)
         if (!filterTest) {
           if (ignoreTest) {
             val theTest = atomic.get.testsMap(tn)
@@ -566,7 +565,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     args: Args,
     superRun: (Option[String], Args) => Status
   ): Status = {
-    SuiteRegistration.runRegistered(theSuite, args) { args =>
+    SuiteRegistration.registeredRun(theSuite, args) { (registration, args) =>
     import args._
 
     // Set the flag that indicates registration is closed (because run has now been invoked),
@@ -578,7 +577,6 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
       updateAtomic(oldBundle, Bundle(currentBranch, testNamesList, testsMap, tagsMap, true))
 
     val report = wrapReporterIfNecessary(theSuite, reporter)
-    val registration = SuiteRegistration.of(theSuite)
     registration.startRun()
     registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
     val origin = registration.originAt(Nil)
@@ -1170,7 +1168,7 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
     includeIcon: Boolean,
     runTest: (String, Args) => Status
   ): Status = {
-    SuiteRegistration.runRegistered(theSuite, args) { args =>
+    SuiteRegistration.registeredRun(theSuite, args) { (registration, args) =>
     import args._
 
     // All but one line of code copied from runImpl. Factor out duplication later...
@@ -1185,7 +1183,6 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
 
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val newArgs = if (report eq reporter) args else args.copy(reporter = report)
-    val registration = SuiteRegistration.of(theSuite)
     registration.startRun()
     registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
     val origin = registration.originAt(Nil)

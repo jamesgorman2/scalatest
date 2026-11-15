@@ -5,6 +5,7 @@ import org.scalatest.DoNotDiscover
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.tools.RegistrationInContext
 import scala.jdk.CollectionConverters.*
 
 // In ScalaTest's package because a suite instance's registration is private to it.
@@ -12,7 +13,7 @@ import scala.jdk.CollectionConverters.*
 class RegistrationProbeSuite extends AnyFunSuite {
 
   test("probes its registration") {
-    RegistrationProbeSuite.ran.add(this -> SuiteRegistration.of(this))
+    RegistrationProbeSuite.ran.add(this -> RegistrationInContext.ofCallingThread)
   }
 }
 

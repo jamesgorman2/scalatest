@@ -255,7 +255,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       throw new IllegalArgumentException("No test in this suite has name: \"" + testName + "\"")
 
     val theTest = atomic.get.testsMap(testName)
-    val origin = SuiteRegistration.of(theSuite).startTestExecution(testName)
+    val origin = SuiteRegistration.inContext(theSuite).startTestExecution(testName)
 
     reportTestStarting(theSuite, report, tracker, testName, theTest.testText, theSuite.rerunner, theTest.location, origin)
     val originOfClosingEvent = origin.ofClosingEventWithMessagesHandedOff
@@ -379,7 +379,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
 
     val asyncOutcome: AsyncOutcome =
       try {
-        val outcome = invokeWithFixture(theTest, onCompleteFun)
+        val outcome = origin.runningTheTest(invokeWithFixture(theTest, onCompleteFun))
         executionContext match {
           case dec: concurrent.SerialExecutionContext =>
             dec.runNow(outcome.toFutureOfOutcome)
@@ -434,7 +434,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
         if (!stopper.stopRequested) {
           node match {
             case testLeaf @ TestLeaf(_, testName, testText, _, _, _, _) =>
-              val (filterTest, ignoreTest) = args.filter(testName, theSuite.tags, theSuite.suiteId)
+              val (filterTest, ignoreTest) = registration.filtered(args.filter, testName, theSuite)
               if (!filterTest)
                 if (ignoreTest) {
                   val testTextWithOptionalPrefix = prependChildPrefix(branch, testText)
@@ -459,7 +459,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                       runTest(testName, registration.argsOfTest(testName, args)) // Even if serial async test execution (i.e., not parallelAsyncTestExection), first time still just go for it
                     }
                     else {
-                      statusVec.last thenRun runTest(testName, registration.argsOfTest(testName, args))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
+                      statusVec.last thenRun registration.runningInItsContext(runTest(testName, registration.argsOfTest(testName, args)))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
                     }
                   )
                 }
@@ -487,7 +487,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                 runTestsInBranch(theSuite, branch, args, includeIcon, parallelAsyncTestExecution, statusVec, runTest, registration) // Even if serial async test execution (i.e., not parallelAsyncTestExection), first time still just go for it
               }
               else {
-                statusVec :+ (statusVec.last thenRun (new CompositeStatus(ListSet(runTestsInBranch(theSuite, branch, args, includeIcon, parallelAsyncTestExecution, statusVec, runTest, registration): _*))))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
+                statusVec :+ (statusVec.last thenRun registration.runningInItsContext(new CompositeStatus(ListSet(runTestsInBranch(theSuite, branch, args, includeIcon, parallelAsyncTestExecution, statusVec, runTest, registration): _*))))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
               }
           }
         }
@@ -559,7 +559,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     runTest: (String, Args) => Status
   ): Status = {
     requireNonNull(testName, passedInArgs)
-    SuiteRegistration.runRegistered(theSuite, passedInArgs) { passedInArgs =>
+    SuiteRegistration.registeredRun(theSuite, passedInArgs) { (registration, passedInArgs) =>
 
     val args =
       if (!parallelAsyncTestExecution) {
@@ -573,7 +573,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                 case _ => Span(Suite.defaultTestSortingReporterTimeoutInSeconds, Seconds)
               }
             val testSortingReporter = new TestSortingReporter(theSuite.suiteId, passedInArgs.reporter, testSortingTimeout, theSuite.expectedTestCount(passedInArgs.filter), passedInArgs.distributedSuiteSorter, System.err)
-            passedInArgs.copy(reporter = SuiteRegistration.of(theSuite).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
+            passedInArgs.copy(reporter = registration.reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           }
           else
             passedInArgs
@@ -589,7 +589,6 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     // into error messages on the standard error stream.
     val report = wrapReporterIfNecessary(theSuite, reporter)
     val newArgs = if (report eq reporter) args else args.copy(reporter = report)
-    val registration = SuiteRegistration.of(theSuite)
     registration.updateStructureFromRegistrationTree(atomic.get.tagsMap, filter)
 
     val statusList: Vector[Status] =
@@ -597,7 +596,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       // by testNames.
       testName match {
         case Some(tn) =>
-          val (filterTest, ignoreTest) = filter(tn, theSuite.tags, theSuite.suiteId)
+          val (filterTest, ignoreTest) = registration.filtered(filter, tn, theSuite)
           if (!filterTest) {
             if (ignoreTest) {
               val theTest = atomic.get.testsMap(tn)
@@ -624,9 +623,8 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     parallelAsyncTestExecution: Boolean,
     superRun: (Option[String], Args) => Status
   ): Status = {
-    SuiteRegistration.runRegistered(theSuite, passedInArgs) { passedInArgs =>
+    SuiteRegistration.registeredRun(theSuite, passedInArgs) { (registration, passedInArgs) =>
 
-    val registration = SuiteRegistration.of(theSuite)
     val args =
       if (!parallelAsyncTestExecution)
         (testName, passedInArgs.distributedTestSorter) match {

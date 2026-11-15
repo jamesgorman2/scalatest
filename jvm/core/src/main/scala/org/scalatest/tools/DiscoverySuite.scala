@@ -32,11 +32,11 @@ private[scalatest] class DiscoverySuite(
   accessibleSuites: Set[String],
   wildcard: Boolean,
   runpathClassLoader: ClassLoader,
-  reporterOfTopLevelSuite: (Suite, Filter, Reporter) => Reporter
+  startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
 ) extends Suite {
 
   def this(path: String, accessibleSuites: Set[String], wildcard: Boolean, runpathClassLoader: ClassLoader) =
-    this(path, accessibleSuites, wildcard, runpathClassLoader, TestEventLogHandOff.noStructureWrapper)
+    this(path, accessibleSuites, wildcard, runpathClassLoader, TestEventLogHandOff.startWithoutEventLog)
 
   requireNonNull(path, accessibleSuites, runpathClassLoader)
 
@@ -47,16 +47,16 @@ private[scalatest] class DiscoverySuite(
       yield DiscoverySuite.getSuiteInstance(suiteClassName, runpathClassLoader)
 
   // The suites a DiscoverySuite nests are the run's top-level suites.
-  private[scalatest] override def reporterOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): Reporter =
-    reporterOfTopLevelSuite(nestedSuite, filter, reporter)
+  private[scalatest] override def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): SuiteStart =
+    startOfTopLevelSuite(nestedSuite, filter, reporter)
 
-  // Runner's distributor asks for a suite's reporter as the suite starts. Any other distributor is handed the reporter.
+  // Runner's distributor starts a suite as the suite starts. Any other distributor is handed it started.
   private[scalatest] override def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status = {
     distribute match {
-      case concurrent: ConcurrentDistributor => concurrent.apply(nestedSuite, args, TestEventLogHandOff.none, reporterOfTopLevelSuite)
+      case concurrent: ConcurrentDistributor => concurrent.apply(nestedSuite, args, TestEventLogHandOff.none, startOfTopLevelSuite)
       case other =>
-        val reporter = reporterOfTopLevelSuite(nestedSuite, args.filter, args.reporter)
-        SuiteRegistration.madeTaking(reporter, args.reporter).removedOnceRun(other(nestedSuite, args.copy(reporter = reporter)))
+        val start = startOfTopLevelSuite(nestedSuite, args.filter, args.reporter)
+        start.run(other(nestedSuite, args.copy(reporter = start.reporter)))
     }
   }
 
