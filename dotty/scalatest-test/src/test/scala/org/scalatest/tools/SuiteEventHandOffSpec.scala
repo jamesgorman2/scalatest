@@ -275,6 +275,27 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       )
     }
 
+    "assign an event naming a suite ID two suites at or below the wrapper's node share to the first of them that has not ended" in
+      withRegisteredSuite { run =>
+        val underSu = su.suite("samples.Other")
+        run.wrapperOfTest("flat")(otherTestStarting)
+        run.wrapperOfTest("s u")(otherTestStarting)
+        run.wrapperOfTest("flat")(otherSuiteCompleted)
+        run.wrapperOfSuite(otherInfo)
+        run.eventLines.last should startWith(nodeOf(underSu))
+      }
+
+    "assign an event naming a suite ID two suites at or below the wrapper's node share to the first of them where both have ended" in
+      withRegisteredSuite { run =>
+        val underFlat = flat.suite("samples.Other")
+        run.wrapperOfTest("flat")(otherTestStarting)
+        run.wrapperOfTest("s u")(otherTestStarting)
+        run.wrapperOfTest("flat")(otherSuiteCompleted)
+        run.wrapperOfTest("s u")(otherSuiteCompleted)
+        run.wrapperOfSuite(otherInfo)
+        run.eventLines.last should startWith(nodeOf(underFlat))
+      }
+
     "give a test its suite's structure lacks a node directly under the suite, in a further structure written before the event" in
       withRegisteredSuite { run =>
         run.wrapperOfSuite(testStarting("lacked"))
@@ -286,6 +307,17 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   // A test of a suite no structure of the run holds.
   private def otherTestStarting: Event =
     TestStarting(ordinal, "Other", "samples.Other", Some("samples.Other"), "x", "x", threadName = "main", timeStamp = timeStamp)
+
+  // The SuiteCompleted of that suite.
+  private def otherSuiteCompleted: Event =
+    SuiteCompleted(ordinal, "Other", "samples.Other", Some("samples.Other"), threadName = "main", timeStamp = timeStamp)
+
+  // A message of that suite, naming no test.
+  private def otherInfo: Event =
+    InfoProvided(ordinal, "of Other", Some(NameInfo("Other", "samples.Other", Some("samples.Other"), None)), threadName = "main", timeStamp = timeStamp)
+
+  // The start of an event line assigned to `node`.
+  private def nodeOf(node: NodePath): String = s"""{"item":"event","node":${node.json},"""
 
   // The structure of that suite, at `node`, holding its one test.
   private def otherStructure(node: NodePath): String =
