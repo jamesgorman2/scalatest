@@ -45,7 +45,7 @@ The plugin's integration tests assert that Mill's list of failed tests and Scala
 
 ### Comparison with ScalaTest 3.2.20
 
-This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `../specification/test-event-log-events.md` AC-113, AC-114, AC-116 and AC-117, and `../specification/runs-and-test-structure-nodes.md` AC-073.
+This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `../specification/test-event-log-events.md` AC-108, AC-113, AC-114, AC-116 and AC-117, and `../specification/runs-and-test-structure-nodes.md` AC-073.
 
 - AC-056 and AC-057 run in a test project of `project/DottyBuild.scala`.
   - The compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) are the sources of an sbt configuration of the project's own that extends neither `Compile` nor `Test` and whose one library dependency is `org.scalatest:scalatest` 3.2.20. They compile there once, so both runs load the same compiled classes. `../../SPECIFICATION.md` R-004 lets the fork run them.
@@ -56,6 +56,7 @@ This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `
 - The test forks one JVM for each run, as IntelliJ's forked mode and a build tool's test worker each start a JVM of their own. Each JVM's classpath is the fixture's compiled classes, the test-interface jar, and either 3.2.20's resolved classpath or the fork's. No JVM-wide state, such as `System.out` or a system property, then passes from one run to the other.
 - In each JVM the recorders write each event to a file as one line, holding every field but timestamps, durations and thread names, and of each throwable only what `../../SPECIFICATION.md` § Constraints § Compatibility with ScalaTest 3.2.x compares. The test compares the two runs' files line by line.
 - The harness that forks a pair of runs takes the arguments only the fork's run is given, so a test with the emitter on passes the runner argument there.
+- A test of AC-108 runs the fixture in one JVM with the fork, launched through `Runner.run` and through `Framework`, with the runner argument and the `-C` recording reporter. That reporter receives the events the emitter receives, so the test takes each event's fields from the recording. Within each suite it receives them in the order core sends them, which is the emitter's order. Under `Framework`, `SuiteSortingReporter` reorders them across suites, so there the recording is not the oracle of the order across suites.
 - A test of AC-113 forks the same pair of JVMs.
   - In each, a recorder writes one line for each class of `org.scalatest.events`: whether it is an event class, its declared fields with their erased types, and its constructors with their parameter types.
   - Scala 3.1 and 3.3 implement a lazy `val` with different fields. The recorder leaves out the two kinds of field only one of them adds, `OFFSET$<n>` and `<n>bitmap$<n>`. It writes the field that stores the value, `<name>$lzy<n>`, by name alone, without its modifiers and type. A lazy `val` or nested object the fork adds therefore still shows as an added field.

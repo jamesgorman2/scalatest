@@ -122,14 +122,14 @@ Feature: Messages
 ```gherkin
 Feature: What the event log keeps of each event
 
-  Rule: Every event a run reports, and all of it that the consolidated output shows or uses, reaches the event log unaltered (R-010, R-011)
+  Rule: Every event the emitter receives, and all of it that the consolidated output shows or uses, reaches the event log unaltered (R-010, R-011)
     Scenario Outline: AC-108 The compatibility fixture under <launch>
       Given the compatibility fixture
-      When <launch> runs it sequentially with the runner argument and a `-C` recording reporter
-      Then for every event the reporter receives, and every event recorded in one, the event log holds that event
-      And each field of it that the consolidated output shows or uses equals the reporter's: each field `../../JSON-LAYOUT.md` § Nodes, § Messages, § Throwables, § Locations and § Run records fold into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
+      When <launch> runs it sequentially with the runner argument
+      Then for every event the emitter receives, and every event recorded in one, the event log holds that event
+      And each field of it that the consolidated output shows or uses equals that field of the event as the emitter received it: each field `../../JSON-LAYOUT.md` § Nodes, § Messages, § Throwables, § Locations and § Run records fold into a node, message, throwable, location or run record, and `TestFailed`'s `analysis`
       And the one exception is the timestamp of a message recorded in a test's closing event, which AC-105 sets
-      And the events the reporter receives that are not recorded in another are in the event log in the order the reporter received them
+      And the events the emitter receives that are not recorded in another are in the event log in the order the emitter received them
 
       Examples:
         | launch       |
