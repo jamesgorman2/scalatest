@@ -265,12 +265,12 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.eventLines.last shouldBe line(flat, List(2, 1), "TestStarting")
     }
 
-    "assign an event that reaches a test's wrapper naming another test of the test's suite to that other test" in withRegisteredSuite { run =>
+    "assign an event that reaches a test's wrapper to the other test of that test's suite that it names" in withRegisteredSuite { run =>
       run.wrapperOfTest("flat")(testStarting("s t"))
       run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
     }
 
-    "give a suite that no suite at or below a test's wrapper has a node directly under the test, in a structure written before the event" in
+    "give a suite a node directly under a test, in a structure written before the event, where the event reaches the test's wrapper and no suite at or below the test has its suite ID" in
       withRegisteredSuite { run =>
         val other = flat.suite("samples.Other")
         run.wrapperOfTest("flat")(otherTestStarting)
@@ -332,7 +332,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         run.eventLines.last should startWith(nodeOf(underFlat))
       }
 
-    "give a test its suite's structure lacks a node directly under the suite, in a further structure written before the event" in
+    "give a test that its suite's structure lacks a node directly under the suite, in a further structure written before the event" in
       withRegisteredSuite { run =>
         run.wrapperOfSuite(testStarting("lacked"))
         run.eventLines.last shouldBe line(top.test("lacked"), List(1, 1), "TestStarting")

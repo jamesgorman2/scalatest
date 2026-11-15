@@ -343,13 +343,12 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * at its send site or by another wrapper: an event reaches the wrapper of its test, of its suite and of each suite
    * around that one, and only the first of them that finds it not handed off writes it.
    *
-   * The event is assigned as one with no origin, from its own data: to the suite its suite ID names, the wrapper's own
-   * suite or one at or below the wrapper's node, and to the test its test name names in that suite. A suite no table
-   * at or below the wrapper's node holds is first given a node directly under the wrapper's node, and a test its
-   * suite's table lacks a node directly under its suite, in a further structure. A message that names no suite is
-   * assigned to the wrapper's node. The
-   * messages recorded in a test's closing event are written before it, assigned as it is, unless the test has handed
-   * them off one by one.
+   * The event is assigned as one with no origin, from its own data: to the suite its suite ID names (the wrapper's own
+   * suite, or one at or below the wrapper's node), and to the test its test name names in that suite. A suite that no
+   * table at or below the wrapper's node holds is first given a node directly under the wrapper's node. A test that its
+   * suite's table lacks is first given a node directly under its suite. Either node is written in a further structure.
+   * A message that names no suite is assigned to the wrapper's node. The messages recorded in a test's closing event
+   * are written before it, assigned as it is, unless the test has handed them off one by one.
    *
    * First, where they are not yet and the instance may have a node table, the node of the wrapper's suite instance is
    * fixed and its node table settled. A wrapper of an instance that has no node table hands nothing off, so the event
@@ -676,10 +675,10 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  // The table of the suite of this suite ID that an event a wrapper hands off names: the wrapper's own suite, `table`,
-  // where it has that suite ID, else the first that has not ended of the suites at or below the wrapper's node, else
-  // the first of them. The wrapper's node is `test` where the wrapper is a test's, and otherwise its suite's. Recurses
-  // once for each suite nested in another.
+  // The table of the suite with this suite ID, named by an event a wrapper hands off. It is the wrapper's own suite,
+  // `table`, where that has the suite ID. Otherwise it is the first not yet ended of the suites with that ID at or below
+  // the wrapper's node, else the first of them. The wrapper's node is `test` for a test's wrapper, else its suite's.
+  // Recurses once for each suite nested in another.
   private def tableNamed(table: SuiteNodeTable, test: Option[NodeId], suiteId: String): Option[SuiteNodeTable] = {
     def nestedWithin(suite: SuiteNodeTable): Vector[SuiteNodeTable] = suite.childSuites.flatMap(nested => nested +: nestedWithin(nested))
     if (table.suiteId == suiteId) {
