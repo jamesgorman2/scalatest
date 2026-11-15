@@ -1,6 +1,7 @@
 package build
 
 import mill.*
+import mill.api.BuildCtx
 import mill.scalalib.*
 import mill.scalalib.publish.*
 
@@ -9,6 +10,9 @@ object Versions {
   val scala: String = "3.9.0"
   // The fork's `releaseVersion` (`project/BuildCommons.scala`): the plugin is released with the fork.
   val fork: String = "3.2.20"
+  val testInterface: String = "1.0"
+  // The BSP client library Mill's own BSP server is built with.
+  val bsp4j: String = "2.2.0-M2"
 }
 
 object ScalacOptions {
@@ -58,8 +62,21 @@ object plugin extends PluginScalaModule, PublishModule {
   object integration extends ScalaTests, TestModule.ScalaTest {
     def mvnDeps: T[Seq[Dep]] = Seq(
       mvn"com.lihaoyi::mill-testkit:${Versions.mill}",
-      mvn"com.edc::scalatest:${Versions.fork}"
+      mvn"com.edc::scalatest:${Versions.fork}",
+      mvn"org.scala-sbt:test-interface:${Versions.testInterface}",
+      mvn"ch.epfl.scala:bsp4j:${Versions.bsp4j}"
     )
+
+    // The fork's sbt test project for the comparison with ScalaTest 3.2.20 holds the compatibility fixture's recorders,
+    // which these tests compile.
+    private def compatibilityTest: os.Path = BuildCtx.workspaceRoot / os.up / "dotty" / "compatibility-test" / "src"
+
+    def compatibilityRecorders: T[Seq[PathRef]] = Task.Sources(
+      compatibilityTest / "fixture" / "scala" / "compatibility" / "recorders",
+      compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "recorders"
+    )
+
+    def sources: T[Seq[PathRef]] = Task { super.sources() ++ compatibilityRecorders() }
 
     def forkEnv: T[Map[String, String]] = Task {
       val repositories = Seq(

@@ -1,0 +1,106 @@
+package org.scalatest.mill
+
+import compatibility.recorders.FrameworkLauncher
+import mill.api.PathRef
+import mill.testkit.IntegrationTester
+import org.scalatest.GivenWhenThen
+import org.scalatest.consolidation.CapturedLine
+import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.RunEvent
+import org.scalatest.consolidation.RunnerArgument
+import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
+import scala.collection.mutable
+
+final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
+
+  /** What a run through `Framework` outside Mill wrote: its test event log's lines, and its stdout and stderr lines. */
+  private final case class RunOutsideMill(eventLogLines: Seq[String], stdoutLines: Seq[String], stderrLines: Seq[String])
+
+  private def runClasspath(tester: IntegrationTester): Seq[os.Path] = {
+    val result = tester.eval(Seq("show", "core.test.runClasspath"))
+    withClue(result.debugString) {
+      result.isSuccess shouldBe true
+    }
+    upickle.default.read[Seq[PathRef]](result.out).map(_.path)
+  }
+
+  private def codeSource(loaded: Class[?]): os.Path = os.Path(java.nio.file.Paths.get(loaded.getProtectionDomain.getCodeSource.getLocation.toURI))
+
+  /**
+   * Runs `suite` through `Framework`, given the runner argument, in a JVM of its own outside Mill. The JVM's classpath is
+   * the module's run classpath, behind the fixture's launcher, the test interface and the Scala library these tests are
+   * compiled with, which the launcher needs.
+   */
+  private def runOutsideMill(tester: IntegrationTester, suite: String): RunOutsideMill = {
+    val runFolder = tester.workspacePath / os.up / s"${tester.workspacePath.last}-outside-mill"
+    os.makeDir.all(runFolder)
+    val eventLog = runFolder / "event-log.jsonl"
+    val classpath = Seq(
+      codeSource(FrameworkLauncher.getClass),
+      codeSource(classOf[sbt.testing.Framework]),
+      codeSource(classOf[Option[?]])
+    ) ++ runClasspath(tester)
+    val result = os.call(
+      cmd = Seq(
+        (os.Path(sys.props("java.home")) / "bin" / "java").toString,
+        "-cp",
+        classpath.mkString(java.io.File.pathSeparator),
+        s"-Dcompatibility.suites=$suite",
+        s"-Dcompatibility.loggerLines=${runFolder / "logger-lines.txt"}",
+        s"-Dcompatibility.events=${runFolder / "events.txt"}",
+        s"-Dcompatibility.summary=${runFolder / "summary.txt"}",
+        "compatibility.recorders.FrameworkLauncher"
+      ) ++ RunnerArgument.forEventLogFile(eventLog.toNIO),
+      cwd = runFolder,
+      check = false
+    )
+    withClue(s"${result.out.text()}\n${result.err.text()}") {
+      result.exitCode shouldBe 0
+    }
+    RunOutsideMill(os.read.lines(eventLog), result.out.lines(), result.err.lines())
+  }
+
+  /** The human-readable output, without colour, the library writes for the run, under test run label `core.test`. */
+  private def consolidated(run: RunOutsideMill): Seq[String] = {
+    val output = mutable.ArrayBuffer.empty[String]
+    val consolidation = Consolidation.start(line => output += line, coloured = false)
+    val feed = consolidation.addRun(TestRunLabel("core.test"))
+    run.eventLogLines.foreach { line =>
+      RunEvent.decode(line) match {
+        case Right(event) => feed.add(event)
+        case Left(reason) => fail(s"the event log line $line cannot be decoded: $reason")
+      }
+    }
+    run.stdoutLines.foreach(line => feed.add(CapturedLine.Stdout(line)))
+    run.stderrLines.foreach(line => feed.add(CapturedLine.Stderr(line)))
+    feed.endEventStream()
+    consolidation.end()
+    output.toVector
+  }
+
+  Feature("The library writes the same human-readable output without Mill as under the test command") {
+
+    Scenario("One run, with and without Mill") {
+      withTester("library-without-mill") { tester =>
+        Given("the test command has run core.test, holding CalculatorSuite, with Mill's --color false")
+        val testCommand = TestCommandResult(tester.eval(Seq("--ticker", "true", "--color", "false", "scalatest/test", "core.test")))
+        withClue(testCommand.debugString) {
+          testCommand.succeeded shouldBe true
+          testCommand.humanReadableOutput should not be empty
+        }
+
+        When("CalculatorSuite runs through Framework outside Mill with the runner argument")
+        val run = runOutsideMill(tester, "samples.CalculatorSuite")
+        And("its event log, decoded with core's codec, and its stdout and stderr lines are fed to the library, with colour off")
+        val output = consolidated(run)
+
+        Then("the library's human-readable output is the test command's, with Mill's prefix removed from each line")
+        withClue(testCommand.debugString) {
+          output shouldBe testCommand.humanReadableOutput
+        }
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@ trait FixtureBuilds {
 
   protected val pluginVersion: String = sys.env("SCALATEST_MILL_VERSION")
   protected val fixtures: os.Path = os.Path(sys.env("MILL_TEST_RESOURCE_DIR"))
-  private val millExecutable: os.Path = os.Path(sys.env("MILL_EXECUTABLE_PATH"))
+  protected val millExecutable: os.Path = os.Path(sys.env("MILL_EXECUTABLE_PATH"))
 
   /** The build header line that adds the plugin. */
   protected def pluginHeaderLine: String = s"""//| mvnDeps: ["com.edc::scalatest-mill::$pluginVersion"]"""
