@@ -167,7 +167,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  private def mintNode(): NodeId = NodeId(mintedNodes.incrementAndGet())
+  private def mintNode(): NodeId = MintedNodeId(mintedNodes.incrementAndGet())
 
   /** Starts an execution for a run of a registered suite instance. */
   def startRun(registration: RegisteredSuite): Unit = synchronized {
@@ -498,7 +498,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           executionsOfParent.openedLast.orElse(executionsOfParent.latest).getOrElse(new Execution)
         )
     }
-    val assigned = NodeExecution(node, executions.number(execution), Some(executionsOfParent.number(executionOfParent)))
+    val assigned = NodeExecution(node, Vector(executionsOfParent.number(executionOfParent), executions.number(execution)))
     if (TestEventLogEmitter.closesItsScopeOrTest(event)) {
       executions.close(execution)
     }
@@ -517,7 +517,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         }
         withNoOrigin
     }
-    val assigned = NodeExecution(table.node, executions.number(execution), None)
+    val assigned = NodeExecution(table.node, Vector(executions.number(execution)))
     if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
       executions.close(execution)
       table.forgetUnrunExecution(execution)

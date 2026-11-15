@@ -7,23 +7,36 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
   private val timeStamp = 1700000000000L
   private val summary = Summary(1, 2, 3, 4, 5, 6, 7, 8)
-  private val suiteExecution = Some(NodeExecution(NodeId(1), 1, None))
-  private val testExecution = Some(NodeExecution(NodeId(3), 2, Some(1)))
+  private val stackSpec = NodeId(Vector(NodePlace.Suite("example.StackSpec", 0)))
+  private val aStack = NodeId(stackSpec.places :+ NodePlace.Scope("A stack", 0))
+  private val pop = NodeId(stackSpec.places :+ NodePlace.Test("A stack should pop"))
+  private val stackSpecText = """[{"suiteId":"example.StackSpec","index":0}]"""
+  private val aStackText = """[{"suiteId":"example.StackSpec","index":0},{"scope":"A stack","index":0}]"""
+  private val popText = """[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"}]"""
+  private val suiteExecution = Some(NodeExecution(stackSpec, Vector(1)))
+  private val testExecution = Some(NodeExecution(pop, Vector(1, 3, 2)))
+  private val testEventText = s"""{"item":"event","node":$popText,"executions":[1,3,2],"event":"""
+  private val suiteEventText = s"""{"item":"event","node":$stackSpecText,"executions":[1],"event":"""
+  private val runEventText = """{"item":"event","event":"""
+
+  private val aSuite = """[{"suiteId":"s","index":0}]"""
+  private val aTest = """[{"suiteId":"s","index":0},{"test":"t"}]"""
 
   private val runStartedLine = """{"item":"runStarted","pid":4242,"startTime":"2026-11-13T02:54:37.123456Z"}"""
 
   private val structureLine =
     """{"item":"structure","nodes":[""" +
-      """{"id":1,"kind":"suite","name":"StackSpec","suiteId":"example.StackSpec","className":"example.StackSpec"},""" +
-      """{"id":2,"kind":"scope","parent":1,"position":0,"name":"A stack","label":"A stack"},""" +
-      """{"id":3,"kind":"test","parent":2,"position":0,"name":"pop","label":"- should pop"},""" +
-      """{"id":4,"kind":"suite","parent":1,"position":1,"name":"QueueSpec","suiteId":"example.QueueSpec","className":"example.QueueSpec"}""" +
+      s"""{"id":$stackSpecText,"kind":"suite","name":"StackSpec","suiteId":"example.StackSpec","className":"example.StackSpec"},""" +
+      s"""{"id":$aStackText,"kind":"scope","parent":$stackSpecText,"position":0,"name":"A stack","label":"A stack"},""" +
+      s"""{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop"},""" +
+      """{"id":[{"suiteId":"example.StackSpec","index":0},{"suiteId":"example.QueueSpec","index":0}],"kind":"suite",""" +
+      s""""parent":$stackSpecText,"position":1,"name":"QueueSpec","suiteId":"example.QueueSpec","className":"example.QueueSpec"}""" +
       """]}"""
 
   private val runEndedLine = """{"item":"runEnded","outcome":"completed"}"""
 
   private def suiteAbortedLine(throwableText: String): String =
-    """{"item":"event","node":1,"execution":1,"event":"SuiteAborted","message":"aborted","throwable":""" + throwableText +
+    suiteEventText + """"SuiteAborted","message":"aborted","throwable":""" + throwableText +
       ""","threadName":"main","timeStamp":1700000000000}"""
 
   private val throwableWithCauseAndSuppressedLine = suiteAbortedLine(
@@ -42,9 +55,6 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},"""
   private val lineInFileText = """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala"},"""
   private val threadAndTimeText = """"threadName":"main","timeStamp":1700000000000}"""
-  private val testEventText = """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"""
-  private val suiteEventText = """{"item":"event","node":1,"execution":1,"event":"""
-  private val runEventText = """{"item":"event","event":"""
 
   private val lineInFile = Some(LineInFile(12, "StackSpec.scala", None))
 
@@ -96,25 +106,38 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         TestEventLogDecoder.decode(structureLine) shouldBe Right(
           TestEventLogEvent.Structure(
             Vector(
-              StructureNode.Suite(NodeId(1), None, None, "StackSpec", "example.StackSpec", "example.StackSpec"),
-              StructureNode.Scope(NodeId(2), NodeId(1), 0, "A stack", "A stack"),
-              StructureNode.Test(NodeId(3), NodeId(2), 0, "pop", "- should pop"),
-              StructureNode.Suite(NodeId(4), Some(NodeId(1)), Some(1), "QueueSpec", "example.QueueSpec", "example.QueueSpec")
+              StructureNode.Suite(stackSpec, None, None, "StackSpec", "example.StackSpec", "example.StackSpec"),
+              StructureNode.Scope(aStack, stackSpec, 0, "A stack", "A stack"),
+              StructureNode.Test(pop, aStack, 0, "pop", "- should pop"),
+              StructureNode.Suite(
+                NodeId(stackSpec.places :+ NodePlace.Suite("example.QueueSpec", 0)),
+                Some(stackSpec),
+                Some(1),
+                "QueueSpec",
+                "example.QueueSpec",
+                "example.QueueSpec"
+              )
             )
           )
         )
       }
-      "yield the root of a further structure, a nested suite new to the event log, with its parent and no position" in {
+      "yield each place of a node path below the places above it, with a scope's or suite's index" in {
+        val secondHelperText =
+          """[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"},{"suiteId":"example.HelperSpec","index":1}]"""
         val line =
           """{"item":"structure","nodes":[""" +
-            """{"id":5,"kind":"suite","parent":1,"name":"HelperSpec","suiteId":"example.HelperSpec","className":"example.HelperSpec"},""" +
-            """{"id":6,"kind":"test","parent":5,"position":0,"name":"helps","label":"- helps"}""" +
+            s"""{"id":$secondHelperText,"kind":"suite","parent":$popText,""" +
+            """"name":"HelperSpec","suiteId":"example.HelperSpec","className":"example.HelperSpec"},""" +
+            """{"id":[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"},""" +
+            """{"suiteId":"example.HelperSpec","index":1},{"scope":"A helper","index":2}],""" +
+            s""""kind":"scope","parent":$secondHelperText,"position":0,"name":"A helper","label":"A helper"}""" +
             """]}"""
+        val secondHelper = NodeId(pop.places :+ NodePlace.Suite("example.HelperSpec", 1))
         TestEventLogDecoder.decode(line) shouldBe Right(
           TestEventLogEvent.Structure(
             Vector(
-              StructureNode.Suite(NodeId(5), Some(NodeId(1)), None, "HelperSpec", "example.HelperSpec", "example.HelperSpec"),
-              StructureNode.Test(NodeId(6), NodeId(5), 0, "helps", "- helps")
+              StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", "example.HelperSpec", "example.HelperSpec"),
+              StructureNode.Scope(NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2)), secondHelper, 0, "A helper", "A helper")
             )
           )
         )
@@ -137,7 +160,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "reading a ScalaTest event" should {
 
-      "yield no node or execution for an event assigned to the run" in {
+      "yield no node or executions for an event assigned to the run" in {
         TestEventLogDecoder.decode(
           """{"item":"event","event":"DiscoveryStarting","threadName":"main","timeStamp":1700000000000}"""
         ) shouldBe Right(TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryStarting("main", timeStamp)))
@@ -145,7 +168,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
       "yield an absent value for an omitted key and an empty sequence for an omitted array" in {
         TestEventLogDecoder.decode(
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestFailed","message":"1 did not equal 2",""" +
+          testEventText + """"TestFailed","message":"1 did not equal 2",""" +
             """"threadName":"main","timeStamp":1700000000000}"""
         ) shouldBe Right(
           TestEventLogEvent.ScalaTestEvent(
@@ -394,13 +417,16 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       val linesAndUnknownKeys = Seq(
         """{"item":"runStarted","pid":1,"startTime":"t","extra":1}""" -> ("extra", "the runStarted event"),
         """{"item":"runEnded","outcome":"completed","duration":1}""" -> ("duration", "the runEnded event"),
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","label":"S","suiteId":"s","className":"c"}]}""" -> ("label", "a suite node"),
-        """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":0,"name":"t","label":"- t","suiteId":"s"}]}""" -> ("suiteId", "a test node"),
-        """{"item":"structure","nodes":[{"id":2,"kind":"scope","parent":1,"position":0,"name":"t","label":"t","className":"c"}]}""" -> ("className", "a scope node"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","label":"S","suiteId":"s","className":"c"}]}""" -> ("label", "a suite node"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","suiteId":"s"}]}""" -> ("suiteId", "a test node"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"scope","parent":$aSuite,"position":0,"name":"t","label":"t","className":"c"}]}""" -> ("className", "a scope node"),
+        """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0,"scope":"t"}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("scope", "a suite's place"),
+        """{"item":"structure","nodes":[{"id":[{"scope":"t","index":0,"test":"t"}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("test", "a scope's place"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","parent":[{"test":"t","index":0}],"name":"S","suiteId":"s","className":"c"}]}""" -> ("index", "a test's place"),
         """{"item":"event","event":"DiscoveryStarting","ordinal":1,"threadName":"main","timeStamp":1}""" -> ("ordinal", "a ScalaTest event"),
         """{"item":"event","event":"DiscoveryStarting","location":{"kind":"SeeStackDepthException"},"threadName":"main","timeStamp":1}""" -> ("location", "a DiscoveryStarting event"),
-        """{"item":"event","node":1,"execution":1,"parentExecution":1,"event":"ScopeOpened","message":"A stack","threadName":"main","timeStamp":1}""" -> ("message", "a ScopeOpened event"),
-        """{"item":"event","node":1,"execution":1,"event":"SuiteStarting","suiteName":"S","threadName":"main","timeStamp":1}""" -> ("suiteName", "a SuiteStarting event"),
+        s"""{"item":"event","node":$aTest,"executions":[1,1],"event":"ScopeOpened","message":"A stack","threadName":"main","timeStamp":1}""" -> ("message", "a ScopeOpened event"),
+        s"""{"item":"event","node":$aSuite,"executions":[1],"event":"SuiteStarting","suiteName":"S","threadName":"main","timeStamp":1}""" -> ("suiteName", "a SuiteStarting event"),
         """{"item":"event","event":"RunCompleted","location":{"kind":"TopOfClass","className":"c","methodId":"m"},"threadName":"main","timeStamp":1}""" -> ("methodId", "a TopOfClass location"),
         ("""{"item":"event","event":"RunCompleted","summary":{"testsSucceededCount":1,"testsFailedCount":2,"testsIgnoredCount":3,""" +
           """"testsPendingCount":4,"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8,""" +
@@ -425,21 +451,26 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         """{"item":"runEnded"}""" -> ("outcome", "the runEnded event"),
         """{"item":"structure"}""" -> ("nodes", "a structure event"),
         """{"item":"structure","nodes":[{"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("id", "a suite node"),
-        """{"item":"structure","nodes":[{"id":1,"name":"S","suiteId":"s","className":"c"}]}""" -> ("kind", "a node"),
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","suiteId":"s","className":"c"}]}""" -> ("name", "a suite node"),
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","className":"c"}]}""" -> ("suiteId", "a suite node"),
-        """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","suiteId":"s"}]}""" -> ("className", "a suite node"),
-        """{"item":"structure","nodes":[{"id":2,"kind":"test","position":0,"name":"t","label":"- t"}]}""" -> ("parent", "a test node"),
-        """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"name":"t","label":"- t"}]}""" -> ("position", "a test node"),
-        """{"item":"structure","nodes":[{"id":2,"kind":"scope","parent":1,"position":0,"name":"t"}]}""" -> ("label", "a scope node"),
+        """{"item":"structure","nodes":[{"id":[],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("id", "a suite node whose id is empty"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"name":"S","suiteId":"s","className":"c"}]}""" -> ("kind", "a node"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","suiteId":"s","className":"c"}]}""" -> ("name", "a suite node"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","className":"c"}]}""" -> ("suiteId", "a suite node"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","suiteId":"s"}]}""" -> ("className", "a suite node"),
+        """{"item":"structure","nodes":[{"id":[{"suiteId":"s"}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("index", "a suite's place"),
+        """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"scope":"t"}],"kind":"scope","parent":[{"suiteId":"s","index":0}],"position":0,"name":"t","label":"t"}]}""" -> ("index", "a scope's place"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","position":0,"name":"t","label":"- t"}]}""" -> ("parent", "a test node"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":[],"position":0,"name":"t","label":"- t"}]}""" -> ("parent", "a test node whose parent is empty"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"name":"t","label":"- t"}]}""" -> ("position", "a test node"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"scope","parent":$aSuite,"position":0,"name":"t"}]}""" -> ("label", "a scope node"),
         """{"item":"event","threadName":"main","timeStamp":1}""" -> ("event", "a ScalaTest event"),
-        """{"item":"event","execution":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("node", "a ScalaTest event with an execution"),
-        """{"item":"event","parentExecution":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("node", "a ScalaTest event with a parentExecution"),
-        """{"item":"event","node":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("execution", "a ScalaTest event with a node"),
+        """{"item":"event","executions":[1],"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("node", "a ScalaTest event with executions"),
+        """{"item":"event","node":[],"executions":[1],"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("node", "a ScalaTest event with executions and an empty node"),
+        s"""{"item":"event","node":$aSuite,"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("executions", "a ScalaTest event with a node"),
+        s"""{"item":"event","node":$aSuite,"executions":[],"event":"SuiteStarting","threadName":"main","timeStamp":1}""" -> ("executions", "a ScalaTest event with a node and empty executions"),
         """{"item":"event","event":"DiscoveryStarting","timeStamp":1}""" -> ("threadName", "a DiscoveryStarting event"),
         """{"item":"event","event":"DiscoveryStarting","threadName":"main"}""" -> ("timeStamp", "a DiscoveryStarting event"),
-        """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"TestFailed","threadName":"main","timeStamp":1}""" -> ("message", "a TestFailed event"),
-        """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"MarkupProvided","threadName":"main","timeStamp":1}""" -> ("text", "a MarkupProvided event"),
+        s"""{"item":"event","node":$aTest,"executions":[1,1],"event":"TestFailed","threadName":"main","timeStamp":1}""" -> ("message", "a TestFailed event"),
+        s"""{"item":"event","node":$aTest,"executions":[1,1],"event":"MarkupProvided","threadName":"main","timeStamp":1}""" -> ("text", "a MarkupProvided event"),
         """{"item":"event","event":"RunStarting","configMap":{},"threadName":"main","timeStamp":1}""" -> ("testCount", "a RunStarting event"),
         """{"item":"event","event":"RunStarting","testCount":1,"threadName":"main","timeStamp":1}""" -> ("configMap", "a RunStarting event"),
         """{"item":"event","event":"RunCompleted","location":{"className":"c"},"threadName":"main","timeStamp":1}""" -> ("kind", "a location"),
@@ -468,8 +499,13 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           Left("unknown event TestExploded")
       }
       "report an unknown kind of node" in {
-        TestEventLogDecoder.decode("""{"item":"structure","nodes":[{"id":1,"kind":"group","name":"g"}]}""") shouldBe
+        TestEventLogDecoder.decode(s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"group","name":"g"}]}""") shouldBe
           Left("unknown kind group")
+      }
+      "report a place holding none of the keys of a suite's, a scope's or a test's place" in {
+        TestEventLogDecoder.decode(
+          """{"item":"structure","nodes":[{"id":[{"index":0}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}"""
+        ) shouldBe Left("a place holds none of the keys suiteId, scope and test")
       }
       "report an unknown kind of location" in {
         TestEventLogDecoder.decode(
@@ -519,7 +555,20 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         "nodes written as an object" -> """{"item":"structure","nodes":{}}""",
         "a node written as a string" -> """{"item":"structure","nodes":["suite"]}""",
         "an analysis line written as a number" ->
-          """{"item":"event","node":3,"execution":1,"parentExecution":1,"event":"TestFailed","message":"m","analysis":[1],"threadName":"main","timeStamp":1}""",
+          s"""{"item":"event","node":$aTest,"executions":[1,1],"event":"TestFailed","message":"m","analysis":[1],"threadName":"main","timeStamp":1}""",
+        "a node's id written as a number" -> """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+        "a node's id written as null" -> """{"item":"structure","nodes":[{"id":null,"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+        "a place written as a string" -> """{"item":"structure","nodes":[{"id":["s"],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+        "a suite's place's suiteId written as a number" ->
+          """{"item":"structure","nodes":[{"id":[{"suiteId":1,"index":0}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+        "a test's place's name written as null" ->
+          s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"test":null}],"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t"}]}""",
+        "an event's node written as an object" ->
+          """{"item":"event","node":{"suiteId":"s","index":0},"executions":[1],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
+        "an event's executions written as a number" ->
+          s"""{"item":"event","node":$aSuite,"executions":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
+        "an execution number written as a string" ->
+          s"""{"item":"event","node":$aSuite,"executions":["1"],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
         "a config map value written as a number" ->
           """{"item":"event","event":"RunStarting","testCount":1,"configMap":{"key":1},"threadName":"main","timeStamp":1}""",
         "a property check mark written as a string" -> suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":"true"}""")
@@ -555,13 +604,18 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         ),
         (
           "a position above the greatest Int",
-          """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":2147483648,"name":"t","label":"- t"}]}""",
+          s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":2147483648,"name":"t","label":"- t"}]}""",
           "position is not a 32-bit integer from 0"
         ),
         (
-          "an execution above the greatest Int",
-          """{"item":"event","node":1,"execution":2147483648,"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
-          "execution is not a 32-bit integer from 1"
+          "a place's index above the greatest Int",
+          """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":2147483648}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+          "index is not a 32-bit integer from 0"
+        ),
+        (
+          "an execution number above the greatest Int",
+          s"""{"item":"event","node":$aSuite,"executions":[2147483648],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
+          "executions is not an array of 32-bit integers from 1"
         ),
         (
           "a testCount above the greatest Int",
@@ -633,23 +687,28 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       val descriptionsLinesAndReasons = Seq(
         (
           "a test node's position below 0",
-          """{"item":"structure","nodes":[{"id":2,"kind":"test","parent":1,"position":-1,"name":"t","label":"- t"}]}""",
+          s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":-1,"name":"t","label":"- t"}]}""",
           "position is not a 32-bit integer from 0"
         ),
         (
           "a suite node's position below 0",
-          """{"item":"structure","nodes":[{"id":4,"kind":"suite","parent":1,"position":-1,"name":"S","suiteId":"s","className":"c"}]}""",
+          s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"suiteId":"n","index":0}],"kind":"suite","parent":$aSuite,"position":-1,"name":"S","suiteId":"n","className":"c"}]}""",
           "position is not a 32-bit integer from 0"
         ),
         (
-          "an execution below 1",
-          """{"item":"event","node":1,"execution":0,"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
-          "execution is not a 32-bit integer from 1"
+          "a suite's place's index below 0",
+          """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":-1}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+          "index is not a 32-bit integer from 0"
         ),
         (
-          "a parentExecution below 1",
-          """{"item":"event","node":3,"execution":1,"parentExecution":0,"event":"TestStarting","threadName":"main","timeStamp":1}""",
-          "parentExecution is not a 32-bit integer from 1"
+          "a scope's place's index below 0",
+          s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"scope":"t","index":-1}],"kind":"scope","parent":$aSuite,"position":0,"name":"t","label":"t"}]}""",
+          "index is not a 32-bit integer from 0"
+        ),
+        (
+          "an execution number below 1",
+          s"""{"item":"event","node":$aTest,"executions":[1,0],"event":"TestStarting","threadName":"main","timeStamp":1}""",
+          "executions is not an array of 32-bit integers from 1"
         ),
         ("a throwable's id below 1", suiteAbortedLine("""{"id":0,"className":"c"}"""), "id is not an integer from 1")
       )

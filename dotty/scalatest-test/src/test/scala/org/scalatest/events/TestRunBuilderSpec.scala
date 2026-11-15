@@ -1,6 +1,7 @@
 package org.scalatest.events
 
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.MintedNodeId
 import org.scalatest.wordspec.AnyWordSpec
 
 import EventNotationBlocks.joined
@@ -39,7 +40,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  private def lastParentExecutionOf(notation: String): Option[Int] = executionsOf(notation).last.flatMap(_.parentExecution)
+  private def lastParentExecutionOf(notation: String): Option[Int] = executionsOf(notation).last.flatMap(_.executions.init.lastOption)
 
   private def throwableOf(written: String): DecodedThrowable = {
     lastDecodedEventOf(s"run: RunAborted(throwable: $written)") match {
@@ -49,16 +50,16 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
   }
 
   private def suite(id: Long, parent: Option[Long], position: Option[Int], name: String, suiteId: String, className: String): StructureNode =
-    StructureNode.Suite(NodeId(id), parent.map(NodeId(_)), position, name, suiteId, className)
+    StructureNode.Suite(MintedNodeId(id), parent.map(MintedNodeId(_)), position, name, suiteId, className)
 
   private def scope(id: Long, parent: Long, position: Int, name: String, label: String): StructureNode =
-    StructureNode.Scope(NodeId(id), NodeId(parent), position, name, label)
+    StructureNode.Scope(MintedNodeId(id), MintedNodeId(parent), position, name, label)
 
   private def test(id: Long, parent: Long, position: Int, name: String, label: String): StructureNode =
-    StructureNode.Test(NodeId(id), NodeId(parent), position, name, label)
+    StructureNode.Test(MintedNodeId(id), MintedNodeId(parent), position, name, label)
 
   private def execution(node: Long, number: Int, parentExecution: Option[Int]): Option[NodeExecution] =
-    Some(NodeExecution(NodeId(node), number, parentExecution))
+    Some(NodeExecution(MintedNodeId(node), parentExecution.toVector :+ number))
 
   "The test run builder" when {
 

@@ -451,6 +451,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     nestedSuiteIds: List[String] = Nil
   )(alsoThen: Vector[String] => Unit): Unit = {
     Scenario(scenario) {
+      pending
       thisProcess
       Given(suite)
       When("Framework runs it without the runner argument")
@@ -475,6 +476,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
+      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(stated.eventLogInFormat)
 

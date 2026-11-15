@@ -19,8 +19,14 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
   private val timeStamp = 1700000000000L
   private val nameInfo = NameInfo("StackSpec", "example.StackSpec", Some("example.StackSpec"), Some("A stack should pop"))
   private val summary = Summary(1, 2, 3, 4, 5, 6, 7, 8)
-  private val suiteExecution = Some(NodeExecution(NodeId(1), 1, None))
-  private val testExecution = Some(NodeExecution(NodeId(3), 2, Some(1)))
+  private val stackSpec = NodeId(Vector(NodePlace.Suite("example.StackSpec", 0)))
+  private val aStack = NodeId(stackSpec.places :+ NodePlace.Scope("A stack", 0))
+  private val pop = NodeId(stackSpec.places :+ NodePlace.Test("A stack should pop"))
+  private val stackSpecText = """[{"suiteId":"example.StackSpec","index":0}]"""
+  private val aStackText = """[{"suiteId":"example.StackSpec","index":0},{"scope":"A stack","index":0}]"""
+  private val popText = """[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"}]"""
+  private val suiteExecution = Some(NodeExecution(stackSpec, Vector(1)))
+  private val testExecution = Some(NodeExecution(pop, Vector(1, 3, 2)))
   private val lineInFile = Some(LineInFile(12, "StackSpec.scala", None))
 
   private val boomText = """"throwable":{"id":1,"className":"java.lang.IllegalStateException","message":"boom"},"""
@@ -29,8 +35,8 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
       """"testsCanceledCount":5,"suitesCompletedCount":6,"suitesAbortedCount":7,"scopesPendingCount":8},"""
   private val lineInFileText = """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala"},"""
   private val threadAndTimeText = """"threadName":"main","timeStamp":1700000000000}"""
-  private val testEventText = """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"""
-  private val suiteEventText = """{"item":"event","node":1,"execution":1,"event":"""
+  private val testEventText = s"""{"item":"event","node":$popText,"executions":[1,3,2],"event":"""
+  private val suiteEventText = s"""{"item":"event","node":$stackSpecText,"executions":[1],"event":"""
   private val runEventText = """{"item":"event","event":"""
 
   private def withoutStackTrace[T <: Throwable](throwable: T): T = {
@@ -57,7 +63,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
   }
 
   private def suiteAbortedLine(throwableText: String): String =
-    """{"item":"event","node":1,"execution":1,"event":"SuiteAborted","message":"aborted","throwable":""" + throwableText +
+    suiteEventText + """"SuiteAborted","message":"aborted","throwable":""" + throwableText +
       ""","threadName":"main","timeStamp":1700000000000}""" + "\n"
 
   private def infoLine(message: String): String = {
@@ -78,29 +84,38 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
 
     "writing a structure event" should {
       "write a top-level suite without parent or position, then its nodes with only the keys of their kind" in {
+        val queueSpec = NodeId(stackSpec.places :+ NodePlace.Suite("example.QueueSpec", 0))
         val nodes = Vector(
-          StructureNode.Suite(NodeId(1), None, None, "StackSpec", "example.StackSpec", "example.StackSpec"),
-          StructureNode.Scope(NodeId(2), NodeId(1), 0, "A stack", "A stack"),
-          StructureNode.Test(NodeId(3), NodeId(2), 0, "pop", "- should pop"),
-          StructureNode.Suite(NodeId(4), Some(NodeId(1)), Some(1), "QueueSpec", "example.QueueSpec", "example.QueueSpec")
+          StructureNode.Suite(stackSpec, None, None, "StackSpec", "example.StackSpec", "example.StackSpec"),
+          StructureNode.Scope(aStack, stackSpec, 0, "A stack", "A stack"),
+          StructureNode.Test(pop, aStack, 0, "pop", "- should pop"),
+          StructureNode.Suite(queueSpec, Some(stackSpec), Some(1), "QueueSpec", "example.QueueSpec", "example.QueueSpec")
         )
         TestEventLogEncoder.structure(nodes) shouldBe
           """{"item":"structure","nodes":[""" +
-          """{"id":1,"kind":"suite","name":"StackSpec","suiteId":"example.StackSpec","className":"example.StackSpec"},""" +
-          """{"id":2,"kind":"scope","parent":1,"position":0,"name":"A stack","label":"A stack"},""" +
-          """{"id":3,"kind":"test","parent":2,"position":0,"name":"pop","label":"- should pop"},""" +
-          """{"id":4,"kind":"suite","parent":1,"position":1,"name":"QueueSpec","suiteId":"example.QueueSpec","className":"example.QueueSpec"}""" +
+          s"""{"id":$stackSpecText,"kind":"suite","name":"StackSpec","suiteId":"example.StackSpec","className":"example.StackSpec"},""" +
+          s"""{"id":$aStackText,"kind":"scope","parent":$stackSpecText,"position":0,"name":"A stack","label":"A stack"},""" +
+          s"""{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop"},""" +
+          """{"id":[{"suiteId":"example.StackSpec","index":0},{"suiteId":"example.QueueSpec","index":0}],"kind":"suite",""" +
+          s""""parent":$stackSpecText,"position":1,"name":"QueueSpec","suiteId":"example.QueueSpec","className":"example.QueueSpec"}""" +
           """]}""" + "\n"
       }
-      "write the root of a further structure, a nested suite new to the event log, with its parent and no position" in {
+      "write each place of a node path below the places above it, with a scope's or suite's index" in {
+        val secondHelper = NodeId(pop.places :+ NodePlace.Suite("example.HelperSpec", 1))
+        val inner = NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2))
         val nodes = Vector(
-          StructureNode.Suite(NodeId(5), Some(NodeId(1)), None, "HelperSpec", "example.HelperSpec", "example.HelperSpec"),
-          StructureNode.Test(NodeId(6), NodeId(5), 0, "helps", "- helps")
+          StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", "example.HelperSpec", "example.HelperSpec"),
+          StructureNode.Scope(inner, secondHelper, 0, "A helper", "A helper")
         )
+        val secondHelperText =
+          """[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"},{"suiteId":"example.HelperSpec","index":1}]"""
         TestEventLogEncoder.structure(nodes) shouldBe
           """{"item":"structure","nodes":[""" +
-          """{"id":5,"kind":"suite","parent":1,"name":"HelperSpec","suiteId":"example.HelperSpec","className":"example.HelperSpec"},""" +
-          """{"id":6,"kind":"test","parent":5,"position":0,"name":"helps","label":"- helps"}""" +
+          s"""{"id":$secondHelperText,"kind":"suite","parent":$popText,""" +
+          """"name":"HelperSpec","suiteId":"example.HelperSpec","className":"example.HelperSpec"},""" +
+          """{"id":[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"},""" +
+          """{"suiteId":"example.HelperSpec","index":1},{"scope":"A helper","index":2}],""" +
+          s""""kind":"scope","parent":$secondHelperText,"position":0,"name":"A helper","label":"A helper"}""" +
           """]}""" + "\n"
       }
     }
@@ -119,12 +134,12 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
 
     "writing a ScalaTest event" should {
 
-      "leave node and execution out of an event assigned to the run" in {
+      "leave node and executions out of an event assigned to the run" in {
         TestEventLogEncoder.event(DiscoveryStarting(ordinal, ConfigMap.empty, "main", timeStamp), None) shouldBe
           """{"item":"event","event":"DiscoveryStarting","threadName":"main","timeStamp":1700000000000}""" + "\n"
       }
 
-      "write node and execution, without parentExecution, for an event assigned to a suite" in {
+      "write the suite's node path and its one execution number for an event assigned to a top-level suite" in {
         val suiteStarting = SuiteStarting(
           ordinal = ordinal,
           suiteName = "StackSpec",
@@ -135,11 +150,11 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           timeStamp = timeStamp
         )
         TestEventLogEncoder.event(suiteStarting, suiteExecution) shouldBe
-          """{"item":"event","node":1,"execution":1,"event":"SuiteStarting",""" +
+          suiteEventText + """"SuiteStarting",""" +
           """"location":{"kind":"TopOfClass","className":"example.StackSpec"},"threadName":"main","timeStamp":1700000000000}""" + "\n"
       }
 
-      "write node, execution and parentExecution for an event assigned to a scope or test" in {
+      "write the node path and the execution path, scopes included, for an event assigned to a test" in {
         val testStarting = TestStarting(
           ordinal = ordinal,
           suiteName = "StackSpec",
@@ -152,7 +167,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           timeStamp = timeStamp
         )
         TestEventLogEncoder.event(testStarting, testExecution) shouldBe
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestStarting",""" +
+          testEventText + """"TestStarting",""" +
           """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala","filePathname":"/src/StackSpec.scala"},""" +
           """"threadName":"main","timeStamp":1700000000000}""" + "\n"
       }
@@ -176,7 +191,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           timeStamp = timeStamp
         )
         TestEventLogEncoder.event(testSucceeded, testExecution) shouldBe
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestSucceeded","duration":5,""" +
+          testEventText + """"TestSucceeded","duration":5,""" +
           """"location":{"kind":"LineInFile","lineNumber":12,"fileName":"StackSpec.scala"},""" +
           """"threadName":"main","timeStamp":1700000000000}""" + "\n"
       }
@@ -214,7 +229,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           timeStamp = timeStamp
         )
         TestEventLogEncoder.event(testFailed, testExecution) shouldBe
-          """{"item":"event","node":3,"execution":2,"parentExecution":1,"event":"TestFailed","message":"1 did not equal 2",""" +
+          testEventText + """"TestFailed","message":"1 did not equal 2",""" +
           """"threadName":"main","timeStamp":1700000000000}""" + "\n"
       }
 

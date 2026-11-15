@@ -4,8 +4,18 @@ import java.util.IdentityHashMap
 import org.scalatest.ScopePlace
 import org.scalatest.Suite
 import org.scalatest.events.NodeId
+import org.scalatest.events.NodePlace
 import org.scalatest.events.StructureNode
 import scala.collection.mutable
+
+/**
+ * The ID of the node the emitter minted with the given number: a one-place node path whose `suiteId` is that number.
+ * It identifies the node uniquely within its run but does not give the node's place.
+ */
+private[scalatest] object MintedNodeId {
+
+  def apply(number: Long): NodeId = NodeId(Vector(NodePlace.Suite(number.toString, 0)))
+}
 
 /** One execution of a suite, scope or test. It has no number until an event naming it is written. */
 private[scalatest] final class Execution

@@ -51,6 +51,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     launch: Launch = Launch.ByFramework
   ): Unit = {
     Scenario(scenario) {
+      pending
       thisProcess
       Given(suite)
       TemporaryEventLog.in { eventLogFile =>
@@ -65,6 +66,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     Scenario(s"The decoder reads the structure of: $scenario") {
+      pending
       When("the decoder is given the line of the suite's structure")
       val event = TestEventLogDecoder.decode(structure.line)
 

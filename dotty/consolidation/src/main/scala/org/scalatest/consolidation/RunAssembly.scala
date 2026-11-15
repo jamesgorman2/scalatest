@@ -270,7 +270,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     val nodeExecutions = executions.getOrElse(nodeExecution.node, SortedMap.empty[Int, Execution])
     val execution = nodeExecutions.getOrElse(
       nodeExecution.execution,
-      Execution(nodeExecution.execution, nodeExecution.parentExecution, Vector.empty, Vector.empty)
+      Execution(nodeExecution.execution, nodeExecution.executions.init.lastOption, Vector.empty, Vector.empty)
     )
     val updated =
       if (RunAssembly.isMessage(event)) execution.added(ReceivedMessage(event, childrenStarted(nodeExecution.node, nodeExecution.execution)))

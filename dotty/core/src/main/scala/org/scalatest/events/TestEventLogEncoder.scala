@@ -40,9 +40,8 @@ private[scalatest] object TestEventLogEncoder {
       JsonWriter.write(
         record(
           text("item", "event"),
-          optionalInteger("node", execution.map(_.node.value)),
-          optionalInteger("execution", execution.map(_.execution.toLong)),
-          optionalInteger("parentExecution", execution.flatMap(_.parentExecution).map(_.toLong)),
+          nested("node", execution.map(assigned => nodePath(assigned.node))),
+          array("executions", execution.toVector.flatMap(_.executions).map(number => JsonValue.Integer(number.toLong))),
           text("event", encoded.name)
         )
       )
@@ -83,9 +82,9 @@ private[scalatest] object TestEventLogEncoder {
     node match {
       case StructureNode.Suite(id, parent, position, name, suiteId, className) =>
         record(
-          integer("id", id.value),
+          nested("id", Some(nodePath(id))),
           text("kind", "suite"),
-          optionalInteger("parent", parent.map(_.value)),
+          nested("parent", parent.map(nodePath)),
           optionalInteger("position", position.map(_.toLong)),
           text("name", name),
           text("suiteId", suiteId),
@@ -100,12 +99,21 @@ private[scalatest] object TestEventLogEncoder {
 
   private def scopeOrTest(kind: String, id: NodeId, parent: NodeId, position: Int, name: String, label: String): JsonValue =
     record(
-      integer("id", id.value),
+      nested("id", Some(nodePath(id))),
       text("kind", kind),
-      integer("parent", parent.value),
+      nested("parent", Some(nodePath(parent))),
       integer("position", position.toLong),
       text("name", name),
       text("label", label)
+    )
+
+  private def nodePath(id: NodeId): JsonValue =
+    JsonValue.Array(
+      id.places.map {
+        case NodePlace.Suite(suiteId, index) => record(text("suiteId", suiteId), integer("index", index.toLong))
+        case NodePlace.Scope(scopeText, index) => record(text("scope", scopeText), integer("index", index.toLong))
+        case NodePlace.Test(name) => record(text("test", name))
+      }
     )
 
   private def nameAndFields(event: Event): (String, Seq[Field]) = {

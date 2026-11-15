@@ -59,19 +59,19 @@ private[scalatest] object TestEventLogDecoder {
 
   private def structureNode(reader: JsonObjectReader): Either[String, StructureNode] = {
     for {
-      id <- reader.long("id")
+      id <- reader.required("id", optionalNodePath(reader, "id"))
       kind <- reader.text("kind")
       name <- reader.text("name")
       node <- kind match {
         case "suite" =>
           for {
-            parent <- reader.optionalLong("parent")
+            parent <- optionalNodePath(reader, "parent")
             position <- reader.optionalIntFrom("position", 0)
             suiteId <- reader.text("suiteId")
             className <- reader.text("className")
-          } yield StructureNode.Suite(NodeId(id), parent.map(NodeId(_)), position, name, suiteId, className)
-        case "scope" => scopeOrTest(reader)(StructureNode.Scope(NodeId(id), _, _, name, _))
-        case "test" => scopeOrTest(reader)(StructureNode.Test(NodeId(id), _, _, name, _))
+          } yield StructureNode.Suite(id, parent, position, name, suiteId, className)
+        case "scope" => scopeOrTest(reader)(StructureNode.Scope(id, _, _, name, _))
+        case "test" => scopeOrTest(reader)(StructureNode.Test(id, _, _, name, _))
         case other => Left(s"unknown kind $other")
       }
     } yield node
@@ -79,22 +79,47 @@ private[scalatest] object TestEventLogDecoder {
 
   private def scopeOrTest(reader: JsonObjectReader)(build: (NodeId, Int, String) => StructureNode): Either[String, StructureNode] = {
     for {
-      parent <- reader.long("parent")
+      parent <- reader.required("parent", optionalNodePath(reader, "parent"))
       position <- reader.intFrom("position", 0)
       label <- reader.text("label")
-    } yield build(NodeId(parent), position, label)
+    } yield build(parent, position, label)
+  }
+
+  // An empty node path is read as an omitted key, as an empty array is written.
+  private def optionalNodePath(reader: JsonObjectReader, key: String): Either[String, Option[NodeId]] = {
+    for {
+      placeReaders <- reader.objects(key)
+      places <- each(placeReaders)(whole(_)(place))
+    } yield Option.when(places.nonEmpty)(NodeId(places))
+  }
+
+  private def place(reader: JsonObjectReader): Either[String, NodePlace] = {
+    if (reader.holds("suiteId")) {
+      for {
+        suiteId <- reader.text("suiteId")
+        index <- reader.intFrom("index", 0)
+      } yield NodePlace.Suite(suiteId, index)
+    } else if (reader.holds("scope")) {
+      for {
+        text <- reader.text("scope")
+        index <- reader.intFrom("index", 0)
+      } yield NodePlace.Scope(text, index)
+    } else if (reader.holds("test")) {
+      reader.text("test").map(NodePlace.Test(_))
+    } else {
+      Left("a place holds none of the keys suiteId, scope and test")
+    }
   }
 
   private def nodeExecution(reader: JsonObjectReader): Either[String, Option[NodeExecution]] = {
     for {
-      node <- reader.optionalLong("node")
-      execution <- reader.optionalIntFrom("execution", 1)
-      parentExecution <- reader.optionalIntFrom("parentExecution", 1)
-      assigned <- (node, execution) match {
-        case (Some(nodeId), Some(number)) => Right(Some(NodeExecution(NodeId(nodeId), number, parentExecution)))
-        case (None, None) if parentExecution.isEmpty => Right(None)
-        case (None, _) => Left("missing key node")
-        case (Some(_), None) => Left("missing key execution")
+      node <- optionalNodePath(reader, "node")
+      executions <- reader.intsFrom("executions", 1)
+      assigned <- (node, executions.nonEmpty) match {
+        case (Some(nodeId), true) => Right(Some(NodeExecution(nodeId, executions)))
+        case (None, false) => Right(None)
+        case (None, true) => Left("missing key node")
+        case (Some(_), false) => Left("missing key executions")
       }
     } yield assigned
   }
@@ -421,6 +446,15 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
     }
   }
 
+  def holds(key: String): Boolean = values.contains(key)
+
+  def intsFrom(key: String, minimum: Int): Either[String, Vector[Int]] = {
+    optional(key, s"an array of 32-bit integers from $minimum") {
+      case JsonValue.Array(items) if items.forall(isIntFrom(minimum)) =>
+        items.collect { case JsonValue.Integer(value) => value.toInt }
+    }.map(_.getOrElse(Vector.empty))
+  }
+
   def texts(key: String): Either[String, Vector[String]] = {
     optional(key, "an array of strings") {
       case JsonValue.Array(items) if items.forall(_.isInstanceOf[JsonValue.Text]) =>
@@ -441,6 +475,13 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
     values.get(key) match {
       case Some(value) => read.lift(value).map(Some(_)).toRight(s"$key is not $expected")
       case None => Right(None)
+    }
+  }
+
+  private def isIntFrom(minimum: Int)(value: JsonValue): Boolean = {
+    value match {
+      case JsonValue.Integer(number) => number.isValidInt && number >= minimum
+      case _ => false
     }
   }
 }

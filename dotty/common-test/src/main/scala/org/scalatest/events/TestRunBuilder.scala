@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import org.scalatest.tools.MintedNodeId
 import scala.collection.mutable
 
 private[scalatest] enum CapturedStream {
@@ -137,7 +138,7 @@ private final class RunUnderConstruction {
 
   private def minted(): NodeId = {
     mintedNodes += 1
-    NodeId(mintedNodes)
+    MintedNodeId(mintedNodes)
   }
 
   private def hold(id: NodeId, kind: NodeKind, name: String, parent: Option[NodeId]): Unit = {
@@ -245,7 +246,7 @@ private final class RunUnderConstruction {
         }
         val number = line.execution.getOrElse(1)
         node.record(number, RunUnderConstruction.eventsEndingAnExecution.contains(line.className))
-        Some(NodeExecution(node.id, number, parentExecution))
+        Some(NodeExecution(node.id, parentExecution.toVector :+ number))
     }
     BuiltEvent(
       line.text,

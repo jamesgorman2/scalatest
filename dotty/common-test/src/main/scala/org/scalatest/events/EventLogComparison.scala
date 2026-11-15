@@ -143,7 +143,7 @@ private[scalatest] object EventLogComparison {
   }
 
   private def withoutIds(node: StructureNode): StructureNode = {
-    val noNode = NodeId(0L)
+    val noNode = NodeId(Vector.empty)
     node match {
       case suite: StructureNode.Suite => suite.copy(id = noNode, parent = None)
       case scope: StructureNode.Scope => scope.copy(id = noNode, parent = noNode)
@@ -209,17 +209,19 @@ private[scalatest] object EventLogComparison {
       case (Some(_), None) => Some("it is assigned to the run, not to a node")
       case (Some(expectedExecution), Some(loggedExecution)) =>
         if (!nodes.loggedNode(expectedExecution.node).contains(loggedExecution.node)) {
-          Some(s"it is assigned to another node, ${loggedExecution.node.value}")
+          Some(s"it is assigned to another node, ${loggedExecution.node}")
         } else if (expectedExecution.execution != loggedExecution.execution) {
           Some(s"it is of execution ${loggedExecution.execution}, not ${expectedExecution.execution}")
-        } else if (fixed.parentExecution && expectedExecution.parentExecution != loggedExecution.parentExecution) {
+        } else if (fixed.parentExecution && parentExecutionOf(expectedExecution) != parentExecutionOf(loggedExecution)) {
           def number(parentExecution: Option[Int]): String = parentExecution.fold("absent")(_.toString)
-          Some(s"its parent execution is ${number(loggedExecution.parentExecution)}, not ${number(expectedExecution.parentExecution)}")
+          Some(s"its parent execution is ${number(parentExecutionOf(loggedExecution))}, not ${number(parentExecutionOf(expectedExecution))}")
         } else {
           None
         }
     }
   }
+
+  private def parentExecutionOf(execution: NodeExecution): Option[Int] = execution.executions.init.lastOption
 
   private def throwableMismatch(expected: Option[WrittenThrowable], logged: Any): Option[String] = {
     (expected, logged) match {
