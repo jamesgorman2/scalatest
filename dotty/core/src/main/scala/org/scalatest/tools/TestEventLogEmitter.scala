@@ -146,7 +146,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * It writes under the lock, so that two instances of one suite that run at once write their structures one after
    * the other. What writing throws is kept from the caller as `runEvent` keeps it.
    */
-  def writeStructureOnceNodeIsFixed(registration: RegisteredSuite)(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Unit = {
+  def writeStructureOnceTableIsSettled(registration: RegisteredSuite)(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Unit = {
     val thrown = synchronized {
       if (isOpen) {
         registration.structureOnceTableIsSettled(scopesAndTestsFor).flatMap(writeStructureWhereChangedUnderLock(_, _))

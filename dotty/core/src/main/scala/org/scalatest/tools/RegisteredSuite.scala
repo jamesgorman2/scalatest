@@ -520,7 +520,7 @@ private[scalatest] final class RegisteredSuite(
   def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = {
     instance.scopesAndTestsOfRegistrationTree.foreach { registered =>
       val tags = Suite.autoTagClassAnnotations(tagsOfTests, instance, SuiteStructure.testNamesIn(registered))
-      emitter.writeStructureOnceNodeIsFixed(this) { table =>
+      emitter.writeStructureOnceTableIsSettled(this) { table =>
         SuiteStructure.kept(registered, table.filterKeepingEarlier(SuiteStructure.testNamesIn(registered), testName => filter(testName, tags, table.suiteId)))
       }
     }
@@ -528,7 +528,7 @@ private[scalatest] final class RegisteredSuite(
 
   def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = {
     val testNames = keptTestNames.toList
-    emitter.writeStructureOnceNodeIsFixed(this)(_ => SuiteStructure.ofTestNames(testNames))
+    emitter.writeStructureOnceTableIsSettled(this)(_ => SuiteStructure.ofTestNames(testNames))
   }
 
   def suiteNameRead(suiteName: String): Unit = {

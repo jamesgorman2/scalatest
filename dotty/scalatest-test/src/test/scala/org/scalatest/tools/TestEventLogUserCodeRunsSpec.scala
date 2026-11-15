@@ -56,6 +56,12 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   private def eventsOf(node: NodePath, lines: Seq[String]): Int = lines.count(_.contains(s""""node":${node.json},"""))
 
+  private val eventName = """"event":"([A-Za-z]+)"""".r
+
+  /** The names of the events assigned to a node, in the order the event log holds them. */
+  private def eventNamesOf(node: NodePath, lines: Seq[String]): Vector[String] =
+    lines.toVector.filter(_.contains(s""""node":${node.json},""")).flatMap(line => eventName.findFirstMatchIn(line).map(_.group(1)))
+
   private val stackSpec = {
     val top = NodePath.topLevel("samples.StackSpec")
     val aStack = top.scope("A Stack")
@@ -189,12 +195,13 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  private val userSuitesTop = NodePath.topLevel("samples.UserSuites")
+  private val user1 = userSuitesTop.suite("samples.User1Suite")
+  private val user2 = userSuitesTop.suite("samples.User2Suite")
+  private val usesOne = user1.test("uses one")
+  private val usesTwo = user2.test("uses two")
+
   private val userSuites = {
-    val top = NodePath.topLevel("samples.UserSuites")
-    val user1 = top.suite("samples.User1Suite")
-    val user2 = top.suite("samples.User2Suite")
-    val usesOne = user1.test("uses one")
-    val usesTwo = user2.test("uses two")
     StatedRun(
       Vector(
         "RunStarting",
@@ -310,9 +317,10 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  private val flaky = NodePath.topLevel("samples.RetryRunsAHelper").test("flaky")
+
   private val retryRunsAHelper = {
-    val top = NodePath.topLevel("samples.RetryRunsAHelper")
-    val flaky = top.test("flaky")
+    val top = flaky.parent
     val helper = helperUnder(flaky)
     def helperEvents(executions: List[Int]): List[String] =
       List(
@@ -835,6 +843,13 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("no other structure holds HelperSuite")
       structuresHolding("HelperSuite", lines) shouldBe 2
+
+      And("no event of a helper is assigned to the suites or the test that ran it")
+      eventNamesOf(userSuitesTop, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(user1, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(user2, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(usesOne, lines) shouldBe Vector("TestStarting", "TestSucceeded")
+      eventNamesOf(usesTwo, lines) shouldBe Vector("TestStarting", "TestSucceeded")
     }
 
     eventScenarios(
@@ -860,6 +875,10 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("no other structure holds HelperSuite")
       structuresHolding("HelperSuite", lines) shouldBe 1
+
+      And("each execution of 'flaky' holds its InfoProvided, and no event of the helper")
+      eventNamesOf(flaky, lines) shouldBe Vector("TestStarting", "InfoProvided", "TestFailed", "TestStarting", "InfoProvided", "TestSucceeded")
+      eventNamesOf(flaky.parent, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
     }
 
     eventScenarios(

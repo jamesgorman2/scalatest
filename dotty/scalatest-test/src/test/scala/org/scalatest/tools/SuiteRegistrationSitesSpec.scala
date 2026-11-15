@@ -610,8 +610,8 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  "The emitter, handing off an event of a suite instance at a place no structure holds, whose run has read no suite name" should {
-    "read the instance's suite name once, and add a node table of that name under the suite it started in" in {
+  "The emitter, handing off an event of a suite instance at a place no structure holds" should {
+    "read the instance's suite name once where its run has read none, and add a node table of that name under the suite it started in" in {
       val anEmitter = emitter
       val started = new StartedTopLevelSuite(anEmitter, new Probe)
       val suite = new CountingSuiteNameReads()
@@ -627,7 +627,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       }
     }
 
-    "read the instance's suite name once, and give it no node table, where reading it throws" in {
+    "read the instance's suite name once where its run has read none, and give it no node table where reading it throws" in {
       val anEmitter = emitter
       val started = new StartedTopLevelSuite(anEmitter, new Probe)
       val suite = new CountingSuiteNameReads(Some(new IllegalStateException("no suite name")))
