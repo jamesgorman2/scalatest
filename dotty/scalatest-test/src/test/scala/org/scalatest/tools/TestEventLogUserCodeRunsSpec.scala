@@ -310,6 +310,137 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  private val retryRunsAHelper = {
+    val top = NodePath.topLevel("samples.RetryRunsAHelper")
+    val flaky = top.test("flaky")
+    val helper = helperUnder(flaky)
+    def helperEvents(executions: List[Int]): List[String] =
+      List(
+        nodeEvent(helperScope(helper), executions, "ScopeOpened"),
+        nodeEvent(helps(helper), executions :+ executions.last, "TestStarting"),
+        nodeEvent(helps(helper), executions :+ executions.last, "TestSucceeded"),
+        nodeEvent(helperScope(helper), executions, "ScopeClosed")
+      )
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting RetryRunsAHelper", "TestStarting flaky") ++ reportedOfAHelper ++
+        Vector("TestFailed", "TestStarting flaky") ++ reportedOfAHelper ++
+        Vector("TestSucceeded flaky", "SuiteCompleted RetryRunsAHelper", "RunCompleted"),
+      """
+      structure
+        suite "RetryRunsAHelper", class "samples.RetryRunsAHelper"
+          test "flaky", label "- flaky"
+      test "flaky": TestStarting
+      structure under test "flaky"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      scope "A helper", in test "flaky" execution 1: ScopeOpened
+      test "helps", in test "flaky" execution 1: TestStarting
+      test "helps", in test "flaky" execution 1: TestSucceeded
+      scope "A helper", in test "flaky" execution 1: ScopeClosed
+      test "flaky": TestFailed
+      test "flaky" execution 2: TestStarting
+      scope "A helper" execution 2, in test "flaky" execution 2, in suite "HelperSuite" execution 2: ScopeOpened
+      test "helps" execution 2, in test "flaky" execution 2, in suite "HelperSuite" execution 2: TestStarting
+      test "helps" execution 2, in test "flaky" execution 2, in suite "HelperSuite" execution 2: TestSucceeded
+      scope "A helper" execution 2, in test "flaky" execution 2: ScopeClosed
+      test "flaky" execution 2: TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("RetryRunsAHelper", "samples.RetryRunsAHelper"),
+          TestEventLogLine.test(flaky, top, 0, "flaky", "- flaky")
+        ),
+        nodeEvent(flaky, List(1, 1), "TestStarting"),
+        helperStructure(helper)
+      ) ++ helperEvents(List(1, 1, 1, 1)) ++ List(
+        nodeEvent(flaky, List(1, 1), "TestFailed", """"message":"1 was not greater than 1","""),
+        nodeEvent(flaky, List(1, 2), "TestStarting")
+      ) ++ helperEvents(List(1, 2, 2, 2)) ++ List(
+        nodeEvent(flaky, List(1, 2), "TestSucceeded")
+      )
+    )
+  }
+
+  private val asyncOuterSuite = {
+    val top = NodePath.topLevel("samples.AsyncOuterSuite")
+    val usesIt = top.test("uses a helper")
+    val helper = helperUnder(usesIt)
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting AsyncOuterSuite", "TestStarting uses a helper") ++ reportedOfAHelper ++
+        Vector("TestSucceeded uses a helper", "SuiteCompleted AsyncOuterSuite", "RunCompleted"),
+      """
+      structure
+        suite "AsyncOuterSuite", class "samples.AsyncOuterSuite"
+          test "uses a helper", label "- uses a helper"
+      test "uses a helper": TestStarting
+      structure under test "uses a helper"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      scope "A helper": ScopeOpened
+      test "helps": TestStarting
+      test "helps": TestSucceeded
+      scope "A helper": ScopeClosed
+      test "uses a helper": TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("AsyncOuterSuite", "samples.AsyncOuterSuite"),
+          TestEventLogLine.test(usesIt, top, 0, "uses a helper", "- uses a helper")
+        ),
+        nodeEvent(usesIt, List(1, 1), "TestStarting"),
+        helperStructure(helper),
+        nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed"),
+        nodeEvent(usesIt, List(1, 1), "TestSucceeded")
+      )
+    )
+  }
+
+  private val setupSuite = {
+    val top = NodePath.topLevel("samples.SetupSuite")
+    val works = top.test("works")
+    val helper = top.suite("samples.HelperSuite")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting SetupSuite", "TestStarting works", "TestSucceeded works", "SuiteCompleted SetupSuite", "RunCompleted"),
+      """
+      structure
+        suite "SetupSuite", class "samples.SetupSuite"
+          test "works", label "- works"
+      suite "SetupSuite": SuiteStarting
+      structure under suite "SetupSuite"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      scope "A helper": ScopeOpened
+      test "helps": TestStarting
+      test "helps": TestSucceeded
+      scope "A helper": ScopeClosed
+      test "works": TestStarting
+      test "works": TestSucceeded
+      suite "SetupSuite": SuiteCompleted
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("SetupSuite", "samples.SetupSuite"),
+          TestEventLogLine.test(works, top, 0, "works", "- works")
+        ),
+        nodeEvent(top, List(1), "SuiteStarting"),
+        helperStructure(helper),
+        nodeEvent(helperScope(helper), List(1, 1, 1), "ScopeOpened"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1), "TestStarting"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(helperScope(helper), List(1, 1, 1), "ScopeClosed"),
+        nodeEvent(works, List(1, 1), "TestStarting"),
+        nodeEvent(works, List(1, 1), "TestSucceeded"),
+        nodeEvent(top, List(1), "SuiteCompleted")
+      )
+    )
+  }
+
   private val runsItsNestedSuitesNode = NodePath.topLevel("samples.RunsItsNestedSuites")
   private val inner1 = runsItsNestedSuitesNode.suite("samples.Inner1Suite")
   private val inner2 = runsItsNestedSuitesNode.suite("samples.Inner2Suite")
@@ -348,6 +479,53 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(innerTwo, List(1, 1, 1), "TestStarting"),
         nodeEvent(innerTwo, List(1, 1, 1), "TestSucceeded"),
         nodeEvent(runsItsNestedSuitesNode, List(1), "SuiteCompleted")
+      )
+    )
+  }
+
+  // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
+  private val runsItsFirstNestedSuiteTwice = {
+    val top = NodePath.topLevel("samples.RunsItsFirstNestedSuiteTwice")
+    val declared = top.suite("samples.Inner1Suite")
+    val second = top.suite("samples.Inner1Suite", 1)
+    val inner2 = top.suite("samples.Inner2Suite")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting RunsItsFirstNestedSuiteTwice", "SuiteCompleted RunsItsFirstNestedSuiteTwice", "RunCompleted"),
+      """
+      structure
+        suite "RunsItsFirstNestedSuiteTwice", class "samples.RunsItsFirstNestedSuiteTwice"
+          suite "Inner1Suite", class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+          suite "Inner2Suite", class "samples.Inner2Suite"
+            test "inner two", label "- inner two"
+      suite "RunsItsFirstNestedSuiteTwice": SuiteStarting
+      test "inner one" #1: TestStarting
+      test "inner one" #1: TestSucceeded
+      structure under suite "RunsItsFirstNestedSuiteTwice"
+        suite "Inner1Suite" #2, class "samples.Inner1Suite"
+          test "inner one", label "- inner one"
+      test "inner one" #2: TestStarting
+      test "inner one" #2: TestSucceeded
+      suite "RunsItsFirstNestedSuiteTwice": SuiteCompleted
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("RunsItsFirstNestedSuiteTwice", "samples.RunsItsFirstNestedSuiteTwice"),
+          TestEventLogLine.nestedSuite(declared, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(declared.test("inner one"), declared, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(inner2.test("inner two"), inner2, 0, "inner two", "- inner two")
+        ),
+        nodeEvent(top, List(1), "SuiteStarting"),
+        nodeEvent(declared.test("inner one"), List(1, 1, 1), "TestStarting"),
+        nodeEvent(declared.test("inner one"), List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.structure(
+          TestEventLogLine.suiteUnder(second, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(second.test("inner one"), second, 0, "inner one", "- inner one")
+        ),
+        nodeEvent(second.test("inner one"), List(1, 1, 1), "TestStarting"),
+        nodeEvent(second.test("inner one"), List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(top, List(1), "SuiteCompleted")
       )
     )
   }
@@ -574,8 +752,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   /**
    * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
    * reads them. The event log holds the stated events in order, and `alsoThen` states what else it holds.
-   *
-   * @param runPendingUntil the task whose change the emitter needs before its run can pass, if any
    */
   private def eventScenarios(
     scenario: String,
@@ -583,11 +759,9 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     suiteClassName: String,
     eventLogHolds: String,
     stated: StatedRun,
-    nestedSuiteIds: List[String] = Nil,
-    runPendingUntil: Option[String] = None
+    nestedSuiteIds: List[String] = Nil
   )(alsoThen: Vector[String] => Unit): Unit = {
     Scenario(scenario) {
-      runPendingUntil.foreach(_ => pending)
       thisProcess
       Given(suite)
       When("Framework runs it without the runner argument")
@@ -645,7 +819,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "samples.OuterSuite",
       "the helper's structure under the test that ran it, then its events, assigned to its own nodes and inside the test that ran it",
       outerSuite,
-      runPendingUntil = Some("Suites at places no structure declared"),
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
       And("no SuiteStarting or SuiteCompleted is assigned to HelperSuite")
@@ -658,7 +831,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "samples.UserSuites",
       "a HelperSuite under each nested suite's test, each holding the events of the helper run there",
       userSuites,
-      runPendingUntil = Some("Suites at places no structure declared"),
       nestedSuiteIds = List("samples.User1Suite", "samples.User2Suite", helperSelected)
     ) { lines =>
       And("no other structure holds HelperSuite")
@@ -671,13 +843,33 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "samples.TwoHelpersSuite",
       "a HelperSuite under each test, each holding the events of the helper run there",
       twoHelpersSuite,
-      runPendingUntil = Some("Suites at places no structure declared"),
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
       And("no other structure holds HelperSuite, and no event is of a second execution of 'A helper' or 'helps'")
       structuresHolding("HelperSuite", lines) shouldBe 2
       eventsOfASecondExecutionOfHelpers(lines) shouldBe 0
     }
+
+    eventScenarios(
+      "A test run twice runs a helper each time",
+      "a suite whose runTest runs its test 'flaky' again where it fails, and whose test runs a HelperSuite, then fails the first time it runs",
+      "samples.RetryRunsAHelper",
+      "one HelperSuite under the test, with an execution under each of the test's executions",
+      retryRunsAHelper,
+      nestedSuiteIds = List(helperSelected)
+    ) { lines =>
+      And("no other structure holds HelperSuite")
+      structuresHolding("HelperSuite", lines) shouldBe 1
+    }
+
+    eventScenarios(
+      "An async test runs a helper inside a Future",
+      "an async suite whose one test, 'uses a helper', runs a HelperSuite inside a Future on the suite's own ExecutionContext",
+      "samples.AsyncOuterSuite",
+      "the helper's structure under the test that ran it, then its events, assigned to its own nodes and inside the test that ran it",
+      asyncOuterSuite,
+      nestedSuiteIds = List(helperSelected)
+    )(_ => ())
   }
 
   Feature("Nested suites run in other ways") {
@@ -695,6 +887,27 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       suiteEventsOf("samples.Inner2Suite", lines) shouldBe 0
       structuresIn(lines) shouldBe 1
     }
+
+    eventScenarios(
+      "A runNestedSuites override runs one nested suite twice",
+      "a Suites nesting Inner1Suite and Inner2Suite whose runNestedSuites runs Inner1Suite twice and Inner2Suite never, sending no event",
+      "samples.RunsItsFirstNestedSuiteTwice",
+      "the structure, the first run's events on the declared Inner1Suite, then a further Inner1Suite beside it, whose own structure precedes the second run's events",
+      runsItsFirstNestedSuiteTwice,
+      nestedSuiteIds = List("samples.Inner1Suite", "samples.Inner2Suite")
+    ) { lines =>
+      And("it holds no other structure")
+      structuresIn(lines) shouldBe 2
+    }
+
+    eventScenarios(
+      "A suite's beforeAll runs a helper",
+      "a suite whose beforeAll runs a HelperSuite with a reporter that drops every event, and whose one test, 'works', succeeds",
+      "samples.SetupSuite",
+      "the helper's structure under the suite, then its events, before those of the suite's own test",
+      setupSuite,
+      nestedSuiteIds = List(helperSelected)
+    )(_ => ())
 
     eventScenarios(
       "A runNestedSuites override runs two suites sharing an ID in reverse order",

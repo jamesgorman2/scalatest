@@ -1,18 +1,24 @@
 package samples
 
+import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.Args
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.CompositeStatus
 import org.scalatest.DoNotDiscover
 import org.scalatest.Outcome
+import org.scalatest.Reporter
 import org.scalatest.Status
 import org.scalatest.SucceededStatus
 import org.scalatest.Suite
 import org.scalatest.Suites
 import org.scalatest.WrapWith
+import org.scalatest.events.Event
 import org.scalatest.events.InfoProvided
 import org.scalatest.events.NameInfo
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.funsuite.AsyncFunSuite
+import scala.concurrent.Future
 
 /** A suite that runs an instance of the class it wraps in its place, giving that instance's names and tests as its own. */
 @DoNotDiscover
@@ -106,6 +112,73 @@ class User2Suite extends RunsHelpers {
 
 @DoNotDiscover
 class UserSuites extends Suites(new User1Suite, new User2Suite)
+
+/** Runs its one test again where it fails. The test runs a helper, then fails the first time it runs. */
+@DoNotDiscover
+class RetryRunsAHelper extends RunsHelpers {
+
+  private val timesRun = new AtomicInteger
+
+  override protected def runTest(testName: String, args: Args): Status = {
+    val first = super.runTest(testName, args)
+    if (first.succeeds()) first else super.runTest(testName, args)
+  }
+
+  test("flaky") {
+    info("trying")
+    runAHelper()
+    assert(timesRun.incrementAndGet() > 1)
+  }
+}
+
+/** An async suite whose test runs a `HelperSuite`, with the `Args` its test is run with, inside a `Future` on the suite's own `ExecutionContext`. */
+@DoNotDiscover
+class AsyncOuterSuite extends AsyncFunSuite {
+
+  @volatile private var argsOfTest = Option.empty[Args]
+
+  override protected def runTest(testName: String, args: Args): Status = {
+    argsOfTest = Some(args)
+    super.runTest(testName, args)
+  }
+
+  test("uses a helper") {
+    Future(argsOfTest.foreach(args => new HelperSuite().run(None, args))).map(_ => succeed)
+  }
+}
+
+/** A suite whose `beforeAll` runs a `HelperSuite` with a reporter that drops every event. */
+@DoNotDiscover
+class SetupSuite extends AnyFunSuite with BeforeAndAfterAll {
+
+  @volatile private var argsOfRun = Option.empty[Args]
+
+  private val dropsEveryEvent = new Reporter {
+    def apply(event: Event): Unit = ()
+  }
+
+  override def run(testName: Option[String], args: Args): Status = {
+    argsOfRun = Some(args)
+    super.run(testName, args)
+  }
+
+  override protected def beforeAll(): Unit = argsOfRun.foreach(args => new HelperSuite().run(None, args.copy(reporter = dropsEveryEvent)))
+
+  test("works") {
+    succeed
+  }
+}
+
+/** Runs its first nested suite twice, and its second never, sending no event for them. */
+@DoNotDiscover
+class RunsItsFirstNestedSuiteTwice extends Suites(new Inner1Suite, new Inner2Suite) {
+
+  override protected def runNestedSuites(args: Args): Status = {
+    val first = nestedSuites.head
+    val runs = List(first.run(None, args), first.run(None, args))
+    new CompositeStatus(runs.toSet)
+  }
+}
 
 /** Runs each of its nested suites itself, sending no event for them. */
 @DoNotDiscover

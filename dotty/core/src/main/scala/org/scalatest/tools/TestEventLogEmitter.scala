@@ -32,6 +32,7 @@ import org.scalatest.events.ScopeOpened
 import org.scalatest.events.ScopePending
 import org.scalatest.events.SuiteAborted
 import org.scalatest.events.SuiteCompleted
+import org.scalatest.events.StructureNode
 import org.scalatest.events.SuiteStarting
 import org.scalatest.events.TestCanceled
 import org.scalatest.events.TestEventLogEncoder
@@ -121,10 +122,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * Where the latest structure of the suite node of a registered instance's run lacks a test that the instance's
    * registration tree, `registered`, holds, adds the test and writes a further `structure` event. The tree is read
    * only where the structure lacks the test, as when a `runTests` override runs a test the filter drops. An instance
-   * whose node is not fixed, or that has no node table, adds nothing.
+   * whose node table is not settled, or that has none, adds nothing.
    */
   def addTestWhereLacking(registration: RegisteredSuite, testName: String, registered: => Option[List[RegisteredNode]]): Unit = {
-    val lacking = synchronized(Option.when(isOpen && registration.isNodeFixed)(registration.table).flatten.filterNot(_.latestHoldsTest(testName)))
+    val lacking = synchronized(Option.when(isOpen && registration.isTableSettled)(registration.table).flatten.filterNot(_.latestHoldsTest(testName)))
     lacking.foreach { table =>
       registered.foreach { tree =>
         // The latest structure is read again under the lock, since another instance of the suite may have changed it.
@@ -137,10 +138,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Where the node of a registered instance's run is fixed, writes a further `structure` event of the scopes and tests
-   * `scopesAndTestsFor` gives for its node table, where they differ from the suite's latest structure, and makes them
-   * the latest. A scope or test an earlier structure of the suite held keeps its node. Otherwise the registration
-   * keeps them, and they are written once its node is fixed.
+   * Where the node table of a registered instance's run is settled, writes a further `structure` event of the scopes
+   * and tests `scopesAndTestsFor` gives for its node table, where they differ from the suite's latest structure, and
+   * makes them the latest. A scope or test an earlier structure of the suite held keeps its node. Otherwise the
+   * registration keeps them, and they are written once its node table is settled.
    *
    * It writes under the lock, so that two instances of one suite that run at once write their structures one after
    * the other. What writing throws is kept from the caller as `runEvent` keeps it.
@@ -148,7 +149,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   def writeStructureOnceNodeIsFixed(registration: RegisteredSuite)(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Unit = {
     val thrown = synchronized {
       if (isOpen) {
-        registration.structureOnceNodeIsFixed(scopesAndTestsFor).flatMap(writeStructureWhereChangedUnderLock(_, _))
+        registration.structureOnceTableIsSettled(scopesAndTestsFor).flatMap(writeStructureWhereChangedUnderLock(_, _))
       } else {
         None
       }
@@ -157,34 +158,38 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Fixes the node of a registered instance's run, and first that of each instance whose run it started in, from
-   * the suite ID each run read: `suiteIdRead` for this instance's, where its run has read none before. Where a run
-   * has read none, the emitter reads it from the instance, outside the lock, once at most, and only while the event
-   * log is open and the instance may have a node table. An instance whose read throws is fixed with no node, as is
-   * one that can have no node table. Each node fixed writes the structure its registration keeps for it, where that
-   * differs from its node table.
+   * Fixes the node of a registered instance's run and settles its node table, and first those of each instance whose
+   * run it started in, from the suite ID and suite name each run read: `suiteIdRead` and `suiteNameRead` for this
+   * instance's, where its run has read none before. A node that no structure holds needs both: its table is added,
+   * and its first structure written, once its name is known.
    *
-   * An inner instance's node is placed below its outer one's, so it stays unfixed while an outer one does, as where
-   * another thread is reading that one's suite ID. The suite ID its run read is kept, and it is fixed by the next
+   * Where a run has read neither and `handingOff` says an event is about to be handed off, the emitter reads the
+   * missing one from the instance, outside the lock, once at most, and only while the event log is open and the
+   * instance may have a node table. An instance whose read throws has no node table, as has one that can have none.
+   * Each node fixed writes the structure its registration keeps for it, where that differs from its node table.
+   *
+   * An inner instance's node is placed below its outer one's, so it stays unsettled while an outer one is, as where
+   * another thread is reading that one's suite ID. The names its run read are kept, and it is settled by a later
    * call once the outer node is.
    *
-   * What reading the suite ID or writing a structure throws is kept from the caller as `runEvent` keeps it.
+   * What reading a name or writing a structure throws is kept from the caller as `runEvent` keeps it.
    */
-  def fixNode(registration: RegisteredSuite, suiteIdRead: Option[String]): Unit = {
-    val unfixed = synchronized {
+  def fixNode(registration: RegisteredSuite, suiteIdRead: Option[String], suiteNameRead: Option[String], handingOff: Boolean): Unit = {
+    val unsettled = synchronized {
       if (isOpen) {
         suiteIdRead.foreach(registration.keepSuiteIdItsRunRead)
-        registration.unfixedFromOutermost
+        suiteNameRead.foreach(registration.keepSuiteNameItsRunRead)
+        registration.unsettledFromOutermost
       } else {
         Nil
       }
     }
-    unfixed.forall(fixNodeOf)
+    unsettled.forall(one => fixNodeOf(one, handingOff) && settleTableOf(one, handingOff))
   }
 
   // Returns whether the node is fixed.
-  private def fixNodeOf(registration: RegisteredSuite): Boolean = {
-    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen && registration.takeReadOfSuiteId()))
+  private def fixNodeOf(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
+    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen && handingOff && registration.takeReadOfSuiteId()))
     val suiteId = if (readsSuiteId) TestEventLogEmitter.caught(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
     val (thrown, isFixed) = synchronized {
       if (!isOpen) {
@@ -210,17 +215,48 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     isFixed
   }
 
+  // Returns whether the node table of a fixed node is settled, adding it, and writing its first structure, where no
+  // structure holds the node and its suite name is known.
+  private def settleTableOf(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
+    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen && handingOff && registration.takeReadOfSuiteName()))
+    val suiteName = if (readsSuiteName) TestEventLogEmitter.caught(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
+    val (thrown, isSettled) = synchronized {
+      if (!isOpen) {
+        (None, false)
+      } else if (registration.isTableSettled) {
+        (None, true)
+      } else {
+        val thrown = suiteName match {
+          case Left(thrownByRead) =>
+            registration.addNewNode(None)
+            Some(thrownByRead)
+          case Right(Some(name)) =>
+            TestEventLogEmitter.caught(registration.addNewNode(Some(name))).fold(Some(_), _.flatMap(writeStructureUnderLock))
+          case Right(None) =>
+            None
+        }
+        (thrown, registration.isTableSettled)
+      }
+    }
+    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+    isSettled
+  }
+
   // Encoding a structure calls no user code, so it is encoded under the lock that makes it the latest.
   private def writeStructureWhereChangedUnderLock(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
     if (isOpen && table.scopesAndTests != scopesAndTests) {
-      val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests))))
-      if (written.isLeft) {
-        close()
-      }
-      written.left.toOption
+      writeStructureUnderLock(table.replaceLatestStructure(scopesAndTests))
     } else {
       None
     }
+  }
+
+  private def writeStructureUnderLock(nodes: Vector[StructureNode]): Option[Throwable] = {
+    val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(nodes)))
+    if (written.isLeft) {
+      close()
+    }
+    written.left.toOption
   }
 
   /** Starts an execution for a run of a registered suite instance, once the node of the run is fixed. */
@@ -234,8 +270,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * closing event are written before it, assigned as it is, unless `messagesHandedOff` says the test handed them off
    * one by one.
    *
-   * The node of the origin's suite instance is fixed first, where it is not yet. Nothing is handed off where the event
-   * log has ended, the instance has no node table, or its top-level suite's registration has been removed: a wrapper
+   * The node of the origin's suite instance is fixed, and its node table settled, first, where they are not yet.
+   * Nothing is handed off where the event log has ended, the instance has no node table, or its top-level suite's
+   * registration has been removed: a wrapper
    * the event reaches then hands it off as an event with no origin. A test's closing event sent after the removal,
    * whose messages the test handed off, is marked so that the top-level suite's wrapper writes it without them.
    *
@@ -244,8 +281,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    */
   def handOff(origin: OriginInRegisteredSuite, event: Event, messagesHandedOff: Boolean): Unit = {
     val registration = origin.registration
-    if (!registration.isNodeFixed) {
-      fixNode(registration, TestEventLogEmitter.namesIn(event).map(_.suiteId))
+    if (!registration.isTableSettled) {
+      val names = TestEventLogEmitter.namesIn(event)
+      fixNode(registration, names.map(_.suiteId), names.map(_.suiteName), handingOff = true)
     }
     if (synchronized(handsOffAtSendSite(registration, event, messagesHandedOff))) {
       val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
@@ -263,7 +301,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   // Called under the lock.
   private def handsOffAtSendSite(registration: RegisteredSuite, event: Event, messagesHandedOff: Boolean): Boolean = {
-    val hasTable = isOpen && registration.isNodeFixed && registration.table.isDefined
+    val hasTable = isOpen && registration.table.isDefined
     if (hasTable && registration.hasBeenRemoved && messagesHandedOff) {
       registration.topLevel.keepClosingEventWithMessagesHandedOff(event)
     }
@@ -311,14 +349,15 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * messages recorded in a test's closing event are written before it, assigned as it is, unless the test has handed
    * them off one by one.
    *
-   * The node of the wrapper's suite instance is fixed first, where it is not yet and may have a node table. A wrapper
-   * of an instance that has no node table hands nothing off, so the event is handed off by a wrapper around it.
+   * The node of the wrapper's suite instance is fixed, and its node table settled, first, where they are not yet and
+   * it may have a node table. A wrapper of an instance that has no node table hands nothing off, so the event is
+   * handed off by a wrapper around it.
    *
    * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
   def writeSuiteEvent(wrapper: WrapperNode, event: Event): Unit = {
-    if (!wrapper.registration.isNodeFixed && synchronized(isOpen && wrapper.registration.canHaveTable)) {
-      fixNode(wrapper.registration, None)
+    if (!wrapper.registration.isTableSettled && synchronized(isOpen && wrapper.registration.canHaveTable)) {
+      fixNode(wrapper.registration, None, None, handingOff = true)
     }
     messagesHandedOffWhereFirstHandedOff(wrapper, event).foreach { messagesHandedOff =>
       // Encoded outside the lock, as `runEvent` encodes.
@@ -354,7 +393,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   def writeTestMessage(origin: OriginInRegisteredSuite, built: Either[Throwable, (Event, EncodedEvent)]): Unit = {
     val registration = origin.registration
     val thrown = synchronized {
-      if (isOpen && registration.isNodeFixed && registration.table.isDefined && !registration.hasBeenRemoved) {
+      if (isOpen && registration.table.isDefined && !registration.hasBeenRemoved) {
         built match {
           case Right((message, encoded)) => writeUnderLock(Right(Vector(encoded)), assignWithOrigin(origin, message))
           case Left(thrownByBuild) =>

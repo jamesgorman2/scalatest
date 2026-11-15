@@ -1015,11 +1015,10 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     val report = wrapReporterIfNecessary(thisSuite, reporter)
     val newArgs = registeredArgs.copy(reporter = report)
 
-    // Read in the order 3.2.20 passes them to the filter, so that the registration keeps the suite ID it read.
+    // Read in the order 3.2.20 passes them to the filter.
     def tagsAndSuiteId: (Map[String, Set[String]], String) = {
       val theTags = tags
       val theSuiteId = suiteId
-      registration.suiteIdRead(theSuiteId)
       (theTags, theSuiteId)
     }
 
@@ -1031,6 +1030,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
       case Some(tn) =>
         val (theTags, theSuiteId) = tagsAndSuiteId
+        registration.suiteIdRead(theSuiteId)
         val (filterTest, ignoreTest) = filter(tn, theTags, theSuiteId)
         if (!filterTest) {
           if (ignoreTest)
@@ -1042,7 +1042,9 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       case None =>
         val (theTags, theSuiteId) = tagsAndSuiteId
         val keptTests = filter(theTestNames, theTags, theSuiteId)
+        // Kept before the suite ID is, so that a suite no structure holds has its tests in its first structure.
         registration.updateStructureFromTestNames(keptTests.map((testName, _) => testName))
+        registration.suiteIdRead(theSuiteId)
         for ((tn, ignoreTest) <- keptTests) {
           if (!stopper.stopRequested) {
             if (ignoreTest)

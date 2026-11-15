@@ -608,17 +608,52 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       }
       suite.reads.get shouldBe 0
     }
+  }
 
-    "read no suite ID of an instance a test runs, which has no node table to hand the event off to" in {
-      val started = new StartedTopLevelSuite(emitter, new Probe)
-      val suite = new CountingSuiteIdReads()
+  "The emitter, handing off an event of a suite instance at a place no structure holds, whose run has read no suite name" should {
+    "read the instance's suite name once, and add a node table of that name under the suite it started in" in {
+      val anEmitter = emitter
+      val started = new StartedTopLevelSuite(anEmitter, new Probe)
+      val suite = new CountingSuiteNameReads()
       try {
-        val wrapper = registeredIn(new InExecutionOfTest(registrationOf(started), "probes", new Execution), suite).reporterOfSuite(passingNoEventOn)
+        val registration = registeredIn(new InRunOfSuite(registrationOf(started), None), suite)
+        val wrapper = registration.reporterOfSuite(passingNoEventOn)
         wrapper(anAlert)
+        wrapper(anAlert)
+        val table = anEmitter.synchronized(registration.table.map(table => (table.name, table.parent)))
+        (suite.reads.get, table) shouldBe ((1, Some(("counted", anEmitter.synchronized(registrationOf(started).table.map(_.node))))))
       } finally {
         started.complete()
       }
-      suite.reads.get shouldBe 0
+    }
+
+    "read the instance's suite name once, and give it no node table, where reading it throws" in {
+      val anEmitter = emitter
+      val started = new StartedTopLevelSuite(anEmitter, new Probe)
+      val suite = new CountingSuiteNameReads(Some(new IllegalStateException("no suite name")))
+      try {
+        val registration = registeredIn(new InRunOfSuite(registrationOf(started), None), suite)
+        val wrapper = registration.reporterOfSuite(passingNoEventOn)
+        wrapper(anAlert)
+        wrapper(anAlert)
+        (suite.reads.get, anEmitter.synchronized(registration.table)) shouldBe ((1, None))
+      } finally {
+        started.complete()
+      }
+    }
+
+    "read no suite name where its run has read one, and name the node table by it" in {
+      val anEmitter = emitter
+      val started = new StartedTopLevelSuite(anEmitter, new Probe)
+      val suite = new CountingSuiteNameReads()
+      try {
+        val registration = registeredIn(new InRunOfSuite(registrationOf(started), None), suite)
+        registration.suiteNameRead("read by its run")
+        registration.reporterOfSuite(passingNoEventOn)(anAlert)
+        (suite.reads.get, anEmitter.synchronized(registration.table.map(_.name))) shouldBe ((0, Some("read by its run")))
+      } finally {
+        started.complete()
+      }
     }
   }
 
@@ -683,6 +718,16 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       reads.incrementAndGet()
       thrown.foreach(throw _)
       super.suiteId
+    }
+  }
+
+  private final class CountingSuiteNameReads(thrown: Option[RuntimeException] = None) extends AnyFunSuite {
+    val reads = new AtomicInteger
+
+    override def suiteName: String = {
+      reads.incrementAndGet()
+      thrown.foreach(throw _)
+      "counted"
     }
   }
 
