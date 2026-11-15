@@ -13,6 +13,7 @@ import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.TestEventLogLine.nodeEvent
 
 final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
@@ -50,11 +51,8 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
   private def frameworkRunOf(configMap: String, lines: String*): List[String] =
     runStarted :: runStartingOfFramework(configMap) :: lines.toList ::: List(runCompleted, runEndedCompleted)
 
-  private def event(node: NodePath, executions: Seq[Int], eventName: String, fields: String = ""): String =
-    TestEventLogLine.nodeEvent(node, executions, eventName, fields)
-
   private def suiteAborted(suite: NodePath, message: String, throwable: String): String =
-    event(suite, List(1), "SuiteAborted", s""""message":"$message","throwable":$throwable,""")
+    nodeEvent(suite, List(1), "SuiteAborted", s""""message":"$message","throwable":$throwable,""")
 
   private val invocationTargetCausedByNoDb =
     """{"id":1,"className":"java.lang.reflect.InvocationTargetException","cause":{"id":2,"className":"java.lang.IllegalStateException","message":"no db"}}"""
@@ -92,9 +90,9 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(reads, aConfig, 0, "reads", "- reads")
         ),
-        event(top, List(1), "SuiteStarting"),
-        event(reads, List(1, 1, 1), "TestStarting"),
-        event(reads, List(1, 1, 1), "TestSucceeded")
+        nodeEvent(top, List(1), "SuiteStarting"),
+        nodeEvent(reads, List(1, 1, 1), "TestStarting"),
+        nodeEvent(reads, List(1, 1, 1), "TestSucceeded")
       )
     )
   }
@@ -153,17 +151,17 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(local, aConfig, 0, "local", "- local")
         ),
-        event(top, List(1), "SuiteStarting"),
+        nodeEvent(top, List(1), "SuiteStarting"),
         TestEventLogLine.structure(
           TestEventLogLine.suite(suite, s"samples.$suite"),
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(remote, aConfig, 0, "remote", "- remote")
         ),
-        event(aConfig, List(1, 1), "ScopeOpened"),
-        event(remote, List(1, 1, 1), "TestStarting"),
-        event(remote, List(1, 1, 1), "TestSucceeded"),
-        event(aConfig, List(1, 1), "ScopeClosed"),
-        event(top, List(1), "SuiteCompleted")
+        nodeEvent(aConfig, List(1, 1), "ScopeOpened"),
+        nodeEvent(remote, List(1, 1, 1), "TestStarting"),
+        nodeEvent(remote, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(aConfig, List(1, 1), "ScopeClosed"),
+        nodeEvent(top, List(1), "SuiteCompleted")
       )
     )
   }
@@ -217,19 +215,19 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         TestEventLogLine.scope(nestedAConfig, 0, "A config", "A config"),
         TestEventLogLine.test(nestedConfigDependentSpec.test("A config local"), nestedAConfig, 0, "local", "- local")
       ),
-      event(nestedConfigDependentSpec.parent, List(1), "SuiteStarting"),
-      event(nestedConfigDependentSpec, List(1, 1), "SuiteStarting"),
+      nodeEvent(nestedConfigDependentSpec.parent, List(1), "SuiteStarting"),
+      nodeEvent(nestedConfigDependentSpec, List(1, 1), "SuiteStarting"),
       TestEventLogLine.structure(
         TestEventLogLine.nestedSuite(nestedConfigDependentSpec, 0, "ConfigDependentSpec", "samples.ConfigDependentSpec"),
         TestEventLogLine.scope(nestedAConfig, 0, "A config", "A config"),
         TestEventLogLine.test(nestedRemote, nestedAConfig, 0, "remote", "- remote")
       ),
-      event(nestedAConfig, List(1, 1, 1), "ScopeOpened"),
-      event(nestedRemote, List(1, 1, 1, 1), "TestStarting"),
-      event(nestedRemote, List(1, 1, 1, 1), "TestSucceeded"),
-      event(nestedAConfig, List(1, 1, 1), "ScopeClosed"),
-      event(nestedConfigDependentSpec, List(1, 1), "SuiteCompleted"),
-      event(nestedConfigDependentSpec.parent, List(1), "SuiteCompleted")
+      nodeEvent(nestedAConfig, List(1, 1, 1), "ScopeOpened"),
+      nodeEvent(nestedRemote, List(1, 1, 1, 1), "TestStarting"),
+      nodeEvent(nestedRemote, List(1, 1, 1, 1), "TestSucceeded"),
+      nodeEvent(nestedAConfig, List(1, 1, 1), "ScopeClosed"),
+      nodeEvent(nestedConfigDependentSpec, List(1, 1), "SuiteCompleted"),
+      nodeEvent(nestedConfigDependentSpec.parent, List(1), "SuiteCompleted")
     )
   )
 
@@ -264,12 +262,12 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         TestEventLogLine.test(oneInstancePerTest.test("a"), oneInstancePerTest, 0, "a", "- a"),
         TestEventLogLine.test(oneInstancePerTest.test("b"), oneInstancePerTest, 1, "b", "- b")
       ),
-      event(oneInstancePerTest, List(1), "SuiteStarting"),
-      event(oneInstancePerTest.test("a"), List(1, 1), "TestStarting"),
-      event(oneInstancePerTest.test("a"), List(1, 1), "TestSucceeded"),
-      event(oneInstancePerTest.test("b"), List(1, 1), "TestStarting"),
-      event(oneInstancePerTest.test("b"), List(1, 1), "TestSucceeded"),
-      event(oneInstancePerTest, List(1), "SuiteCompleted")
+      nodeEvent(oneInstancePerTest, List(1), "SuiteStarting"),
+      nodeEvent(oneInstancePerTest.test("a"), List(1, 1), "TestStarting"),
+      nodeEvent(oneInstancePerTest.test("a"), List(1, 1), "TestSucceeded"),
+      nodeEvent(oneInstancePerTest.test("b"), List(1, 1), "TestStarting"),
+      nodeEvent(oneInstancePerTest.test("b"), List(1, 1), "TestSucceeded"),
+      nodeEvent(oneInstancePerTest, List(1), "SuiteCompleted")
     )
   )
 
@@ -291,10 +289,10 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         TestEventLogLine.suite("TagsOverrideSuite", "samples.TagsOverrideSuite"),
         TestEventLogLine.test(tagsOverride.test("a"), tagsOverride, 0, "a", "- a")
       ),
-      event(tagsOverride, List(1), "SuiteStarting"),
-      event(tagsOverride.test("a"), List(1, 1), "TestStarting"),
-      event(tagsOverride.test("a"), List(1, 1), "TestSucceeded"),
-      event(tagsOverride, List(1), "SuiteCompleted")
+      nodeEvent(tagsOverride, List(1), "SuiteStarting"),
+      nodeEvent(tagsOverride.test("a"), List(1, 1), "TestStarting"),
+      nodeEvent(tagsOverride.test("a"), List(1, 1), "TestSucceeded"),
+      nodeEvent(tagsOverride, List(1), "SuiteCompleted")
     )
   )
 
@@ -347,20 +345,20 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         TestEventLogLine.test(sharedTest.test("A config reads"), sharedTestAConfig, 0, "reads", "- reads"),
         TestEventLogLine.test(sharedTest.test("A config local"), sharedTestAConfig, 1, "local", "- local")
       ),
-      event(sharedTest, List(1), "SuiteStarting"),
+      nodeEvent(sharedTest, List(1), "SuiteStarting"),
       TestEventLogLine.structure(
         TestEventLogLine.suite("ConfigDependentWithSharedTestSpec", "samples.ConfigDependentWithSharedTestSpec"),
         TestEventLogLine.scope(sharedTestAConfig, 0, "A config", "A config"),
         TestEventLogLine.test(sharedTest.test("A config reads"), sharedTestAConfig, 0, "reads", "- reads"),
         TestEventLogLine.test(sharedTest.test("A config remote"), sharedTestAConfig, 1, "remote", "- remote")
       ),
-      event(sharedTestAConfig, List(1, 1), "ScopeOpened"),
-      event(sharedTest.test("A config reads"), List(1, 1, 1), "TestStarting"),
-      event(sharedTest.test("A config reads"), List(1, 1, 1), "TestSucceeded"),
-      event(sharedTest.test("A config remote"), List(1, 1, 1), "TestStarting"),
-      event(sharedTest.test("A config remote"), List(1, 1, 1), "TestSucceeded"),
-      event(sharedTestAConfig, List(1, 1), "ScopeClosed"),
-      event(sharedTest, List(1), "SuiteCompleted")
+      nodeEvent(sharedTestAConfig, List(1, 1), "ScopeOpened"),
+      nodeEvent(sharedTest.test("A config reads"), List(1, 1, 1), "TestStarting"),
+      nodeEvent(sharedTest.test("A config reads"), List(1, 1, 1), "TestSucceeded"),
+      nodeEvent(sharedTest.test("A config remote"), List(1, 1, 1), "TestStarting"),
+      nodeEvent(sharedTest.test("A config remote"), List(1, 1, 1), "TestSucceeded"),
+      nodeEvent(sharedTestAConfig, List(1, 1), "ScopeClosed"),
+      nodeEvent(sharedTest, List(1), "SuiteCompleted")
     )
   )
 
@@ -379,7 +377,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     frameworkRunOf(
       "",
       TestEventLogLine.structure(TestEventLogLine.suite("ConfigWithoutDbFailsSpec", "samples.ConfigWithoutDbFailsSpec")),
-      event(NodePath.topLevel("samples.ConfigWithoutDbFailsSpec"), List(1), "SuiteStarting"),
+      nodeEvent(NodePath.topLevel("samples.ConfigWithoutDbFailsSpec"), List(1), "SuiteStarting"),
       suiteAborted(NodePath.topLevel("samples.ConfigWithoutDbFailsSpec"), invocationTargetEncountered("samples.ConfigWithoutDbFailsSpec"), invocationTargetCausedByNoDb)
     )
   )
@@ -477,12 +475,12 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         TestEventLogLine.suite("ConfigNamedTestSuite", "samples.ConfigNamedTestSuite"),
         TestEventLogLine.test(configNamedTest.test("local"), configNamedTest, 0, "local", "- local")
       ),
-      event(configNamedTest, List(1), "SuiteStarting"),
+      nodeEvent(configNamedTest, List(1), "SuiteStarting"),
       TestEventLogLine.structure(
         TestEventLogLine.suite("ConfigNamedTestSuite", "samples.ConfigNamedTestSuite"),
         TestEventLogLine.test(configNamedTest.test("remote"), configNamedTest, 0, "remote", "- remote")
       ),
-      event(configNamedTest, List(1), "SuiteCompleted")
+      nodeEvent(configNamedTest, List(1), "SuiteCompleted")
     )
   )
 
@@ -524,17 +522,17 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         TestEventLogLine.suite("RunsADroppedTestSuite", "samples.RunsADroppedTestSuite"),
         TestEventLogLine.test(runsADroppedTest.test("a"), runsADroppedTest, 0, "a", "- a")
       ),
-      event(runsADroppedTest, List(1), "SuiteStarting"),
-      event(runsADroppedTest.test("a"), List(1, 1), "TestStarting"),
-      event(runsADroppedTest.test("a"), List(1, 1), "TestSucceeded"),
+      nodeEvent(runsADroppedTest, List(1), "SuiteStarting"),
+      nodeEvent(runsADroppedTest.test("a"), List(1, 1), "TestStarting"),
+      nodeEvent(runsADroppedTest.test("a"), List(1, 1), "TestSucceeded"),
       TestEventLogLine.structure(
         TestEventLogLine.suite("RunsADroppedTestSuite", "samples.RunsADroppedTestSuite"),
         TestEventLogLine.test(runsADroppedTest.test("a"), runsADroppedTest, 0, "a", "- a"),
         TestEventLogLine.test(runsADroppedTest.test("b"), runsADroppedTest, 1, "b", "- b")
       ),
-      event(runsADroppedTest.test("b"), List(1, 1), "TestStarting"),
-      event(runsADroppedTest.test("b"), List(1, 1), "TestSucceeded"),
-      event(runsADroppedTest, List(1), "SuiteCompleted")
+      nodeEvent(runsADroppedTest.test("b"), List(1, 1), "TestStarting"),
+      nodeEvent(runsADroppedTest.test("b"), List(1, 1), "TestSucceeded"),
+      nodeEvent(runsADroppedTest, List(1), "SuiteCompleted")
     )
   )
 

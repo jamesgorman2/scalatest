@@ -23,6 +23,7 @@ import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.TestEventLogLine.nodeEvent
 
 final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
@@ -69,15 +70,12 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private def frameworkRunOf(lines: String*): List[String] =
     runStarted :: runStartingOfFramework :: lines.toList ::: List(runCompleted, runEndedCompleted)
 
-  private def event(node: NodePath, executions: Seq[Int], eventName: String, fields: String = ""): String =
-    TestEventLogLine.nodeEvent(node, executions, eventName, fields)
+  private def suiteStarting(suite: NodePath, executions: Seq[Int] = List(1)): String = nodeEvent(suite, executions, "SuiteStarting")
 
-  private def suiteStarting(suite: NodePath, executions: Seq[Int] = List(1)): String = event(suite, executions, "SuiteStarting")
-
-  private def suiteCompleted(suite: NodePath, executions: Seq[Int] = List(1)): String = event(suite, executions, "SuiteCompleted")
+  private def suiteCompleted(suite: NodePath, executions: Seq[Int] = List(1)): String = nodeEvent(suite, executions, "SuiteCompleted")
 
   private def startingAndSucceeded(test: NodePath, executions: Seq[Int]): List[String] =
-    List(event(test, executions, "TestStarting"), event(test, executions, "TestSucceeded"))
+    List(nodeEvent(test, executions, "TestStarting"), nodeEvent(test, executions, "TestSucceeded"))
 
   private def thrown(className: String, message: String): String =
     s""""throwable":{"id":1,"className":"$className","message":"$message"},"""
@@ -183,14 +181,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(pops, whenEmpty, 1, "pops", "- pops")
         ),
         suiteStarting(top),
-        event(aStack, List(1, 1), "ScopeOpened"),
-        event(whenEmpty, List(1, 1, 1), "ScopeOpened"),
-        event(isEmpty, List(1, 1, 1, 1), "TestStarting"),
-        event(isEmpty, List(1, 1, 1, 1), "TestSucceeded"),
-        event(pops, List(1, 1, 1, 1), "TestStarting"),
-        event(pops, List(1, 1, 1, 1), "TestSucceeded"),
-        event(whenEmpty, List(1, 1, 1), "ScopeClosed"),
-        event(aStack, List(1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeOpened"),
+        nodeEvent(whenEmpty, List(1, 1, 1), "ScopeOpened"),
+        nodeEvent(isEmpty, List(1, 1, 1, 1), "TestStarting"),
+        nodeEvent(isEmpty, List(1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(pops, List(1, 1, 1, 1), "TestStarting"),
+        nodeEvent(pops, List(1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(whenEmpty, List(1, 1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeClosed"),
         suiteCompleted(top)
       )
     )
@@ -222,7 +220,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(top.test("A repo should write"), aRepo, 1, "write", "- should write")
         ),
         suiteStarting(top),
-        event(top, List(1), "SuiteAborted", """"message":"database unreachable",""" + thrown("java.lang.RuntimeException", "database unreachable"))
+        nodeEvent(top, List(1), "SuiteAborted", """"message":"database unreachable",""" + thrown("java.lang.RuntimeException", "database unreachable"))
       )
     )
   }
@@ -398,10 +396,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(u, top, 1, "u", "- u")
         ),
         suiteStarting(top),
-        event(t, List(1, 1), "TestStarting"),
-        event(t, List(1, 1), "TestSucceeded"),
-        event(u, List(1, 1), "TestStarting"),
-        event(u, List(1, 1), "TestSucceeded"),
+        nodeEvent(t, List(1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1), "TestSucceeded"),
+        nodeEvent(u, List(1, 1), "TestStarting"),
+        nodeEvent(u, List(1, 1), "TestSucceeded"),
         suiteCompleted(top)
       )
     )
@@ -441,7 +439,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.suite("FilteredSuite", "samples.FilteredSuite"),
           TestEventLogLine.test(fast, top, 0, "fast", "- fast"),
           TestEventLogLine.test(later, top, 1, "later", "- later")
-        ) :: suiteStarting(top) :: startingAndSucceeded(fast, List(1, 1))) ::: List(event(later, List(1, 1), "TestIgnored"), suiteCompleted(top))*
+        ) :: suiteStarting(top) :: startingAndSucceeded(fast, List(1, 1))) ::: List(nodeEvent(later, List(1, 1), "TestIgnored"), suiteCompleted(top))*
       )
     )
   }
@@ -487,7 +485,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         ),
         suiteStarting(top),
         suiteStarting(spec, List(1, 1)),
-        event(
+        nodeEvent(
           spec,
           List(1, 1),
           "SuiteAborted",
@@ -515,7 +513,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       frameworkRunOf(
         TestEventLogLine.structure(TestEventLogLine.suite("BrokenCtorSpec", "samples.BrokenCtorSpec")),
         suiteStarting(top),
-        event(top, List(1), "SuiteAborted", """"message":"no config",""" + thrown("java.lang.IllegalStateException", "no config"))
+        nodeEvent(top, List(1), "SuiteAborted", """"message":"no config",""" + thrown("java.lang.IllegalStateException", "no config"))
       )
     )
   }
@@ -546,7 +544,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(throwsOnPop, top, 0, "throws on pop", "- throws on pop")
         ),
         suiteStarting(top),
-        event(throwsOnPop, List(1, 1), "TestStarting"),
+        nodeEvent(throwsOnPop, List(1, 1), "TestStarting"),
         TestEventLogLine.runEvent("RunAborted", s""""message":"$runAborted",""" + thrown("java.lang.OutOfMemoryError", "Java heap space")),
         TestEventLogLine.runEnded("aborted")
       )
@@ -642,12 +640,12 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       frameworkRunOf(
         TestEventLogLine.structure(TestEventLogLine.suite("RetrySuite", "samples.RetrySuite"), TestEventLogLine.test(flaky, top, 0, "flaky", "- flaky")),
         suiteStarting(top),
-        event(flaky, List(1, 1), "TestStarting"),
-        event(flaky, List(1, 1), "InfoProvided", """"message":"trying","""),
-        event(flaky, List(1, 1), "TestFailed", """"message":"1 was not greater than 1","""),
-        event(flaky, List(1, 2), "TestStarting"),
-        event(flaky, List(1, 2), "InfoProvided", """"message":"trying","""),
-        event(flaky, List(1, 2), "TestSucceeded"),
+        nodeEvent(flaky, List(1, 1), "TestStarting"),
+        nodeEvent(flaky, List(1, 1), "InfoProvided", """"message":"trying","""),
+        nodeEvent(flaky, List(1, 1), "TestFailed", """"message":"1 was not greater than 1","""),
+        nodeEvent(flaky, List(1, 2), "TestStarting"),
+        nodeEvent(flaky, List(1, 2), "InfoProvided", """"message":"trying","""),
+        nodeEvent(flaky, List(1, 2), "TestSucceeded"),
         suiteCompleted(top)
       )
     )
@@ -707,15 +705,15 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(pops, whenFull, 0, "pops", "- pops")
         ),
         suiteStarting(top),
-        event(aStack, List(1, 1), "ScopeOpened"),
-        event(isEmpty, List(1, 1, 1), "TestStarting"),
-        event(isEmpty, List(1, 1, 1), "TestSucceeded"),
-        event(aStack, List(1, 1), "InfoProvided", """"message":"an info in a scope","""),
-        event(whenFull, List(1, 1, 1), "ScopeOpened"),
-        event(pops, List(1, 1, 1, 1), "TestStarting"),
-        event(pops, List(1, 1, 1, 1), "TestSucceeded"),
-        event(whenFull, List(1, 1, 1), "ScopeClosed"),
-        event(aStack, List(1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeOpened"),
+        nodeEvent(isEmpty, List(1, 1, 1), "TestStarting"),
+        nodeEvent(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(aStack, List(1, 1), "InfoProvided", """"message":"an info in a scope","""),
+        nodeEvent(whenFull, List(1, 1, 1), "ScopeOpened"),
+        nodeEvent(pops, List(1, 1, 1, 1), "TestStarting"),
+        nodeEvent(pops, List(1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(whenFull, List(1, 1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeClosed"),
         suiteCompleted(top)
       )
     )
@@ -782,7 +780,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.suite("UnregisteredSuite", "samples.UnregisteredSuite"),
           TestEventLogLine.test(b, top, 0, "b", "- b"),
           TestEventLogLine.test(a, top, 1, "a", "- a")
-        ) :: suiteStarting(top) :: startingAndSucceeded(b, List(1, 1))) ::: List(event(a, List(1, 1), "TestIgnored"), suiteCompleted(top))*
+        ) :: suiteStarting(top) :: startingAndSucceeded(b, List(1, 1))) ::: List(nodeEvent(a, List(1, 1), "TestIgnored"), suiteCompleted(top))*
       )
     )
   }
@@ -819,10 +817,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       frameworkRunOf(
         TestEventLogLine.structure(TestEventLogLine.suite("AnnouncingSuite", "samples.AnnouncingSuite"), TestEventLogLine.test(runs, top, 0, "runs", "- runs")),
         suiteStarting(top),
-        event(top, List(1), "InfoProvided", """"message":"setting up","""),
-        event(runs, List(1, 1), "TestStarting"),
-        event(runs, List(1, 1), "TestSucceeded"),
-        event(top, List(1), "InfoProvided", """"message":"declared after the test","""),
+        nodeEvent(top, List(1), "InfoProvided", """"message":"setting up","""),
+        nodeEvent(runs, List(1, 1), "TestStarting"),
+        nodeEvent(runs, List(1, 1), "TestSucceeded"),
+        nodeEvent(top, List(1), "InfoProvided", """"message":"declared after the test","""),
         suiteCompleted(top)
       )
     )
@@ -871,11 +869,11 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(pops, aStack, 1, "pops", "- pops")
         ),
         suiteStarting(top),
-        event(aStack, List(1, 1), "ScopeOpened"),
-        event(isEmpty, List(1, 1, 1), "TestStarting"),
-        event(isEmpty, List(1, 1, 1), "TestSucceeded"),
-        event(pops, List(1, 1, 1), "TestIgnored"),
-        event(aStack, List(1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeOpened"),
+        nodeEvent(isEmpty, List(1, 1, 1), "TestStarting"),
+        nodeEvent(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(pops, List(1, 1, 1), "TestIgnored"),
+        nodeEvent(aStack, List(1, 1), "ScopeClosed"),
         suiteCompleted(top)
       )
     )
@@ -933,14 +931,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(u, second, 0, "u", "- u")
         ),
         suiteStarting(top),
-        event(first, List(1, 1), "ScopeOpened"),
-        event(t, List(1, 1, 1), "TestStarting"),
-        event(t, List(1, 1, 1), "TestSucceeded"),
-        event(first, List(1, 1), "ScopeClosed"),
-        event(second, List(1, 1), "ScopeOpened"),
-        event(u, List(1, 1, 1), "TestStarting"),
-        event(u, List(1, 1, 1), "TestSucceeded"),
-        event(second, List(1, 1), "ScopeClosed"),
+        nodeEvent(first, List(1, 1), "ScopeOpened"),
+        nodeEvent(t, List(1, 1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(first, List(1, 1), "ScopeClosed"),
+        nodeEvent(second, List(1, 1), "ScopeOpened"),
+        nodeEvent(u, List(1, 1, 1), "TestStarting"),
+        nodeEvent(u, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(second, List(1, 1), "ScopeClosed"),
         suiteCompleted(top)
       )
     )
@@ -978,10 +976,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       frameworkRunOf(
         TestEventLogLine.structure(TestEventLogLine.suite("RunsTwiceSuite", "samples.RunsTwiceSuite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
         suiteStarting(top),
-        event(t, List(1, 1), "TestStarting"),
-        event(t, List(1, 1), "TestSucceeded"),
-        event(t, List(2, 2), "TestStarting"),
-        event(t, List(2, 2), "TestSucceeded"),
+        nodeEvent(t, List(1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1), "TestSucceeded"),
+        nodeEvent(t, List(2, 2), "TestStarting"),
+        nodeEvent(t, List(2, 2), "TestSucceeded"),
         suiteCompleted(top, List(2))
       )
     )
@@ -1039,14 +1037,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(u, second, 0, "u", "- u")
         ),
         suiteStarting(top),
-        event(first, List(1, 1), "ScopeOpened"),
-        event(t, List(1, 1, 1), "TestStarting"),
-        event(t, List(1, 1, 1), "TestSucceeded"),
-        event(first, List(1, 1), "ScopeClosed"),
-        event(second, List(1, 1), "ScopeOpened"),
-        event(u, List(1, 1, 1), "TestStarting"),
-        event(u, List(1, 1, 1), "TestSucceeded"),
-        event(second, List(1, 1), "ScopeClosed"),
+        nodeEvent(first, List(1, 1), "ScopeOpened"),
+        nodeEvent(t, List(1, 1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(first, List(1, 1), "ScopeClosed"),
+        nodeEvent(second, List(1, 1), "ScopeOpened"),
+        nodeEvent(u, List(1, 1, 1), "TestStarting"),
+        nodeEvent(u, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(second, List(1, 1), "ScopeClosed"),
         suiteCompleted(top)
       )
     )
@@ -1084,10 +1082,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       frameworkRunOf(
         TestEventLogLine.structure(TestEventLogLine.suite("RunsTwiceAsyncSpec", "samples.RunsTwiceAsyncSpec"), TestEventLogLine.test(t, top, 0, "t", "- t")),
         suiteStarting(top),
-        event(t, List(1, 1), "TestStarting"),
-        event(t, List(1, 1), "TestSucceeded"),
-        event(t, List(2, 2), "TestStarting"),
-        event(t, List(2, 2), "TestSucceeded"),
+        nodeEvent(t, List(1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1), "TestSucceeded"),
+        nodeEvent(t, List(2, 2), "TestStarting"),
+        nodeEvent(t, List(2, 2), "TestSucceeded"),
         suiteCompleted(top, List(2))
       )
     )
@@ -1146,14 +1144,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.test(pops, whenFull, 0, "pops", "- pops")
         ),
         suiteStarting(top),
-        event(aStack, List(1, 1), "ScopeOpened"),
-        event(isEmpty, List(1, 1, 1), "TestStarting"),
-        event(isEmpty, List(1, 1, 1), "TestSucceeded"),
-        event(whenFull, List(1, 1, 1), "ScopeOpened"),
-        event(pops, List(1, 1, 1, 1), "TestStarting"),
-        event(pops, List(1, 1, 1, 1), "TestSucceeded"),
-        event(whenFull, List(1, 1, 1), "ScopeClosed"),
-        event(aStack, List(1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeOpened"),
+        nodeEvent(isEmpty, List(1, 1, 1), "TestStarting"),
+        nodeEvent(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(whenFull, List(1, 1, 1), "ScopeOpened"),
+        nodeEvent(pops, List(1, 1, 1, 1), "TestStarting"),
+        nodeEvent(pops, List(1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(whenFull, List(1, 1, 1), "ScopeClosed"),
+        nodeEvent(aStack, List(1, 1), "ScopeClosed"),
         suiteCompleted(top)
       )
     )
@@ -1177,7 +1175,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       frameworkRunOf(
         TestEventLogLine.structure(TestEventLogLine.suite("MarkupDocSpec", "org.scalatest.samples.MarkupDocSpec")),
         suiteStarting(top),
-        event(top, List(1), "MarkupProvided", """"text":"A stack pops","""),
+        nodeEvent(top, List(1), "MarkupProvided", """"text":"A stack pops","""),
         suiteCompleted(top)
       )
     )
@@ -1237,16 +1235,16 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       TestEventLogLine.runEvent("SuiteStarting"),
       TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
       suiteStarting(addSuite),
-      event(adds, List(1, 1), "TestStarting"),
-      event(adds, List(1, 1), "TestSucceeded"),
+      nodeEvent(adds, List(1, 1), "TestStarting"),
+      nodeEvent(adds, List(1, 1), "TestSucceeded"),
       suiteCompleted(addSuite),
       TestEventLogLine.structure(
         TestEventLogLine.suite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
         TestEventLogLine.test(sqrtOfASquare, sqrtPropSpec, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
       ),
       suiteStarting(sqrtPropSpec),
-      event(sqrtOfASquare, List(1, 1), "TestStarting"),
-      event(sqrtOfASquare, List(1, 1), "TestSucceeded"),
+      nodeEvent(sqrtOfASquare, List(1, 1), "TestStarting"),
+      nodeEvent(sqrtOfASquare, List(1, 1), "TestSucceeded"),
       suiteCompleted(sqrtPropSpec),
       TestEventLogLine.runEvent("SuiteCompleted"),
       runCompleted,
@@ -1306,13 +1304,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         TestEventLogLine.test(sqrtOfASquare, sqrtPropSpec, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
       ),
       suiteStarting(sqrtPropSpec),
-      event(sqrtOfASquare, List(1, 1), "TestStarting"),
-      event(sqrtOfASquare, List(1, 1), "TestSucceeded"),
+      nodeEvent(sqrtOfASquare, List(1, 1), "TestStarting"),
+      nodeEvent(sqrtOfASquare, List(1, 1), "TestSucceeded"),
       suiteCompleted(sqrtPropSpec),
       TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
       suiteStarting(addSuite),
-      event(adds, List(1, 1), "TestStarting"),
-      event(adds, List(1, 1), "TestSucceeded"),
+      nodeEvent(adds, List(1, 1), "TestStarting"),
+      nodeEvent(adds, List(1, 1), "TestSucceeded"),
       suiteCompleted(addSuite),
       TestEventLogLine.runEvent("SuiteCompleted"),
       runCompleted,
@@ -1361,7 +1359,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         TestEventLogLine.runEvent("SuiteStarting"),
         TestEventLogLine.structure(TestEventLogLine.suite("BrokenCtorSpec", "samples.discovered.BrokenCtorSpec")),
         suiteStarting(top),
-        event(
+        nodeEvent(
           top,
           List(1),
           "SuiteAborted",
@@ -1411,7 +1409,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   /** The TestStarting and TestSucceeded of a test directly in a top-level suite, each in their first executions. */
   private def startingAndSucceededOf(suite: NodePath, test: String): List[StatedEvent] = {
-    List("TestStarting", "TestSucceeded").map(eventName => StatedEvent(s"""test "$test": $eventName""", event(suite.test(test), List(1, 1), eventName)))
+    List("TestStarting", "TestSucceeded").map(eventName => StatedEvent(s"""test "$test": $eventName""", nodeEvent(suite.test(test), List(1, 1), eventName)))
   }
 
   // Every order of the sequences' events that keeps each sequence's own events in order.
@@ -1538,7 +1536,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         1,
         TestEventLogLine.structure(TestEventLogLine.suite("ParAbortSuite", "samples.ParAbortSuite"), TestEventLogLine.test(a, top, 0, "a", "- a")),
         suiteStarting(top),
-        event(a, List(1, 1), "SuiteAborted", s""""message":"$abortedRunningOneTest",""" + thrown("java.lang.RuntimeException", "no fixture")),
+        nodeEvent(a, List(1, 1), "SuiteAborted", s""""message":"$abortedRunningOneTest",""" + thrown("java.lang.RuntimeException", "no fixture")),
         suiteCompleted(top)
       )
     )
@@ -1602,9 +1600,9 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     val sleeps = slowSuite.test("sleeps")
     List(
       TestEventLogLine.structure(TestEventLogLine.suite("SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(sleeps, slowSuite, 0, "sleeps", "- sleeps")),
-      event(sleeps, List(1, 1), "TestStarting"),
+      nodeEvent(sleeps, List(1, 1), "TestStarting"),
       alert,
-      event(sleeps, List(1, 1), "TestSucceeded")
+      nodeEvent(sleeps, List(1, 1), "TestSucceeded")
     )
   }
 

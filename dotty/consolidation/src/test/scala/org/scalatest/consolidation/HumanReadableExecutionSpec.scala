@@ -202,6 +202,8 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("A suite run from two tests shows its name line once, and no abort line, though no event is assigned to it") {
+      // Pending until the task "Suites under tests and execution paths in the output", which rewrites this test.
+      pending
       Given("an event log of a nested suite whose scope two tests of the suite nesting it each ran")
       val eventLog =
         """

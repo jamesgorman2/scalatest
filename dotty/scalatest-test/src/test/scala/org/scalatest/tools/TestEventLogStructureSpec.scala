@@ -144,10 +144,10 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     finally runner.done()
   }
 
-  /** A scope named s, registered with `scopeText`, holding tests named t and then u, each given as its test name and label. */
-  private def scopeHoldingTests(scopeText: String, scopeLabel: String, testNamesAndLabels: (String, String)*): NodePath => List[String] = { suite =>
+  /** A scope named s, registered with and labelled `scopeText`, holding tests named t and then u, each given as its test name and label. */
+  private def scopeHoldingTests(scopeText: String, testNamesAndLabels: (String, String)*): NodePath => List[String] = { suite =>
     val scope = suite.scope(scopeText)
-    TestEventLogLine.scope(scope, 0, "s", scopeLabel) ::
+    TestEventLogLine.scope(scope, 0, "s", scopeText) ::
       testNamesAndLabels.toList.zip(List("t", "u")).zipWithIndex.map { case (((testName, label), name), position) =>
         TestEventLogLine.test(suite.test(testName), scope, position, name, label)
       }
@@ -189,7 +189,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithDescribe",
       "scope s, labelled 's', holding test t, labelled '- t'",
       scopeHoldingOneTest,
-      scopeHoldingTests("s", "s", "s t" -> "- t")
+      scopeHoldingTests("s", "s t" -> "- t")
     ),
     LabelledDeclaration(
       List("AnyFreeSpec", "AsyncFreeSpec", "FixtureAnyFreeSpec", "FixtureAsyncFreeSpec", "PathAnyFreeSpec"),
@@ -197,7 +197,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithDash",
       "scope s, labelled 's', holding test t, labelled '- t'",
       scopeHoldingOneTest,
-      scopeHoldingTests("s", "s", "s t" -> "- t")
+      scopeHoldingTests("s", "s t" -> "- t")
     ),
     LabelledDeclaration(
       List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
@@ -221,7 +221,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithCan",
       "scope s, labelled 's', holding test t, labelled '- can t'",
       "scope \"s\", label \"s\"\n  test \"t\", label \"- can t\"",
-      scopeHoldingTests("s", "s", "s can t" -> "- can t")
+      scopeHoldingTests("s", "s can t" -> "- can t")
     ),
     LabelledDeclaration(
       List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
@@ -322,7 +322,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithSubject",
       "scope s, labelled 's', holding test t, labelled '- should t', and test u, labelled '- must u'",
       "scope \"s\", label \"s\"\n  test \"t\", label \"- should t\"\n  test \"u\", label \"- must u\"",
-      scopeHoldingTests("s", "s", "s should t" -> "- should t", "s must u" -> "- must u")
+      scopeHoldingTests("s", "s should t" -> "- should t", "s must u" -> "- must u")
     ),
     LabelledDeclaration(
       List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
@@ -330,7 +330,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithBehaviorOf",
       "scope s, labelled 's', holding test t, labelled '- can t'",
       "scope \"s\", label \"s\"\n  test \"t\", label \"- can t\"",
-      scopeHoldingTests("s", "s", "s can t" -> "- can t")
+      scopeHoldingTests("s", "s can t" -> "- can t")
     ),
     LabelledDeclaration(
       List("AnyFeatureSpec", "FixtureAnyFeatureSpec"),
@@ -338,7 +338,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithScenario",
       "scope s, labelled 'Feature: s', holding test t, labelled 'Scenario: t'",
       "scope \"s\", label \"Feature: s\"\n  test \"t\", label \"Scenario: t\"",
-      scopeHoldingTests("Feature: s", "Feature: s", "Feature: s Scenario: t" -> "Scenario: t")
+      scopeHoldingTests("Feature: s", "Feature: s Scenario: t" -> "Scenario: t")
     ),
     LabelledDeclaration(
       List("AsyncFeatureSpec", "FixtureAsyncFeatureSpec"),
@@ -346,7 +346,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithScenario",
       "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
       featureHoldingScenarioWithIcon,
-      scopeHoldingTests("Feature: s", "Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
+      scopeHoldingTests("Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
     ),
     LabelledDeclaration(
       List("AnyFeatureSpec", "AsyncFeatureSpec", "FixtureAnyFeatureSpec", "FixtureAsyncFeatureSpec"),
@@ -354,7 +354,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithIgnoredScenario",
       "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
       featureHoldingScenarioWithIcon,
-      scopeHoldingTests("Feature: s", "Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
+      scopeHoldingTests("Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
     ),
     LabelledDeclaration(
       List("RefSpec"),

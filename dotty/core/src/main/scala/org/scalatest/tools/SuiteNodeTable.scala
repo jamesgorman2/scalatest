@@ -88,7 +88,6 @@ private[scalatest] object ScopeAndTestIds {
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstIds the node IDs of `firstScopesAndTests`
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
- * @param nestedSuitesOf given this table, each nested suite's table, at its position in `nestedSuites`
  */
 private[scalatest] final class SuiteNodeTable(
   val instance: Option[Suite],
@@ -100,11 +99,8 @@ private[scalatest] final class SuiteNodeTable(
   val position: Option[Int],
   firstScopesAndTests: List[ScopeOrTest],
   firstIds: ScopeAndTestIds,
-  firstFilteredTests: Map[String, (Boolean, Boolean)],
-  nestedSuitesOf: SuiteNodeTable => Vector[SuiteNodeTable]
+  firstFilteredTests: Map[String, (Boolean, Boolean)]
 ) {
-
-  val nestedSuites: Vector[SuiteNodeTable] = nestedSuitesOf(this)
 
   // All are read and written only under the emitter's lock. The IDs are those of every scope and test any structure
   // of the suite has held, so that each keeps its ID in a later structure.
@@ -114,11 +110,18 @@ private[scalatest] final class SuiteNodeTable(
   private var latestScopesAndTests = firstScopesAndTests
   private var testNamesOfLatest = SuiteNodeTable.testNamesIn(firstScopesAndTests)
   private var filteredTests = firstFilteredTests
+  private var nestedSuitesOfFirstStructure = Vector.empty[SuiteNodeTable]
   private var nestedSuitesAdded = Vector.empty[SuiteNodeTable]
   private var hasEndedOnce = false
 
   /** The suite node this one is nested in, if any. */
   def parent: Option[NodeId] = parentSuite.map(_.node)
+
+  /** The tables of the nested suites of its first structure, each at its position among them. */
+  def nestedSuites: Vector[SuiteNodeTable] = nestedSuitesOfFirstStructure
+
+  // Set once, by the companion, after this table is built, so that each nested table's parent is a whole table.
+  private def holdNestedSuitesOfFirstStructure(tables: Vector[SuiteNodeTable]): Unit = nestedSuitesOfFirstStructure = tables
 
   /** The tables of its nested suites: those of its first structure in declared order, then those added later, in the order added. */
   def childSuites: Vector[SuiteNodeTable] = nestedSuites ++ nestedSuitesAdded
@@ -134,7 +137,7 @@ private[scalatest] final class SuiteNodeTable(
    */
   def addNestedSuite(instance: Option[Suite], name: String, suiteId: String, className: String): SuiteNodeTable = {
     val id = SuiteNodeTable.nestedSuiteId(node, suiteId, childSuites.map(_.suiteId))
-    val nested = new SuiteNodeTable(instance, id, name, suiteId, className, Some(this), None, Nil, ScopeAndTestIds.none, Map.empty, _ => Vector.empty)
+    val nested = new SuiteNodeTable(instance, id, name, suiteId, className, Some(this), None, Nil, ScopeAndTestIds.none, Map.empty)
     nestedSuitesAdded :+= nested
     nested
   }
@@ -264,13 +267,6 @@ private[scalatest] object SuiteNodeTable {
     if (structure.testsBeforeNestedSuites) {
       nodes ++= nodesOfScopesAndTests.result()
     }
-    def nestedSuitesOf(table: SuiteNodeTable): Vector[SuiteNodeTable] = {
-      val nested = structure.nestedSuites.toVector
-      nested.zipWithIndex.map { (nestedSuite, index) =>
-        val nestedId = nestedSuiteId(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
-        suite(nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
-      }
-    }
     val table = new SuiteNodeTable(
       Some(structure.instance),
       id,
@@ -281,9 +277,13 @@ private[scalatest] object SuiteNodeTable {
       position,
       structure.scopesAndTests,
       scopesAndTests.ids,
-      structure.filteredTests,
-      nestedSuitesOf
+      structure.filteredTests
     )
+    val nested = structure.nestedSuites.toVector
+    table.holdNestedSuitesOfFirstStructure(nested.zipWithIndex.map { (nestedSuite, index) =>
+      val nestedId = nestedSuiteId(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
+      suite(nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
+    })
     if (!structure.testsBeforeNestedSuites) {
       nodes ++= nodesOfScopesAndTests.result()
     }

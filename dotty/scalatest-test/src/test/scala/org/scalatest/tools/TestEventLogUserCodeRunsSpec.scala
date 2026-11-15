@@ -12,6 +12,7 @@ import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.TestEventLogLine.nodeEvent
 
 final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
@@ -38,9 +39,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     }
   }
 
-  private def event(node: NodePath, executions: Seq[Int], eventName: String, fields: String = ""): String =
-    TestEventLogLine.nodeEvent(node, executions, eventName, fields)
-
   private val direct = """"message":"direct","""
 
   private def structuresIn(lines: Seq[String]): Int = lines.count(_.contains(""""item":"structure""""))
@@ -48,8 +46,11 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   private def structuresHolding(name: String, lines: Seq[String]): Int =
     lines.count(line => line.contains(""""item":"structure"""") && line.contains(s""""name":"$name""""))
 
-  private def suiteEventsOf(node: NodePath, lines: Seq[String]): Int =
-    lines.count(line => line.contains(s""""node":${node.json},""") && (line.contains(""""event":"SuiteStarting"""") || line.contains(""""event":"SuiteCompleted"""")))
+  private def suiteEventsOf(suiteId: String, lines: Seq[String]): Int =
+    lines.count(line =>
+      line.contains(""""item":"event"""") && line.contains(s""""suiteId":"$suiteId"""") &&
+        (line.contains(""""event":"SuiteStarting"""") || line.contains(""""event":"SuiteCompleted""""))
+    )
 
   private def infosIn(lines: Seq[String]): Int = lines.count(_.contains(""""event":"InfoProvided""""))
 
@@ -90,17 +91,17 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.suiteWithId(top, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
           TestEventLogLine.test(pops, top, 0, "A Stack pops", "- A Stack pops")
         ),
-        event(top, List(1), "SuiteStarting"),
+        nodeEvent(top, List(1), "SuiteStarting"),
         TestEventLogLine.structure(
           TestEventLogLine.suiteWithId(top, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(pops, aStack, 0, "pops", "- pops")
         ),
-        event(aStack, List(1, 1), "ScopeOpened"),
-        event(pops, List(1, 1, 1), "TestStarting"),
-        event(pops, List(1, 1, 1), "TestSucceeded"),
-        event(aStack, List(1, 1), "ScopeClosed"),
-        event(top, List(1), "SuiteCompleted")
+        nodeEvent(aStack, List(1, 1), "ScopeOpened"),
+        nodeEvent(pops, List(1, 1, 1), "TestStarting"),
+        nodeEvent(pops, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(aStack, List(1, 1), "ScopeClosed"),
+        nodeEvent(top, List(1), "SuiteCompleted")
       )
     )
   }
@@ -118,10 +119,20 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   private def helps(helper: NodePath): NodePath = helper.test("A helper helps")
 
-  private val ofASecondExecution = """"executions":\[[0-9,]*,2\]""".r
+  private val placesOfTheNode = """"node":\[(.*?)\],"executions"""".r
+  private val place = """\{[^}]*\}""".r
+  private val executionPath = """"executions":\[([0-9,]*)\]""".r
+
+  /** Whether an event line's execution path holds a second execution at the place of `A helper` or at a place under it. */
+  private def ofASecondExecutionOfAHelper(line: String): Boolean = {
+    val places = placesOfTheNode.findFirstMatchIn(line).toList.flatMap(node => place.findAllIn(node.group(1)).toList)
+    val executions = executionPath.findFirstMatchIn(line).toList.flatMap(_.group(1).split(',').toList.map(_.toInt))
+    val aHelper = places.indexWhere(_.startsWith("""{"scope":"A helper","""))
+    aHelper >= 0 && executions.drop(aHelper).contains(2)
+  }
 
   private def eventsOfASecondExecutionOfHelpers(lines: Seq[String]): Int =
-    lines.count(line => line.contains(""""suiteId":"samples.HelperSuite"""") && line.contains(""""item":"event"""") && ofASecondExecution.findFirstIn(line).isDefined)
+    lines.count(line => line.contains(""""suiteId":"samples.HelperSuite"""") && line.contains(""""item":"event"""") && ofASecondExecutionOfAHelper(line))
 
   private def helperStructure(helper: NodePath): String =
     TestEventLogLine.structure(
@@ -160,15 +171,15 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.suite("OuterSuite", "samples.OuterSuite"),
           TestEventLogLine.test(usesAHelper, top, 0, "uses a helper", "- uses a helper")
         ),
-        event(top, List(1), "SuiteStarting"),
-        event(usesAHelper, List(1, 1), "TestStarting"),
+        nodeEvent(top, List(1), "SuiteStarting"),
+        nodeEvent(usesAHelper, List(1, 1), "TestStarting"),
         helperStructure(helper),
-        event(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
-        event(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
-        event(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
-        event(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed"),
-        event(usesAHelper, List(1, 1), "TestSucceeded"),
-        event(top, List(1), "SuiteCompleted")
+        nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed"),
+        nodeEvent(usesAHelper, List(1, 1), "TestSucceeded"),
+        nodeEvent(top, List(1), "SuiteCompleted")
       )
     )
   }
@@ -222,14 +233,14 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.nestedSuite(user2, 1, "User2Suite", "samples.User2Suite"),
           TestEventLogLine.test(usesTwo, user2, 0, "uses two", "- uses two")
         ),
-        event(usesOne, List(1, 1, 1), "TestStarting"),
+        nodeEvent(usesOne, List(1, 1, 1), "TestStarting"),
         helperStructure(helperUnder(usesOne)),
-        event(helps(helperUnder(usesOne)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
-        event(usesOne, List(1, 1, 1), "TestSucceeded"),
-        event(usesTwo, List(1, 1, 1), "TestStarting"),
+        nodeEvent(helps(helperUnder(usesOne)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
+        nodeEvent(usesOne, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(usesTwo, List(1, 1, 1), "TestStarting"),
         helperStructure(helperUnder(usesTwo)),
-        event(helps(helperUnder(usesTwo)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
-        event(usesTwo, List(1, 1, 1), "TestSucceeded")
+        nodeEvent(helps(helperUnder(usesTwo)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
+        nodeEvent(usesTwo, List(1, 1, 1), "TestSucceeded")
       )
     )
   }
@@ -242,10 +253,10 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       val helper = helperUnder(test)
       List(
         helperStructure(helper),
-        event(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
-        event(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
-        event(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
-        event(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed")
+        nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
+        nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed")
       )
     }
     StatedRun(
@@ -284,12 +295,12 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.test(first, top, 0, "first", "- first"),
           TestEventLogLine.test(second, top, 1, "second", "- second")
         ),
-        event(first, List(1, 1), "TestStarting")
+        nodeEvent(first, List(1, 1), "TestStarting")
       ) ++ helperEvents(first) ++ List(
-        event(first, List(1, 1), "TestSucceeded"),
-        event(second, List(1, 1), "TestStarting")
+        nodeEvent(first, List(1, 1), "TestSucceeded"),
+        nodeEvent(second, List(1, 1), "TestStarting")
       ) ++ helperEvents(second) ++ List(
-        event(second, List(1, 1), "TestSucceeded")
+        nodeEvent(second, List(1, 1), "TestSucceeded")
       )
     )
   }
@@ -326,12 +337,12 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
           TestEventLogLine.test(innerTwo, inner2, 0, "inner two", "- inner two")
         ),
-        event(runsItsNestedSuitesNode, List(1), "SuiteStarting"),
-        event(innerOne, List(1, 1, 1), "TestStarting"),
-        event(innerOne, List(1, 1, 1), "TestSucceeded"),
-        event(innerTwo, List(1, 1, 1), "TestStarting"),
-        event(innerTwo, List(1, 1, 1), "TestSucceeded"),
-        event(runsItsNestedSuitesNode, List(1), "SuiteCompleted")
+        nodeEvent(runsItsNestedSuitesNode, List(1), "SuiteStarting"),
+        nodeEvent(innerOne, List(1, 1, 1), "TestStarting"),
+        nodeEvent(innerOne, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(innerTwo, List(1, 1, 1), "TestStarting"),
+        nodeEvent(innerTwo, List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(runsItsNestedSuitesNode, List(1), "SuiteCompleted")
       )
     )
   }
@@ -360,10 +371,10 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.test(twiceRunA, top, 1, "a", "- a"),
           TestEventLogLine.test(top.test("c"), top, 2, "c", "- c")
         ),
-        event(twiceRunA, List(1, 1), "TestStarting"),
-        event(twiceRunA, List(1, 1), "TestSucceeded"),
-        event(twiceRunA, List(1, 2), "TestStarting"),
-        event(twiceRunA, List(1, 2), "TestSucceeded")
+        nodeEvent(twiceRunA, List(1, 1), "TestStarting"),
+        nodeEvent(twiceRunA, List(1, 1), "TestSucceeded"),
+        nodeEvent(twiceRunA, List(1, 2), "TestStarting"),
+        nodeEvent(twiceRunA, List(1, 2), "TestSucceeded")
       )
     )
   }
@@ -385,9 +396,9 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       """,
       List(
         TestEventLogLine.structure(TestEventLogLine.suite(suite, s"samples.$suite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
-        event(t, List(1, 1), "TestStarting"),
-        if (isAssignedToTest) event(t, List(1, 1), "InfoProvided", direct) else event(top, List(1), "InfoProvided", direct),
-        event(t, List(1, 1), "TestSucceeded")
+        nodeEvent(t, List(1, 1), "TestStarting"),
+        if (isAssignedToTest) nodeEvent(t, List(1, 1), "InfoProvided", direct) else nodeEvent(top, List(1), "InfoProvided", direct),
+        nodeEvent(t, List(1, 1), "TestSucceeded")
       )
     )
   }
@@ -423,9 +434,9 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.nestedSuite(nestedNode, 0, nested, s"samples.$nested"),
           TestEventLogLine.test(t, nestedNode, 0, "t", "- t")
         ),
-        event(t, List(1, 1, 1), "TestStarting"),
-        if (isAssignedToTest) event(t, List(1, 1, 1), "InfoProvided", direct) else event(nestedNode, List(1, 1), "InfoProvided", direct),
-        event(t, List(1, 1, 1), "TestSucceeded")
+        nodeEvent(t, List(1, 1, 1), "TestStarting"),
+        if (isAssignedToTest) nodeEvent(t, List(1, 1, 1), "InfoProvided", direct) else nodeEvent(nestedNode, List(1, 1), "InfoProvided", direct),
+        nodeEvent(t, List(1, 1, 1), "TestSucceeded")
       )
     )
   }
@@ -460,11 +471,11 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.suite("DirectNamingItsSecondRun", "samples.DirectNamingItsSecondRun"),
           TestEventLogLine.test(t, top, 0, "t", "- t")
         ),
-        event(t, List(1, 1), "TestStarting"),
-        event(t, List(1, 1), "TestSucceeded"),
-        event(t, List(1, 2), "TestStarting"),
-        event(t, List(1, 2), "InfoProvided", direct),
-        event(t, List(1, 2), "TestSucceeded")
+        nodeEvent(t, List(1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1), "TestSucceeded"),
+        nodeEvent(t, List(1, 2), "TestStarting"),
+        nodeEvent(t, List(1, 2), "InfoProvided", direct),
+        nodeEvent(t, List(1, 2), "TestSucceeded")
       )
     )
   }
@@ -495,9 +506,9 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
           TestEventLogLine.suite("DirectNamingItsTestAfterRun", "samples.DirectNamingItsTestAfterRun"),
           TestEventLogLine.test(t, top, 0, "t", "- t")
         ),
-        event(t, List(1, 1), "TestStarting"),
-        event(t, List(1, 1), "TestSucceeded"),
-        event(t, List(1, 1), "InfoProvided", direct)
+        nodeEvent(t, List(1, 1), "TestStarting"),
+        nodeEvent(t, List(1, 1), "TestSucceeded"),
+        nodeEvent(t, List(1, 1), "InfoProvided", direct)
       )
     )
   }
@@ -580,7 +591,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
       And("no SuiteStarting or SuiteCompleted is assigned to HelperSuite")
-      suiteEventsOf(helperUnder(usesAHelper), lines) shouldBe 0
+      suiteEventsOf("samples.HelperSuite", lines) shouldBe 0
     }
 
     eventScenarios(
@@ -622,8 +633,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       nestedSuiteIds = List("samples.Inner1Suite", "samples.Inner2Suite")
     ) { lines =>
       And("no SuiteStarting or SuiteCompleted is assigned to Inner1Suite or Inner2Suite, and no further structure is written")
-      suiteEventsOf(inner1, lines) shouldBe 0
-      suiteEventsOf(inner2, lines) shouldBe 0
+      suiteEventsOf("samples.Inner1Suite", lines) shouldBe 0
+      suiteEventsOf("samples.Inner2Suite", lines) shouldBe 0
       structuresIn(lines) shouldBe 1
     }
   }

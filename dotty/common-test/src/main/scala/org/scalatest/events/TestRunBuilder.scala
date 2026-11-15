@@ -86,7 +86,7 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, var name: Strin
 
 private final class HeldSuite(val id: NodeId, val suiteId: String, val className: String, val parent: Option[NodeId], val position: Option[Int])
 
-private final class OpenTreeNode(val depth: Int, val id: NodeId, val kind: NodeKind, val suiteId: NodeId, val scopeNames: Vector[String]) {
+private final class OpenTreeNode(val depth: Int, val id: NodeId, val kind: NodeKind, val suite: NodeId, val scopeNames: Vector[String]) {
 
   private var children = 0
   private val scopesNamed = mutable.Map.empty[String, Int]
@@ -219,13 +219,13 @@ private final class RunUnderConstruction {
           val id = NodeId(above.id.places :+ NodePlace.Scope(name, above.nextIndexOfScopeNamed(name)))
           hold(id, NodeKind.Scope, name, Some(above.id))
           built += StructureNode.Scope(id, above.id, above.nextPosition(), name, label)
-          open = new OpenTreeNode(line.depth, id, NodeKind.Scope, above.suiteId, above.scopeNames :+ name) :: open
+          open = new OpenTreeNode(line.depth, id, NodeKind.Scope, above.suite, above.scopeNames :+ name) :: open
         case WrittenNode.Test(name, label, writtenTestName) =>
           val testName = writtenTestName.getOrElse((above.scopeNames :+ name).mkString(" "))
-          if (!testNames.add((above.suiteId, testName))) {
+          if (!testNames.add((above.suite, testName))) {
             fail(s"two tests of one suite have the test name \"$testName\": give '${line.text}' its own test name")
           }
-          val id = NodeId(above.suiteId.places :+ NodePlace.Test(testName))
+          val id = NodeId(above.suite.places :+ NodePlace.Test(testName))
           hold(id, NodeKind.Test, name, Some(above.id))
           built += StructureNode.Test(id, above.id, above.nextPosition(), name, label)
       }
