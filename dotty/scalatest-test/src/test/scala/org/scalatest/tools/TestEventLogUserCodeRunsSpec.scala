@@ -195,6 +195,44 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  private val usesAHelperOnAThread = NodePath.topLevel("samples.HelperOnAThreadSuite").test("uses a helper")
+  private val helperOnAThread = helperUnder(usesAHelperOnAThread)
+  private val helpsOnAThread = helperOnAThread.test("A helper helps")
+
+  private val helperOnAThreadSuite = {
+    val top = usesAHelperOnAThread.parent
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting HelperOnAThreadSuite", "TestStarting uses a helper") ++ reportedOfAHelper ++
+        Vector("TestSucceeded uses a helper", "SuiteCompleted HelperOnAThreadSuite", "RunCompleted"),
+      """
+      structure
+        suite "HelperOnAThreadSuite", class "samples.HelperOnAThreadSuite"
+          test "uses a helper", label "- uses a helper"
+      test "uses a helper": TestStarting
+      structure under test "uses a helper"
+        suite "HelperSuite", class "samples.HelperSuite"
+          test "A helper helps", label "- A helper helps"
+      test "A helper helps": TestStarting
+      test "A helper helps": TestSucceeded
+      test "uses a helper": TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("HelperOnAThreadSuite", "samples.HelperOnAThreadSuite"),
+          TestEventLogLine.test(usesAHelperOnAThread, top, 0, "uses a helper", "- uses a helper")
+        ),
+        nodeEvent(usesAHelperOnAThread, List(1, 1), "TestStarting"),
+        TestEventLogLine.structure(
+          TestEventLogLine.suiteUnder(helperOnAThread, "HelperSuite", "samples.HelperSuite"),
+          TestEventLogLine.test(helpsOnAThread, helperOnAThread, 0, "A helper helps", "- A helper helps")
+        ),
+        nodeEvent(helpsOnAThread, List(1, 1, 1, 1), "TestStarting"),
+        nodeEvent(helpsOnAThread, List(1, 1, 1, 1), "TestSucceeded"),
+        nodeEvent(usesAHelperOnAThread, List(1, 1), "TestSucceeded")
+      )
+    )
+  }
+
   private val userSuitesTop = NodePath.topLevel("samples.UserSuites")
   private val user1 = userSuitesTop.suite("samples.User1Suite")
   private val user2 = userSuitesTop.suite("samples.User2Suite")
@@ -757,6 +795,22 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  /** Asserts each node's events in a run whose test `t` sends a message straight to a reporter, on `t` or on its suite. */
+  private def eventsOfDirectRun(suite: NodePath, messageOnTest: Boolean, lines: Seq[String]): Unit = {
+    And(if (messageOnTest) "no event of 't' is assigned to its suite" else "the suite holds the message beside its own events, and 't' holds only its own")
+    val ofSuite = if (messageOnTest) Vector("SuiteStarting", "SuiteCompleted") else Vector("SuiteStarting", "InfoProvided", "SuiteCompleted")
+    val ofTest = if (messageOnTest) Vector("TestStarting", "InfoProvided", "TestSucceeded") else Vector("TestStarting", "TestSucceeded")
+    eventNamesOf(suite, lines) shouldBe ofSuite
+    eventNamesOf(suite.test("t"), lines) shouldBe ofTest
+  }
+
+  /** Asserts each node's events in a run as `eventsOfDirectRun` does, where the suite of `t` is nested in `outer`. */
+  private def eventsOfNestedDirectRun(outer: NodePath, nested: String, messageOnTest: Boolean, lines: Seq[String]): Unit = {
+    eventsOfDirectRun(outer.suite(nested), messageOnTest, lines)
+    And("no event of the nested suite is assigned to the suite nesting it")
+    eventNamesOf(outer, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+  }
+
   /**
    * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
    * reads them. The event log holds the stated events in order, and `alsoThen` states what else it holds.
@@ -889,6 +943,24 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       asyncOuterSuite,
       nestedSuiteIds = List(helperSelected)
     )(_ => ())
+
+    eventScenarios(
+      "A test runs a helper on a thread of its own",
+      "a suite whose one test, 'uses a helper', runs a HelperSuite on a thread it starts, and waits for that thread to end",
+      "samples.HelperOnAThreadSuite",
+      "the helper's structure under the test that ran it, holding its tests directly, then its tests' events, inside the test that ran it",
+      helperOnAThreadSuite,
+      nestedSuiteIds = List(helperSelected)
+    ) { lines =>
+      And("no structure holds a scope under HelperSuite")
+      lines.count(line => line.contains(""""suiteId":"samples.HelperSuite"""") && line.contains(""""kind":"scope"""")) shouldBe 0
+
+      And("no event of the helper is assigned to the suite or the test that ran it")
+      eventNamesOf(usesAHelperOnAThread.parent, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(usesAHelperOnAThread, lines) shouldBe Vector("TestStarting", "TestSucceeded")
+      eventNamesOf(helpsOnAThread, lines) shouldBe Vector("TestStarting", "TestSucceeded")
+      eventNamesOf(helperOnAThread, lines) shouldBe Vector("ScopeOpened", "ScopeClosed")
+    }
   }
 
   Feature("Nested suites run in other ways") {
@@ -905,6 +977,13 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       suiteEventsOf("samples.Inner1Suite", lines) shouldBe 0
       suiteEventsOf("samples.Inner2Suite", lines) shouldBe 0
       structuresIn(lines) shouldBe 1
+
+      And("no event of a nested suite is assigned to a suite above its test")
+      eventNamesOf(runsItsNestedSuitesNode, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(inner1, lines) shouldBe empty
+      eventNamesOf(inner2, lines) shouldBe empty
+      eventNamesOf(inner1.test("inner one"), lines) shouldBe Vector("TestStarting", "TestSucceeded")
+      eventNamesOf(inner2.test("inner two"), lines) shouldBe Vector("TestStarting", "TestSucceeded")
     }
 
     eventScenarios(
@@ -949,6 +1028,9 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("no other event is assigned to 'a'")
       eventsOf(twiceRunA, lines) shouldBe 4
+
+      And("no event of 'a' is assigned to its suite")
+      eventNamesOf(twiceRunA.parent, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
     }
   }
 
@@ -963,6 +1045,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("no InfoProvided is assigned to test 't'")
       infosIn(lines) shouldBe 1
+      eventsOfDirectRun(NodePath.topLevel("samples.DirectNamelessSuite"), messageOnTest = false, lines)
     }
 
     eventScenarios(
@@ -974,6 +1057,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
+      eventsOfDirectRun(NodePath.topLevel("samples.DirectNamingItsSuite"), messageOnTest = false, lines)
     }
 
     eventScenarios(
@@ -986,6 +1070,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
+      eventsOfNestedDirectRun(NodePath.topLevel("samples.DirectSuitesNamingTheSuite"), "samples.NestedDirectNamingItsSuite", messageOnTest = false, lines)
     }
 
     eventScenarios(
@@ -997,6 +1082,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
+      eventsOfDirectRun(NodePath.topLevel("samples.DirectNamingItsTest"), messageOnTest = true, lines)
     }
 
     eventScenarios(
@@ -1009,6 +1095,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
+      eventsOfNestedDirectRun(NodePath.topLevel("samples.DirectSuitesNamingTheTest"), "samples.NestedDirectNamingItsTest", messageOnTest = true, lines)
     }
 
     eventScenarios(
@@ -1020,6 +1107,11 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
+
+      And("no event of 't' is assigned to its suite")
+      val top = NodePath.topLevel("samples.DirectNamingItsSecondRun")
+      eventNamesOf(top, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(top.test("t"), lines) shouldBe Vector("TestStarting", "TestSucceeded", "TestStarting", "InfoProvided", "TestSucceeded")
     }
 
     eventScenarios(
@@ -1031,6 +1123,11 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
+
+      And("no event of 't' is assigned to its suite")
+      val top = NodePath.topLevel("samples.DirectNamingItsTestAfterRun")
+      eventNamesOf(top, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(top.test("t"), lines) shouldBe Vector("TestStarting", "TestSucceeded", "InfoProvided")
     }
   }
 }

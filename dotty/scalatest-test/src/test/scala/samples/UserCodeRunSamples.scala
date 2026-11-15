@@ -78,6 +78,18 @@ class OuterSuite extends RunsHelpers {
   }
 }
 
+/** A suite whose test runs a `HelperSuite` on a thread it starts, and waits for that thread to end. */
+@DoNotDiscover
+class HelperOnAThreadSuite extends RunsHelpers {
+
+  test("uses a helper") {
+    val helping = new Thread(() => runAHelper())
+    helping.start()
+    helping.join()
+    succeed
+  }
+}
+
 @DoNotDiscover
 class TwoHelpersSuite extends RunsHelpers {
 
