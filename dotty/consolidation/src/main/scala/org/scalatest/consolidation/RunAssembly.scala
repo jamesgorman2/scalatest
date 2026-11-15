@@ -45,7 +45,7 @@ private[consolidation] enum Outcome {
   case NotRun
 }
 
-/** A message of a suite or scope, placed after the first `childrenBefore` of the children shown under its execution. */
+/** A message of a suite, scope or test, placed after the first `childrenBefore` of the children shown under its execution. */
 private[consolidation] final case class PlacedMessage(event: DecodedEvent, childrenBefore: Int)
 
 /**
