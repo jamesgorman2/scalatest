@@ -9,6 +9,7 @@ import java.util.Comparator
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import org.scalatest.tools.TestEventLogArgument
 import scala.jdk.CollectionConverters.*
 
 enum Library(val label: String) {
@@ -16,9 +17,15 @@ enum Library(val label: String) {
   case Fork extends Library("fork")
 }
 
-enum Launch(val mainClass: String) {
-  case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher")
-  case Framework extends Launch("compatibility.recorders.FrameworkLauncher")
+enum Launch(val mainClass: String, val named: String) {
+  case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher", "Runner.run")
+  case Framework extends Launch("compatibility.recorders.FrameworkLauncher", "Framework")
+}
+
+/** Whether the fork's run is given the runner argument, which turns its emitter on. 3.2.20's run never is. */
+enum Emitter {
+  case Off
+  case On
 }
 
 final case class Compared[A](upstream: A, fork: A) {
@@ -42,7 +49,9 @@ final case class RunOutput(
   stdout: String,
   stderr: String,
   files: Map[String, Seq[String]],
-  threadNames: Set[String]
+  threadNames: Set[String],
+  eventFields: Seq[String],
+  eventLog: Seq[String]
 ) {
   // The fixture's own line is removed as text, not as a line: a reporter may write an event over several writes, and
   // the fixture's line can land between two of them.
@@ -53,6 +62,9 @@ final case class RunOutput(
       "loggers" -> loggerLines
     ) ++ files.map((name, lines) => ("file " + name) -> lines)
 }
+
+/** What a JVM given an argument list did: its exit code, whether the launch accepted the list, and what it printed. */
+final case class ArgumentsOutcome(exitCode: Int, outcome: Seq[String], stdout: String, stderr: String)
 
 object RunOutput {
 
@@ -145,11 +157,35 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
 
   private val runCount = new AtomicInteger
 
-  def ofFixture(launch: Launch, arguments: Seq[String], forkOnlyArguments: Seq[String] = Nil): Compared[RunOutput] =
+  def ofFixture(launch: Launch, arguments: Seq[String], emitter: Emitter = Emitter.Off): Compared[RunOutput] =
     Compared(
-      ofFixtureOn(Library.Upstream, launch, arguments),
-      ofFixtureOn(Library.Fork, launch, arguments ++ forkOnlyArguments)
+      ofFixtureOn(Library.Upstream, launch, arguments, Emitter.Off),
+      ofFixtureOn(Library.Fork, launch, arguments, emitter)
     )
+
+  def ofFixtureOnFork(launch: Launch, arguments: Seq[String], emitter: Emitter): RunOutput =
+    ofFixtureOn(Library.Fork, launch, arguments, emitter)
+
+  /** Gives the argument list to the launch, without running any suite. */
+  def ofArguments(launch: Launch, arguments: Seq[String]): Compared[ArgumentsOutcome] =
+    ofArgumentsNamingAFile(launch, _ => arguments)
+
+  /** Gives the launch the argument list the function makes of the path of a file of the run's own, without running any suite. */
+  def ofArgumentsNamingAFile(launch: Launch, arguments: Path => Seq[String]): Compared[ArgumentsOutcome] = {
+    def outcomeOn(library: Library): ArgumentsOutcome = {
+      val directory = newRunDirectory("arguments", library)
+      val outcome = directory.resolve("outcome.txt")
+      val exitCode = start(
+        library,
+        directory,
+        List("-Dcompatibility.outcome=" + outcome, "-Dcompatibility.events=" + directory.resolve("events.txt")),
+        "compatibility.recorders.ArgumentsLauncher",
+        launch.named +: arguments(directory.resolve("file-named"))
+      )
+      ArgumentsOutcome(exitCode, lines(outcome), text(directory.resolve("stdout.txt")), text(directory.resolve("stderr.txt")))
+    }
+    Compared(outcomeOn(Library.Upstream), outcomeOn(Library.Fork))
+  }
 
   def ofEventClassShapes(): Compared[Seq[String]] = {
     def shapesOn(library: Library): Seq[String] = {
@@ -161,15 +197,22 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     Compared(shapesOn(Library.Upstream), shapesOn(Library.Fork))
   }
 
-  private def ofFixtureOn(library: Library, launch: Launch, arguments: Seq[String]): RunOutput = {
+  private def ofFixtureOn(library: Library, launch: Launch, arguments: Seq[String], emitter: Emitter): RunOutput = {
     val directory = newRunDirectory(launch.toString, library)
     val events = directory.resolve("events.txt")
+    val eventFields = directory.resolve("event-fields.txt")
+    val eventLog = directory.resolve("test-event-log.jsonl")
+    val runnerArgument = emitter match {
+      case Emitter.Off => Nil
+      case Emitter.On => TestEventLogArgument.forFile(eventLog.toString)
+    }
     val loggerLines = directory.resolve("logger-lines.txt")
     val summary = directory.resolve("summary.txt")
     val threads = directory.resolve("threads.txt")
     val recorderFiles =
       List(
         "-Dcompatibility.events=" + events,
+        "-Dcompatibility.eventFields=" + eventFields,
         "-Dcompatibility.loggerLines=" + loggerLines,
         "-Dcompatibility.summary=" + summary,
         "-Dcompatibility.threads=" + threads
@@ -178,7 +221,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
       case Launch.RunnerRun => (Nil, CompatibilityFixture.suiteClassNames.flatMap(List("-s", _)))
       case Launch.Framework => (List("-Dcompatibility.suites=" + CompatibilityFixture.suiteClassNames.mkString(",")), Nil)
     }
-    val workingDirectory = run(library, directory, recorderFiles ++ suiteOptions, launch.mainClass, suiteArguments ++ arguments)
+    val workingDirectory = run(library, directory, recorderFiles ++ suiteOptions, launch.mainClass, suiteArguments ++ arguments ++ runnerArgument)
     RunOutput(
       lines(events),
       lines(loggerLines),
@@ -186,29 +229,38 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
       text(directory.resolve("stdout.txt")),
       text(directory.resolve("stderr.txt")),
       filesIn(workingDirectory).map(file => file.getFileName.toString -> lines(file)).toMap,
-      lines(threads).toSet
+      lines(threads).toSet,
+      lines(eventFields),
+      lines(eventLog)
     )
   }
 
   private def run(library: Library, directory: Path, jvmOptions: Seq[String], mainClass: String, arguments: Seq[String]): Path = {
-    val workingDirectory = Files.createDirectories(directory.resolve("working-directory"))
-    val stderr = directory.resolve("stderr.txt")
+    val exitCode = start(library, directory, jvmOptions, mainClass, arguments)
+    if (exitCode != 0) {
+      throw new IllegalStateException(s"$mainClass on ${library.label} exited with $exitCode:\n${lines(directory.resolve("stderr.txt")).mkString("\n")}")
+    }
+    workingDirectoryOf(directory)
+  }
+
+  private def workingDirectoryOf(directory: Path): Path = directory.resolve("working-directory")
+
+  /** Runs the main class in a JVM of its own, in the run directory's working directory, and returns its exit code. */
+  private def start(library: Library, directory: Path, jvmOptions: Seq[String], mainClass: String, arguments: Seq[String]): Int = {
+    val workingDirectory = Files.createDirectories(workingDirectoryOf(directory))
     val java = Paths.get(System.getProperty("java.home"), "bin", "java").toString
     val encodings = List("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
     val command = List(java, "-cp", classpaths.of(library)) ++ encodings ++ jvmOptions ++ List(mainClass) ++ arguments
     val process = new ProcessBuilder(command.asJava)
       .directory(workingDirectory.toFile)
       .redirectOutput(directory.resolve("stdout.txt").toFile)
-      .redirectError(stderr.toFile)
+      .redirectError(directory.resolve("stderr.txt").toFile)
       .start()
     if (!process.waitFor(2, TimeUnit.MINUTES)) {
       process.destroyForcibly()
       throw new IllegalStateException(s"$mainClass on ${library.label} did not end within 2 minutes, in $directory")
     }
-    if (process.exitValue != 0) {
-      throw new IllegalStateException(s"$mainClass on ${library.label} exited with ${process.exitValue}:\n${lines(stderr).mkString("\n")}")
-    }
-    workingDirectory
+    process.exitValue
   }
 
   private def newRunDirectory(name: String, library: Library): Path = {
