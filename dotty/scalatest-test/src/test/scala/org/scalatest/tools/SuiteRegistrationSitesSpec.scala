@@ -586,7 +586,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val started = new StartedTopLevelSuite(emitter, new Probe)
       val suite = new CountingSuiteIdReads(Some(new IllegalStateException("no suite ID")))
       try {
-        val wrapper = registeredIn(new InRunOfSuite(registrationOf(started)), suite).reporterOfSuite(passingNoEventOn)
+        val wrapper = registeredIn(new InRunOfSuite(registrationOf(started), None), suite).reporterOfSuite(passingNoEventOn)
         wrapper(anAlert)
         wrapper(anAlert)
       } finally {
@@ -600,7 +600,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val started = new StartedTopLevelSuite(anEmitter, new Probe)
       val suite = new CountingSuiteIdReads()
       try {
-        val wrapper = registeredIn(new InRunOfSuite(registrationOf(started)), suite).reporterOfSuite(passingNoEventOn)
+        val wrapper = registeredIn(new InRunOfSuite(registrationOf(started), None), suite).reporterOfSuite(passingNoEventOn)
         anEmitter.endWithoutRunEnded()
         wrapper(anAlert)
       } finally {
@@ -630,8 +630,8 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val started = new StartedTopLevelSuite(anEmitter, new Suites(outer))
       val readsOfInnerAtStart = inner.reads.get
       try {
-        val outerRegistration = registeredIn(new InRunOfSuite(registrationOf(started)), outer)
-        val innerRegistration = registeredIn(new InRunOfSuite(outerRegistration), inner)
+        val outerRegistration = registeredIn(new InRunOfSuite(registrationOf(started), None), outer)
+        val innerRegistration = registeredIn(new InRunOfSuite(outerRegistration, None), inner)
         outer.holdReads()
         val handingOffForOuter = new Thread(() => outerRegistration.reporterOfSuite(passingNoEventOn)(anAlert))
         handingOffForOuter.start()

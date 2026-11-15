@@ -446,7 +446,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                       SucceededStatus
                     }
                     else {
-                      statusVec.last thenRun {
+                      statusVec.last thenRun origin.runningInItsExecution {
                         reportTestIgnored(theSuite, args.reporter, args.tracker, testName, testTextWithOptionalPrefix, getIndentedTextForTest(testTextWithOptionalPrefix, testLeaf.indentationLevel, true), theTest.location, registration.startTestExecution(testName))
                         SucceededStatus
                       }  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status

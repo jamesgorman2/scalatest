@@ -1,13 +1,17 @@
 package org.scalatest.tools
 
 import org.scalatest.Args
+import org.scalatest.CompositeStatus
+import org.scalatest.Filter
 import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
 import org.scalatest.ScopePlace
 import org.scalatest.Status
+import org.scalatest.SucceededStatus
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.SuiteStart
+import org.scalatest.Tag
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.Event
 import org.scalatest.events.InfoProvided
@@ -23,9 +27,12 @@ import org.scalatest.events.TestFailed
 import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.tools.EventLogRecording.passingNoEventOn
 import org.scalatest.wordspec.AnyWordSpec
+import java.util.concurrent.LinkedBlockingQueue
+import scala.concurrent.ExecutionContext
 
 final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLogRecording {
 
@@ -67,6 +74,66 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     override protected def runTests(testName: Option[String], args: Args): Status = {
       super.runTests(testName, args)
       super.runTests(testName, args)
+    }
+
+    describe("s") {
+      it("t") {}
+    }
+  }
+
+  // Holds each task given it until `runAll`, which runs it in no invocation context.
+  private final class QueuingExecutionContext extends ExecutionContext {
+    private val tasks = new LinkedBlockingQueue[Runnable]
+
+    def execute(runnable: Runnable): Unit = tasks.put(runnable)
+
+    def reportFailure(cause: Throwable): Unit = throw cause
+
+    def runAll(): Unit = Iterator.continually(tasks.poll()).takeWhile(_ != null).foreach(_.run())
+  }
+
+  private object InFirstOpeningOnly extends Tag("org.scalatest.tools.SuiteEventHandOffSpec.InFirstOpeningOnly")
+
+  // Its runTests opens its scope twice in one run. The first opening reports its ignored test once its first test
+  // completes, which is once `queued` runs, after the second opening has closed. The second opening excludes that test,
+  // so reports its ignored test at once.
+  private final class OpensItsAsyncScopeTwiceSpec(queued: QueuingExecutionContext) extends AsyncFunSpec {
+    implicit override def executionContext: ExecutionContext = queued
+
+    override protected def runTests(testName: Option[String], args: Args): Status = {
+      val first = super.runTests(testName, args)
+      val second = super.runTests(testName, args.copy(filter = Filter(tagsToExclude = Set("org.scalatest.Ignore", InFirstOpeningOnly.name))))
+      new CompositeStatus(Set(first, second))
+    }
+
+    describe("s") {
+      it("t", InFirstOpeningOnly) {
+        succeed
+      }
+      ignore("i") {
+        succeed
+      }
+    }
+  }
+
+  // A suite its outer suite declares as nested, and runs from within the scope of its own test.
+  private final class RunFromAScopeSpec extends AnyFunSpec {
+    this.info("from the suite")
+
+    it("o") {}
+  }
+
+  // Its runTest runs the nested suite it declares, which its runNestedSuites does not run.
+  private final class RunsItsNestedSuiteFromAScopeSpec extends AnyFunSpec {
+    private val runFromAScope = new RunFromAScopeSpec
+
+    override def nestedSuites: IndexedSeq[Suite] = Vector(runFromAScope)
+
+    override protected def runNestedSuites(args: Args): Status = SucceededStatus
+
+    override protected def runTest(testName: String, args: Args): Status = {
+      runFromAScope.run(None, args)
+      super.runTest(testName, args)
     }
 
     describe("s") {
@@ -130,6 +197,20 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     val start = SuiteStart.ofNestedSuite(nested, reporter)
     start.namesRead(nested.suiteName, nested.suiteId)
     start
+  }
+
+  // The lines the suite's run writes after its structure, by the time `afterItsRunReturns` has returned.
+  private def eventLinesOfRun(suite: Suite, afterItsRunReturns: () => Unit = () => ()): Vector[String] = {
+    val eventLog = new RecordingEventLog
+    new SuiteRunner(
+      suite,
+      Args(new RecordingReporter),
+      new ScalaTestStatefulStatus,
+      TestEventLogHandOff.none,
+      TestEventLogEmitter.startOfTopLevelSuiteFor(Some(TestEventLogEmitter.appendingTo(eventLog)))
+    ).run()
+    afterItsRunReturns()
+    eventLog.writes.drop(1).map(_.stripSuffix("\n"))
   }
 
   private def withRegisteredSuite[A](body: RegisteredRun => A): A = {
@@ -282,14 +363,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
   "An emitter whose suite runs its scope twice in one run" should {
     "give each opening of the scope, and the test run in it, an execution of its own within the suite's one execution" in {
-      val eventLog = new RecordingEventLog
-      new SuiteRunner(
-        new RunsItsTestsTwiceSpec,
-        Args(new RecordingReporter),
-        new ScalaTestStatefulStatus,
-        TestEventLogHandOff.none,
-        TestEventLogEmitter.startOfTopLevelSuiteFor(Some(TestEventLogEmitter.appendingTo(eventLog)))
-      ).run()
       val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$RunsItsTestsTwiceSpec")
       val s = spec.scope("s")
       val t = spec.test("s t")
@@ -301,7 +374,34 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           TestEventLogLine.nodeEvent(s, List(1, opening), "ScopeClosed")
         )
       } ::: List(TestEventLogLine.nodeEvent(spec, List(1), "SuiteCompleted"))
-      StatedLines.mismatchWhenIs(eventLog.writes.drop(1).map(_.stripSuffix("\n")), stated) shouldBe None
+      StatedLines.mismatchWhenIs(eventLinesOfRun(new RunsItsTestsTwiceSpec), stated) shouldBe None
+    }
+  }
+
+  "An emitter whose async suite runs its scope twice in one run, one test after another" should {
+    "assign an ignored test, reported once a later opening of its scope has closed, to its own opening's execution" in {
+      val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OpensItsAsyncScopeTwiceSpec")
+      val i = spec.test("s i")
+      val queued = new QueuingExecutionContext
+      val written = eventLinesOfRun(new OpensItsAsyncScopeTwiceSpec(queued), () => queued.runAll())
+      val stated = List(
+        TestEventLogLine.nodeEvent(i, List(1, 2, 1), "TestIgnored"),
+        TestEventLogLine.nodeEvent(i, List(1, 1, 2), "TestIgnored")
+      )
+      StatedLines.mismatchWhenHoldsInOrder(written, stated) shouldBe None
+    }
+  }
+
+  "An emitter whose suite runs a nested suite it declares from within one of its scopes" should {
+    "number the nested suite's events by the nested suite's own run, not by the scope's" in {
+      val outer = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$RunsItsNestedSuiteFromAScopeSpec")
+      val nested = outer.suite("org.scalatest.tools.SuiteEventHandOffSpec$RunFromAScopeSpec")
+      val stated = List(
+        TestEventLogLine.nodeEvent(nested, List(1, 1), "InfoProvided", """"message":"from the suite","""),
+        TestEventLogLine.nodeEvent(nested.test("o"), List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(nested.test("o"), List(1, 1, 1), "TestSucceeded")
+      )
+      StatedLines.mismatchWhenHoldsInOrder(eventLinesOfRun(new RunsItsNestedSuiteFromAScopeSpec), stated) shouldBe None
     }
   }
 

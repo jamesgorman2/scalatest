@@ -79,7 +79,7 @@ private[scalatest] sealed abstract class ContextOfRegisteredSuite extends Invoca
  *
  * @param scope the execution of the scope the code runs in, where it runs in one
  */
-private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite, val scope: Option[ScopeExecution] = None) extends ContextOfRegisteredSuite {
+private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite, val scope: Option[ScopeExecution]) extends ContextOfRegisteredSuite {
 
   def registrationOf(suite: Suite): Option[SuiteRegistration] = Option.when(registration.isOf(suite))(registration)
 }
@@ -117,9 +117,11 @@ private[scalatest] final class RegisteredSuite(
   /** The registration of the top-level suite this instance runs within: its own where it is that suite. */
   val topLevel: RegisteredSuite = startedIn.fold(this)(_.registration.topLevel)
 
-  // An instance whose run started in a scope of a suite's run runs in that scope: where it is that suite, as a
-  // per-test instance is, its tests name that scope's execution.
-  private val runContext = new InRunOfSuite(this, startedIn.collect { case inRun: InRunOfSuite => inRun.scope }.flatten)
+  private val runContext = new InRunOfSuite(this, None)
+
+  // The execution of the scope of a suite's run that this instance's run started in, where it started in one. Its
+  // tests name it only where the instance turns out to be that suite, as a per-test instance is.
+  private val scopeItStartedIn = startedIn.collect { case inRun: InRunOfSuite => inRun.scope }.flatten
 
   // Read without the lock, to tell whether to take it. Set only under it.
   @volatile private var nodeIsFixed = false
@@ -354,7 +356,7 @@ private[scalatest] final class RegisteredSuite(
 
   def startRun(): Unit = emitter.startRun(this)
 
-  // The execution of the scope this instance's run runs in on this thread, where it runs in one.
+  // The execution of the scope this instance's run opened, and runs in on this thread, where it runs in one.
   private def scopeInContext: Option[ScopeExecution] =
     InvocationContext.get.collect { case inRun: InRunOfSuite if inRun.registration eq this => inRun.scope }.flatten
 
@@ -485,9 +487,14 @@ private[scalatest] final class RegisteredSuite(
     override def runningInItsExecution[A](body: => A): A = InvocationContext.within(new InRunOfSuite(RegisteredSuite.this, Some(scope)))(body)
   }
 
-  // The origin of the events of one execution of a test, which ran in the scope execution `scope`, where it ran in a
-  // scope, and in the run in flight when its first event was handed off.
-  private final class OriginOfTestExecution(testName: String, scope: Option[ScopeExecution])
+  // The scope execution of a suite's run that this instance's run started in, where the instance is that suite.
+  // Called under the emitter's lock, once the node is fixed.
+  private def scopeOfSuiteItIs: Option[ScopeExecution] = scopeItStartedIn.filter(_ => runOfSuite.isDefined)
+
+  // The origin of the events of one execution of a test, which ran in the run in flight when its first event was
+  // handed off, and in a scope execution, where it ran in one: `scopeOpened`, where the instance's run opened it,
+  // else the one of the suite it is.
+  private final class OriginOfTestExecution(testName: String, scopeOpened: Option[ScopeExecution])
       extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.Test(testName)) {
 
     private val execution = new Execution
@@ -495,6 +502,7 @@ private[scalatest] final class RegisteredSuite(
     private var executionOfItsRun = Option.empty[Execution]
 
     def executionsOf(event: Event): NamedExecutions = {
+      val scope = scopeOpened.orElse(scopeOfSuiteItIs)
       val ofRun = executionOfItsRun.getOrElse(scope.fold(executionOfRun())(_.executionOfRun(executionOfRun())))
       executionOfItsRun = Some(ofRun)
       executionsInRun(ofRun, scope.fold(Map.empty[List[ScopePlace], Execution])(_.byPath), Some(execution))
