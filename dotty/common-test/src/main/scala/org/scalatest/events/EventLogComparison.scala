@@ -6,10 +6,12 @@ package org.scalatest.events
  * Each event is compared only on what its criterion fixes:
  *
  *  - a `structure` event on its whole tree;
- *  - a ScalaTest event on its node, its execution, its class, and the fields and throwable parts it writes.
+ *  - a ScalaTest event on its node, its own execution, the execution of each ancestor it marks, its class, and the
+ *    fields and throwable parts it writes.
  *
  * The log's node IDs need not be the built ones. Each built node is taken to be the log's node at its place in a
- * matching `structure` event, and must stay that node in every later event.
+ * matching `structure` event, and must stay that node in every later event. An ancestor's execution is read from the
+ * ancestor's place in the event's execution path, under the latest `structure` before the event on each side.
  */
 private[scalatest] object EventLogComparison {
 
@@ -17,13 +19,15 @@ private[scalatest] object EventLogComparison {
   def mismatchWhenIs(log: Seq[TestEventLogEvent], expected: Seq[BuiltEvent]): Option[String] = {
     val logged = log.toVector
     var nodes = MatchedNodes.none
+    var trees = Trees.none
     var mismatch = Option.empty[String]
     var index = 0
     while (mismatch.isEmpty && index < expected.size && index < logged.size) {
-      matched(nodes, expected(index), logged(index)) match {
+      matched(nodes, trees, expected(index), logged(index)) match {
         case Right(withEvent) => nodes = withEvent
         case Left(reason) => mismatch = Some(s"event ${index + 1} of the log is not '${expected(index).notation}': $reason")
       }
+      trees = trees.afterBuilt(expected(index).event).afterLogged(logged(index))
       index += 1
     }
     mismatch.orElse {
@@ -39,6 +43,7 @@ private[scalatest] object EventLogComparison {
   def mismatchWhenHoldsInOrder(log: Seq[TestEventLogEvent], expected: Seq[BuiltEvent]): Option[String] = {
     val logged = log.toVector
     var nodes = MatchedNodes.none
+    var trees = Trees.none
     var mismatch = Option.empty[String]
     var next = 0
     val remaining = expected.iterator
@@ -46,11 +51,15 @@ private[scalatest] object EventLogComparison {
       val built = remaining.next()
       var found = false
       while (!found && next < logged.size) {
-        matched(nodes, built, logged(next)).foreach { withEvent =>
+        matched(nodes, trees, built, logged(next)).foreach { withEvent =>
           nodes = withEvent
           found = true
         }
+        trees = trees.afterLogged(logged(next))
         next += 1
+      }
+      if (found) {
+        trees = trees.afterBuilt(built.event)
       }
       if (!found) {
         mismatch = Some(s"the log does not hold '${built.notation}' after the events expected before it")
@@ -76,14 +85,39 @@ private[scalatest] object EventLogComparison {
     val none: MatchedNodes = MatchedNodes(Map.empty, Map.empty)
   }
 
-  private def matched(nodes: MatchedNodes, built: BuiltEvent, logged: TestEventLogEvent): Either[String, MatchedNodes] = {
+  /** Each side's nodes, as the latest `structure` event so far on that side gives them. */
+  private final case class Trees(built: Map[NodeId, StructureNode], logged: Map[NodeId, StructureNode]) {
+
+    def afterBuilt(event: TestEventLogEvent): Trees = copy(built = withNodesOf(built, event))
+
+    def afterLogged(event: TestEventLogEvent): Trees = copy(logged = withNodesOf(logged, event))
+  }
+
+  private object Trees {
+    val none: Trees = Trees(Map.empty, Map.empty)
+  }
+
+  private def withNodesOf(nodes: Map[NodeId, StructureNode], event: TestEventLogEvent): Map[NodeId, StructureNode] = {
+    event match {
+      case TestEventLogEvent.Structure(tree) => nodes ++ tree.map(node => idOf(node) -> node)
+      case _ => nodes
+    }
+  }
+
+  /** The nodes above the given one, from its top-level suite down, a test's scopes as the latest structure gives them. */
+  private def ancestorsOf(node: NodeId, nodes: Map[NodeId, StructureNode]): Vector[NodeId] = {
+    def parentOfNode(id: NodeId): Option[NodeId] = nodes.get(id).flatMap(parentOf)
+    Iterator.unfold(parentOfNode(node))(_.map(parent => (parent, parentOfNode(parent)))).toVector.reverse
+  }
+
+  private def matched(nodes: MatchedNodes, trees: Trees, built: BuiltEvent, logged: TestEventLogEvent): Either[String, MatchedNodes] = {
     (built.event, logged) match {
       case (_: TestEventLogEvent.RunStarted, _: TestEventLogEvent.RunStarted) => Right(nodes)
       case (TestEventLogEvent.RunEnded(expected), TestEventLogEvent.RunEnded(outcome)) =>
         if (expected == outcome) Right(nodes) else Left(s"its outcome is $outcome, not $expected")
       case (TestEventLogEvent.Structure(expected), TestEventLogEvent.Structure(tree)) => matchedTree(nodes, expected, tree)
       case (TestEventLogEvent.ScalaTestEvent(expectedExecution, expected), TestEventLogEvent.ScalaTestEvent(execution, event)) =>
-        scalaTestEventMismatch(nodes, built.fixed, expectedExecution, expected, execution, event).toLeft(nodes)
+        scalaTestEventMismatch(nodes, trees, built.fixed, expectedExecution, expected, execution, event).toLeft(nodes)
       case _ => Left(s"it is a ${describe(logged)}")
     }
   }
@@ -151,15 +185,16 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  private def inNotation(node: StructureNode): String = {
-    def quoted(text: String): String = {
-      val escaped = text.flatMap {
-        case '"' => "\\\""
-        case '\\' => "\\\\"
-        case other => other.toString
-      }
-      "\"" + escaped + "\""
+  private def quoted(text: String): String = {
+    val escaped = text.flatMap {
+      case '"' => "\\\""
+      case '\\' => "\\\\"
+      case other => other.toString
     }
+    "\"" + escaped + "\""
+  }
+
+  private def inNotation(node: StructureNode): String = {
     node match {
       case StructureNode.Suite(_, _, position, name, suiteId, className) =>
         s"suite ${quoted(name)}, class ${quoted(className)}, id ${quoted(suiteId)}, ${position.fold("no position")("position " + _)}"
@@ -170,6 +205,7 @@ private[scalatest] object EventLogComparison {
 
   private def scalaTestEventMismatch(
     nodes: MatchedNodes,
+    trees: Trees,
     fixed: FixedParts,
     expectedExecution: Option[NodeExecution],
     expected: DecodedEvent,
@@ -179,7 +215,7 @@ private[scalatest] object EventLogComparison {
     if (expected.productPrefix != event.productPrefix) {
       Some(s"it is a ${event.productPrefix}")
     } else {
-      executionMismatch(nodes, fixed, expectedExecution, execution).orElse {
+      executionMismatch(nodes, trees, fixed, expectedExecution, execution).orElse {
         val expectedFields = fieldsOf(expected)
         val fields = fieldsOf(event)
         fixed.fields.toVector.sorted.iterator.map { name =>
@@ -199,6 +235,7 @@ private[scalatest] object EventLogComparison {
 
   private def executionMismatch(
     nodes: MatchedNodes,
+    trees: Trees,
     fixed: FixedParts,
     expected: Option[NodeExecution],
     execution: Option[NodeExecution]
@@ -209,19 +246,48 @@ private[scalatest] object EventLogComparison {
       case (Some(_), None) => Some("it is assigned to the run, not to a node")
       case (Some(expectedExecution), Some(loggedExecution)) =>
         if (!nodes.loggedNode(expectedExecution.node).contains(loggedExecution.node)) {
-          Some(s"it is assigned to another node, ${loggedExecution.node}")
+          Some(s"it is assigned to another node, ${described(loggedExecution.node, trees.logged)}")
         } else if (expectedExecution.execution != loggedExecution.execution) {
           Some(s"it is of execution ${loggedExecution.execution}, not ${expectedExecution.execution}")
-        } else if (fixed.ancestorExecutions.nonEmpty && parentExecutionOf(expectedExecution) != parentExecutionOf(loggedExecution)) {
-          def number(parentExecution: Option[Int]): String = parentExecution.fold("absent")(_.toString)
-          Some(s"its parent execution is ${number(parentExecutionOf(loggedExecution))}, not ${number(parentExecutionOf(expectedExecution))}")
         } else {
-          None
+          markedAncestorExecutionMismatch(nodes, trees, fixed, expectedExecution, loggedExecution)
         }
     }
   }
 
-  private def parentExecutionOf(execution: NodeExecution): Option[Int] = execution.executions.init.lastOption
+  // Each side's ancestors come from its own structures, since a log the event is expected to hold in order can hold a
+  // further structure that moves the node.
+  private def markedAncestorExecutionMismatch(
+    nodes: MatchedNodes,
+    trees: Trees,
+    fixed: FixedParts,
+    expected: NodeExecution,
+    logged: NodeExecution
+  ): Option[String] = {
+    val loggedAncestors = ancestorsOf(logged.node, trees.logged)
+    ancestorsOf(expected.node, trees.built).zip(expected.executions).iterator.collect {
+      case (ancestor, expectedNumber) if fixed.ancestorExecutions.contains(ancestor) =>
+        val name = described(ancestor, trees.built)
+        nodes.loggedNode(ancestor).map(loggedAncestors.indexOf).filter(_ >= 0) match {
+          case None => Some(s"it is not under $name")
+          case Some(depth) =>
+            logged.executions.lift(depth) match {
+              case Some(`expectedNumber`) => None
+              case Some(number) => Some(s"it ran in execution $number of $name, not $expectedNumber")
+              case None => Some(s"its execution path has no execution of $name")
+            }
+        }
+    }.collectFirst { case Some(mismatch) => mismatch }
+  }
+
+  private def described(node: NodeId, nodes: Map[NodeId, StructureNode]): String = {
+    nodes.get(node) match {
+      case Some(suite: StructureNode.Suite) => s"suite ${quoted(suite.name)}"
+      case Some(scope: StructureNode.Scope) => s"scope ${quoted(scope.name)}"
+      case Some(test: StructureNode.Test) => s"test ${quoted(test.name)}"
+      case None => "a node no structure holds"
+    }
+  }
 
   private def throwableMismatch(expected: Option[WrittenThrowable], logged: Any): Option[String] = {
     (expected, logged) match {

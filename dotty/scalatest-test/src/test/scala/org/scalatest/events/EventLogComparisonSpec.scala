@@ -1,7 +1,6 @@
 package org.scalatest.events
 
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.tools.MintedNodeId
 import org.scalatest.wordspec.AnyWordSpec
 
 import EventNotationBlocks.joined
@@ -21,12 +20,9 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     "structure\n  suite \"StackSuite\", class \"samples.StackSuite\"\n    scope \"A Stack\", label \"A Stack\"\n" +
       "      test \"pops\", label \"- pops\"\n      test \"pushes\", label \"- pushes\""
 
-  private val suiteHeldBeforeTheLog =
-    """
-    structure
-      suite "EarlierSuite", class "samples.EarlierSuite"
-        test "earlier", label "- earlier"
-    """
+  private val stackSuiteNode = NodeId(Vector(NodePlace.Suite("samples.StackSuite", 0)))
+
+  private def under(parent: NodeId, place: NodePlace): NodeId = NodeId(parent.places :+ place)
 
   private def expected(blocks: String*): Vector[BuiltEvent] = {
     TestRunBuilder.build(TestRunPart.Events(joined(blocks*))) match {
@@ -37,9 +33,21 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
 
   private def log(blocks: String*): Vector[TestEventLogEvent] = expected(blocks*).map(_.event)
 
-  // The log's node IDs follow those of a suite the log does not hold, so no node has its expected node's ID.
-  private def logWithOtherNodeIds(blocks: String*): Vector[TestEventLogEvent] =
-    log((suiteHeldBeforeTheLog +: blocks)*).drop(1)
+  // Each of the log's node IDs starts with a place the expected IDs lack, so no node has its expected node's ID.
+  private def logWithOtherNodeIds(blocks: String*): Vector[TestEventLogEvent] = {
+    def otherId(id: NodeId): NodeId = NodeId(NodePlace.Suite("samples.OtherSuite", 0) +: id.places)
+    log(blocks*).map {
+      case TestEventLogEvent.Structure(tree) =>
+        TestEventLogEvent.Structure(tree.map {
+          case suite: StructureNode.Suite => suite.copy(id = otherId(suite.id), parent = suite.parent.map(otherId))
+          case scope: StructureNode.Scope => scope.copy(id = otherId(scope.id), parent = otherId(scope.parent))
+          case test: StructureNode.Test => test.copy(id = otherId(test.id), parent = otherId(test.parent))
+        })
+      case TestEventLogEvent.ScalaTestEvent(execution, event) =>
+        TestEventLogEvent.ScalaTestEvent(execution.map(assigned => assigned.copy(node = otherId(assigned.node))), event)
+      case unassigned => unassigned
+    }
+  }
 
   private def mismatchOfLastEvent(expectedEvent: String, loggedEvent: String): Option[String] =
     EventLogComparison.mismatchWhenIs(log(stackSuite, loggedEvent), expected(stackSuite, expectedEvent))
@@ -289,22 +297,24 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "report a node under another parent" in {
+      val scope = under(stackSuiteNode, NodePlace.Scope("A Stack", 0))
+      val test = under(stackSuiteNode, NodePlace.Test("A Stack pops"))
       val expectedTree = BuiltEvent(
         "structure",
         TestEventLogEvent.Structure(
           Vector(
-            StructureNode.Suite(MintedNodeId(1), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
-            StructureNode.Scope(MintedNodeId(2), MintedNodeId(1), 0, "A Stack", "A Stack"),
-            StructureNode.Test(MintedNodeId(3), MintedNodeId(2), 0, "pops", "- pops")
+            StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+            StructureNode.Scope(scope, stackSuiteNode, 0, "A Stack", "A Stack"),
+            StructureNode.Test(test, scope, 0, "pops", "- pops")
           )
         ),
         FixedParts.none
       )
       val loggedTree = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(MintedNodeId(1), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
-          StructureNode.Scope(MintedNodeId(2), MintedNodeId(1), 0, "A Stack", "A Stack"),
-          StructureNode.Test(MintedNodeId(3), MintedNodeId(1), 0, "pops", "- pops")
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          StructureNode.Scope(scope, stackSuiteNode, 0, "A Stack", "A Stack"),
+          StructureNode.Test(test, stackSuiteNode, 0, "pops", "- pops")
         )
       )
 
@@ -405,16 +415,17 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "report a further structure that gives a new node the ID of a node the log already holds" in {
+      val test = under(stackSuiteNode, NodePlace.Test("pops"))
       val first = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(MintedNodeId(1), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
-          StructureNode.Test(MintedNodeId(2), MintedNodeId(1), 0, "pops", "- pops")
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          StructureNode.Test(test, stackSuiteNode, 0, "pops", "- pops")
         )
       )
       val further = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(MintedNodeId(1), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
-          StructureNode.Test(MintedNodeId(2), MintedNodeId(1), 0, "pushes", "- pushes")
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          StructureNode.Test(test, stackSuiteNode, 0, "pushes", "- pushes")
         )
       )
 
@@ -444,9 +455,8 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "report an event assigned to another node" in {
-      pending
       mismatchOfLastEvent("""test "pops": TestStarting""", """test "pushes": TestStarting""") shouldBe
-        notLastEvent("""test "pops": TestStarting""", "it is assigned to another node, 4")
+        notLastEvent("""test "pops": TestStarting""", "it is assigned to another node, test \"pushes\"")
     }
 
     "report an event assigned to a node where one assigned to the run is expected" in {
@@ -464,15 +474,59 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
         notLastEvent("""test "pops": TestStarting""", "it is of execution 2, not 1")
     }
 
-    "report another parent execution than the one the event writes" in {
-      pending
-      mismatchOfLastEvent("""test "pops", parent execution 1: TestStarting""", """test "pops", parent execution 2: TestStarting""") shouldBe
-        notLastEvent("""test "pops", parent execution 1: TestStarting""", "its parent execution is 2, not 1")
+    "report another execution of an ancestor than the one the event marks" in {
+      mismatchOfLastEvent("""test "pops", in scope "A Stack" execution 1: TestStarting""", """test "pops", in scope "A Stack" execution 2: TestStarting""") shouldBe
+        notLastEvent("""test "pops", in scope "A Stack" execution 1: TestStarting""", "it ran in execution 2 of scope \"A Stack\", not 1")
     }
 
-    "match any parent execution where the event writes none" in {
-      pending
-      mismatchOfLastEvent("""test "pops": TestStarting""", """test "pops", parent execution 2: TestStarting""") shouldBe None
+    "match any execution of an ancestor where the event marks none" in {
+      mismatchOfLastEvent("""test "pops": TestStarting""", """test "pops", in scope "A Stack" execution 2: TestStarting""") shouldBe None
+    }
+
+    "match any execution of an ancestor the event does not mark, beside one it marks" in {
+      mismatchOfLastEvent(
+        """test "pops", in scope "A Stack" execution 1: TestStarting""",
+        """test "pops", in suite "StackSuite" execution 2, in scope "A Stack" execution 1: TestStarting"""
+      ) shouldBe None
+    }
+
+    "report the highest marked ancestor whose execution differs" in {
+      mismatchOfLastEvent(
+        """test "pops", in suite "StackSuite" execution 1, in scope "A Stack" execution 1: TestStarting""",
+        """test "pops", in suite "StackSuite" execution 2, in scope "A Stack" execution 2: TestStarting"""
+      ) shouldBe notLastEvent(
+        """test "pops", in suite "StackSuite" execution 1, in scope "A Stack" execution 1: TestStarting""",
+        "it ran in execution 2 of suite \"StackSuite\", not 1"
+      )
+    }
+
+    "compare a marked ancestor's execution at the ancestor's place in the execution path" in {
+      val nested =
+        """
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            suite "InnerSuite", class "samples.InnerSuite"
+              scope "A Stack", label "A Stack"
+                test "pops", label "- pops"
+        """
+      val expectedEvent = """test "pops", in suite "InnerSuite" execution 1: TestStarting"""
+
+      EventLogComparison.mismatchWhenIs(
+        log(nested, """test "pops", in suite "OuterSuite" execution 3, in suite "InnerSuite" execution 2, in scope "A Stack" execution 1: TestStarting"""),
+        expected(nested, expectedEvent)
+      ) shouldBe Some(s"event 2 of the log is not '$expectedEvent': it ran in execution 2 of suite \"InnerSuite\", not 1")
+    }
+
+    "report an execution path with no execution of an ancestor the event marks" in {
+      val expectedEvent = """test "pops", in scope "A Stack" execution 1: TestStarting"""
+      val logged = log(stackSuite, expectedEvent).map {
+        case TestEventLogEvent.ScalaTestEvent(Some(assigned), event) =>
+          TestEventLogEvent.ScalaTestEvent(Some(assigned.copy(executions = assigned.executions.takeRight(1))), event)
+        case other => other
+      }
+
+      EventLogComparison.mismatchWhenIs(logged, expected(stackSuite, expectedEvent)) shouldBe
+        notLastEvent(expectedEvent, "its execution path has no execution of scope \"A Stack\"")
     }
 
     "match any value of a field the event does not write" in {
@@ -748,6 +802,21 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
         log(stackSuite, """test "pops": InfoProvided(message: "checked")"""),
         expected(stackSuite, """test "pops": InfoProvided(message: "checked size")""")
       ) shouldBe Some("the log does not hold 'test \"pops\": InfoProvided(message: \"checked size\")' after the events expected before it")
+    }
+
+    "report an event the log holds only after a further structure takes its node out of an ancestor the event marks" in {
+      EventLogComparison.mismatchWhenHoldsInOrder(
+        log(
+          stackSuite,
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+              test "pops", label "- pops", test name "A Stack pops"
+          test "pops": TestStarting
+          """
+        ),
+        expected(stackSuite, """test "pops", in scope "A Stack" execution 1: TestStarting""")
+      ) shouldBe Some("the log does not hold 'test \"pops\", in scope \"A Stack\" execution 1: TestStarting' after the events expected before it")
     }
 
     "report a structure the log does not hold" in {
