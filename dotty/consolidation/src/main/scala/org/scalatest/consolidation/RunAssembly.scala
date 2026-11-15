@@ -248,8 +248,9 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     }
 
   // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
-  // one it holds. A suite's nested suites sit before or after them, as its first structure placed them. Each suite a
-  // later structure added, in the order they arrived, sits directly after the last sibling sharing its suite ID, else last.
+  // one it holds. A suite's nested suites sit before or after them, as its first structure placed them. A suite a
+  // later structure added sits directly after the last sibling with its suite ID, or last if none has it. Added suites
+  // are placed in the order they arrived.
   private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): Vector[StructureNode] = {
     val scopesAndTests = children.filter(RunAssembly.isScopeOrTest).sortBy(child => (RunAssembly.declaredPositionOf(child), isDropped(child)))
     val suites = children.collect { case suite: StructureNode.Suite => suite }
@@ -282,8 +283,9 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     executions(node) = executions(node).updated(number, updated)
   }
 
-  // Reads the path against the latest structure: its last number is the node's, and each before it that of the next
-  // node up, each scope between a test and its suite counted. Each execution keeps the parent execution it first had.
+  // Reads the execution path against the latest structure. Its last number is the node's, and each number before it
+  // belongs to the next node up, counting each scope between a test and its suite. An execution keeps the parent
+  // execution it first had.
   private def recordExecutionPath(nodeExecution: NodeExecution): Unit = {
     val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(RunAssembly.parentOf)))).toVector
     val executionsUp = nodesUp.zip(nodeExecution.executions.reverse).map((node, number) => ExecutionOfNode(node, number))

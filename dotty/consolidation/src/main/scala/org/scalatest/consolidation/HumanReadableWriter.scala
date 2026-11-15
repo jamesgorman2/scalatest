@@ -78,7 +78,7 @@ private[consolidation] object HumanReadableWriter {
   }
 
   // A suite shows its name line once, then what each of its executions produced. A scope or test shows a line for
-  // each execution, a test's failure or cancel lines before its messages and the suites it ran.
+  // each execution. Under a test's line come its failure or cancel lines, then its messages and the suites it ran.
   private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
     node.node match {
       case suite: StructureNode.Suite =>
