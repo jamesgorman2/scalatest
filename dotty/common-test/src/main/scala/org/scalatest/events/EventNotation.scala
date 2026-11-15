@@ -14,7 +14,7 @@ private[events] final case class NodeReference(kind: NodeKind, name: String, ord
 }
 
 private[events] enum WrittenNode {
-  case Suite(name: String, className: String, suiteId: Option[String])
+  case Suite(name: String, number: Option[Int], className: String, suiteId: Option[String])
   case Scope(name: String, label: String)
   case Test(name: String, label: String, testName: Option[String])
 }
@@ -29,13 +29,15 @@ private[events] enum FieldValue {
   case Thrown(throwable: WrittenThrowable)
 }
 
+private[events] final case class AncestorExecution(ancestor: NodeReference, execution: Int)
+
 private[events] enum NotationLine {
   case RunStarted(text: String)
   case Structure(under: Option[NodeReference], tree: Vector[TreeLine], text: String)
   case Event(
     node: Option[NodeReference],
     execution: Option[Int],
-    parentExecution: Option[Int],
+    ancestorExecutions: Vector[AncestorExecution],
     className: String,
     fields: Vector[(String, FieldValue)],
     text: String
@@ -122,7 +124,7 @@ private[events] object EventNotation {
     cursor.expect("structure")
     val parent = if (cursor.accepts(" under ")) Some(nodeReference(cursor)) else None
     cursor.end()
-    parent.filter(_.kind != NodeKind.Suite).foreach(_ => cursor.fail("a structure is under a suite"))
+    parent.filter(_.kind == NodeKind.Scope).foreach(_ => cursor.fail("a structure is under a suite or a test"))
     val tree = under.map { line =>
       val depth = line.indentation - outermost
       if (depth % 2 != 0) {
@@ -139,9 +141,10 @@ private[events] object EventNotation {
     val node = {
       if (cursor.accepts("suite ")) {
         val name = cursor.quoted()
+        val number = if (cursor.accepts(" #")) Some(cursor.count()) else None
         cursor.expect(", class ")
         val className = cursor.quoted()
-        WrittenNode.Suite(name, className, if (cursor.accepts(", id ")) Some(cursor.quoted()) else None)
+        WrittenNode.Suite(name, number, className, if (cursor.accepts(", id ")) Some(cursor.quoted()) else None)
       } else if (cursor.accepts("scope ")) {
         val name = cursor.quoted()
         cursor.expect(", label ")
@@ -182,12 +185,17 @@ private[events] object EventNotation {
     val cursor = new LineCursor(text)
     val node = if (cursor.accepts("run")) None else Some(nodeReference(cursor))
     val execution = if (cursor.accepts(" execution ")) Some(cursor.count()) else None
-    val parentExecution = if (cursor.accepts(", parent execution ")) Some(cursor.count()) else None
+    val ancestorExecutions = Vector.newBuilder[AncestorExecution]
+    while (cursor.accepts(", in ")) {
+      val ancestor = nodeReference(cursor)
+      cursor.expect(" execution ")
+      ancestorExecutions += AncestorExecution(ancestor, cursor.count())
+    }
     cursor.expect(": ")
     val className = cursor.word("an event class")(_.isLetterOrDigit)
     val fields = if (cursor.accepts("(")) eventFields(cursor) else Vector.empty
     cursor.end()
-    NotationLine.Event(node, execution, parentExecution, className, fields, text)
+    NotationLine.Event(node, execution, ancestorExecutions.result(), className, fields, text)
   }
 
   private def nodeReference(cursor: LineCursor): NodeReference = {

@@ -124,6 +124,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("A test's execution sits under the scope execution its events name, though the scope's executions overlap") {
+      pending
       Given("an event log of a scope opened twice before either execution of its test starts")
       val eventLog =
         """

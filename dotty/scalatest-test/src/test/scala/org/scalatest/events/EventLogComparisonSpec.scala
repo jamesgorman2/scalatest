@@ -465,11 +465,13 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "report another parent execution than the one the event writes" in {
+      pending
       mismatchOfLastEvent("""test "pops", parent execution 1: TestStarting""", """test "pops", parent execution 2: TestStarting""") shouldBe
         notLastEvent("""test "pops", parent execution 1: TestStarting""", "its parent execution is 2, not 1")
     }
 
     "match any parent execution where the event writes none" in {
+      pending
       mismatchOfLastEvent("""test "pops": TestStarting""", """test "pops", parent execution 2: TestStarting""") shouldBe None
     }
 

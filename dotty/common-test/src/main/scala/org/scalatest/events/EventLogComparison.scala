@@ -212,7 +212,7 @@ private[scalatest] object EventLogComparison {
           Some(s"it is assigned to another node, ${loggedExecution.node}")
         } else if (expectedExecution.execution != loggedExecution.execution) {
           Some(s"it is of execution ${loggedExecution.execution}, not ${expectedExecution.execution}")
-        } else if (fixed.parentExecution && parentExecutionOf(expectedExecution) != parentExecutionOf(loggedExecution)) {
+        } else if (fixed.ancestorExecutions.nonEmpty && parentExecutionOf(expectedExecution) != parentExecutionOf(loggedExecution)) {
           def number(parentExecution: Option[Int]): String = parentExecution.fold("absent")(_.toString)
           Some(s"its parent execution is ${number(parentExecutionOf(loggedExecution))}, not ${number(parentExecutionOf(expectedExecution))}")
         } else {

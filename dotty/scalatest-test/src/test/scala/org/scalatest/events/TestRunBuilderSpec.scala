@@ -1,7 +1,6 @@
 package org.scalatest.events
 
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.tools.MintedNodeId
 import org.scalatest.wordspec.AnyWordSpec
 
 import EventNotationBlocks.joined
@@ -15,6 +14,10 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         scope "A Stack", label "A Stack"
           test "pops", label "- pops"
     """
+
+  private val stackSuiteId = id(suiteAt("samples.StackSuite"))
+  private val aStackId = id(suiteAt("samples.StackSuite"), scopeAt("A Stack"))
+  private val popsId = id(suiteAt("samples.StackSuite"), testAt("A Stack pops"))
 
   private def built(parts: TestRunPart*): BuiltRun = {
     TestRunBuilder.build(parts*) match {
@@ -49,17 +52,26 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  private def suite(id: Long, parent: Option[Long], position: Option[Int], name: String, suiteId: String, className: String): StructureNode =
-    StructureNode.Suite(MintedNodeId(id), parent.map(MintedNodeId(_)), position, name, suiteId, className)
+  private def id(places: NodePlace*): NodeId = NodeId(places.toVector)
 
-  private def scope(id: Long, parent: Long, position: Int, name: String, label: String): StructureNode =
-    StructureNode.Scope(MintedNodeId(id), MintedNodeId(parent), position, name, label)
+  private def suiteAt(suiteId: String, index: Int = 0): NodePlace = NodePlace.Suite(suiteId, index)
 
-  private def test(id: Long, parent: Long, position: Int, name: String, label: String): StructureNode =
-    StructureNode.Test(MintedNodeId(id), MintedNodeId(parent), position, name, label)
+  private def scopeAt(text: String, index: Int = 0): NodePlace = NodePlace.Scope(text, index)
 
-  private def execution(node: Long, number: Int, parentExecution: Option[Int]): Option[NodeExecution] =
-    Some(NodeExecution(MintedNodeId(node), parentExecution.toVector :+ number))
+  private def testAt(testName: String): NodePlace = NodePlace.Test(testName)
+
+  private def under(parent: NodeId, places: NodePlace*): NodeId = NodeId(parent.places ++ places)
+
+  private def suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String): StructureNode =
+    StructureNode.Suite(id, parent, position, name, suiteId, className)
+
+  private def scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String): StructureNode =
+    StructureNode.Scope(id, parent, position, name, label)
+
+  private def test(id: NodeId, parent: NodeId, position: Int, name: String, label: String): StructureNode =
+    StructureNode.Test(id, parent, position, name, label)
+
+  private def execution(node: NodeId, executionPath: Int*): Option[NodeExecution] = Some(NodeExecution(node, executionPath.toVector))
 
   "The test run builder" when {
 
@@ -78,6 +90,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
           TestRunPart.Events("run ended completed")
         )
+        val divideSuiteId = id(suiteAt("samples.DivideSuite"))
 
         run.items shouldBe Vector(
           BuiltRunItem.Event(BuiltEvent("run started", TestEventLogEvent.RunStarted(1L, "1970-01-01T00:00:00Z"), FixedParts.none)),
@@ -85,14 +98,14 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           BuiltRunItem.Event(
             BuiltEvent(
               "structure\n  suite \"DivideSuite\", class \"samples.DivideSuite\"",
-              TestEventLogEvent.Structure(Vector(suite(1, None, None, "DivideSuite", "samples.DivideSuite", "samples.DivideSuite"))),
+              TestEventLogEvent.Structure(Vector(suite(divideSuiteId, None, None, "DivideSuite", "samples.DivideSuite", "samples.DivideSuite"))),
               FixedParts.none
             )
           ),
           BuiltRunItem.Event(
             BuiltEvent(
               "suite \"DivideSuite\": SuiteStarting",
-              TestEventLogEvent.ScalaTestEvent(execution(1, 1, None), DecodedEvent.SuiteStarting(None, "main", 0L)),
+              TestEventLogEvent.ScalaTestEvent(execution(divideSuiteId, 1), DecodedEvent.SuiteStarting(None, "main", 0L)),
               FixedParts.none
             )
           ),
@@ -104,7 +117,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       "resolve a node that an earlier part's structure holds" in {
         val run = built(TestRunPart.Events(stackSuite), TestRunPart.CapturedLine(CapturedStream.Stdout, "popping"), TestRunPart.Events("""test "pops": TestStarting"""))
 
-        run.events.last.event shouldBe TestEventLogEvent.ScalaTestEvent(execution(3, 1, Some(1)), DecodedEvent.TestStarting(None, "main", 0L))
+        run.events.last.event shouldBe TestEventLogEvent.ScalaTestEvent(execution(popsId, 1, 1, 1), DecodedEvent.TestStarting(None, "main", 0L))
       }
 
       "build no event from notation that holds none" in {
@@ -131,7 +144,12 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     }
 
     "given a suite's first structure" should {
-      "give each node its ID, its parent's ID and its declared position among its siblings" in {
+      "give each node its node path, its parent's node path and its declared position among its siblings" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+        val aStack = under(outer, scopeAt("A Stack"))
+        val whenEmpty = under(aStack, scopeAt("when empty"))
+        val inner = under(outer, suiteAt("inner"))
+
         structuresOf(
           """
           structure
@@ -146,19 +164,45 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           """
         ) shouldBe Vector(
           Vector(
-            suite(1, None, None, "OuterSuite", "samples.OuterSuite", "samples.OuterSuite"),
-            scope(2, 1, 0, "A Stack", "A Stack"),
-            test(3, 2, 0, "pops", "- pops"),
-            scope(4, 2, 1, "when empty", "when empty"),
-            test(5, 4, 0, "is empty", "- is empty"),
-            test(6, 1, 1, "has a top", "- has a top"),
-            suite(7, Some(1), Some(2), "InnerSuite", "inner", "samples.InnerSuite"),
-            test(8, 7, 0, "inner one", "- inner one")
+            suite(outer, None, None, "OuterSuite", "samples.OuterSuite", "samples.OuterSuite"),
+            scope(aStack, outer, 0, "A Stack", "A Stack"),
+            test(under(outer, testAt("A Stack pops")), aStack, 0, "pops", "- pops"),
+            scope(whenEmpty, aStack, 1, "when empty", "when empty"),
+            test(under(outer, testAt("A Stack when empty is empty")), whenEmpty, 0, "is empty", "- is empty"),
+            test(under(outer, testAt("has a top")), outer, 1, "has a top", "- has a top"),
+            suite(inner, Some(outer), Some(2), "InnerSuite", "inner", "samples.InnerSuite"),
+            test(under(inner, testAt("inner one")), inner, 0, "inner one", "- inner one")
           )
         )
       }
 
-      "give new IDs to a suite with another suite ID" in {
+      "index the sibling suites that share a suite ID, and the sibling scopes that share a name, in declared order" in {
+        val outer = id(suiteAt("samples.TwiceSuites"))
+
+        structuresOf(
+          """
+          structure
+            suite "TwiceSuites", class "samples.TwiceSuites"
+              scope "A Stack", label "A Stack"
+              suite "InnerSuite", class "samples.InnerSuite"
+              scope "A Stack", label "A Stack"
+              suite "InnerSuite", class "samples.InnerSuite"
+          """
+        ) shouldBe Vector(
+          Vector(
+            suite(outer, None, None, "TwiceSuites", "samples.TwiceSuites", "samples.TwiceSuites"),
+            scope(under(outer, scopeAt("A Stack", 0)), outer, 0, "A Stack", "A Stack"),
+            suite(under(outer, suiteAt("samples.InnerSuite", 0)), Some(outer), Some(1), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
+            scope(under(outer, scopeAt("A Stack", 1)), outer, 2, "A Stack", "A Stack"),
+            suite(under(outer, suiteAt("samples.InnerSuite", 1)), Some(outer), Some(3), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite")
+          )
+        )
+      }
+
+      "give a suite with another suite ID its own node path" in {
+        val inA = id(suiteAt("a.SameSuite"))
+        val inB = id(suiteAt("b.SameSuite"))
+
         structuresOf(
           """
           structure
@@ -169,12 +213,14 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "in b", label "- in b"
           """
         ) shouldBe Vector(
-          Vector(suite(1, None, None, "SameSuite", "a.SameSuite", "a.SameSuite"), test(2, 1, 0, "in a", "- in a")),
-          Vector(suite(3, None, None, "SameSuite", "b.SameSuite", "b.SameSuite"), test(4, 3, 0, "in b", "- in b"))
+          Vector(suite(inA, None, None, "SameSuite", "a.SameSuite", "a.SameSuite"), test(under(inA, testAt("in a")), inA, 0, "in a", "- in a")),
+          Vector(suite(inB, None, None, "SameSuite", "b.SameSuite", "b.SameSuite"), test(under(inB, testAt("in b")), inB, 0, "in b", "- in b"))
         )
       }
 
-      "give new IDs to a suite whose suite ID an earlier structure holds only under a parent" in {
+      "give its own node path to a suite whose suite ID an earlier structure holds only under a parent" in {
+        val helper = id(suiteAt("samples.HelperSuite"))
+
         structuresOf(
           """
           structure
@@ -186,8 +232,45 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "helps", label "- helps"
           """
         ).last shouldBe Vector(
-          suite(4, None, None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
-          test(5, 4, 0, "helps", "- helps")
+          suite(helper, None, None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(under(helper, testAt("helps")), helper, 0, "helps", "- helps")
+        )
+      }
+
+      "add a suite after the siblings that share its suite ID where its number names no suite an earlier structure holds" in {
+        structuresOf(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+          structure
+            suite "StackSuite" #2, class "samples.StackSuite"
+          """
+        ).last shouldBe Vector(suite(id(suiteAt("samples.StackSuite", 1)), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"))
+      }
+
+      "reject a number on a new suite other than the next among the suites that share its name" in {
+        rejection(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+          structure
+            suite "StackSuite" #3, class "samples.StackSuite"
+          """
+        ) shouldBe Some(
+          "a suite new to the event log is #2 among the suites that share its name, not #3: 'suite \"StackSuite\" #3, class \"samples.StackSuite\"'"
+        )
+      }
+
+      "reject a number that names a suite of another suite ID" in {
+        rejection(
+          """
+          structure
+            suite "SameSuite", class "a.SameSuite"
+          structure
+            suite "SameSuite" #1, class "b.SameSuite"
+          """
+        ) shouldBe Some(
+          "suite \"SameSuite\" #1 is not a suite of suite ID b.SameSuite under the structure's parent: 'suite \"SameSuite\" #1, class \"b.SameSuite\"'"
         )
       }
 
@@ -278,7 +361,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     }
 
     "given a structure under a suite" should {
-      "give a suite new to the run its parent's ID and no position" in {
+      "give a suite new to the run its parent's node path and no position" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+        val helper = under(outer, suiteAt("samples.HelperSuite"))
+        val aHelper = under(helper, scopeAt("A helper"))
+
         structuresOf(
           """
           structure
@@ -290,13 +377,15 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
                 test "helps", label "- helps"
           """
         ).last shouldBe Vector(
-          suite(3, Some(1), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
-          scope(4, 3, 0, "A helper", "A helper"),
-          test(5, 4, 0, "helps", "- helps")
+          suite(helper, Some(outer), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          scope(aHelper, helper, 0, "A helper", "A helper"),
+          test(under(helper, testAt("A helper helps")), aHelper, 0, "helps", "- helps")
         )
       }
 
       "put the suite under the suite a number picks among those sharing the name" in {
+        val userTwo = id(suiteAt("samples.UserSuites"), suiteAt("samples.two.UserSuite"))
+
         structuresOf(
           """
           structure
@@ -306,10 +395,15 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure under suite "UserSuite" #2
             suite "HelperSuite", class "samples.HelperSuite"
           """
-        ).last shouldBe Vector(suite(4, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"))
+        ).last shouldBe Vector(
+          suite(under(userTwo, suiteAt("samples.HelperSuite")), Some(userTwo), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite")
+        )
       }
 
-      "give new IDs to a suite whose suite ID an earlier structure holds only with no parent" in {
+      "give its own node path to a suite whose suite ID an earlier structure holds only with no parent" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+        val helper = under(outer, suiteAt("samples.HelperSuite"))
+
         structuresOf(
           """
           structure
@@ -322,12 +416,15 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "helps", label "- helps"
           """
         ).last shouldBe Vector(
-          suite(4, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
-          test(5, 4, 0, "helps", "- helps")
+          suite(helper, Some(outer), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(under(helper, testAt("helps")), helper, 0, "helps", "- helps")
         )
       }
 
-      "give new IDs to a suite whose suite ID an earlier structure holds only under another parent" in {
+      "give its own node path to a suite whose suite ID an earlier structure holds only under another parent" in {
+        val userTwo = id(suiteAt("samples.UserSuites"), suiteAt("samples.User2Suite"))
+        val helper = under(userTwo, suiteAt("samples.HelperSuite"))
+
         structuresOf(
           """
           structure
@@ -342,8 +439,8 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "helps", label "- helps"
           """
         ).last shouldBe Vector(
-          suite(6, Some(3), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
-          test(7, 6, 0, "helps", "- helps")
+          suite(helper, Some(userTwo), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(under(helper, testAt("helps")), helper, 0, "helps", "- helps")
         )
       }
 
@@ -351,7 +448,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         rejection(joined(stackSuite, """
           structure under scope "A Stack"
             suite "HelperSuite", class "samples.HelperSuite"
-          """)) shouldBe Some("a structure is under a suite at column 32 of 'structure under scope \"A Stack\"'")
+          """)) shouldBe Some("a structure is under a suite or a test at column 32 of 'structure under scope \"A Stack\"'")
       }
 
       "reject a structure under a suite no structure holds" in {
@@ -364,8 +461,52 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
     }
 
+    "given a structure under a test" should {
+      "give a suite new to the run the test's node path as its parent and no position" in {
+        val usesAHelper = id(suiteAt("samples.OuterSuite"), testAt("uses a helper"))
+        val helper = under(usesAHelper, suiteAt("samples.HelperSuite"))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              test "uses a helper", label "- uses a helper"
+          structure under test "uses a helper"
+            suite "HelperSuite", class "samples.HelperSuite"
+              test "helps", label "- helps"
+          """
+        ).last shouldBe Vector(
+          suite(helper, Some(usesAHelper), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(under(helper, testAt("helps")), helper, 0, "helps", "- helps")
+        )
+      }
+
+      "give the suites that two tests run a node path each" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              test "first", label "- first"
+              test "second", label "- second"
+          structure under test "first"
+            suite "HelperSuite", class "samples.HelperSuite"
+          structure under test "second"
+            suite "HelperSuite", class "samples.HelperSuite"
+          """
+        ).drop(1).map(_.head) shouldBe Vector(
+          suite(under(outer, testAt("first"), suiteAt("samples.HelperSuite")), Some(under(outer, testAt("first"))), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          suite(under(outer, testAt("second"), suiteAt("samples.HelperSuite")), Some(under(outer, testAt("second"))), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite")
+        )
+      }
+    }
+
     "given a further structure for a suite an earlier structure holds" should {
-      "keep the ID of a test of the same test name, whichever parent it now has" in {
+      "keep the node path of a test of the same test name, whichever parent it now has" in {
+        val stackSpec = id(suiteAt("samples.StackSpec"))
+        val aStack = under(stackSpec, scopeAt("A Stack"))
+
         structuresOf(
           """
           structure
@@ -378,14 +519,14 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
                 test "pushes", label "- pushes"
           """
         ).last shouldBe Vector(
-          suite(1, None, None, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
-          scope(3, 1, 0, "A Stack", "A Stack"),
-          test(2, 3, 0, "pops", "- pops"),
-          test(4, 3, 1, "pushes", "- pushes")
+          suite(stackSpec, None, None, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
+          scope(aStack, stackSpec, 0, "A Stack", "A Stack"),
+          test(under(stackSpec, testAt("A Stack pops")), aStack, 0, "pops", "- pops"),
+          test(under(stackSpec, testAt("A Stack pushes")), aStack, 1, "pushes", "- pushes")
         )
       }
 
-      "keep the ID of a test whose written test name is an earlier test's" in {
+      "give a test the node path of its written test name" in {
         structuresOf(
           """
           structure
@@ -397,13 +538,15 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "removes", label "- removes", test name "stack pops"
           """
         ).last shouldBe Vector(
-          suite(1, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
-          test(3, 1, 0, "pops", "- pops"),
-          test(2, 1, 1, "removes", "- removes")
+          suite(stackSuiteId, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          test(under(stackSuiteId, testAt("pops")), stackSuiteId, 0, "pops", "- pops"),
+          test(under(stackSuiteId, testAt("stack pops")), stackSuiteId, 1, "removes", "- removes")
         )
       }
 
-      "keep the ID of a scope of the same name at the same place among its parent's scopes of that name" in {
+      "keep the node path of a scope of the same name at the same place among its parent's scopes of that name" in {
+        val dupSpec = id(suiteAt("samples.DupSpec"))
+
         structuresOf(
           """
           structure
@@ -421,16 +564,19 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               scope "A Stack", label "A Stack"
           """
         ).last shouldBe Vector(
-          suite(1, None, None, "DupSpec", "samples.DupSpec", "samples.DupSpec"),
-          scope(6, 1, 0, "A Queue", "A Queue"),
-          scope(2, 1, 1, "A Stack", "A Stack"),
-          scope(4, 1, 2, "A Stack", "A Stack"),
-          test(5, 4, 0, "pops", "- pops"),
-          scope(7, 1, 3, "A Stack", "A Stack")
+          suite(dupSpec, None, None, "DupSpec", "samples.DupSpec", "samples.DupSpec"),
+          scope(under(dupSpec, scopeAt("A Queue")), dupSpec, 0, "A Queue", "A Queue"),
+          scope(under(dupSpec, scopeAt("A Stack", 0)), dupSpec, 1, "A Stack", "A Stack"),
+          scope(under(dupSpec, scopeAt("A Stack", 1)), dupSpec, 2, "A Stack", "A Stack"),
+          test(under(dupSpec, testAt("A Stack pops")), under(dupSpec, scopeAt("A Stack", 1)), 0, "pops", "- pops"),
+          scope(under(dupSpec, scopeAt("A Stack", 2)), dupSpec, 3, "A Stack", "A Stack")
         )
       }
 
-      "mint an ID for a scope of an earlier scope's name under another parent" in {
+      "give a scope of an earlier scope's name under another parent its own node path" in {
+        val stackSpec = id(suiteAt("samples.StackSpec"))
+        val aQueue = under(stackSpec, scopeAt("A Queue"))
+
         structuresOf(
           """
           structure
@@ -443,13 +589,16 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
                 scope "when empty", label "when empty"
           """
         ).last shouldBe Vector(
-          suite(1, None, None, "StackSpec", "samples.StackSpec", "samples.StackSpec"),
-          scope(4, 1, 0, "A Queue", "A Queue"),
-          scope(5, 4, 0, "when empty", "when empty")
+          suite(stackSpec, None, None, "StackSpec", "samples.StackSpec", "samples.StackSpec"),
+          scope(aQueue, stackSpec, 0, "A Queue", "A Queue"),
+          scope(under(aQueue, scopeAt("when empty")), aQueue, 0, "when empty", "when empty")
         )
       }
 
-      "give a nested suite its parent's ID and the position its first structure gave it" in {
+      "give a nested suite its parent's node path and the position its first structure gave it" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+        val inner = under(outer, suiteAt("samples.InnerSuite"))
+
         structuresOf(
           """
           structure
@@ -463,13 +612,16 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "inner one", label "- inner one"
           """
         ).last shouldBe Vector(
-          suite(3, Some(1), Some(1), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
-          test(5, 3, 0, "inner two", "- inner two"),
-          test(4, 3, 1, "inner one", "- inner one")
+          suite(inner, Some(outer), Some(1), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
+          test(under(inner, testAt("inner two")), inner, 0, "inner two", "- inner two"),
+          test(under(inner, testAt("inner one")), inner, 1, "inner one", "- inner one")
         )
       }
 
-      "give a suite that a structure under a suite added its parent's ID and no position" in {
+      "give a suite that a structure under a suite added its parent's node path and no position" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+        val helper = under(outer, suiteAt("samples.HelperSuite"))
+
         structuresOf(
           """
           structure
@@ -481,12 +633,15 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "helps", label "- helps"
           """
         ).last shouldBe Vector(
-          suite(2, Some(1), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
-          test(3, 2, 0, "helps", "- helps")
+          suite(helper, Some(outer), None, "HelperSuite", "samples.HelperSuite", "samples.HelperSuite"),
+          test(under(helper, testAt("helps")), helper, 0, "helps", "- helps")
         )
       }
 
-      "continue the first of the sibling suites that share the suite ID, the only one whose place a block of one suite can take" in {
+      "continue the first of the sibling suites that share the suite ID where the suite line gives no number" in {
+        val outer = id(suiteAt("samples.TwiceSuites"))
+        val first = under(outer, suiteAt("samples.InnerSuite", 0))
+
         structuresOf(
           """
           structure
@@ -501,9 +656,51 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "inner one", label "- inner one"
           """
         ).last shouldBe Vector(
-          suite(2, Some(1), Some(0), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
-          test(6, 2, 0, "inner two", "- inner two"),
-          test(3, 2, 1, "inner one", "- inner one")
+          suite(first, Some(outer), Some(0), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
+          test(under(first, testAt("inner two")), first, 0, "inner two", "- inner two"),
+          test(under(first, testAt("inner one")), first, 1, "inner one", "- inner one")
+        )
+      }
+
+      "continue the sibling suite that the suite line's number names" in {
+        val outer = id(suiteAt("samples.TwiceSuites"))
+        val second = under(outer, suiteAt("samples.InnerSuite", 1))
+
+        structuresOf(
+          """
+          structure
+            suite "TwiceSuites", class "samples.TwiceSuites"
+              suite "InnerSuite", class "samples.InnerSuite"
+                test "inner one", label "- inner one"
+              suite "InnerSuite", class "samples.InnerSuite"
+                test "inner one", label "- inner one"
+          structure under suite "TwiceSuites"
+            suite "InnerSuite" #2, class "samples.InnerSuite"
+              test "inner two", label "- inner two"
+          """
+        ).last shouldBe Vector(
+          suite(second, Some(outer), Some(1), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
+          test(under(second, testAt("inner two")), second, 0, "inner two", "- inner two")
+        )
+      }
+
+      "add a sibling suite of the same suite ID where the suite line's number names no suite an earlier structure holds" in {
+        val outer = id(suiteAt("samples.OuterSuites"))
+        val second = under(outer, suiteAt("samples.Inner1Suite", 1))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuites", class "samples.OuterSuites"
+              suite "Inner1Suite", class "samples.Inner1Suite"
+                test "inner one", label "- inner one"
+          structure under suite "OuterSuites"
+            suite "Inner1Suite" #2, class "samples.Inner1Suite"
+              test "inner one", label "- inner one"
+          """
+        ).last shouldBe Vector(
+          suite(second, Some(outer), None, "Inner1Suite", "samples.Inner1Suite", "samples.Inner1Suite"),
+          test(under(second, testAt("inner one")), second, 0, "inner one", "- inner one")
         )
       }
 
@@ -535,6 +732,8 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
     "given an event that names a node" should {
       "assign the event to the node of that kind and name" in {
+        val pops = id(suiteAt("samples.pops"))
+
         executionsOf(
           """
           structure
@@ -545,10 +744,19 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           scope "pops": ScopeOpened
           suite "pops": SuiteStarting
           """
-        ) shouldBe Vector(execution(3, 1, Some(1)), execution(2, 1, Some(1)), execution(1, 1, None))
+        ) shouldBe Vector(
+          execution(under(pops, testAt("pops pops")), 1, 1, 1),
+          execution(under(pops, scopeAt("pops")), 1, 1),
+          execution(pops, 1)
+        )
       }
 
       "assign the event to the node its number picks among those sharing a name, in the order structures first hold them" in {
+        val outer = id(suiteAt("samples.TwiceSuites"))
+        val first = under(outer, suiteAt("samples.InnerSuite", 0))
+        val second = under(outer, suiteAt("samples.InnerSuite", 1))
+        val other = id(suiteAt("samples.other.InnerSuite"))
+
         executionsOf(
           """
           structure
@@ -567,15 +775,18 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           suite "InnerSuite" #3: SuiteStarting
           """
         ) shouldBe Vector(
-          execution(3, 1, Some(1)),
-          execution(7, 1, Some(1)),
-          execution(4, 1, None),
-          execution(5, 1, Some(1)),
-          execution(6, 1, None)
+          execution(under(first, testAt("inner one")), 1, 1, 1),
+          execution(under(other, testAt("inner one")), 1, 1),
+          execution(second, 1, 1),
+          execution(under(second, testAt("inner one")), 1, 1, 1),
+          execution(other, 1)
         )
       }
 
       "name a node as the latest structure names it" in {
+        val stackSpec = id(suiteAt("samples.StackSpec"))
+        val aStackPops = under(stackSpec, testAt("A Stack pops"))
+
         executionsOf(
           """
           structure
@@ -588,7 +799,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
                 test "pops", label "- pops"
           test "pops": TestSucceeded
           """
-        ) shouldBe Vector(execution(2, 1, Some(1)), execution(2, 1, Some(1)))
+        ) shouldBe Vector(execution(aStackPops, 1, 1), execution(aStackPops, 1, 1, 1))
       }
 
       "reject the name an earlier structure gave a node that a later one renamed" in {
@@ -640,6 +851,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         rejection("run execution 2: RunStopped") shouldBe Some("an event assigned to the run has no execution: 'run execution 2: RunStopped'")
       }
 
+      "reject an ancestor's execution for an event of the run" in {
+        rejection(joined(stackSuite, """run, in suite "StackSuite" execution 1: RunStopped""")) shouldBe
+          Some("an event assigned to the run has no execution: 'run, in suite \"StackSuite\" execution 1: RunStopped'")
+      }
+
       "reject a line that names no run, suite, scope or test" in {
         rejection("""spec "pops": TestStarting""") shouldBe Some("expected run, suite, scope or test at column 1 of 'spec \"pops\": TestStarting'")
       }
@@ -653,16 +869,18 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "numbering an event's execution" should {
-      "give the node's first execution where the event writes none" in {
-        executionsOf(joined(stackSuite, """test "pops": TestStarting""")) shouldBe Vector(execution(3, 1, Some(1)))
+    "numbering an event's executions" should {
+      "give the execution of each node from the top-level suite down to the event's node, the test's scopes included" in {
+        executionsOf(joined(stackSuite, """test "pops": TestStarting""")) shouldBe Vector(execution(popsId, 1, 1, 1))
       }
 
       "give the execution the event writes" in {
-        executionsOf(joined(stackSuite, """test "pops" execution 4: TestStarting""")) shouldBe Vector(execution(3, 4, Some(1)))
+        executionsOf(joined(stackSuite, """test "pops" execution 4: TestStarting""")) shouldBe Vector(execution(popsId, 1, 1, 4))
       }
 
-      "give a suite's event no parent execution, nested or not" in {
+      "give a nested suite's event the execution of the suite above it" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+
         executionsOf(
           """
           structure
@@ -671,26 +889,63 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           suite "OuterSuite" execution 2: SuiteStarting
           suite "InnerSuite": SuiteStarting
           """
-        ) shouldBe Vector(execution(1, 2, None), execution(2, 1, None))
+        ) shouldBe Vector(execution(outer, 2), execution(under(outer, suiteAt("samples.InnerSuite")), 2, 1))
       }
 
-      "give a scope's or test's event the parent execution it writes" in {
+      "give the event of a suite a test runs the execution of that test" in {
+        val flaky = id(suiteAt("samples.RetrySuite"), testAt("flaky"))
+
+        executionsOf(
+          """
+          structure
+            suite "RetrySuite", class "samples.RetrySuite"
+              test "flaky", label "- flaky"
+          structure under test "flaky"
+            suite "HelperSuite", class "samples.HelperSuite"
+          test "flaky": TestStarting
+          test "flaky": TestFailed
+          test "flaky" execution 2: TestStarting
+          suite "HelperSuite": SuiteStarting
+          """
+        ).last shouldBe execution(under(flaky, suiteAt("samples.HelperSuite")), 1, 2, 1)
+      }
+
+      "give the execution of each ancestor the event marks" in {
         executionsOf(
           joined(stackSuite, """
-          scope "A Stack", parent execution 5: ScopeOpened
-          test "pops" execution 2, parent execution 3: TestStarting
+          scope "A Stack", in suite "StackSuite" execution 5: ScopeOpened
+          test "pops" execution 2, in suite "StackSuite" execution 4, in scope "A Stack" execution 3: TestStarting
           """)
-        ) shouldBe Vector(execution(2, 1, Some(5)), execution(3, 2, Some(3)))
+        ) shouldBe Vector(execution(aStackId, 5, 1), execution(popsId, 4, 3, 2))
       }
 
-      "reject a parent execution for a suite's event" in {
-        rejection(joined(stackSuite, """suite "StackSuite", parent execution 1: SuiteStarting""")) shouldBe
-          Some("a suite's event has no parent execution: 'suite \"StackSuite\", parent execution 1: SuiteStarting'")
+      "reject a marked node that is not above the event's node" in {
+        rejection(joined(stackSuite, """suite "StackSuite", in scope "A Stack" execution 1: SuiteStarting""")) shouldBe
+          Some("scope \"A Stack\" is not above suite \"StackSuite\": 'suite \"StackSuite\", in scope \"A Stack\" execution 1: SuiteStarting'")
+      }
+
+      "reject ancestors marked other than from the top-level suite down" in {
+        rejection(joined(stackSuite, """test "pops", in scope "A Stack" execution 1, in suite "StackSuite" execution 1: TestStarting""")) shouldBe
+          Some(
+            "an event marks each ancestor's execution once, from the top-level suite down: 'test \"pops\", in scope \"A Stack\" execution 1, in suite \"StackSuite\" execution 1: TestStarting'"
+          )
+      }
+
+      "reject an ancestor marked twice" in {
+        rejection(joined(stackSuite, """test "pops", in scope "A Stack" execution 1, in scope "A Stack" execution 2: TestStarting""")) shouldBe
+          Some(
+            "an event marks each ancestor's execution once, from the top-level suite down: 'test \"pops\", in scope \"A Stack\" execution 1, in scope \"A Stack\" execution 2: TestStarting'"
+          )
       }
 
       "reject an execution below 1" in {
         rejection(joined(stackSuite, """test "pops" execution 0: TestStarting""")) shouldBe
           Some("expected a number from 1 at column 23 of 'test \"pops\" execution 0: TestStarting'")
+      }
+
+      "reject an ancestor's execution below 1" in {
+        rejection(joined(stackSuite, """test "pops", in scope "A Stack" execution 0: TestStarting""")) shouldBe
+          Some("expected a number from 1 at column 43 of 'test \"pops\", in scope \"A Stack\" execution 0: TestStarting'")
       }
 
       "reject an execution that does not fit an Int" in {
@@ -699,8 +954,8 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "defaulting a scope's or test's parent execution" should {
-      "take the parent's latest execution that is open" in {
+    "defaulting an ancestor's execution" should {
+      "take the ancestor's latest execution that is open" in {
         lastParentExecutionOf(
           joined(stackSuite, """
           scope "A Stack": ScopeOpened
@@ -712,7 +967,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(2)
       }
 
-      "take the parent's latest execution where none is open" in {
+      "take the ancestor's latest execution where none is open" in {
         lastParentExecutionOf(
           joined(stackSuite, """
           scope "A Stack": ScopeOpened
@@ -724,7 +979,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(2)
       }
 
-      "take the parent's first execution where the parent has none" in {
+      "take the ancestor's first execution where the ancestor has none" in {
         lastParentExecutionOf(joined(stackSuite, """test "pops" execution 2: TestStarting""")) shouldBe Some(1)
       }
 
@@ -736,6 +991,18 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           test "pops": TestStarting
           """)
         ) shouldBe Some(1)
+      }
+
+      "count an execution as open from the first event that marks it" in {
+        lastParentExecutionOf(
+          joined(stackSuite, """
+          scope "A Stack": ScopeOpened
+          test "pops", in scope "A Stack" execution 2: TestStarting
+          scope "A Stack" execution 3: ScopeOpened
+          scope "A Stack" execution 3: ScopeClosed
+          test "pops": TestSucceeded
+          """)
+        ) shouldBe Some(2)
       }
 
       "count a scope's execution as closed by ScopePending" in {
@@ -769,6 +1036,32 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           scope "A Stack": ScopeOpened
           """)
         ) shouldBe Some(1)
+      }
+
+      "count a test's execution as closed by its closing event" in {
+        val closings = Vector(
+          "TestSucceeded",
+          "TestFailed",
+          "TestCanceled",
+          "TestPending",
+          "TestIgnored"
+        )
+
+        closings.map { closing =>
+          closing -> lastParentExecutionOf(
+            s"""
+            structure
+              suite "RetrySuite", class "samples.RetrySuite"
+                test "flaky", label "- flaky"
+            structure under test "flaky"
+              suite "HelperSuite", class "samples.HelperSuite"
+            test "flaky": TestStarting
+            test "flaky" execution 2: TestStarting
+            test "flaky" execution 2: $closing
+            suite "HelperSuite": SuiteStarting
+            """
+          )
+        } shouldBe closings.map(_ -> Some(1))
       }
 
       "take the execution of the parent the latest structure gives the node" in {
@@ -1122,7 +1415,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
         event.fixed shouldBe FixedParts(
           Set("throwable", "analysis"),
-          false,
+          Set.empty,
           Some(
             WrittenThrowable(
               "java.lang.IllegalStateException",
@@ -1137,12 +1430,12 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "record a parent execution the event writes" in {
-        built(TestRunPart.Events(joined(stackSuite, """test "pops", parent execution 1: TestStarting"""))).events.last.fixed shouldBe
-          FixedParts(Set.empty, true, None)
+      "record each ancestor whose execution the event marks" in {
+        built(TestRunPart.Events(joined(stackSuite, """test "pops", in scope "A Stack" execution 1: TestStarting"""))).events.last.fixed shouldBe
+          FixedParts(Set.empty, Set(aStackId), None)
       }
 
-      "record no parent execution where the event leaves it to the default" in {
+      "record no ancestor where the event leaves each to the default" in {
         built(TestRunPart.Events(joined(stackSuite, """test "pops" execution 2: TestStarting"""))).events.last.fixed shouldBe FixedParts.none
       }
 
