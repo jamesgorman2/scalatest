@@ -55,7 +55,7 @@ private[scalatest] final class NodeExecutions {
 
   /**
    * The number of the execution an event below this node ran in, where nothing names it: the execution that opened
-   * last and has not closed, else the latest, else a first.
+   * last and has not closed, else the latest, else a new first one.
    */
   def numberOfCurrent: Int = number(openedLast.orElse(latest).getOrElse(new Execution))
 }
@@ -197,14 +197,14 @@ private[scalatest] final class SuiteNodeTable(
 
   def executionsOf(node: NodeId): NodeExecutions = executionsOfNodes.getOrElseUpdate(node, new NodeExecutions)
 
-  /** The execution path of an event of this suite, but for the suite's own execution: the current execution of each suite above it, from its top-level suite down. */
+  /** The execution path of an event of this suite, without the suite's own execution: the current execution of each suite above it, from its top-level suite down. */
   def executionPathAboveSuite: Vector[Int] = {
     val suitesAbove = Iterator.unfold(parentSuite)(above => above.map(table => (table, table.parentSuite))).toVector.reverse
     suitesAbove.map(table => table.executionsOf(table.node).numberOfCurrent)
   }
 
   /**
-   * The execution path of an event of one of this suite's scopes or tests, but for the node's own execution. The
+   * The execution path of an event of one of this suite's scopes or tests, without the node's own execution. The
    * suite's execution is `executionOfSuite`, else the suite's current one. Each suite above it, and each scope between
    * it and the node, takes its current execution. A test's scopes are those its latest structure puts it in.
    */

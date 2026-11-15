@@ -233,7 +233,7 @@ private final class RunUnderConstruction {
     built.result()
   }
 
-  /** The nodes above the given one, from its top-level suite down, a test's scopes as the latest structure gives them. */
+  /** The nodes above the given one, from its top-level suite down. A test's scopes are those of the latest structure. */
   private def ancestorsOf(node: HeldNode): Vector[HeldNode] =
     Iterator.unfold(node.parent)(parent => parent.map(nodes).map(held => (held, held.parent))).toVector.reverse
 

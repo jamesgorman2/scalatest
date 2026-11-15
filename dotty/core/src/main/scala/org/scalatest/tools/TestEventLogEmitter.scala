@@ -49,7 +49,7 @@ import org.scalatest.events.TestSucceeded
 private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStream) {
 
   private var isOpen = true
-  // Read and written only under this emitter's lock: how many top-level suites of each suite ID the run has written.
+  // How many top-level suites of each suite ID the run has written. Read and written only under this emitter's lock.
   private val topLevelSuitesOfSuiteId = scala.collection.mutable.HashMap.empty[String, Int]
   // Both are read and written only under this emitter's lock. Both are keyed by the event's identity, since an
   // event's `equals` compares its fields, which hold the run's own objects. The second maps each event an inner
@@ -104,8 +104,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   /**
    * Gives a top-level suite and each node of its structure its node path, writes the structure, and returns the
-   * suite's node table. A top-level suite whose suite ID an earlier one of the run has takes the next index, so no
-   * two nodes of the run share a node path.
+   * suite's node table. A top-level suite that shares its suite ID with an earlier one takes the next index, so no two
+   * nodes of the run share a node path.
    */
   def topLevelSuite(structure: SuiteStructure): SuiteNodeTable = {
     val index = synchronized {

@@ -4,8 +4,8 @@ import org.scalatest.tools.StackDepthView
 import org.scalatest.tools.ThrowableView
 
 /**
- * A node's place under its parent. A suite's index orders the suites with its `suiteId` under that parent, and a
- * scope's the scopes with its text.
+ * A node's place under its parent. A suite's index is its order among the parent's suites of its `suiteId`; a
+ * scope's is its order among the parent's scopes of its text.
  */
 private[scalatest] enum NodePlace {
   case Suite(suiteId: String, index: Int)

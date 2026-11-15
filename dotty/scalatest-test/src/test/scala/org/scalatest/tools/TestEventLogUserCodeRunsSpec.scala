@@ -125,7 +125,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   /**
    * Whether an event line's execution path holds a second execution of a node under its `HelperSuite`: `A helper` or
-   * `helps`. A test's node path holds no place for its scopes, but its execution path does, so the executions under the
+   * `helps`. A test's node path holds no place for its scopes, but its execution path does. The executions under the
    * helper are those after the helper's place, which is at the same index in both.
    */
   private def ofASecondExecutionOfAHelper(line: String): Boolean = {

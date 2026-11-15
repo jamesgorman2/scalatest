@@ -42,7 +42,8 @@ private[tools] object StatedLines {
   private def parsed(line: String): JsonValue =
     JsonReader.read(line).fold(reason => throw new IllegalArgumentException(s"$reason, in $line"), identity)
 
-  // Recurses once for each object or array nested in another, which in an event log's line are at most a node path's places and a throwable's parts.
+  // Recurses once for each nested object or array. In an event log line, those are only a node path's places and a
+  // throwable's parts.
   private def holds(written: JsonValue, stated: JsonValue): Boolean = {
     (written, stated) match {
       case (JsonValue.Object(writtenFields), JsonValue.Object(statedFields)) =>

@@ -104,7 +104,7 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  /** The nodes above the given one, from its top-level suite down, a test's scopes as the latest structure gives them. */
+  /** The nodes above the given one, from its top-level suite down. A test's scopes are those of the latest structure. */
   private def ancestorsOf(node: NodeId, nodes: Map[NodeId, StructureNode]): Vector[NodeId] = {
     def parentOfNode(id: NodeId): Option[NodeId] = nodes.get(id).flatMap(parentOf)
     Iterator.unfold(parentOfNode(node))(_.map(parent => (parent, parentOfNode(parent)))).toVector.reverse
@@ -255,8 +255,7 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  // Each side's ancestors come from its own structures, since a log the event is expected to hold in order can hold a
-  // further structure that moves the node.
+  // Each side's ancestors come from its own structures: the log can hold a further structure that moves the node.
   private def markedAncestorExecutionMismatch(
     nodes: MatchedNodes,
     trees: Trees,

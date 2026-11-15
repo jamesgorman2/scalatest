@@ -398,7 +398,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private val runAbortedByConstructor = "An exception or error caused a run to abort. "
 
-  /** The structure of a suite whose one scope, A config, holds its one test, reads. */
+  /** The structure of a suite whose only scope, `A config`, holds its only test, `reads`. */
   private def structureOfAConfigReads(name: String, className: String): String = {
     val suite = NodePath.topLevel(className)
     TestEventLogLine.structure(

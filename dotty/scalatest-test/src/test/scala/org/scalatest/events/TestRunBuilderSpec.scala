@@ -618,7 +618,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "give a suite that a structure under a suite added its parent's node path and no position" in {
+      "give a suite added by a structure under a suite its parent's node path and no position" in {
         val outer = id(suiteAt("samples.OuterSuite"))
         val helper = under(outer, suiteAt("samples.HelperSuite"))
 
