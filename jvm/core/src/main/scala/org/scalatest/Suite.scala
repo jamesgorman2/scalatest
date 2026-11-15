@@ -1196,7 +1196,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         val nestedSuiteName = nestedSuite.suiteName
         val nestedSuiteId = nestedSuite.suiteId
         start.namesRead(nestedSuiteName, nestedSuiteId)
-        nestedReport(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+        start.report(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
@@ -1209,11 +1209,11 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
           status.unreportedException match {
             case Some(ue) =>
-              nestedReport(SuiteAborted(tracker.nextOrdinal(), ue.getMessage, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+              start.report(SuiteAborted(tracker.nextOrdinal(), ue.getMessage, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
               FailedStatus
 
             case None =>
-              nestedReport(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+              start.report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
               SucceededStatus
           }
         }
@@ -1228,7 +1228,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
             val formatter = formatterForSuiteAborted(nestedSuite, rawString)
 
             val duration = System.currentTimeMillis - suiteStartTime
-            nestedReport(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+            start.report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
             if (NonFatal(e.getCause))
               FailedStatus
             else
@@ -1680,9 +1680,9 @@ used for test events like succeeded/failed, etc.
       case _ => Vector.empty
     }
 
-  // Records the event's origin for a run that writes a test event log, then reports the event.
+  // Hands the event off with its origin for a run that writes a test event log, then reports the event.
   private def reportFrom(origin: EventOrigin, report: Reporter, event: org.scalatest.events.Event): Unit = {
-    origin.recordFor(event)
+    origin.handOff(event)
     report(event)
   }
 

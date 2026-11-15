@@ -312,7 +312,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
 
     try {
 
-      origin.runningTheTest(invokeWithFixture(theTest)).toUnit
+      origin.runningInItsExecution(invokeWithFixture(theTest)).toUnit
 
       val duration = System.currentTimeMillis - testStartTime
       val durationToReport = theTest.recordedDuration.getOrElse(duration)
@@ -415,7 +415,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
         val descriptionTextWithOptionalPrefix = prependChildPrefix(parent, descriptionText)
         val indentationLevel = desc.indentationLevel
         reportScopeOpened(theSuite, args.reporter, args.tracker, descriptionTextWithOptionalPrefix, indentationLevel, false, lineInFile, origin)
-        traverseSubNodes()
+        origin.runningInItsExecution(traverseSubNodes())
         if (desc.pending)
           reportScopePending(theSuite, args.reporter, args.tracker, descriptionTextWithOptionalPrefix, indentationLevel, false, lineInFile, origin)
         else

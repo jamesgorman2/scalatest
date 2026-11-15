@@ -379,7 +379,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
 
     val asyncOutcome: AsyncOutcome =
       try {
-        val outcome = origin.runningTheTest(invokeWithFixture(theTest, onCompleteFun))
+        val outcome = origin.runningInItsExecution(invokeWithFixture(theTest, onCompleteFun))
         executionContext match {
           case dec: concurrent.SerialExecutionContext =>
             dec.runNow(outcome.toFutureOfOutcome)
@@ -459,7 +459,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                       runTest(testName, registration.argsOfTest(testName, args)) // Even if serial async test execution (i.e., not parallelAsyncTestExection), first time still just go for it
                     }
                     else {
-                      statusVec.last thenRun registration.runningInItsContext(runTest(testName, registration.argsOfTest(testName, args)))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
+                      statusVec.last thenRun origin.runningInItsExecution(runTest(testName, registration.argsOfTest(testName, args)))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
                     }
                   )
                 }
@@ -487,7 +487,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                 runTestsInBranch(theSuite, branch, args, includeIcon, parallelAsyncTestExecution, statusVec, runTest, registration) // Even if serial async test execution (i.e., not parallelAsyncTestExection), first time still just go for it
               }
               else {
-                statusVec :+ (statusVec.last thenRun registration.runningInItsContext(new CompositeStatus(ListSet(runTestsInBranch(theSuite, branch, args, includeIcon, parallelAsyncTestExecution, statusVec, runTest, registration): _*))))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
+                statusVec :+ (statusVec.last thenRun origin.runningInItsExecution(new CompositeStatus(ListSet(runTestsInBranch(theSuite, branch, args, includeIcon, parallelAsyncTestExecution, statusVec, runTest, registration): _*))))  // Only if serial async test execution (i.e., not parallelAsyncTestExecution), after first Status
               }
           }
         }
@@ -503,7 +503,7 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
         val descriptionTextWithOptionalPrefix = prependChildPrefix(parent, descriptionText)
         val indentationLevel = desc.indentationLevel
         reportScopeOpened(theSuite, args.reporter, args.tracker, descriptionTextWithOptionalPrefix, indentationLevel, false, lineInFile, origin)
-        val statusVec = traverseSubNodes()
+        val statusVec = origin.runningInItsExecution(traverseSubNodes())
         if (desc.pending)
           reportScopePending(theSuite, args.reporter, args.tracker, descriptionTextWithOptionalPrefix, indentationLevel, false, lineInFile, origin)
         else

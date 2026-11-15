@@ -70,9 +70,9 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
     /** Completes the suite's run, which removes its registration. */
     def complete(): Unit = started.complete()
 
-    /** Records the event's origin as the test's engine site does, and has the suite's wrapper hand it off. */
+    /** Hands the event off with its origin as the test's engine site does, then reports it to the suite's wrapper. */
     def send(event: Event, origin: EventOrigin = ofTest): Unit = {
-      origin.recordFor(event)
+      origin.handOff(event)
       wrapperOfSuite(event)
     }
 
@@ -95,53 +95,40 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
   }
 
   "An emitter handed a test's message as the test calls it" should {
-    "write the message at once, assigned as the test's written TestStarting is" in withRegisteredSuite { run =>
+    "write the message at once, assigned to the test in the execution its origin names" in withRegisteredSuite { run =>
       run.send(testStarting)
       run.ofTest.handOffMessage(info("first"))
       run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("first"))
     }
 
-    "hold a message handed off before the test's TestStarting is written, and write it after that event" in withRegisteredSuite { run =>
-      val starting = testStarting
-      run.ofTest.recordFor(starting)
-      run.ofTest.handOffMessage(info("before the start was written"))
-      run.eventLines shouldBe Vector.empty
-      run.wrapperOfSuite(starting)
-      run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("before the start was written"))
-    }
-
-    "write a held message before the test's closing event, where that event is the first of the test's execution written" in
+    "write a message handed off while a sorter holds the test's TestStarting back after that event, and not write the event again when the sorter passes it on" in
       withRegisteredSuite { run =>
-        run.ofTest.handOffMessage(info("held"))
-        run.send(testSucceeded(), run.ofTest.ofClosingEventWithMessagesHandedOff)
-        run.eventLines shouldBe Vector(infoLine("held"), testLine("TestSucceeded"))
+        val starting = testStarting
+        run.ofTest.handOff(starting)
+        run.ofTest.handOffMessage(info("while the start was held back"))
+        run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("while the start was held back"))
+        run.wrapperOfSuite(starting)
+        run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("while the start was held back"))
       }
+
+    "write a message handed off before any other event of the test's execution at once, in that execution" in withRegisteredSuite { run =>
+      run.ofTest.handOffMessage(info("first"))
+      run.send(testSucceeded(), run.ofTest.ofClosingEventWithMessagesHandedOff)
+      run.eventLines shouldBe Vector(infoLine("first"), testLine("TestSucceeded"))
+    }
 
     "write the messages in the order of the test's calls, where a reporter ahead of every wrapper holds the test's events back" in
       withRegisteredSuite { run =>
         val (starting, noted, alerted) = (testStarting, note("second"), alert("third"))
-        run.ofTest.recordFor(starting)
+        run.ofTest.handOff(starting)
         run.ofTest.handOffMessage(info("first"))
-        run.ofTest.recordFor(noted)
-        run.ofTest.recordFor(alerted)
+        run.ofTest.handOff(noted)
+        run.ofTest.handOff(alerted)
         run.ofTest.handOffMessage(markup("fourth"))
-        run.eventLines shouldBe Vector.empty
-        run.wrapperOfSuite(starting)
-        run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided first")
-        run.wrapperOfSuite(noted)
-        run.wrapperOfSuite(alerted)
+        List(starting, noted, alerted).foreach(run.wrapperOfSuite(_))
         run.eventsAndMessages shouldBe
           Vector("TestStarting", "InfoProvided first", "NoteProvided second", "AlertProvided third", "MarkupProvided fourth")
       }
-
-    "write a message held behind an event that never reaches a wrapper before the test's closing event" in withRegisteredSuite { run =>
-      run.send(testStarting)
-      run.ofTest.recordFor(note("never passed on"))
-      run.ofTest.handOffMessage(info("held"))
-      run.eventsAndMessages shouldBe Vector("TestStarting")
-      run.send(testSucceeded(Vector(info("held"))), run.ofTest.ofClosingEventWithMessagesHandedOff)
-      run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided held", "TestSucceeded")
-    }
 
     "write no message once the test's registration has been removed" in withRegisteredSuite { run =>
       run.send(testStarting)
@@ -194,18 +181,6 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
         run.send(testSucceeded(Vector(info("handed off"))), run.ofTest.ofClosingEventWithMessagesHandedOff)
         run.eventsAndMessages shouldBe Vector("TestStarting", "InfoProvided handed off", "TestSucceeded")
       }
-
-    "write the messages held for it before it, where its origin was dropped when the test's registration was removed" in
-      withRegisteredSuite { run =>
-        val starting = testStarting
-        val closing = testSucceeded(Vector(info("held")))
-        run.ofTest.recordFor(starting)
-        run.ofTest.handOffMessage(info("held"))
-        run.ofTest.ofClosingEventWithMessagesHandedOff.recordFor(closing)
-        run.complete()
-        run.wrapperOfSuite(closing)
-        run.eventsAndMessages shouldBe Vector("InfoProvided held", "TestSucceeded")
-      }
   }
 
   "A run that writes no test event log" should {
@@ -239,7 +214,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
     /** Records an event's message, ordinal and timestamp, as the emitter receives it. */
     final class ReceivingOrigin extends EventOrigin {
       var received = Vector.empty[Event]
-      def recordFor(event: Event): Unit = ()
+      def handOff(event: Event): Unit = ()
       override def handOffMessage(message: => Event): Unit = received :+= message
     }
 
