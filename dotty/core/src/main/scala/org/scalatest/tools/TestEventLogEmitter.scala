@@ -165,21 +165,33 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * one that can have no node table. Each node fixed writes the structure its registration keeps for it, where that
    * differs from its node table.
    *
+   * An inner instance's node is placed below its outer one's, so it stays unfixed while an outer one does, as where
+   * another thread is reading that one's suite ID. The suite ID its run read is kept, and it is fixed by the next
+   * call once the outer node is.
+   *
    * What reading the suite ID or writing a structure throws is kept from the caller as `runEvent` keeps it.
    */
   def fixNode(registration: RegisteredSuite, suiteIdRead: Option[String]): Unit = {
-    val unfixed = synchronized(if (isOpen) registration.unfixedFromOutermost else Nil)
-    unfixed.foreach(one => fixNodeOf(one, Option.when(one eq registration)(suiteIdRead).flatten))
+    val unfixed = synchronized {
+      if (isOpen) {
+        suiteIdRead.foreach(registration.keepSuiteIdItsRunRead)
+        registration.unfixedFromOutermost
+      } else {
+        Nil
+      }
+    }
+    unfixed.forall(fixNodeOf)
   }
 
-  private def fixNodeOf(registration: RegisteredSuite, suiteIdRead: Option[String]): Unit = {
-    val readsSuiteId = suiteIdRead.isEmpty && synchronized(isOpen && registration.takeReadOfSuiteId())
+  // Returns whether the node is fixed.
+  private def fixNodeOf(registration: RegisteredSuite): Boolean = {
+    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen && registration.takeReadOfSuiteId()))
     val suiteId = if (readsSuiteId) TestEventLogEmitter.caught(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
-    val thrown = synchronized {
+    val (thrown, isFixed) = synchronized {
       if (!isOpen) {
-        None
+        (None, false)
       } else {
-        suiteId match {
+        val thrown = suiteId match {
           case Left(thrownByRead) =>
             registration.fixNode(None)
             Some(thrownByRead)
@@ -192,9 +204,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
             }
             None
         }
+        (thrown, registration.isNodeFixed)
       }
     }
     thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+    isFixed
   }
 
   // Encoding a structure calls no user code, so it is encoded under the lock that makes it the latest.

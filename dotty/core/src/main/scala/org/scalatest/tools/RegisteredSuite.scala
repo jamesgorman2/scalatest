@@ -159,6 +159,8 @@ private[scalatest] final class RegisteredSuite(
   private var suiteIdOfRun = Option.empty[String]
   // Set once the emitter takes the read of the instance's suite ID, so that it reads it once at most.
   private var emitterReadsSuiteId = false
+  // The first suite ID the instance's run read, kept until the node is fixed from it.
+  private var suiteIdItsRunRead = Option.empty[String]
   // The registration of the suite this instance is, whose run this instance's run is.
   private var runOfSuite = Option.empty[RegisteredSuite]
   private var executionOfLatestRun = Option.empty[Execution]
@@ -255,11 +257,24 @@ private[scalatest] final class RegisteredSuite(
   }
 
   /**
-   * Whether the emitter is to read the instance's suite ID itself: where its node is not fixed, may have a node table,
-   * and the emitter has not read it before. Called under the emitter's lock.
+   * Keeps the suite ID the instance's run read, where its node is not fixed and the run has read none before, until
+   * the node is fixed from it. Called under the emitter's lock.
+   */
+  def keepSuiteIdItsRunRead(suiteId: String): Unit = {
+    if (!nodeIsFixed && suiteIdItsRunRead.isEmpty) {
+      suiteIdItsRunRead = Some(suiteId)
+    }
+  }
+
+  /** The first suite ID the instance's run read, where its node is not yet fixed. Called under the emitter's lock. */
+  def suiteIdReadByItsRun: Option[String] = Option.when(!nodeIsFixed)(suiteIdItsRunRead).flatten
+
+  /**
+   * Whether the emitter is to read the instance's suite ID itself: where its node is not fixed, its run has read no
+   * suite ID, it may have a node table, and the emitter has not read it before. Called under the emitter's lock.
    */
   def takeReadOfSuiteId(): Boolean = {
-    val takes = !nodeIsFixed && !emitterReadsSuiteId && canHaveTable
+    val takes = !nodeIsFixed && suiteIdItsRunRead.isEmpty && !emitterReadsSuiteId && canHaveTable
     emitterReadsSuiteId ||= takes
     takes
   }
@@ -275,6 +290,7 @@ private[scalatest] final class RegisteredSuite(
       suiteIdOfRun = suiteId
       suiteId.foreach(placeBy)
       nodeIsFixed = true
+      suiteIdItsRunRead = None
       if (startsARunOnceNodeIsFixed) {
         startRunUnderLock()
       }

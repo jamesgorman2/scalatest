@@ -622,6 +622,35 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
+  "A nested suite instance whose outer instance's suite ID another thread is reading" should {
+    "stay unfixed until that read returns, and then take its node from the suite ID its run read" in {
+      val inner = new CountingSuiteIdReads()
+      val outer = new HoldingSuiteIdReads(inner)
+      val anEmitter = emitter
+      val started = new StartedTopLevelSuite(anEmitter, new Suites(outer))
+      val readsOfInnerAtStart = inner.reads.get
+      try {
+        val outerRegistration = registeredIn(new InRunOfSuite(registrationOf(started)), outer)
+        val innerRegistration = registeredIn(new InRunOfSuite(outerRegistration), inner)
+        outer.holdReads()
+        val handingOffForOuter = new Thread(() => outerRegistration.reporterOfSuite(passingNoEventOn)(anAlert))
+        handingOffForOuter.start()
+        outer.isBeingRead.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
+        innerRegistration.suiteIdRead(classOf[CountingSuiteIdReads].getName)
+        val fixedWhileOuterIsRead = anEmitter.synchronized(innerRegistration.isNodeFixed)
+        outer.mayBeRead.countDown()
+        joined(handingOffForOuter) shouldBe true
+        innerRegistration.reporterOfSuite(passingNoEventOn)(anAlert)
+        val nodeOfInner = anEmitter.synchronized(registrationOf(started).table.flatMap(_.childSuites.headOption).flatMap(_.childSuites.headOption).map(_.node))
+        (fixedWhileOuterIsRead, anEmitter.synchronized(innerRegistration.table.map(_.node)), inner.reads.get - readsOfInnerAtStart) shouldBe
+          ((false, nodeOfInner, 0))
+      } finally {
+        outer.mayBeRead.countDown()
+        started.complete()
+      }
+    }
+  }
+
   "A suite whose tests a TestSortingReporter sorts" should {
     "have the node of its run fixed by the suite ID it reads for that reporter, as an async suite" in {
       val suite = new AsyncSuiteRecordingItsNodeAsTestsAreCounted
@@ -653,6 +682,25 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     override def suiteId: String = {
       reads.incrementAndGet()
       thrown.foreach(throw _)
+      super.suiteId
+    }
+  }
+
+  // Nests `nested`. Once `holdReads` is called, each call of its suite ID waits until `mayBeRead` is released.
+  private final class HoldingSuiteIdReads(nested: Suite) extends Suite {
+    val isBeingRead = new CountDownLatch(1)
+    val mayBeRead = new CountDownLatch(1)
+    @volatile private var holds = false
+
+    def holdReads(): Unit = holds = true
+
+    override def nestedSuites: IndexedSeq[Suite] = Vector(nested)
+
+    override def suiteId: String = {
+      if (holds) {
+        isBeingRead.countDown()
+        mayBeRead.await(waitLimitSeconds, TimeUnit.SECONDS)
+      }
       super.suiteId
     }
   }
