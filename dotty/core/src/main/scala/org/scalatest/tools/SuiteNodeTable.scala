@@ -110,7 +110,6 @@ private[scalatest] final class SuiteNodeTable(
   private var latestScopesAndTests = firstScopesAndTests
   private var testNamesOfLatest = SuiteNodeTable.testNamesIn(firstScopesAndTests)
   private var filteredTests = firstFilteredTests
-  private var nestedSuitesOfFirstStructure = Vector.empty[SuiteNodeTable]
   private var nestedSuitesAdded = Vector.empty[SuiteNodeTable]
   private var hasEndedOnce = false
 
@@ -120,7 +119,10 @@ private[scalatest] final class SuiteNodeTable(
   /** The tables of the nested suites of its first structure, each at its position among them. */
   def nestedSuites: Vector[SuiteNodeTable] = nestedSuitesOfFirstStructure
 
-  // Set once, by the companion, after this table is built, so that each nested table's parent is a whole table.
+  // Set once, by the companion, after this table is built, so that each nested table's parent is a whole table. Set
+  // before the table is shared, and never written again, so it is read without the emitter's lock.
+  private var nestedSuitesOfFirstStructure = Vector.empty[SuiteNodeTable]
+
   private def holdNestedSuitesOfFirstStructure(tables: Vector[SuiteNodeTable]): Unit = nestedSuitesOfFirstStructure = tables
 
   /** The tables of its nested suites: those of its first structure in declared order, then those added later, in the order added. */
