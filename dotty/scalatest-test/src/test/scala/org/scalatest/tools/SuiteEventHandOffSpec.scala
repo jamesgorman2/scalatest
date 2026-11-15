@@ -141,6 +141,21 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
+  // A suite whose nested suite has its suite ID.
+  private final class SharesItsIdWithItsNestedSuite extends org.scalatest.Suites(new SharesItsIdWithItsOuterSuite) {
+    override def suiteName: String = SuiteEventHandOffSpec.this.suiteName
+
+    override def suiteId: String = SuiteEventHandOffSpec.this.suiteId
+  }
+
+  private final class SharesItsIdWithItsOuterSuite extends Suite {
+    override def suiteName: String = SuiteEventHandOffSpec.this.suiteName
+
+    override def suiteId: String = SuiteEventHandOffSpec.this.suiteId
+
+    override def testNames: Set[String] = Set("only")
+  }
+
   private final class OneTestSuite extends Suite {
     override def testNames: Set[String] = Set("only")
   }
@@ -284,6 +299,27 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         run.wrapperOfSuite(otherInfo)
         run.eventLines.last should startWith(nodeOf(underSu))
       }
+
+    "assign an event naming a suite ID two suites at or below the wrapper's node share to the first of them where neither has ended" in
+      withRegisteredSuite { run =>
+        val underFlat = flat.suite("samples.Other")
+        run.wrapperOfTest("flat")(otherTestStarting)
+        run.wrapperOfTest("s u")(otherTestStarting)
+        run.wrapperOfSuite(otherInfo)
+        run.eventLines.last should startWith(nodeOf(underFlat))
+      }
+
+    "assign an event naming the wrapper's own suite ID to the wrapper's own suite, not to a suite nested in it that shares the ID" in {
+      val eventLog = new RecordingEventLog
+      val outer = new SharesItsIdWithItsNestedSuite
+      val ofOuter = new StartedTopLevelSuite(TestEventLogEmitter.appendingTo(eventLog), outer, new RecordingReporter)
+      try {
+        ofOuter.wrapper(InfoProvided(ordinal, "of both", Some(NameInfo(suiteName, suiteId, Some(suiteId), None)), threadName = "main", timeStamp = timeStamp))
+        eventLog.writes.last should startWith(nodeOf(top))
+      } finally {
+        ofOuter.complete()
+      }
+    }
 
     "assign an event naming a suite ID two suites at or below the wrapper's node share to the first of them where both have ended" in
       withRegisteredSuite { run =>
