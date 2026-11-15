@@ -22,6 +22,19 @@ object EventLogFields {
     node(logged.execution) + " " + event.productPrefix + fields.mkString("(", ", ", ")")
   }
 
+  /** The suite ID that an event written by `of` names, quoted, or `run` for an event assigned to the run. */
+  def suiteOf(written: String): String =
+    if (written.startsWith("run ")) {
+      "run"
+    } else {
+      val opening = written.indexOf('"')
+      var closing = opening + 1
+      while (written.charAt(closing) != '"') {
+        closing += (if (written.charAt(closing) == '\\') 2 else 1)
+      }
+      written.substring(opening, closing + 1)
+    }
+
   private def node(execution: Option[NodeExecution]): String =
     execution.fold("run") { assigned =>
       val places = assigned.node.places
@@ -93,36 +106,56 @@ object EventLogFields {
 }
 
 /**
- * Checks that a test event log holds every event a reporter of the same run received, and every event recorded in
- * one, as `compatibility.recorders.EventFieldsRecordingReporter` wrote them. The events received must be in the event
- * log in the order received; a recorded event may be anywhere in it.
+ * Which of the recording's orders the emitter received its events in: the whole run's, or only each suite's, where
+ * the recording reporter sits behind `Framework`'s `SuiteSortingReporter`, which reorders events across suites.
+ */
+enum EmitterOrder {
+  case AcrossTheRun
+  case WithinEachSuite
+}
+
+/**
+ * Checks that a test event log holds every event the emitter received, and every event recorded in one, with the
+ * fields `compatibility.recorders.EventFieldsRecordingReporter` recorded of it in the same run. The events received
+ * must be in the event log in the emitter's order, as far as the recording gives it; a recorded event may be
+ * anywhere in it.
  */
 object EventLogCoverage {
 
   private val receivedPrefix = "received "
   private val recordedPrefix = "recorded "
 
-  /** Describes each event the reporter's lines hold that the event log does not, in the order the reporter wrote them. */
-  def missing(reporterLines: Seq[String], eventLog: Seq[TestEventLogEvent.ScalaTestEvent]): Seq[String] = {
+  /** Describes each event the recording holds that the event log does not, in the order the recording holds them. */
+  def missing(recording: Seq[String], eventLog: Seq[TestEventLogEvent.ScalaTestEvent], order: EmitterOrder): Seq[String] = {
     val logged = eventLog.toVector
     val withTimeStamps = logged.map(EventLogFields.of(_, withTimeStamp = true))
     val withoutTimeStamps = logged.map(EventLogFields.of(_, withTimeStamp = false))
     val held = Array.fill(logged.size)(false)
-    var after = 0
+    val after = scala.collection.mutable.Map.empty[String, Int]
 
-    val missingReceived = reporterLines.filter(_.startsWith(receivedPrefix)).map(_.stripPrefix(receivedPrefix)).flatMap { event =>
-      val at = withTimeStamps.indexWhere(_ == event, after)
-      if (at < 0) {
-        val elsewhere = if (withTimeStamps.contains(event)) ", though it is earlier" else ""
-        Some(s"received, not in the event log in the order received$elsewhere: $event")
-      } else {
-        held(at) = true
-        after = at + 1
-        None
+    def orderedWith(event: String): String =
+      order match {
+        case EmitterOrder.AcrossTheRun => ""
+        case EmitterOrder.WithinEachSuite => EventLogFields.suiteOf(event)
+      }
+
+    val missingReceived = recording.filter(_.startsWith(receivedPrefix)).map(_.stripPrefix(receivedPrefix)).flatMap { event =>
+      val group = orderedWith(event)
+      val at = withTimeStamps.indices.find(index =>
+        index >= after.getOrElse(group, 0) && withTimeStamps(index) == event && orderedWith(withTimeStamps(index)) == group
+      )
+      at match {
+        case Some(index) =>
+          held(index) = true
+          after(group) = index + 1
+          None
+        case None =>
+          val elsewhere = if (withTimeStamps.contains(event)) ", though it is earlier" else ""
+          Some(s"received, not in the event log in the emitter's order$elsewhere: $event")
       }
     }
 
-    val missingRecorded = reporterLines.filter(_.startsWith(recordedPrefix)).map(_.stripPrefix(recordedPrefix)).flatMap { event =>
+    val missingRecorded = recording.filter(_.startsWith(recordedPrefix)).map(_.stripPrefix(recordedPrefix)).flatMap { event =>
       val at = withoutTimeStamps.indices.find(index => !held(index) && withoutTimeStamps(index) == event)
       at.foreach(held(_) = true)
       if (at.isEmpty) Some(s"recorded, not in the event log: $event") else None

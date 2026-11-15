@@ -91,17 +91,17 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
 
   Feature("What the event log keeps of each event") {
     Launch.values.toList.foreach { launch =>
-      Scenario(s"The event log of a ${launch.named} launch holds every event a recording reporter of the run receives") {
+      Scenario(s"The event log of a ${launch.named} launch holds every event the emitter receives, in the emitter's order") {
         Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
         When(s"${launch.named} runs it on this fork with the runner argument and a -C reporter that records every field the event log keeps")
         val output = runs.ofFixtureOnFork(launch, List("-C", "compatibility.recorders.EventFieldsRecordingReporter"), Emitter.On)
         val logged = decoded(output.eventLog).collect { case event: TestEventLogEvent.ScalaTestEvent => event }
 
-        Then("the event log holds each event the reporter receives, with the same fields, in the order received")
+        Then(s"the event log holds each event the emitter receives, with the fields the reporter records, in the emitter's order ${emitterOrderDescribed(launch)}")
         And("it holds each event recorded in one, with the same fields but its timestamp")
         output.eventFields.count(_.startsWith("received ")) should be > 0
         output.eventFields.count(_.startsWith("recorded ")) should be > 0
-        EventLogCoverage.missing(output.eventFields, logged) shouldBe Nil
+        EventLogCoverage.missing(output.eventFields, logged, emitterOrderIn(launch)) shouldBe Nil
       }
     }
   }
@@ -296,6 +296,19 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
       pool.shutdown()
     }
   }
+
+  // Framework's SuiteSortingReporter sits between the emitter and the recording reporter, and reorders events across suites.
+  private def emitterOrderIn(launch: Launch): EmitterOrder =
+    launch match {
+      case Launch.RunnerRun => EmitterOrder.AcrossTheRun
+      case Launch.Framework => EmitterOrder.WithinEachSuite
+    }
+
+  private def emitterOrderDescribed(launch: Launch): String =
+    emitterOrderIn(launch) match {
+      case EmitterOrder.AcrossTheRun => "across the run"
+      case EmitterOrder.WithinEachSuite => "within each suite"
+    }
 
   private def described(emitter: Emitter): String =
     emitter match {
