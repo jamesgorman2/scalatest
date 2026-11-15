@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, or on a failure's source pathname; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
 ---
 
 <learning>
@@ -119,4 +119,20 @@ A reporter placed ahead of the sorter, inside the suite's `Args`, still receives
 Such a helper also runs none of its tests when the task selects only its outer suite: `Framework`'s filter then requires `Suite.SELECTED_TAG`, given only to the suite IDs the task's selectors name. Add a `NestedSuiteSelector` for the helper's suite ID to run them.
 
 Take the expected reported events of such a run from 3.2.20, never from what the code sends.
+</learning>
+
+<learning>
+date: 2026-11-15
+---
+On Scala Native, ScalaTest 3.2.20's `Framework` task waits for the suite in its synchronous `execute(eventHandler, loggers)` and rethrows what aborted it, such as an exception from `beforeAll`, to the caller. Scala Native's test bridge calls that method, so the build tool receives the exception. On Scala.js the bridge calls the `execute` that takes a continuation, which instead passes the exception to each logger's `trace`.
+
+Code that drives `Framework` as a build tool does on these platforms must use the same `execute` the platform's bridge uses, and on Native catch what a task throws, or one aborted suite ends the run.
+</learning>
+
+<learning>
+date: 2026-11-15
+---
+On Scala.js, a `StackTraceElement` can name its method with braces, as `{anonymous}()`, so a `J` reporter's `stackTraces` JSON holds `{` and `}` inside its strings. A pattern that skips a stack frame as `\{[^{}]*\}` then fails to match, and the frames, which differ between two links of the same code, are compared.
+
+Match a JSON object's strings as strings, `"(?:[^"\]|\.)*"`, when skipping or blanking part of a reporter's JSON.
 </learning>

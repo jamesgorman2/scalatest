@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins, incremental compilation and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, or packaging dependent projects in one sbt session on Windows.
+description: How sbt, its plugins, incremental compilation and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, or linking Scala Native on Windows.
 ---
 
 <learning>
@@ -102,4 +102,12 @@ date: 2026-11-15
 In an sbt build of a Scala 3 project, an incremental compile can fail after a type changes kind, from an opaque type to a class or the reverse. An opaque type lives in the enclosing file's `<File>$package` class, so the stale analysis still references it there. On Windows this failed with `Required: <package>.<File>$package.<Type> … could not resolve reference`.
 
 Run `sbt.bat <project>/clean` and recompile before suspecting the code. When a type changes kind in a Scala 3 project, clean it first.
+</learning>
+
+<learning>
+date: 2026-11-15
+---
+Scala Native needs clang only to link: `compile` produces NIR without it, but `nativeLink`, and so `test` and `run` of a Native project, fail before linking with `'clang' not found in PATH or via 'LLVM_BIN' environment variable.` A Windows machine may have neither LLVM on `PATH` nor the `clang.exe` of Visual Studio's LLVM component; Visual Studio's `VC/Tools/Llvm` can hold only `clang-format` and `clang-tidy`.
+
+On Windows, set `LLVM_BIN` to the `bin` directory of an LLVM release whose target is `x86_64-pc-windows-msvc` before starting sbt; with the MSVC build tools installed it links. Report a Native run that could not link as not run, never as passed.
 </learning>
