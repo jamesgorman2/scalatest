@@ -94,9 +94,9 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
   private object InFirstOpeningOnly extends Tag("org.scalatest.tools.SuiteEventHandOffSpec.InFirstOpeningOnly")
 
-  // Its runTests opens its scope twice in one run. The first opening reports its ignored test once its first test
-  // completes, which is once `queued` runs, after the second opening has closed. The second opening excludes that test,
-  // so reports its ignored test at once.
+  // Its runTests opens its scope twice in one run. The first opening reports its ignored test once test `t` completes,
+  // which is when `queued` runs, after the second opening has closed. The second opening excludes `t`, so it reports
+  // its ignored test at once.
   private final class OpensItsAsyncScopeTwiceSpec(queued: QueuingExecutionContext) extends AsyncFunSpec {
     implicit override def executionContext: ExecutionContext = queued
 
@@ -116,7 +116,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  // A suite its outer suite declares as nested, and runs from within the scope of its own test.
+  // A nested suite that its outer suite runs from within one of the outer suite's scopes.
   private final class RunFromAScopeSpec extends AnyFunSpec {
     this.info("from the suite")
 

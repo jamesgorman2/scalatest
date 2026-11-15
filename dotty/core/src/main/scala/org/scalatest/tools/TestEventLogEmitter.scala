@@ -229,14 +229,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Writes an event a send site hands off with its origin, assigned to the node and executions the origin names, and
-   * keeps it so that no structure wrapper it reaches hands it off again. The messages recorded in a test's closing
-   * event are written before it, assigned as it is, unless `messagesHandedOff` says the test handed them off one by
-   * one.
+   * Writes an event a send site hands off with its origin, assigned to the node and executions the origin names. It
+   * keeps the event so that no structure wrapper it reaches hands it off again. The messages recorded in a test's
+   * closing event are written before it, assigned as it is, unless `messagesHandedOff` says the test handed them off
+   * one by one.
    *
    * The node of the origin's suite instance is fixed first, where it is not yet. Nothing is handed off where the event
    * log has ended, the instance has no node table, or its top-level suite's registration has been removed: a wrapper
-   * the event reaches then hands it off as an event with no origin. Such a closing event, sent after the removal,
+   * the event reaches then hands it off as an event with no origin. A test's closing event sent after the removal,
    * whose messages the test handed off, is marked so that the top-level suite's wrapper writes it without them.
    *
    * The event is encoded outside the lock, as `runEvent` encodes. What encoding or writing throws is kept from the
@@ -278,7 +278,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    *
    * Those events move to the top-level suite's registration, which its wrapper holds. One may still reach that
    * wrapper, as an alert from a thread the run started or an event a reporter between the wrappers held back. The
-   * wrapper then writes nothing, since it has been written.
+   * wrapper then writes nothing, since the event has been written.
    *
    * A nested suite's handed-off events stay here until then, since a reporter that holds events back, such as a
    * `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's run has completed. After the
@@ -305,7 +305,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * at its send site or by another wrapper: an event reaches the wrapper of its test, of its suite and of each suite
    * around that one, and only the first of them that finds it not handed off writes it.
    *
-   * The event has no origin, so it is assigned from its own data: to the suite its suite ID names, at or below the
+   * The event is assigned as one with no origin, from its own data: to the suite its suite ID names, at or below the
    * wrapper's suite, and to the test its test name names in that suite. A suite or test no structure holds is first
    * given a node in a further structure. A message that names no suite is assigned to the wrapper's node. The
    * messages recorded in a test's closing event are written before it, assigned as it is, unless the test has handed
@@ -368,9 +368,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
-  // Returns `Some`, holding whether the event is a test's closing event whose messages the test handed off one by
-  // one, where this wrapper is to hand the event off, and `None` where it is not. A wrapper of an instance with no
-  // node table hands nothing off.
+  // Returns `None` where this wrapper is not to hand the event off. Otherwise returns `Some` of whether the event is a
+  // test's closing event whose messages the test handed off one by one. A wrapper of an instance with no node table
+  // hands nothing off.
   // The top-level suite's wrapper is the last an event reaches, so it forgets the event. Once the top-level suite's
   // registration is removed, inner wrappers hand nothing off and that wrapper writes the event: an inner wrapper that
   // wrote it would have to keep it for that wrapper to skip, for good where it never reaches that wrapper. An event

@@ -65,8 +65,11 @@ private[scalatest] final class NodeExecutions {
 }
 
 /**
- * The executions an event's origin names: that of each suite above its suite, from the top-level suite down, its
- * suite's, that of each scope it ran in, by the scope's path, and its own node's where that is a scope or test.
+ * The executions an event's origin names:
+ *  - that of each suite above the event's suite, from the top-level suite down;
+ *  - that of its suite;
+ *  - that of each scope it ran in, by the scope's path;
+ *  - that of its own node, where that is a scope or test.
  */
 private[scalatest] final case class NamedExecutions(
   ofSuitesAbove: Vector[Execution],
@@ -209,8 +212,9 @@ private[scalatest] final class SuiteNodeTable(
   def executionsOf(node: NodeId): NodeExecutions = executionsOfNodes.getOrElseUpdate(node, new NodeExecutions)
 
   /**
-   * The execution path of an event of this suite, without the suite's own execution: for each suite above it, from
-   * its top-level suite down, the execution `named` gives it where it names one for each, else its current one.
+   * The execution path of an event of this suite, without the suite's own execution. Each suite above it, from its
+   * top-level suite down, takes the execution `named` gives it where `named` gives one for every such suite, and
+   * otherwise its current one.
    */
   def executionPathAboveSuite(named: Option[NamedExecutions]): Vector[Int] = {
     val suitesAbove = Iterator.unfold(parentSuite)(above => above.map(table => (table, table.parentSuite))).toVector.reverse

@@ -24,8 +24,8 @@ private[scalatest] enum TreeNode {
 }
 
 /**
- * One execution of a scope of a registered instance's run, which `runTestsInBranch` starts each time it opens the
- * scope, within the execution of the scope above it, where it has one.
+ * One execution of a scope in a registered instance's run. `runTestsInBranch` starts one each time it opens the
+ * scope, within the execution of the scope above it, where there is one.
  *
  * @param places the scope's path, from its suite down
  */
@@ -37,7 +37,7 @@ private[scalatest] final class ScopeExecution(val places: List[ScopePlace], val 
   private var executionOfItsRun = Option.empty[Execution]
 
   /**
-   * The execution of the run the scope opened in: that of the scope above it, else `latestRun`, taken as an event
+   * The execution of the run the scope opened in: that of the scope above it, else `latestRun`, fixed when an event
    * naming the scope is first handed off. Called under the emitter's lock.
    */
   def executionOfRun(latestRun: => Execution): Execution = {
@@ -52,7 +52,7 @@ private[scalatest] final class ScopeExecution(val places: List[ScopePlace], val 
 
 /**
  * The origin of the events one engine site sends for a registered suite instance. A send site hands each event off
- * with it, and the emitter writes the event then.
+ * with it, and the emitter writes the event at once.
  *
  * @param registration the registration of the instance that sends the events
  * @param node the suite, scope or test of its registration tree the events are for
@@ -299,8 +299,8 @@ private[scalatest] final class RegisteredSuite(
   }
 
   /**
-   * Starts an execution for a run of the instance, whose node is fixed: the one the instance's `SuiteStarting` opened,
-   * where no run has taken it. Called under the emitter's lock.
+   * Starts an execution for a run of the instance, whose node is fixed, or takes the one the instance's
+   * `SuiteStarting` opened where no run has taken it yet. Called under the emitter's lock.
    */
   def startRunUnderLock(): Execution = {
     runOfSuite match {
@@ -356,7 +356,7 @@ private[scalatest] final class RegisteredSuite(
 
   def startRun(): Unit = emitter.startRun(this)
 
-  // The execution of the scope this instance's run opened, and runs in on this thread, where it runs in one.
+  // The execution of a scope this instance's run opened that this thread runs in, where it runs in one.
   private def scopeInContext: Option[ScopeExecution] =
     InvocationContext.get.collect { case inRun: InRunOfSuite if inRun.registration eq this => inRun.scope }.flatten
 
@@ -491,9 +491,9 @@ private[scalatest] final class RegisteredSuite(
   // Called under the emitter's lock, once the node is fixed.
   private def scopeOfSuiteItIs: Option[ScopeExecution] = scopeItStartedIn.filter(_ => runOfSuite.isDefined)
 
-  // The origin of the events of one execution of a test, which ran in the run in flight when its first event was
-  // handed off, and in a scope execution, where it ran in one: `scopeOpened`, where the instance's run opened it,
-  // else the one of the suite it is.
+  // The origin of the events of one execution of a test. The test ran in the run in flight when its first event was
+  // handed off. Where it ran in a scope execution, that is `scopeOpened` where the instance's run opened it, else
+  // `scopeOfSuiteItIs`.
   private final class OriginOfTestExecution(testName: String, scopeOpened: Option[ScopeExecution])
       extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.Test(testName)) {
 

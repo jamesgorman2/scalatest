@@ -493,7 +493,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   "A DocSpec" should {
-    "hand its markup off as its suite's own as it sends it" in {
+    "hand its markup off as its suite's own when it sends it" in {
       val anEmitter = emitter
       val suite = new MarkupDocSpec
       val started = new StartedTopLevelSuite(anEmitter, suite)

@@ -101,7 +101,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("first"))
     }
 
-    "write a message handed off while a sorter holds the test's TestStarting back after that event, and not write the event again when the sorter passes it on" in
+    "write the test's TestStarting as it is handed off, then a message handed off while a sorter holds that event back, and not the event again when the sorter passes it on" in
       withRegisteredSuite { run =>
         val starting = testStarting
         run.ofTest.handOff(starting)
@@ -111,7 +111,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
         run.eventLines shouldBe Vector(testLine("TestStarting"), infoLine("while the start was held back"))
       }
 
-    "write a message handed off before any other event of the test's execution at once, in that execution" in withRegisteredSuite { run =>
+    "write at once, in the test's execution, a message handed off before any other event of that execution" in withRegisteredSuite { run =>
       run.ofTest.handOffMessage(info("first"))
       run.send(testSucceeded(), run.ofTest.ofClosingEventWithMessagesHandedOff)
       run.eventLines shouldBe Vector(infoLine("first"), testLine("TestSucceeded"))

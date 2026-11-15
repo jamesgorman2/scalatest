@@ -13,7 +13,7 @@ private[scalatest] abstract class EventOrigin {
 
   /**
    * Hands the event to the emitter of the run's test event log with this origin, leaving the event unchanged. The
-   * emitter writes it then. Called before the event is reported.
+   * emitter writes it at once. Called before the event is reported.
    */
   def handOff(event: Event): Unit
 
@@ -36,9 +36,10 @@ private[scalatest] abstract class EventOrigin {
   def ofClosingEventWithMessagesHandedOff: EventOrigin = this
 
   /**
-   * Runs `body` in the invocation context of the execution this origin is of: a test execution's, so that a suite the
-   * test's body runs starts in it, or a scope execution's, so that a test or scope `body` runs names it. Called with
-   * the origin a test execution's or a scope's start returned.
+   * Runs `body` in the invocation context of the execution this origin is of:
+   *  - a test execution's, so that a suite the test's body runs starts in it;
+   *  - a scope execution's, so that a test or scope `body` runs names it.
+   * Called with the origin a test execution's or a scope's start returned.
    */
   def runningInItsExecution[A](body: => A): A = body
 }
@@ -48,15 +49,16 @@ private[scalatest] object EventOrigin {
   /** The prepared hand-off of a message that is handed to no emitter. */
   val nothingToHandOff: () => Unit = () => ()
 
-  /** The origin of every event of a run that writes no test event log. It records nothing. */
+  /** The origin of every event of a run that writes no test event log. It hands nothing off. */
   val none: EventOrigin = new EventOrigin {
     def handOff(event: Event): Unit = ()
   }
 }
 
 /**
- * The invocation context the code on a thread runs in, in a run that writes a test event log: a suite instance's run,
- * outside its tests, or one execution of a test. A suite instance whose run starts in it is registered in it.
+ * The invocation context the code on a thread runs in, in a run that writes a test event log: a suite instance's run
+ * outside its tests, with the scope execution it is in where it has one, or one execution of a test. A suite instance
+ * whose run starts in it is registered in it.
  */
 private[scalatest] abstract class InvocationContext {
 
@@ -234,12 +236,12 @@ private[scalatest] abstract class SuiteStart {
   /** Takes the suite name and suite ID the site read as it built the suite's `SuiteStarting`. */
   def namesRead(suiteName: String, suiteId: String): Unit
 
-  /** The origin of the suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`: none where its registration records none. */
+  /** The origin of the suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`, which hands nothing off unless overridden. */
   protected def originOfStartAndEnd: EventOrigin = EventOrigin.none
 
   /**
    * Reports the suite's `SuiteStarting`, `SuiteCompleted` or `SuiteAborted` to `reporter`, first handing it off with
-   * the suite's origin where its registration records one.
+   * the suite's origin.
    */
   final def report(event: Event): Unit = {
     originOfStartAndEnd.handOff(event)
