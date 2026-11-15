@@ -1475,6 +1475,129 @@ trait DottyBuild { this: BuildCommons =>
   private def testInterfaceJar: File =
     new File(classOf[sbt.testing.Framework].getProtectionDomain.getCodeSource.getLocation.toURI)
 
+  // The fixture for Scala.js and Native compiles once against 3.2.20's artefacts for the platform, in a project that
+  // links it with 3.2.20. A second project links the same compiled classes with the fork, and a JVM test project runs
+  // and compares the two programs.
+  private def compatibilityFixtureSettings(platformDirectory: String): Seq[Setting[_]] =
+    Seq(
+      libraryDependencies += upstreamScalatestOrganization %%% "scalatest" % previousReleaseVersion,
+      Compile / unmanagedSourceDirectories := {
+        val sources = (scalatestCompatibilityTestDotty / sourceDirectory).value
+        Seq(
+          sources / "fixture" / "scala",
+          sources / "fixture" / "scala-js-native",
+          sources / "fixture" / platformDirectory,
+          sources / "normalisation" / "scala"
+        )
+      },
+      Compile / mainClass := Some("compatibility.recorders.PlatformLauncher")
+    ) ++ noPublishSettings
+
+  private def compatibilityForkLinkSettings(fixture: Project): Seq[Setting[_]] =
+    Seq(
+      Compile / unmanagedClasspath ++= Attributed.blankSeq((fixture / Compile / products).value),
+      Compile / mainClass := Some("compatibility.recorders.PlatformLauncher")
+    ) ++ noPublishSettings
+
+  private def compatibilityPlatformTestSettings(
+    platform: String,
+    launcher: String,
+    upstreamProgram: Def.Initialize[Task[File]],
+    forkProgram: Def.Initialize[Task[File]]
+  ): Seq[Setting[_]] =
+    Seq(
+      Test / unmanagedSourceDirectories := {
+        val sources = (scalatestCompatibilityTestDotty / sourceDirectory).value
+        Seq(sources / "comparison" / "scala", sources / "platform-test" / "scala")
+      },
+      Test / resourceGenerators += Def.task {
+        val properties = new java.util.Properties
+        properties.setProperty("platform", platform)
+        properties.setProperty("launcher", launcher)
+        properties.setProperty("upstreamProgram", upstreamProgram.value.getAbsolutePath)
+        properties.setProperty("forkProgram", forkProgram.value.getAbsolutePath)
+        properties.setProperty("runsDirectory", (target.value / "compatibility-runs").getAbsolutePath)
+        val resource = (Test / resourceManaged).value / "compatibility-platform.properties"
+        IO.write(properties, "The programs of the comparison with ScalaTest " + previousReleaseVersion + " on " + platform, resource)
+        Seq(resource)
+      }.taskValue,
+      Test / logBuffered := false
+    ) ++ noPublishSettings
+
+  private def linkedJSProgram(linking: Project): Def.Initialize[Task[File]] =
+    Def.task {
+      val report = (linking / Compile / ScalaJSPlugin.autoImport.fastLinkJS).value.data
+      (linking / Compile / ScalaJSPlugin.autoImport.fastLinkJS / ScalaJSPlugin.autoImport.scalaJSLinkerOutputDirectory).value /
+        report.publicModules.head.jsFileName
+    }
+
+  private def linkedNativeProgram(linking: Project): Def.Initialize[Task[File]] =
+    Def.task((linking / Compile / ScalaNativePlugin.autoImport.nativeLink).value)
+
+  lazy val scalatestCompatibilityFixtureDottyJS = project.in(file("dotty/compatibility-fixture.js"))
+    .enablePlugins(ScalaJSPlugin)
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fixture JS",
+      ScalaJSPlugin.autoImport.scalaJSUseMainModuleInitializer := true,
+      compatibilityFixtureSettings("scala-js"),
+    )
+
+  lazy val scalatestCompatibilityForkLinkDottyJS = project.in(file("dotty/compatibility-fork-link.js"))
+    .enablePlugins(ScalaJSPlugin)
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fork Link JS",
+      ScalaJSPlugin.autoImport.scalaJSUseMainModuleInitializer := true,
+      compatibilityForkLinkSettings(scalatestCompatibilityFixtureDottyJS),
+    ).dependsOn(scalatestDottyJS)
+
+  lazy val scalatestCompatibilityTestDottyJS = project.in(file("dotty/compatibility-test.js"))
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Test JS",
+      compatibilityPlatformTestSettings(
+        "Scala.js",
+        "node",
+        linkedJSProgram(scalatestCompatibilityFixtureDottyJS),
+        linkedJSProgram(scalatestCompatibilityForkLinkDottyJS)
+      ),
+    ).dependsOn(scalatestDotty % "test")
+
+  lazy val scalatestCompatibilityFixtureDottyNative = project.in(file("dotty/compatibility-fixture.native"))
+    .enablePlugins(ScalaNativePlugin)
+    .settings(sharedSettings: _*)
+    .settings(nativeDottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fixture Native",
+      compatibilityFixtureSettings("scala-native"),
+    )
+
+  lazy val scalatestCompatibilityForkLinkDottyNative = project.in(file("dotty/compatibility-fork-link.native"))
+    .enablePlugins(ScalaNativePlugin)
+    .settings(sharedSettings: _*)
+    .settings(nativeDottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fork Link Native",
+      compatibilityForkLinkSettings(scalatestCompatibilityFixtureDottyNative),
+    ).dependsOn(scalatestDottyNative)
+
+  lazy val scalatestCompatibilityTestDottyNative = project.in(file("dotty/compatibility-test.native"))
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Test Native",
+      compatibilityPlatformTestSettings(
+        "Scala Native",
+        "",
+        linkedNativeProgram(scalatestCompatibilityFixtureDottyNative),
+        linkedNativeProgram(scalatestCompatibilityForkLinkDottyNative)
+      ),
+    ).dependsOn(scalatestDotty % "test")
+
   def sharedTestSettingsDottyJS: Seq[Setting[_]] = 
     Seq(
       organization := forkOrganization,

@@ -77,6 +77,9 @@ class FixtureAsyncFreeSpecSpec extends FixtureAsyncFreeSpec {
 }
 
 class PathAnyFreeSpecSpec extends PathAnyFreeSpec {
+  // Scala.js and Native cannot create an instance by reflection, so a path suite there says how to create one.
+  override def newInstance: PathAnyFreeSpecSpec = new PathAnyFreeSpecSpec
+
   "A scope" - {
     "sends messages" in {
       info("info from a path test")
