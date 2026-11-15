@@ -10,12 +10,13 @@ object ReporterText {
     val unit = """\d+ (?:milliseconds?|seconds?|minutes?|hours?)"""
     s"$unit(?:, $unit)*".r
   }
+  private val jsonString = """"(?:[^"\\]|\\.)*""""
   private val jsonValuesNotCompared = List(
     """"depth": -?\d+""".r -> """"depth": <depth>""",
-    """"stackTraces": \[(?:\{[^{}]*\}(?:, )?)*\]""".r -> s""""stackTraces": $stackFrames""",
+    raw""""stackTraces": \[(?:\{(?:[^{}"]|$jsonString)*\}(?:, )?)*\]""".r -> s""""stackTraces": $stackFrames""",
     """"duration": \d+""".r -> """"duration": <duration>""",
     """"timeStamp": \d+""".r -> """"timeStamp": <timestamp>""",
-    """"threadName": "(?:[^"\\]|\\.)*"""".r -> """"threadName": <thread name>"""
+    raw""""threadName": $jsonString""".r -> """"threadName": <thread name>"""
   )
 
   def normalised(lines: Seq[String]): Seq[String] =

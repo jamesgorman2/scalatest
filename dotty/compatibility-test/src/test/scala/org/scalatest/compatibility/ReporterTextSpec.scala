@@ -51,6 +51,11 @@ final class ReporterTextSpec extends AnyWordSpec with Matchers {
           """{ "eventType": "TestFailed", "duration": <duration>, "throwable": { "className": "E",  "message": "m", "depth": <depth>, "stackTraces": <stack frames> }, "threadName": <thread name>, "timeStamp": <timestamp> }"""
         )
       }
+      "blank the stack frames of a JSON line whose frames hold braces in their text" in {
+        val line =
+          """{ "throwable": { "stackTraces": [{ "methodName": "{anonymous}()", "toString": "<jscode>.{anonymous}()(main.js:9:1)" }, { "methodName": "f" }] } }"""
+        ReporterText.normalised(List(line)) shouldBe List("""{ "throwable": { "stackTraces": <stack frames> } }""")
+      }
     }
   }
 }
