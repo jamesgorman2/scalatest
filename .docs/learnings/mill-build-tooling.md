@@ -1,6 +1,6 @@
 ---
 kind: mill-build-tooling
-description: How Mill 1.x, its bootstrap scripts, testkit and plugin API misbehave, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, or inspecting a meta-build's classpath.
+description: How Mill 1.x, its bootstrap scripts, testkit, BSP server and plugin API misbehave, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, driving Mill's BSP server, or inspecting a meta-build's classpath.
 ---
 
 <learning>
@@ -67,4 +67,22 @@ date: 2026-11-14
 A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `ScalaTests` test module's classpath. A Mill plugin that depends on Mill through `compileMvnDeps` therefore has no Mill or os-lib classes in its unit tests: a test naming `os.*` fails with `Not found: os`.
 
 Keep classes under unit test free of Mill and os-lib types, and do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Test that wiring under testkit.
+</learning>
+
+<learning>
+date: 2026-11-16
+---
+Mill 1.3.1's BSP server answers every `buildTarget/test` request with the JSON-RPC error `Internal error.`, logging `scala.MatchError: (of class build_.package_$)` from `mill.bsp.worker.MillBspEndpoints.buildTargetTest`. It maps the evaluators' root modules with a partial `case m: BspModuleApi`, and a build's root module (`package build`) is not one. It would also test only targets that are root modules. No test runs.
+
+A test of `buildTarget/test` on Mill 1.3.1 can only compare the error response. Catch the `ExecutionException` whose cause is `org.eclipse.lsp4j.jsonrpc.ResponseErrorException` and record its `getResponseError`.
+</learning>
+
+<learning>
+date: 2026-11-16
+---
+To drive Mill 1.3.1's BSP server from a test, spawn `<mill executable> --bsp --jobs 1` in the workspace (the argv `--bsp-install` writes to `.bsp/mill-bsp.json`), and connect with `ch.epfl.scala:bsp4j:2.2.0-M2`, the version Mill's BSP worker is built with. Give lsp4j's `Launcher.Builder` a Scala trait extending `BuildServer`, `ScalaBuildServer` and `JvmBuildServer` as the remote interface. Send `build/initialize`, then `build/initialized`, before any request, and `build/shutdown`, then `build/exit`, at the end.
+
+`--bsp` without `--no-daemon` runs through the regular Mill daemon and shares the regular `out/` folder. A test that compares two sessions must stop the daemon between them (`IntegrationTester.removeProcessIdFile()`, with the tester in daemon mode) and remove the module's `out/` folder, or the second session finds the first one's compiled classes and sends no compile notifications.
+
+`buildTarget/scalaTestClasses` is deprecated in bsp4j; calling it under `-Werror` needs `@nowarn("cat=deprecation")`.
 </learning>
