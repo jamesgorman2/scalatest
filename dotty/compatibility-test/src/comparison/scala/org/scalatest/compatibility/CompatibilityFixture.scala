@@ -4,7 +4,7 @@ object CompatibilityFixture {
   val stdoutLine: String = "a line on stdout"
   val stderrLine: String = "a line on stderr"
 
-  val suiteClassNamesOnEveryRuntime: Seq[String] =
+  val suiteClassNames: Seq[String] =
     List(
       "AnyFunSuiteSpec",
       "AsyncFunSuiteSpec",
@@ -34,10 +34,14 @@ object CompatibilityFixture {
       "AsyncFeatureSpecSpec",
       "FixtureAnyFeatureSpecSpec",
       "FixtureAsyncFeatureSpecSpec",
+      "RefSpecSpec",
       "NestingSpec",
-      "BeforeAllThrowsSpec"
+      "BeforeAllThrowsSpec",
+      "ConfigMapWrappedSpec"
     ).map("compatibility.fixture." + _)
 
-  val suiteClassNames: Seq[String] =
-    suiteClassNamesOnEveryRuntime ++ List("RefSpecSpec", "ConfigMapWrappedSpec").map("compatibility.fixture." + _)
+  private val jvmOnlySuiteClassNames: Set[String] =
+    Set("RefSpecSpec", "ConfigMapWrappedSpec").map("compatibility.fixture." + _)
+
+  val suiteClassNamesOnEveryRuntime: Seq[String] = suiteClassNames.filterNot(jvmOnlySuiteClassNames)
 }

@@ -1641,7 +1641,8 @@ trait DottyBuild { this: BuildCommons =>
        scalatestFunSpecTestDottyJS, 
        scalatestFunSuiteTestDottyJS, 
        scalatestPropSpecTestDottyJS, 
-       scalatestWordSpecTestDottyJS
+       scalatestWordSpecTestDottyJS,
+       scalatestCompatibilityTestDottyJS
      ).enablePlugins(ScalaJSPlugin)
 
   lazy val scalatestTestDottyNative = project.in(file("dotty/scalatest-test.native"))
@@ -1663,7 +1664,8 @@ trait DottyBuild { this: BuildCommons =>
        scalatestFunSpecTestDottyNative, 
        scalatestFunSuiteTestDottyNative, 
        scalatestPropSpecTestDottyNative, 
-       scalatestWordSpecTestDottyNative
+       scalatestWordSpecTestDottyNative,
+       scalatestCompatibilityTestDottyNative
      ).enablePlugins(ScalaNativePlugin)   
 
 
