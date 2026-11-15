@@ -126,7 +126,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   /**
    * Whether an event line's execution path holds a second execution of a node under its `HelperSuite`: `A helper` or
    * `helps`. A test's node path holds no place for its scopes, but its execution path does. The executions under the
-   * helper are those after the helper's place, which is at the same index in both.
+   * helper are those after the helper's place. No scope sits above the helper in these scenarios, so that place is at
+   * the same index in both.
    */
   private def ofASecondExecutionOfAHelper(line: String): Boolean = {
     val places = placesOfTheNode.findFirstMatchIn(line).toList.flatMap(node => place.findAllIn(node.group(1)).toList)
