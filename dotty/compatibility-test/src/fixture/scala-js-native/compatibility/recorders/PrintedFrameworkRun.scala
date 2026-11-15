@@ -11,10 +11,16 @@ import sbt.testing.TaskDef
 import scala.collection.mutable.ListBuffer
 
 /**
- * A run of the fixture's suites through `Framework`, given the launch's arguments: the suites' class names, separated
- * by commas, then the runner's arguments. Once its tasks have run, it prints to stdout, one line each, what the event
- * handler received, then what the loggers received, then the summary the runner's `done` returns. Logger lines and the
- * summary are normalised as reporter text, which needs every line of a stack trace first.
+ * A run of the fixture's suites through `Framework`. The launch's arguments are the suites' class names, separated by
+ * commas, then the runner's arguments.
+ *
+ * Once its tasks have run, it prints to stdout, one line each:
+ *  1. what the event handler received,
+ *  2. what the loggers received,
+ *  3. the summary the runner's `done` returns.
+ *
+ * The logger lines and the summary are normalised as reporter text, in one call each, because the normalisation
+ * collapses consecutive stack-trace lines into one.
  */
 final class PrintedFrameworkRun(launchArguments: Array[String]) {
 
