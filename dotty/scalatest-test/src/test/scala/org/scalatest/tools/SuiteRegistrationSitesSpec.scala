@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Args
 import org.scalatest.DistributedTestSorter
@@ -19,12 +20,16 @@ import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.Suites
 import org.scalatest.concurrent.SerialExecutionContext
+import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
+import org.scalatest.events.Ordinal
 import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.samples.AsyncSuiteRecordingItsNodeAsTestsAreCounted
 import org.scalatest.samples.MarkupDocSpec
 import org.scalatest.samples.OneInstancePerTestProbe
+import org.scalatest.samples.ParallelSuiteRecordingItsNodeAsTestsAreCounted
 import org.scalatest.samples.ParallelTestExecutionProbe
 import org.scalatest.samples.PerTestInstances
 import org.scalatest.samples.RandomTestOrderProbe
@@ -166,26 +171,41 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   private def hasBeenRemoved(registration: Option[SuiteRegistration]): Option[Boolean] =
     registration.collect { case registered: RegisteredSuite => registered.emitter.synchronized(registered.hasBeenRemoved) }
 
+  // Runs `body` in the context of another top-level suite's run, and returns what it returned, with whether that context
+  // is the one the thread is left in once `body` returns.
+  private def inTheContextOfAnotherSuite[A](body: => A): (A, Boolean) = {
+    val other = new StartedTopLevelSuite(emitter, new Probe)
+    try {
+      other.runningInItsContext {
+        val contextGiven = InvocationContext.get
+        val returned = body
+        (returned, contextGiven.isDefined && InvocationContext.get == contextGiven)
+      }
+    } finally {
+      other.complete()
+    }
+  }
+
   "A top-level suite of a run that writes a test event log" should {
-    "run in the context of its registration, run its test in the context of the test's execution, and leave no context once its run has returned" in {
+    "run in the context of its registration, run its test in the context of the test's execution, and restore the context it started in once its run has returned" in {
       val suite = new Probe
-      runAsTopLevelSuite(suite, Some(emitter))
-      (isRegistered(suite.registrationInRun), suite.registrationInTest, suite.testRunsInATest, InvocationContext.get) shouldBe
-        ((true, suite.registrationInRun, true, None))
+      val (_, restored) = inTheContextOfAnotherSuite(runAsTopLevelSuite(suite, Some(emitter)))
+      (isRegistered(suite.registrationInRun), suite.registrationInTest, suite.testRunsInATest, restored) shouldBe
+        ((true, suite.registrationInRun, true, true))
     }
 
-    "leave no context once its run has thrown an exception" in {
+    "restore the context it started in, and be removed, once its run has thrown an exception" in {
       val suite = new ProbeWhoseRunThrows(new IllegalStateException("thrown by run"))
-      runAsTopLevelSuite(suite, Some(emitter))
-      (isRegistered(suite.registrationInTest), InvocationContext.get) shouldBe ((true, None))
+      val (_, restored) = inTheContextOfAnotherSuite(runAsTopLevelSuite(suite, Some(emitter)))
+      (isRegistered(suite.registrationInTest), hasBeenRemoved(suite.registrationInRun), restored) shouldBe ((true, Some(true), true))
     }
 
-    "leave no context once its run has thrown an error its runner does not catch" in {
+    "restore the context it started in, and be removed, once its run has thrown an error its runner does not catch" in {
       val error = new LinkageError("thrown by run")
       val suite = new ProbeWhoseRunThrows(error)
-      val thrown = the[LinkageError] thrownBy runAsTopLevelSuite(suite, Some(emitter))
+      val (thrown, restored) = inTheContextOfAnotherSuite(the[LinkageError] thrownBy runAsTopLevelSuite(suite, Some(emitter)))
       thrown should be theSameInstanceAs error
-      (isRegistered(suite.registrationInTest), InvocationContext.get) shouldBe ((true, None))
+      (isRegistered(suite.registrationInTest), hasBeenRemoved(suite.registrationInRun), restored) shouldBe ((true, Some(true), true))
     }
 
     "keep its registration until the Status its run returned completes" in {
@@ -225,16 +245,10 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       (suite.runIsGivenAStructureWrapper, suite.testIsGivenAStructureWrapper) shouldBe ((false, false))
     }
 
-    "run in no context, where the site that starts it runs in one" in {
-      val outer = new Probe
-      val started = new StartedTopLevelSuite(emitter, outer)
+    "run in no context, where the site that starts it runs in one, and restore that context once its run has returned" in {
       val suite = new Probe
-      try {
-        started.runningInItsContext(runAsTopLevelSuite(suite, None))
-      } finally {
-        started.complete()
-      }
-      (suite.registrationInRun, suite.registrationInTest) shouldBe ((Some(SuiteRegistration.none), Some(SuiteRegistration.none)))
+      val (_, restored) = inTheContextOfAnotherSuite(runAsTopLevelSuite(suite, None))
+      (suite.registrationInRun, suite.registrationInTest, restored) shouldBe ((Some(SuiteRegistration.none), Some(SuiteRegistration.none), true))
     }
   }
 
@@ -495,37 +509,160 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   "The registration a suite's run finds in its context on one thread" should {
-    "be found by a suite run that the context hands to a distributor, on a thread of the distributor's pool" in {
+    "be found by a suite handed to a distributor in its context, on a thread of the distributor's pool, which is left in no context" in {
       val suite = new Probe
       val started = new StartedTopLevelSuite(emitter, suite)
       val pool = Executors.newSingleThreadExecutor()
+      val contextAfterTheSuite = new AtomicReference(Option.empty[Option[InvocationContext]])
       try {
         val distributor = new ConcurrentDistributor(Args(passingNoEventOn), pool)
         started.runningInItsContext(distributor(new DistributedProbe(suite), Args(passingNoEventOn)))
         distributor.waitUntilDone()
+        pool.submit((() => contextAfterTheSuite.set(Some(InvocationContext.get))): Runnable).get(waitLimitSeconds, TimeUnit.SECONDS)
       } finally {
         pool.shutdown()
         started.complete()
       }
-      suite.registrationInRun shouldBe Some(started.registration)
+      (suite.registrationInRun, contextAfterTheSuite.get) shouldBe ((Some(started.registration), Some(None)))
     }
 
-    "be found by a task that the context hands to a SerialExecutionContext, which another thread runs" in {
+    "be found by a task given to a SerialExecutionContext in its context and run by another thread, which is left in no context" in {
       val suite = new Probe
       val started = new StartedTopLevelSuite(emitter, suite)
       val executionContext = new SerialExecutionContext
       val foundInTask = new AtomicReference(Option.empty[SuiteRegistration])
+      val contextAfterTheTask = new AtomicReference(Option.empty[Option[InvocationContext]])
       try {
         started.runningInItsContext(executionContext.execute(() => foundInTask.set(Some(SuiteRegistration.inContext(suite)))))
-        val runningTheTask = new Thread(() => executionContext.runNow(Future.successful(Succeeded)))
+        val runningTheTask = new Thread(() => {
+          executionContext.runNow(Future.successful(Succeeded))
+          contextAfterTheTask.set(Some(InvocationContext.get))
+        })
         runningTheTask.start()
         joined(runningTheTask) shouldBe true
       } finally {
         started.complete()
       }
-      foundInTask.get shouldBe Some(started.registration)
+      (foundInTask.get, contextAfterTheTask.get) shouldBe ((Some(started.registration), Some(None)))
     }
   }
+
+  "A task given to a SerialExecutionContext in no context" should {
+    "run in no context, where the thread that runs it runs in one" in {
+      val started = new StartedTopLevelSuite(emitter, new Probe)
+      val executionContext = new SerialExecutionContext
+      val contextOfTask = new AtomicReference(Option.empty[Option[InvocationContext]])
+      try {
+        executionContext.execute(() => contextOfTask.set(Some(InvocationContext.get)))
+        started.runningInItsContext(executionContext.runNow(Future.successful(Succeeded)))
+      } finally {
+        started.complete()
+      }
+      contextOfTask.get shouldBe Some(None)
+    }
+  }
+
+  "A run that writes no test event log" should {
+    "run a suite handed to a distributor, and a task given to a SerialExecutionContext, in no context" in {
+      val suite = new Probe
+      val pool = Executors.newSingleThreadExecutor()
+      val executionContext = new SerialExecutionContext
+      val contextOfTask = new AtomicReference(Option.empty[Option[InvocationContext]])
+      try {
+        val distributor = new ConcurrentDistributor(Args(passingNoEventOn), pool)
+        distributor(new DistributedProbe(suite), Args(passingNoEventOn))
+        distributor.waitUntilDone()
+        executionContext.execute(() => contextOfTask.set(Some(InvocationContext.get)))
+        executionContext.runNow(Future.successful(Succeeded))
+      } finally {
+        pool.shutdown()
+      }
+      (suite.registrationInRun, contextOfTask.get) shouldBe ((Some(SuiteRegistration.none), Some(None)))
+    }
+  }
+
+  "The emitter, handing off an event of a suite instance whose run has not read its suite ID" should {
+    "read the instance's suite ID once, where reading it throws" in {
+      val started = new StartedTopLevelSuite(emitter, new Probe)
+      val suite = new CountingSuiteIdReads(Some(new IllegalStateException("no suite ID")))
+      try {
+        val wrapper = registeredIn(new InRunOfSuite(registrationOf(started)), suite).reporterOfSuite(passingNoEventOn)
+        wrapper(anAlert)
+        wrapper(anAlert)
+      } finally {
+        started.complete()
+      }
+      suite.reads.get shouldBe 1
+    }
+
+    "read no suite ID once the event log has ended" in {
+      val anEmitter = emitter
+      val started = new StartedTopLevelSuite(anEmitter, new Probe)
+      val suite = new CountingSuiteIdReads()
+      try {
+        val wrapper = registeredIn(new InRunOfSuite(registrationOf(started)), suite).reporterOfSuite(passingNoEventOn)
+        anEmitter.endWithoutRunEnded()
+        wrapper(anAlert)
+      } finally {
+        started.complete()
+      }
+      suite.reads.get shouldBe 0
+    }
+
+    "read no suite ID of an instance a test runs, which has no node table to hand the event off to" in {
+      val started = new StartedTopLevelSuite(emitter, new Probe)
+      val suite = new CountingSuiteIdReads()
+      try {
+        val wrapper = registeredIn(new InExecutionOfTest(registrationOf(started), "probes", new Execution), suite).reporterOfSuite(passingNoEventOn)
+        wrapper(anAlert)
+      } finally {
+        started.complete()
+      }
+      suite.reads.get shouldBe 0
+    }
+  }
+
+  "A suite whose tests a TestSortingReporter sorts" should {
+    "have the node of its run fixed by the suite ID it reads for that reporter, as an async suite" in {
+      val suite = new AsyncSuiteRecordingItsNodeAsTestsAreCounted
+      val started = new StartedTopLevelSuite(emitter, new Probe)
+      try {
+        started.runningInItsContext(suite.run(None, Args(passingNoEventOn)))
+      } finally {
+        started.complete()
+      }
+      suite.nodeFixedAsTestsAreCounted shouldBe Vector(true)
+    }
+
+    "have the node of its run fixed by the suite ID it reads for that reporter, as a suite mixing in ParallelTestExecution" in {
+      val suite = new ParallelSuiteRecordingItsNodeAsTestsAreCounted
+      val started = new StartedTopLevelSuite(emitter, new Probe)
+      try {
+        started.runningInItsContext(suite.run(None, Args(passingNoEventOn, distributor = Some(RunningEachSuiteAtOnce))))
+      } finally {
+        started.complete()
+      }
+      suite.nodeFixedAsTestsAreCounted shouldBe Vector(true)
+    }
+  }
+
+  // Counts the calls of its suite ID, each of which throws `thrown` where one is given.
+  private final class CountingSuiteIdReads(thrown: Option[RuntimeException] = None) extends AnyFunSuite {
+    val reads = new AtomicInteger
+
+    override def suiteId: String = {
+      reads.incrementAndGet()
+      thrown.foreach(throw _)
+      super.suiteId
+    }
+  }
+
+  private def registrationOf(started: StartedTopLevelSuite): RegisteredSuite = started.registration.asInstanceOf[RegisteredSuite]
+
+  // Registers `suite` in `context`, as the first site of its run that finds the context would.
+  private def registeredIn(context: ContextOfRegisteredSuite, suite: Suite): RegisteredSuite = context.register(suite).asInstanceOf[RegisteredSuite]
+
+  private def anAlert: Event = AlertProvided(new Ordinal(1), "alert", None, threadName = "main", timeStamp = 0L)
 
   // A suite that records, as it runs, the registration the probe finds in the context it runs in.
   private final class DistributedProbe(probe: Probe) extends Suite {

@@ -7,8 +7,8 @@ import org.scalatest.events.Event
 private[scalatest] enum WrapperNode {
   case TopLevelSuite(ofSuite: RegisteredSuite)
   case NestedSuite(ofSuite: RegisteredSuite)
-  /** A suite's, put in the `Args` of its run by the site that registered it, where no other site had. */
-  case SelfRegisteredSuite(ofSuite: RegisteredSuite)
+  /** A suite's, put in the `Args` of its run by the first site of the run that registered it. */
+  case RegisteredByItsRun(ofSuite: RegisteredSuite)
   /** A suite's, put ahead of a reporter that holds the suite's events back. */
   case SuiteAheadOfSorter(ofSuite: RegisteredSuite)
   case Test(ofSuite: RegisteredSuite, testName: String)
@@ -18,7 +18,7 @@ private[scalatest] enum WrapperNode {
     this match {
       case TopLevelSuite(ofSuite) => ofSuite
       case NestedSuite(ofSuite) => ofSuite
-      case SelfRegisteredSuite(ofSuite) => ofSuite
+      case RegisteredByItsRun(ofSuite) => ofSuite
       case SuiteAheadOfSorter(ofSuite) => ofSuite
       case Test(ofSuite, _) => ofSuite
     }

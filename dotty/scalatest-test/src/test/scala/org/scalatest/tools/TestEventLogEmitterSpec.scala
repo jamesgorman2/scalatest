@@ -546,14 +546,25 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       }
 
       "start it in the context of its registration, and restore the context around it once its run returns" in {
+        val anEmitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
         val suite = new OneTestSuite
-        val start = TestEventLogEmitter.appendingTo(new RecordingEventLog).startOfTopLevelSuite(suite, Filter.default, new RecordingReporter)
+        val start = anEmitter.startOfTopLevelSuite(suite, Filter.default, new RecordingReporter)
+        val around = new StartedTopLevelSuite(anEmitter, new OneTestSuite)
         var inItsRun = SuiteRegistration.none
-        start.run {
-          inItsRun = SuiteRegistration.inContext(suite)
-          SucceededStatus
-        }
-        (inItsRun ne SuiteRegistration.none, InvocationContext.get) shouldBe ((true, None))
+        val (contextAround, contextRestored) =
+          try {
+            around.runningInItsContext {
+              val contextGiven = InvocationContext.get
+              start.run {
+                inItsRun = SuiteRegistration.inContext(suite)
+                SucceededStatus
+              }
+              (contextGiven, InvocationContext.get)
+            }
+          } finally {
+            around.complete()
+          }
+        (inItsRun ne SuiteRegistration.none, contextAround.isDefined, contextRestored) shouldBe ((true, true, contextAround))
       }
 
       "end the event log before a structure it cannot read, and start the suite with its reporter itself, in no context" in {

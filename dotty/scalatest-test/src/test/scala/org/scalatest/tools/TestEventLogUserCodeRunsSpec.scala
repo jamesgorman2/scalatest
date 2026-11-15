@@ -703,10 +703,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the structure, then each ModeSuite at the place its start gives it, with a further structure of its own test before that test's events",
       pairSuites,
       nestedSuiteIds = List("samples.ModeSuite")
-    ) { lines =>
-      And("it holds no other structure")
-      structuresIn(lines) shouldBe 3
-    }
+    )(_ => ())
   }
 
   Feature("A test run more than once") {

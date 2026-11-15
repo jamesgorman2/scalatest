@@ -109,7 +109,9 @@ private[scalatest] class SerialExecutionContext extends ExecutionContext {
   }*/
 
 
-  def runNow(future: Future[Outcome]): Unit = recRunNow(future)
+  // A task given in no invocation context runs in none, not in the context of the thread that runs it.
+  def runNow(future: Future[Outcome]): Unit =
+    if (InvocationContext.get.isEmpty) recRunNow(future) else InvocationContext.cleared(recRunNow(future))
 
   @tailrec
   private def recRunNow(future: Future[Outcome]): Unit = // Could take a scala.concurrent.duration.Deadline to be used for poll(timeout, timeUnit)

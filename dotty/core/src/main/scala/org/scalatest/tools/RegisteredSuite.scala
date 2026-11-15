@@ -155,8 +155,10 @@ private[scalatest] final class RegisteredSuite(
   @volatile private var nodeIsFixed = false
   private var nodePath = Option.empty[NodeId]
   private var tableOfNode = Option.empty[SuiteNodeTable]
+  // The suite ID the node was fixed from, none where it was fixed with no node.
   private var suiteIdOfRun = Option.empty[String]
-  private var suiteNameOfRun = Option.empty[String]
+  // Set once the emitter takes the read of the instance's suite ID, so that it reads it once at most.
+  private var emitterReadsSuiteId = false
   // The registration of the suite this instance is, whose run this instance's run is.
   private var runOfSuite = Option.empty[RegisteredSuite]
   private var executionOfLatestRun = Option.empty[Execution]
@@ -225,43 +227,53 @@ private[scalatest] final class RegisteredSuite(
     nodePath = Some(table.node)
     tableOfNode = Some(table)
     suiteIdOfRun = Some(table.suiteId)
-    suiteNameOfRun = Some(table.name)
     nodeIsFixed = true
   }
 
   /**
    * The registrations, outermost first, of this instance and of each instance whose run it started in, whose nodes
-   * are not fixed, each with the suite ID its run read, if any. Called under the emitter's lock.
+   * are not fixed. Called under the emitter's lock.
    */
-  def unfixedFromOutermost: List[(RegisteredSuite, Option[String])] = {
+  def unfixedFromOutermost: List[RegisteredSuite] = {
     val outer = startedIn.map(_.registration.unfixedFromOutermost).getOrElse(Nil)
-    if (nodeIsFixed) outer else outer :+ (this -> suiteIdOfRun)
+    if (nodeIsFixed) outer else outer :+ this
   }
 
-  /** Fixes the node of the instance's run from its suite ID, where it is not yet fixed. Called under the emitter's lock, outermost first. */
-  def fixNode(suiteId: String): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
+  /**
+   * Whether the instance's node has, or may yet have once fixed, a node table. One started in a test's execution, or
+   * in the run of an instance with none, has none. Called under the emitter's lock.
+   */
+  def canHaveTable: Boolean = {
+    if (nodeIsFixed) {
+      tableOfNode.isDefined
+    } else {
+      startedIn match {
+        case Some(inRun: InRunOfSuite) => inRun.registration.canHaveTable
+        case _ => false
+      }
+    }
+  }
+
+  /**
+   * Whether the emitter is to read the instance's suite ID itself: where its node is not fixed, may have a node table,
+   * and the emitter has not read it before. Called under the emitter's lock.
+   */
+  def takeReadOfSuiteId(): Boolean = {
+    val takes = !nodeIsFixed && !emitterReadsSuiteId && canHaveTable
+    emitterReadsSuiteId ||= takes
+    takes
+  }
+
+  /**
+   * Fixes the node of the instance's run from its suite ID, where it is not yet fixed: with no node, and so no node
+   * table, where the suite ID is none. Called under the emitter's lock, outermost first.
+   */
+  def fixNode(suiteId: Option[String]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
     if (nodeIsFixed) {
       None
     } else {
-      val ofRun = suiteIdOfRun.getOrElse(suiteId)
-      suiteIdOfRun = Some(ofRun)
-      startedIn match {
-        case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfRun.contains(ofRun) =>
-          val outer = inRun.registration
-          runOfSuite = Some(outer.runOfSuite.getOrElse(outer))
-          nodePath = outer.nodePath
-          tableOfNode = outer.tableOfNode
-        case Some(inRun: InRunOfSuite) =>
-          val outer = inRun.registration
-          val index = outer.executionOfRun().indexOfStartingSuite(ofRun)
-          nodePath = outer.nodePath.map(path => NodeId(path.places :+ NodePlace.Suite(ofRun, index)))
-          tableOfNode = outer.tableOfNode.flatMap(_.childSuites.find(child => nodePath.contains(child.node)))
-        case Some(inTest: InExecutionOfTest) =>
-          val index = inTest.execution.indexOfStartingSuite(ofRun)
-          nodePath = inTest.registration.nodePath.map(path => NodeId(path.places :+ NodePlace.Test(inTest.testName) :+ NodePlace.Suite(ofRun, index)))
-          tableOfNode = None
-        case None => ()
-      }
+      suiteIdOfRun = suiteId
+      suiteId.foreach(placeBy)
       nodeIsFixed = true
       if (startsARunOnceNodeIsFixed) {
         startRunUnderLock()
@@ -269,6 +281,27 @@ private[scalatest] final class RegisteredSuite(
       val awaiting = structureAwaitingNode
       structureAwaitingNode = None
       for (scopesAndTestsFor <- awaiting; table <- tableOfNode) yield (table, scopesAndTestsFor(table))
+    }
+  }
+
+  // Gives the instance its node, and the node's table where a structure declared one.
+  private def placeBy(ofRun: String): Unit = {
+    startedIn match {
+      case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfRun.contains(ofRun) =>
+        val outer = inRun.registration
+        runOfSuite = Some(outer.runOfSuite.getOrElse(outer))
+        nodePath = outer.nodePath
+        tableOfNode = outer.tableOfNode
+      case Some(inRun: InRunOfSuite) =>
+        val outer = inRun.registration
+        val index = outer.executionOfRun().indexOfStartingSuite(ofRun)
+        nodePath = outer.nodePath.map(path => NodeId(path.places :+ NodePlace.Suite(ofRun, index)))
+        tableOfNode = outer.tableOfNode.flatMap(_.childSuites.find(child => nodePath.contains(child.node)))
+      case Some(inTest: InExecutionOfTest) =>
+        val index = inTest.execution.indexOfStartingSuite(ofRun)
+        nodePath = inTest.registration.nodePath.map(path => NodeId(path.places :+ NodePlace.Test(inTest.testName) :+ NodePlace.Suite(ofRun, index)))
+        tableOfNode = None
+      case None => ()
     }
   }
 
@@ -305,18 +338,8 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  /** The suite ID the instance's run read, where it has read one. Called under the emitter's lock. */
-  def suiteIdOfItsRun: Option[String] = suiteIdOfRun
-
   /** Calls the instance's own `suiteId`. Called outside the emitter's lock: it is user code. */
   def readSuiteIdOfInstance(): String = instance.suiteId
-
-  /** Keeps the suite name the instance's run read first. Called under the emitter's lock. */
-  def keepSuiteName(suiteName: String): Unit = {
-    if (suiteNameOfRun.isEmpty) {
-      suiteNameOfRun = Some(suiteName)
-    }
-  }
 
   def startRun(): Unit = emitter.startRun(this)
 
@@ -335,7 +358,7 @@ private[scalatest] final class RegisteredSuite(
     new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), emitter.writeSuiteEvent)
 
   def reporterOfSuite(reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.SelfRegisteredSuite(this), emitter.writeSuiteEvent)
+    new StructureWrapper(reporter, WrapperNode.RegisteredByItsRun(this), emitter.writeSuiteEvent)
 
   def startWith(reporter: Reporter): SuiteStart = {
     val wrapper = new StructureWrapper(reporter, WrapperNode.NestedSuite(this), emitter.writeSuiteEvent)
@@ -400,7 +423,8 @@ private[scalatest] final class RegisteredSuite(
     emitter.writeStructureOnceNodeIsFixed(this)(_ => SuiteStructure.ofTestNames(testNames))
   }
 
-  def suiteNameRead(suiteName: String): Unit = emitter.keepSuiteName(this, suiteName)
+  // A node table takes its suite's name from the suite's structure, so nothing yet needs the name a run reads.
+  def suiteNameRead(suiteName: String): Unit = ()
 
   def suiteIdRead(suiteId: String): Unit = {
     if (!nodeIsFixed) {
@@ -411,9 +435,7 @@ private[scalatest] final class RegisteredSuite(
   // An event of the instance's own carries the names its send helper read.
   private def recordOrigin(event: Event, origin: RecordingOrigin, messages: Option[TestExecutionMessages]): Unit = {
     if (!nodeIsFixed) {
-      val names = TestEventLogEmitter.namesIn(event)
-      names.foreach(read => suiteNameRead(read.suiteName))
-      emitter.fixNode(this, names.map(_.suiteId))
+      emitter.fixNode(this, TestEventLogEmitter.namesIn(event).map(_.suiteId))
     }
     messages match {
       case Some(handedOff) => emitter.recordOriginOfClosingEventWithMessagesHandedOff(event, origin, handedOff)

@@ -3,6 +3,7 @@ package org.scalatest.samples
 import java.util.concurrent.ConcurrentLinkedQueue
 import org.scalatest.Args
 import org.scalatest.DoNotDiscover
+import org.scalatest.Filter
 import org.scalatest.OneInstancePerTest
 import org.scalatest.ParallelTestExecution
 import org.scalatest.RandomTestOrder
@@ -15,6 +16,7 @@ import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.tools.RegisteredSuite
 import org.scalatest.tools.RegistrationInContext
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -159,5 +161,44 @@ class SendsFromRunTestsAsyncSuite extends AsyncFunSuite {
 
   test("t") {
     Future.successful(succeed)
+  }
+}
+
+/** Whether the node of a suite's run is fixed, where the suite's run is registered. */
+object NodeOfRun {
+  def isFixed(suite: Suite): Option[Boolean] =
+    SuiteRegistration.inContext(suite) match {
+      case registered: RegisteredSuite => Some(registered.isNodeFixed)
+      case _ => None
+    }
+}
+
+/** Records, each time its run asks for its expected test count, whether the node of its run is fixed by then. */
+@DoNotDiscover
+class AsyncSuiteRecordingItsNodeAsTestsAreCounted extends AsyncFunSuite {
+  @volatile var nodeFixedAsTestsAreCounted = Vector.empty[Boolean]
+
+  override def expectedTestCount(filter: Filter): Int = {
+    nodeFixedAsTestsAreCounted ++= NodeOfRun.isFixed(this)
+    super.expectedTestCount(filter)
+  }
+
+  test("t") {
+    Future.successful(succeed)
+  }
+}
+
+/** Records, each time its run asks for its expected test count, whether the node of its run is fixed by then. */
+@DoNotDiscover
+class ParallelSuiteRecordingItsNodeAsTestsAreCounted extends AnyFunSuite with ParallelTestExecution {
+  @volatile var nodeFixedAsTestsAreCounted = Vector.empty[Boolean]
+
+  override def expectedTestCount(filter: Filter): Int = {
+    nodeFixedAsTestsAreCounted ++= NodeOfRun.isFixed(this)
+    super.expectedTestCount(filter)
+  }
+
+  test("t") {
+    succeed
   }
 }

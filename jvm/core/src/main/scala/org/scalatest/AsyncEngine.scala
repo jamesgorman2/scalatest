@@ -572,7 +572,9 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
                 case Some(ssr: SuiteSortingReporter) => ssr.testSortingTimeout
                 case _ => Span(Suite.defaultTestSortingReporterTimeoutInSeconds, Seconds)
               }
-            val testSortingReporter = new TestSortingReporter(theSuite.suiteId, passedInArgs.reporter, testSortingTimeout, theSuite.expectedTestCount(passedInArgs.filter), passedInArgs.distributedSuiteSorter, System.err)
+            val theSuiteId = theSuite.suiteId
+            registration.suiteIdRead(theSuiteId)
+            val testSortingReporter = new TestSortingReporter(theSuiteId, passedInArgs.reporter, testSortingTimeout, theSuite.expectedTestCount(passedInArgs.filter), passedInArgs.distributedSuiteSorter, System.err)
             passedInArgs.copy(reporter = registration.reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           }
           else

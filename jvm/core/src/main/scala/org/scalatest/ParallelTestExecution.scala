@@ -83,8 +83,11 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
       else {
         args.distributor match {  // This is the initial instance
           case Some(distributor) =>
-            val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-            args.copy(reporter = SuiteRegistration.inContext(this).reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
+            val registration = SuiteRegistration.inContext(this)
+            val theSuiteId = suiteId
+            registration.suiteIdRead(theSuiteId)
+            val testSortingReporter = new TestSortingReporter(theSuiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
+            args.copy(reporter = registration.reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           case None =>
             args
         }
