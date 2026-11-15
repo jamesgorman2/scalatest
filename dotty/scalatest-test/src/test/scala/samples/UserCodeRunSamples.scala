@@ -114,6 +114,22 @@ class RunsItsNestedSuites extends Suites(new Inner1Suite, new Inner2Suite) {
   override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.map(_.run(None, args)).toSet)
 }
 
+/** A suite whose one test is named by the mode it is constructed with. */
+@DoNotDiscover
+class ModeSuite(mode: String) extends AnyFunSuite {
+
+  test(mode) {
+    succeed
+  }
+}
+
+/** Runs its two nested suites, which share a suite ID, itself and in reverse order, sending no event for them. */
+@DoNotDiscover
+class PairSuites extends Suites(new ModeSuite("fast"), new ModeSuite("slow")) {
+
+  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.reverse.map(_.run(None, args)).toSet)
+}
+
 /** Runs test `a` twice, and no other test. */
 @DoNotDiscover
 class TwiceRunPlainSuite extends PlainSuite {

@@ -352,6 +352,59 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
+  private val pairSuites = {
+    val top = NodePath.topLevel("samples.PairSuites")
+    val first = top.suite("samples.ModeSuite")
+    val second = top.suite("samples.ModeSuite", 1)
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting PairSuites", "SuiteCompleted PairSuites", "RunCompleted"),
+      """
+      structure
+        suite "PairSuites", class "samples.PairSuites"
+          suite "ModeSuite", class "samples.ModeSuite"
+            test "fast", label "- fast"
+          suite "ModeSuite", class "samples.ModeSuite"
+            test "slow", label "- slow"
+      suite "PairSuites": SuiteStarting
+      structure under suite "PairSuites"
+        suite "ModeSuite" #1, class "samples.ModeSuite"
+          test "slow", label "- slow"
+      test "slow" #2: TestStarting
+      test "slow" #2: TestSucceeded
+      structure under suite "PairSuites"
+        suite "ModeSuite" #2, class "samples.ModeSuite"
+          test "fast", label "- fast"
+      test "fast" #2: TestStarting
+      test "fast" #2: TestSucceeded
+      suite "PairSuites": SuiteCompleted
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("PairSuites", "samples.PairSuites"),
+          TestEventLogLine.nestedSuite(first, 0, "ModeSuite", "samples.ModeSuite"),
+          TestEventLogLine.test(first.test("fast"), first, 0, "fast", "- fast"),
+          TestEventLogLine.nestedSuite(second, 1, "ModeSuite", "samples.ModeSuite"),
+          TestEventLogLine.test(second.test("slow"), second, 0, "slow", "- slow")
+        ),
+        nodeEvent(top, List(1), "SuiteStarting"),
+        TestEventLogLine.structure(
+          TestEventLogLine.nestedSuite(first, 0, "ModeSuite", "samples.ModeSuite"),
+          TestEventLogLine.test(first.test("slow"), first, 0, "slow", "- slow")
+        ),
+        nodeEvent(first.test("slow"), List(1, 1, 1), "TestStarting"),
+        nodeEvent(first.test("slow"), List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.structure(
+          TestEventLogLine.nestedSuite(second, 1, "ModeSuite", "samples.ModeSuite"),
+          TestEventLogLine.test(second.test("fast"), second, 0, "fast", "- fast")
+        ),
+        nodeEvent(second.test("fast"), List(1, 1, 1), "TestStarting"),
+        nodeEvent(second.test("fast"), List(1, 1, 1), "TestSucceeded"),
+        nodeEvent(top, List(1), "SuiteCompleted")
+      )
+    )
+  }
+
   private val twiceRunA = NodePath.topLevel("samples.TwiceRunPlainSuite").test("a")
 
   private val twiceRunPlainSuite = {
@@ -641,6 +694,18 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       suiteEventsOf("samples.Inner1Suite", lines) shouldBe 0
       suiteEventsOf("samples.Inner2Suite", lines) shouldBe 0
       structuresIn(lines) shouldBe 1
+    }
+
+    eventScenarios(
+      "A runNestedSuites override runs two suites sharing an ID in reverse order",
+      "a Suites nesting ModeSuite(\"fast\") and then ModeSuite(\"slow\"), whose runNestedSuites runs them itself in reverse order, sending no event",
+      "samples.PairSuites",
+      "the structure, then each ModeSuite at the place its start gives it, with a further structure of its own test before that test's events",
+      pairSuites,
+      nestedSuiteIds = List("samples.ModeSuite")
+    ) { lines =>
+      And("it holds no other structure")
+      structuresIn(lines) shouldBe 3
     }
   }
 
