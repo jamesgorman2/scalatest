@@ -108,8 +108,8 @@ private[scalatest] final class InExecutionOfTest(
  *    that suite: it takes that suite's node, and its run is that suite's;
  *  - otherwise its node path is the path of the suite or test it started in, followed by its suite ID and its index
  *    among the suites of that suite ID started in the execution it started in. It takes the node table a structure
- *    gives that path, where one does. Where none does, it is a suite new to the event log: once its suite name is
- *    known too, it adds a node table under that suite or test, whose first structure the emitter writes.
+ *    gives that path, where one does. Where none does, the suite is new to the event log: once its suite name is
+ *    known too, it adds a node table under that suite or test, and the emitter writes the table's first structure.
  *
  * An instance with no node table, as where the instance it started in has none, hands no event off at a send site,
  * and its wrappers hand nothing off: its events are assigned by the wrappers around it, from their own data.

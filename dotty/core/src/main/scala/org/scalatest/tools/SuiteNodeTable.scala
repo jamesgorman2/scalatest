@@ -159,8 +159,8 @@ private[scalatest] final class SuiteNodeTable(
   }
 
   /**
-   * Adds a suite node of node path `id` under `parentNode`, this suite's node or one of its tests', after the other
-   * suites under this one. Its first structure holds the suite alone, and is the caller's to write.
+   * Adds a suite node of node path `id` under `parentNode`, which is this suite's node or that of one of its tests,
+   * after the other suites under this one. Its first structure holds the suite alone, and is the caller's to write.
    */
   def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
     val added = new SuiteNodeTable(id, name, suiteId, className, Some(this), Some(parentNode), None, Nil, ScopeAndTestIds.none, Map.empty)

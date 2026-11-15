@@ -158,15 +158,15 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Fixes the node of a registered instance's run and settles its node table, and first those of each instance whose
-   * run it started in, from the suite ID and suite name each run read: `suiteIdRead` and `suiteNameRead` for this
+   * Fixes the node of a registered instance's run and settles its node table, after doing so for each instance whose
+   * run it started in. Each uses the suite ID and suite name its run read; `suiteIdRead` and `suiteNameRead` are this
    * instance's, where its run has read none before. A node that no structure holds needs both: its table is added,
    * and its first structure written, once its name is known.
    *
-   * Where a run has read neither and `handingOff` says an event is about to be handed off, the emitter reads the
-   * missing one from the instance, outside the lock, once at most, and only while the event log is open and the
-   * instance may have a node table. An instance whose read throws has no node table, as has one that can have none.
-   * Each node fixed writes the structure its registration keeps for it, where that differs from its node table.
+   * Where a run has not read one of them and `handingOff` says an event is about to be handed off, the emitter reads
+   * it from the instance, outside the lock, once at most, and only while the event log is open and the instance may
+   * have a node table. An instance whose read throws, or that can have no node table, is left without one. Each node
+   * fixed writes the structure its registration keeps for it, where that differs from its node table.
    *
    * An inner instance's node is placed below its outer one's, so it stays unsettled while an outer one is, as where
    * another thread is reading that one's suite ID. The names its run read are kept, and it is settled by a later
@@ -215,8 +215,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     isFixed
   }
 
-  // Returns whether the node table of a fixed node is settled, adding it, and writing its first structure, where no
-  // structure holds the node and its suite name is known.
+  // Settles the node table of a fixed node, and returns whether it is settled. Where no structure holds the node and
+  // its suite name is known, it adds the table and writes its first structure.
   private def settleTableOf(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
     val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen && handingOff && registration.takeReadOfSuiteName()))
     val suiteName = if (readsSuiteName) TestEventLogEmitter.caught(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
@@ -270,11 +270,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * closing event are written before it, assigned as it is, unless `messagesHandedOff` says the test handed them off
    * one by one.
    *
-   * The node of the origin's suite instance is fixed, and its node table settled, first, where they are not yet.
+   * First, where they are not yet, the node of the origin's suite instance is fixed and its node table settled.
    * Nothing is handed off where the event log has ended, the instance has no node table, or its top-level suite's
-   * registration has been removed: a wrapper
-   * the event reaches then hands it off as an event with no origin. A test's closing event sent after the removal,
-   * whose messages the test handed off, is marked so that the top-level suite's wrapper writes it without them.
+   * registration has been removed: a wrapper the event reaches then hands it off as an event with no origin. A test's
+   * closing event sent after the removal, whose messages the test handed off, is marked so that the top-level suite's
+   * wrapper writes it without them.
    *
    * The event is encoded outside the lock, as `runEvent` encodes. What encoding or writing throws is kept from the
    * caller as `runEvent` keeps it.
@@ -349,9 +349,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * messages recorded in a test's closing event are written before it, assigned as it is, unless the test has handed
    * them off one by one.
    *
-   * The node of the wrapper's suite instance is fixed, and its node table settled, first, where they are not yet and
-   * it may have a node table. A wrapper of an instance that has no node table hands nothing off, so the event is
-   * handed off by a wrapper around it.
+   * First, where they are not yet and the instance may have a node table, the node of the wrapper's suite instance is
+   * fixed and its node table settled. A wrapper of an instance that has no node table hands nothing off, so the event
+   * is handed off by a wrapper around it.
    *
    * What encoding or writing throws is kept from the caller as `runEvent` keeps it.
    */
