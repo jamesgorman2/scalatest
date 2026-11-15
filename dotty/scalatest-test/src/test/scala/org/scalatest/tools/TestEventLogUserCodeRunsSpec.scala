@@ -20,7 +20,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
    *
    * @param reported what the run's reporters receive, in order, whether or not the run writes an event log
    * @param eventLogInNotation the events the criterion states, in the event notation, after the structures that name their nodes
-   * @param eventLogInFormat those events as the format writes them, one line for each, the first suite's node ID being 1
+   * @param eventLogInFormat those events as the format writes them, one line for each
    */
   private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
 
@@ -38,9 +38,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     }
   }
 
-  private def suiteEvent(node: Long, eventName: String): String = TestEventLogLine.suiteEvent(node, 1, eventName)
-
-  private def inFirstExecution(node: Long, eventName: String): String = TestEventLogLine.scopeOrTestEvent(node, 1, 1, eventName)
+  private def event(node: NodePath, executions: Seq[Int], eventName: String, fields: String = ""): String =
+    TestEventLogLine.nodeEvent(node, executions, eventName, fields)
 
   private val direct = """"message":"direct","""
 
@@ -49,57 +48,62 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   private def structuresHolding(name: String, lines: Seq[String]): Int =
     lines.count(line => line.contains(""""item":"structure"""") && line.contains(s""""name":"$name""""))
 
-  private def suiteEventsOf(node: Long, lines: Seq[String]): Int =
-    lines.count(line => line.contains(s""""node":$node,""") && (line.contains(""""event":"SuiteStarting"""") || line.contains(""""event":"SuiteCompleted"""")))
+  private def suiteEventsOf(node: NodePath, lines: Seq[String]): Int =
+    lines.count(line => line.contains(s""""node":${node.json},""") && (line.contains(""""event":"SuiteStarting"""") || line.contains(""""event":"SuiteCompleted"""")))
 
   private def infosIn(lines: Seq[String]): Int = lines.count(_.contains(""""event":"InfoProvided""""))
 
-  private def eventsOf(node: Long, lines: Seq[String]): Int = lines.count(_.contains(s""""node":$node,"""))
+  private def eventsOf(node: NodePath, lines: Seq[String]): Int = lines.count(_.contains(s""""node":${node.json},"""))
 
-  private val stackSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting StackSpec",
-      "ScopeOpened A Stack",
-      "TestStarting A Stack pops",
-      "TestSucceeded A Stack pops",
-      "ScopeClosed A Stack",
-      "SuiteCompleted StackSpec",
-      "RunCompleted"
-    ),
-    """
-    structure
-      suite "StackSpec", class "samples.DelegatingSuite", id "samples.StackSpec"
-        test "A Stack pops", label "- A Stack pops"
-    suite "StackSpec": SuiteStarting
-    structure
-      suite "StackSpec", class "samples.DelegatingSuite", id "samples.StackSpec"
-        scope "A Stack", label "A Stack"
-          test "pops", label "- pops"
-    scope "A Stack": ScopeOpened
-    test "pops": TestStarting
-    test "pops": TestSucceeded
-    scope "A Stack": ScopeClosed
-    suite "StackSpec": SuiteCompleted
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suiteWithId(1, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
-        TestEventLogLine.test(2, 1, 0, "A Stack pops", "- A Stack pops")
+  private val stackSpec = {
+    val top = NodePath.topLevel("samples.StackSpec")
+    val aStack = top.scope("A Stack")
+    val pops = top.test("A Stack pops")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting StackSpec",
+        "ScopeOpened A Stack",
+        "TestStarting A Stack pops",
+        "TestSucceeded A Stack pops",
+        "ScopeClosed A Stack",
+        "SuiteCompleted StackSpec",
+        "RunCompleted"
       ),
-      suiteEvent(1, "SuiteStarting"),
-      TestEventLogLine.structure(
-        TestEventLogLine.suiteWithId(1, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
-        TestEventLogLine.scope(3, 1, 0, "A Stack", "A Stack"),
-        TestEventLogLine.test(2, 3, 0, "pops", "- pops")
-      ),
-      inFirstExecution(3, "ScopeOpened"),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      inFirstExecution(3, "ScopeClosed"),
-      suiteEvent(1, "SuiteCompleted")
+      """
+      structure
+        suite "StackSpec", class "samples.DelegatingSuite", id "samples.StackSpec"
+          test "A Stack pops", label "- A Stack pops"
+      suite "StackSpec": SuiteStarting
+      structure
+        suite "StackSpec", class "samples.DelegatingSuite", id "samples.StackSpec"
+          scope "A Stack", label "A Stack"
+            test "pops", label "- pops"
+      scope "A Stack": ScopeOpened
+      test "pops": TestStarting
+      test "pops": TestSucceeded
+      scope "A Stack": ScopeClosed
+      suite "StackSpec": SuiteCompleted
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suiteWithId(top, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
+          TestEventLogLine.test(pops, top, 0, "A Stack pops", "- A Stack pops")
+        ),
+        event(top, List(1), "SuiteStarting"),
+        TestEventLogLine.structure(
+          TestEventLogLine.suiteWithId(top, "StackSpec", "samples.StackSpec", "samples.DelegatingSuite"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(pops, aStack, 0, "pops", "- pops")
+        ),
+        event(aStack, List(1, 1), "ScopeOpened"),
+        event(pops, List(1, 1, 1), "TestStarting"),
+        event(pops, List(1, 1, 1), "TestSucceeded"),
+        event(aStack, List(1, 1), "ScopeClosed"),
+        event(top, List(1), "SuiteCompleted")
+      )
     )
-  )
+  }
 
   // Framework's SuiteSortingReporter passes on no event of a suite that sent it no SuiteStarting, such as a helper's.
   private val reportedOfAHelper = Vector.empty[String]
@@ -107,215 +111,267 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   // Framework's filter keeps only the tests of the suites its task selects, so the helper's suite ID is selected too.
   private val helperSelected = "samples.HelperSuite"
 
-  private def helperUnder(suiteNode: Long, parent: Long): String =
+  /** The node of the helper a test runs, which sits under that test. */
+  private def helperUnder(test: NodePath): NodePath = test.suite("samples.HelperSuite")
+
+  private def helperScope(helper: NodePath): NodePath = helper.scope("A helper")
+
+  private def helps(helper: NodePath): NodePath = helper.test("A helper helps")
+
+  private val ofASecondExecution = """"executions":\[[0-9,]*,2\]""".r
+
+  private def eventsOfASecondExecutionOfHelpers(lines: Seq[String]): Int =
+    lines.count(line => line.contains(""""suiteId":"samples.HelperSuite"""") && line.contains(""""item":"event"""") && ofASecondExecution.findFirstIn(line).isDefined)
+
+  private def helperStructure(helper: NodePath): String =
     TestEventLogLine.structure(
-      TestEventLogLine.suiteUnder(suiteNode, parent, "HelperSuite", "samples.HelperSuite"),
-      TestEventLogLine.scope(suiteNode + 1, suiteNode, 0, "A helper", "A helper"),
-      TestEventLogLine.test(suiteNode + 2, suiteNode + 1, 0, "helps", "- helps")
+      TestEventLogLine.suiteUnder(helper, "HelperSuite", "samples.HelperSuite"),
+      TestEventLogLine.scope(helperScope(helper), 0, "A helper", "A helper"),
+      TestEventLogLine.test(helps(helper), helperScope(helper), 0, "helps", "- helps")
     )
 
-  private val outerSuite = StatedRun(
-    Vector("RunStarting", "SuiteStarting OuterSuite", "TestStarting uses a helper") ++ reportedOfAHelper ++
-      Vector("TestSucceeded uses a helper", "SuiteCompleted OuterSuite", "RunCompleted"),
-    s"""
-    structure
-      suite "OuterSuite", class "samples.OuterSuite"
-        test "uses a helper", label "- uses a helper"
-    suite "OuterSuite": SuiteStarting
-    test "uses a helper": TestStarting
-    structure under suite "OuterSuite"
-      suite "HelperSuite", class "samples.HelperSuite"
-        scope "A helper", label "A helper"
-          test "helps", label "- helps"
-    scope "A helper": ScopeOpened
-    test "helps": TestStarting
-    test "helps": TestSucceeded
-    scope "A helper": ScopeClosed
-    test "uses a helper": TestSucceeded
-    suite "OuterSuite": SuiteCompleted
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "OuterSuite", "samples.OuterSuite"),
-        TestEventLogLine.test(2, 1, 0, "uses a helper", "- uses a helper")
-      ),
-      suiteEvent(1, "SuiteStarting"),
-      inFirstExecution(2, "TestStarting"),
-      helperUnder(3, 1),
-      inFirstExecution(4, "ScopeOpened"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      inFirstExecution(4, "ScopeClosed"),
-      inFirstExecution(2, "TestSucceeded"),
-      suiteEvent(1, "SuiteCompleted")
-    )
-  )
+  private val usesAHelper = NodePath.topLevel("samples.OuterSuite").test("uses a helper")
 
-  private val userSuites = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting UserSuites",
-      "SuiteCompleted UserSuites",
-      "SuiteStarting User1Suite",
-      "TestStarting uses one"
-    ) ++ reportedOfAHelper ++ Vector(
-      "TestSucceeded uses one",
-      "SuiteCompleted User1Suite",
-      "SuiteStarting User2Suite",
-      "TestStarting uses two"
-    ) ++ reportedOfAHelper ++ Vector("TestSucceeded uses two", "SuiteCompleted User2Suite", "RunCompleted"),
-    s"""
-    structure
-      suite "UserSuites", class "samples.UserSuites"
-        suite "User1Suite", class "samples.User1Suite"
-          test "uses one", label "- uses one"
-        suite "User2Suite", class "samples.User2Suite"
-          test "uses two", label "- uses two"
-    test "uses one": TestStarting
-    structure under suite "User1Suite"
-      suite "HelperSuite", class "samples.HelperSuite"
-        scope "A helper", label "A helper"
-          test "helps", label "- helps"
-    test "helps" #1: TestStarting
-    test "uses one": TestSucceeded
-    test "uses two": TestStarting
-    structure under suite "User2Suite"
-      suite "HelperSuite", class "samples.HelperSuite"
-        scope "A helper", label "A helper"
-          test "helps", label "- helps"
-    test "helps" #2: TestStarting
-    test "uses two": TestSucceeded
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "UserSuites", "samples.UserSuites"),
-        TestEventLogLine.nestedSuite(2, 1, 0, "User1Suite", "samples.User1Suite"),
-        TestEventLogLine.test(3, 2, 0, "uses one", "- uses one"),
-        TestEventLogLine.nestedSuite(4, 1, 1, "User2Suite", "samples.User2Suite"),
-        TestEventLogLine.test(5, 4, 0, "uses two", "- uses two")
-      ),
-      inFirstExecution(3, "TestStarting"),
-      helperUnder(6, 2),
-      inFirstExecution(8, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(5, "TestStarting"),
-      helperUnder(9, 4),
-      inFirstExecution(11, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded")
+  private val outerSuite = {
+    val top = usesAHelper.parent
+    val helper = helperUnder(usesAHelper)
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting OuterSuite", "TestStarting uses a helper") ++ reportedOfAHelper ++
+        Vector("TestSucceeded uses a helper", "SuiteCompleted OuterSuite", "RunCompleted"),
+      s"""
+      structure
+        suite "OuterSuite", class "samples.OuterSuite"
+          test "uses a helper", label "- uses a helper"
+      suite "OuterSuite": SuiteStarting
+      test "uses a helper": TestStarting
+      structure under test "uses a helper"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      scope "A helper": ScopeOpened
+      test "helps": TestStarting
+      test "helps": TestSucceeded
+      scope "A helper": ScopeClosed
+      test "uses a helper": TestSucceeded
+      suite "OuterSuite": SuiteCompleted
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("OuterSuite", "samples.OuterSuite"),
+          TestEventLogLine.test(usesAHelper, top, 0, "uses a helper", "- uses a helper")
+        ),
+        event(top, List(1), "SuiteStarting"),
+        event(usesAHelper, List(1, 1), "TestStarting"),
+        helperStructure(helper),
+        event(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
+        event(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
+        event(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
+        event(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed"),
+        event(usesAHelper, List(1, 1), "TestSucceeded"),
+        event(top, List(1), "SuiteCompleted")
+      )
     )
-  )
+  }
 
-  private val twoHelpersSuite = StatedRun(
-    Vector("RunStarting", "SuiteStarting TwoHelpersSuite", "TestStarting first") ++ reportedOfAHelper ++
-      Vector("TestSucceeded first", "TestStarting second") ++ reportedOfAHelper ++
-      Vector("TestSucceeded second", "SuiteCompleted TwoHelpersSuite", "RunCompleted"),
-    s"""
-    structure
-      suite "TwoHelpersSuite", class "samples.TwoHelpersSuite"
-        test "first", label "- first"
-        test "second", label "- second"
-    test "first": TestStarting
-    structure under suite "TwoHelpersSuite"
-      suite "HelperSuite", class "samples.HelperSuite"
-        scope "A helper", label "A helper"
-          test "helps", label "- helps"
-    scope "A helper": ScopeOpened
-    test "helps", parent execution 1: TestStarting
-    test "helps", parent execution 1: TestSucceeded
-    scope "A helper": ScopeClosed
-    test "first": TestSucceeded
-    test "second": TestStarting
-    scope "A helper" execution 2: ScopeOpened
-    test "helps" execution 2, parent execution 2: TestStarting
-    test "helps" execution 2, parent execution 2: TestSucceeded
-    scope "A helper" execution 2: ScopeClosed
-    test "second": TestSucceeded
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "TwoHelpersSuite", "samples.TwoHelpersSuite"),
-        TestEventLogLine.test(2, 1, 0, "first", "- first"),
-        TestEventLogLine.test(3, 1, 1, "second", "- second")
-      ),
-      inFirstExecution(2, "TestStarting"),
-      helperUnder(4, 1),
-      inFirstExecution(5, "ScopeOpened"),
-      inFirstExecution(6, "TestStarting"),
-      inFirstExecution(6, "TestSucceeded"),
-      inFirstExecution(5, "ScopeClosed"),
-      inFirstExecution(2, "TestSucceeded"),
-      inFirstExecution(3, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(5, 2, 2, "ScopeOpened"),
-      TestEventLogLine.scopeOrTestEvent(6, 2, 2, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(6, 2, 2, "TestSucceeded"),
-      TestEventLogLine.scopeOrTestEvent(5, 2, 2, "ScopeClosed"),
-      inFirstExecution(3, "TestSucceeded")
+  private val userSuites = {
+    val top = NodePath.topLevel("samples.UserSuites")
+    val user1 = top.suite("samples.User1Suite")
+    val user2 = top.suite("samples.User2Suite")
+    val usesOne = user1.test("uses one")
+    val usesTwo = user2.test("uses two")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting UserSuites",
+        "SuiteCompleted UserSuites",
+        "SuiteStarting User1Suite",
+        "TestStarting uses one"
+      ) ++ reportedOfAHelper ++ Vector(
+        "TestSucceeded uses one",
+        "SuiteCompleted User1Suite",
+        "SuiteStarting User2Suite",
+        "TestStarting uses two"
+      ) ++ reportedOfAHelper ++ Vector("TestSucceeded uses two", "SuiteCompleted User2Suite", "RunCompleted"),
+      s"""
+      structure
+        suite "UserSuites", class "samples.UserSuites"
+          suite "User1Suite", class "samples.User1Suite"
+            test "uses one", label "- uses one"
+          suite "User2Suite", class "samples.User2Suite"
+            test "uses two", label "- uses two"
+      test "uses one": TestStarting
+      structure under test "uses one"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      test "helps" #1: TestStarting
+      test "uses one": TestSucceeded
+      test "uses two": TestStarting
+      structure under test "uses two"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      test "helps" #2: TestStarting
+      test "uses two": TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("UserSuites", "samples.UserSuites"),
+          TestEventLogLine.nestedSuite(user1, 0, "User1Suite", "samples.User1Suite"),
+          TestEventLogLine.test(usesOne, user1, 0, "uses one", "- uses one"),
+          TestEventLogLine.nestedSuite(user2, 1, "User2Suite", "samples.User2Suite"),
+          TestEventLogLine.test(usesTwo, user2, 0, "uses two", "- uses two")
+        ),
+        event(usesOne, List(1, 1, 1), "TestStarting"),
+        helperStructure(helperUnder(usesOne)),
+        event(helps(helperUnder(usesOne)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
+        event(usesOne, List(1, 1, 1), "TestSucceeded"),
+        event(usesTwo, List(1, 1, 1), "TestStarting"),
+        helperStructure(helperUnder(usesTwo)),
+        event(helps(helperUnder(usesTwo)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
+        event(usesTwo, List(1, 1, 1), "TestSucceeded")
+      )
     )
-  )
+  }
+
+  private val twoHelpersSuite = {
+    val top = NodePath.topLevel("samples.TwoHelpersSuite")
+    val first = top.test("first")
+    val second = top.test("second")
+    def helperEvents(test: NodePath): List[String] = {
+      val helper = helperUnder(test)
+      List(
+        helperStructure(helper),
+        event(helperScope(helper), List(1, 1, 1, 1), "ScopeOpened"),
+        event(helps(helper), List(1, 1, 1, 1, 1), "TestStarting"),
+        event(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
+        event(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed")
+      )
+    }
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting TwoHelpersSuite", "TestStarting first") ++ reportedOfAHelper ++
+        Vector("TestSucceeded first", "TestStarting second") ++ reportedOfAHelper ++
+        Vector("TestSucceeded second", "SuiteCompleted TwoHelpersSuite", "RunCompleted"),
+      s"""
+      structure
+        suite "TwoHelpersSuite", class "samples.TwoHelpersSuite"
+          test "first", label "- first"
+          test "second", label "- second"
+      test "first": TestStarting
+      structure under test "first"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      scope "A helper" #1: ScopeOpened
+      test "helps" #1, in test "first" execution 1: TestStarting
+      test "helps" #1, in test "first" execution 1: TestSucceeded
+      scope "A helper" #1: ScopeClosed
+      test "first": TestSucceeded
+      test "second": TestStarting
+      structure under test "second"
+        suite "HelperSuite", class "samples.HelperSuite"
+          scope "A helper", label "A helper"
+            test "helps", label "- helps"
+      scope "A helper" #2: ScopeOpened
+      test "helps" #2, in test "second" execution 1: TestStarting
+      test "helps" #2, in test "second" execution 1: TestSucceeded
+      scope "A helper" #2: ScopeClosed
+      test "second": TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("TwoHelpersSuite", "samples.TwoHelpersSuite"),
+          TestEventLogLine.test(first, top, 0, "first", "- first"),
+          TestEventLogLine.test(second, top, 1, "second", "- second")
+        ),
+        event(first, List(1, 1), "TestStarting")
+      ) ++ helperEvents(first) ++ List(
+        event(first, List(1, 1), "TestSucceeded"),
+        event(second, List(1, 1), "TestStarting")
+      ) ++ helperEvents(second) ++ List(
+        event(second, List(1, 1), "TestSucceeded")
+      )
+    )
+  }
+
+  private val runsItsNestedSuitesNode = NodePath.topLevel("samples.RunsItsNestedSuites")
+  private val inner1 = runsItsNestedSuitesNode.suite("samples.Inner1Suite")
+  private val inner2 = runsItsNestedSuitesNode.suite("samples.Inner2Suite")
 
   // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
-  private val runsItsNestedSuites = StatedRun(
-    Vector("RunStarting", "SuiteStarting RunsItsNestedSuites", "SuiteCompleted RunsItsNestedSuites", "RunCompleted"),
-    """
-    structure
-      suite "RunsItsNestedSuites", class "samples.RunsItsNestedSuites"
-        suite "Inner1Suite", class "samples.Inner1Suite"
-          test "inner one", label "- inner one"
-        suite "Inner2Suite", class "samples.Inner2Suite"
-          test "inner two", label "- inner two"
-    suite "RunsItsNestedSuites": SuiteStarting
-    test "inner one": TestStarting
-    test "inner one": TestSucceeded
-    test "inner two": TestStarting
-    test "inner two": TestSucceeded
-    suite "RunsItsNestedSuites": SuiteCompleted
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "RunsItsNestedSuites", "samples.RunsItsNestedSuites"),
-        TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
-        TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
-        TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
-        TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
-      ),
-      suiteEvent(1, "SuiteStarting"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      suiteEvent(1, "SuiteCompleted")
+  private val runsItsNestedSuites = {
+    val innerOne = inner1.test("inner one")
+    val innerTwo = inner2.test("inner two")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting RunsItsNestedSuites", "SuiteCompleted RunsItsNestedSuites", "RunCompleted"),
+      """
+      structure
+        suite "RunsItsNestedSuites", class "samples.RunsItsNestedSuites"
+          suite "Inner1Suite", class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+          suite "Inner2Suite", class "samples.Inner2Suite"
+            test "inner two", label "- inner two"
+      suite "RunsItsNestedSuites": SuiteStarting
+      test "inner one": TestStarting
+      test "inner one": TestSucceeded
+      test "inner two": TestStarting
+      test "inner two": TestSucceeded
+      suite "RunsItsNestedSuites": SuiteCompleted
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("RunsItsNestedSuites", "samples.RunsItsNestedSuites"),
+          TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(innerTwo, inner2, 0, "inner two", "- inner two")
+        ),
+        event(runsItsNestedSuitesNode, List(1), "SuiteStarting"),
+        event(innerOne, List(1, 1, 1), "TestStarting"),
+        event(innerOne, List(1, 1, 1), "TestSucceeded"),
+        event(innerTwo, List(1, 1, 1), "TestStarting"),
+        event(innerTwo, List(1, 1, 1), "TestSucceeded"),
+        event(runsItsNestedSuitesNode, List(1), "SuiteCompleted")
+      )
     )
-  )
+  }
 
-  private val twiceRunPlainSuite = StatedRun(
-    Vector("RunStarting", "SuiteStarting TwiceRunPlainSuite", "TestStarting a", "TestSucceeded a", "TestStarting a", "TestSucceeded a", "SuiteCompleted TwiceRunPlainSuite", "RunCompleted"),
-    """
-    structure
-      suite "TwiceRunPlainSuite", class "samples.TwiceRunPlainSuite"
-        test "b", label "- b"
-        test "a", label "- a"
-        test "c", label "- c"
-    test "a": TestStarting
-    test "a": TestSucceeded
-    test "a" execution 2: TestStarting
-    test "a" execution 2: TestSucceeded
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "TwiceRunPlainSuite", "samples.TwiceRunPlainSuite"),
-        TestEventLogLine.test(2, 1, 0, "b", "- b"),
-        TestEventLogLine.test(3, 1, 1, "a", "- a"),
-        TestEventLogLine.test(4, 1, 2, "c", "- c")
-      ),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      TestEventLogLine.scopeOrTestEvent(3, 2, 1, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(3, 2, 1, "TestSucceeded")
+  private val twiceRunA = NodePath.topLevel("samples.TwiceRunPlainSuite").test("a")
+
+  private val twiceRunPlainSuite = {
+    val top = twiceRunA.parent
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting TwiceRunPlainSuite", "TestStarting a", "TestSucceeded a", "TestStarting a", "TestSucceeded a", "SuiteCompleted TwiceRunPlainSuite", "RunCompleted"),
+      """
+      structure
+        suite "TwiceRunPlainSuite", class "samples.TwiceRunPlainSuite"
+          test "b", label "- b"
+          test "a", label "- a"
+          test "c", label "- c"
+      test "a": TestStarting
+      test "a": TestSucceeded
+      test "a" execution 2: TestStarting
+      test "a" execution 2: TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("TwiceRunPlainSuite", "samples.TwiceRunPlainSuite"),
+          TestEventLogLine.test(top.test("b"), top, 0, "b", "- b"),
+          TestEventLogLine.test(twiceRunA, top, 1, "a", "- a"),
+          TestEventLogLine.test(top.test("c"), top, 2, "c", "- c")
+        ),
+        event(twiceRunA, List(1, 1), "TestStarting"),
+        event(twiceRunA, List(1, 1), "TestSucceeded"),
+        event(twiceRunA, List(1, 2), "TestStarting"),
+        event(twiceRunA, List(1, 2), "TestSucceeded")
+      )
     )
-  )
+  }
 
-  /** A run of a suite whose test `t` sends a message straight to a reporter, which is assigned to `messageNode`, the suite's or `t`'s. */
-  private def directRun(suite: String, messageAssignedTo: String, messageNode: Long, isAssignedToTest: Boolean): StatedRun = {
+  /** A run of a suite whose test `t` sends a message straight to a reporter, which is assigned to the suite or to `t`. */
+  private def directRun(suite: String, messageAssignedTo: String, isAssignedToTest: Boolean): StatedRun = {
+    val top = NodePath.topLevel(s"samples.$suite")
+    val t = top.test("t")
     val reportedOfT = Vector("TestStarting t", "InfoProvided direct", "TestSucceeded t")
     StatedRun(
       Vector("RunStarting", s"SuiteStarting $suite") ++ reportedOfT ++ Vector(s"SuiteCompleted $suite", "RunCompleted"),
@@ -328,17 +384,18 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       test "t": TestSucceeded
       """,
       List(
-        TestEventLogLine.structure(TestEventLogLine.suite(1, suite, s"samples.$suite"), TestEventLogLine.test(2, 1, 0, "t", "- t")),
-        inFirstExecution(2, "TestStarting"),
-        if (isAssignedToTest) TestEventLogLine.scopeOrTestEvent(messageNode, 1, 1, "InfoProvided", direct)
-        else TestEventLogLine.suiteEvent(messageNode, 1, "InfoProvided", direct),
-        inFirstExecution(2, "TestSucceeded")
+        TestEventLogLine.structure(TestEventLogLine.suite(suite, s"samples.$suite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
+        event(t, List(1, 1), "TestStarting"),
+        if (isAssignedToTest) event(t, List(1, 1), "InfoProvided", direct) else event(top, List(1), "InfoProvided", direct),
+        event(t, List(1, 1), "TestSucceeded")
       )
     )
   }
 
   /** A run of a suite nesting one whose test `t` sends a message to the reporter the outer suite's `run` was given. */
   private def nestedDirectRun(suite: String, nested: String, messageAssignedTo: String, isAssignedToTest: Boolean): StatedRun = {
+    val nestedNode = NodePath.topLevel(s"samples.$suite").suite(s"samples.$nested")
+    val t = nestedNode.test("t")
     StatedRun(
       Vector(
         "RunStarting",
@@ -362,85 +419,94 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       """,
       List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite(1, suite, s"samples.$suite"),
-          TestEventLogLine.nestedSuite(2, 1, 0, nested, s"samples.$nested"),
-          TestEventLogLine.test(3, 2, 0, "t", "- t")
+          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.nestedSuite(nestedNode, 0, nested, s"samples.$nested"),
+          TestEventLogLine.test(t, nestedNode, 0, "t", "- t")
         ),
-        inFirstExecution(3, "TestStarting"),
-        if (isAssignedToTest) TestEventLogLine.scopeOrTestEvent(3, 1, 1, "InfoProvided", direct)
-        else TestEventLogLine.suiteEvent(2, 1, "InfoProvided", direct),
-        inFirstExecution(3, "TestSucceeded")
+        event(t, List(1, 1, 1), "TestStarting"),
+        if (isAssignedToTest) event(t, List(1, 1, 1), "InfoProvided", direct) else event(nestedNode, List(1, 1), "InfoProvided", direct),
+        event(t, List(1, 1, 1), "TestSucceeded")
       )
     )
   }
 
-  private val directNamingItsSecondRun = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting DirectNamingItsSecondRun",
-      "TestStarting t",
-      "TestSucceeded t",
-      "TestStarting t",
-      "InfoProvided direct",
-      "TestSucceeded t",
-      "SuiteCompleted DirectNamingItsSecondRun",
-      "RunCompleted"
-    ),
-    """
-    structure
-      suite "DirectNamingItsSecondRun", class "samples.DirectNamingItsSecondRun"
-        test "t", label "- t"
-    test "t": TestStarting
-    test "t": TestSucceeded
-    test "t" execution 2: TestStarting
-    test "t" execution 2: InfoProvided(message: "direct")
-    test "t" execution 2: TestSucceeded
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "DirectNamingItsSecondRun", "samples.DirectNamingItsSecondRun"),
-        TestEventLogLine.test(2, 1, 0, "t", "- t")
+  private val directNamingItsSecondRun = {
+    val top = NodePath.topLevel("samples.DirectNamingItsSecondRun")
+    val t = top.test("t")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting DirectNamingItsSecondRun",
+        "TestStarting t",
+        "TestSucceeded t",
+        "TestStarting t",
+        "InfoProvided direct",
+        "TestSucceeded t",
+        "SuiteCompleted DirectNamingItsSecondRun",
+        "RunCompleted"
       ),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 1, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 1, "InfoProvided", direct),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 1, "TestSucceeded")
+      """
+      structure
+        suite "DirectNamingItsSecondRun", class "samples.DirectNamingItsSecondRun"
+          test "t", label "- t"
+      test "t": TestStarting
+      test "t": TestSucceeded
+      test "t" execution 2: TestStarting
+      test "t" execution 2: InfoProvided(message: "direct")
+      test "t" execution 2: TestSucceeded
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("DirectNamingItsSecondRun", "samples.DirectNamingItsSecondRun"),
+          TestEventLogLine.test(t, top, 0, "t", "- t")
+        ),
+        event(t, List(1, 1), "TestStarting"),
+        event(t, List(1, 1), "TestSucceeded"),
+        event(t, List(1, 2), "TestStarting"),
+        event(t, List(1, 2), "InfoProvided", direct),
+        event(t, List(1, 2), "TestSucceeded")
+      )
     )
-  )
+  }
 
-  private val directNamingItsTestAfterRun = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting DirectNamingItsTestAfterRun",
-      "TestStarting t",
-      "TestSucceeded t",
-      "InfoProvided direct",
-      "SuiteCompleted DirectNamingItsTestAfterRun",
-      "RunCompleted"
-    ),
-    """
-    structure
-      suite "DirectNamingItsTestAfterRun", class "samples.DirectNamingItsTestAfterRun"
-        test "t", label "- t"
-    test "t": TestStarting
-    test "t": TestSucceeded
-    test "t": InfoProvided(message: "direct")
-    """,
-    List(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "DirectNamingItsTestAfterRun", "samples.DirectNamingItsTestAfterRun"),
-        TestEventLogLine.test(2, 1, 0, "t", "- t")
+  private val directNamingItsTestAfterRun = {
+    val top = NodePath.topLevel("samples.DirectNamingItsTestAfterRun")
+    val t = top.test("t")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting DirectNamingItsTestAfterRun",
+        "TestStarting t",
+        "TestSucceeded t",
+        "InfoProvided direct",
+        "SuiteCompleted DirectNamingItsTestAfterRun",
+        "RunCompleted"
       ),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "InfoProvided", direct)
+      """
+      structure
+        suite "DirectNamingItsTestAfterRun", class "samples.DirectNamingItsTestAfterRun"
+          test "t", label "- t"
+      test "t": TestStarting
+      test "t": TestSucceeded
+      test "t": InfoProvided(message: "direct")
+      """,
+      List(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("DirectNamingItsTestAfterRun", "samples.DirectNamingItsTestAfterRun"),
+          TestEventLogLine.test(t, top, 0, "t", "- t")
+        ),
+        event(t, List(1, 1), "TestStarting"),
+        event(t, List(1, 1), "TestSucceeded"),
+        event(t, List(1, 1), "InfoProvided", direct)
+      )
     )
-  )
+  }
 
   /**
    * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
    * reads them. The event log holds the stated events in order, and `alsoThen` states what else it holds.
+   *
+   * @param runPendingUntil the task whose change the emitter needs before its run can pass, if any
    */
   private def eventScenarios(
     scenario: String,
@@ -448,10 +514,11 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     suiteClassName: String,
     eventLogHolds: String,
     stated: StatedRun,
-    nestedSuiteIds: List[String] = Nil
+    nestedSuiteIds: List[String] = Nil,
+    runPendingUntil: Option[String] = None
   )(alsoThen: Vector[String] => Unit): Unit = {
     Scenario(scenario) {
-      pending
+      runPendingUntil.foreach(_ => pending)
       thisProcess
       Given(suite)
       When("Framework runs it without the runner argument")
@@ -476,7 +543,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
-      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(stated.eventLogInFormat)
 
@@ -508,20 +574,22 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "A test runs a helper",
       "a suite whose one test, 'uses a helper', runs a HelperSuite with the Args its test is run with",
       "samples.OuterSuite",
-      "the helper's structure under the outer suite, then its events, assigned to its own nodes and inside the test that ran it",
+      "the helper's structure under the test that ran it, then its events, assigned to its own nodes and inside the test that ran it",
       outerSuite,
+      runPendingUntil = Some("Suites at places no structure declared"),
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
       And("no SuiteStarting or SuiteCompleted is assigned to HelperSuite")
-      suiteEventsOf(3, lines) shouldBe 0
+      suiteEventsOf(helperUnder(usesAHelper), lines) shouldBe 0
     }
 
     eventScenarios(
       "Tests of two nested suites each run a helper",
       "a Suites nesting User1Suite and User2Suite, whose one test each runs a HelperSuite",
       "samples.UserSuites",
-      "a HelperSuite under each nested suite, each holding the events of the helper run there",
+      "a HelperSuite under each nested suite's test, each holding the events of the helper run there",
       userSuites,
+      runPendingUntil = Some("Suites at places no structure declared"),
       nestedSuiteIds = List("samples.User1Suite", "samples.User2Suite", helperSelected)
     ) { lines =>
       And("no other structure holds HelperSuite")
@@ -532,12 +600,14 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "Two tests each run a helper",
       "a suite whose tests 'first' and 'second' each run a HelperSuite",
       "samples.TwoHelpersSuite",
-      "one HelperSuite under the suite, whose scope and test have a second execution for the second test's helper",
+      "a HelperSuite under each test, each holding the events of the helper run there",
       twoHelpersSuite,
+      runPendingUntil = Some("Suites at places no structure declared"),
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
-      And("no other structure holds HelperSuite")
-      structuresHolding("HelperSuite", lines) shouldBe 1
+      And("no other structure holds HelperSuite, and no event is of a second execution of 'A helper' or 'helps'")
+      structuresHolding("HelperSuite", lines) shouldBe 2
+      eventsOfASecondExecutionOfHelpers(lines) shouldBe 0
     }
   }
 
@@ -552,8 +622,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       nestedSuiteIds = List("samples.Inner1Suite", "samples.Inner2Suite")
     ) { lines =>
       And("no SuiteStarting or SuiteCompleted is assigned to Inner1Suite or Inner2Suite, and no further structure is written")
-      suiteEventsOf(2, lines) shouldBe 0
-      suiteEventsOf(4, lines) shouldBe 0
+      suiteEventsOf(inner1, lines) shouldBe 0
+      suiteEventsOf(inner2, lines) shouldBe 0
       structuresIn(lines) shouldBe 1
     }
   }
@@ -568,7 +638,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       twiceRunPlainSuite
     ) { lines =>
       And("no other event is assigned to 'a'")
-      eventsOf(3, lines) shouldBe 4
+      eventsOf(twiceRunA, lines) shouldBe 4
     }
   }
 
@@ -579,7 +649,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "a suite whose run keeps args.reporter, and whose test 't' sends that reporter an InfoProvided with no nameInfo",
       "samples.DirectNamelessSuite",
       "the message assigned to the suite, between the test's events",
-      directRun("DirectNamelessSuite", "suite \"DirectNamelessSuite\"", 1, isAssignedToTest = false)
+      directRun("DirectNamelessSuite", "suite \"DirectNamelessSuite\"", isAssignedToTest = false)
     ) { lines =>
       And("no InfoProvided is assigned to test 't'")
       infosIn(lines) shouldBe 1
@@ -590,7 +660,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "a suite whose run keeps args.reporter, and whose test 't' sends that reporter an InfoProvided naming the suite and no test",
       "samples.DirectNamingItsSuite",
       "the message assigned to the suite",
-      directRun("DirectNamingItsSuite", "suite \"DirectNamingItsSuite\"", 1, isAssignedToTest = false)
+      directRun("DirectNamingItsSuite", "suite \"DirectNamingItsSuite\"", isAssignedToTest = false)
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1
@@ -613,7 +683,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "a suite whose run keeps args.reporter, and whose test 't' sends that reporter an InfoProvided naming the suite and 't'",
       "samples.DirectNamingItsTest",
       "the message assigned to test 't', in its open execution",
-      directRun("DirectNamingItsTest", "test \"t\"", 2, isAssignedToTest = true)
+      directRun("DirectNamingItsTest", "test \"t\"", isAssignedToTest = true)
     ) { lines =>
       And("it holds no other InfoProvided")
       infosIn(lines) shouldBe 1

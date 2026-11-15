@@ -8,7 +8,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.util.IdentityHashMap
-import java.util.concurrent.atomic.AtomicLong
 import org.scalatest.Filter
 import org.scalatest.RegisteredNode
 import org.scalatest.Reporter
@@ -50,7 +49,8 @@ import org.scalatest.events.TestSucceeded
 private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStream) {
 
   private var isOpen = true
-  private val mintedNodes = new AtomicLong(0L)
+  // Read and written only under this emitter's lock: how many top-level suites of each suite ID the run has written.
+  private val topLevelSuitesOfSuiteId = scala.collection.mutable.HashMap.empty[String, Int]
   // Both are read and written only under this emitter's lock. Both are keyed by the event's identity, since an
   // event's `equals` compares its fields, which hold the run's own objects. The second maps each event an inner
   // wrapper handed off to that wrapper's registration. `RegisteredSuites`' lock is taken under this one, only to
@@ -80,7 +80,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   /**
    * Returns the structure wrapper of a top-level suite, over the reporter the suite would report to. Before it
-   * returns, it mints the suite's node table and writes the suite's structure to the event log: the suite, its nested
+   * returns, it builds the suite's node table and writes the suite's structure to the event log: the suite, its nested
    * suites, and the scopes and tests the filter keeps. It registers the suite instance against that table, and the
    * caller removes the registration when the suite's run throws or the `Status` it returns completes.
    *
@@ -103,11 +103,17 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   /**
-   * Mints a node for a top-level suite and for each node of its structure, writes the structure, and returns the
-   * suite's node table. No node ID is minted twice in the run.
+   * Gives a top-level suite and each node of its structure its node path, writes the structure, and returns the
+   * suite's node table. A top-level suite whose suite ID an earlier one of the run has takes the next index, so no
+   * two nodes of the run share a node path.
    */
   def topLevelSuite(structure: SuiteStructure): SuiteNodeTable = {
-    val (table, nodes) = SuiteNodeTable.minted(structure, mintNode)
+    val index = synchronized {
+      val earlier = topLevelSuitesOfSuiteId.getOrElse(structure.suiteId, 0)
+      topLevelSuitesOfSuiteId(structure.suiteId) = earlier + 1
+      earlier
+    }
+    val (table, nodes) = SuiteNodeTable.ofTopLevelSuite(structure, index)
     append(TestEventLogEmitter.caught(TestEventLogEncoder.structure(nodes)), None)
     table
   }
@@ -116,8 +122,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * Where `scopesAndTests` differ from the suite's latest structure, writes them as a further `structure` event and
    * makes them the latest. A scope or test an earlier structure of the suite held keeps its node.
    *
-   * It writes under the lock, so that two instances of one suite that run at once mint no node twice. What writing
-   * throws is kept from the caller as `runEvent` keeps it.
+   * It writes under the lock, so that two instances of one suite that run at once write their structures one after
+   * the other. What writing throws is kept from the caller as `runEvent` keeps it.
    */
   def writeStructureWhereChanged(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Unit = {
     val thrown = synchronized(writeStructureWhereChangedUnderLock(table, scopesAndTests))
@@ -154,10 +160,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Encoding a structure calls no user code, so it is encoded under the lock that mints its nodes.
+  // Encoding a structure calls no user code, so it is encoded under the lock that makes it the latest.
   private def writeStructureWhereChangedUnderLock(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
     if (isOpen && table.scopesAndTests != scopesAndTests) {
-      val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode))))
+      val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests))))
       if (written.isLeft) {
         close()
       }
@@ -166,8 +172,6 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       None
     }
   }
-
-  private def mintNode(): NodeId = MintedNodeId(mintedNodes.incrementAndGet())
 
   /** Starts an execution for a run of a registered suite instance. */
   def startRun(registration: RegisteredSuite): Unit = synchronized {
@@ -308,7 +312,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    *  - the wrapper's suite's table, where its suite ID is that suite's;
    *  - else the table of a nested suite of that suite with its suite ID: the one read from this instance, else the
    *    first in declared order that has not ended;
-   *  - else a nested suite node minted directly under that suite.
+   *  - else a nested suite node added directly under that suite.
    * Each instance awaiting a placed one is then placed below it in the same way, or with its table where it was
    * created to run one test or in its creator's place. The instances' structures are written, where a suite node is
    * new or its tree differs from the table, and then every event they held, in the order handed off.
@@ -363,7 +367,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           unencodable.foreach(thrown => throw thrown)
           val scopesAndTests = pendingStructure.fold(table.scopesAndTests)(_.scopesAndTestsFor(table))
           if (isNew || table.scopesAndTests != scopesAndTests) {
-            write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode)))
+            write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests)))
           }
           placed.origins.foreach((event, origin) => originOfEvent.put(event, origin))
           held ++= placed.held
@@ -383,7 +387,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       val sharingItsId = around.childSuites.filter(_.suiteId == suiteId)
       sharingItsId.find(_.instance.exists(registration.isOf)).orElse(sharingItsId.find(!_.hasEnded)) match {
         case Some(nested) => (nested, false)
-        case None => (registration.mintedBelow(around, mintNode), true)
+        case None => (registration.nestedSuiteBelow(around), true)
       }
     }
   }
@@ -474,11 +478,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       case Some(names) =>
         val found = TestEventLogEmitter.tableAtOrBelow(ofWrapper, names.suiteId)
           .orElse(TestEventLogEmitter.tableAtOrBelow(wrapper.registration.topLevel.table, names.suiteId))
-        val table = found.getOrElse(ofWrapper.mintNestedSuite(None, names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId), mintNode))
+        val table = found.getOrElse(ofWrapper.addNestedSuite(None, names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId)))
         val lackedTest = names.testName.filterNot(table.tests.contains)
         if (found.isEmpty || lackedTest.isDefined) {
           val scopesAndTests = table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList)
-          write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests, mintNode)))
+          write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests)))
         }
         names.testName.flatMap(table.tests.get) match {
           case Some(test) => assignToScopeOrTest(table, test, None, event)
@@ -487,18 +491,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
+  // Where the event has an origin, its suite's execution is that of the run that sent it.
   private def assignToScopeOrTest(table: SuiteNodeTable, node: NodeId, origin: Option[RecordedOrigin], event: Event): NodeExecution = {
     val executions = table.executionsOf(node)
-    val executionsOfParent = table.executionsOf(table.parents(node))
-    val (execution, executionOfParent) = origin match {
-      case Some(recorded) => (recorded.execution, recorded.executionOfRun)
-      case None =>
-        (
-          TestEventLogEmitter.executionWithNoOrigin(executions, event),
-          executionsOfParent.openedLast.orElse(executionsOfParent.latest).getOrElse(new Execution)
-        )
+    val (execution, executionOfSuite) = origin match {
+      case Some(recorded) => (recorded.execution, Some(recorded.executionOfRun))
+      case None => (TestEventLogEmitter.executionWithNoOrigin(executions, event), None)
     }
-    val assigned = NodeExecution(node, Vector(executionsOfParent.number(executionOfParent), executions.number(execution)))
+    val assigned = NodeExecution(node, table.executionPathAbove(node, executionOfSuite) :+ executions.number(execution))
     if (TestEventLogEmitter.closesItsScopeOrTest(event)) {
       executions.close(execution)
     }
@@ -517,7 +517,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         }
         withNoOrigin
     }
-    val assigned = NodeExecution(table.node, Vector(executions.number(execution)))
+    val assigned = NodeExecution(table.node, table.executionPathAboveSuite :+ executions.number(execution))
     if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
       executions.close(execution)
       table.forgetUnrunExecution(execution)

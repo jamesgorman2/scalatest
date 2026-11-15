@@ -6,6 +6,8 @@ import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
+import org.scalatest.events.NodeId
+import org.scalatest.events.NodePlace
 import org.scalatest.events.Ordinal
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -14,7 +16,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
 
   private val suite = new Suite {}
   private val table =
-    new SuiteNodeTable(Some(suite), MintedNodeId(1), "OneSuite", "samples.OneSuite", "samples.OneSuite", None, None, Nil, ScopeAndTestIds.none, Map.empty, Vector.empty)
+    new SuiteNodeTable(Some(suite), NodeId(Vector(NodePlace.Suite("samples.OneSuite", 0))), "OneSuite", "samples.OneSuite", "samples.OneSuite", None, None, Nil, ScopeAndTestIds.none, Map.empty, _ => Vector.empty)
   private val registration = new RegisteredSuite(TestEventLogEmitter.appendingTo(new ByteArrayOutputStream), table, suite, None, None)
   private val node = WrapperNode.NestedSuite(registration)
 

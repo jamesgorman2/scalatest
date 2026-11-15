@@ -31,7 +31,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
    *
    * @param reported what the run's reporters receive, in order, whether or not the run writes an event log
    * @param eventLogInNotation the run's whole event log, in the event notation
-   * @param eventLogInFormat that event log as the format writes it, one line for each event, the first suite's node ID being 1
+   * @param eventLogInFormat that event log as the format writes it, one line for each event
    */
   private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
 
@@ -69,15 +69,15 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private def frameworkRunOf(lines: String*): List[String] =
     runStarted :: runStartingOfFramework :: lines.toList ::: List(runCompleted, runEndedCompleted)
 
-  private def suiteStarting(node: Long): String = TestEventLogLine.suiteEvent(node, 1, "SuiteStarting")
+  private def event(node: NodePath, executions: Seq[Int], eventName: String, fields: String = ""): String =
+    TestEventLogLine.nodeEvent(node, executions, eventName, fields)
 
-  private def suiteCompleted(node: Long): String = TestEventLogLine.suiteEvent(node, 1, "SuiteCompleted")
+  private def suiteStarting(suite: NodePath, executions: Seq[Int] = List(1)): String = event(suite, executions, "SuiteStarting")
 
-  private def inFirstExecution(node: Long, eventName: String, fields: String = ""): String =
-    TestEventLogLine.scopeOrTestEvent(node, 1, 1, eventName, fields)
+  private def suiteCompleted(suite: NodePath, executions: Seq[Int] = List(1)): String = event(suite, executions, "SuiteCompleted")
 
-  private def startingAndSucceeded(node: Long): List[String] =
-    List(inFirstExecution(node, "TestStarting"), inFirstExecution(node, "TestSucceeded"))
+  private def startingAndSucceeded(test: NodePath, executions: Seq[Int]): List[String] =
+    List(event(test, executions, "TestStarting"), event(test, executions, "TestSucceeded"))
 
   private def thrown(className: String, message: String): String =
     s""""throwable":{"id":1,"className":"$className","message":"$message"},"""
@@ -99,7 +99,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     nestedSuiteIds: List[String] = Nil
   ): Unit = {
     Scenario(scenario) {
-      pending
       thisProcess
       Given(suite)
       When(s"${launch.named} runs it without the runner argument")
@@ -124,7 +123,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
-      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(stated.eventLogInFormat)
 
@@ -133,948 +131,1062 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
   }
 
-  private val stackFunSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting StackFunSpec",
-      "ScopeOpened A Stack",
-      "ScopeOpened when empty",
-      "TestStarting A Stack when empty is empty",
-      "TestSucceeded A Stack when empty is empty",
-      "TestStarting A Stack when empty pops",
-      "TestSucceeded A Stack when empty pops",
-      "ScopeClosed when empty",
-      "ScopeClosed A Stack",
-      "SuiteCompleted StackFunSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "StackFunSpec", class "samples.StackFunSpec"
-        scope "A Stack", label "A Stack"
-          scope "when empty", label "when empty"
-            test "is empty", label "- is empty"
-            test "pops", label "- pops"
-    suite "StackFunSpec": SuiteStarting
-    scope "A Stack": ScopeOpened
-    scope "when empty": ScopeOpened
-    test "is empty": TestStarting
-    test "is empty": TestSucceeded
-    test "pops": TestStarting
-    test "pops": TestSucceeded
-    scope "when empty": ScopeClosed
-    scope "A Stack": ScopeClosed
-    suite "StackFunSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "StackFunSpec", "samples.StackFunSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
-        TestEventLogLine.scope(3, 2, 0, "when empty", "when empty"),
-        TestEventLogLine.test(4, 3, 0, "is empty", "- is empty"),
-        TestEventLogLine.test(5, 3, 1, "pops", "- pops")
+  private val stackFunSpec = {
+    val top = NodePath.topLevel("samples.StackFunSpec")
+    val aStack = top.scope("A Stack")
+    val whenEmpty = aStack.scope("when empty")
+    val isEmpty = top.test("A Stack when empty is empty")
+    val pops = top.test("A Stack when empty pops")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting StackFunSpec",
+        "ScopeOpened A Stack",
+        "ScopeOpened when empty",
+        "TestStarting A Stack when empty is empty",
+        "TestSucceeded A Stack when empty is empty",
+        "TestStarting A Stack when empty pops",
+        "TestSucceeded A Stack when empty pops",
+        "ScopeClosed when empty",
+        "ScopeClosed A Stack",
+        "SuiteCompleted StackFunSpec",
+        "RunCompleted"
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(3, "ScopeOpened"),
-      inFirstExecution(4, "TestStarting"),
-      inFirstExecution(4, "TestSucceeded"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      inFirstExecution(3, "ScopeClosed"),
-      inFirstExecution(2, "ScopeClosed"),
-      suiteCompleted(1)
-    )
-  )
-
-  private val setupFailsSpec = StatedRun(
-    Vector("RunStarting", "SuiteStarting SetupFailsSpec", "SuiteAborted SetupFailsSpec: database unreachable", "RunCompleted"),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "SetupFailsSpec", class "samples.SetupFailsSpec"
-        scope "A repo", label "A repo"
-          test "read", label "- should read"
-          test "write", label "- should write"
-    suite "SetupFailsSpec": SuiteStarting
-    suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "SetupFailsSpec", "samples.SetupFailsSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A repo", "A repo"),
-        TestEventLogLine.test(3, 2, 0, "read", "- should read"),
-        TestEventLogLine.test(4, 2, 1, "write", "- should write")
-      ),
-      suiteStarting(1),
-      TestEventLogLine.suiteEvent(
-        1,
-        1,
-        "SuiteAborted",
-        """"message":"database unreachable",""" + thrown("java.lang.RuntimeException", "database unreachable")
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "StackFunSpec", class "samples.StackFunSpec"
+          scope "A Stack", label "A Stack"
+            scope "when empty", label "when empty"
+              test "is empty", label "- is empty"
+              test "pops", label "- pops"
+      suite "StackFunSpec": SuiteStarting
+      scope "A Stack": ScopeOpened
+      scope "when empty": ScopeOpened
+      test "is empty": TestStarting
+      test "is empty": TestSucceeded
+      test "pops": TestStarting
+      test "pops": TestSucceeded
+      scope "when empty": ScopeClosed
+      scope "A Stack": ScopeClosed
+      suite "StackFunSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("StackFunSpec", "samples.StackFunSpec"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.scope(whenEmpty, 0, "when empty", "when empty"),
+          TestEventLogLine.test(isEmpty, whenEmpty, 0, "is empty", "- is empty"),
+          TestEventLogLine.test(pops, whenEmpty, 1, "pops", "- pops")
+        ),
+        suiteStarting(top),
+        event(aStack, List(1, 1), "ScopeOpened"),
+        event(whenEmpty, List(1, 1, 1), "ScopeOpened"),
+        event(isEmpty, List(1, 1, 1, 1), "TestStarting"),
+        event(isEmpty, List(1, 1, 1, 1), "TestSucceeded"),
+        event(pops, List(1, 1, 1, 1), "TestStarting"),
+        event(pops, List(1, 1, 1, 1), "TestSucceeded"),
+        event(whenEmpty, List(1, 1, 1), "ScopeClosed"),
+        event(aStack, List(1, 1), "ScopeClosed"),
+        suiteCompleted(top)
       )
     )
-  )
+  }
 
-  // Framework's SuiteSortingReporter gives the run's reporters a nested suite's events after those of the suite that nests it.
-  private val outerSuites = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting OuterSuites",
-      "SuiteCompleted OuterSuites",
-      "SuiteStarting Inner1Suite",
-      "TestStarting inner one",
-      "TestSucceeded inner one",
-      "SuiteCompleted Inner1Suite",
-      "SuiteStarting Inner2Suite",
-      "TestStarting inner two",
-      "TestSucceeded inner two",
-      "SuiteCompleted Inner2Suite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "OuterSuites", class "samples.OuterSuites"
-        suite "Inner1Suite", class "samples.Inner1Suite"
-          test "inner one", label "- inner one"
-        suite "Inner2Suite", class "samples.Inner2Suite"
-          test "inner two", label "- inner two"
-    suite "OuterSuites": SuiteStarting
-    suite "Inner1Suite": SuiteStarting
-    test "inner one": TestStarting
-    test "inner one": TestSucceeded
-    suite "Inner1Suite": SuiteCompleted
-    suite "Inner2Suite": SuiteStarting
-    test "inner two": TestStarting
-    test "inner two": TestSucceeded
-    suite "Inner2Suite": SuiteCompleted
-    suite "OuterSuites": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "OuterSuites", "samples.OuterSuites"),
-        TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
-        TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
-        TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
-        TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
-      ) :: suiteStarting(1) :: suiteStarting(2) :: startingAndSucceeded(3)) :::
-        (suiteCompleted(2) :: suiteStarting(4) :: startingAndSucceeded(5)) :::
-        List(suiteCompleted(4), suiteCompleted(1))*
-    )
-  )
-
-  private val forwardingSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting ForwardingSuite",
-      "TestStarting a",
-      "TestSucceeded a",
-      "TestStarting b",
-      "TestSucceeded b",
-      "SuiteCompleted ForwardingSuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "ForwardingSuite", class "samples.ForwardingSuite"
-        test "a", label "- a"
-        test "b", label "- b"
-    suite "ForwardingSuite": SuiteStarting
-    test "a": TestStarting
-    test "a": TestSucceeded
-    test "b": TestStarting
-    test "b": TestSucceeded
-    suite "ForwardingSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "ForwardingSuite", "samples.ForwardingSuite"),
-        TestEventLogLine.test(2, 1, 0, "a", "- a"),
-        TestEventLogLine.test(3, 1, 1, "b", "- b")
-      ) :: suiteStarting(1) :: startingAndSucceeded(2)) ::: startingAndSucceeded(3) ::: List(suiteCompleted(1))*
-    )
-  )
-
-  private val keepsItsRunsReporterSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting KeepsItsRunsReporterSuite",
-      "TestStarting a",
-      "TestSucceeded a",
-      "SuiteCompleted KeepsItsRunsReporterSuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "KeepsItsRunsReporterSuite", class "samples.KeepsItsRunsReporterSuite"
-        test "a", label "- a"
-    suite "KeepsItsRunsReporterSuite": SuiteStarting
-    test "a": TestStarting
-    test "a": TestSucceeded
-    suite "KeepsItsRunsReporterSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "KeepsItsRunsReporterSuite", "samples.KeepsItsRunsReporterSuite"),
-        TestEventLogLine.test(2, 1, 0, "a", "- a")
-      ) :: suiteStarting(1) :: startingAndSucceeded(2)) ::: List(suiteCompleted(1))*
-    )
-  )
-
-  private val keepsItsRunsReporterAsyncSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting KeepsItsRunsReporterAsyncSpec",
-      "TestStarting t",
-      "TestSucceeded t",
-      "TestStarting u",
-      "TestSucceeded u",
-      "SuiteCompleted KeepsItsRunsReporterAsyncSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "KeepsItsRunsReporterAsyncSpec", class "samples.KeepsItsRunsReporterAsyncSpec"
-        test "t", label "- t"
-        test "u", label "- u"
-    suite "KeepsItsRunsReporterAsyncSpec": SuiteStarting
-    test "t": TestStarting
-    test "t": TestSucceeded
-    test "u": TestStarting
-    test "u": TestSucceeded
-    suite "KeepsItsRunsReporterAsyncSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "KeepsItsRunsReporterAsyncSpec", "samples.KeepsItsRunsReporterAsyncSpec"),
-        TestEventLogLine.test(2, 1, 0, "t", "- t"),
-        TestEventLogLine.test(3, 1, 1, "u", "- u")
-      ),
-      suiteStarting(1),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      suiteCompleted(1)
-    )
-  )
-
-  private val filteredSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting FilteredSuite",
-      "TestStarting fast",
-      "TestSucceeded fast",
-      "TestIgnored later",
-      "SuiteCompleted FilteredSuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "FilteredSuite", class "samples.FilteredSuite"
-        test "fast", label "- fast"
-        test "later", label "- later"
-    suite "FilteredSuite": SuiteStarting
-    test "fast": TestStarting
-    test "fast": TestSucceeded
-    test "later": TestIgnored
-    suite "FilteredSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "FilteredSuite", "samples.FilteredSuite"),
-        TestEventLogLine.test(2, 1, 0, "fast", "- fast"),
-        TestEventLogLine.test(3, 1, 1, "later", "- later")
-      ) :: suiteStarting(1) :: startingAndSucceeded(2)) ::: List(inFirstExecution(3, "TestIgnored"), suiteCompleted(1))*
-    )
-  )
-
-  private val nestedSuiteAborted = "Exception encountered when invoking run on a nested suite - database unreachable"
-
-  private val setupFailsSuites = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting SetupFailsSuites",
-      "SuiteCompleted SetupFailsSuites",
-      "SuiteStarting SetupFailsSpec",
-      s"SuiteAborted SetupFailsSpec: $nestedSuiteAborted",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "SetupFailsSuites", class "samples.SetupFailsSuites"
+  private val setupFailsSpec = {
+    val top = NodePath.topLevel("samples.SetupFailsSpec")
+    val aRepo = top.scope("A repo")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting SetupFailsSpec", "SuiteAborted SetupFailsSpec: database unreachable", "RunCompleted"),
+      """
+      run started
+      run: RunStarting
+      structure
         suite "SetupFailsSpec", class "samples.SetupFailsSpec"
           scope "A repo", label "A repo"
             test "read", label "- should read"
             test "write", label "- should write"
-    suite "SetupFailsSuites": SuiteStarting
-    suite "SetupFailsSpec": SuiteStarting
-    suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
-    suite "SetupFailsSuites": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "SetupFailsSuites", "samples.SetupFailsSuites"),
-        TestEventLogLine.nestedSuite(2, 1, 0, "SetupFailsSpec", "samples.SetupFailsSpec"),
-        TestEventLogLine.scope(3, 2, 0, "A repo", "A repo"),
-        TestEventLogLine.test(4, 3, 0, "read", "- should read"),
-        TestEventLogLine.test(5, 3, 1, "write", "- should write")
-      ),
-      suiteStarting(1),
-      suiteStarting(2),
-      TestEventLogLine.suiteEvent(
-        2,
-        1,
-        "SuiteAborted",
-        s""""message":"$nestedSuiteAborted",""" + thrown("java.lang.RuntimeException", "database unreachable")
-      ),
-      suiteCompleted(1)
+      suite "SetupFailsSpec": SuiteStarting
+      suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("SetupFailsSpec", "samples.SetupFailsSpec"),
+          TestEventLogLine.scope(aRepo, 0, "A repo", "A repo"),
+          TestEventLogLine.test(top.test("A repo should read"), aRepo, 0, "read", "- should read"),
+          TestEventLogLine.test(top.test("A repo should write"), aRepo, 1, "write", "- should write")
+        ),
+        suiteStarting(top),
+        event(top, List(1), "SuiteAborted", """"message":"database unreachable",""" + thrown("java.lang.RuntimeException", "database unreachable"))
+      )
     )
-  )
+  }
 
-  private val brokenCtorSpec = StatedRun(
-    Vector("RunStarting", "SuiteStarting BrokenCtorSpec", "SuiteAborted BrokenCtorSpec: no config", "RunCompleted"),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "BrokenCtorSpec", class "samples.BrokenCtorSpec"
-    suite "BrokenCtorSpec": SuiteStarting
-    suite "BrokenCtorSpec": SuiteAborted(throwable: java.lang.IllegalStateException "no config")
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "BrokenCtorSpec", "samples.BrokenCtorSpec")),
-      suiteStarting(1),
-      TestEventLogLine.suiteEvent(1, 1, "SuiteAborted", """"message":"no config",""" + thrown("java.lang.IllegalStateException", "no config"))
+  // Framework's SuiteSortingReporter gives the run's reporters a nested suite's events after those of the suite that nests it.
+  private val outerSuites = {
+    val top = NodePath.topLevel("samples.OuterSuites")
+    val inner1 = top.suite("samples.Inner1Suite")
+    val innerOne = inner1.test("inner one")
+    val inner2 = top.suite("samples.Inner2Suite")
+    val innerTwo = inner2.test("inner two")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting OuterSuites",
+        "SuiteCompleted OuterSuites",
+        "SuiteStarting Inner1Suite",
+        "TestStarting inner one",
+        "TestSucceeded inner one",
+        "SuiteCompleted Inner1Suite",
+        "SuiteStarting Inner2Suite",
+        "TestStarting inner two",
+        "TestSucceeded inner two",
+        "SuiteCompleted Inner2Suite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "OuterSuites", class "samples.OuterSuites"
+          suite "Inner1Suite", class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+          suite "Inner2Suite", class "samples.Inner2Suite"
+            test "inner two", label "- inner two"
+      suite "OuterSuites": SuiteStarting
+      suite "Inner1Suite": SuiteStarting
+      test "inner one": TestStarting
+      test "inner one": TestSucceeded
+      suite "Inner1Suite": SuiteCompleted
+      suite "Inner2Suite": SuiteStarting
+      test "inner two": TestStarting
+      test "inner two": TestSucceeded
+      suite "Inner2Suite": SuiteCompleted
+      suite "OuterSuites": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("OuterSuites", "samples.OuterSuites"),
+          TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(innerTwo, inner2, 0, "inner two", "- inner two")
+        ) :: suiteStarting(top) :: suiteStarting(inner1, List(1, 1)) :: startingAndSucceeded(innerOne, List(1, 1, 1))) :::
+          (suiteCompleted(inner1, List(1, 1)) :: suiteStarting(inner2, List(1, 1)) :: startingAndSucceeded(innerTwo, List(1, 1, 1))) :::
+          List(suiteCompleted(inner2, List(1, 1)), suiteCompleted(top))*
+      )
     )
-  )
+  }
+
+  private val forwardingSuite = {
+    val top = NodePath.topLevel("samples.ForwardingSuite")
+    val a = top.test("a")
+    val b = top.test("b")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting ForwardingSuite",
+        "TestStarting a",
+        "TestSucceeded a",
+        "TestStarting b",
+        "TestSucceeded b",
+        "SuiteCompleted ForwardingSuite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "ForwardingSuite", class "samples.ForwardingSuite"
+          test "a", label "- a"
+          test "b", label "- b"
+      suite "ForwardingSuite": SuiteStarting
+      test "a": TestStarting
+      test "a": TestSucceeded
+      test "b": TestStarting
+      test "b": TestSucceeded
+      suite "ForwardingSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("ForwardingSuite", "samples.ForwardingSuite"),
+          TestEventLogLine.test(a, top, 0, "a", "- a"),
+          TestEventLogLine.test(b, top, 1, "b", "- b")
+        ) :: suiteStarting(top) :: startingAndSucceeded(a, List(1, 1))) ::: startingAndSucceeded(b, List(1, 1)) ::: List(suiteCompleted(top))*
+      )
+    )
+  }
+
+  private val keepsItsRunsReporterSuite = {
+    val top = NodePath.topLevel("samples.KeepsItsRunsReporterSuite")
+    val a = top.test("a")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting KeepsItsRunsReporterSuite",
+        "TestStarting a",
+        "TestSucceeded a",
+        "SuiteCompleted KeepsItsRunsReporterSuite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "KeepsItsRunsReporterSuite", class "samples.KeepsItsRunsReporterSuite"
+          test "a", label "- a"
+      suite "KeepsItsRunsReporterSuite": SuiteStarting
+      test "a": TestStarting
+      test "a": TestSucceeded
+      suite "KeepsItsRunsReporterSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("KeepsItsRunsReporterSuite", "samples.KeepsItsRunsReporterSuite"),
+          TestEventLogLine.test(a, top, 0, "a", "- a")
+        ) :: suiteStarting(top) :: startingAndSucceeded(a, List(1, 1))) ::: List(suiteCompleted(top))*
+      )
+    )
+  }
+
+  private val keepsItsRunsReporterAsyncSpec = {
+    val top = NodePath.topLevel("samples.KeepsItsRunsReporterAsyncSpec")
+    val t = top.test("t")
+    val u = top.test("u")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting KeepsItsRunsReporterAsyncSpec",
+        "TestStarting t",
+        "TestSucceeded t",
+        "TestStarting u",
+        "TestSucceeded u",
+        "SuiteCompleted KeepsItsRunsReporterAsyncSpec",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "KeepsItsRunsReporterAsyncSpec", class "samples.KeepsItsRunsReporterAsyncSpec"
+          test "t", label "- t"
+          test "u", label "- u"
+      suite "KeepsItsRunsReporterAsyncSpec": SuiteStarting
+      test "t": TestStarting
+      test "t": TestSucceeded
+      test "u": TestStarting
+      test "u": TestSucceeded
+      suite "KeepsItsRunsReporterAsyncSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("KeepsItsRunsReporterAsyncSpec", "samples.KeepsItsRunsReporterAsyncSpec"),
+          TestEventLogLine.test(t, top, 0, "t", "- t"),
+          TestEventLogLine.test(u, top, 1, "u", "- u")
+        ),
+        suiteStarting(top),
+        event(t, List(1, 1), "TestStarting"),
+        event(t, List(1, 1), "TestSucceeded"),
+        event(u, List(1, 1), "TestStarting"),
+        event(u, List(1, 1), "TestSucceeded"),
+        suiteCompleted(top)
+      )
+    )
+  }
+
+  private val filteredSuite = {
+    val top = NodePath.topLevel("samples.FilteredSuite")
+    val fast = top.test("fast")
+    val later = top.test("later")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting FilteredSuite",
+        "TestStarting fast",
+        "TestSucceeded fast",
+        "TestIgnored later",
+        "SuiteCompleted FilteredSuite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "FilteredSuite", class "samples.FilteredSuite"
+          test "fast", label "- fast"
+          test "later", label "- later"
+      suite "FilteredSuite": SuiteStarting
+      test "fast": TestStarting
+      test "fast": TestSucceeded
+      test "later": TestIgnored
+      suite "FilteredSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("FilteredSuite", "samples.FilteredSuite"),
+          TestEventLogLine.test(fast, top, 0, "fast", "- fast"),
+          TestEventLogLine.test(later, top, 1, "later", "- later")
+        ) :: suiteStarting(top) :: startingAndSucceeded(fast, List(1, 1))) ::: List(event(later, List(1, 1), "TestIgnored"), suiteCompleted(top))*
+      )
+    )
+  }
+
+  private val nestedSuiteAborted = "Exception encountered when invoking run on a nested suite - database unreachable"
+
+  private val setupFailsSuites = {
+    val top = NodePath.topLevel("samples.SetupFailsSuites")
+    val spec = top.suite("samples.SetupFailsSpec")
+    val aRepo = spec.scope("A repo")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting SetupFailsSuites",
+        "SuiteCompleted SetupFailsSuites",
+        "SuiteStarting SetupFailsSpec",
+        s"SuiteAborted SetupFailsSpec: $nestedSuiteAborted",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "SetupFailsSuites", class "samples.SetupFailsSuites"
+          suite "SetupFailsSpec", class "samples.SetupFailsSpec"
+            scope "A repo", label "A repo"
+              test "read", label "- should read"
+              test "write", label "- should write"
+      suite "SetupFailsSuites": SuiteStarting
+      suite "SetupFailsSpec": SuiteStarting
+      suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+      suite "SetupFailsSuites": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("SetupFailsSuites", "samples.SetupFailsSuites"),
+          TestEventLogLine.nestedSuite(spec, 0, "SetupFailsSpec", "samples.SetupFailsSpec"),
+          TestEventLogLine.scope(aRepo, 0, "A repo", "A repo"),
+          TestEventLogLine.test(spec.test("A repo should read"), aRepo, 0, "read", "- should read"),
+          TestEventLogLine.test(spec.test("A repo should write"), aRepo, 1, "write", "- should write")
+        ),
+        suiteStarting(top),
+        suiteStarting(spec, List(1, 1)),
+        event(
+          spec,
+          List(1, 1),
+          "SuiteAborted",
+          s""""message":"$nestedSuiteAborted",""" + thrown("java.lang.RuntimeException", "database unreachable")
+        ),
+        suiteCompleted(top)
+      )
+    )
+  }
+
+  private val brokenCtorSpec = {
+    val top = NodePath.topLevel("samples.BrokenCtorSpec")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting BrokenCtorSpec", "SuiteAborted BrokenCtorSpec: no config", "RunCompleted"),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "BrokenCtorSpec", class "samples.BrokenCtorSpec"
+      suite "BrokenCtorSpec": SuiteStarting
+      suite "BrokenCtorSpec": SuiteAborted(throwable: java.lang.IllegalStateException "no config")
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("BrokenCtorSpec", "samples.BrokenCtorSpec")),
+        suiteStarting(top),
+        event(top, List(1), "SuiteAborted", """"message":"no config",""" + thrown("java.lang.IllegalStateException", "no config"))
+      )
+    )
+  }
 
   private val runAborted = "An exception or error caused a run to abort: Java heap space "
 
-  private val abortSuite = StatedRun(
-    Vector("RunStarting", "SuiteStarting AbortSuite", "TestStarting throws on pop", s"RunAborted: $runAborted"),
-    """
-    run started
-    run: RunStarting(testCount: 1)
-    structure
-      suite "AbortSuite", class "samples.AbortSuite"
-        test "throws on pop", label "- throws on pop"
-    suite "AbortSuite": SuiteStarting
-    test "throws on pop": TestStarting
-    run: RunAborted(throwable: java.lang.OutOfMemoryError "Java heap space")
-    run ended aborted
-    """,
-    List(
-      runStarted,
-      TestEventLogLine.runEvent("RunStarting", """"testCount":1,"configMap":{},"""),
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "AbortSuite", "samples.AbortSuite"),
-        TestEventLogLine.test(2, 1, 0, "throws on pop", "- throws on pop")
+  private val abortSuite = {
+    val top = NodePath.topLevel("samples.AbortSuite")
+    val throwsOnPop = top.test("throws on pop")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting AbortSuite", "TestStarting throws on pop", s"RunAborted: $runAborted"),
+      """
+      run started
+      run: RunStarting(testCount: 1)
+      structure
+        suite "AbortSuite", class "samples.AbortSuite"
+          test "throws on pop", label "- throws on pop"
+      suite "AbortSuite": SuiteStarting
+      test "throws on pop": TestStarting
+      run: RunAborted(throwable: java.lang.OutOfMemoryError "Java heap space")
+      run ended aborted
+      """,
+      List(
+        runStarted,
+        TestEventLogLine.runEvent("RunStarting", """"testCount":1,"configMap":{},"""),
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("AbortSuite", "samples.AbortSuite"),
+          TestEventLogLine.test(throwsOnPop, top, 0, "throws on pop", "- throws on pop")
+        ),
+        suiteStarting(top),
+        event(throwsOnPop, List(1, 1), "TestStarting"),
+        TestEventLogLine.runEvent("RunAborted", s""""message":"$runAborted",""" + thrown("java.lang.OutOfMemoryError", "Java heap space")),
+        TestEventLogLine.runEnded("aborted")
+      )
+    )
+  }
+
+  private val twiceSuites = {
+    val top = NodePath.topLevel("samples.TwiceSuites")
+    val first = top.suite("samples.Inner1Suite")
+    val second = top.suite("samples.Inner1Suite", 1)
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting TwiceSuites",
+        "SuiteCompleted TwiceSuites",
+        "SuiteStarting Inner1Suite",
+        "TestStarting inner one",
+        "TestSucceeded inner one",
+        "SuiteStarting Inner1Suite",
+        "TestStarting inner one",
+        "TestSucceeded inner one",
+        "SuiteCompleted Inner1Suite",
+        "SuiteCompleted Inner1Suite",
+        "RunCompleted"
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "TestStarting"),
-      TestEventLogLine.runEvent("RunAborted", s""""message":"$runAborted",""" + thrown("java.lang.OutOfMemoryError", "Java heap space")),
-      TestEventLogLine.runEnded("aborted")
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "TwiceSuites", class "samples.TwiceSuites"
+          suite "Inner1Suite", class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+          suite "Inner1Suite", class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+      suite "TwiceSuites": SuiteStarting
+      suite "Inner1Suite" #1: SuiteStarting
+      test "inner one" #1: TestStarting
+      test "inner one" #1: TestSucceeded
+      suite "Inner1Suite" #1: SuiteCompleted
+      suite "Inner1Suite" #2: SuiteStarting
+      test "inner one" #2: TestStarting
+      test "inner one" #2: TestSucceeded
+      suite "Inner1Suite" #2: SuiteCompleted
+      suite "TwiceSuites": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("TwiceSuites", "samples.TwiceSuites"),
+          TestEventLogLine.nestedSuite(first, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(first.test("inner one"), first, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(second, 1, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(second.test("inner one"), second, 0, "inner one", "- inner one")
+        ) :: suiteStarting(top) :: suiteStarting(first, List(1, 1)) :: startingAndSucceeded(first.test("inner one"), List(1, 1, 1))) :::
+          (suiteCompleted(first, List(1, 1)) :: suiteStarting(second, List(1, 1)) :: startingAndSucceeded(second.test("inner one"), List(1, 1, 1))) :::
+          List(suiteCompleted(second, List(1, 1)), suiteCompleted(top))*
+      )
     )
-  )
+  }
 
-  private val twiceSuites = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting TwiceSuites",
-      "SuiteCompleted TwiceSuites",
-      "SuiteStarting Inner1Suite",
-      "TestStarting inner one",
-      "TestSucceeded inner one",
-      "SuiteStarting Inner1Suite",
-      "TestStarting inner one",
-      "TestSucceeded inner one",
-      "SuiteCompleted Inner1Suite",
-      "SuiteCompleted Inner1Suite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "TwiceSuites", class "samples.TwiceSuites"
-        suite "Inner1Suite", class "samples.Inner1Suite"
-          test "inner one", label "- inner one"
-        suite "Inner1Suite", class "samples.Inner1Suite"
-          test "inner one", label "- inner one"
-    suite "TwiceSuites": SuiteStarting
-    suite "Inner1Suite" #1: SuiteStarting
-    test "inner one" #1: TestStarting
-    test "inner one" #1: TestSucceeded
-    suite "Inner1Suite" #1: SuiteCompleted
-    suite "Inner1Suite" #2: SuiteStarting
-    test "inner one" #2: TestStarting
-    test "inner one" #2: TestSucceeded
-    suite "Inner1Suite" #2: SuiteCompleted
-    suite "TwiceSuites": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "TwiceSuites", "samples.TwiceSuites"),
-        TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
-        TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
-        TestEventLogLine.nestedSuite(4, 1, 1, "Inner1Suite", "samples.Inner1Suite"),
-        TestEventLogLine.test(5, 4, 0, "inner one", "- inner one")
-      ) :: suiteStarting(1) :: suiteStarting(2) :: startingAndSucceeded(3)) :::
-        (suiteCompleted(2) :: suiteStarting(4) :: startingAndSucceeded(5)) :::
-        List(suiteCompleted(4), suiteCompleted(1))*
+  private val retrySuite = {
+    val top = NodePath.topLevel("samples.RetrySuite")
+    val flaky = top.test("flaky")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting RetrySuite",
+        "TestStarting flaky",
+        "TestFailed flaky: 1 was not greater than 1, recording InfoProvided trying",
+        "TestStarting flaky",
+        "TestSucceeded flaky, recording InfoProvided trying",
+        "SuiteCompleted RetrySuite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "RetrySuite", class "samples.RetrySuite"
+          test "flaky", label "- flaky"
+      suite "RetrySuite": SuiteStarting
+      test "flaky": TestStarting
+      test "flaky": InfoProvided(message: "trying")
+      test "flaky": TestFailed
+      test "flaky" execution 2: TestStarting
+      test "flaky" execution 2: InfoProvided(message: "trying")
+      test "flaky" execution 2: TestSucceeded
+      suite "RetrySuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("RetrySuite", "samples.RetrySuite"), TestEventLogLine.test(flaky, top, 0, "flaky", "- flaky")),
+        suiteStarting(top),
+        event(flaky, List(1, 1), "TestStarting"),
+        event(flaky, List(1, 1), "InfoProvided", """"message":"trying","""),
+        event(flaky, List(1, 1), "TestFailed", """"message":"1 was not greater than 1","""),
+        event(flaky, List(1, 2), "TestStarting"),
+        event(flaky, List(1, 2), "InfoProvided", """"message":"trying","""),
+        event(flaky, List(1, 2), "TestSucceeded"),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
 
-  private val retrySuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting RetrySuite",
-      "TestStarting flaky",
-      "TestFailed flaky: 1 was not greater than 1, recording InfoProvided trying",
-      "TestStarting flaky",
-      "TestSucceeded flaky, recording InfoProvided trying",
-      "SuiteCompleted RetrySuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "RetrySuite", class "samples.RetrySuite"
-        test "flaky", label "- flaky"
-    suite "RetrySuite": SuiteStarting
-    test "flaky": TestStarting
-    test "flaky": InfoProvided(message: "trying")
-    test "flaky": TestFailed
-    test "flaky" execution 2: TestStarting
-    test "flaky" execution 2: InfoProvided(message: "trying")
-    test "flaky" execution 2: TestSucceeded
-    suite "RetrySuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "RetrySuite", "samples.RetrySuite"), TestEventLogLine.test(2, 1, 0, "flaky", "- flaky")),
-      suiteStarting(1),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "InfoProvided", """"message":"trying","""),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestFailed", """"message":"1 was not greater than 1","""),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 1, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 1, "InfoProvided", """"message":"trying","""),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 1, "TestSucceeded"),
-      suiteCompleted(1)
+  private val scopeInfoFunSpec = {
+    val top = NodePath.topLevel("samples.ScopeInfoFunSpec")
+    val aStack = top.scope("A Stack")
+    val isEmpty = top.test("A Stack is empty")
+    val whenFull = aStack.scope("when full")
+    val pops = top.test("A Stack when full pops")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting ScopeInfoFunSpec",
+        "ScopeOpened A Stack",
+        "TestStarting A Stack is empty",
+        "TestSucceeded A Stack is empty",
+        "InfoProvided an info in a scope",
+        "ScopeOpened when full",
+        "TestStarting A Stack when full pops",
+        "TestSucceeded A Stack when full pops",
+        "ScopeClosed when full",
+        "ScopeClosed A Stack",
+        "SuiteCompleted ScopeInfoFunSpec",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "ScopeInfoFunSpec", class "samples.ScopeInfoFunSpec"
+          scope "A Stack", label "A Stack"
+            test "is empty", label "- is empty"
+            scope "when full", label "when full"
+              test "pops", label "- pops"
+      suite "ScopeInfoFunSpec": SuiteStarting
+      scope "A Stack": ScopeOpened
+      test "is empty": TestStarting
+      test "is empty": TestSucceeded
+      scope "A Stack": InfoProvided(message: "an info in a scope")
+      scope "when full": ScopeOpened
+      test "pops": TestStarting
+      test "pops": TestSucceeded
+      scope "when full": ScopeClosed
+      scope "A Stack": ScopeClosed
+      suite "ScopeInfoFunSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("ScopeInfoFunSpec", "samples.ScopeInfoFunSpec"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
+          TestEventLogLine.scope(whenFull, 1, "when full", "when full"),
+          TestEventLogLine.test(pops, whenFull, 0, "pops", "- pops")
+        ),
+        suiteStarting(top),
+        event(aStack, List(1, 1), "ScopeOpened"),
+        event(isEmpty, List(1, 1, 1), "TestStarting"),
+        event(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        event(aStack, List(1, 1), "InfoProvided", """"message":"an info in a scope","""),
+        event(whenFull, List(1, 1, 1), "ScopeOpened"),
+        event(pops, List(1, 1, 1, 1), "TestStarting"),
+        event(pops, List(1, 1, 1, 1), "TestSucceeded"),
+        event(whenFull, List(1, 1, 1), "ScopeClosed"),
+        event(aStack, List(1, 1), "ScopeClosed"),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
 
-  private val scopeInfoFunSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting ScopeInfoFunSpec",
-      "ScopeOpened A Stack",
-      "TestStarting A Stack is empty",
-      "TestSucceeded A Stack is empty",
-      "InfoProvided an info in a scope",
-      "ScopeOpened when full",
-      "TestStarting A Stack when full pops",
-      "TestSucceeded A Stack when full pops",
-      "ScopeClosed when full",
-      "ScopeClosed A Stack",
-      "SuiteCompleted ScopeInfoFunSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "ScopeInfoFunSpec", class "samples.ScopeInfoFunSpec"
-        scope "A Stack", label "A Stack"
-          test "is empty", label "- is empty"
-          scope "when full", label "when full"
+  private val bothStreamsSuite = {
+    val top = NodePath.topLevel("samples.BothStreamsSuite")
+    val writes = top.test("writes")
+    StatedRun(
+      Vector.empty,
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "BothStreamsSuite", class "samples.BothStreamsSuite"
+          test "writes", label "- writes"
+      suite "BothStreamsSuite": SuiteStarting
+      test "writes": TestStarting
+      test "writes": TestSucceeded
+      suite "BothStreamsSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("BothStreamsSuite", "samples.BothStreamsSuite"),
+          TestEventLogLine.test(writes, top, 0, "writes", "- writes")
+        ) :: suiteStarting(top) :: startingAndSucceeded(writes, List(1, 1))) ::: List(suiteCompleted(top))*
+      )
+    )
+  }
+
+  private val unregisteredSuite = {
+    val top = NodePath.topLevel("samples.UnregisteredSuite")
+    val b = top.test("b")
+    val a = top.test("a")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting UnregisteredSuite",
+        "TestStarting b",
+        "TestSucceeded b",
+        "TestIgnored a",
+        "SuiteCompleted UnregisteredSuite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "UnregisteredSuite", class "samples.UnregisteredSuite"
+          test "b", label "- b"
+          test "a", label "- a"
+      suite "UnregisteredSuite": SuiteStarting
+      test "b": TestStarting
+      test "b": TestSucceeded
+      test "a": TestIgnored
+      suite "UnregisteredSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        (TestEventLogLine.structure(
+          TestEventLogLine.suite("UnregisteredSuite", "samples.UnregisteredSuite"),
+          TestEventLogLine.test(b, top, 0, "b", "- b"),
+          TestEventLogLine.test(a, top, 1, "a", "- a")
+        ) :: suiteStarting(top) :: startingAndSucceeded(b, List(1, 1))) ::: List(event(a, List(1, 1), "TestIgnored"), suiteCompleted(top))*
+      )
+    )
+  }
+
+  private val announcingSuite = {
+    val top = NodePath.topLevel("samples.AnnouncingSuite")
+    val runs = top.test("runs")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting AnnouncingSuite",
+        "InfoProvided setting up",
+        "TestStarting runs",
+        "TestSucceeded runs",
+        "InfoProvided declared after the test",
+        "SuiteCompleted AnnouncingSuite",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "AnnouncingSuite", class "samples.AnnouncingSuite"
+          test "runs", label "- runs"
+      suite "AnnouncingSuite": SuiteStarting
+      suite "AnnouncingSuite": InfoProvided(message: "setting up")
+      test "runs": TestStarting
+      test "runs": TestSucceeded
+      suite "AnnouncingSuite": InfoProvided(message: "declared after the test")
+      suite "AnnouncingSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("AnnouncingSuite", "samples.AnnouncingSuite"), TestEventLogLine.test(runs, top, 0, "runs", "- runs")),
+        suiteStarting(top),
+        event(top, List(1), "InfoProvided", """"message":"setting up","""),
+        event(runs, List(1, 1), "TestStarting"),
+        event(runs, List(1, 1), "TestSucceeded"),
+        event(top, List(1), "InfoProvided", """"message":"declared after the test","""),
+        suiteCompleted(top)
+      )
+    )
+  }
+
+  private val stackAsyncFunSpec = {
+    val top = NodePath.topLevel("samples.StackAsyncFunSpec")
+    val aStack = top.scope("A Stack")
+    val isEmpty = top.test("A Stack is empty")
+    val pops = top.test("A Stack pops")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting StackAsyncFunSpec",
+        "ScopeOpened A Stack",
+        "TestStarting A Stack is empty",
+        "TestSucceeded A Stack is empty",
+        "TestIgnored A Stack pops",
+        "ScopeClosed A Stack",
+        "SuiteCompleted StackAsyncFunSpec",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "StackAsyncFunSpec", class "samples.StackAsyncFunSpec"
+          scope "A Stack", label "A Stack"
+            test "is empty", label "- is empty"
             test "pops", label "- pops"
-    suite "ScopeInfoFunSpec": SuiteStarting
-    scope "A Stack": ScopeOpened
-    test "is empty": TestStarting
-    test "is empty": TestSucceeded
-    scope "A Stack": InfoProvided(message: "an info in a scope")
-    scope "when full": ScopeOpened
-    test "pops": TestStarting
-    test "pops": TestSucceeded
-    scope "when full": ScopeClosed
-    scope "A Stack": ScopeClosed
-    suite "ScopeInfoFunSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "ScopeInfoFunSpec", "samples.ScopeInfoFunSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
-        TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
-        TestEventLogLine.scope(4, 2, 1, "when full", "when full"),
-        TestEventLogLine.test(5, 4, 0, "pops", "- pops")
+      suite "StackAsyncFunSpec": SuiteStarting
+      scope "A Stack": ScopeOpened
+      test "is empty": TestStarting
+      test "is empty": TestSucceeded
+      test "pops": TestIgnored
+      scope "A Stack": ScopeClosed
+      suite "StackAsyncFunSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("StackAsyncFunSpec", "samples.StackAsyncFunSpec"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
+          TestEventLogLine.test(pops, aStack, 1, "pops", "- pops")
+        ),
+        suiteStarting(top),
+        event(aStack, List(1, 1), "ScopeOpened"),
+        event(isEmpty, List(1, 1, 1), "TestStarting"),
+        event(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        event(pops, List(1, 1, 1), "TestIgnored"),
+        event(aStack, List(1, 1), "ScopeClosed"),
+        suiteCompleted(top)
+      )
+    )
+  }
+
+  private val twinScopesFunSpec = {
+    val top = NodePath.topLevel("samples.TwinScopesFunSpec")
+    val first = top.scope("s")
+    val second = top.scope("s", 1)
+    val t = top.test("s t")
+    val u = top.test("s u")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting TwinScopesFunSpec",
+        "ScopeOpened s",
+        "TestStarting s t",
+        "TestSucceeded s t",
+        "ScopeClosed s",
+        "ScopeOpened s",
+        "TestStarting s u",
+        "TestSucceeded s u",
+        "ScopeClosed s",
+        "SuiteCompleted TwinScopesFunSpec",
+        "RunCompleted"
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(2, "InfoProvided", """"message":"an info in a scope","""),
-      inFirstExecution(4, "ScopeOpened"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      inFirstExecution(4, "ScopeClosed"),
-      inFirstExecution(2, "ScopeClosed"),
-      suiteCompleted(1)
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "TwinScopesFunSpec", class "samples.TwinScopesFunSpec"
+          scope "s", label "s"
+            test "t", label "- t"
+          scope "s", label "s"
+            test "u", label "- u"
+      suite "TwinScopesFunSpec": SuiteStarting
+      scope "s" #1: ScopeOpened
+      test "t": TestStarting
+      test "t": TestSucceeded
+      scope "s" #1: ScopeClosed
+      scope "s" #2: ScopeOpened
+      test "u": TestStarting
+      test "u": TestSucceeded
+      scope "s" #2: ScopeClosed
+      suite "TwinScopesFunSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("TwinScopesFunSpec", "samples.TwinScopesFunSpec"),
+          TestEventLogLine.scope(first, 0, "s", "s"),
+          TestEventLogLine.test(t, first, 0, "t", "- t"),
+          TestEventLogLine.scope(second, 1, "s", "s"),
+          TestEventLogLine.test(u, second, 0, "u", "- u")
+        ),
+        suiteStarting(top),
+        event(first, List(1, 1), "ScopeOpened"),
+        event(t, List(1, 1, 1), "TestStarting"),
+        event(t, List(1, 1, 1), "TestSucceeded"),
+        event(first, List(1, 1), "ScopeClosed"),
+        event(second, List(1, 1), "ScopeOpened"),
+        event(u, List(1, 1, 1), "TestStarting"),
+        event(u, List(1, 1, 1), "TestSucceeded"),
+        event(second, List(1, 1), "ScopeClosed"),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
 
-  private val bothStreamsSuite = StatedRun(
-    Vector.empty,
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "BothStreamsSuite", class "samples.BothStreamsSuite"
-        test "writes", label "- writes"
-    suite "BothStreamsSuite": SuiteStarting
-    test "writes": TestStarting
-    test "writes": TestSucceeded
-    suite "BothStreamsSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "BothStreamsSuite", "samples.BothStreamsSuite"),
-        TestEventLogLine.test(2, 1, 0, "writes", "- writes")
-      ) :: suiteStarting(1) :: startingAndSucceeded(2)) ::: List(suiteCompleted(1))*
-    )
-  )
-
-  private val unregisteredSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting UnregisteredSuite",
-      "TestStarting b",
-      "TestSucceeded b",
-      "TestIgnored a",
-      "SuiteCompleted UnregisteredSuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "UnregisteredSuite", class "samples.UnregisteredSuite"
-        test "b", label "- b"
-        test "a", label "- a"
-    suite "UnregisteredSuite": SuiteStarting
-    test "b": TestStarting
-    test "b": TestSucceeded
-    test "a": TestIgnored
-    suite "UnregisteredSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      (TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "UnregisteredSuite", "samples.UnregisteredSuite"),
-        TestEventLogLine.test(2, 1, 0, "b", "- b"),
-        TestEventLogLine.test(3, 1, 1, "a", "- a")
-      ) :: suiteStarting(1) :: startingAndSucceeded(2)) ::: List(inFirstExecution(3, "TestIgnored"), suiteCompleted(1))*
-    )
-  )
-
-  private val announcingSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting AnnouncingSuite",
-      "InfoProvided setting up",
-      "TestStarting runs",
-      "TestSucceeded runs",
-      "InfoProvided declared after the test",
-      "SuiteCompleted AnnouncingSuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "AnnouncingSuite", class "samples.AnnouncingSuite"
-        test "runs", label "- runs"
-    suite "AnnouncingSuite": SuiteStarting
-    suite "AnnouncingSuite": InfoProvided(message: "setting up")
-    test "runs": TestStarting
-    test "runs": TestSucceeded
-    suite "AnnouncingSuite": InfoProvided(message: "declared after the test")
-    suite "AnnouncingSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "AnnouncingSuite", "samples.AnnouncingSuite"), TestEventLogLine.test(2, 1, 0, "runs", "- runs")),
-      suiteStarting(1),
-      TestEventLogLine.suiteEvent(1, 1, "InfoProvided", """"message":"setting up","""),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      TestEventLogLine.suiteEvent(1, 1, "InfoProvided", """"message":"declared after the test","""),
-      suiteCompleted(1)
-    )
-  )
-
-  private val stackAsyncFunSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting StackAsyncFunSpec",
-      "ScopeOpened A Stack",
-      "TestStarting A Stack is empty",
-      "TestSucceeded A Stack is empty",
-      "TestIgnored A Stack pops",
-      "ScopeClosed A Stack",
-      "SuiteCompleted StackAsyncFunSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "StackAsyncFunSpec", class "samples.StackAsyncFunSpec"
-        scope "A Stack", label "A Stack"
-          test "is empty", label "- is empty"
-          test "pops", label "- pops"
-    suite "StackAsyncFunSpec": SuiteStarting
-    scope "A Stack": ScopeOpened
-    test "is empty": TestStarting
-    test "is empty": TestSucceeded
-    test "pops": TestIgnored
-    scope "A Stack": ScopeClosed
-    suite "StackAsyncFunSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "StackAsyncFunSpec", "samples.StackAsyncFunSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
-        TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
-        TestEventLogLine.test(4, 2, 1, "pops", "- pops")
+  private val runsTwiceSuite = {
+    val top = NodePath.topLevel("samples.RunsTwiceSuite")
+    val t = top.test("t")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting RunsTwiceSuite",
+        "TestStarting t",
+        "TestSucceeded t",
+        "TestStarting t",
+        "TestSucceeded t",
+        "SuiteCompleted RunsTwiceSuite",
+        "RunCompleted"
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(4, "TestIgnored"),
-      inFirstExecution(2, "ScopeClosed"),
-      suiteCompleted(1)
-    )
-  )
-
-  private val twinScopesFunSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting TwinScopesFunSpec",
-      "ScopeOpened s",
-      "TestStarting s t",
-      "TestSucceeded s t",
-      "ScopeClosed s",
-      "ScopeOpened s",
-      "TestStarting s u",
-      "TestSucceeded s u",
-      "ScopeClosed s",
-      "SuiteCompleted TwinScopesFunSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "TwinScopesFunSpec", class "samples.TwinScopesFunSpec"
-        scope "s", label "s"
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "RunsTwiceSuite", class "samples.RunsTwiceSuite"
           test "t", label "- t"
-        scope "s", label "s"
-          test "u", label "- u"
-    suite "TwinScopesFunSpec": SuiteStarting
-    scope "s" #1: ScopeOpened
-    test "t": TestStarting
-    test "t": TestSucceeded
-    scope "s" #1: ScopeClosed
-    scope "s" #2: ScopeOpened
-    test "u": TestStarting
-    test "u": TestSucceeded
-    scope "s" #2: ScopeClosed
-    suite "TwinScopesFunSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "TwinScopesFunSpec", "samples.TwinScopesFunSpec"),
-        TestEventLogLine.scope(2, 1, 0, "s", "s"),
-        TestEventLogLine.test(3, 2, 0, "t", "- t"),
-        TestEventLogLine.scope(4, 1, 1, "s", "s"),
-        TestEventLogLine.test(5, 4, 0, "u", "- u")
+      suite "RunsTwiceSuite": SuiteStarting
+      test "t": TestStarting
+      test "t": TestSucceeded
+      test "t" execution 2, in suite "RunsTwiceSuite" execution 2: TestStarting
+      test "t" execution 2, in suite "RunsTwiceSuite" execution 2: TestSucceeded
+      suite "RunsTwiceSuite" execution 2: SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("RunsTwiceSuite", "samples.RunsTwiceSuite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
+        suiteStarting(top),
+        event(t, List(1, 1), "TestStarting"),
+        event(t, List(1, 1), "TestSucceeded"),
+        event(t, List(2, 2), "TestStarting"),
+        event(t, List(2, 2), "TestSucceeded"),
+        suiteCompleted(top, List(2))
+      )
+    )
+  }
+
+  private val twinScopesAsyncFunSpec = {
+    val top = NodePath.topLevel("samples.TwinScopesAsyncFunSpec")
+    val first = top.scope("s")
+    val second = top.scope("s", 1)
+    val t = top.test("s t")
+    val u = top.test("s u")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting TwinScopesAsyncFunSpec",
+        "ScopeOpened s",
+        "TestStarting s t",
+        "TestSucceeded s t",
+        "ScopeClosed s",
+        "ScopeOpened s",
+        "TestStarting s u",
+        "TestSucceeded s u",
+        "ScopeClosed s",
+        "SuiteCompleted TwinScopesAsyncFunSpec",
+        "RunCompleted"
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(2, "ScopeClosed"),
-      inFirstExecution(4, "ScopeOpened"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      inFirstExecution(4, "ScopeClosed"),
-      suiteCompleted(1)
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "TwinScopesAsyncFunSpec", class "samples.TwinScopesAsyncFunSpec"
+          scope "s", label "s"
+            test "t", label "- t"
+          scope "s", label "s"
+            test "u", label "- u"
+      suite "TwinScopesAsyncFunSpec": SuiteStarting
+      scope "s" #1: ScopeOpened
+      test "t": TestStarting
+      test "t": TestSucceeded
+      scope "s" #1: ScopeClosed
+      scope "s" #2: ScopeOpened
+      test "u": TestStarting
+      test "u": TestSucceeded
+      scope "s" #2: ScopeClosed
+      suite "TwinScopesAsyncFunSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("TwinScopesAsyncFunSpec", "samples.TwinScopesAsyncFunSpec"),
+          TestEventLogLine.scope(first, 0, "s", "s"),
+          TestEventLogLine.test(t, first, 0, "t", "- t"),
+          TestEventLogLine.scope(second, 1, "s", "s"),
+          TestEventLogLine.test(u, second, 0, "u", "- u")
+        ),
+        suiteStarting(top),
+        event(first, List(1, 1), "ScopeOpened"),
+        event(t, List(1, 1, 1), "TestStarting"),
+        event(t, List(1, 1, 1), "TestSucceeded"),
+        event(first, List(1, 1), "ScopeClosed"),
+        event(second, List(1, 1), "ScopeOpened"),
+        event(u, List(1, 1, 1), "TestStarting"),
+        event(u, List(1, 1, 1), "TestSucceeded"),
+        event(second, List(1, 1), "ScopeClosed"),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
 
-  private val runsTwiceSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting RunsTwiceSuite",
-      "TestStarting t",
-      "TestSucceeded t",
-      "TestStarting t",
-      "TestSucceeded t",
-      "SuiteCompleted RunsTwiceSuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "RunsTwiceSuite", class "samples.RunsTwiceSuite"
-        test "t", label "- t"
-    suite "RunsTwiceSuite": SuiteStarting
-    test "t": TestStarting
-    test "t": TestSucceeded
-    test "t" execution 2, parent execution 2: TestStarting
-    test "t" execution 2, parent execution 2: TestSucceeded
-    suite "RunsTwiceSuite" execution 2: SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "RunsTwiceSuite", "samples.RunsTwiceSuite"), TestEventLogLine.test(2, 1, 0, "t", "- t")),
-      suiteStarting(1),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestSucceeded"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 2, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 2, "TestSucceeded"),
-      TestEventLogLine.suiteEvent(1, 2, "SuiteCompleted")
-    )
-  )
-
-  private val twinScopesAsyncFunSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting TwinScopesAsyncFunSpec",
-      "ScopeOpened s",
-      "TestStarting s t",
-      "TestSucceeded s t",
-      "ScopeClosed s",
-      "ScopeOpened s",
-      "TestStarting s u",
-      "TestSucceeded s u",
-      "ScopeClosed s",
-      "SuiteCompleted TwinScopesAsyncFunSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "TwinScopesAsyncFunSpec", class "samples.TwinScopesAsyncFunSpec"
-        scope "s", label "s"
+  private val runsTwiceAsyncSpec = {
+    val top = NodePath.topLevel("samples.RunsTwiceAsyncSpec")
+    val t = top.test("t")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting RunsTwiceAsyncSpec",
+        "TestStarting t",
+        "TestSucceeded t",
+        "TestStarting t",
+        "TestSucceeded t",
+        "SuiteCompleted RunsTwiceAsyncSpec",
+        "RunCompleted"
+      ),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "RunsTwiceAsyncSpec", class "samples.RunsTwiceAsyncSpec"
           test "t", label "- t"
-        scope "s", label "s"
-          test "u", label "- u"
-    suite "TwinScopesAsyncFunSpec": SuiteStarting
-    scope "s" #1: ScopeOpened
-    test "t": TestStarting
-    test "t": TestSucceeded
-    scope "s" #1: ScopeClosed
-    scope "s" #2: ScopeOpened
-    test "u": TestStarting
-    test "u": TestSucceeded
-    scope "s" #2: ScopeClosed
-    suite "TwinScopesAsyncFunSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "TwinScopesAsyncFunSpec", "samples.TwinScopesAsyncFunSpec"),
-        TestEventLogLine.scope(2, 1, 0, "s", "s"),
-        TestEventLogLine.test(3, 2, 0, "t", "- t"),
-        TestEventLogLine.scope(4, 1, 1, "s", "s"),
-        TestEventLogLine.test(5, 4, 0, "u", "- u")
-      ),
-      suiteStarting(1),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(2, "ScopeClosed"),
-      inFirstExecution(4, "ScopeOpened"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      inFirstExecution(4, "ScopeClosed"),
-      suiteCompleted(1)
+      suite "RunsTwiceAsyncSpec": SuiteStarting
+      test "t": TestStarting
+      test "t": TestSucceeded
+      test "t" execution 2, in suite "RunsTwiceAsyncSpec" execution 2: TestStarting
+      test "t" execution 2, in suite "RunsTwiceAsyncSpec" execution 2: TestSucceeded
+      suite "RunsTwiceAsyncSpec" execution 2: SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("RunsTwiceAsyncSpec", "samples.RunsTwiceAsyncSpec"), TestEventLogLine.test(t, top, 0, "t", "- t")),
+        suiteStarting(top),
+        event(t, List(1, 1), "TestStarting"),
+        event(t, List(1, 1), "TestSucceeded"),
+        event(t, List(2, 2), "TestStarting"),
+        event(t, List(2, 2), "TestSucceeded"),
+        suiteCompleted(top, List(2))
+      )
     )
-  )
+  }
 
-  private val runsTwiceAsyncSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting RunsTwiceAsyncSpec",
-      "TestStarting t",
-      "TestSucceeded t",
-      "TestStarting t",
-      "TestSucceeded t",
-      "SuiteCompleted RunsTwiceAsyncSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "RunsTwiceAsyncSpec", class "samples.RunsTwiceAsyncSpec"
-        test "t", label "- t"
-    suite "RunsTwiceAsyncSpec": SuiteStarting
-    test "t": TestStarting
-    test "t": TestSucceeded
-    test "t" execution 2, parent execution 2: TestStarting
-    test "t" execution 2, parent execution 2: TestSucceeded
-    suite "RunsTwiceAsyncSpec" execution 2: SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "RunsTwiceAsyncSpec", "samples.RunsTwiceAsyncSpec"),
-        TestEventLogLine.test(2, 1, 0, "t", "- t")
-      ),
-      suiteStarting(1),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 1, 1, "TestSucceeded"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 2, "TestStarting"),
-      TestEventLogLine.scopeOrTestEvent(2, 2, 2, "TestSucceeded"),
-      TestEventLogLine.suiteEvent(1, 2, "SuiteCompleted")
-    )
-  )
 
-  private val stackPathFunSpec = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting StackPathFunSpec",
-      "ScopeOpened A Stack",
-      "TestStarting A Stack is empty",
-      "TestSucceeded A Stack is empty",
-      "ScopeOpened when full",
-      "TestStarting A Stack when full pops",
-      "TestSucceeded A Stack when full pops",
-      "ScopeClosed when full",
-      "ScopeClosed A Stack",
-      "SuiteCompleted StackPathFunSpec",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "StackPathFunSpec", class "samples.StackPathFunSpec"
-        scope "A Stack", label "A Stack"
-          test "is empty", label "- is empty"
-          scope "when full", label "when full"
-            test "pops", label "- pops"
-    suite "StackPathFunSpec": SuiteStarting
-    scope "A Stack": ScopeOpened
-    test "is empty": TestStarting
-    test "is empty": TestSucceeded
-    scope "when full": ScopeOpened
-    test "pops": TestStarting
-    test "pops": TestSucceeded
-    scope "when full": ScopeClosed
-    scope "A Stack": ScopeClosed
-    suite "StackPathFunSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "StackPathFunSpec", "samples.StackPathFunSpec"),
-        TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
-        TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
-        TestEventLogLine.scope(4, 2, 1, "when full", "when full"),
-        TestEventLogLine.test(5, 4, 0, "pops", "- pops")
+  private val stackPathFunSpec = {
+    val top = NodePath.topLevel("samples.StackPathFunSpec")
+    val aStack = top.scope("A Stack")
+    val isEmpty = top.test("A Stack is empty")
+    val whenFull = aStack.scope("when full")
+    val pops = top.test("A Stack when full pops")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting StackPathFunSpec",
+        "ScopeOpened A Stack",
+        "TestStarting A Stack is empty",
+        "TestSucceeded A Stack is empty",
+        "ScopeOpened when full",
+        "TestStarting A Stack when full pops",
+        "TestSucceeded A Stack when full pops",
+        "ScopeClosed when full",
+        "ScopeClosed A Stack",
+        "SuiteCompleted StackPathFunSpec",
+        "RunCompleted"
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "ScopeOpened"),
-      inFirstExecution(3, "TestStarting"),
-      inFirstExecution(3, "TestSucceeded"),
-      inFirstExecution(4, "ScopeOpened"),
-      inFirstExecution(5, "TestStarting"),
-      inFirstExecution(5, "TestSucceeded"),
-      inFirstExecution(4, "ScopeClosed"),
-      inFirstExecution(2, "ScopeClosed"),
-      suiteCompleted(1)
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "StackPathFunSpec", class "samples.StackPathFunSpec"
+          scope "A Stack", label "A Stack"
+            test "is empty", label "- is empty"
+            scope "when full", label "when full"
+              test "pops", label "- pops"
+      suite "StackPathFunSpec": SuiteStarting
+      scope "A Stack": ScopeOpened
+      test "is empty": TestStarting
+      test "is empty": TestSucceeded
+      scope "when full": ScopeOpened
+      test "pops": TestStarting
+      test "pops": TestSucceeded
+      scope "when full": ScopeClosed
+      scope "A Stack": ScopeClosed
+      suite "StackPathFunSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(
+          TestEventLogLine.suite("StackPathFunSpec", "samples.StackPathFunSpec"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
+          TestEventLogLine.scope(whenFull, 1, "when full", "when full"),
+          TestEventLogLine.test(pops, whenFull, 0, "pops", "- pops")
+        ),
+        suiteStarting(top),
+        event(aStack, List(1, 1), "ScopeOpened"),
+        event(isEmpty, List(1, 1, 1), "TestStarting"),
+        event(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        event(whenFull, List(1, 1, 1), "ScopeOpened"),
+        event(pops, List(1, 1, 1, 1), "TestStarting"),
+        event(pops, List(1, 1, 1, 1), "TestSucceeded"),
+        event(whenFull, List(1, 1, 1), "ScopeClosed"),
+        event(aStack, List(1, 1), "ScopeClosed"),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
 
-  private val markupDocSpec = StatedRun(
-    Vector("RunStarting", "SuiteStarting MarkupDocSpec", "MarkupProvided A stack pops", "SuiteCompleted MarkupDocSpec", "RunCompleted"),
-    """
-    run started
-    run: RunStarting
-    structure
-      suite "MarkupDocSpec", class "org.scalatest.samples.MarkupDocSpec"
-    suite "MarkupDocSpec": SuiteStarting
-    suite "MarkupDocSpec": MarkupProvided(text: "A stack pops")
-    suite "MarkupDocSpec": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    frameworkRunOf(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "MarkupDocSpec", "org.scalatest.samples.MarkupDocSpec")),
-      suiteStarting(1),
-      TestEventLogLine.suiteEvent(1, 1, "MarkupProvided", """"text":"A stack pops","""),
-      suiteCompleted(1)
+  private val markupDocSpec = {
+    val top = NodePath.topLevel("org.scalatest.samples.MarkupDocSpec")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting MarkupDocSpec", "MarkupProvided A stack pops", "SuiteCompleted MarkupDocSpec", "RunCompleted"),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "MarkupDocSpec", class "org.scalatest.samples.MarkupDocSpec"
+      suite "MarkupDocSpec": SuiteStarting
+      suite "MarkupDocSpec": MarkupProvided(text: "A stack pops")
+      suite "MarkupDocSpec": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("MarkupDocSpec", "org.scalatest.samples.MarkupDocSpec")),
+        suiteStarting(top),
+        event(top, List(1), "MarkupProvided", """"text":"A stack pops","""),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
+
+  private val addSuite = NodePath.topLevel("samples.discovered.AddSuite")
+  private val adds = addSuite.test("adds")
+  private val sqrtPropSpec = NodePath.topLevel("samples.discovered.SqrtPropSpec")
+  private val sqrtOfASquare = sqrtPropSpec.test("sqrt of a square is the root")
 
   private val discoveredWithAddSuiteFirst = StatedRun(
     Vector(
@@ -1123,19 +1235,19 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       TestEventLogLine.runEvent("DiscoveryCompleted"),
       TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
       TestEventLogLine.runEvent("SuiteStarting"),
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(2, 1, 0, "adds", "- adds")),
-      suiteStarting(1),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      suiteCompleted(1),
+      TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
+      suiteStarting(addSuite),
+      event(adds, List(1, 1), "TestStarting"),
+      event(adds, List(1, 1), "TestSucceeded"),
+      suiteCompleted(addSuite),
       TestEventLogLine.structure(
-        TestEventLogLine.suite(3, "SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
-        TestEventLogLine.test(4, 3, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
+        TestEventLogLine.suite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
+        TestEventLogLine.test(sqrtOfASquare, sqrtPropSpec, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
       ),
-      suiteStarting(3),
-      inFirstExecution(4, "TestStarting"),
-      inFirstExecution(4, "TestSucceeded"),
-      suiteCompleted(3),
+      suiteStarting(sqrtPropSpec),
+      event(sqrtOfASquare, List(1, 1), "TestStarting"),
+      event(sqrtOfASquare, List(1, 1), "TestSucceeded"),
+      suiteCompleted(sqrtPropSpec),
       TestEventLogLine.runEvent("SuiteCompleted"),
       runCompleted,
       runEndedCompleted
@@ -1190,18 +1302,18 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
       TestEventLogLine.runEvent("SuiteStarting"),
       TestEventLogLine.structure(
-        TestEventLogLine.suite(1, "SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
-        TestEventLogLine.test(2, 1, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
+        TestEventLogLine.suite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
+        TestEventLogLine.test(sqrtOfASquare, sqrtPropSpec, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
       ),
-      suiteStarting(1),
-      inFirstExecution(2, "TestStarting"),
-      inFirstExecution(2, "TestSucceeded"),
-      suiteCompleted(1),
-      TestEventLogLine.structure(TestEventLogLine.suite(3, "AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(4, 3, 0, "adds", "- adds")),
-      suiteStarting(3),
-      inFirstExecution(4, "TestStarting"),
-      inFirstExecution(4, "TestSucceeded"),
-      suiteCompleted(3),
+      suiteStarting(sqrtPropSpec),
+      event(sqrtOfASquare, List(1, 1), "TestStarting"),
+      event(sqrtOfASquare, List(1, 1), "TestSucceeded"),
+      suiteCompleted(sqrtPropSpec),
+      TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
+      suiteStarting(addSuite),
+      event(adds, List(1, 1), "TestStarting"),
+      event(adds, List(1, 1), "TestSucceeded"),
+      suiteCompleted(addSuite),
       TestEventLogLine.runEvent("SuiteCompleted"),
       runCompleted,
       runEndedCompleted
@@ -1214,52 +1326,55 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private val cannotLoadBrokenCtorSpec =
     "Unable to load a Suite class samples.discovered.BrokenCtorSpec that was discovered in the runpath: no config"
 
-  private val brokenCtorSpecDiscovered = StatedRun(
-    Vector(
-      "DiscoveryStarting",
-      "DiscoveryCompleted",
-      "RunStarting",
-      "SuiteStarting DiscoverySuite",
-      "SuiteStarting BrokenCtorSpec",
-      s"SuiteAborted BrokenCtorSpec: Exception encountered when invoking run on a nested suite - $cannotLoadBrokenCtorSpec",
-      "SuiteCompleted DiscoverySuite",
-      "RunCompleted"
-    ),
-    """
-    run started
-    run: DiscoveryStarting
-    run: DiscoveryCompleted
-    run: RunStarting(testCount: 0)
-    run: SuiteStarting
-    structure
-      suite "BrokenCtorSpec", class "samples.discovered.BrokenCtorSpec"
-    suite "BrokenCtorSpec": SuiteStarting
-    suite "BrokenCtorSpec": SuiteAborted(throwable: java.lang.RuntimeException caused by java.lang.IllegalStateException "no config")
-    run: SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    List(
-      runStarted,
-      TestEventLogLine.runEvent("DiscoveryStarting"),
-      TestEventLogLine.runEvent("DiscoveryCompleted"),
-      TestEventLogLine.runEvent("RunStarting", """"testCount":0,"configMap":{},"""),
-      TestEventLogLine.runEvent("SuiteStarting"),
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "BrokenCtorSpec", "samples.discovered.BrokenCtorSpec")),
-      suiteStarting(1),
-      TestEventLogLine.suiteEvent(
-        1,
-        1,
-        "SuiteAborted",
-        s""""message":"Exception encountered when invoking run on a nested suite - $cannotLoadBrokenCtorSpec",""" +
-          s""""throwable":{"id":1,"className":"java.lang.RuntimeException","message":"$cannotLoadBrokenCtorSpec",""" +
-          """"cause":{"id":2,"className":"java.lang.IllegalStateException","message":"no config"}},"""
+  private val brokenCtorSpecDiscovered = {
+    val top = NodePath.topLevel("samples.discovered.BrokenCtorSpec")
+    StatedRun(
+      Vector(
+        "DiscoveryStarting",
+        "DiscoveryCompleted",
+        "RunStarting",
+        "SuiteStarting DiscoverySuite",
+        "SuiteStarting BrokenCtorSpec",
+        s"SuiteAborted BrokenCtorSpec: Exception encountered when invoking run on a nested suite - $cannotLoadBrokenCtorSpec",
+        "SuiteCompleted DiscoverySuite",
+        "RunCompleted"
       ),
-      TestEventLogLine.runEvent("SuiteCompleted"),
-      runCompleted,
-      runEndedCompleted
+      """
+      run started
+      run: DiscoveryStarting
+      run: DiscoveryCompleted
+      run: RunStarting(testCount: 0)
+      run: SuiteStarting
+      structure
+        suite "BrokenCtorSpec", class "samples.discovered.BrokenCtorSpec"
+      suite "BrokenCtorSpec": SuiteStarting
+      suite "BrokenCtorSpec": SuiteAborted(throwable: java.lang.RuntimeException caused by java.lang.IllegalStateException "no config")
+      run: SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      List(
+        runStarted,
+        TestEventLogLine.runEvent("DiscoveryStarting"),
+        TestEventLogLine.runEvent("DiscoveryCompleted"),
+        TestEventLogLine.runEvent("RunStarting", """"testCount":0,"configMap":{},"""),
+        TestEventLogLine.runEvent("SuiteStarting"),
+        TestEventLogLine.structure(TestEventLogLine.suite("BrokenCtorSpec", "samples.discovered.BrokenCtorSpec")),
+        suiteStarting(top),
+        event(
+          top,
+          List(1),
+          "SuiteAborted",
+          s""""message":"Exception encountered when invoking run on a nested suite - $cannotLoadBrokenCtorSpec",""" +
+            s""""throwable":{"id":1,"className":"java.lang.RuntimeException","message":"$cannotLoadBrokenCtorSpec",""" +
+            """"cause":{"id":2,"className":"java.lang.IllegalStateException","message":"no config"}},"""
+        ),
+        TestEventLogLine.runEvent("SuiteCompleted"),
+        runCompleted,
+        runEndedCompleted
+      )
     )
-  )
+  }
 
   private def classFilesOf(simpleNames: String*): List[String] = simpleNames.toList.map(name => s"samples/discovered/$name.class")
 
@@ -1294,8 +1409,9 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   /** One event, in the notation and as the format writes it. */
   private final case class StatedEvent(inNotation: String, inFormat: String)
 
-  private def startingAndSucceededOf(test: String, node: Long): List[StatedEvent] = {
-    List("TestStarting", "TestSucceeded").map(eventName => StatedEvent(s"""test "$test": $eventName""", inFirstExecution(node, eventName)))
+  /** The TestStarting and TestSucceeded of a test directly in a top-level suite, each in their first executions. */
+  private def startingAndSucceededOf(suite: NodePath, test: String): List[StatedEvent] = {
+    List("TestStarting", "TestSucceeded").map(eventName => StatedEvent(s"""test "$test": $eventName""", event(suite.test(test), List(1, 1), eventName)))
   }
 
   // Every order of the sequences' events that keeps each sequence's own events in order.
@@ -1312,7 +1428,9 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private def notationOf(events: List[StatedEvent]): String = events.map(_.inNotation).mkString("\n")
 
-  private val parFunSuiteRuns = interleavings(List(startingAndSucceededOf("a", 2), startingAndSucceededOf("b", 3))).map { order =>
+  private val parFunSuite = NodePath.topLevel("samples.ParFunSuite")
+
+  private val parFunSuiteRuns = interleavings(List(startingAndSucceededOf(parFunSuite, "a"), startingAndSucceededOf(parFunSuite, "b"))).map { order =>
     StatedRun(
       Vector(
         "RunStarting",
@@ -1340,17 +1458,19 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       runnerRunOf(
         2,
         (TestEventLogLine.structure(
-          TestEventLogLine.suite(1, "ParFunSuite", "samples.ParFunSuite"),
-          TestEventLogLine.test(2, 1, 0, "a", "- a"),
-          TestEventLogLine.test(3, 1, 1, "b", "- b")
-        ) :: suiteStarting(1) :: order.map(_.inFormat)) ::: List(suiteCompleted(1))*
+          TestEventLogLine.suite("ParFunSuite", "samples.ParFunSuite"),
+          TestEventLogLine.test(parFunSuite.test("a"), parFunSuite, 0, "a", "- a"),
+          TestEventLogLine.test(parFunSuite.test("b"), parFunSuite, 1, "b", "- b")
+        ) :: suiteStarting(parFunSuite) :: order.map(_.inFormat)) ::: List(suiteCompleted(parFunSuite))*
       )
     )
   }
 
+  private val shuffledSuite = NodePath.topLevel("samples.ShuffledSuite")
+
   // Each test runs in an instance of its own, one after another, in any order.
-  private val shuffledSuiteRuns = List("a" -> 2L, "b" -> 3L, "c" -> 4L).permutations.toList.map { tests =>
-    val order = tests.flatMap((test, node) => startingAndSucceededOf(test, node))
+  private val shuffledSuiteRuns = List("a", "b", "c").permutations.toList.map { tests =>
+    val order = tests.flatMap(test => startingAndSucceededOf(shuffledSuite, test))
     StatedRun(
       Vector(
         "RunStarting",
@@ -1380,45 +1500,49 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       |""".stripMargin,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite(1, "ShuffledSuite", "samples.ShuffledSuite"),
-          TestEventLogLine.test(2, 1, 0, "a", "- a"),
-          TestEventLogLine.test(3, 1, 1, "b", "- b"),
-          TestEventLogLine.test(4, 1, 2, "c", "- c")
-        ) :: suiteStarting(1) :: order.map(_.inFormat)) ::: List(suiteCompleted(1))*
+          TestEventLogLine.suite("ShuffledSuite", "samples.ShuffledSuite"),
+          TestEventLogLine.test(shuffledSuite.test("a"), shuffledSuite, 0, "a", "- a"),
+          TestEventLogLine.test(shuffledSuite.test("b"), shuffledSuite, 1, "b", "- b"),
+          TestEventLogLine.test(shuffledSuite.test("c"), shuffledSuite, 2, "c", "- c")
+        ) :: suiteStarting(shuffledSuite) :: order.map(_.inFormat)) ::: List(suiteCompleted(shuffledSuite))*
       )
     )
   }
 
   private val abortedRunningOneTest = "Exception encountered when invoking run on a nested suite - no fixture"
 
-  private val parAbortSuite = StatedRun(
-    Vector(
-      "RunStarting",
-      "SuiteStarting ParAbortSuite",
-      s"SuiteAborted DistributedTestRunnerSuite: $abortedRunningOneTest",
-      "SuiteCompleted ParAbortSuite",
-      "RunCompleted"
-    ),
-    s"""
-    run started
-    run: RunStarting(testCount: 1)
-    structure
-      suite "ParAbortSuite", class "samples.ParAbortSuite"
-        test "a", label "- a"
-    suite "ParAbortSuite": SuiteStarting
-    test "a": SuiteAborted(message: "$abortedRunningOneTest", throwable: java.lang.RuntimeException "no fixture")
-    suite "ParAbortSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """,
-    runnerRunOf(
-      1,
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "ParAbortSuite", "samples.ParAbortSuite"), TestEventLogLine.test(2, 1, 0, "a", "- a")),
-      suiteStarting(1),
-      inFirstExecution(2, "SuiteAborted", s""""message":"$abortedRunningOneTest",""" + thrown("java.lang.RuntimeException", "no fixture")),
-      suiteCompleted(1)
+  private val parAbortSuite = {
+    val top = NodePath.topLevel("samples.ParAbortSuite")
+    val a = top.test("a")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        "SuiteStarting ParAbortSuite",
+        s"SuiteAborted DistributedTestRunnerSuite: $abortedRunningOneTest",
+        "SuiteCompleted ParAbortSuite",
+        "RunCompleted"
+      ),
+      s"""
+      run started
+      run: RunStarting(testCount: 1)
+      structure
+        suite "ParAbortSuite", class "samples.ParAbortSuite"
+          test "a", label "- a"
+      suite "ParAbortSuite": SuiteStarting
+      test "a": SuiteAborted(message: "$abortedRunningOneTest", throwable: java.lang.RuntimeException "no fixture")
+      suite "ParAbortSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      runnerRunOf(
+        1,
+        TestEventLogLine.structure(TestEventLogLine.suite("ParAbortSuite", "samples.ParAbortSuite"), TestEventLogLine.test(a, top, 0, "a", "- a")),
+        suiteStarting(top),
+        event(a, List(1, 1), "SuiteAborted", s""""message":"$abortedRunningOneTest",""" + thrown("java.lang.RuntimeException", "no fixture")),
+        suiteCompleted(top)
+      )
     )
-  )
+  }
 
   /**
    * Registers two scenarios: a run whose tests hand off their events in no fixed order, and the decoder reading the
@@ -1437,7 +1561,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   ): Unit = {
     val reportedInEveryOrder = runs.map(_.reported).distinct
     Scenario(scenario) {
-      pending
       thisProcess
       reportedInEveryOrder should have size 1
       Given(suite)
@@ -1465,7 +1588,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
-      pending
       When("the decoder is given the lines of that event log, in each order the tests may run in")
       val mismatches = runs.flatMap(run => EventLogComparison.mismatchWhenIs(decodedOrFail(run.eventLogInFormat), built(run.eventLogInNotation)))
 
@@ -1474,12 +1596,15 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
   }
 
+  private val slowSuite = NodePath.topLevel("samples.SlowSuite")
+
   private def slowSuiteAlertedBy(alert: String): List[String] = {
+    val sleeps = slowSuite.test("sleeps")
     List(
-      TestEventLogLine.structure(TestEventLogLine.suite(1, "SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(2, 1, 0, "sleeps", "- sleeps")),
-      inFirstExecution(2, "TestStarting"),
+      TestEventLogLine.structure(TestEventLogLine.suite("SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(sleeps, slowSuite, 0, "sleeps", "- sleeps")),
+      event(sleeps, List(1, 1), "TestStarting"),
       alert,
-      inFirstExecution(2, "TestSucceeded")
+      event(sleeps, List(1, 1), "TestSucceeded")
     )
   }
 
@@ -1504,7 +1629,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   Feature("Each suite's structure") {
 
     Scenario("Suites Runner discovers are top-level") {
-      pending
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         Given("a runpath holding two suites, an AnyFunSuite whose one test succeeds and an AnyPropSpec whose one property succeeds")
@@ -1529,7 +1653,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("The decoder reads the event log of: Suites Runner discovers are top-level") {
-      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(discoveredWithAddSuiteFirst.eventLogInFormat)
 
@@ -1690,7 +1813,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   Feature("A suite's class name, under discovery") {
 
     Scenario("A suite's constructor throws under discovery") {
-      pending
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         Given("a runpath holding one suite class, whose constructor throws")
@@ -1716,7 +1838,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("The decoder reads the event log of: A suite's constructor throws under discovery") {
-      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(brokenCtorSpecDiscovered.eventLogInFormat)
 
@@ -1728,7 +1849,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   Feature("The run in its test event log") {
 
     Scenario("A slowpoke alert") {
-      pending
       thisProcess
       Given("an AnyFunSuite whose one test sleeps 3 seconds, then succeeds")
       TemporaryEventLog.in { eventLogFile =>
@@ -1763,7 +1883,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("The decoder reads the event log of: A slowpoke alert") {
-      pending
       When("the decoder is given the lines of the suite's structure, its test's TestStarting, a slowpoke alert and the test's TestSucceeded")
       val events = decodedOrFail(slowSuiteAlerted.eventLogInFormat)
 
@@ -1854,7 +1973,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   Feature("Captured output") {
 
     Scenario("A test writes to both streams") {
-      pending
       thisProcess
       Given("an AnyFunSuite whose test writes a line to stdout and a line to stderr, then succeeds")
       TemporaryEventLog.in { eventLogFile =>
@@ -1876,7 +1994,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("The decoder reads the event log of: A test writes to both streams") {
-      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(bothStreamsSuite.eventLogInFormat)
 

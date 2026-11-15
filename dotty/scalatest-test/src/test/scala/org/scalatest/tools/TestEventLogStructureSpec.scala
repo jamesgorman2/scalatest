@@ -20,26 +20,26 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
    * A suite's structure as a criterion states it, in the event notation, and as the event log's format writes it.
    *
    * @param nodesInNotation the nodes below the suite, the outermost unindented
-   * @param nodesInFormat the nodes below the suite, in the order the event holds them, the suite's node ID being 1
+   * @param nodesInFormat the nodes below the suite, in the order the event holds them, given the suite's node path
    */
   private final case class StatedStructure(
     suiteName: String,
     suiteClassName: String,
     nodesInNotation: String,
-    nodesInFormat: List[String]
+    nodesInFormat: NodePath => List[String]
   ) {
 
     def inNotation: String =
       ("structure" :: s"""  suite "$suiteName", class "$suiteClassName"""" :: nodesInNotation.linesIterator.map("    " + _).toList).mkString("\n")
 
-    def line: String = TestEventLogLine.structure((TestEventLogLine.suite(1, suiteName, suiteClassName) :: nodesInFormat)*)
+    def line: String = TestEventLogLine.structure((TestEventLogLine.suite(suiteName, suiteClassName) :: nodesInFormat(NodePath.topLevel(suiteClassName)))*)
   }
 
   private def runHolding(structure: StatedStructure): String =
     List("run started", "run: RunStarting", structure.inNotation, "run: RunCompleted", "run ended completed").mkString("\n")
 
   private def structureLinesOf(lines: Seq[String]): Vector[String] =
-    lines.toVector.filter(_.contains(""""item":"structure"""")).map(TestEventLogLine.withNodesRenumbered)
+    lines.toVector.filter(_.contains(""""item":"structure""""))
 
   /** Registers the scenario of the run that writes a suite's structure, and the scenario of the decoder that reads it. */
   private def structureScenarios(
@@ -51,7 +51,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     launch: Launch = Launch.ByFramework
   ): Unit = {
     Scenario(scenario) {
-      pending
       thisProcess
       Given(suite)
       TemporaryEventLog.in { eventLogFile =>
@@ -66,7 +65,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     Scenario(s"The decoder reads the structure of: $scenario") {
-      pending
       When("the decoder is given the line of the suite's structure")
       val event = TestEventLogDecoder.decode(structure.line)
 
@@ -146,11 +144,14 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     finally runner.done()
   }
 
-  private def scopeHoldingTests(scopeLabel: String, testLabels: String*): List[String] =
-    TestEventLogLine.scope(2, 1, 0, "s", scopeLabel) ::
-      testLabels.toList.zip(List("t", "u")).zipWithIndex.map { case ((label, name), position) =>
-        TestEventLogLine.test(3 + position, 2, position, name, label)
+  /** A scope named s, registered with `scopeText`, holding tests named t and then u, each given as its test name and label. */
+  private def scopeHoldingTests(scopeText: String, scopeLabel: String, testNamesAndLabels: (String, String)*): NodePath => List[String] = { suite =>
+    val scope = suite.scope(scopeText)
+    TestEventLogLine.scope(scope, 0, "s", scopeLabel) ::
+      testNamesAndLabels.toList.zip(List("t", "u")).zipWithIndex.map { case (((testName, label), name), position) =>
+        TestEventLogLine.test(suite.test(testName), scope, position, name, label)
       }
+  }
 
   private final case class LabelledDeclaration(
     styles: List[String],
@@ -158,7 +159,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     sampleNamedAfter: String,
     holds: String,
     nodesInNotation: String,
-    nodesInFormat: List[String]
+    nodesInFormat: NodePath => List[String]
   )
 
   private val oneTest = "test \"t\", label \"- t\""
@@ -172,7 +173,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithTest",
       "test t, labelled '- t'",
       oneTest,
-      List(TestEventLogLine.test(2, 1, 0, "t", "- t"))
+      suite => List(TestEventLogLine.test(suite.test("t"), suite, 0, "t", "- t"))
     ),
     LabelledDeclaration(
       List("AnyPropSpec", "FixtureAnyPropSpec"),
@@ -180,7 +181,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithProperty",
       "test t, labelled '- t'",
       oneTest,
-      List(TestEventLogLine.test(2, 1, 0, "t", "- t"))
+      suite => List(TestEventLogLine.test(suite.test("t"), suite, 0, "t", "- t"))
     ),
     LabelledDeclaration(
       List("AnyFunSpec", "AsyncFunSpec", "FixtureAnyFunSpec", "FixtureAsyncFunSpec", "PathAnyFunSpec"),
@@ -188,7 +189,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithDescribe",
       "scope s, labelled 's', holding test t, labelled '- t'",
       scopeHoldingOneTest,
-      scopeHoldingTests("s", "- t")
+      scopeHoldingTests("s", "s", "s t" -> "- t")
     ),
     LabelledDeclaration(
       List("AnyFreeSpec", "AsyncFreeSpec", "FixtureAnyFreeSpec", "FixtureAsyncFreeSpec", "PathAnyFreeSpec"),
@@ -196,7 +197,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithDash",
       "scope s, labelled 's', holding test t, labelled '- t'",
       scopeHoldingOneTest,
-      scopeHoldingTests("s", "- t")
+      scopeHoldingTests("s", "s", "s t" -> "- t")
     ),
     LabelledDeclaration(
       List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
@@ -204,11 +205,15 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithWhenAndShould",
       "scope s, labelled 's', holding scope u, labelled 'when u', holding test t, labelled '- should t'",
       "scope \"s\", label \"s\"\n  scope \"u\", label \"when u\"\n    test \"t\", label \"- should t\"",
-      List(
-        TestEventLogLine.scope(2, 1, 0, "s", "s"),
-        TestEventLogLine.scope(3, 2, 0, "u", "when u"),
-        TestEventLogLine.test(4, 3, 0, "t", "- should t")
-      )
+      { suite =>
+        val s = suite.scope("s")
+        val u = s.scope("u")
+        List(
+          TestEventLogLine.scope(s, 0, "s", "s"),
+          TestEventLogLine.scope(u, 0, "u", "when u"),
+          TestEventLogLine.test(suite.test("s when u should t"), u, 0, "t", "- should t")
+        )
+      }
     ),
     LabelledDeclaration(
       List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
@@ -216,7 +221,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithCan",
       "scope s, labelled 's', holding test t, labelled '- can t'",
       "scope \"s\", label \"s\"\n  test \"t\", label \"- can t\"",
-      scopeHoldingTests("s", "- can t")
+      scopeHoldingTests("s", "s", "s can t" -> "- can t")
     ),
     LabelledDeclaration(
       List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
@@ -233,17 +238,17 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         |    test "t", label "- t"
         |  scope "x", label "should x that provides"
         |    test "t", label "- t"""".stripMargin,
-      List(
-        TestEventLogLine.scope(2, 1, 0, "s", "s"),
-        TestEventLogLine.scope(3, 2, 0, "u", "should u which"),
-        TestEventLogLine.test(4, 3, 0, "t", "- t"),
-        TestEventLogLine.scope(5, 2, 1, "v", "should v that"),
-        TestEventLogLine.test(6, 5, 0, "t", "- t"),
-        TestEventLogLine.scope(7, 2, 2, "w", "should w which provides"),
-        TestEventLogLine.test(8, 7, 0, "t", "- t"),
-        TestEventLogLine.scope(9, 2, 3, "x", "should x that provides"),
-        TestEventLogLine.test(10, 9, 0, "t", "- t")
-      )
+      { suite =>
+        val s = suite.scope("s")
+        TestEventLogLine.scope(s, 0, "s", "s") ::
+          List("u which", "v that", "w which provides", "x that provides").zipWithIndex.flatMap { (text, position) =>
+            val scope = s.scope(text)
+            List(
+              TestEventLogLine.scope(scope, position, text.takeWhile(_ != ' '), s"should $text"),
+              TestEventLogLine.test(suite.test(s"s should $text t"), scope, 0, "t", "- t")
+            )
+          }
+      }
     ),
     LabelledDeclaration(
       List("AnyWordSpec", "AsyncWordSpec", "FixtureAnyWordSpec", "FixtureAsyncWordSpec"),
@@ -277,32 +282,27 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         |  test "t", label "- when t"
         |scope "q", label "q"
         |  test "x", label "- when x"""".stripMargin,
-      List(
-        TestEventLogLine.scope(2, 1, 0, "u", "u which"),
-        TestEventLogLine.test(3, 2, 0, "t", "- t"),
-        TestEventLogLine.scope(4, 1, 1, "u", "u which"),
-        TestEventLogLine.test(5, 4, 0, "x", "- should x"),
-        TestEventLogLine.scope(6, 1, 2, "v", "v that"),
-        TestEventLogLine.test(7, 6, 0, "t", "- t"),
-        TestEventLogLine.scope(8, 1, 3, "v", "v that"),
-        TestEventLogLine.test(9, 8, 0, "x", "- must x"),
-        TestEventLogLine.scope(10, 1, 4, "w", "w which provides"),
-        TestEventLogLine.test(11, 10, 0, "t", "- t"),
-        TestEventLogLine.scope(12, 1, 5, "w", "w which provides"),
-        TestEventLogLine.test(13, 12, 0, "x", "- can x"),
-        TestEventLogLine.scope(14, 1, 6, "y", "y that provides"),
-        TestEventLogLine.test(15, 14, 0, "t", "- t"),
-        TestEventLogLine.scope(16, 1, 7, "y", "y that provides"),
-        TestEventLogLine.test(17, 16, 0, "x", "- should x"),
-        TestEventLogLine.scope(18, 1, 8, "z", "z"),
-        TestEventLogLine.test(19, 18, 0, "t", "- should t"),
-        TestEventLogLine.scope(20, 1, 9, "z", "z"),
-        TestEventLogLine.test(21, 20, 0, "x", "- must x"),
-        TestEventLogLine.scope(22, 1, 10, "q", "q"),
-        TestEventLogLine.test(23, 22, 0, "t", "- when t"),
-        TestEventLogLine.scope(24, 1, 11, "q", "q"),
-        TestEventLogLine.test(25, 24, 0, "x", "- when x")
-      )
+      { suite =>
+        // A shorthand scope is registered with the text of the scope before it, so each pair shares a text.
+        List(
+          ("u which", "t", "should x"),
+          ("v that", "t", "must x"),
+          ("w which provides", "t", "can x"),
+          ("y that provides", "t", "should x"),
+          ("z", "should t", "must x"),
+          ("q", "when t", "when x")
+        ).zipWithIndex.flatMap { case ((text, firstTestText, secondTestText), pair) =>
+          val name = text.takeWhile(_ != ' ')
+          val first = suite.scope(text)
+          val second = suite.scope(text, 1)
+          List(
+            TestEventLogLine.scope(first, 2 * pair, name, text),
+            TestEventLogLine.test(suite.test(s"$text $firstTestText"), first, 0, "t", s"- $firstTestText"),
+            TestEventLogLine.scope(second, 2 * pair + 1, name, text),
+            TestEventLogLine.test(suite.test(s"$text $secondTestText"), second, 0, "x", s"- $secondTestText")
+          )
+        }
+      }
     ),
     LabelledDeclaration(
       List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
@@ -310,10 +310,11 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithRegisterTest",
       "test 'can open a file', labelled '- can open a file', and test 'should close it', labelled '- should close it'",
       "test \"can open a file\", label \"- can open a file\"\ntest \"should close it\", label \"- should close it\"",
-      List(
-        TestEventLogLine.test(2, 1, 0, "can open a file", "- can open a file"),
-        TestEventLogLine.test(3, 1, 1, "should close it", "- should close it")
-      )
+      suite =>
+        List(
+          TestEventLogLine.test(suite.test("can open a file"), suite, 0, "can open a file", "- can open a file"),
+          TestEventLogLine.test(suite.test("should close it"), suite, 1, "should close it", "- should close it")
+        )
     ),
     LabelledDeclaration(
       List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
@@ -321,7 +322,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithSubject",
       "scope s, labelled 's', holding test t, labelled '- should t', and test u, labelled '- must u'",
       "scope \"s\", label \"s\"\n  test \"t\", label \"- should t\"\n  test \"u\", label \"- must u\"",
-      scopeHoldingTests("s", "- should t", "- must u")
+      scopeHoldingTests("s", "s", "s should t" -> "- should t", "s must u" -> "- must u")
     ),
     LabelledDeclaration(
       List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
@@ -329,7 +330,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithBehaviorOf",
       "scope s, labelled 's', holding test t, labelled '- can t'",
       "scope \"s\", label \"s\"\n  test \"t\", label \"- can t\"",
-      scopeHoldingTests("s", "- can t")
+      scopeHoldingTests("s", "s", "s can t" -> "- can t")
     ),
     LabelledDeclaration(
       List("AnyFeatureSpec", "FixtureAnyFeatureSpec"),
@@ -337,7 +338,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithScenario",
       "scope s, labelled 'Feature: s', holding test t, labelled 'Scenario: t'",
       "scope \"s\", label \"Feature: s\"\n  test \"t\", label \"Scenario: t\"",
-      scopeHoldingTests("Feature: s", "Scenario: t")
+      scopeHoldingTests("Feature: s", "Feature: s", "Feature: s Scenario: t" -> "Scenario: t")
     ),
     LabelledDeclaration(
       List("AsyncFeatureSpec", "FixtureAsyncFeatureSpec"),
@@ -345,7 +346,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithScenario",
       "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
       featureHoldingScenarioWithIcon,
-      scopeHoldingTests("Feature: s", "- Scenario: t")
+      scopeHoldingTests("Feature: s", "Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
     ),
     LabelledDeclaration(
       List("AnyFeatureSpec", "AsyncFeatureSpec", "FixtureAnyFeatureSpec", "FixtureAsyncFeatureSpec"),
@@ -353,7 +354,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithIgnoredScenario",
       "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
       featureHoldingScenarioWithIcon,
-      scopeHoldingTests("Feature: s", "- Scenario: t")
+      scopeHoldingTests("Feature: s", "Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
     ),
     LabelledDeclaration(
       List("RefSpec"),
@@ -361,7 +362,10 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "WithObject",
       "scope 's v', labelled 's v', holding test 't u', labelled '- t u'",
       "scope \"s v\", label \"s v\"\n  test \"t u\", label \"- t u\"",
-      List(TestEventLogLine.scope(2, 1, 0, "s v", "s v"), TestEventLogLine.test(3, 2, 0, "t u", "- t u"))
+      { suite =>
+        val scope = suite.scope("s v")
+        List(TestEventLogLine.scope(scope, 0, "s v", "s v"), TestEventLogLine.test(suite.test("s v t u"), scope, 0, "t u", "- t u"))
+      }
     )
   )
 
@@ -500,12 +504,16 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
           |  test "inner one", label "- inner one"
           |suite "Inner2Suite", class "samples.Inner2Suite"
           |  test "inner two", label "- inner two"""".stripMargin,
-        List(
-          TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
-          TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
-          TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
-          TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
-        )
+        { suite =>
+          val inner1 = suite.suite("samples.Inner1Suite")
+          val inner2 = suite.suite("samples.Inner2Suite")
+          List(
+            TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
+            TestEventLogLine.test(inner1.test("inner one"), inner1, 0, "inner one", "- inner one"),
+            TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
+            TestEventLogLine.test(inner2.test("inner two"), inner2, 0, "inner two", "- inner two")
+          )
+        }
       ),
       // Framework, given a suite by name, runs none of the tests of the suites it nests.
       Launch.ByRunner
@@ -520,7 +528,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         "FilteredSuite",
         "samples.FilteredSuite",
         "test \"fast\", label \"- fast\"\ntest \"later\", label \"- later\"",
-        List(TestEventLogLine.test(2, 1, 0, "fast", "- fast"), TestEventLogLine.test(3, 1, 1, "later", "- later"))
+        suite => List(TestEventLogLine.test(suite.test("fast"), suite, 0, "fast", "- fast"), TestEventLogLine.test(suite.test("later"), suite, 1, "later", "- later"))
       )
     )
 
@@ -533,11 +541,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         "ShuffledSuite",
         "samples.ShuffledSuite",
         "test \"a\", label \"- a\"\ntest \"b\", label \"- b\"\ntest \"c\", label \"- c\"",
-        List(
-          TestEventLogLine.test(2, 1, 0, "a", "- a"),
-          TestEventLogLine.test(3, 1, 1, "b", "- b"),
-          TestEventLogLine.test(4, 1, 2, "c", "- c")
-        )
+        suite => List("a", "b", "c").zipWithIndex.map((name, position) => TestEventLogLine.test(suite.test(name), suite, position, name, s"- $name"))
       )
     )
 
@@ -550,7 +554,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         "PlainSuite",
         "samples.PlainSuite",
         "test \"b\", label \"- b\"\ntest \"a\", label \"- a\"",
-        List(TestEventLogLine.test(2, 1, 0, "b", "- b"), TestEventLogLine.test(3, 1, 1, "a", "- a"))
+        suite => List(TestEventLogLine.test(suite.test("b"), suite, 0, "b", "- b"), TestEventLogLine.test(suite.test("a"), suite, 1, "a", "- a"))
       )
     )
   }
@@ -580,7 +584,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "a suite class whose constructor throws",
       Nil,
       "the suite alone, with the class that failed to construct",
-      StatedStructure("BrokenCtorSpec", "samples.BrokenCtorSpec", "", Nil)
+      StatedStructure("BrokenCtorSpec", "samples.BrokenCtorSpec", "", _ => Nil)
     )
   }
 }

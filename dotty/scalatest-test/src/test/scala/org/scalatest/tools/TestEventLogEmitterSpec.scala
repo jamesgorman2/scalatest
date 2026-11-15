@@ -19,6 +19,8 @@ import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
+import org.scalatest.events.NodeId
+import org.scalatest.events.NodePlace
 import org.scalatest.events.Ordinal
 import org.scalatest.events.RunAborted
 import org.scalatest.events.RunCompleted
@@ -113,7 +115,11 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
   private val oneTestSuiteLine = {
     val className = classOf[OneTestSuite].getName
-    TestEventLogLine.structure(TestEventLogLine.suite(1, "TestEventLogEmitterSpec$OneTestSuite", className), TestEventLogLine.test(2, 1, 0, "only", "- only"))
+    val suite = NodePath.topLevel(className)
+    TestEventLogLine.structure(
+      TestEventLogLine.suite("TestEventLogEmitterSpec$OneTestSuite", className),
+      TestEventLogLine.test(suite.test("only"), suite, 0, "only", "- only")
+    )
   }
 
   "A started emitter" should {
@@ -374,35 +380,38 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           ),
           List(structureOf(inner, "Inner", List(test("i"))))
         )
+      val outerPath = NodePath.topLevel("samples.Outer")
+      val outerPlace = NodePlace.Suite("samples.Outer", 0)
+      def nodeId(places: NodePlace*): NodeId = NodeId(places.toVector)
 
       "write it as one line, the suite first and each node's children after it in declared order, nested suites before scopes and tests" in {
-        pending
         val eventLog = new RecordingEventLog
         TestEventLogEmitter.appendingTo(eventLog).topLevelSuite(nestedThenScopesAndTests)
+        val innerPath = outerPath.suite("samples.Inner")
+        val firstS = outerPath.scope("s")
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
-            TestEventLogLine.suite(1, "Outer", "samples.Outer"),
-            TestEventLogLine.nestedSuite(2, 1, 0, "Inner", "samples.Inner"),
-            TestEventLogLine.test(3, 2, 0, "i", "- i"),
-            TestEventLogLine.scope(4, 1, 1, "s", "s"),
-            TestEventLogLine.test(5, 4, 0, "t", "- t"),
-            TestEventLogLine.scope(6, 1, 2, "s", "s"),
-            TestEventLogLine.test(7, 1, 3, "flat", "- flat")
+            TestEventLogLine.suite("Outer", "samples.Outer"),
+            TestEventLogLine.nestedSuite(innerPath, 0, "Inner", "samples.Inner"),
+            TestEventLogLine.test(innerPath.test("i"), innerPath, 0, "i", "- i"),
+            TestEventLogLine.scope(firstS, 1, "s", "s"),
+            TestEventLogLine.test(outerPath.test("s t"), firstS, 0, "t", "- t"),
+            TestEventLogLine.scope(outerPath.scope("s", 1), 2, "s", "s"),
+            TestEventLogLine.test(outerPath.test("flat"), outerPath, 3, "flat", "- flat")
           ) + "\n"
         )
       }
 
       "write a suite's scopes and tests before its nested suites where the suite runs its tests first" in {
-        pending
         val eventLog = new RecordingEventLog
         TestEventLogEmitter
           .appendingTo(eventLog)
           .topLevelSuite(structureOf(outer, "Outer", List(test("flat")), List(structureOf(inner, "Inner", Nil)), testsBeforeNestedSuites = true))
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
-            TestEventLogLine.suite(1, "Outer", "samples.Outer"),
-            TestEventLogLine.test(2, 1, 0, "flat", "- flat"),
-            TestEventLogLine.nestedSuite(3, 1, 1, "Inner", "samples.Inner")
+            TestEventLogLine.suite("Outer", "samples.Outer"),
+            TestEventLogLine.test(outerPath.test("flat"), outerPath, 0, "flat", "- flat"),
+            TestEventLogLine.nestedSuite(outerPath.suite("samples.Inner"), 1, "Inner", "samples.Inner")
           ) + "\n"
         )
       }
@@ -410,12 +419,12 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "return the suite's node table, holding the suite's node, suite ID, class name and the instance it was read from" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
         table.instance.get should be theSameInstanceAs outer
-        (table.node, table.suiteId, table.className) shouldBe ((MintedNodeId(1), "samples.Outer", "samples.Outer"))
+        (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), "samples.Outer", "samples.Outer"))
       }
 
       "return a node table holding each test's node by its test name" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
-        table.tests shouldBe Map("s t" -> MintedNodeId(5), "flat" -> MintedNodeId(7))
+        table.tests shouldBe Map("s t" -> nodeId(outerPlace, NodePlace.Test("s t")), "flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
       }
 
       "return a node table holding each scope's node by its path of registered texts, telling sibling scopes of one text apart by their place" in {
@@ -430,33 +439,55 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           )
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(structure)
         table.scopes shouldBe Map(
-          List(ScopePlace("s", 0)) -> MintedNodeId(2),
-          List(ScopePlace("s", 0), ScopePlace("u which", 0)) -> MintedNodeId(3),
-          List(ScopePlace("s", 1)) -> MintedNodeId(4)
+          List(ScopePlace("s", 0)) -> nodeId(outerPlace, NodePlace.Scope("s", 0)),
+          List(ScopePlace("s", 0), ScopePlace("u which", 0)) -> nodeId(outerPlace, NodePlace.Scope("s", 0), NodePlace.Scope("u which", 0)),
+          List(ScopePlace("s", 1)) -> nodeId(outerPlace, NodePlace.Scope("s", 1))
         )
       }
 
       "return a node table holding the parent of each scope and test" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
-        table.parents shouldBe Map(MintedNodeId(4) -> MintedNodeId(1), MintedNodeId(5) -> MintedNodeId(4), MintedNodeId(6) -> MintedNodeId(1), MintedNodeId(7) -> MintedNodeId(1))
+        val outerId = nodeId(outerPlace)
+        val firstS = nodeId(outerPlace, NodePlace.Scope("s", 0))
+        table.parents shouldBe Map(
+          firstS -> outerId,
+          nodeId(outerPlace, NodePlace.Test("s t")) -> firstS,
+          nodeId(outerPlace, NodePlace.Scope("s", 1)) -> outerId,
+          nodeId(outerPlace, NodePlace.Test("flat")) -> outerId
+        )
       }
 
       "return a node table holding each nested suite's table at its position, with the instance it was read from" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
         table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites)) shouldBe
-          Vector((MintedNodeId(2), "samples.Inner", "samples.Inner", Map("i" -> MintedNodeId(3)), Map.empty, Vector.empty))
+          Vector(
+            (
+              nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0)),
+              "samples.Inner",
+              "samples.Inner",
+              Map("i" -> nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0), NodePlace.Test("i"))),
+              Map.empty,
+              Vector.empty
+            )
+          )
         table.nestedSuites.head.instance.get should be theSameInstanceAs inner
       }
 
-      "mint for a later suite no node ID an earlier suite has" in {
-        pending
+      "give a later top-level suite of an earlier one's suite ID the next index, so that no two nodes share a path" in {
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
-        emitter.topLevelSuite(structureOf(inner, "Inner", List(test("i"))))
+        emitter.topLevelSuite(structureOf(inner, "Outer", List(test("flat"))))
+        val laterPath = NodePath.topLevel("samples.Outer", 1)
         eventLog.writes shouldBe Vector(
-          TestEventLogLine.structure(TestEventLogLine.suite(1, "Outer", "samples.Outer"), TestEventLogLine.test(2, 1, 0, "flat", "- flat")) + "\n",
-          TestEventLogLine.structure(TestEventLogLine.suite(3, "Inner", "samples.Inner"), TestEventLogLine.test(4, 3, 0, "i", "- i")) + "\n"
+          TestEventLogLine.structure(
+            TestEventLogLine.suite("Outer", "samples.Outer"),
+            TestEventLogLine.test(outerPath.test("flat"), outerPath, 0, "flat", "- flat")
+          ) + "\n",
+          TestEventLogLine.structure(
+            TestEventLogLine.suiteWithId(laterPath, "Outer", "samples.Outer", "samples.Outer"),
+            TestEventLogLine.test(laterPath.test("flat"), laterPath, 0, "flat", "- flat")
+          ) + "\n"
         )
       }
 
@@ -466,7 +497,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         emitter.endWithoutRunEnded()
         val table = emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
         eventLog.writes shouldBe Vector.empty
-        table.tests shouldBe Map("flat" -> MintedNodeId(2))
+        table.tests shouldBe Map("flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
       }
 
       "not throw where its event log rejects the write, and close the event log" in {
@@ -477,7 +508,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     }
 
     "handed the structures of top-level suites by several threads at once" should {
-      "write each as one whole line, and give every node of the run its own ID" in {
+      "write each as one whole line, and give every node of the run its own node path" in {
         val threadCount = 4
         val suitesOfEachThread = 25
         val decoded = wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, thread) =>
@@ -492,13 +523,13 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
             case test: org.scalatest.events.StructureNode.Test => test.id
           }
         }.flatten
-        nodeIds should contain theSameElementsAs (1L to threadCount * suitesOfEachThread * 3L).map(MintedNodeId(_))
+        nodeIds should have size (threadCount * suitesOfEachThread * 3L)
+        nodeIds.distinct shouldBe nodeIds
       }
     }
 
     "asked for the structure wrapper of a top-level suite" should {
       "have written the suite's structure, as the suite and the filter give it, when it returns the wrapper" in {
-        pending
         val eventLog = new RecordingEventLog
         val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(new OneTestSuite, Filter.default, new RecordingReporter)
         SuiteRegistration.madeWith(wrapper).remove()

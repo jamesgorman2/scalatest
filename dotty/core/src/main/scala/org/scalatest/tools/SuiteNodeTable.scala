@@ -8,15 +8,6 @@ import org.scalatest.events.NodePlace
 import org.scalatest.events.StructureNode
 import scala.collection.mutable
 
-/**
- * The ID of the node the emitter minted with the given number: a one-place node path whose `suiteId` is that number.
- * It identifies the node uniquely within its run but does not give the node's place.
- */
-private[scalatest] object MintedNodeId {
-
-  def apply(number: Long): NodeId = NodeId(Vector(NodePlace.Suite(number.toString, 0)))
-}
-
 /** One execution of a suite, scope or test. It has no number until an event naming it is written. */
 private[scalatest] final class Execution
 
@@ -61,6 +52,12 @@ private[scalatest] final class NodeExecutions {
 
   /** The execution numbered last. */
   def latest: Option[Execution] = started
+
+  /**
+   * The number of the execution an event below this node ran in, where nothing names it: the execution that opened
+   * last and has not closed, else the latest, else a first.
+   */
+  def numberOfCurrent: Int = number(openedLast.orElse(latest).getOrElse(new Execution))
 }
 
 /** The node IDs of a suite's scopes and tests: each test's by test name, each scope's by its path, and each one's parent. */
@@ -76,18 +73,22 @@ private[scalatest] object ScopeAndTestIds {
 
 /**
  * The node IDs a run's test event log gives one suite node: the suite's own, and those of its tests, scopes and
- * nested suites. It also keeps the suite's latest structure, and the executions of the suite and of its scopes and
- * tests.
+ * nested suites. Each ID is the node's node path:
+ *  - a nested suite's is its parent's, then its `suiteId` and its index among its parent's suites of that `suiteId`;
+ *  - a scope's is its parent's, then its registered text and its index among its parent's scopes of that text;
+ *  - a test's is its suite's, then its test name.
+ *
+ * It also keeps the suite's latest structure, and the executions of the suite and of its scopes and tests.
  *
  * Not a case class: the suite instance is user code, whose `equals`, `hashCode` and `toString` must not be called.
  *
- * @param instance the suite instance the suite's first structure is for, none where the node was minted for an event's suite ID
- * @param parent the suite node this one is nested in, if any
- * @param position its place among that node's children, if it has one: a nested suite node minted after its parent's first structure has none
+ * @param instance the suite instance the suite's first structure is for, none where the node was added for an event's suite ID
+ * @param parentSuite the table of the suite node this one is nested in, if any
+ * @param position its place among that node's children, if it has one: a nested suite node added after its parent's first structure has none
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstIds the node IDs of `firstScopesAndTests`
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
- * @param nestedSuites each nested suite's table, at its position in `nestedSuites`
+ * @param nestedSuitesOf given this table, each nested suite's table, at its position in `nestedSuites`
  */
 private[scalatest] final class SuiteNodeTable(
   val instance: Option[Suite],
@@ -95,13 +96,15 @@ private[scalatest] final class SuiteNodeTable(
   val name: String,
   val suiteId: String,
   val className: String,
-  val parent: Option[NodeId],
+  val parentSuite: Option[SuiteNodeTable],
   val position: Option[Int],
   firstScopesAndTests: List[ScopeOrTest],
   firstIds: ScopeAndTestIds,
   firstFilteredTests: Map[String, (Boolean, Boolean)],
-  val nestedSuites: Vector[SuiteNodeTable]
+  nestedSuitesOf: SuiteNodeTable => Vector[SuiteNodeTable]
 ) {
+
+  val nestedSuites: Vector[SuiteNodeTable] = nestedSuitesOf(this)
 
   // All are read and written only under the emitter's lock. The IDs are those of every scope and test any structure
   // of the suite has held, so that each keeps its ID in a later structure.
@@ -111,11 +114,14 @@ private[scalatest] final class SuiteNodeTable(
   private var latestScopesAndTests = firstScopesAndTests
   private var testNamesOfLatest = SuiteNodeTable.testNamesIn(firstScopesAndTests)
   private var filteredTests = firstFilteredTests
-  private var nestedSuitesMinted = Vector.empty[SuiteNodeTable]
+  private var nestedSuitesAdded = Vector.empty[SuiteNodeTable]
   private var hasEndedOnce = false
 
-  /** The tables of its nested suites: those of its first structure in declared order, then those minted later, in the order minted. */
-  def childSuites: Vector[SuiteNodeTable] = nestedSuites ++ nestedSuitesMinted
+  /** The suite node this one is nested in, if any. */
+  def parent: Option[NodeId] = parentSuite.map(_.node)
+
+  /** The tables of its nested suites: those of its first structure in declared order, then those added later, in the order added. */
+  def childSuites: Vector[SuiteNodeTable] = nestedSuites ++ nestedSuitesAdded
 
   /** Whether an event has ended an execution of the suite: a `SuiteCompleted` or `SuiteAborted`. */
   def hasEnded: Boolean = hasEndedOnce
@@ -123,12 +129,13 @@ private[scalatest] final class SuiteNodeTable(
   def markEnded(): Unit = hasEndedOnce = true
 
   /**
-   * Mints a suite node nested directly in this one, after its other children. Its first structure holds the suite
+   * Adds a suite node nested directly in this one, after its other children. Its first structure holds the suite
    * alone, and is the caller's to write.
    */
-  def mintNestedSuite(instance: Option[Suite], name: String, suiteId: String, className: String, mint: () => NodeId): SuiteNodeTable = {
-    val nested = new SuiteNodeTable(instance, mint(), name, suiteId, className, Some(node), None, Nil, ScopeAndTestIds.none, Map.empty, Vector.empty)
-    nestedSuitesMinted :+= nested
+  def addNestedSuite(instance: Option[Suite], name: String, suiteId: String, className: String): SuiteNodeTable = {
+    val id = SuiteNodeTable.nestedSuiteId(node, suiteId, childSuites.map(_.suiteId))
+    val nested = new SuiteNodeTable(instance, id, name, suiteId, className, Some(this), None, Nil, ScopeAndTestIds.none, Map.empty, _ => Vector.empty)
+    nestedSuitesAdded :+= nested
     nested
   }
 
@@ -160,14 +167,13 @@ private[scalatest] final class SuiteNodeTable(
   }
 
   /**
-   * Makes `scopesAndTests` the suite's latest structure, minting a node for each scope and test no earlier structure
-   * of the suite held. Returns the nodes of the further `structure` event that holds them: the suite, then its scopes
-   * and tests, positioned from 0 among themselves.
+   * Makes `scopesAndTests` the suite's latest structure. Returns the nodes of the further `structure` event that holds
+   * them: the suite, then its scopes and tests, positioned from 0 among themselves.
    */
-  def replaceLatestStructure(scopesAndTests: List[ScopeOrTest], mint: () => NodeId): Vector[StructureNode] = {
+  def replaceLatestStructure(scopesAndTests: List[ScopeOrTest]): Vector[StructureNode] = {
     val nodes = Vector.newBuilder[StructureNode]
     nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
-    val added = new SuiteNodeTable.ScopesAndTests(ids, mint, nodes)
+    val added = new SuiteNodeTable.ScopesAndTests(ids, node, nodes)
     added.add(scopesAndTests, node, 0, Nil)
     ids = added.ids
     latestScopesAndTests = scopesAndTests
@@ -185,6 +191,25 @@ private[scalatest] final class SuiteNodeTable(
   }
 
   def executionsOf(node: NodeId): NodeExecutions = executionsOfNodes.getOrElseUpdate(node, new NodeExecutions)
+
+  /** The execution path of an event of this suite, but for the suite's own execution: the current execution of each suite above it, from its top-level suite down. */
+  def executionPathAboveSuite: Vector[Int] = {
+    val suitesAbove = Iterator.unfold(parentSuite)(above => above.map(table => (table, table.parentSuite))).toVector.reverse
+    suitesAbove.map(table => table.executionsOf(table.node).numberOfCurrent)
+  }
+
+  /**
+   * The execution path of an event of one of this suite's scopes or tests, but for the node's own execution. The
+   * suite's execution is `executionOfSuite`, else the suite's current one. Each suite above it, and each scope between
+   * it and the node, takes its current execution. A test's scopes are those its latest structure puts it in.
+   */
+  def executionPathAbove(scopeOrTest: NodeId, executionOfSuite: Option[Execution]): Vector[Int] = {
+    def scopeAbove(below: NodeId): Option[NodeId] = parents.get(below).filter(_ != node)
+    val scopesAbove = Iterator.unfold(scopeAbove(scopeOrTest))(scope => scope.map(id => (id, scopeAbove(id)))).toVector.reverse
+    val ofSuite = executionsOf(node)
+    val suiteNumber = executionOfSuite.fold(ofSuite.numberOfCurrent)(ofSuite.number)
+    (executionPathAboveSuite :+ suiteNumber) ++ scopesAbove.map(scope => executionsOf(scope).numberOfCurrent)
+  }
 
   /** Keeps the execution the suite's `SuiteStarting` opened for the suite's next run to take. */
   def awaitRun(execution: Execution): Unit = openedBySuiteStarting = Some(execution)
@@ -207,54 +232,66 @@ private[scalatest] object SuiteNodeTable {
 
   private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[String] = SuiteStructure.testsIn(scopesAndTests).map(_.testName).toSet
 
+  // The node path of a suite of this suite ID nested in `parent`, after nested suites of the suite IDs `earlier`.
+  private def nestedSuiteId(parent: NodeId, suiteId: String, earlier: Vector[String]): NodeId =
+    NodeId(parent.places :+ NodePlace.Suite(suiteId, earlier.count(_ == suiteId)))
+
   /**
-   * Mints a node for a top-level suite and for each node of its structure. Returns the suite's table, and the
-   * nodes as a `structure` event holds them: in depth-first pre-order, each node's children in declared order.
+   * Gives a top-level suite, and each node of its structure, its node path. The suite's is its `suiteId` and `index`,
+   * its index among the run's top-level suites of that `suiteId`. Returns the suite's table, and the nodes as a
+   * `structure` event holds them: in depth-first pre-order, each node's children in declared order.
    */
-  def minted(structure: SuiteStructure, mint: () => NodeId): (SuiteNodeTable, Vector[StructureNode]) = {
-    val minting = new Minting(mint)
-    val table = minting.suite(structure, None, None)
-    (table, minting.nodes.result())
-  }
-
-  private final class Minting(mint: () => NodeId) {
-
+  def ofTopLevelSuite(structure: SuiteStructure, index: Int): (SuiteNodeTable, Vector[StructureNode]) = {
     val nodes = Vector.newBuilder[StructureNode]
-
-    // Recurses once for each suite nested in another, as reading the structure does.
-    def suite(structure: SuiteStructure, parent: Option[NodeId], position: Option[Int]): SuiteNodeTable = {
-      val id = mint()
-      nodes += StructureNode.Suite(id, parent, position, structure.name, structure.suiteId, structure.className)
-      val scopesAndTests = new ScopesAndTests(ScopeAndTestIds.none, mint, nodes)
-      def nestedSuitesFrom(firstPosition: Int): Vector[SuiteNodeTable] =
-        structure.nestedSuites.toVector.zipWithIndex.map((nested, index) => suite(nested, Some(id), Some(firstPosition + index)))
-      val nestedSuites =
-        if (structure.testsBeforeNestedSuites) {
-          scopesAndTests.add(structure.scopesAndTests, id, 0, Nil)
-          nestedSuitesFrom(structure.scopesAndTests.size)
-        } else {
-          val before = nestedSuitesFrom(0)
-          scopesAndTests.add(structure.scopesAndTests, id, structure.nestedSuites.size, Nil)
-          before
-        }
-      new SuiteNodeTable(
-        Some(structure.instance),
-        id,
-        structure.name,
-        structure.suiteId,
-        structure.className,
-        parent,
-        position,
-        structure.scopesAndTests,
-        scopesAndTests.ids,
-        structure.filteredTests,
-        nestedSuites
-      )
-    }
+    val table = suite(structure, NodeId(Vector(NodePlace.Suite(structure.suiteId, index))), None, None, nodes)
+    (table, nodes.result())
   }
 
-  /** Adds scopes and tests to a structure's nodes, each taking the ID `known` holds for it, where it holds one, and a minted one otherwise. */
-  private final class ScopesAndTests(known: ScopeAndTestIds, mint: () => NodeId, nodes: mutable.Builder[StructureNode, Vector[StructureNode]]) {
+  // Recurses once for each suite nested in another, as reading the structure does.
+  private def suite(
+    structure: SuiteStructure,
+    id: NodeId,
+    parentSuite: Option[SuiteNodeTable],
+    position: Option[Int],
+    nodes: mutable.Builder[StructureNode, Vector[StructureNode]]
+  ): SuiteNodeTable = {
+    nodes += StructureNode.Suite(id, parentSuite.map(_.node), position, structure.name, structure.suiteId, structure.className)
+    val nodesOfScopesAndTests = Vector.newBuilder[StructureNode]
+    val scopesAndTests = new ScopesAndTests(ScopeAndTestIds.none, id, nodesOfScopesAndTests)
+    val (firstPositionOfScopesAndTests, firstPositionOfNestedSuites) =
+      if (structure.testsBeforeNestedSuites) (0, structure.scopesAndTests.size) else (structure.nestedSuites.size, 0)
+    scopesAndTests.add(structure.scopesAndTests, id, firstPositionOfScopesAndTests, Nil)
+    if (structure.testsBeforeNestedSuites) {
+      nodes ++= nodesOfScopesAndTests.result()
+    }
+    def nestedSuitesOf(table: SuiteNodeTable): Vector[SuiteNodeTable] = {
+      val nested = structure.nestedSuites.toVector
+      nested.zipWithIndex.map { (nestedSuite, index) =>
+        val nestedId = nestedSuiteId(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
+        suite(nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
+      }
+    }
+    val table = new SuiteNodeTable(
+      Some(structure.instance),
+      id,
+      structure.name,
+      structure.suiteId,
+      structure.className,
+      parentSuite,
+      position,
+      structure.scopesAndTests,
+      scopesAndTests.ids,
+      structure.filteredTests,
+      nestedSuitesOf
+    )
+    if (!structure.testsBeforeNestedSuites) {
+      nodes ++= nodesOfScopesAndTests.result()
+    }
+    table
+  }
+
+  /** Adds scopes and tests to a structure's nodes, each taking its node path below the suite node `suite`. */
+  private final class ScopesAndTests(known: ScopeAndTestIds, suite: NodeId, nodes: mutable.Builder[StructureNode, Vector[StructureNode]]) {
 
     private var added = known
 
@@ -265,14 +302,14 @@ private[scalatest] object SuiteNodeTable {
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
         case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label), index)) =>
-          val id = added.tests.getOrElse(testName, mint())
+          val id = NodeId(suite.places :+ NodePlace.Test(testName))
           nodes += StructureNode.Test(id, parent, firstPosition + index, name, label)
           added = added.copy(tests = added.tests.updated(testName, id), parents = added.parents.updated(id, parent))
           scopesSoFarByText
         case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), index)) =>
           val place = scopesSoFarByText.getOrElse(text, 0)
+          val id = NodeId(parent.places :+ NodePlace.Scope(text, place))
           val path = pathOfParent :+ ScopePlace(text, place)
-          val id = added.scopes.getOrElse(path, mint())
           nodes += StructureNode.Scope(id, parent, firstPosition + index, name, label)
           added = added.copy(scopes = added.scopes.updated(path, id), parents = added.parents.updated(id, parent))
           add(scopesAndTests, id, 0, path)

@@ -87,17 +87,20 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
   private val runCompleted = TestEventLogLine.runEvent("RunCompleted")
   private val runEndedCompleted = TestEventLogLine.runEnded("completed")
 
-  /** A Framework run of one suite, node 1, whose one test is node 2. */
-  private def frameworkRunOfOneTest(suiteName: String, suiteClassName: String, testName: String, eventsOfTest: String*): List[String] = {
+  /** A Framework run of one top-level suite with one test, each of the test's events given the test's node path. */
+  private def frameworkRunOfOneTest(suiteName: String, suiteClassName: String, testName: String, eventsOfTest: (NodePath => String)*): List[String] = {
+    val suite = NodePath.topLevel(suiteClassName)
+    val test = suite.test(testName)
     List(
       runStarted,
       runStartingOfFramework,
-      TestEventLogLine.structure(TestEventLogLine.suite(1, suiteName, suiteClassName), TestEventLogLine.test(2, 1, 0, testName, s"- $testName")),
-      TestEventLogLine.suiteEvent(1, 1, "SuiteStarting")
-    ) ++ eventsOfTest ++ List(TestEventLogLine.suiteEvent(1, 1, "SuiteCompleted"), runCompleted, runEndedCompleted)
+      TestEventLogLine.structure(TestEventLogLine.suite(suiteName, suiteClassName), TestEventLogLine.test(test, suite, 0, testName, s"- $testName")),
+      TestEventLogLine.nodeEvent(suite, List(1), "SuiteStarting")
+    ) ++ eventsOfTest.map(_(test)) ++ List(TestEventLogLine.nodeEvent(suite, List(1), "SuiteCompleted"), runCompleted, runEndedCompleted)
   }
 
-  private def ofTest(eventName: String, fields: String = ""): String = TestEventLogLine.scopeOrTestEvent(2, 1, 1, eventName, fields)
+  private def ofTest(eventName: String, fields: String = ""): NodePath => String =
+    test => TestEventLogLine.nodeEvent(test, List(1, 1), eventName, fields)
 
   private def notationOfOneTest(suiteName: String, suiteClassName: String, testName: String, eventsOfTest: String*): String = {
     s"""
@@ -148,7 +151,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     checkRun: (Vector[Event], Vector[TestEventLogEvent]) => Unit = (_, _) => ()
   ): Unit = {
     Scenario(scenario) {
-      pending
       thisProcess
       Given(suite)
       When("Framework runs it without the runner argument")
@@ -175,7 +177,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
-      pending
       When("the decoder is given the lines of that event log")
       val events = decodedOrFail(stated.linesTheDecoderReads.getOrElse(stated.eventLogInFormat))
 
@@ -346,7 +347,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     )
 
     Scenario("The decoder reads the frames of each throwable of a cause chain with a suppressed throwable") {
-      pending
       val frame = """{"className":"samples.ThrowSuite","methodName":"f","fileName":"ThrowSuite.scala","lineNumber":9,"text":"samples.ThrowSuite.f(ThrowSuite.scala:9)"}"""
       val stated = throwSuite(
         """java.lang.IllegalStateException "outer" frames ["samples.ThrowSuite.f(ThrowSuite.scala:9)"] """ +
@@ -404,7 +404,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     )
 
     Scenario("The decoder reads a StackDepth exception's pathname") {
-      pending
       When("the decoder is given the lines of an event log whose TestFailedException gives the failed code's pathname")
       val events = decodedOrFail(
         frameworkRunOfOneTest(

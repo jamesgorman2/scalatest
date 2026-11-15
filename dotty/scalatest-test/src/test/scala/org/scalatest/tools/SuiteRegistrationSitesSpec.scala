@@ -16,6 +16,8 @@ import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
 import org.scalatest.Suites
 import org.scalatest.events.Event
+import org.scalatest.events.NodeId
+import org.scalatest.events.NodePlace
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.SuiteCompleted
@@ -316,25 +318,29 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   "A suite whose nested suites Suite.runNestedSuites hands to a distributor" should {
     "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
-      pending
       val suite = new samples.OuterSuites
       val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper, distributor = Some(RunningEachSuiteAtOnce))))
+      val top = NodePath.topLevel("samples.OuterSuites")
+      val inner1 = top.suite("samples.Inner1Suite")
+      val inner2 = top.suite("samples.Inner2Suite")
+      val innerOne = inner1.test("inner one")
+      val innerTwo = inner2.test("inner two")
       val stated = List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite(1, "OuterSuites", "samples.OuterSuites"),
-          TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
-          TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
-          TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
-          TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
+          TestEventLogLine.suite("OuterSuites", "samples.OuterSuites"),
+          TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(innerTwo, inner2, 0, "inner two", "- inner two")
         ),
-        TestEventLogLine.suiteEvent(2, 1, "SuiteStarting"),
-        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
-        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
-        TestEventLogLine.suiteEvent(2, 1, "SuiteCompleted"),
-        TestEventLogLine.suiteEvent(4, 1, "SuiteStarting"),
-        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestStarting"),
-        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestSucceeded"),
-        TestEventLogLine.suiteEvent(4, 1, "SuiteCompleted")
+        TestEventLogLine.nodeEvent(inner1, List(1, 1), "SuiteStarting"),
+        TestEventLogLine.nodeEvent(innerOne, List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(innerOne, List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.nodeEvent(inner1, List(1, 1), "SuiteCompleted"),
+        TestEventLogLine.nodeEvent(inner2, List(1, 1), "SuiteStarting"),
+        TestEventLogLine.nodeEvent(innerTwo, List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(innerTwo, List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.nodeEvent(inner2, List(1, 1), "SuiteCompleted")
       )
       StatedLines.mismatchWhenIs(lines, stated) shouldBe None
     }
@@ -383,47 +389,56 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   "A suite mixing in OneInstancePerTest" should {
     "send each test's events from the instance it runs the test in to the test's node, in the execution of the run that created that instance" in {
-      pending
       val suite = new StackPerTestFunSpec
       val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
+      val top = NodePath.topLevel("org.scalatest.samples.StackPerTestFunSpec")
+      val aStack = top.scope("A Stack")
+      val isEmpty = top.test("A Stack is empty")
+      val pops = top.test("A Stack pops")
       val stated = List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite(1, "StackPerTestFunSpec", "org.scalatest.samples.StackPerTestFunSpec"),
-          TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
-          TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
-          TestEventLogLine.test(4, 2, 1, "pops", "- pops")
+          TestEventLogLine.suite("StackPerTestFunSpec", "org.scalatest.samples.StackPerTestFunSpec"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
+          TestEventLogLine.test(pops, aStack, 1, "pops", "- pops")
         ),
-        TestEventLogLine.scopeOrTestEvent(2, 1, 1, "ScopeOpened"),
-        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
-        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
-        TestEventLogLine.scopeOrTestEvent(4, 1, 1, "TestStarting"),
-        TestEventLogLine.scopeOrTestEvent(4, 1, 1, "TestSucceeded"),
-        TestEventLogLine.scopeOrTestEvent(2, 1, 1, "ScopeClosed")
+        TestEventLogLine.nodeEvent(aStack, List(1, 1), "ScopeOpened"),
+        TestEventLogLine.nodeEvent(isEmpty, List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(isEmpty, List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.nodeEvent(pops, List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(pops, List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.nodeEvent(aStack, List(1, 1), "ScopeClosed")
       )
       StatedLines.mismatchWhenIs(lines, stated) shouldBe None
     }
   }
 
   "A suite whose scope's events a TestSortingReporter holds back until its test completes" should {
-    def scopeAndItsTest(suite: Suite, eventsInOrderHandedOff: List[(Long, String)]): List[String] = {
+    // Each event handed off is named by the text of its scope or test: "s" or "t".
+    def scopeAndItsTest(suite: Suite, eventsInOrderHandedOff: List[(String, String)]): List[String] = {
+      val top = NodePath.topLevel(suite.getClass.getName)
+      val s = top.scope("s")
+      val t = top.test("s t")
+      val nodes = Map("s" -> (s, List(1, 1)), "t" -> (t, List(1, 1, 1)))
       TestEventLogLine.structure(
-        TestEventLogLine.suite(1, suite.suiteName, suite.getClass.getName),
-        TestEventLogLine.scope(2, 1, 0, "s", "s"),
-        TestEventLogLine.test(3, 2, 0, "t", "- t")
-      ) :: eventsInOrderHandedOff.map((node, eventName) => TestEventLogLine.scopeOrTestEvent(node, 1, 1, eventName))
+        TestEventLogLine.suite(suite.suiteName, suite.getClass.getName),
+        TestEventLogLine.scope(s, 0, "s", "s"),
+        TestEventLogLine.test(t, s, 0, "t", "- t")
+      ) :: eventsInOrderHandedOff.map { (node, eventName) =>
+        val (path, executions) = nodes(node)
+        TestEventLogLine.nodeEvent(path, executions, eventName)
+      }
     }
 
-    val scopeClosedBeforeItsTest = List(2L -> "ScopeOpened", 2L -> "ScopeClosed", 3L -> "TestStarting", 3L -> "TestSucceeded")
+    val scopeClosedBeforeItsTest = List("s" -> "ScopeOpened", "s" -> "ScopeClosed", "t" -> "TestStarting", "t" -> "TestSucceeded")
 
     "hand the scope's events off as they are sent, where it mixes in RandomTestOrder" in {
-      pending
       val suite = new ScopedRandomOrderFunSpec
       val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
       StatedLines.mismatchWhenIs(lines, scopeAndItsTest(suite, scopeClosedBeforeItsTest)) shouldBe None
     }
 
     "hand the scope's events off as they are sent, where it mixes in ParallelTestExecution and its test runs once its run has returned" in {
-      pending
       val suite = new ScopedParallelFunSpec
       val distributor = new RunningEachSuiteWhenAsked
       val lines = linesWrittenRunning(suite) { wrapper =>
@@ -434,13 +449,12 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
 
     "hand the scope's events off as they are sent, where it is of an async style and its test completes once its run has returned" in {
-      pending
       val suite = new ScopedQueueingAsyncFunSpec
       val lines = linesWrittenRunning(suite) { wrapper =>
         suite.run(None, Args(wrapper))
         suite.queueing.runQueued()
       }
-      val scopeClosedWhileItsTestRuns = List(2L -> "ScopeOpened", 3L -> "TestStarting", 2L -> "ScopeClosed", 3L -> "TestSucceeded")
+      val scopeClosedWhileItsTestRuns = List("s" -> "ScopeOpened", "t" -> "TestStarting", "s" -> "ScopeClosed", "t" -> "TestSucceeded")
       StatedLines.mismatchWhenIs(lines, scopeAndItsTest(suite, scopeClosedWhileItsTestRuns)) shouldBe None
     }
   }
@@ -452,12 +466,12 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       "is of an async style" -> (() => new SendsFromRunTestsAsyncSuite)
     ).foreach { (kind, sample) =>
       s"hand off, assigned to that test, a message sent through the reporter its runTests is given, where it $kind" in {
-        pending
         val suite = sample()
         val lines = linesWrittenRunning(suite)(wrapper => suite.run(Some("t"), Args(wrapper, distributedTestSorter = Some(sortingNoEventOn))))
+        val top = NodePath.topLevel(suite.getClass.getName)
         val stated = List(
-          TestEventLogLine.structure(TestEventLogLine.suite(1, suite.suiteName, suite.getClass.getName), TestEventLogLine.test(2, 1, 0, "t", "- t")),
-          TestEventLogLine.scopeOrTestEvent(2, 1, 1, "InfoProvided", """"message":"sent by runTests",""")
+          TestEventLogLine.structure(TestEventLogLine.suite(suite.suiteName, suite.getClass.getName), TestEventLogLine.test(top.test("t"), top, 0, "t", "- t")),
+          TestEventLogLine.nodeEvent(top.test("t"), List(1, 1), "InfoProvided", """"message":"sent by runTests",""")
         )
         StatedLines.mismatchWhenIs(lines, stated) shouldBe None
       }
@@ -477,7 +491,9 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
         SuiteRegistration.madeWith(first).remove()
         SuiteRegistration.madeWith(second).remove()
       }
-      val nodesOfFirstStructure = Set(1L, 2L, 3L).map(MintedNodeId(_))
+      val firstTop = NodePlace.Suite(suite.suiteId, 0)
+      val nodesOfFirstStructure =
+        Set(NodeId(Vector(firstTop)), NodeId(Vector(firstTop, NodePlace.Scope("s", 0))), NodeId(Vector(firstTop, NodePlace.Test("s t"))))
       val events = eventLog.writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n"))).collect {
         case Right(TestEventLogEvent.ScalaTestEvent(execution, event)) => (execution.exists(assigned => nodesOfFirstStructure.contains(assigned.node)), event.getClass.getSimpleName)
       }
@@ -487,7 +503,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   "A suite whose nested suites StepwiseNestedSuiteExecution.runNestedSuites runs" should {
     "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
-      pending
       val eventLog = new RecordingEventLog
       val suite = new samples.StepwiseOuterSuites
       val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
@@ -496,22 +511,27 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       } finally {
         SuiteRegistration.madeWith(wrapper).remove()
       }
+      val top = NodePath.topLevel("samples.StepwiseOuterSuites")
+      val inner1 = top.suite("samples.Inner1Suite")
+      val inner2 = top.suite("samples.Inner2Suite")
+      val innerOne = inner1.test("inner one")
+      val innerTwo = inner2.test("inner two")
       val stated = List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite(1, "StepwiseOuterSuites", "samples.StepwiseOuterSuites"),
-          TestEventLogLine.nestedSuite(2, 1, 0, "Inner1Suite", "samples.Inner1Suite"),
-          TestEventLogLine.test(3, 2, 0, "inner one", "- inner one"),
-          TestEventLogLine.nestedSuite(4, 1, 1, "Inner2Suite", "samples.Inner2Suite"),
-          TestEventLogLine.test(5, 4, 0, "inner two", "- inner two")
+          TestEventLogLine.suite("StepwiseOuterSuites", "samples.StepwiseOuterSuites"),
+          TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
+          TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
+          TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
+          TestEventLogLine.test(innerTwo, inner2, 0, "inner two", "- inner two")
         ),
-        TestEventLogLine.suiteEvent(2, 1, "SuiteStarting"),
-        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestStarting"),
-        TestEventLogLine.scopeOrTestEvent(3, 1, 1, "TestSucceeded"),
-        TestEventLogLine.suiteEvent(2, 1, "SuiteCompleted"),
-        TestEventLogLine.suiteEvent(4, 1, "SuiteStarting"),
-        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestStarting"),
-        TestEventLogLine.scopeOrTestEvent(5, 1, 1, "TestSucceeded"),
-        TestEventLogLine.suiteEvent(4, 1, "SuiteCompleted")
+        TestEventLogLine.nodeEvent(inner1, List(1, 1), "SuiteStarting"),
+        TestEventLogLine.nodeEvent(innerOne, List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(innerOne, List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.nodeEvent(inner1, List(1, 1), "SuiteCompleted"),
+        TestEventLogLine.nodeEvent(inner2, List(1, 1), "SuiteStarting"),
+        TestEventLogLine.nodeEvent(innerTwo, List(1, 1, 1), "TestStarting"),
+        TestEventLogLine.nodeEvent(innerTwo, List(1, 1, 1), "TestSucceeded"),
+        TestEventLogLine.nodeEvent(inner2, List(1, 1), "SuiteCompleted")
       )
       StatedLines.mismatchWhenIs(eventLog.writes.map(_.stripSuffix("\n")), stated) shouldBe None
     }
@@ -519,7 +539,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   "A path suite whose run is called twice" should {
     "send the events of its second run in a second execution of each of its scopes and tests" in {
-      pending
       val eventLog = new RecordingEventLog
       val suite = new samples.StackPathFunSpec
       val wrapper = TestEventLogEmitter.appendingTo(eventLog).wrapperOfTopLevelSuite(suite, Filter.default, passingNoEventOn)
@@ -529,26 +548,31 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       } finally {
         SuiteRegistration.madeWith(wrapper).remove()
       }
+      val top = NodePath.topLevel("samples.StackPathFunSpec")
+      val aStack = top.scope("A Stack")
+      val isEmpty = top.test("A Stack is empty")
+      val whenFull = aStack.scope("when full")
+      val pops = top.test("A Stack when full pops")
       def eventsOfRun(execution: Int): List[String] = {
-        def inRun(node: Long, eventName: String): String = TestEventLogLine.scopeOrTestEvent(node, execution, execution, eventName)
+        def inRun(node: NodePath, depth: Int, eventName: String): String = TestEventLogLine.nodeEvent(node, List.fill(depth)(execution), eventName)
         List(
-          inRun(2, "ScopeOpened"),
-          inRun(3, "TestStarting"),
-          inRun(3, "TestSucceeded"),
-          inRun(4, "ScopeOpened"),
-          inRun(5, "TestStarting"),
-          inRun(5, "TestSucceeded"),
-          inRun(4, "ScopeClosed"),
-          inRun(2, "ScopeClosed")
+          inRun(aStack, 2, "ScopeOpened"),
+          inRun(isEmpty, 3, "TestStarting"),
+          inRun(isEmpty, 3, "TestSucceeded"),
+          inRun(whenFull, 3, "ScopeOpened"),
+          inRun(pops, 4, "TestStarting"),
+          inRun(pops, 4, "TestSucceeded"),
+          inRun(whenFull, 3, "ScopeClosed"),
+          inRun(aStack, 2, "ScopeClosed")
         )
       }
       val structure =
         TestEventLogLine.structure(
-          TestEventLogLine.suite(1, "StackPathFunSpec", "samples.StackPathFunSpec"),
-          TestEventLogLine.scope(2, 1, 0, "A Stack", "A Stack"),
-          TestEventLogLine.test(3, 2, 0, "is empty", "- is empty"),
-          TestEventLogLine.scope(4, 2, 1, "when full", "when full"),
-          TestEventLogLine.test(5, 4, 0, "pops", "- pops")
+          TestEventLogLine.suite("StackPathFunSpec", "samples.StackPathFunSpec"),
+          TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
+          TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
+          TestEventLogLine.scope(whenFull, 1, "when full", "when full"),
+          TestEventLogLine.test(pops, whenFull, 0, "pops", "- pops")
         )
       StatedLines.mismatchWhenIs(eventLog.writes.map(_.stripSuffix("\n")), structure :: eventsOfRun(1) ::: eventsOfRun(2)) shouldBe None
     }

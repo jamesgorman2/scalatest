@@ -1,7 +1,6 @@
 package org.scalatest.events
 
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.tools.MintedNodeId
 import org.scalatest.wordspec.AnyWordSpec
 
 final class ConsolidationTestSupportSpec extends AnyWordSpec with Matchers {
@@ -25,7 +24,7 @@ final class ConsolidationTestSupportSpec extends AnyWordSpec with Matchers {
           BuiltRunItem.Event(
             BuiltEvent(
               "suite \"DivideSuite\": SuiteStarting",
-              TestEventLogEvent.ScalaTestEvent(Some(NodeExecution(MintedNodeId(1), Vector(1))), DecodedEvent.SuiteStarting(None, "main", 0L)),
+              TestEventLogEvent.ScalaTestEvent(Some(NodeExecution(NodeId(Vector(NodePlace.Suite("samples.DivideSuite", 0))), Vector(1))), DecodedEvent.SuiteStarting(None, "main", 0L)),
               FixedParts.none
             )
           ),

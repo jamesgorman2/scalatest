@@ -15,7 +15,6 @@ import org.scalatest.SuiteRegistrations
 import org.scalatest.events.EncodedEvent
 import org.scalatest.events.Event
 import org.scalatest.events.NodeExecution
-import org.scalatest.events.NodeId
 import scala.jdk.CollectionConverters.*
 
 /** The suite, scope or test of a suite's registration tree that an event is for. */
@@ -496,11 +495,11 @@ private[scalatest] final class RegisteredSuite private (
   def isOf(suite: Suite): Boolean = instance eq suite
 
   /**
-   * Mints a suite node for this unplaced instance, nested directly in `parent`, with the suite ID and name its run
+   * Adds a suite node for this unplaced instance, nested directly in `parent`, with the suite ID and name its run
    * read and its own class name. Called under the emitter's lock and `UnplacedSuites`' lock.
    */
-  def mintedBelow(parent: SuiteNodeTable, mint: () => NodeId): SuiteNodeTable =
-    parent.mintNestedSuite(Some(instance), suiteNameOfRun, suiteIdRead.getOrElse(parent.suiteId), Suite.getSuiteClassName(instance), mint)
+  def nestedSuiteBelow(parent: SuiteNodeTable): SuiteNodeTable =
+    parent.addNestedSuite(Some(instance), suiteNameOfRun, suiteIdRead.getOrElse(parent.suiteId), Suite.getSuiteClassName(instance))
 
   /**
    * Places this unplaced instance: from now on its events go to `emitter`, assigned to the nodes of `table`. Returns
