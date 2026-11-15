@@ -233,7 +233,10 @@ private[scalatest] object SuiteStart {
       def run(run: => Status): Status = InvocationContext.cleared(run)
     }
 
-  /** The start of a suite in the context the site finds, which takes the names it reads where it is the suite's run. */
+  /**
+   * The start of a suite in the context the site finds. Where that context is the suite's run, it keeps the names
+   * the site reads.
+   */
   def inTheContextItFinds(suite: Suite, suiteReporter: Reporter): SuiteStart =
     new SuiteStart {
       def reporter: Reporter = suiteReporter

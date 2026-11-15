@@ -161,7 +161,7 @@ private[scalatest] final class RegisteredSuite(
   private var emitterReadsSuiteId = false
   // The first suite ID the instance's run read, kept until the node is fixed from it.
   private var suiteIdItsRunRead = Option.empty[String]
-  // The registration of the suite this instance is, whose run this instance's run is.
+  // Where this instance's run is that of the suite it started in, that suite's registration.
   private var runOfSuite = Option.empty[RegisteredSuite]
   private var executionOfLatestRun = Option.empty[Execution]
   private var startsARunOnceNodeIsFixed = false

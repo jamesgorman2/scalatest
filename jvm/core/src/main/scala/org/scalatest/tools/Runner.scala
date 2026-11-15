@@ -1165,7 +1165,7 @@ object Runner {
     def testEventLogHandOffFor(suite: Suite): Event => Unit =
       if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
 
-    // A DiscoverySuite is no top-level suite, and runs in no invocation context: the suites it nests are top-level, and it starts each.
+    // A DiscoverySuite is not a top-level suite and runs in no invocation context: the suites it nests are top-level, and it starts each.
     def startOfTopLevelSuiteFor(suite: Suite): (Suite, Filter, Reporter) => SuiteStart =
       if (suite.isInstanceOf[DiscoverySuite]) TestEventLogHandOff.startWithoutEventLog else startOfTopLevelSuite
 

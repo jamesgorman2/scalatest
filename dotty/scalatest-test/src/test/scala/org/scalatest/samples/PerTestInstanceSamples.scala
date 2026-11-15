@@ -29,7 +29,7 @@ object PerTestInstances {
 
   def recordRanItsTest(suite: Suite): Unit = ranItsTest.add(suite -> RegistrationInContext.ofCallingThread)
 
-  /** Returns the instances that ran a test in the runs `launch` starts, each with the registration it had as it ran it. Callers record one at a time. */
+  /** Returns the instances that ran a test in the runs `launch` starts, each with the registration it had as it ran it. One call records at a time. */
   def recordedIn(launch: => Unit): Vector[(Suite, SuiteRegistration)] = synchronized {
     ranItsTest.clear()
     launch

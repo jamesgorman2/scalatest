@@ -41,8 +41,8 @@ private[scalatest] class ConcurrentDistributor(args: Args, execSvc: ExecutorServ
     apply(suite, args, handOffToTestEventLog, TestEventLogHandOff.startInTheContextItFinds)
 
   /**
-   * Runs the suite as `startOfSuite` starts it, asked for as the suite starts, on a thread of the pool and in the
-   * invocation context the suite is handed in.
+   * Runs the suite on a thread of the pool, in the invocation context the suite is handed in, as `startOfSuite`
+   * starts it. `startOfSuite` is called as the suite starts.
    */
   def apply(suite: Suite, args: Args, handOffToTestEventLog: Event => Unit, startOfSuite: (Suite, Filter, Reporter) => SuiteStart): Status = {
     requireNonNull(suite, args)
