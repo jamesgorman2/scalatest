@@ -45,6 +45,44 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |      {green}- inner two{reset}""".stripExpectedMargin
     }
 
+    Scenario("A suite a test ran sits under the test's line") {
+      Given("an event log of a test that ran a helper suite, followed by a test that ran none")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "uses a helper", label "- uses a helper"
+            test "stands alone", label "- stands alone"
+        suite "OuterSuite": SuiteStarting
+        test "uses a helper": TestStarting
+        structure under test "uses a helper"
+          suite "HelperSuite", class "samples.HelperSuite"
+            test "helps", label "- helps"
+        suite "HelperSuite": SuiteStarting
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        suite "HelperSuite": SuiteCompleted
+        test "uses a helper": TestSucceeded
+        test "stands alone": TestStarting
+        test "stands alone": TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the helper suite's name line sits under the line of the test that ran it, with its test under it")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuite:{reset}
+          |    {green}- uses a helper{reset}
+          |      {green}HelperSuite:{reset}
+          |        {green}- helps{reset}
+          |    {green}- stands alone{reset}""".stripExpectedMargin
+    }
+
     Scenario("A scope's or test's line shows its label, with or without a leading `- `, never its name") {
       Given("an event log of a WordSpec and a FeatureSpec, whose labels differ from their names")
       val eventLog =
@@ -272,6 +310,50 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       val suiteA = "  {green}SameSuite:{reset}\n    {green}- in a{reset}"
       val suiteB = "  {green}SameSuite:{reset}\n    {green}- in b{reset}"
       output should (equal(s"{cyan}[core.test]{reset}\n$suiteA\n$suiteB") or equal(s"{cyan}[core.test]{reset}\n$suiteB\n$suiteA"))
+    }
+
+    Scenario("A nested suite that ran twice in one run of its parent sits directly after the sibling sharing its suite ID") {
+      Given("an event log of a suite whose first nested suite ran a second time, before the second nested suite")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuites", class "samples.OuterSuites"
+            suite "Inner1Suite", class "samples.Inner1Suite"
+              test "inner one", label "- inner one"
+              test "inner more", label "- inner more"
+            suite "Inner2Suite", class "samples.Inner2Suite"
+              test "inner two", label "- inner two"
+        suite "OuterSuites": SuiteStarting
+        test "inner one" #1: TestStarting
+        test "inner one" #1: TestSucceeded
+        test "inner more": TestStarting
+        test "inner more": TestSucceeded
+        structure under suite "OuterSuites"
+          suite "Inner1Suite" #2, class "samples.Inner1Suite"
+            test "inner one", label "- inner one"
+        test "inner one" #2: TestStarting
+        test "inner one" #2: TestSucceeded
+        test "inner two": TestStarting
+        test "inner two": TestSucceeded
+        suite "OuterSuites": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the second run of the first nested suite follows the first, with the tests its own structure gives it")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuites:{reset}
+          |    {green}Inner1Suite:{reset}
+          |      {green}- inner one{reset}
+          |      {green}- inner more{reset}
+          |    {green}Inner1Suite:{reset}
+          |      {green}- inner one{reset}
+          |    {green}Inner2Suite:{reset}
+          |      {green}- inner two{reset}""".stripExpectedMargin
     }
   }
 }

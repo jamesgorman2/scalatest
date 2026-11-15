@@ -247,4 +247,45 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {green}- third{reset}""".stripExpectedMargin
     }
   }
+
+  Feature("A test's messages sit among the suites it ran") {
+
+    Scenario("A test's message sits after the suites it had started when the message arrived, and before the next, below its failure") {
+      Given("an event log of a test that sends an info, runs a helper suite, sends another info, then fails")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "uses a helper", label "- uses a helper"
+        suite "OuterSuite": SuiteStarting
+        test "uses a helper": TestStarting
+        test "uses a helper": InfoProvided(message: "before")
+        structure under test "uses a helper"
+          suite "HelperSuite", class "samples.HelperSuite"
+            test "helps", label "- helps"
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        test "uses a helper": InfoProvided(message: "after")
+        test "uses a helper": TestFailed(throwable: java.lang.IllegalStateException "not helped")
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the failure's lines come first, then the info sent before the helper suite, the suite, and the info sent after it")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuite:{reset}
+          |    {red}- uses a helper *** FAILED ***{reset}
+          |      {red}java.lang.IllegalStateException: not helped{reset}
+          |        {red}...{reset}
+          |      {green}[info] before{reset}
+          |      {green}HelperSuite:{reset}
+          |        {green}- helps{reset}
+          |      {green}[info] after{reset}""".stripExpectedMargin
+    }
+  }
 }

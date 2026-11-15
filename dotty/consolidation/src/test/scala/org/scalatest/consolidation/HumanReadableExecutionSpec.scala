@@ -201,10 +201,96 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {red}- grows *** NOT RUN ***{reset}""".stripExpectedMargin
     }
 
-    Scenario("A suite run from two tests shows its name line once, and no abort line, though no event is assigned to it") {
-      // Pending until the task "Suites under tests and execution paths in the output", which rewrites this test.
-      pending
-      Given("an event log of a nested suite whose scope two tests of the suite nesting it each ran")
+    Scenario("A suite a test ran in each of its two executions shows its name line under each, and no abort line, though no event is assigned to it") {
+      Given("an event log of a test that ran a helper suite, failed, then ran it again and succeeded")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "flaky", label "- flaky"
+        suite "OuterSuite": SuiteStarting
+        test "flaky": TestStarting
+        structure under test "flaky"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        test "flaky": TestFailed
+        test "flaky" execution 2: TestStarting
+        scope "A helper" execution 2, in suite "HelperSuite" execution 2: ScopeOpened
+        test "helps" execution 2: TestStarting
+        test "helps" execution 2: TestSucceeded
+        scope "A helper" execution 2: ScopeClosed
+        test "flaky" execution 2: TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("each execution of the test holds the helper suite's name line, with the helper's execution that ran in it")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuite:{reset}
+          |    {red}- flaky *** FAILED ***{reset}
+          |      {green}HelperSuite:{reset}
+          |        {green}A helper{reset}
+          |          {green}- helps{reset}
+          |    {green}- flaky{reset}
+          |      {green}HelperSuite:{reset}
+          |        {green}A helper{reset}
+          |          {green}- helps{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite that ran twice in one execution of the test that ran it shows its name line once, with both executions under it") {
+      Given("an event log of a test that ran a helper suite twice")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "uses a helper", label "- uses a helper"
+        suite "OuterSuite": SuiteStarting
+        test "uses a helper": TestStarting
+        structure under test "uses a helper"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper": ScopeOpened
+        test "helps": TestStarting
+        test "helps": TestSucceeded
+        scope "A helper": ScopeClosed
+        scope "A helper" execution 2, in suite "HelperSuite" execution 2: ScopeOpened
+        test "helps" execution 2: TestStarting
+        test "helps" execution 2: TestSucceeded
+        scope "A helper" execution 2: ScopeClosed
+        test "uses a helper": TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the helper suite's name line sits once under the test, followed by what each of its executions produced")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuite:{reset}
+          |    {green}- uses a helper{reset}
+          |      {green}HelperSuite:{reset}
+          |        {green}A helper{reset}
+          |          {green}- helps{reset}
+          |        {green}A helper{reset}
+          |          {green}- helps{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite that each of two tests ran sits under each test's line, as two nodes") {
+      Given("an event log of two tests that each ran a helper suite of one class")
       val eventLog =
         """
         run started
@@ -214,20 +300,24 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
             test "second", label "- second"
         suite "OuterSuite": SuiteStarting
         test "first": TestStarting
-        structure under suite "OuterSuite"
+        structure under test "first"
           suite "HelperSuite", class "samples.HelperSuite"
             scope "A helper", label "A helper"
               test "helps", label "- helps"
-        scope "A helper": ScopeOpened
-        test "helps": TestStarting
-        test "helps": TestSucceeded
-        scope "A helper": ScopeClosed
+        scope "A helper" #1: ScopeOpened
+        test "helps" #1: TestStarting
+        test "helps" #1: TestSucceeded
+        scope "A helper" #1: ScopeClosed
         test "first": TestSucceeded
         test "second": TestStarting
-        scope "A helper" execution 2: ScopeOpened
-        test "helps" execution 2: TestStarting
-        test "helps" execution 2: TestSucceeded
-        scope "A helper" execution 2: ScopeClosed
+        structure under test "second"
+          suite "HelperSuite", class "samples.HelperSuite"
+            scope "A helper", label "A helper"
+              test "helps", label "- helps"
+        scope "A helper" #2: ScopeOpened
+        test "helps" #2: TestStarting
+        test "helps" #2: TestSucceeded
+        scope "A helper" #2: ScopeClosed
         test "second": TestSucceeded
         suite "OuterSuite": SuiteCompleted
         run ended completed
@@ -236,17 +326,18 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the nested suite follows the tests, its name line once, with both executions of its scope under it")
+      Then("each test's line holds its own helper suite")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}OuterSuite:{reset}
           |    {green}- first{reset}
+          |      {green}HelperSuite:{reset}
+          |        {green}A helper{reset}
+          |          {green}- helps{reset}
           |    {green}- second{reset}
-          |    {green}HelperSuite:{reset}
-          |      {green}A helper{reset}
-          |        {green}- helps{reset}
-          |      {green}A helper{reset}
-          |        {green}- helps{reset}""".stripExpectedMargin
+          |      {green}HelperSuite:{reset}
+          |        {green}A helper{reset}
+          |          {green}- helps{reset}""".stripExpectedMargin
     }
 
     Scenario("A suite that ran twice shows its name line once, then what each execution produced, in the order they started") {

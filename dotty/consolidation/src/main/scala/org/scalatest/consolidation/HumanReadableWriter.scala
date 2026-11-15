@@ -78,7 +78,7 @@ private[consolidation] object HumanReadableWriter {
   }
 
   // A suite shows its name line once, then what each of its executions produced. A scope or test shows a line for
-  // each execution.
+  // each execution, a test's failure or cancel lines before its messages and the suites it ran.
   private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
     node.node match {
       case suite: StructureNode.Suite =>
@@ -91,12 +91,12 @@ private[consolidation] object HumanReadableWriter {
         }
       case test: StructureNode.Test =>
         node.executions.flatMap { execution =>
-          testLines(test, execution, depth) ++ execution.messages.flatMap(message => messageLines(message.event, depth + 1))
+          testLines(test, execution, depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
         }
     }
 
   // A collapsed execution shows its messages alone. Any other shows each of its messages after the children that had
-  // started when it arrived.
+  // started in it when the message arrived.
   private def contentLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
     def messagesAfter(childrenBefore: Int): Vector[OutputLine] =
       execution.messages.filter(_.childrenBefore == childrenBefore).flatMap(message => messageLines(message.event, depth))
