@@ -1850,7 +1850,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       thisProcess
       Given("an AnyFunSuite whose one test sleeps 3 seconds, then succeeds")
       TemporaryEventLog.in { eventLogFile =>
-        When("Framework runs it with the runner argument, -W 1 1 and a recording reporter")
+        When("Framework runs it with the runner argument and -W 1 1")
         val events = eventsReportedWhenLaunched(Launch.ByFramework, "samples.SlowSuite", List("-W", "1", "1") ++ runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
@@ -1861,10 +1861,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         StatedLines.mismatchWhenHoldsInOrder(lines, slowSuiteAlertedWithAnyMessage) shouldBe None
         EventLogComparison.mismatchWhenHoldsInOrder(eventLog, built(slowSuiteAlerted.eventLogInNotation)) shouldBe None
 
-        And("it holds an AlertProvided assigned to the run for each one the reporter receives while the test runs, in the same order and with the same message")
-        // An alert the timer sends as the run ends can reach the reporter after the event log has closed. One the
-        // reporter receives before the test's TestSucceeded was handed off before the test ended.
-        val alertsReported = events.takeWhile(!_.isInstanceOf[TestSucceeded]).collect { case alert: AlertProvided => alert.message }
+        And("for each AlertProvided the emitter receives before the run ends, it holds one assigned to the run with that message, in the order the emitter received them")
+        // The recording reporter observes what the emitter receives. The slowpoke timer hands each alert to the
+        // emitter, then queues it for the reporters, all on its one thread, and no reporter reorders an alert assigned
+        // to no suite. So the reporter receives the alerts in the emitter's order, and each it receives before
+        // RunCompleted reached the emitter before RunCompleted did. One the timer sends as the run ends can reach the
+        // reporter only after RunCompleted, once the event log has closed.
+        val alertsReported = events.takeWhile(!_.isInstanceOf[RunCompleted]).collect { case alert: AlertProvided => alert.message }
         val alertsInEventLog = eventLog.collect { case TestEventLogEvent.ScalaTestEvent(execution, alert: DecodedEvent.AlertProvided) =>
           execution.map(_.node) -> alert.message
         }

@@ -478,7 +478,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         AnalysisFailure.reportedMessage
       ),
       { (reported, log) =>
-        And("the analysis is the one the run's reporters are told")
+        And("the analysis is that of the TestFailed the emitter receives, which the recording reporter receives too")
         val logged = decodedEventsIn(log).collectFirst { case failed: DecodedEvent.TestFailed => failed.analysis }
         logged shouldBe Some(testFailedOf(reported).analysis)
       }

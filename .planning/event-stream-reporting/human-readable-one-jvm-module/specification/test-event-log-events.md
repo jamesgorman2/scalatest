@@ -166,7 +166,7 @@ Feature: What the event log keeps of each event
         | a `StackDepth` exception                  | calls `fail("boom")` at line 7                                               | the throwable `org.scalatest.exceptions.TestFailedException "boom" at FailSuite.scala:7`, which also holds the pathname of `FailSuite.scala` |
         | a property check failure                  | runs a `forAll` from `TableDrivenPropertyChecks` whose property fails         | a throwable marked `property check`                                                                                                                         |
         | a throwable whose message is `null`       | throws `new RuntimeException()`                                              | the throwable `java.lang.RuntimeException null`                                                                                                            |
-        | an assertion with analysis                | calls `assert(Point(1, 2) == Point(1, 3))`, `Point` being a case class, for which 3.2.20's `TestFailed` carries an analysis | the `analysis` that a `-C` recording reporter in the same run receives on the test's `TestFailed`                                                         |
+        | an assertion with analysis                | calls `assert(Point(1, 2) == Point(1, 3))`, `Point` being a case class, for which 3.2.20's `TestFailed` carries an analysis | the `analysis` of the `TestFailed` the emitter receives for the test, `Point(y: 2 -> 3)`                                                                   |
 ```
 
 ## Captured output

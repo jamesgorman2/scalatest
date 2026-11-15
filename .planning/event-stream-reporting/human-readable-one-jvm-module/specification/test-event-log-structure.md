@@ -61,14 +61,14 @@ Feature: The run in its test event log
   Rule: A message no suite, scope or test sends attaches to the run (R-097)
     Scenario: AC-121 A slowpoke alert
       Given suite `SlowSuite`, class `samples.SlowSuite`, an `AnyFunSuite` whose one test, `sleeps`, labelled `- sleeps`, sleeps 3 seconds, then succeeds
-      When `Framework` runs it with the runner argument, `-W 1 1` and a `-C` recording reporter
+      When `Framework` runs it with the runner argument and `-W 1 1`
       Then the event log holds, in this order:
         """
         test "sleeps": TestStarting
         run: AlertProvided
         test "sleeps": TestSucceeded
         """
-      And it holds a `run: AlertProvided` for each `AlertProvided` the reporter receives, in the same order and with the same message, such as `Test still running after 1 second, 4 milliseconds: suite name: SlowSuite, test name: sleeps.`
+      And for each `AlertProvided` the emitter receives before the run ends, it holds a `run: AlertProvided` with that message, in the order the emitter received them, such as `Test still running after 1 second, 4 milliseconds: suite name: SlowSuite, test name: sleeps.`
       And no `AlertProvided` is assigned to test `sleeps` or suite `SlowSuite`
       And each line of its test event log decodes to one event
 ```
