@@ -11,6 +11,7 @@ import org.scalatest.events.EventLogComparison
 import org.scalatest.events.Ordinal
 import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
+import org.scalatest.events.RunStopped
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -279,6 +280,43 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
         } finally {
           endThreadsLeftByDoneThrowing(runner, subProcessServer)
         }
+      }
+    }
+  }
+
+  Feature("A run whose sub-process stops") {
+
+    Scenario("A Framework runner relays a sub-process's RunStopped and still ends its event log with its own RunCompleted") {
+      thisProcess
+      TemporaryEventLog.in { eventLogFile =>
+        Given("a Framework runner constructed with the runner argument, waiting for the events of a sub-process")
+        val runner = frameworkRunner(runnerArgument(eventLogFile))
+        val subProcessServer = runner.remoteArgs()
+
+        When("the sub-process sends RunStopped, and the runner is done")
+        val socket = new Socket(subProcessServer(0), subProcessServer(1).toInt)
+        try {
+          val events = new ObjectOutputStream(socket.getOutputStream)
+          events.writeObject(RunStopped(new Ordinal(0)))
+          events.flush()
+          runner.asInstanceOf[Framework#ScalaTestRunner].serverThread.get.foreach(_.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds)))
+        } finally {
+          socket.close()
+        }
+        runner.done()
+
+        Then("the event log is the run's start, its RunStarting, its RunCompleted and its end, completed")
+        EventLogComparison.mismatchWhenIs(
+          eventLogOf(eventLogFile),
+          built(
+            """
+            run started
+            run: RunStarting(testCount: 0)
+            run: RunCompleted
+            run ended completed
+            """
+          )
+        ) shouldBe None
       }
     }
   }

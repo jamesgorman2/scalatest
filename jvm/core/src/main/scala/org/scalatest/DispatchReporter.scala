@@ -61,6 +61,60 @@ private[scalatest] class DispatchReporter(
   def registerTestEventLogHandOff(handOffToTestEventLog: Event => Unit): Unit =
     testEventLogHandOff.set(handOffToTestEventLog)
 
+  /**
+   * Reports a closing run event of this reporter's own run and, once every reporter has it, hands off the event they
+   * received, which carries the run's summary. It returns once the event is handed off and throws what the hand-off
+   * throws, so that a hand-off throws to its send site, not on the dispatcher's thread. Closing run events relayed from
+   * another process are reported with `apply`, which hands nothing off.
+   */
+  def reportAndHandOff(closingRunEvent: Event): Unit = {
+    val handOff = testEventLogHandOff.get
+    if ((handOff eq TestEventLogHandOff.none) || isDisposed)
+      apply(closingRunEvent)
+    else {
+      val closing = new ClosingRunEventToHandOff(closingRunEvent, handOff)
+      queue.put(closing)
+      closing.awaitHandOff()
+    }
+  }
+
+  private final class ClosingRunEventToHandOff(val event: Event, handOffToTestEventLog: Event => Unit) {
+
+    private val handedOff = new java.util.concurrent.CountDownLatch(1)
+    private val thrown = new AtomicReference[Option[Throwable]](None)
+
+    def handOff(reported: Event): Unit = {
+      try handOffToTestEventLog(reported)
+      catch {
+        case uncontained: Throwable => thrown.set(Some(uncontained))
+      }
+      finally {
+        // A hand-off interrupted while encoding leaves its thread interrupted, which would end the dispatcher's next
+        // take from its queue.
+        Thread.interrupted()
+      }
+    }
+
+    def complete(): Unit = handedOff.countDown()
+
+    def awaitHandOff(): Unit = {
+      var interrupted = false
+      var waiting = true
+      while (waiting) {
+        try {
+          handedOff.await()
+          waiting = false
+        }
+        catch {
+          case _: InterruptedException => interrupted = true
+        }
+      }
+      if (interrupted)
+        Thread.currentThread().interrupt()
+      thrown.get.foreach(uncontained => throw uncontained)
+    }
+  }
+
   private case object Dispose
 
   private final val latch = new CountDownLatch(1)
@@ -170,100 +224,109 @@ private[scalatest] class DispatchReporter(
         }
       }
   
+      // Reports an event to the reporters and returns the event they received.
+      def propagate(event: Event): Event = {
+        val highestSoFar = highestOrdinalSeenSoFar.get
+        if (event.ordinal > highestSoFar)
+          highestOrdinalSeenSoFar.compareAndSet(highestSoFar, event.ordinal) // Ignore conflicts. Just let first one win and move on.
+          // The reason is that this is used to send AlertProvided events for slowpoke notifications, and these need not have the
+          // exactly the latest ordinal. So long as it is in the ballpark, that's is good enough.
+          
+        var reported = event
+        try {
+          // The event will only actually be updated if it it is a RunCompleted/Aborted/Stopped event with None
+          // as its summary and its runstamp has a counter entry. In that case, it will be given a Summary taken
+          // from the counter. (And the counter will be removed from the counterMap.) These are counted here, because
+          // they need to be counted on this side of any FilterReporters that may be in place. (In early versions of
+          // ScalaTest, these were wrongly being counted by the reporters themselves, so if a FilterReporter filtered
+          // out TestSucceeded events, then they just weren't being counted.
+          val updatedEvent =
+            event match {
+  
+              case _: RunStarting => counterMap(event.ordinal.runStamp) = new Counter; event
+
+              case ts: TestSucceeded =>
+                incrementCount(event, _.testsSucceededCount += 1)
+                fireTestFinishedIfNecessary(ts.suiteName, ts.suiteId, ts.testName)
+                event
+              case tf: TestFailed =>
+                incrementCount(event, _.testsFailedCount += 1)
+                fireTestFinishedIfNecessary(tf.suiteName, tf.suiteId, tf.testName)
+                event
+              case _: TestIgnored => incrementCount(event, _.testsIgnoredCount += 1); event
+              case tc: TestCanceled =>
+                incrementCount(event, _.testsCanceledCount += 1)
+                fireTestFinishedIfNecessary(tc.suiteName, tc.suiteId, tc.testName)
+                event
+              case tp: TestPending =>
+                incrementCount(event, _.testsPendingCount += 1)
+                fireTestFinishedIfNecessary(tp.suiteName, tp.suiteId, tp.testName)
+                event
+              case _: SuiteCompleted => incrementCount(event, _.suitesCompletedCount += 1); event
+              case _: SuiteAborted => incrementCount(event, _.suitesAbortedCount += 1); event
+              case _: ScopePending => incrementCount(event, _.scopesPendingCount += 1); event
+
+              case oldRunCompleted @ RunCompleted(ordinal, duration, summary, formatter, location, payload, threadName, timeStamp) =>
+                updatedSummary(summary, ordinal) match {
+                  case None => oldRunCompleted
+                  case newSummary @ Some(_) =>
+                    counterMap.remove(ordinal.runStamp)
+                    // Update the RunCompleted so that it is the same except it has a new Some(Summary)
+                    RunCompleted(ordinal, duration, newSummary, formatter, location, payload, threadName, timeStamp)
+                }
+    
+              case oldRunStopped @ RunStopped(ordinal, duration, summary, formatter, location, payload, threadName, timeStamp) =>
+                updatedSummary(summary, ordinal) match {
+                  case None => oldRunStopped
+                  case newSummary @ Some(_) =>
+                    counterMap.remove(ordinal.runStamp)
+                    // Update the RunStopped so that it is the same except it has a new Some(Summary)
+                    RunStopped(ordinal, duration, newSummary, formatter, location, payload, threadName, timeStamp)
+                }
+              
+              case oldRunAborted @ RunAborted(ordinal, message, throwable, duration, summary, formatter, location, payload, threadName, timeStamp) => 
+                updatedSummary(summary, ordinal) match {
+                  case None => oldRunAborted
+                  case newSummary @ Some(_) =>
+                    counterMap.remove(ordinal.runStamp)
+                    // Update the RunAborted so that it is the same except it has a new Some(Summary)
+                    RunAborted(ordinal, message, throwable, duration, newSummary, formatter, location, payload, threadName, timeStamp)
+                }
+              
+              case ts: TestStarting =>
+                slowpokeItems match {
+                  case Some((slowpokeDetector, _)) =>
+                    slowpokeDetector.testStarting(
+                      suiteName = ts.suiteName, 
+                      suiteId = ts.suiteId, 
+                      testName = ts.testName, 
+                      now()
+                    )
+                  case None =>
+                }
+                event
+              case _ => event
+            }
+          reported = updatedEvent
+          for (report <- reporters)
+            report(updatedEvent)
+        }
+        catch {
+          case e: Exception => 
+            val stringToPrint = Resources.reporterThrew(event)
+            out.println(stringToPrint)
+            e.printStackTrace(out)
+        }
+        reported
+      }
+
       while (alive) {
         queue.take() match {
+          case closing: ClosingRunEventToHandOff =>
+            try closing.handOff(propagate(closing.event))
+            finally closing.complete()
           case event: Event =>
-            val highestSoFar = highestOrdinalSeenSoFar.get
-            if (event.ordinal > highestSoFar)
-              highestOrdinalSeenSoFar.compareAndSet(highestSoFar, event.ordinal) // Ignore conflicts. Just let first one win and move on.
-              // The reason is that this is used to send AlertProvided events for slowpoke notifications, and these need not have the
-              // exactly the latest ordinal. So long as it is in the ballpark, that's is good enough.
-              
-            try {
-              // The event will only actually be updated if it it is a RunCompleted/Aborted/Stopped event with None
-              // as its summary and its runstamp has a counter entry. In that case, it will be given a Summary taken
-              // from the counter. (And the counter will be removed from the counterMap.) These are counted here, because
-              // they need to be counted on this side of any FilterReporters that may be in place. (In early versions of
-              // ScalaTest, these were wrongly being counted by the reporters themselves, so if a FilterReporter filtered
-              // out TestSucceeded events, then they just weren't being counted.
-              val updatedEvent =
-                event match {
-  
-                  case _: RunStarting => counterMap(event.ordinal.runStamp) = new Counter; event
-
-                  case ts: TestSucceeded =>
-                    incrementCount(event, _.testsSucceededCount += 1)
-                    fireTestFinishedIfNecessary(ts.suiteName, ts.suiteId, ts.testName)
-                    event
-                  case tf: TestFailed =>
-                    incrementCount(event, _.testsFailedCount += 1)
-                    fireTestFinishedIfNecessary(tf.suiteName, tf.suiteId, tf.testName)
-                    event
-                  case _: TestIgnored => incrementCount(event, _.testsIgnoredCount += 1); event
-                  case tc: TestCanceled =>
-                    incrementCount(event, _.testsCanceledCount += 1)
-                    fireTestFinishedIfNecessary(tc.suiteName, tc.suiteId, tc.testName)
-                    event
-                  case tp: TestPending =>
-                    incrementCount(event, _.testsPendingCount += 1)
-                    fireTestFinishedIfNecessary(tp.suiteName, tp.suiteId, tp.testName)
-                    event
-                  case _: SuiteCompleted => incrementCount(event, _.suitesCompletedCount += 1); event
-                  case _: SuiteAborted => incrementCount(event, _.suitesAbortedCount += 1); event
-                  case _: ScopePending => incrementCount(event, _.scopesPendingCount += 1); event
-
-                  case oldRunCompleted @ RunCompleted(ordinal, duration, summary, formatter, location, payload, threadName, timeStamp) =>
-                    updatedSummary(summary, ordinal) match {
-                      case None => oldRunCompleted
-                      case newSummary @ Some(_) =>
-                        counterMap.remove(ordinal.runStamp)
-                        // Update the RunCompleted so that it is the same except it has a new Some(Summary)
-                        RunCompleted(ordinal, duration, newSummary, formatter, location, payload, threadName, timeStamp)
-                    }
-        
-                  case oldRunStopped @ RunStopped(ordinal, duration, summary, formatter, location, payload, threadName, timeStamp) =>
-                    updatedSummary(summary, ordinal) match {
-                      case None => oldRunStopped
-                      case newSummary @ Some(_) =>
-                        counterMap.remove(ordinal.runStamp)
-                        // Update the RunStopped so that it is the same except it has a new Some(Summary)
-                        RunStopped(ordinal, duration, newSummary, formatter, location, payload, threadName, timeStamp)
-                    }
-                  
-                  case oldRunAborted @ RunAborted(ordinal, message, throwable, duration, summary, formatter, location, payload, threadName, timeStamp) => 
-                    updatedSummary(summary, ordinal) match {
-                      case None => oldRunAborted
-                      case newSummary @ Some(_) =>
-                        counterMap.remove(ordinal.runStamp)
-                        // Update the RunAborted so that it is the same except it has a new Some(Summary)
-                        RunAborted(ordinal, message, throwable, duration, newSummary, formatter, location, payload, threadName, timeStamp)
-                    }
-                  
-                  case ts: TestStarting =>
-                    slowpokeItems match {
-                      case Some((slowpokeDetector, _)) =>
-                        slowpokeDetector.testStarting(
-                          suiteName = ts.suiteName, 
-                          suiteId = ts.suiteId, 
-                          testName = ts.testName, 
-                          now()
-                        )
-                      case None =>
-                    }
-                    event
-                  case _ => event
-                }
-              if (TestEventLogHandOff.isHandedOffByDispatchReporter(updatedEvent))
-                testEventLogHandOff.get.apply(updatedEvent)
-              for (report <- reporters)
-                report(updatedEvent)
-            }
-            catch {
-              case e: Exception => 
-                val stringToPrint = Resources.reporterThrew(event)
-                out.println(stringToPrint)
-                e.printStackTrace(out)
-            }
+            propagate(event)
           case Dispose =>
             try {
               for (reporter <- reporters)

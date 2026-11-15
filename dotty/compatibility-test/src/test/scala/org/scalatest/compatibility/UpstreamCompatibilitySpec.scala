@@ -228,6 +228,20 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         And("this fork accepts it")
         isAccepted(outcome.fork) shouldBe true
       }
+
+      Scenario(s"A $launch launch rejects the runner argument without a file, or given twice") {
+        Given("an argument list that holds the runner argument's flag with no file after it, and one that holds the runner argument twice")
+        val runnerArgumentLists = List[java.nio.file.Path => Seq[String]](
+          _ => List("-o", TestEventLogArgument.flag),
+          eventLogFile => "-o" :: TestEventLogArgument.forFile(eventLogFile.toString) ::: TestEventLogArgument.forFile(eventLogFile.toString)
+        )
+
+        When(s"$launch is given each on this fork")
+        val outcomes = inParallel(runnerArgumentLists.map(arguments => () => runs.ofArgumentsNamingAFile(launch, arguments)))
+
+        Then("this fork rejects each")
+        outcomes.map(outcome => isAccepted(outcome.fork)) shouldBe List(false, false)
+      }
     }
   }
 

@@ -1157,9 +1157,12 @@ object Runner {
     var tracker = new Tracker(new Ordinal(runStamp))
 
     def sendRunEvent(event: Event): Unit = {
-      if (!TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+      if (TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+        dispatch.reportAndHandOff(event)
+      else {
         handOffToTestEventLog(event)
-      dispatch(event)
+        dispatch(event)
+      }
     }
 
     // The events SuiteRunner sends for a DiscoverySuite pass through no structure wrapper.

@@ -792,9 +792,12 @@ class Framework extends SbtFramework {
     dispatchReporter.registerTestEventLogHandOff(handOffToTestEventLog)
 
     private def sendRunEvent(event: Event): Unit = {
-      if (!TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+      if (TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+        dispatchReporter.reportAndHandOff(event)
+      else {
         handOffToTestEventLog(event)
-      dispatchReporter(event)
+        dispatchReporter(event)
+      }
     }
 
     sendRunEvent(RunStarting(tracker.nextOrdinal(), 0, configMap))
