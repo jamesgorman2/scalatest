@@ -79,9 +79,9 @@ class NonEmptyStringSpec extends UnitSpec {
     NonEmptyString("hi")(0) shouldEqual 'h'
     NonEmptyString("789")(2) shouldEqual '9'
     // SKIP-SCALATESTJS,NATIVE-START
-    the [IndexOutOfBoundsException] thrownBy { // In ScalaJs, this throws scala.scalajs.runtime.UndefinedBehaviorError
+    (the [IndexOutOfBoundsException] thrownBy { // In ScalaJs, this throws scala.scalajs.runtime.UndefinedBehaviorError
       NonEmptyString("123")(3)                 // TODO, might be nice to check for that exception on ScalaJS instead of just skipping the check
-    } should have message "String index out of range: 3"
+    }).getMessage should (equal ("String index out of range: 3") or equal ("Index 3 out of bounds for length 3")) // JDK 8, then JDK 11+
     // SKIP-SCALATESTJS,NATIVE-END
   }
   it should "have a length method" in {
