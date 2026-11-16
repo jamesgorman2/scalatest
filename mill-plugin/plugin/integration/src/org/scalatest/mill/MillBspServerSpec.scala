@@ -20,27 +20,26 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
   )
 
   /**
-   * Each request's exchange with Mill's BSP server in the `mill-own-tasks` build without the plugin, then with it. Each
+   * What a BSP client received from Mill's BSP server in the `mill-own-tasks` build without the plugin, then with it. Each
    * session sends every request in turn, on a build whose module has no output yet.
    */
-  private lazy val exchanges: Map[String, BuildComparison[BspExchange]] =
+  private lazy val sessions: BuildComparison[BspSessionRecord] =
     withTester("mill-own-tasks", daemonMode = true) { tester =>
-      val withoutPlugin = exchangeAll(tester, "without-plugin")
+      val withoutPlugin = recordSession(tester, "without-plugin")
       addPlugin(tester)
-      val withPlugin = exchangeAll(tester, "with-plugin")
-      requests.map(request => request -> BuildComparison(withoutPlugin(request), withPlugin(request))).toMap
+      BuildComparison(withoutPlugin, recordSession(tester, "with-plugin"))
     }
 
   // BSP deprecates buildTarget/scalaTestClasses, but Metals and IntelliJ still send it, and Mill still serves it.
   @nowarn("cat=deprecation")
-  private def exchangeAll(tester: IntegrationTester, build: String): Map[String, BspExchange] = {
+  private def recordSession(tester: IntegrationTester, build: String): BspSessionRecord = {
     MillBuild.removeModuleOutput(tester)
     val stderrLog = tester.workspacePath / os.up / s"${tester.workspacePath.last}-bsp-$build.log"
     try {
-      BspClientSession.withSession(tester, millExecutable, stderrLog) { session =>
+      val (responses, notifications) = BspClientSession.withSession(tester, millExecutable, stderrLog) { session =>
         val (targets, buildTargets) = session.exchange(_.workspaceBuildTargets())
         val coreTest = BspClientSession.targetsNamed("core.test", targets.toSeq.flatMap(_.getTargets.asScala))
-        withClue(buildTargets.describe) {
+        withClue(buildTargets) {
           coreTest.asScala should not be empty
         }
         val (_, scalaTestClasses) = session.exchange(_.buildTargetScalaTestClasses(new ScalaTestClassesParams(coreTest)))
@@ -48,6 +47,7 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
         val (_, test) = session.exchange(_.buildTargetTest(new TestParams(coreTest)))
         requests.zip(Seq(buildTargets, scalaTestClasses, jvmTestEnvironment, test)).toMap
       }
+      BspSessionRecord(responses, notifications)
     } finally {
       tester.removeProcessIdFile()
     }
@@ -55,23 +55,46 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
 
   Feature("In a build that adds the plugin, Mill's BSP server answers an IDE's requests as it does without it") {
 
-    requests.foreach { request =>
+    requests.filterNot(_ == testRequest).foreach { request =>
       Scenario(request) {
-        Given("core.test holds CalculatorSuite, whose test writes dividing now to stdout, and StackFlatSpec, whose test fails")
+        givenTheFixture()
         When(s"a BSP client connected to Mill's BSP server sends $request, in the build without the plugin, and in the same build with it")
-        val exchange = exchanges(request)
+        Then("the client receives the same response under both, apart from durations, timestamps and task IDs")
+        sameResponses(request)
+      }
+    }
 
-        withClue(exchange.describe(_.describe)) {
-          Then("the client receives the same response and notifications under both, apart from durations, timestamps and task IDs")
-          exchange.withPlugin.response shouldBe exchange.withoutPlugin.response
-          exchange.withPlugin.notifications shouldBe exchange.withoutPlugin.notifications
+    Scenario(s"$testRequest, which Mill 1.3.1 fails with or without the plugin") {
+      givenTheFixture()
+      When(s"a BSP client connected to Mill's BSP server sends $testRequest, in the build without the plugin, and in the same build with it")
+      Then("the client receives an error, and the same one under both")
+      sessions.withoutPlugin.responses(testRequest) should startWith("error ")
+      sameResponses(testRequest)
+    }
 
-          And("no notification under either holds [core.test] or Output outside any suite:")
-          all(exchange.withoutPlugin.notifications ++ exchange.withPlugin.notifications) should (
-            not include "[core.test]" and not include "Output outside any suite:"
-          )
-        }
+    Scenario("the notifications of a session that sends every request") {
+      givenTheFixture()
+      When("a BSP client connected to Mill's BSP server sends every request in one session, in the build without the plugin, and in the same build with it")
+      withClue(sessions.describe(_.describe)) {
+        Then("the client receives the same notifications under both, apart from durations, timestamps and task IDs")
+        sessions.withoutPlugin.notifications should not be empty
+        sessions.withPlugin.notifications shouldBe sessions.withoutPlugin.notifications
+
+        And("no notification under either holds [core.test] or Output outside any suite:")
+        all(sessions.withoutPlugin.notifications ++ sessions.withPlugin.notifications) should (
+          not include "[core.test]" and not include "Output outside any suite:"
+        )
       }
     }
   }
+
+  private def givenTheFixture(): Unit =
+    Given("core.test holds CalculatorSuite, whose test writes dividing now to stdout, and StackFlatSpec, whose test fails")
+
+  private def testRequest: String = requests.last
+
+  private def sameResponses(request: String): Unit =
+    withClue(sessions.describe(_.describe)) {
+      sessions.withPlugin.responses(request) shouldBe sessions.withoutPlugin.responses(request)
+    }
 }
