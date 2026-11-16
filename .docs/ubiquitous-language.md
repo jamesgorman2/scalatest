@@ -36,7 +36,7 @@ _Avoid_: Attempt, invocation, retry
 _Context_: A node of the test structure; unrelated to execution mode
 
 **Node**:
-A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. A node is one place in the test structure, and the times that place ran are its executions. A suite's place is its `suiteId` under the suite or test that ran it, and where siblings share that `suiteId`, its order among them: declared order in a `structure`, start order within one execution of the parent in the run. A scope's is its path in its suite, and a test's its name in its suite. Two suites with one `suiteId` at different places are two nodes. In consolidated output, the consolidation is the root, a test run label is also a node, and a run is not: its top-level suites sit directly under its test run label.
+An element in the test structure hierarchy as it is planned and executed. A single declaration (eg, suite, scope, test) may be referenced by multiple nodes when it is executed multiple times.
 _Avoid_: Element, item, entry, test case
 
 **Node path**:
