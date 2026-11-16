@@ -67,9 +67,14 @@ object plugin extends PluginScalaModule, PublishModule {
       mvn"ch.epfl.scala:bsp4j:${Versions.bsp4j}"
     )
 
-    // The fork's sbt test project for the comparison with ScalaTest 3.2.20 holds the compatibility fixture's recorders,
-    // which these tests compile.
+    // The fork's sbt test project for the comparison with ScalaTest 3.2.20 holds the compatibility fixture and its
+    // recorders. These tests compile the recorders, and copy the fixture's suites into the builds they test.
     private def compatibilityTest: os.Path = BuildCtx.workspaceRoot / os.up / "dotty" / "compatibility-test" / "src"
+
+    def compatibilityFixtureSuites: T[Seq[PathRef]] = Task.Sources(
+      compatibilityTest / "fixture" / "scala" / "compatibility" / "fixture",
+      compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "fixture"
+    )
 
     def compatibilityRecorders: T[Seq[PathRef]] = Task.Sources(
       compatibilityTest / "fixture" / "scala" / "compatibility" / "recorders",
@@ -86,7 +91,8 @@ object plugin extends PluginScalaModule, PublishModule {
       super.forkEnv() ++ Map(
         "MILL_EXECUTABLE_PATH" -> millExecutable.program().path.toString,
         "COURSIER_REPOSITORIES" -> repositories.mkString("|"),
-        "SCALATEST_MILL_VERSION" -> publishVersion()
+        "SCALATEST_MILL_VERSION" -> publishVersion(),
+        "COMPATIBILITY_FIXTURE_SUITES" -> compatibilityFixtureSuites().map(_.path.toString).mkString(java.io.File.pathSeparator)
       )
     }
 
