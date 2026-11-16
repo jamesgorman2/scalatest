@@ -7,3 +7,6 @@ scalatest.js/target/
 .DS_Store
 lowered.hnir
 .bsp/
+
+# Logs written by test-all.sh and test-all.ps1
+test-all-logs/

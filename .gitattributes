@@ -12,5 +12,5 @@
 *.html text
 *.htm text
 *.txt text
-*.sh text
+*.sh text eol=lf
 *.bnd text
