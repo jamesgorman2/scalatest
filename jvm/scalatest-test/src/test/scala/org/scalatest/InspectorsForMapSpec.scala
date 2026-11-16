@@ -63,8 +63,8 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         }
         e.failedCodeFileName should be (Some("InspectorsForMapSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAll failed, because: \n" +
-                                   "  at key 2, \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                   "  at key 2, \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -87,8 +87,8 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         }
         e2.failedCodeFileName should be (Some("InspectorsForMapSpec.scala"))
         e2.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e2.message should be (Some("forAll failed, because: \n" +
-                                    "  at key 2, \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e2.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                    "  at key 2, \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                     "in " + decorateToStringValue(prettifier, col)))
         e2.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -149,9 +149,9 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val second = getNext(itr, predicate)._1
         val secondValue = col(second)
         val secondExpectedValue = standardMap(second)
-        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: \n" +
-                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), \n" +
-                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") \n" +
+        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), " + Prettifier.lineSeparator +
+                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -177,10 +177,10 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val third = itr.next._1
         val thirdValue = col(third)
         val thirdExpectedValue = standardMap(third)
-        e.message should be (Some("forAtLeast(2) failed, because no element satisfied the assertion block: \n" +
-                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), \n" +
-                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), \n" +
-                                   "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") \n" +
+        e.message should be (Some("forAtLeast(2) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), " + Prettifier.lineSeparator +
+                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), " + Prettifier.lineSeparator +
+                                   "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -204,9 +204,9 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val second = getNext(itr, predicate)._1
         val secondValue = col(second)
         val secondExpectedValue = standardMap(second)
-        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: \n" +
-                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), \n" +
-                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") \n" +
+        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), " + Prettifier.lineSeparator +
+                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -222,8 +222,8 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         }
         e.failedCodeFileName should be (Some("InspectorsForMapSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAtLeast(3) failed, because only 2 elements satisfied the assertion block: \n" +
-                                   "  at key 2" + ", \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAtLeast(3) failed, because only 2 elements satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at key 2" + ", \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -256,10 +256,10 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val third = itr.next._1
         val thirdValue = col(third)
         val thirdExpectedValue = standardMap(third)
-        e.message should be (Some("forAtLeast(1) failed, because no element satisfied the assertion block: \n" +
-                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), \n" +
-                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), \n" +
-                                   "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") \n" +
+        e.message should be (Some("forAtLeast(1) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), " + Prettifier.lineSeparator +
+                                   "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), " + Prettifier.lineSeparator +
+                                   "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -387,10 +387,10 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val thirdExpectedValue = standardMap(third)
         e.failedCodeFileName should be (Some("InspectorsForMapSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 15))
-        e.message should be (Some("forExactly(2) failed, because no element satisfied the assertion block: \n" +
-                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), \n" +
-                                  "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") \n" +
+        e.message should be (Some("forExactly(2) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -414,9 +414,9 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val secondExpectedValue = standardMap(second)
         e.failedCodeFileName should be (Some("InspectorsForMapSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 13))
-        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at key 3: \n" +
-                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") \n" +
+        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at key 3: " + Prettifier.lineSeparator +
+                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -455,8 +455,8 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val predicate = (e: Tuple2[Int, String]) => e._2 == standardMap(e._1)
         val first = getNext(itr, predicate)._1
         val second = getNext(itr, predicate)._1
-        e.message should be (Some("forExactly(3) failed, because only 2 elements satisfied the assertion block at key " + first + " and " + second + ": \n" +
-                                  "  at key " + 2 + ", \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 10) + ") \n" +
+        e.message should be (Some("forExactly(3) failed, because only 2 elements satisfied the assertion block at key " + first + " and " + second + ": " + Prettifier.lineSeparator +
+                                  "  at key " + 2 + ", \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 10) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -499,9 +499,9 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val second = getNext(itr, predicate)._1
         val secondValue = col(second)
         val secondExpectedValue = standardMap(second)
-        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at key 3: \n" +
-                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") \n" +
+        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at key 3: " + Prettifier.lineSeparator +
+                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -684,10 +684,10 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val third = itr.next._1
         val thirdValue = col(third)
         val thirdExpectedValue = standardMap(third)
-        e.message should be (Some("forBetween(1, 2) failed, because no element satisfied the assertion block: \n" +
-                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), \n" +
-                                  "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") \n" +
+        e.message should be (Some("forBetween(1, 2) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 16) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 17) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + third + ", \"[" + thirdValue + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 18) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -711,9 +711,9 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val second = getNext(itr, predicate)._1
         val secondValue = col(second)
         val secondExpectedValue = standardMap(second)
-        e.message should be (Some("forBetween(2, 3) failed, because only 1 element satisfied the assertion block at key 2: \n" +
-                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") \n" +
+        e.message should be (Some("forBetween(2, 3) failed, because only 1 element satisfied the assertion block at key 2: " + Prettifier.lineSeparator +
+                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -733,8 +733,8 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val predicate = (e: Tuple2[Int, String]) => e._2 == standardMap(e._1)
         val first = getNext(itr, predicate)._1
         val second = getNext(itr, predicate)._1
-        e.message should be (Some("forBetween(3, 4) failed, because only 2 elements satisfied the assertion block at key " + first + " and " + second + ": \n" +
-                                  "  at key 1, \"[satu]\" did not equal \"[one]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 10) + ") \n" +
+        e.message should be (Some("forBetween(3, 4) failed, because only 2 elements satisfied the assertion block at key " + first + " and " + second + ": " + Prettifier.lineSeparator +
+                                  "  at key 1, \"[satu]\" did not equal \"[one]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 10) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -785,11 +785,11 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val forth = getNext(itr, predicate)._1
         val forthValue = col(forth)
         val forthExpectedValue = standardMap(forth)
-        e.message should be (Some("forBetween(2, 4) failed, because only 1 element satisfied the assertion block at key 3: \n" + 
-                                  "  at key " + first + ", \"[" + firstValue  + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 20) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue  + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 21) + "), \n" +
-                                  "  at key " + third + ", \"[" + thirdValue  + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 22) + "), \n" +
-                                  "  at key " + forth + ", \"[" + forthValue  + "]\" did not equal \"[" + forthExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 23) + ") \n" +
+        e.message should be (Some("forBetween(2, 4) failed, because only 1 element satisfied the assertion block at key 3: " + Prettifier.lineSeparator + 
+                                  "  at key " + first + ", \"[" + firstValue  + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 20) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue  + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 21) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + third + ", \"[" + thirdValue  + "]\" did not equal \"[" + thirdExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 22) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + forth + ", \"[" + forthValue  + "]\" did not equal \"[" + forthExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 23) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -836,8 +836,8 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         }
         e.failedCodeFileName should be (Some("InspectorsForMapSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forEvery failed, because: \n" +
-                                  "  at key 2, \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forEvery failed, because: " + Prettifier.lineSeparator +
+                                  "  at key 2, \"[dua]\" did not equal \"[two]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -860,9 +860,9 @@ class InspectorsForMapSpec extends AnyFunSpec with Inspectors with TableDrivenPr
         val second = getNext(itr, predicate)._1
         val secondValue = col(second)
         val secondExpectedValue = standardMap(second)
-        e.message should be (Some("forEvery failed, because: \n" +
-                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), \n" +
-                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") \n" +
+        e.message should be (Some("forEvery failed, because: " + Prettifier.lineSeparator +
+                                  "  at key " + first + ", \"[" + firstValue + "]\" did not equal \"[" + firstExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 14) + "), " + Prettifier.lineSeparator +
+                                  "  at key " + second + ", \"[" + secondValue + "]\" did not equal \"[" + secondExpectedValue + "]\" (InspectorsForMapSpec.scala:" + (thisLineNumber - 15) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }

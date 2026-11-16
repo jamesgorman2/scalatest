@@ -112,7 +112,7 @@ trait DottyBuild { this: BuildCommons =>
       sourceGenerators in Compile += {
         Def.task {
           // From scalactic-macro
-          GenScalacticDotty.genMacroScala((sourceManaged in Compile).value, version.value, scalaVersion.value) ++
+          GenScalacticDotty.genMacroScala((sourceManaged in Compile).value, version.value, scalaVersion.value, GenScalaTestDotty.ScalaJsLineEnding) ++
           ScalacticGenResourcesJSVM.genResources((sourceManaged in Compile).value / "org" / "scalactic", version.value, scalaVersion.value) ++
           GenAnyVals.genMain((sourceManaged in Compile).value / "org" / "scalactic" / "anyvals", version.value, scalaVersion.value, true) ++
           GenEvery.genMain((sourceManaged in Compile).value / "org" / "scalactic", version.value, scalaVersion.value) ++

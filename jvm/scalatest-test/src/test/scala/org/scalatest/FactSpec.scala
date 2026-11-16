@@ -846,7 +846,7 @@ class FactSpec extends AnyFreeSpec with Matchers with PrettyMethods with Expecta
 
       "should prefix new line to midSentenceFactMessage in toString when the midSentenceFactMessage contains \\n" in {
         val fact = Yes("fact message", "simplified fact message", "line 1\nline 2\nline 3", "simplified mid-sentence fact message")
-        fact.toString shouldBe "Yes(" + NEWLINE + "  line 1\n  line 2\n  line 3" + NEWLINE + ")"
+        fact.toString shouldBe "Yes(" + NEWLINE + "  line 1" + NEWLINE + "  line 2" + NEWLINE + "  line 3" + NEWLINE + ")"
       }
     }
   }

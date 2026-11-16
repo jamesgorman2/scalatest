@@ -914,7 +914,7 @@ class Framework extends SbtFramework {
             presentReminderWithFullStackTraces,
             presentReminderWithoutCanceledTests,
             presentFilePathname
-          ).map(_.toPossiblyColoredText(presentInColor)).mkString("\n")
+          ).map(_.toPossiblyColoredText(presentInColor)).mkString(org.scalactic.Prettifier.lineSeparator)
       }
       finally {
         // A done that throws before it sends RunCompleted must not leave the run's test event log open.

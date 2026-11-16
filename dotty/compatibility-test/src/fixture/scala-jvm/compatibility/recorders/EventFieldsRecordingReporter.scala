@@ -99,7 +99,7 @@ private object EventFields {
     }
 
   private def quoted(text: String): String =
-    text.flatMap {
+    EventLine.withLineFeeds(text).flatMap {
       case '"' => "\\\""
       case '\\' => "\\\\"
       case '\n' => "\\n"

@@ -54,7 +54,7 @@ object CompileMacro {
       errors match {
         case Error(_, _, _, ErrorKind.Typer) :: _ => '{ Succeeded }
         case Error(msg, _, _, ErrorKind.Parser) :: _ => '{
-          val messageExpr = Resources.expectedTypeErrorButGotParseError(${ Expr(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedTypeErrorButGotParseError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
           ${
             source.Position.withPosition[Assertion]('{(pos: source.Position) => 
               throw new TestFailedException((_: StackDepthException) => Some(messageExpr), None, pos)
@@ -112,7 +112,7 @@ object CompileMacro {
           )($prettifier) 
         }
         case Error(msg, _, _, ErrorKind.Parser) :: _ => '{
-          val messageExpr = Resources.expectedTypeErrorButGotParseError(${ Expr(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedTypeErrorButGotParseError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
           Fact.No(
             messageExpr,
             messageExpr,
@@ -214,7 +214,7 @@ object CompileMacro {
 
       errors match {
         case Error(msg, _, _, ErrorKind.Typer) :: _ => '{
-          val messageExpr = Resources.expectedNoErrorButGotTypeError(${ Expr(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedNoErrorButGotTypeError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
           ${
             source.Position.withPosition[Assertion]('{(pos: source.Position) => 
               throw new TestFailedException((_: StackDepthException) => Some(messageExpr), None, pos)
@@ -222,7 +222,7 @@ object CompileMacro {
           }
         }
         case Error(msg, _, _, ErrorKind.Parser) :: _ => '{
-          val messageExpr = Resources.expectedNoErrorButGotParseError(${ Expr(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedNoErrorButGotParseError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
           ${
             source.Position.withPosition[Assertion]('{(pos: source.Position) => 
               throw new TestFailedException((_: StackDepthException) => Some(messageExpr), None, pos)
@@ -260,7 +260,7 @@ object CompileMacro {
 
       errors match {
         case Error(msg, _, _, ErrorKind.Typer) :: _ => '{
-          val messageExpr = Resources.expectedNoErrorButGotTypeError(${ Expr(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedNoErrorButGotTypeError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
           Fact.No(
             messageExpr,
             messageExpr,
@@ -273,7 +273,7 @@ object CompileMacro {
           )($prettifier)
         }
         case Error(msg, _, _, ErrorKind.Parser) :: _ => '{
-          val messageExpr = Resources.expectedNoErrorButGotParseError(${ Expr(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedNoErrorButGotParseError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
           Fact.No(
             messageExpr,
             messageExpr,

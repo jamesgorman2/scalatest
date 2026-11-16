@@ -39,7 +39,7 @@ object RegexStringMacro {
       case e: PatternSyntaxException =>
 // SKIP-SCALATESTJS,NATIVE-END
 //SCALATESTJS,NATIVE-ONLY case e: Exception => // TODO: Figure out exactly what exception JS throws in this case
-        (false, "\n" + e.getMessage)
+        (false, org.scalactic.Prettifier.lineSeparator + e.getMessage)
     }
 
   def apply(value: Expr[String])(using Quotes): Expr[RegexString] = {

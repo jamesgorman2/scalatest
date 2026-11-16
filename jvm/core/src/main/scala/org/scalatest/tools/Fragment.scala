@@ -24,19 +24,22 @@ private[scalatest] case class Fragment(text: String, ansiColor: AnsiColor) {
   def toPossiblyColoredText(presentInColor: Boolean): String =
     if (!presentInColor || text.trim.isEmpty) text
     else {
-      ("\n" * countLeadingEOLs(text)) +
-      text.split("\n").dropWhile(_.isEmpty).map(ansiColor.code + _ + ansiReset).mkString("\n") +
-      ("\n" * countTrailingEOLs(text))
+      val lineSeparator = org.scalactic.Prettifier.lineSeparator
+      (lineSeparator * countLeadingEOLs(text)) +
+      text.split("\r?\n").dropWhile(_.isEmpty).map(ansiColor.code + _ + ansiReset).mkString(lineSeparator) +
+      (lineSeparator * countTrailingEOLs(text))
     }
 }
 
 private[scalatest] object Fragment {
 
-  def countTrailingEOLs(s: String): Int = s.length - s.lastIndexWhere(_ != '\n') - 1
+  private def isEOLChar(c: Char): Boolean = c == '\n' || c == '\r'
+
+  def countTrailingEOLs(s: String): Int = s.substring(s.lastIndexWhere(!isEOLChar(_)) + 1).count(_ == '\n')
 
   def countLeadingEOLs(s: String): Int = {
-    val idx = s.indexWhere(_ != '\n')
-    if (idx != -1) idx else 0
+    val idx = s.indexWhere(!isEOLChar(_))
+    if (idx != -1) s.substring(0, idx).count(_ == '\n') else 0
   }
 }
 

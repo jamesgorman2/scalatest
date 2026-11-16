@@ -306,8 +306,8 @@ class ListShouldContainAllOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAllOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(8, 4, 3, 2)) + " did not contain all of " + "(1, 2, 3)" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(8, 4, 3, 2)) + " did not contain all of " + "(1, 2, 3)" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -359,8 +359,8 @@ class ListShouldContainAllOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAllOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(8, 4, 3, 2)) + " did not contain all of " + "(1, 2, 3)" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(8, 4, 3, 2)) + " did not contain all of " + "(1, 2, 3)" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -408,8 +408,8 @@ class ListShouldContainAllOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAllOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" +  " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" +  " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -448,8 +448,8 @@ class ListShouldContainAllOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAllOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -488,8 +488,8 @@ class ListShouldContainAllOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAllOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" +  " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" +  " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -528,8 +528,8 @@ class ListShouldContainAllOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAllOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("happy", "to", "you")) + " contained all of " + "(\"you\", \"to\")" + " (ListShouldContainAllOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

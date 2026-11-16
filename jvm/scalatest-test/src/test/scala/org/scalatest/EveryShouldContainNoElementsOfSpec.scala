@@ -263,8 +263,8 @@ class EveryShouldContainNoElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainNoElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.containedAtLeastOneElementOf(prettifier, lists(2), Seq(2, 3, 4)) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.containedAtLeastOneElementOf(prettifier, lists(2), Seq(2, 3, 4)) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -312,8 +312,8 @@ class EveryShouldContainNoElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainNoElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.containedAtLeastOneElementOf(prettifier, lists(2), Seq(2, 3, 4)) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.containedAtLeastOneElementOf(prettifier, lists(2), Seq(2, 3, 4)) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -357,8 +357,8 @@ class EveryShouldContainNoElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainNoElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -393,8 +393,8 @@ class EveryShouldContainNoElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainNoElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -429,8 +429,8 @@ class EveryShouldContainNoElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainNoElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -465,8 +465,8 @@ class EveryShouldContainNoElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainNoElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.didNotContainAtLeastOneElementOf(prettifier, toLists(0), Seq("fee", "fie", "foe", "fum")) + " (EveryShouldContainNoElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

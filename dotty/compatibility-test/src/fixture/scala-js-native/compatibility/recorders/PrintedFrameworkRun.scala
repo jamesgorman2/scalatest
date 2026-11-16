@@ -43,6 +43,6 @@ final class PrintedFrameworkRun(launchArguments: Array[String]) {
   def printRecorded(): Unit = {
     eventLines.foreach(line => println("event handler: " + line))
     ReporterText.normalised(loggerLines.toList).foreach(line => println("logger: " + line))
-    ReporterText.normalised(runner.done().split("\n", -1).toList).foreach(line => println("summary: " + line))
+    ReporterText.normalised(runner.done().split("\r?\n", -1).toList).foreach(line => println("summary: " + line))
   }
 }

@@ -615,8 +615,8 @@ class EveryShouldContainOnlyLogicalAndSpec extends AnyFunSpec {
     val hiLists: Every[Every[String]] = Every(Every("hi", "hello"), Every("hi", "hello"), Every("hi", "hello"))
 
     def allErrMsg(index: Int, message: String, lineNumber: Int, left: Any): String =
-      "'all' inspection failed, because: \n" +
-        "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") \n" +
+      "'all' inspection failed, because: " + Prettifier.lineSeparator +
+        "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") " + Prettifier.lineSeparator +
         "in " + decorateToStringValue(prettifier, left)
 
     describe("used with contain only xx and contain only xx") {

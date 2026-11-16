@@ -257,8 +257,8 @@ class EveryShouldContainTheSameElementsInOrderAsSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainTheSameElementsInOrderAsSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(2, 3, 4)) + " did not contain the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer(1, 2, 3)) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(2, 3, 4)) + " did not contain the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer(1, 2, 3)) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -303,8 +303,8 @@ class EveryShouldContainTheSameElementsInOrderAsSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainTheSameElementsInOrderAsSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(2, 3, 4)) + " did not contain the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer(1, 2, 3)) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(2, 3, 4)) + " did not contain the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer(1, 2, 3)) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -345,8 +345,8 @@ class EveryShouldContainTheSameElementsInOrderAsSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainTheSameElementsInOrderAsSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) +  " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) +  " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -378,8 +378,8 @@ class EveryShouldContainTheSameElementsInOrderAsSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainTheSameElementsInOrderAsSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -411,8 +411,8 @@ class EveryShouldContainTheSameElementsInOrderAsSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainTheSameElementsInOrderAsSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) +  " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) +  " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -444,8 +444,8 @@ class EveryShouldContainTheSameElementsInOrderAsSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainTheSameElementsInOrderAsSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained the same elements in the same (iterated) order as " + decorateToStringValue(prettifier, ListBuffer("to", "you")) + " (EveryShouldContainTheSameElementsInOrderAsSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

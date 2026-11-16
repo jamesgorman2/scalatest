@@ -21,6 +21,12 @@ import java.io.{File, FileWriter, BufferedWriter}
 
 object GenScalaTestDotty {
 
+  /** Line ending of copies built for the JVM or Native: the build machine's, as BufferedWriter.newLine wrote. */
+  val PlatformLineEnding: String = System.lineSeparator
+
+  /** Line ending of copies built for Scala.js, whose line separator is "\n" on every machine, so multi-line literals match its output. */
+  val ScalaJsLineEnding: String = "\n"
+
   private def uncommentJsExport(line: String): String =
     if (line.trim.startsWith("//DOTTY-ONLY "))
       line.substring(line.indexOf("//DOTTY-ONLY ") + 13)
@@ -32,7 +38,7 @@ object GenScalaTestDotty {
   private def transformLine(line: String): String =
     uncommentJsExport(line)
 
-  private def copyFile(sourceFile: File, destFile: File): File = {
+  private def copyFile(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -44,7 +50,7 @@ object GenScalaTestDotty {
           skipMode = false
         else if (!skipMode) {
           destWriter.write(transformLine(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -71,7 +77,7 @@ object GenScalaTestDotty {
   private def transformLineJS(line: String): String =
     uncommentJsExportJS(line)
 
-  private def copyFileJS(sourceFile: File, destFile: File): File = {
+  private def copyFileJS(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -88,7 +94,7 @@ object GenScalaTestDotty {
           skipJSMode = false  
         else if (!skipDottyMode && !skipJSMode) {
           destWriter.write(transformLineJS(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -100,7 +106,7 @@ object GenScalaTestDotty {
     }
   }
 
-  def copyFiles(sourceDirName: String, packageDirName: String, targetDir: File, files: List[String]): Seq[File] = {
+  def copyFiles(sourceDirName: String, packageDirName: String, targetDir: File, files: List[String], lineEnding: String = PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
@@ -108,46 +114,46 @@ object GenScalaTestDotty {
       val sourceFile = new File(sourceDir, sourceFileName)
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFile(sourceFile, destFile)
+        copyFile(sourceFile, destFile, lineEnding)
 
       destFile
     }
   }
 
-  def copyStartsWithFiles(sourceDirName: String, packageDirName: String, startsWith: String, targetDir: File): Seq[File] = {
+  def copyStartsWithFiles(sourceDirName: String, packageDirName: String, startsWith: String, targetDir: File, lineEnding: String = PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && f.getName.startsWith(startsWith) && f.getName.endsWith(".scala")).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFile(sourceFile, destFile)
+        copyFile(sourceFile, destFile, lineEnding)
 
       destFile
     }
   }
 
-  def copyDir(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDir(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String = PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFile(sourceFile, destFile)
+        copyFile(sourceFile, destFile, lineEnding)
 
       destFile
     }
   }
 
-  def copyDirJS(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDirJS(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFileJS(sourceFile, destFile)
+        copyFileJS(sourceFile, destFile, lineEnding)
 
       destFile
     }
@@ -170,7 +176,7 @@ object GenScalaTestDotty {
   private def transformLineNative(line: String): String =
     uncommentNativeExportNative(line)
 
-  private def copyFileNative(sourceFile: File, destFile: File): File = {
+  private def copyFileNative(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -187,7 +193,7 @@ object GenScalaTestDotty {
           skipNativeMode = false  
         else if (!skipDottyMode && !skipNativeMode) {
           destWriter.write(transformLineNative(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -199,14 +205,14 @@ object GenScalaTestDotty {
     }
   }  
 
-  def copyDirNative(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDirNative(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String = PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFileNative(sourceFile, destFile)
+        copyFileNative(sourceFile, destFile, lineEnding)
 
       destFile
     }
@@ -435,14 +441,14 @@ object GenScalaTestDotty {
     }.toList*/
 
   def genScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
-    copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
-    copyDir("dotty/core/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty) ++
-    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, List.empty) ++
-    copyDir("dotty/core/src/main/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty) ++ 
-    copyDir("js/core/src/main/scala/org/scalatest/compatible", "org/scalatest/compatible", targetDir, List.empty) ++ 
-    copyDir("js/core/src/main/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, List.empty) ++ 
-    copyDir("js/core/src/main/scala/org/scalatest/tools", "org/scalatest/tools", targetDir, List.empty) ++ 
-    copyDir("js/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++ 
+    copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("js/core/src/main/scala/org/scalatest/compatible", "org/scalatest/compatible", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("js/core/src/main/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("js/core/src/main/scala/org/scalatest/tools", "org/scalatest/tools", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("js/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDirJS("jvm/core/src/main/scala/org/scalatest/tools", "org/scalatest/tools", targetDir, 
       List(
         "AboutJDialog.scala",
@@ -494,7 +500,7 @@ object GenScalaTestDotty {
         "TestSpec.scala",
         "XmlReporter.scala",
         "XmlSocketReporter.scala"
-      ))
+      ), ScalaJsLineEnding)
 
   def genScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
@@ -559,28 +565,28 @@ object GenScalaTestDotty {
       ))    
 
   def genMatchersCoreScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
-    copyDirJS("dotty/matchers-core/src/main/scala/org/scalatest/matchers", "org/scalatest/matchers", targetDir, List.empty) ++
-    copyDirJS("dotty/matchers-core/src/main/scala/org/scalatest/matchers/dsl", "org/scalatest/matchers/dsl", targetDir, List.empty)
+    copyDirJS("dotty/matchers-core/src/main/scala/org/scalatest/matchers", "org/scalatest/matchers", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("dotty/matchers-core/src/main/scala/org/scalatest/matchers/dsl", "org/scalatest/matchers/dsl", targetDir, List.empty, ScalaJsLineEnding)
 
   def genMatchersCoreScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDirNative("dotty/matchers-core/src/main/scala/org/scalatest/matchers", "org/scalatest/matchers", targetDir, List.empty) ++
     copyDirNative("dotty/matchers-core/src/main/scala/org/scalatest/matchers/dsl", "org/scalatest/matchers/dsl", targetDir, List.empty)  
 
   def genShouldMatchersScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
-    copyDirJS("dotty/shouldmatchers/src/main/scala/org/scalatest/matchers/should", "org/scalatest/matchers/should", targetDir, List.empty)
+    copyDirJS("dotty/shouldmatchers/src/main/scala/org/scalatest/matchers/should", "org/scalatest/matchers/should", targetDir, List.empty, ScalaJsLineEnding)
 
   def genShouldMatchersScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDirNative("dotty/shouldmatchers/src/main/scala/org/scalatest/matchers/should", "org/scalatest/matchers/should", targetDir, List.empty)  
 
   def genMustMatchersScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
-    copyDirJS("dotty/mustmatchers/src/main/scala/org/scalatest/matchers/must", "org/scalatest/matchers/must", targetDir, List.empty)
+    copyDirJS("dotty/mustmatchers/src/main/scala/org/scalatest/matchers/must", "org/scalatest/matchers/must", targetDir, List.empty, ScalaJsLineEnding)
 
   def genMustMatchersScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDirNative("dotty/mustmatchers/src/main/scala/org/scalatest/matchers/must", "org/scalatest/matchers/must", targetDir, List.empty)  
 
   def genDiagramsScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
-    copyDirJS("dotty/diagrams/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
-    copyDirJS("dotty/diagrams/src/main/scala/org/scalatest/diagrams", "org/scalatest/diagrams", targetDir, List.empty)
+    copyDirJS("dotty/diagrams/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("dotty/diagrams/src/main/scala/org/scalatest/diagrams", "org/scalatest/diagrams", targetDir, List.empty, ScalaJsLineEnding)
 
   def genDiagramsScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDirNative("dotty/diagrams/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
@@ -654,17 +660,19 @@ object GenScalaTestDotty {
         "MatchersSerializableSpec.scala",   // skipped because testing java serialization
         "SeveredStackTracesSpec.scala", // skipped because stack trace isn't really helpful after linked in different js env like node.
         "SeveredStackTracesFailureSpec.scala" // skipped because stack trace isn't really helpful after linked in different js env like node.
-      )
-    ) ++ 
+      ),
+      ScalaJsLineEnding
+    ) ++
     copyDirJS("dotty/scalatest-test/src/test/scala/org/scalatest", "org/scalatest", targetDir,
       List(
         "MessageRecordingInformerSpec.scala"   // skipped because it uses threads and CountDownLatch.
-      )
+      ),
+      ScalaJsLineEnding
     ) ++
-    copyDirJS("dotty/scalatest-test/src/test/scala/org/scalatest/matchers/should", "org/scalatest/matchers/should", targetDir, List.empty) ++
-    copyDirJS("dotty/scalatest-test/src/test/scala/org/scalatest/matchers/must", "org/scalatest/matchers/must", targetDir, List.empty) ++
-    copyDir("jvm/scalatest-test/src/test/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty) ++ 
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, 
+    copyDirJS("dotty/scalatest-test/src/test/scala/org/scalatest/matchers/should", "org/scalatest/matchers/should", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("dotty/scalatest-test/src/test/scala/org/scalatest/matchers/must", "org/scalatest/matchers/must", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDir("jvm/scalatest-test/src/test/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir,
       List(
         "WaitersSpec.scala",    // skipped because Waiters not supported.
         "AsyncAssertionsSpec.scala",    // skipped because AsyncAssertions (deprecated name for Waiters) not supported.
@@ -682,10 +690,11 @@ object GenScalaTestDotty {
         "DeprecatedTimeLimitedTestsSpec.scala",   // skipped because DeprecatedTimeLimitedTests not supported.
         "TimeoutsSpec.scala",            // skipped because Timeouts not supported.
         "UltimatelySpec.scala"   // skipped because Eventually not supported.
-      )
+      ),
+      ScalaJsLineEnding
     ) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/events/examples", "org/scalatest/events/examples", targetDir, List.empty) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/events/examples", "org/scalatest/events/examples", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/events", "org/scalatest/events", targetDir,
       List(
         "TestLocationJUnit3Suite.scala", // Not supported by scala-js
@@ -695,21 +704,22 @@ object GenScalaTestDotty {
         "TestLocationMethodJUnitSuite.scala", // Not supported by scala-js
         "TestLocationMethodTestNGSuite.scala", // Not supported by scala-js
         "LocationMethodSuiteProp.scala", // Not supported by scala-js
-      )
+      ),
+      ScalaJsLineEnding
     ) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/exceptions", "org/scalatest/exceptions", targetDir, List.empty) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/exceptions", "org/scalatest/exceptions", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/fixture", "org/scalatest/fixture", targetDir,
       List(
         "NoArgSpec.scala",  // skipped because scala 3 dropped DelayedInit.
         "SuiteSpec.scala"    // skipped because depends on java reflections
-      )) ++ 
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/path", "org/scalatest/path", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/prop", "org/scalatest/prop", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/suiteprop", "org/scalatest/suiteprop", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/matchers", "org/scalatest/matchers", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/time", "org/scalatest/time", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/tagobjects", "org/scalatest/tagobjects", targetDir, List.empty) ++
-    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/verbs", "org/scalatest/verbs", targetDir, List.empty) ++
+      ), ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/path", "org/scalatest/path", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/prop", "org/scalatest/prop", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/suiteprop", "org/scalatest/suiteprop", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/matchers", "org/scalatest/matchers", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/time", "org/scalatest/time", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/tagobjects", "org/scalatest/tagobjects", targetDir, List.empty, ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/verbs", "org/scalatest/verbs", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDirJS("jvm/scalatest-test/src/test/scala/org/scalatest/tools", "org/scalatest/tools", targetDir,
       List(
         "DashboardReporterSpec.scala",
@@ -732,7 +742,8 @@ object GenScalaTestDotty {
         "StringReporterSummarySpec.scala",
         "SuiteDiscoveryHelperSuite.scala",
         "XmlSocketReporterSpec.scala"
-      )
+      ),
+      ScalaJsLineEnding
     )
   }
 
@@ -1148,7 +1159,7 @@ object GenScalaTestDotty {
     copyDir("jvm/diagrams-test/src/test/scala/org/scalatest/diagrams", "org/scalatest/diagrams", targetDir, List.empty)
 
   def genDiagramsTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/diagrams-test/src/test/scala/org/scalatest/diagrams", "org/scalatest/diagrams", targetDir, List.empty)
+    copyDirJS("jvm/diagrams-test/src/test/scala/org/scalatest/diagrams", "org/scalatest/diagrams", targetDir, List.empty, ScalaJsLineEnding)
 
   def genDiagramsTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/diagrams-test/src/test/scala/org/scalatest/diagrams", "org/scalatest/diagrams", targetDir, List.empty)    
@@ -1157,7 +1168,7 @@ object GenScalaTestDotty {
     copyDir("jvm/featurespec-test/src/test/scala/org/scalatest/featurespec", "org/scalatest/featurespec", targetDir, List.empty)
 
   def genFeatureSpecTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/featurespec-test/src/test/scala/org/scalatest/featurespec", "org/scalatest/featurespec", targetDir, List.empty)
+    copyDirJS("jvm/featurespec-test/src/test/scala/org/scalatest/featurespec", "org/scalatest/featurespec", targetDir, List.empty, ScalaJsLineEnding)
 
   def genFeatureSpecTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/featurespec-test/src/test/scala/org/scalatest/featurespec", "org/scalatest/featurespec", targetDir, List.empty)    
@@ -1166,7 +1177,7 @@ object GenScalaTestDotty {
     copyDir("jvm/flatspec-test/src/test/scala/org/scalatest/flatspec", "org/scalatest/flatspec", targetDir, List.empty)
 
   def genFlatSpecTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/flatspec-test/src/test/scala/org/scalatest/flatspec", "org/scalatest/flatspec", targetDir, List.empty)
+    copyDirJS("jvm/flatspec-test/src/test/scala/org/scalatest/flatspec", "org/scalatest/flatspec", targetDir, List.empty, ScalaJsLineEnding)
 
   def genFlatSpecTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/flatspec-test/src/test/scala/org/scalatest/flatspec", "org/scalatest/flatspec", targetDir, List.empty)        
@@ -1175,7 +1186,7 @@ object GenScalaTestDotty {
     copyDir("jvm/freespec-test/src/test/scala/org/scalatest/freespec", "org/scalatest/freespec", targetDir, List.empty)
 
   def genFreeSpecTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/freespec-test/src/test/scala/org/scalatest/freespec", "org/scalatest/freespec", targetDir, List.empty)
+    copyDirJS("jvm/freespec-test/src/test/scala/org/scalatest/freespec", "org/scalatest/freespec", targetDir, List.empty, ScalaJsLineEnding)
 
   def genFreeSpecTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/freespec-test/src/test/scala/org/scalatest/freespec", "org/scalatest/freespec", targetDir, List.empty)    
@@ -1184,7 +1195,7 @@ object GenScalaTestDotty {
     copyDir("jvm/funspec-test/src/test/scala/org/scalatest/funspec", "org/scalatest/funspec", targetDir, List.empty)
 
   def genFunSpecTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/funspec-test/src/test/scala/org/scalatest/funspec", "org/scalatest/funspec", targetDir, List.empty)
+    copyDirJS("jvm/funspec-test/src/test/scala/org/scalatest/funspec", "org/scalatest/funspec", targetDir, List.empty, ScalaJsLineEnding)
 
   def genFunSpecTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/funspec-test/src/test/scala/org/scalatest/funspec", "org/scalatest/funspec", targetDir, List.empty)        
@@ -1193,7 +1204,7 @@ object GenScalaTestDotty {
     copyDir("jvm/funsuite-test/src/test/scala/org/scalatest/funsuite", "org/scalatest/funsuite", targetDir, List.empty)
 
   def genFunSuiteTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/funsuite-test/src/test/scala/org/scalatest/funsuite", "org/scalatest/funsuite", targetDir, List.empty)
+    copyDirJS("jvm/funsuite-test/src/test/scala/org/scalatest/funsuite", "org/scalatest/funsuite", targetDir, List.empty, ScalaJsLineEnding)
 
   def genFunSuiteTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/funsuite-test/src/test/scala/org/scalatest/funsuite", "org/scalatest/funsuite", targetDir, List.empty)    
@@ -1202,7 +1213,7 @@ object GenScalaTestDotty {
     copyDir("jvm/propspec-test/src/test/scala/org/scalatest/propspec", "org/scalatest/propspec", targetDir, List.empty)
 
   def genPropSpecTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/propspec-test/src/test/scala/org/scalatest/propspec", "org/scalatest/propspec", targetDir, List.empty)
+    copyDirJS("jvm/propspec-test/src/test/scala/org/scalatest/propspec", "org/scalatest/propspec", targetDir, List.empty, ScalaJsLineEnding)
 
   def genPropSpecTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/propspec-test/src/test/scala/org/scalatest/propspec", "org/scalatest/propspec", targetDir, List.empty)    
@@ -1211,7 +1222,7 @@ object GenScalaTestDotty {
     copyDir("jvm/wordspec-test/src/test/scala/org/scalatest/wordspec", "org/scalatest/wordspec", targetDir, List.empty)
 
   def genWordSpecTestJS(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
-    copyDirJS("jvm/wordspec-test/src/test/scala/org/scalatest/wordspec", "org/scalatest/wordspec", targetDir, List.empty)
+    copyDirJS("jvm/wordspec-test/src/test/scala/org/scalatest/wordspec", "org/scalatest/wordspec", targetDir, List.empty, ScalaJsLineEnding)
 
   def genWordSpecTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] = 
     copyDirNative("jvm/wordspec-test/src/test/scala/org/scalatest/wordspec", "org/scalatest/wordspec", targetDir, List.empty)        

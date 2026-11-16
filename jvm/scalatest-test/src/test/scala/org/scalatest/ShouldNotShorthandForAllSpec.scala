@@ -28,8 +28,8 @@ class ShouldNotShorthandForAllSpec extends AnyFunSpec with EmptyMocks with BookP
   private val prettifier = Prettifier.default
   
   def errorMessage(index: Int, message: String, lineNumber: Int, left: Any): String = 
-    "'all' inspection failed, because: \n" +
-    "  at index " + index + ", " + message + " (ShouldNotShorthandForAllSpec.scala:" + lineNumber + ") \n" +
+    "'all' inspection failed, because: " + Prettifier.lineSeparator +
+    "  at index " + index + ", " + message + " (ShouldNotShorthandForAllSpec.scala:" + lineNumber + ") " + Prettifier.lineSeparator +
     "in " + decorateToStringValue(prettifier, left)
   
   describe("The shouldNot syntax") {

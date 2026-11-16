@@ -93,8 +93,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         }
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAll failed, because: \n" +
-                                   "  at index " + getIndex(col, 2) + ", 2 equaled 2 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                   "  at index " + getIndex(col, 2) + ", 2 equaled 2 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -118,8 +118,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         e2.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e2.failedCodeLineNumber should be (Some(thisLineNumber - 5))
         val firstViolation = getFirst[Int](col, _ >= 2)
-        e2.message should be (Some("forAll failed, because: \n" +
-                                    "  at index " + getIndex(col, firstViolation) + ", " + firstViolation + " was not less than 2 (InspectorsSpec.scala:" + (thisLineNumber - 7) + ") \n" +
+        e2.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                    "  at index " + getIndex(col, firstViolation) + ", " + firstViolation + " was not less than 2 (InspectorsSpec.scala:" + (thisLineNumber - 7) + ") " + Prettifier.lineSeparator +
                                     "in " + decorateToStringValue(prettifier, col)))
         e2.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -227,8 +227,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         }
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAll failed, because: \n" +
-                                   "  at index 3, 4 was not less than 4 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 3, 4 was not less than 4 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in Array(1, 2, 3, 4, 5)"))
         e.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -253,8 +253,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         }
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAll failed, because: \n" +
-                                   "  at index 3, '4' was not less than '4' (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 3, '4' was not less than '4' (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in \"12345\""))
         e.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -283,8 +283,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         }
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAll failed, because: \n" +
-                                   "  at index 3, 4 was not less than 4 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 3, 4 was not less than 4 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in [1, 2, 3, 4, 5]"))
         e.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -312,8 +312,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         }
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
-        e.message should be (Some("forAll failed, because: \n" +
-                                   "  at key 4, 4 was not less than 4 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                   "  at key 4, 4 was not less than 4 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                    "in {1=2, 2=3, 3=4, 4=5, 5=6}"))
         e.getCause match {
           case tfe: exceptions.TestFailedException =>
@@ -372,9 +372,9 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val firstIndex = getIndex(col, first)
         val second = getNext[Int](itr, _ != 2)
         val secondIndex = getIndex(col, second)
-        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: \n" +
-                                   "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                   "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                   "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -394,10 +394,10 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val first = itr.next
         val second = itr.next
         val third = itr.next
-        e.message should be (Some("forAtLeast(2) failed, because no element satisfied the assertion block: \n" +
-                                   "  at index 0, " + first + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), \n" +
-                                   "  at index 1, " + second + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                   "  at index 2, " + third + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forAtLeast(2) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + first + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), " + Prettifier.lineSeparator +
+                                   "  at index 1, " + second + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                   "  at index 2, " + third + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -418,9 +418,9 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val firstIndex = getIndex(col, first)
         val second = getNextNot[Int](itr, _ == 2)
         val secondIndex = getIndex(col, second)
-        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: \n" +
-                                   "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                   "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                   "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -437,8 +437,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 5))
         val index = getIndex(col, 3)
-        e.message should be (Some("forAtLeast(3) failed, because only 2 elements satisfied the assertion block: \n" +
-                                   "  at index " + index + ", 3 was not less than 3 (InspectorsSpec.scala:" + (thisLineNumber - 7) + ") \n" +
+        e.message should be (Some("forAtLeast(3) failed, because only 2 elements satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at index " + index + ", 3 was not less than 3 (InspectorsSpec.scala:" + (thisLineNumber - 7) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -465,10 +465,10 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val first = itr.next
         val second = itr.next
         val third = itr.next
-        e.message should be (Some("forAtLeast(1) failed, because no element satisfied the assertion block: \n" +
-                                   "  at index 0, " + first + " was not greater than 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), \n" +
-                                   "  at index 1, " + second + " was not greater than 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                   "  at index 2, " + third + " was not greater than 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forAtLeast(1) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + first + " was not greater than 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), " + Prettifier.lineSeparator +
+                                   "  at index 1, " + second + " was not greater than 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                   "  at index 2, " + third + " was not greater than 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -756,10 +756,10 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val third = itr.next
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 9))
-        e.message should be (Some("forExactly(2) failed, because no element satisfied the assertion block: \n" +
-                                  "  at index 0, " + first + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), \n" +
-                                  "  at index 1, " + second + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                  "  at index 2, " + third + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forExactly(2) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                  "  at index 0, " + first + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), " + Prettifier.lineSeparator +
+                                  "  at index 1, " + second + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                  "  at index 2, " + third + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -781,9 +781,9 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val succeededIndex = getIndex(col, 2)
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 11))
-        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at index " + succeededIndex + ": \n" +
-                                  "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + "), \n" +
-                                  "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 13) + ") \n" +
+        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at index " + succeededIndex + ": " + Prettifier.lineSeparator +
+                                  "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 13) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -820,8 +820,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val passedSecond = getNext[Int](passedItr, _ < 3)
         val passedSecondIndex = getIndex(col, passedSecond)
         val failedIndex = getIndex(col, 3)
-        e.message should be (Some("forExactly(3) failed, because only 2 elements satisfied the assertion block at index " + passedFirstIndex + " and " + passedSecondIndex + ": \n" +
-                                  "  at index " + failedIndex + ", 3 was not less than 3 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forExactly(3) failed, because only 2 elements satisfied the assertion block at index " + passedFirstIndex + " and " + passedSecondIndex + ": " + Prettifier.lineSeparator +
+                                  "  at index " + failedIndex + ", 3 was not less than 3 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -863,9 +863,9 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val firstIndex = getIndex(col, first)
         val second = getNext[Int](itr, _ != 2)
         val secondIndex = getIndex(col, second)
-        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at index " + index + ": \n" +
-                                  "  at index " + firstIndex + ", " + first + " did not equal 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + "), \n" +
-                                  "  at index " + secondIndex + ", " + second + " did not equal 2 (InspectorsSpec.scala:" + (thisLineNumber - 13) + ") \n" +
+        e.message should be (Some("forExactly(2) failed, because only 1 element satisfied the assertion block at index " + index + ": " + Prettifier.lineSeparator +
+                                  "  at index " + firstIndex + ", " + first + " did not equal 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + secondIndex + ", " + second + " did not equal 2 (InspectorsSpec.scala:" + (thisLineNumber - 13) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -1191,10 +1191,10 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val first = itr.next
         val second = itr.next
         val third = itr.next
-        e.message should be (Some("forBetween(1, 2) failed, because no element satisfied the assertion block: \n" +
-                                  "  at index 0, " + first + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), \n" +
-                                  "  at index 1, " + second + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                  "  at index 2, " + third + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" +
+        e.message should be (Some("forBetween(1, 2) failed, because no element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                  "  at index 0, " + first + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), " + Prettifier.lineSeparator +
+                                  "  at index 1, " + second + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                  "  at index 2, " + third + " was not equal to 5 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -1216,9 +1216,9 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val second = getNextNot[Int](itr, _ == 2)
         val secondIndex = getIndex(col, second)
         val passedIndex = getIndex(col, 2)
-        e.message should be (Some("forBetween(2, 3) failed, because only 1 element satisfied the assertion block at index " + passedIndex + ": \n" +
-                                  "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + "), \n" +
-                                  "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 13) + ") \n" +
+        e.message should be (Some("forBetween(2, 3) failed, because only 1 element satisfied the assertion block at index " + passedIndex + ": " + Prettifier.lineSeparator +
+                                  "  at index " + firstIndex + ", " + first + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 12) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + secondIndex + ", " + second + " was not equal to 2 (InspectorsSpec.scala:" + (thisLineNumber - 13) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -1238,8 +1238,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val firstIndex = getIndex(col, getNext[Int](itr, _ < 3))
         val secondIndex = getIndex(col, getNext[Int](itr, _ < 3))
         val failedIndex = getIndex(col, 3)
-        e.message should be (Some("forBetween(3, 4) failed, because only 2 elements satisfied the assertion block at index " + firstIndex + " and " + secondIndex + ": \n" +
-                                  "  at index " + failedIndex + ", 3 was not less than 3 (InspectorsSpec.scala:" + (thisLineNumber - 10) + ") \n" +
+        e.message should be (Some("forBetween(3, 4) failed, because only 2 elements satisfied the assertion block at index " + firstIndex + " and " + secondIndex + ": " + Prettifier.lineSeparator +
+                                  "  at index " + failedIndex + ", 3 was not less than 3 (InspectorsSpec.scala:" + (thisLineNumber - 10) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
         e.getCause should be (null)
       }
@@ -1285,11 +1285,11 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val secondIndex = getIndex(col, second)
         val thirdIndex = getIndex(col, third)
         val forthIndex = getIndex(col, forth)
-        e.message should be (Some("forBetween(2, 4) failed, because only 1 element satisfied the assertion block at index " + index + ": \n" + 
-                                  "  at index " + firstIndex + ", " + first  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 16) + "), \n" +
-                                  "  at index " + secondIndex + ", " + second  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 17) + "), \n" +
-                                  "  at index " + thirdIndex + ", " + third  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 18) + "), \n" +
-                                  "  at index " + forthIndex + ", " + forth  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 19) + ") \n" +
+        e.message should be (Some("forBetween(2, 4) failed, because only 1 element satisfied the assertion block at index " + index + ": " + Prettifier.lineSeparator + 
+                                  "  at index " + firstIndex + ", " + first  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 16) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + secondIndex + ", " + second  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 17) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + thirdIndex + ", " + third  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 18) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + forthIndex + ", " + forth  + " was not greater than 4 (InspectorsSpec.scala:" + (thisLineNumber - 19) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -1408,8 +1408,8 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
         e.failedCodeLineNumber should be (Some(thisLineNumber - 3))
         val index = getIndex(col, 2)
-        e.message should be (Some("forEvery failed, because: \n" +
-                                  "  at index " + index + ", 2 equaled 2 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") \n" +
+        e.message should be (Some("forEvery failed, because: " + Prettifier.lineSeparator +
+                                  "  at index " + index + ", 2 equaled 2 (InspectorsSpec.scala:" + (thisLineNumber - 6) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -1427,9 +1427,9 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
         val firstIndex = getIndex(col, first)
         val second = getNextNot[Int](itr, _ < 2)
         val secondIndex = getIndex(col, second)
-        e.message should be (Some("forEvery failed, because: \n" +
-                                  "  at index " + firstIndex + ", " + first + " was not less than 2 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), \n" +
-                                  "  at index " + secondIndex + ", " + second + " was not less than 2 (InspectorsSpec.scala:" + (thisLineNumber - 11) + ") \n" +
+        e.message should be (Some("forEvery failed, because: " + Prettifier.lineSeparator +
+                                  "  at index " + firstIndex + ", " + first + " was not less than 2 (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), " + Prettifier.lineSeparator +
+                                  "  at index " + secondIndex + ", " + second + " was not less than 2 (InspectorsSpec.scala:" + (thisLineNumber - 11) + ") " + Prettifier.lineSeparator +
                                   "in " + decorateToStringValue(prettifier, col)))
       }
     }
@@ -1546,17 +1546,17 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
       }
       e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
       e.failedCodeLineNumber should be (Some(thisLineNumber - 7))
-      e.message should be (Some("forAll failed, because: \n" +
-                                "  at index 1, forAll failed, because: \n" +
-                                "    at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 8) + ") \n" +
-                                "  in List(8, 9, 12) (InspectorsSpec.scala:" + (thisLineNumber - 10) + ") \n" +
+      e.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                "  at index 1, forAll failed, because: " + Prettifier.lineSeparator +
+                                "    at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 8) + ") " + Prettifier.lineSeparator +
+                                "  in List(8, 9, 12) (InspectorsSpec.scala:" + (thisLineNumber - 10) + ") " + Prettifier.lineSeparator +
                                 "in List(List(2, 4, 6), List(8, 9, 12))"))
       e.getCause match {
         case tfe: exceptions.TestFailedException => 
           tfe.failedCodeFileName should be (Some("InspectorsSpec.scala"))
           tfe.failedCodeLineNumber should be (Some(thisLineNumber - 15))
-          tfe.message should be (Some("forAll failed, because: \n" +
-                                      "  at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 16) + ") \n" +
+          tfe.message should be (Some("forAll failed, because: " + Prettifier.lineSeparator +
+                                      "  at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 16) + ") " + Prettifier.lineSeparator +
                                       "in List(8, 9, 12)"))
           tfe.getCause match {
             case tfe: exceptions.TestFailedException => 
@@ -1599,11 +1599,11 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
       }
       e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
       e.failedCodeLineNumber should be (Some(thisLineNumber - 7))
-      e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: \n" +
-                                 "  at index 1, forAtLeast(2) failed, because only 1 element satisfied the assertion block: \n" +
-                                 "    at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 8) + "), \n" +
-                                 "    at index 2, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 9) + ") \n" + 
-                                 "  in List(8, 11, 13) (InspectorsSpec.scala:" + (thisLineNumber - 11) + ") \n" +
+      e.message should be (Some("forAtLeast(2) failed, because only 1 element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                 "  at index 1, forAtLeast(2) failed, because only 1 element satisfied the assertion block: " + Prettifier.lineSeparator +
+                                 "    at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 8) + "), " + Prettifier.lineSeparator +
+                                 "    at index 2, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 9) + ") " + Prettifier.lineSeparator + 
+                                 "  in List(8, 11, 13) (InspectorsSpec.scala:" + (thisLineNumber - 11) + ") " + Prettifier.lineSeparator +
                                  "in List(List(2, 3, 6), List(8, 11, 13))"))
       e.getCause should be (null)
     }
@@ -1778,14 +1778,14 @@ class InspectorsSpec extends AnyFunSpec with Inspectors with TableDrivenProperty
       }
       e.failedCodeFileName should be (Some("InspectorsSpec.scala"))
       e.failedCodeLineNumber should be (Some(thisLineNumber - 7))
-      e.message should be (Some("forEvery failed, because: \n" +
-                                "  at index 1, forEvery failed, because: \n" +
-                                "    at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 8) + ") \n" +
-                                "  in List(8, 9, 12) (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), \n" +
-                                "  at index 2, forEvery failed, because: \n" + 
-                                "    at index 0, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), \n" +
-                                "    at index 2, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") \n" + 
-                                "  in List(11, 16, 19) (InspectorsSpec.scala:" + (thisLineNumber - 14) + ") \n" +
+      e.message should be (Some("forEvery failed, because: " + Prettifier.lineSeparator +
+                                "  at index 1, forEvery failed, because: " + Prettifier.lineSeparator +
+                                "    at index 1, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 8) + ") " + Prettifier.lineSeparator +
+                                "  in List(8, 9, 12) (InspectorsSpec.scala:" + (thisLineNumber - 10) + "), " + Prettifier.lineSeparator +
+                                "  at index 2, forEvery failed, because: " + Prettifier.lineSeparator + 
+                                "    at index 0, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 11) + "), " + Prettifier.lineSeparator +
+                                "    at index 2, 1 was not equal to 0 (InspectorsSpec.scala:" + (thisLineNumber - 12) + ") " + Prettifier.lineSeparator + 
+                                "  in List(11, 16, 19) (InspectorsSpec.scala:" + (thisLineNumber - 14) + ") " + Prettifier.lineSeparator +
                                 "in List(List(2, 4, 6), List(8, 9, 12), List(11, 16, 19))"))
       e.getCause should be (null)
     }

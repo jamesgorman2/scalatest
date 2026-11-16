@@ -10,6 +10,12 @@ object EventLine {
 
   def of(event: Event): String = rendered(event)
 
+  /**
+   * The text with each "\r\n" written as "\n". The fork separates the lines of the text it writes with the platform's
+   * line separator, and 3.2.20 with "\n", so on Windows the same message differs only there.
+   */
+  def withLineFeeds(text: String): String = text.replace("\r\n", "\n")
+
   def ofThrowable(throwable: Throwable): String = {
     val failedCode = throwable match {
       case stackDepth: StackDepth =>
@@ -38,7 +44,7 @@ object EventLine {
       .mkString(product.productPrefix + "(", ", ", ")")
 
   private def quoted(text: String): String =
-    text.flatMap {
+    withLineFeeds(text).flatMap {
       case '"' => "\\\""
       case '\\' => "\\\\"
       case '\n' => "\\n"

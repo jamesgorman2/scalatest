@@ -95,9 +95,9 @@ abstract class UnitInspectorAsserting {
       if (result.failedElements.length > 0)
         indicateFailure(
           if (shorthand)
-            Resources.allShorthandFailed(indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+            Resources.allShorthandFailed(indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
           else
-            Resources.forAllFailed(indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original)),
+            Resources.forAllFailed(indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original)),
           Some(result.failedElements(0)._3),
           pos,
           result.failedElements.flatMap(_._4)
@@ -142,14 +142,14 @@ abstract class UnitInspectorAsserting {
         indicateFailure(
           if (shorthand)
             if (passedCount > 0)
-              Resources.atLeastShorthandFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.atLeastShorthandFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else
-              Resources.atLeastShorthandFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.atLeastShorthandFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
           else
             if (passedCount > 0)
-              Resources.forAtLeastFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.forAtLeastFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else
-              Resources.forAtLeastFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original)),
+              Resources.forAtLeastFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original)),
           None,
           pos
         )
@@ -186,19 +186,19 @@ abstract class UnitInspectorAsserting {
         indicateFailure(
           if (shorthand)
             if (result.passedCount == 0)
-              Resources.exactlyShorthandFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.exactlyShorthandFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else {
               if (result.passedCount < succeededCount)
-                Resources.exactlyShorthandFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.exactlyShorthandFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
                 Resources.exactlyShorthandFailedMore(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
             }
           else
             if (result.passedCount == 0)
-              Resources.forExactlyFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.forExactlyFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else {
               if (result.passedCount < succeededCount)
-                Resources.forExactlyFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.forExactlyFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
                 Resources.forExactlyFailedMore(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
             },
@@ -239,19 +239,19 @@ abstract class UnitInspectorAsserting {
         indicateFailure(
           if (shorthand)
             if (result.passedCount == 0)
-              Resources.betweenShorthandFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.betweenShorthandFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else {
               if (result.passedCount < from)
-                Resources.betweenShorthandFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.betweenShorthandFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
                 Resources.betweenShorthandFailedMore(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
             }
           else
             if (result.passedCount == 0)
-              Resources.forBetweenFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.forBetweenFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else {
               if (result.passedCount < from)
-                Resources.forBetweenFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.forBetweenFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
                 Resources.forBetweenFailedMore(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
             },
@@ -291,9 +291,9 @@ abstract class UnitInspectorAsserting {
       if (messageList.size > 0)
         indicateFailure(
           if (shorthand)
-            Resources.everyShorthandFailed(indentErrorMessages(messageList).mkString(", \n"), decorateToStringValue(prettifier, original))
+            Resources.everyShorthandFailed(indentErrorMessages(messageList).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
           else
-            Resources.forEveryFailed(indentErrorMessages(messageList).mkString(", \n"), decorateToStringValue(prettifier, original)),
+            Resources.forEveryFailed(indentErrorMessages(messageList).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original)),
           None,
           pos
         )
@@ -406,9 +406,9 @@ object InspectorAsserting extends UnitInspectorAsserting /*ExpectationInspectorA
         if (result.failedElements.length > 0)
           indicateFailureFuture(
             if (shorthand)
-              Resources.allShorthandFailed(indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.allShorthandFailed(indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else
-              Resources.forAllFailed(indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original)),
+              Resources.forAllFailed(indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original)),
             Some(result.failedElements(0)._3),
             pos
           )
@@ -474,14 +474,14 @@ object InspectorAsserting extends UnitInspectorAsserting /*ExpectationInspectorA
           indicateFailureFuture(
             if (shorthand)
               if (passedCount > 0)
-                Resources.atLeastShorthandFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.atLeastShorthandFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
-                Resources.atLeastShorthandFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.atLeastShorthandFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else
             if (passedCount > 0)
-              Resources.forAtLeastFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.forAtLeastFailed(min.toString, elementLabel(passedCount), indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else
-              Resources.forAtLeastFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original)),
+              Resources.forAtLeastFailedNoElement(min.toString, indentErrorMessages(messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original)),
             None,
             pos
           )
@@ -520,18 +520,18 @@ object InspectorAsserting extends UnitInspectorAsserting /*ExpectationInspectorA
           indicateFailureFuture(
             if (shorthand)
               if (result.passedCount == 0)
-                Resources.exactlyShorthandFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.exactlyShorthandFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else {
                 if (result.passedCount < succeededCount)
-                  Resources.exactlyShorthandFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                  Resources.exactlyShorthandFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
                 else
                   Resources.exactlyShorthandFailedMore(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
               }
             else if (result.passedCount == 0)
-              Resources.forExactlyFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.forExactlyFailedNoElement(succeededCount.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else {
               if (result.passedCount < succeededCount)
-                Resources.forExactlyFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.forExactlyFailedLess(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
                 Resources.forExactlyFailedMore(succeededCount.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
             },
@@ -576,18 +576,18 @@ object InspectorAsserting extends UnitInspectorAsserting /*ExpectationInspectorA
           indicateFailureFuture(
             if (shorthand)
               if (result.passedCount == 0)
-                Resources.betweenShorthandFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.betweenShorthandFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else {
                 if (result.passedCount < from)
-                  Resources.betweenShorthandFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                  Resources.betweenShorthandFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
                 else
                   Resources.betweenShorthandFailedMore(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
               }
             else if (result.passedCount == 0)
-              Resources.forBetweenFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.forBetweenFailedNoElement(from.toString, upTo.toString, indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else {
               if (result.passedCount < from)
-                Resources.forBetweenFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+                Resources.forBetweenFailedLess(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
               else
                 Resources.forBetweenFailedMore(from.toString, upTo.toString, elementLabel(result.passedCount), keyOrIndexLabel(original, result.passedElements), decorateToStringValue(prettifier, original))
             },
@@ -605,9 +605,9 @@ object InspectorAsserting extends UnitInspectorAsserting /*ExpectationInspectorA
         if (result.failedElements.length > 0)
           indicateFailureFuture(
             if (shorthand)
-              Resources.everyShorthandFailed(indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original))
+              Resources.everyShorthandFailed(indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original))
             else
-              Resources.forEveryFailed(indentErrorMessages(result.messageAcc).mkString(", \n"), decorateToStringValue(prettifier, original)),
+              Resources.forEveryFailed(indentErrorMessages(result.messageAcc).mkString(", " + Prettifier.lineSeparator), decorateToStringValue(prettifier, original)),
             Some(result.failedElements(0)._3),
             pos
           )

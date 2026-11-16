@@ -349,8 +349,8 @@ class ListShouldContainAtMostOneElementOfLogicalOrSpec extends AnyFreeSpec {
     val toLists: Vector[List[String]] = Vector(List("to", "you"), List("to", "you"), List("to", "you"))
 
     def allErrMsg(index: Int, message: String, lineNumber: Int, left: Any): String =
-      "'all' inspection failed, because: \n" +
-        "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") \n" +
+      "'all' inspection failed, because: " + Prettifier.lineSeparator +
+        "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") " + Prettifier.lineSeparator +
         "in " + decorateToStringValue(prettifier, left)
 
     "when used with (contain oneOf (..) and contain oneOf (..)) syntax" - {

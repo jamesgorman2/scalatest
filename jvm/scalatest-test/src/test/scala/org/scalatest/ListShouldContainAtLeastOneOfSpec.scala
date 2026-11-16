@@ -314,8 +314,8 @@ The bottom two don't, but still I don't want to support that in general.
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(2)) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(2)) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
 
         val e2 = intercept[TestFailedException] {
@@ -323,8 +323,8 @@ The bottom two don't, but still I don't want to support that in general.
         }
         e2.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e2.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e2.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (\"ho\", \"hey\", \"howdy\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (\"ho\", \"hey\", \"howdy\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, nils)))
 
         val e4 = intercept[TestFailedException] {
@@ -332,8 +332,8 @@ The bottom two don't, but still I don't want to support that in general.
         }
         e4.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, listsNil)))
       }
 
@@ -387,8 +387,8 @@ The bottom two don't, but still I don't want to support that in general.
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(2)) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(2)) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
 
         val e2 = intercept[TestFailedException] {
@@ -396,8 +396,8 @@ The bottom two don't, but still I don't want to support that in general.
         }
         e2.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e2.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e2.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (\"ho\", \"hey\", \"howdy\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (\"ho\", \"hey\", \"howdy\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, nils)))
 
         val e4 = intercept[TestFailedException] {
@@ -405,8 +405,8 @@ The bottom two don't, but still I don't want to support that in general.
         }
         e4.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, Nil) + " did not contain at least one of (1, 3, 4) (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, listsNil)))
       }
 
@@ -469,8 +469,8 @@ scala> all (list1s) should (contain (atLeastOneOf (1, 3, 4)))
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -526,8 +526,8 @@ The top two don't, but still I don't want to support that in general.
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -566,8 +566,8 @@ The top two don't, but still I don't want to support that in general.
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -606,8 +606,8 @@ The top two don't, but still I don't want to support that in general.
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtLeastOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to")) + " contained at least one of (\"happy\", \"birthday\", \"to\", \"you\") (ListShouldContainAtLeastOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

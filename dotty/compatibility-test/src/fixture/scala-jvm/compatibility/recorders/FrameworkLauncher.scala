@@ -19,7 +19,7 @@ object FrameworkLauncher {
     val logger = new RecordingLogger(LineFile.namedBy("compatibility.loggerLines").append)
     execute(runner.tasks(taskDefs), new RecordingEventHandler(LineFile.namedBy("compatibility.events").append), logger)
     val summary = LineFile.namedBy("compatibility.summary")
-    runner.done().split("\n", -1).foreach(summary.append)
+    runner.done().split("\r?\n", -1).foreach(summary.append)
     System.exit(0)
   }
 

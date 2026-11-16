@@ -1666,7 +1666,7 @@ used for test events like succeeded/failed, etc.
   def indentation(level: Int) = "  " * level
   
   def indentLines(level: Int, lines: GenTraversable[String]) = 
-    lines.map(line => line.split("\n").map(indentation(level) + _).mkString("\n"))
+    lines.map(line => line.split("\r?\n").map(indentation(level) + _).mkString(Prettifier.lineSeparator))
     
   def substituteHtmlSpace(value: String) = value.replaceAll(" ", "&nbsp;")
 

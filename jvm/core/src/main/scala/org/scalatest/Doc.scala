@@ -174,7 +174,7 @@ println("&&&&&&&&&&&")
             IncludedSuite(registeredSuites(key)) +: left
           case (line, None) =>
             left.head match {
-              case Markup(text) => Markup(text + "\n" + line) +: left.tail
+              case Markup(text) => Markup(text + org.scalactic.Prettifier.lineSeparator + line) +: left.tail
               case _ => Markup(line) +: left
             }
         }
@@ -196,7 +196,7 @@ private[scalatest] object Doc {
     val lastNonWhiteLine = zipLines.reverse.find { case (line, _) => !line.trim.isEmpty }
     (firstNonWhiteLine, lastNonWhiteLine) match {
       case (None, None) => text.trim // Will be either (None, None) or (Some, Some)
-      case (Some((_, frontIdx)), Some((_, backIdx))) => lines.take(backIdx + 1).drop(frontIdx).mkString("\n")
+      case (Some((_, frontIdx)), Some((_, backIdx))) => lines.take(backIdx + 1).drop(frontIdx).mkString(org.scalactic.Prettifier.lineSeparator)
     }
   }
 
@@ -212,7 +212,7 @@ private[scalatest] object Doc {
           val strip = if (line.length > margin) margin else line.length
           line.substring(strip)
         }
-        choppedLines.mkString("\n")
+        choppedLines.mkString(org.scalactic.Prettifier.lineSeparator)
     }
   }
 }

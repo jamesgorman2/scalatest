@@ -144,7 +144,7 @@ class MasterRunner(theArgs: Array[String], theRemoteArgs: Array[String], testCla
         presentReminderWithoutCanceledTests,
         presentFilePathname
       )
-    fragments.map(_.toPossiblyColoredText(presentInColor)).mkString("\n")
+    fragments.map(_.toPossiblyColoredText(presentInColor)).mkString(org.scalactic.Prettifier.lineSeparator)
   }
 
   def remoteArgs(): Array[String] = {

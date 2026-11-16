@@ -126,7 +126,7 @@ private[scalatest] object Reporter {
     val indentation = if (level > 0) "  " * level else ""
     val withTabsZapped = stackTrace.replaceAll("\t", "  ")
     val withInitialIndent = indentation + withTabsZapped
-    withInitialIndent.replaceAll("\n", "\n" + indentation) // I wonder if I need to worry about alternate line endings. Probably.
+    withInitialIndent.replaceAll("\r?\n", org.scalactic.Prettifier.lineSeparator + indentation)
   }
 
   // In the unlikely event that a message is blank, use the throwable's detail message

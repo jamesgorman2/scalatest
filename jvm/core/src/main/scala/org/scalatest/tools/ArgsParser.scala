@@ -596,8 +596,8 @@ private[tools] object ArgsParser {
         case c: Char => {
 
           // this should be moved to the checker, and just throw an exception here with a debug message. Or allow a MatchError.
-          val msg1 = Resources.invalidConfigOption(String.valueOf(c)) + '\n'
-          val msg2 =  Resources.probarg(reporterArg) + '\n'
+          val msg1 = Resources.invalidConfigOption(String.valueOf(c)) + org.scalactic.Prettifier.lineSeparator
+          val msg2 =  Resources.probarg(reporterArg) + org.scalactic.Prettifier.lineSeparator
 
           throw new IllegalArgumentException(msg1 + msg2)
         }

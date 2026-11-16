@@ -139,7 +139,7 @@ private[scalatest] class DispatchReporter(
             val msgs =
               for (slowpoke <- slowpokes)
               yield Resources.slowpokeDetected(makeDurationString(slowpoke.duration.millisPart), slowpoke.suiteName, slowpoke.testName)
-            val fullMessage = msgs.mkString("\n")
+            val fullMessage = msgs.mkString(org.scalactic.Prettifier.lineSeparator)
             val dispatch = thisDispatchReporter
             val alertEvent =
               new AlertProvided(

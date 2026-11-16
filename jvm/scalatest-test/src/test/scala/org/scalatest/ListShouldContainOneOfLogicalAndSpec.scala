@@ -448,8 +448,8 @@ class ListShouldContainOneOfLogicalAndSpec extends AnyFunSpec {
     val toLists: Vector[List[String]] = Vector(List("to"), List("to"), List("to"))
 
     def allErrMsg(index: Int, message: String, lineNumber: Int, left: Any): String =
-      "'all' inspection failed, because: \n" +
-      "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") \n" +
+      "'all' inspection failed, because: " + Prettifier.lineSeparator +
+      "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") " + Prettifier.lineSeparator +
       "in " + decorateToStringValue(prettifier, left)
 
     describe("when used with (contain oneOf (..) and contain oneOf (..))") {

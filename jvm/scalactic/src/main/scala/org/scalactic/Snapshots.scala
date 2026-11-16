@@ -190,7 +190,7 @@ final class SnapshotSeq(underlying: collection.immutable.IndexedSeq[Snapshot]) e
    * f was null
    * </pre>
    */
-  def lines: String = mkString("\n")
+  def lines: String = mkString(Prettifier.lineSeparator)
 }
 
 object SnapshotSeq {

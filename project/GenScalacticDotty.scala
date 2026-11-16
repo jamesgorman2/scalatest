@@ -38,7 +38,7 @@ object GenScalacticDotty {
   private def transformLine(line: String): String =
     ((uncommentJsExport _) andThen (rewrite213 _))(line)
 
-  private def copyFile(sourceFile: File, destFile: File): File = {
+  private def copyFile(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -50,7 +50,7 @@ object GenScalacticDotty {
           skipMode = false
         else if (!skipMode) {
           destWriter.write(transformLine(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -62,25 +62,25 @@ object GenScalacticDotty {
     }
   }
 
-  def copyFiles(sourceDirName: String, packageDirName: String, targetDir: File, files: List[String]): Seq[File] = {
+  def copyFiles(sourceDirName: String, packageDirName: String, targetDir: File, files: List[String], lineEnding: String = GenScalaTestDotty.PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     files.map { sourceFileName =>
       val sourceFile = new File(sourceDir, sourceFileName)
       val destFile = new File(packageDir, sourceFile.getName)
-      copyFile(sourceFile, destFile)
+      copyFile(sourceFile, destFile, lineEnding)
     }
   }
 
-  def copyDir(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDir(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String = GenScalaTestDotty.PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && f.getName.endsWith(".scala")).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified) {
-        copyFile(sourceFile, destFile)
+        copyFile(sourceFile, destFile, lineEnding)
       }
 
       destFile
@@ -106,7 +106,7 @@ object GenScalacticDotty {
   private def transformLineJS(line: String): String =
     uncommentJsExportJS(line)
 
-  private def copyFileJS(sourceFile: File, destFile: File): File = {
+  private def copyFileJS(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -126,7 +126,7 @@ object GenScalacticDotty {
           skipMode = false    
         else if (!skipMode) {
           destWriter.write(transformLineJS(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -138,14 +138,14 @@ object GenScalacticDotty {
     }
   }
 
-  def copyDirJS(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDirJS(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFileJS(sourceFile, destFile)
+        copyFileJS(sourceFile, destFile, lineEnding)
 
       destFile
     }
@@ -168,7 +168,7 @@ object GenScalacticDotty {
   private def transformLineNative(line: String): String =
     uncommentNativeExportNative(line)
 
-  private def copyFileNative(sourceFile: File, destFile: File): File = {
+  private def copyFileNative(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -188,7 +188,7 @@ object GenScalacticDotty {
           skipMode = false
         else if (!skipMode) {
           destWriter.write(transformLineNative(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -200,14 +200,14 @@ object GenScalacticDotty {
     }
   }
 
-  def copyDirNative(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDirNative(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String = GenScalaTestDotty.PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFileNative(sourceFile, destFile)
+        copyFileNative(sourceFile, destFile, lineEnding)
 
       destFile
     }
@@ -247,20 +247,21 @@ object GenScalacticDotty {
         "BooleanMacro.scala", // Re-implemented
         "Requirements.scala", // Re-implemented
         "Snapshots.scala"     // Re-implemented
-      )
+      ),
+      GenScalaTestDotty.ScalaJsLineEnding
     ) ++
-    copyDir("jvm/scalactic/src/main/scala/org/scalactic/exceptions", "org/scalactic/exceptions", targetDir, List.empty) ++
+    copyDir("jvm/scalactic/src/main/scala/org/scalactic/exceptions", "org/scalactic/exceptions", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
     copyDir("jvm/scalactic/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir,
       List(
         "Position.scala",  // Re-implemented
         "TypeInfo.scala",  // Re-implemented
         "ObjectMeta.scala"    // Re-implemented in scala-js
-      )) ++
-    copyDir("jvm/scalactic/src/main/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir, List.empty) ++
-    copyDir("dotty/scalactic/src/main/scala/org/scalactic", "org/scalactic", targetDir, List.empty) ++
-    copyDir("dotty/scalactic/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty) ++
-    copyDirJS("dotty/scalactic/src/main/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir, List.empty) ++ 
-    copyDir("js/scalactic/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty) 
+      ), GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDir("jvm/scalactic/src/main/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDir("dotty/scalactic/src/main/scala/org/scalactic", "org/scalactic", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDir("dotty/scalactic/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDirJS("dotty/scalactic/src/main/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDir("js/scalactic/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding)
 
   def genScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDirNative("jvm/scalactic/src/main/scala/org/scalactic", "org/scalactic", targetDir,
@@ -282,12 +283,13 @@ object GenScalacticDotty {
     copyDir("dotty/scalactic/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty) ++
     copyDirNative("dotty/scalactic/src/main/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir, List.empty)
 
-  def genMacroScala(targetDir: File, version: String, scalaVersion: String): Seq[File] =
+  def genMacroScala(targetDir: File, version: String, scalaVersion: String, lineEnding: String = GenScalaTestDotty.PlatformLineEnding): Seq[File] =
     copyDir("jvm/scalactic-macro/src/main/scala/org/scalactic", "org/scalactic", targetDir,
       List(
         "BooleanMacro.scala", // Seems to be moved to scalactic already
         "MacroOwnerRepair.scala"  // No longer needed by the new macro?
-      )
+      ),
+      lineEnding
     ) ++
     //copyDir("scalactic-macro/src/main/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir, List.empty) ++
     copyDir("jvm/scalactic-macro/src/main/scala/org/scalactic/source", "org/scalactic/source", targetDir,
@@ -295,7 +297,8 @@ object GenScalacticDotty {
         "PositionMacro.scala",  // Already reimplemented in Position.scala
         "TypeInfoMacro.scala",  // Already reimplemented
         "Position.scala"        // Already exists for scalactic-dotty
-      )
+      ),
+      lineEnding
     )
 
   def genResource(targetDir: File): Seq[File] = {
@@ -304,7 +307,7 @@ object GenScalacticDotty {
     destResourceDir.mkdirs()
     val destResourceFile = new File(destResourceDir, "ScalacticBundle.properties")
     if (!destResourceFile.exists || sourceResourceFile.lastModified > destResourceFile.lastModified)
-      copyFile(sourceResourceFile, destResourceFile)
+      copyFile(sourceResourceFile, destResourceFile, GenScalaTestDotty.PlatformLineEnding)
 
     List(destResourceFile)
   }
@@ -331,13 +334,13 @@ object GenScalacticDotty {
       List(
         "TripleEqualsSpec.for210",  // Old staff, we shall delete this soon.
         "FutureSugarSpec.scala"     // instability, occasional timeout in CI
-      )) ++
+      ), GenScalaTestDotty.ScalaJsLineEnding) ++
     copyDirJS("jvm/scalactic-test/src/test/scala/org/scalactic/anyvals", "org/scalactic/anyvals", targetDir,
       List(
         "OddIntMacro.scala",  // not used, scala2 macros
         "OddInt.scala"        // not used, scala2 macros
-      )) ++
-    copyDirJS("jvm/scalactic-test/src/test/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty)
+      ), GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDirJS("jvm/scalactic-test/src/test/scala/org/scalactic/source", "org/scalactic/source", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding)
 
   def genTestNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDirNative("jvm/scalactic-test/src/test/scala/org/scalactic", "org/scalactic", targetDir,

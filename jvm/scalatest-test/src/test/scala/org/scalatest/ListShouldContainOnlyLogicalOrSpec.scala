@@ -570,8 +570,8 @@ class ListShouldContainOnlyLogicalOrSpec extends AnyFunSpec {
     val toLists: Vector[List[String]] = Vector(List("you", "to"), List("you", "to"), List("you", "to"))
     
     def allErrMsg(index: Int, message: String, lineNumber: Int, left: Any): String = 
-      "'all' inspection failed, because: \n" +
-      "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") \n" +
+      "'all' inspection failed, because: " + Prettifier.lineSeparator +
+      "  at index " + index + ", " + message + " (" + fileName + ":" + (lineNumber) + ") " + Prettifier.lineSeparator +
       "in " + decorateToStringValue(prettifier, left)
     
     describe("when used with (contain only (..) and contain only (..))") {

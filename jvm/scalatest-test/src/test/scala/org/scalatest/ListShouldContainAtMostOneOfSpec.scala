@@ -308,8 +308,8 @@ class ListShouldContainAtMostOneOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one of (2, 3, 4) (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one of (2, 3, 4) (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -363,8 +363,8 @@ class ListShouldContainAtMostOneOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one of (2, 3, 4) (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one of (2, 3, 4) (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -414,8 +414,8 @@ class ListShouldContainAtMostOneOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -456,8 +456,8 @@ class ListShouldContainAtMostOneOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -496,8 +496,8 @@ class ListShouldContainAtMostOneOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -538,8 +538,8 @@ class ListShouldContainAtMostOneOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one of (\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

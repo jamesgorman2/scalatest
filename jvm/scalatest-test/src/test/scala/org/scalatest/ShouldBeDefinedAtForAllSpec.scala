@@ -15,6 +15,7 @@
  */
 package org.scalatest
 
+import org.scalactic.Prettifier
 import SharedHelpers.thisLineNumber
 import exceptions.TestFailedException
 import org.scalatest.funspec.AnyFunSpec
@@ -35,8 +36,8 @@ class ShouldBeDefinedAtForAllSpec extends AnyFunSpec {
     s"${left.toString()} did not equal ${right.toString()}"
   
   def errorMessage(index: Int, message: String, lineNumber: Int, left: Any): String = 
-    "'all' inspection failed, because: \n" +
-    "  at index " + index + ", " + message + " (ShouldBeDefinedAtForAllSpec.scala:" + lineNumber + ") \n" +
+    "'all' inspection failed, because: " + Prettifier.lineSeparator +
+    "  at index " + index + ", " + message + " (ShouldBeDefinedAtForAllSpec.scala:" + lineNumber + ") " + Prettifier.lineSeparator +
     "in " + left
   
   describe("PartialFunction ") {

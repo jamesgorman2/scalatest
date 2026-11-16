@@ -1001,7 +1001,7 @@ private[scalatest] object StringReporter {
       if (possiblyEmptyMessageWithPossibleLineNumber.isEmpty)
         stringToPrintWithPossibleDuration :: diffAnalysis ::: stackTrace
       else
-        stringToPrintWithPossibleDuration :: possiblyEmptyMessageWithPossibleLineNumber.split("\n").toList ::: diffAnalysis ::: stackTrace
+        stringToPrintWithPossibleDuration :: possiblyEmptyMessageWithPossibleLineNumber.split("\r?\n").toList ::: diffAnalysis ::: stackTrace
     Vector.empty ++ resultAsList
   }
 

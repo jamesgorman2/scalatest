@@ -95,8 +95,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List("test", "test2", "test")) shouldEqual ("test")
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 1, \"test[2]\" did not equal \"test[]\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 1, \"test[2]\" did not equal \"test[]\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(\"test\", \"test2\", \"test\")"))
         assert(e.analysis == Vector("\"test[2]\" -> \"test[]\""))
       }
@@ -105,8 +105,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List("test", "test2", "test")) shouldEqual (2)
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 0, \"test\" did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 0, \"test\" did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(\"test\", \"test2\", \"test\")"))
         assert(e.analysis == Vector.empty)
       }
@@ -115,8 +115,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List(1, 2, 3)) shouldEqual ("test")
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 0, 1 did not equal \"test\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 0, 1 did not equal \"test\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(1, 2, 3)"))
         assert(e.analysis == Vector.empty)
       }
@@ -125,8 +125,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List(1, 2, 3)) shouldEqual (2)
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 0, 1 did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 0, 1 did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(1, 2, 3)"))
         assert(e.analysis == Vector.empty)
       }
@@ -135,8 +135,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List("test", "test2", "test")) should equal("test")
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 1, \"test[2]\" did not equal \"test[]\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 1, \"test[2]\" did not equal \"test[]\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(\"test\", \"test2\", \"test\")"))
         assert(e.analysis == Vector("\"test[2]\" -> \"test[]\""))
       }
@@ -145,8 +145,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List("test", "test2", "test")) should equal(2)
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 0, \"test\" did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 0, \"test\" did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(\"test\", \"test2\", \"test\")"))
         assert(e.analysis == Vector.empty)
       }
@@ -155,8 +155,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List(1, 2, 3)) should equal("test")
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 0, 1 did not equal \"test\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 0, 1 did not equal \"test\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(1, 2, 3)"))
         assert(e.analysis == Vector.empty)
       }
@@ -165,8 +165,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List(1, 2, 3)) should equal(2)
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 0, 1 did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 0, 1 did not equal 2 (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(1, 2, 3)"))
         assert(e.analysis == Vector.empty)
       }
@@ -240,8 +240,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List("test", "test2", "test")) shouldEqual ("test")
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 1, \"**test[2]\" did not equal \"test[]**\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 1, \"**test[2]\" did not equal \"test[]**\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(\"test\", \"test2\", \"test\")"))
         assert(e.analysis == Vector(("\"test[2]\" -> \"test[]\"")))
       }
@@ -250,8 +250,8 @@ class DifferSpec extends funspec.AnyFunSpec {
         val e = intercept[TestFailedException] {
           all(List("test", "test2", "test")) should equal("test")
         }
-        assert(e.message == Some("'all' inspection failed, because: \n" +
-          "  at index 1, \"**test[2]\" did not equal \"test[]**\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") \n" +
+        assert(e.message == Some("'all' inspection failed, because: " + EOL +
+          "  at index 1, \"**test[2]\" did not equal \"test[]**\" (DifferSpec.scala:" + (thisLineNumber - 3) + ") " + EOL +
           "in List(\"test\", \"test2\", \"test\")"))
         assert(e.analysis == Vector(("\"test[2]\" -> \"test[]\"")))
       }
