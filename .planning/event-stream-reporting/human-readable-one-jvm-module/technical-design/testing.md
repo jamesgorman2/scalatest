@@ -44,9 +44,13 @@ Each test of human-readable output compares the whole output, written with colou
 
 The plugin's integration tests assert that Mill's list of failed tests and ScalaTest's end-of-run summary do not reach the console. They cannot assert the same of Mill's runner progress: without a terminal Mill prints no progress prompt, even under `testForked` with `--ticker true`, so its absence proves nothing. Suppressing the progress is covered by construction (`test-command.md` § Stdout, the reading of `Task.log.prompt`) and by `../../research/mill-runner-progress-without-trait.md`, which observed it under pseudo-terminals.
 
+### The compatibility fixture's output
+
+This serves `../specification/runs-and-test-structure-nodes.md` AC-073. It runs among the plugin's integration tests under Mill's testkit. The test holds the expected human-readable output for the compatibility fixture as one multi-line string and checks the test command's output against it. Before comparing, it normalises the text that varies from run to run, such as durations and paths.
+
 ### Comparison with ScalaTest 3.2.20
 
-This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `../specification/test-event-log-events.md` AC-108, AC-113, AC-114, AC-116 and AC-117, and `../specification/runs-and-test-structure-nodes.md` AC-073.
+This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `../specification/test-event-log-events.md` AC-108, AC-113, AC-114, AC-116 and AC-117.
 
 - AC-056 and AC-057 run in a test project of `project/DottyBuild.scala`.
   - The compatibility fixture and the recorders (the `-C` recording reporter, and a test-interface event handler and loggers that record what they receive) are the sources of an sbt configuration of the project's own that extends neither `Compile` nor `Test` and whose one library dependency is `org.scalatest:scalatest` 3.2.20. They compile there once, so both runs load the same compiled classes. `../../SPECIFICATION.md` R-004 lets the fork run them.
@@ -86,7 +90,3 @@ This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `
   - For each platform, a fixture project compiles the fixture against 3.2.20 and links it with 3.2.20, and a fork-link project links the same compiled classes with the fork. The test project runs on the JVM: it starts each linked program in a process of its own, `node` running the Scala.js one, and compares their stdout and stderr.
   - Each run is given the fixture's suites and one of the `-o` argument lists of AC-114, or none: `Framework` on Scala.js and Native takes no other reporter. The launchers and the code that prints a run are in `src/fixture/scala-js`, `src/fixture/scala-native` and `src/fixture/scala-js-native`.
   - The launchers execute tasks as each platform's test bridge does: on Scala.js, each task once the one before it has called back; on Native, synchronously, printing what a task throws.
-- AC-073 runs among the plugin's integration tests under Mill's testkit. Its fixture build also holds a module over the same suites that tests with 3.2.20 and passes `-f` in its own ScalaTest arguments, configured as `../SPECIFICATION.md` § Acceptance criteria requires of every JVM test module of a criterion's build; Mill's `testForked` on that module writes the `-f` file the criterion takes as the reference for what the run holds.
-  - From the `-f` file, between its first suite's name line and the first line that begins `Run completed in`, the test derives the reference set by indentation and suffix: each suite from its name line and any abort line, each scope and test with its outcome from its line, and each failure, cancel and abort with the message lines under it. A node 3.2.20 prints on more than one line, such as a pending scope, is one member. Message lines (`+ `) and stack-frame lines (`../specification/test-event-log-events.md` AC-114) add nothing.
-  - It checks that each member appears in the human-readable output with that outcome and message, in the line form `../specification/layout-tree.md` and `../specification/layout-lines.md` give, not 3.2.20's line form.
-  - It checks that each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the output.

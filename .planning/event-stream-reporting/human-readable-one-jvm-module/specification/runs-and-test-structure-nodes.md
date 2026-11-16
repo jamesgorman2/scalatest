@@ -269,9 +269,6 @@ Feature: Failures
   Rule: Every suite, scope, test, failure and line of captured output a run holds is shown (R-021)
     Scenario: AC-073 The compatibility fixture
       Given the module's suites are the compatibility fixture, in which the suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` does not abort
-      And the file ScalaTest 3.2.20's `-f` reporter writes for the same suites when Mill's `testForked` runs them through `Framework`
       When the test command runs the module with Mill's `--color false`
-      Then each suite, scope and test that file reports is shown by the line the other criteria give it, with the outcome that file reports for it: a suite by its name line (`layout-tree.md` AC-003) and, where it aborted, its abort line (`layout-lines.md` AC-012), a scope or test by its line (`layout-lines.md` AC-017 to AC-027)
-      And each failure, cancel and abort that file reports is shown with its message, under its test's or suite's line, as `layout-lines.md` § Failure, cancel and abort messages and AC-013 give it
-      And each line the fixture writes to stdout or stderr is a `[stdout]` or `[stderr]` line of the human-readable output
+      Then its human-readable output shows every suite, scope and test of the run, every failure with its message, and every line the fixture writes to stdout or stderr
 ```
