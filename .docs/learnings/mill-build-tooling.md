@@ -80,7 +80,12 @@ A test of `buildTarget/test` on Mill 1.3.1 can only compare the error response. 
 <learning>
 date: 2026-11-16
 ---
-To drive Mill 1.3.1's BSP server from a test, spawn `<mill executable> --bsp --jobs 1` in the workspace (the argv `--bsp-install` writes to `.bsp/mill-bsp.json`), and connect with `ch.epfl.scala:bsp4j:2.2.0-M2`, the version Mill's BSP worker is built with. Give lsp4j's `Launcher.Builder` a Scala trait extending `BuildServer`, `ScalaBuildServer` and `JvmBuildServer` as the remote interface. Send `build/initialize`, then `build/initialized`, before any request, and `build/shutdown`, then `build/exit`, at the end.
+To drive Mill 1.3.1's BSP server from a test:
+
+- Spawn `<mill executable> --bsp --jobs 1` in the workspace. This is the argv `--bsp-install` writes to `.bsp/mill-bsp.json`.
+- Connect with `ch.epfl.scala:bsp4j:2.2.0-M2`, the version Mill's BSP worker is built with.
+- Give lsp4j's `Launcher.Builder` a Scala trait extending `BuildServer`, `ScalaBuildServer` and `JvmBuildServer` as the remote interface.
+- Send `build/initialize`, then `build/initialized`, before any request, and `build/shutdown`, then `build/exit`, at the end.
 
 `--bsp` without `--no-daemon` runs through the regular Mill daemon and shares the regular `out/` folder. A test that compares two sessions must stop the daemon between them (`IntegrationTester.removeProcessIdFile()`, with the tester in daemon mode) and remove the module's `out/` folder, or the second session finds the first one's compiled classes and sends no compile notifications.
 

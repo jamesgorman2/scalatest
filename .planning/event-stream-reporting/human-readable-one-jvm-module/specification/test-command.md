@@ -272,4 +272,8 @@ Feature: Mill's own test tasks and BSP server
         | `buildTarget/test` for `core.test`               |
 ```
 
-On Mill 1.3.1, Mill's BSP server answers every `buildTarget/test` request with `Internal error.` and runs no test, with or without the plugin: the bug is in Mill itself. AC-093's `buildTarget/test` row therefore shows only that the plugin does not change that failure; it does not show that a test run an IDE starts over BSP is unchanged. A notification the server sends after its response to one request cannot be told apart from one for the next, so AC-093 compares the notifications of one session that sends every request, from initialization until the server closes the connection.
+On Mill 1.3.1, Mill's BSP server answers every `buildTarget/test` request with `Internal error.` and runs no test, with or without the plugin. The bug is in Mill itself.
+
+AC-093's `buildTarget/test` row therefore shows only that the plugin does not change that failure. It does not show that a test run an IDE starts over BSP is unchanged.
+
+A notification sent after the response to one request cannot be told apart from one for the next. AC-093 therefore compares the notifications of one session that sends every request, from initialization until the server closes the connection.
