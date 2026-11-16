@@ -39,3 +39,8 @@ the repo, are not visible to the user, and accumulate as garbage.
 ## Running bash
 
 Always run in the foreground to avoid idle/timeout issues.
+
+## Testing everything
+
+- Powershell - `test-all.ps1`
+- Bash - `test-all.sh`
