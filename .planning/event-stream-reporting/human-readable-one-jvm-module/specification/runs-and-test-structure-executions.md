@@ -1,15 +1,17 @@
 # Consolidated human-readable output for one JVM module: executions
 
-Acceptance criteria for what the human-readable output shows of a suite, scope or test that ran more than once. Part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events and executions among them; [layout.md](layout.md) gives where each line sits and its text and colour.
-
-Each criterion below feeds the consolidation library an event log.
+This part contains the acceptance criteria for what the human-readable output shows of a suite, scope or test that ran more than once. It is part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria defines the notation these criteria use for an event log and its executions. [layout.md](layout.md) contains the criteria for where each line sits and for each line's text and colour.
 
 ## Executions
 
 ```gherkin
 Feature: Nodes that ran more than once
 
-  Rule: A test shows one line for each of its executions, each with that execution's outcome, failure and messages; those that ran in one execution of its parent sit together at the test's declared position, in the order they started (R-105, R-131, R-133)
+  Background:
+    Given the consolidation library is used directly, without Mill, with colour on
+    And the library consolidates a run under the test run label `core.test`
+
+  Rule: A test shows one line for each of its executions, each with that execution's outcome, failure and messages, and the test's executions that ran in one execution of the test's parent sit together at the test's declared position, in the order they started
     Scenario: AC-141 A test that failed, then succeeded when run again
       Given an event log holding:
         """
@@ -42,7 +44,7 @@ Feature: Nodes that ran more than once
           - steady
         """
 
-  Rule: A scope shows one line for each of its executions, together at the scope's declared position and in the order they started, and each execution of a scope or test sits under the execution of its parent scope that it ran in (R-131, R-133, R-134)
+  Rule: A scope shows one line for each of its executions, together at the scope's declared position and in the order the executions started, and each execution of a scope or test sits under the execution of the parent scope that the child execution ran in
     Scenario: AC-142 A scope and its test ran twice, either side of a sibling scope
       Given an event log holding:
         """
@@ -113,7 +115,7 @@ Feature: Nodes that ran more than once
             - pops
         """
 
-  Rule: A scope's execution shows no line for a node with executions but none in it, and a scope or test with no execution is shown once, under its parent's latest execution (R-100, R-131)
+  Rule: An execution of a scope shows no line for a child whose executions all ran in other executions of the scope, and a scope or test that has no execution is shown once, under the latest execution of its parent
     Scenario: AC-148 One test ran in the second execution only, and one never started
       Given an event log holding:
         """
@@ -150,7 +152,7 @@ Feature: Nodes that ran more than once
             - grows *** NOT RUN ***
         """
 
-  Rule: A suite shows its name line once under each execution of its parent that ran it, however many times it ran in it, and no abort line where no event is assigned to it but a node below it has an execution (R-100, R-132, R-134)
+  Rule: A suite shows its name line once under each execution of its parent that ran the suite, however many times the suite ran in that execution, and a suite execution for which ScalaTest reports no event naming the suite, but in which a node below the suite ran, shows no abort line
     Scenario: AC-143 A suite that a test ran in each of its two executions
       Given an event log holding:
         """
@@ -229,7 +231,7 @@ Feature: Nodes that ran more than once
                 - helps
         """
 
-  Rule: A suite that each of two tests ran is two nodes, one under each test's line (R-096, R-130)
+  Rule: A suite that each of two tests ran is two nodes, one under each test's line
     Scenario: AC-159 A suite that two tests each ran
       Given an event log holding:
         """
@@ -276,3 +278,17 @@ Feature: Nodes that ran more than once
                 - helps
         """
 ```
+
+## Requirements covered
+
+| Requirement | Criteria                       |
+|-------------|--------------------------------|
+| R-096       | AC-159                         |
+| R-100       | AC-148, AC-143, AC-161         |
+| R-104       | AC-159                         |
+| R-105       | AC-141                         |
+| R-130       | AC-159                         |
+| R-131       | AC-141, AC-142, AC-149, AC-148 |
+| R-132       | AC-143, AC-161                 |
+| R-133       | AC-141, AC-142, AC-149         |
+| R-134       | AC-142, AC-149, AC-143, AC-161 |

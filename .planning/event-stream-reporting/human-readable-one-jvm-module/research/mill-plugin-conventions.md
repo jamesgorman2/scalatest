@@ -220,7 +220,7 @@ These are outside the issue's list. They are recorded because they bear on the r
 ### 8.4 Which Mill release to build against
 
 - **`1.1.10`.** Every research note ran there.
-  - Under R-120 the floor is `1.1.10`, and the plugin compiles on Scala `3.8.2`. By Mill's backward compatibility it loads on `1.3.x`.
+  - Under `.planning/event-stream-reporting/SPECIFICATION.md` § Scope the floor is `1.1.10`, and the plugin compiles on Scala `3.8.2`. By Mill's backward compatibility it loads on `1.3.x`.
   - Costs: under `.planning/event-stream-reporting/decisions/test-command.md` "A release of the Mill plugin supports exactly the Mill releases its integration tests passed on…", supporting `1.3.x` needs the integration tests to pass there.
   - The `1.1.10` copies of the queue scheduling and of `Execution` differ from `1.3.1`'s (§ 5, § 6). Supporting both may need behaviour chosen by the running Mill version.
   - `1.1.10` is the last release of a line that `1.3` has superseded.

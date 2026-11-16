@@ -1,16 +1,18 @@
-# Consolidated human-readable output for one JVM module: structures that change
+# Consolidated human-readable output for one JVM module: registrations that change
 
-Acceptance criteria for what the human-readable output shows of a suite whose structure the event log holds more than once. Part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events, executions and further `structure` events among them; [layout.md](layout.md) gives where each line sits and its text and colour.
+This part contains the acceptance criteria for what the human-readable output shows of a suite that registers its scopes and tests more than once. It is part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria defines the notation these criteria use for an event log, its executions and its further `structure` events. [layout.md](layout.md) contains the criteria for where each line sits and for each line's text and colour.
 
-Each criterion below feeds the consolidation library an event log.
-
-## A suite with more than one structure
+## A suite that registers its scopes and tests more than once
 
 ```gherkin
-Feature: A suite whose structure the event log holds more than once
+Feature: A suite that registers its scopes and tests more than once
 
-  Rule: Every execution of a node is shown at the parent, declared position and label its suite's last structure gives the node (R-105, R-130)
-    Scenario: AC-144 A further structure reorders tests, relabels one and moves one under a scope
+  Background:
+    Given the consolidation library is used directly, without Mill, with colour on
+    And the library consolidates a run under the test run label `core.test`
+
+  Rule: Every execution of a scope or test is shown at the parent, declared position and label that the last registration of its suite's scopes and tests gives the scope or test
+    Scenario: AC-144 A later registration reorders tests, relabels one and moves one under a scope
       Given an event log holding:
         """
         run started
@@ -55,8 +57,8 @@ Feature: A suite whose structure the event log holds more than once
             - must pop
         """
 
-  Rule: A node that its suite's last structure lacks, and that has an execution or holds a node that has one, is shown with the parent, declared position and label the last structure to hold it gave it, after any node the last structure holds at that position (R-021)
-    Scenario: AC-145 A test that ran is missing from the last structure
+  Rule: A scope or test that only an earlier registration of its suite contained, and that ran or contains a node that ran, is shown with the parent, declared position and label that the latest registration containing the scope or test gave it, after any node that the suite's last registration contains at that position
+    Scenario: AC-145 A test that ran is missing from the last registration
       Given an event log holding:
         """
         run started
@@ -90,7 +92,7 @@ Feature: A suite whose structure the event log holds more than once
             - peeks *** NOT RUN ***
         """
 
-    Scenario: AC-150 A scope whose test ran is missing from the last structure
+    Scenario: AC-150 A scope whose test ran is missing from the last registration
       Given an event log holding:
         """
         run started
@@ -126,8 +128,8 @@ Feature: A suite whose structure the event log holds more than once
             - pops
         """
 
-  Rule: A node with no execution that its suite's last structure lacks is not shown, and is not aborted with reason *not run* (R-100, R-130)
-    Scenario: AC-146 A test only the first structure holds never starts
+  Rule: A scope or test that only an earlier registration of its suite contained, and that never ran, is not shown, is not counted among the nodes a collapsed subtree hides, and is not aborted with reason *not run*
+    Scenario: AC-146 A test only the first registration contains never starts
       Given an event log holding:
         """
         run started
@@ -155,9 +157,19 @@ Feature: A suite whose structure the event log holds more than once
             - remote
         """
 
-    Scenario: AC-147 A test only the first structure holds is not counted in a collapsed subtree
-      Given the event log of AC-146, with every event after its second `structure` replaced by:
+    Scenario: AC-147 A test only the first registration contains is not counted in a collapsed subtree
+      Given an event log holding:
         """
+        run started
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+            scope "A config", label "A config"
+              test "local", label "- local"
+        suite "ConfigSpec": SuiteStarting
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+            scope "A config", label "A config"
+              test "remote", label "- remote"
         suite "ConfigSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
         run ended completed
         """
@@ -170,3 +182,14 @@ Feature: A suite whose structure the event log holds more than once
           (1 scope, 1 test not run)
         """
 ```
+
+## Requirements covered
+
+| Requirement | Criteria                                       |
+|-------------|------------------------------------------------|
+| R-021       | AC-145, AC-150                                 |
+| R-100       | AC-145, AC-146, AC-147                         |
+| R-105       | AC-144                                         |
+| R-107       | AC-147                                         |
+| R-130       | AC-144, AC-145, AC-150, AC-146, AC-147         |
+| R-131       | AC-145                                         |

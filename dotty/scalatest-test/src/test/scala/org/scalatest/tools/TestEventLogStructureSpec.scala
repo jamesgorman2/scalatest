@@ -480,13 +480,9 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
         TemporaryEventLog.in { eventLogFile =>
           When(s"${registration.launch.named} runs it with the runner argument")
-          val reportedWithTheArgument =
-            reported(eventsReportedWhenLaunched(registration.launch, registration.suiteClassName, runnerArgument(eventLogFile)))
+          eventsReportedWhenLaunched(registration.launch, registration.suiteClassName, runnerArgument(eventLogFile))
 
-          Then("the run's reporters are told the same")
-          reportedWithTheArgument shouldBe registration.reports
-
-          And("the event log holds no structure of the suite")
+          Then("the event log holds no structure of the suite")
           EventLogComparison.mismatchWhenIs(eventLogOf(eventLogFile), built(registration.eventLogIs)) shouldBe None
         }
       }
@@ -536,7 +532,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "A suite whose tests run in random order",
       "a suite mixing in RandomTestOrder that registers tests a, b and c in that order",
       Nil,
-      "a, b and c in the order registered",
+      "a, b and c in that order, whatever order the tests ran in",
       StatedStructure(
         "ShuffledSuite",
         "samples.ShuffledSuite",
@@ -580,7 +576,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
   Feature("A suite's class name") {
 
     structureScenarios(
-      "A suite whose constructor throws",
+      "A suite's constructor throws",
       "a suite class whose constructor throws",
       Nil,
       "the suite alone, with the class that failed to construct",

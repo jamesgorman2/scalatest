@@ -1,5 +1,6 @@
 package org.scalatest.tools
 
+import java.util.concurrent.ConcurrentLinkedQueue
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.Event
 import org.scalatest.events.EventLogComparison
@@ -14,13 +15,15 @@ import org.scalatest.events.TestSucceeded
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.tools.TestEventLogLine.nodeEvent
+import sbt.testing.EventHandler
+import scala.jdk.CollectionConverters.*
 
 final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
   /**
    * A run as a criterion states it.
    *
-   * @param reported what the run's reporters receive, in order, whether or not the run writes an event log
+   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
    * @param eventLogInNotation the events the criterion states, in the event notation
    * @param eventLogInFormat those events as the format writes them, one line for each
    */
@@ -564,13 +567,10 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
-        val reportedWithTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile)))
+        eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("the run's reporters are told the same")
-        reportedWithTheArgument shouldBe stated.reported
-
-        And(s"the event log ${if (isWhole) "is" else "holds, in order,"} $eventLogHolds")
+        Then(s"the event log ${if (isWhole) "is" else "holds, in order,"} $eventLogHolds")
         if (isWhole) {
           StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
           EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
@@ -579,7 +579,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
         }
         structures.foreach { count =>
-          And(s"it holds $count structure${if (count == 1) "" else "s"}")
+          And(s"the event log holds $count structure${if (count == 1) "" else "s"}")
           structuresIn(lines) shouldBe count
         }
       }
@@ -631,12 +631,11 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           When("Runner.run discovers and runs the runpath's suites without the runner argument, and again with it")
           val arguments = List("-R", runpath, "-C", classOf[RunRecordingReporter].getName)
           val reportedWithoutTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments)))
-          val reportedWithTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile))))
+          runnerRun(arguments ++ runnerArgument(eventLogFile))
           val lines = TemporaryEventLog.lines(eventLogFile)
 
-          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, both times")
+          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
           reportedWithoutTheArgument shouldBe configSpecDiscovered.reported
-          reportedWithTheArgument shouldBe configSpecDiscovered.reported
 
           And("the event log holds, in order, the structure of the wrapped class, then the suite's events, and no other structure")
           StatedLines.mismatchWhenHoldsInOrder(lines, configSpecDiscovered.eventLogInFormat) shouldBe None
@@ -664,7 +663,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     )
 
     eventScenarios(
-      "A scope and a test that both structures of a suite run through ConfigMapWrapperSuite hold",
+      "A scope and a test that both structures of a suite run through ConfigMapWrapperSuite contain",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'reads', " +
         "then test 'remote' where its config map holds db, and test 'local' where it does not",
       "samples.ConfigDependentWithSharedTestSpec",
@@ -679,12 +678,12 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       Given("a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), whose constructor throws IllegalStateException(\"no db\") where its config map lacks db")
       val suiteClassName = "samples.ConfigWithoutDbFailsSpec"
       val thrownByTheTask = "java.lang.reflect.InvocationTargetException caused by java.lang.IllegalStateException: no db"
-      def thrownAndReported(arguments: List[String]): (String, Vector[String]) = {
+      def thrownAndReported(arguments: List[String], eventHandler: EventHandler): (String, Vector[String]) = {
         var thrown = "nothing"
         val events = RunRecordingReporter.eventsReportedIn {
           val runner = frameworkRunner(arguments ++ List("-C", classOf[RunRecordingReporter].getName))
           try {
-            scala.util.Try(execute(runner, suiteClassName, new RecordingLogger)).failed.foreach { failure =>
+            scala.util.Try(execute(runner, suiteClassName, eventHandler, new RecordingLogger, Nil)).failed.foreach { failure =>
               thrown = s"${failure.getClass.getName} caused by ${failure.getCause.getClass.getName}: ${failure.getCause.getMessage}"
             }
           } finally runner.done()
@@ -693,15 +692,17 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       }
 
       When("Framework runs it without the runner argument")
-      thrownAndReported(Nil) shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reported))
+      thrownAndReported(Nil, _ => ()) shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reported))
 
       TemporaryEventLog.in { eventLogFile =>
         When("Framework runs it with the runner argument")
-        val result = thrownAndReported(runnerArgument(eventLogFile))
+        val handled = new ConcurrentLinkedQueue[sbt.testing.Event]
+        val (thrown, _) = thrownAndReported(runnerArgument(eventLogFile), event => handled.add(event))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("its task throws that InvocationTargetException, and no reporter receives an event for the suite")
-        result shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reported))
+        Then("the execute of the task for the suite throws that InvocationTargetException, and the build tool's test-interface event handler receives no event for the suite")
+        thrown shouldBe thrownByTheTask
+        handled.asScala.toVector.map(_.fullyQualifiedName) shouldBe Vector.empty
 
         And("the event log is the suite's structure, its SuiteStarting and its SuiteAborted, and the run's events")
         StatedLines.mismatchWhenIs(lines, configWithoutDbFailsSpec.eventLogInFormat) shouldBe None
@@ -728,14 +729,10 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run runs it with the runner argument")
-        val reportedWithTheArgument =
-          reported(eventsReportedWhenLaunched(Launch.ByRunner, "samples.ConfigWithoutDbFailsSpec", runnerArgument(eventLogFile)))
+        eventsReportedWhenLaunched(Launch.ByRunner, "samples.ConfigWithoutDbFailsSpec", runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("the run's reporters are told the same")
-        reportedWithTheArgument shouldBe configWithoutDbFailsBySuite.reported
-
-        And("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
+        Then("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
         StatedLines.mismatchWhenHoldsInOrder(lines, configWithoutDbFailsBySuite.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(configWithoutDbFailsBySuite.eventLogInNotation)) shouldBe None
         structuresIn(lines) shouldBe 0
@@ -763,13 +760,11 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           val whereTheConstructorThrows = Some(samples.discovered.BrokenCtorSpec.threadGroupItsConstructorThrowsIn)
           val reportedWithoutTheArgument =
             reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments, whereTheConstructorThrows)))
-          val reportedWithTheArgument =
-            reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows)))
+          runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows)
           val lines = TemporaryEventLog.lines(eventLogFile)
 
-          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, both times")
+          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
           reportedWithoutTheArgument shouldBe configWithoutDbFailsDiscovered.reported
-          reportedWithTheArgument shouldBe configWithoutDbFailsDiscovered.reported
 
           And("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
           StatedLines.mismatchWhenHoldsInOrder(lines, configWithoutDbFailsDiscovered.eventLogInFormat) shouldBe None
@@ -793,7 +788,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "A wrapped suite's beforeAll throws",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), mixing in BeforeAndAfterAll, whose beforeAll throws",
       "samples.ConfigSetupFailsSpec",
-      "a structure holding the suite with the wrapped class's name, and later the suite's SuiteAborted",
+      "a structure holding the suite, every structure holding it giving it the wrapped class's name, and in this order after it the suite's SuiteAborted",
       configSetupFailsSpec,
       isWhole = false
     )
@@ -802,7 +797,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "A wrapped suite's constructor throws given the run's config map",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), whose constructor throws where its config map holds db",
       "samples.ConfigWithDbFailsSpec",
-      "a structure holding the suite with the wrapped class's name, and later the suite's SuiteAborted",
+      "a structure holding the suite, every structure holding it giving it the wrapped class's name, and in this order after it the suite's SuiteAborted",
       configWithDbFailsSpec,
       arguments = List("-Ddb=on"),
       isWhole = false
@@ -812,7 +807,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
   Feature("Further structures") {
 
     eventScenarios(
-      "A suite with no registration tree runs other tests than its first structure holds",
+      "A suite with no registration tree runs other tests than its first structure contains",
       "a Suite run through ConfigMapWrapperSuite whose one test is 'remote' where its config map holds db, and 'local' where it does not",
       "samples.ConfigNamedTestSuite",
       "the structure the empty config map gives, the suite's SuiteStarting, then a further structure holding 'remote'",

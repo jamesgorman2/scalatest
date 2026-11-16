@@ -41,14 +41,14 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
 
       Scenario(s"`$command`") {
         Given("core.test holds CalculatorSuite, whose test writes dividing now to stdout, and StackFlatSpec, whose test fails")
-        When(s"`$command` runs in the build without the plugin, and in the same build with it")
+        When(s"`$command` runs in a build that adds the plugin, and in the same build without it")
         val run = runs(task)
 
         withClue(run.describe(_.debugString)) {
           Then("Mill's result is the same under both")
           run.withPlugin.exitCode shouldBe run.withoutPlugin.exitCode
 
-          And("so is its console output, apart from durations")
+          And("so is its console output, apart from durations and the lines Mill writes while it compiles the build itself")
           run.withPlugin.stdoutLines shouldBe run.withoutPlugin.stdoutLines
           run.withPlugin.stderrLines shouldBe run.withoutPlugin.stderrLines
 

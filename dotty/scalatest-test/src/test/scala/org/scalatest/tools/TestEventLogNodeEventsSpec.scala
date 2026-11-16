@@ -30,7 +30,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   /**
    * A run as a criterion states it.
    *
-   * @param reported what the run's reporters receive, in order, whether or not the run writes an event log
+   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
    * @param eventLogInNotation the run's whole event log, in the event notation
    * @param eventLogInFormat that event log as the format writes it, one line for each event
    */
@@ -107,14 +107,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
-        val reportedWithTheArgument =
-          reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile), nestedSuiteIds))
+        eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile), nestedSuiteIds)
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("the run's reporters are told the same")
-        reportedWithTheArgument shouldBe stated.reported
-
-        And(s"the event log is $eventLogHolds")
+        Then(s"the event log is $eventLogHolds")
         StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
       }
@@ -491,6 +487,34 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           "SuiteAborted",
           s""""message":"$nestedSuiteAborted",""" + thrown("java.lang.RuntimeException", "database unreachable")
         ),
+        suiteCompleted(top)
+      )
+    )
+  }
+
+  private val completingAddSuite = {
+    val top = NodePath.topLevel("samples.AddSuite")
+    val adds = top.test("adds")
+    StatedRun(
+      Vector("RunStarting", "SuiteStarting AddSuite", "TestStarting adds", "TestSucceeded adds", "SuiteCompleted AddSuite", "RunCompleted"),
+      """
+      run started
+      run: RunStarting
+      structure
+        suite "AddSuite", class "samples.AddSuite"
+          test "adds", label "- adds"
+      suite "AddSuite": SuiteStarting
+      test "adds": TestStarting
+      test "adds": TestSucceeded
+      suite "AddSuite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.AddSuite"), TestEventLogLine.test(adds, top, 0, "adds", "- adds")),
+        suiteStarting(top),
+        nodeEvent(adds, List(1, 1), "TestStarting"),
+        nodeEvent(adds, List(1, 1), "TestSucceeded"),
         suiteCompleted(top)
       )
     )
@@ -1570,13 +1594,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
-        val reportedWithTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile)))
+        eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("the run's reporters are told the same")
-        reportedWithTheArgument shouldBe reportedInEveryOrder.head
-
-        And(s"the event log is $eventLogHolds, in one of the orders the tests may run in")
+        Then(s"the event log is $eventLogHolds, in one of the orders the tests may run in")
         val runInOrderWritten = runs.filter(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat).isEmpty)
         withClue(s"The event log is:\n${lines.mkString("\n")}\n") {
           runInOrderWritten should have size 1
@@ -1637,9 +1658,8 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val reportedWithTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile))))
           val lines = TemporaryEventLog.lines(eventLogFile)
 
-          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, both times")
+          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
           runsOfDiscoveredSuites.map(_.reported) should contain(reportedWithoutTheArgument)
-          reportedWithTheArgument shouldBe reportedWithoutTheArgument
 
           And("each suite has its own structure, whose root is that suite, before its events, which are assigned to it and its test")
           And("no structure holds the discovery suite, whose SuiteStarting and SuiteCompleted are assigned to the run")
@@ -1760,7 +1780,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       "Tests run in parallel by Runner",
       "an AnyFunSuite mixing in ParallelTestExecution, whose tests a and b succeed",
       "samples.ParFunSuite",
-      "one structure holding the suite and no DistributedTestRunnerSuite, then the suite's events, " +
+      "one structure holding the suite and no structure holding a DistributedTestRunnerSuite, then the suite's events, " +
         "with one TestStarting and one TestSucceeded assigned to each of a and b",
       parFunSuiteRuns,
       Launch.ByRunner,
@@ -1791,10 +1811,18 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   Feature("A suite's class name") {
 
     eventScenarios(
+      "A suite that completes",
+      "an AnyFunSuite whose one test, 'adds', succeeds",
+      "samples.AddSuite",
+      "a structure holding the suite, every structure holding it giving it the runtime class of the suite instance, and in this order after it the suite's SuiteCompleted",
+      completingAddSuite
+    )
+
+    eventScenarios(
       "A nested suite's beforeAll throws",
       "a suite with no tests nesting an AnyWordSpec whose beforeAll throws",
       "samples.SetupFailsSuites",
-      "a structure holding the nested suite with its class name, and later that suite's SuiteAborted assigned to it",
+      "a structure holding the nested suite, every structure holding it giving it its class name, and in this order after it that suite's SuiteAborted",
       setupFailsSuites,
       nestedSuiteIds = List("samples.SetupFailsSpec")
     )
@@ -1803,7 +1831,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       "A suite's constructor throws",
       "a suite class whose constructor throws",
       "samples.BrokenCtorSpec",
-      "a structure holding the suite with the class that failed to construct, and later the suite's SuiteAborted assigned to it",
+      "a structure holding the suite, every structure holding it giving it the class that failed to construct, and in this order after it the suite's SuiteAborted",
       brokenCtorSpec
     )
   }
@@ -1820,15 +1848,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val whereTheConstructorThrows = Some(samples.discovered.BrokenCtorSpec.threadGroupItsConstructorThrowsIn)
           val reportedWithoutTheArgument =
             reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments, whereTheConstructorThrows)))
-          val reportedWithTheArgument =
-            reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows)))
+          runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows)
           val lines = TemporaryEventLog.lines(eventLogFile)
 
-          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, both times")
+          Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
           reportedWithoutTheArgument shouldBe brokenCtorSpecDiscovered.reported
-          reportedWithTheArgument shouldBe brokenCtorSpecDiscovered.reported
 
-          And("the event log holds a structure holding the suite with the class that failed to construct, and later the suite's SuiteAborted assigned to it")
+          And("the event log holds a structure holding the suite, every structure holding it giving it the class that failed to construct, and in this order after it the suite's SuiteAborted")
           StatedLines.mismatchWhenIs(lines, brokenCtorSpecDiscovered.eventLogInFormat) shouldBe None
           EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(brokenCtorSpecDiscovered.eventLogInNotation)) shouldBe None
         }
@@ -1854,14 +1880,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         val events = eventsReportedWhenLaunched(Launch.ByFramework, "samples.SlowSuite", List("-W", "1", "1") ++ runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("each line of the event log decodes to one event")
+        Then("each line of the run's test event log decodes to one event")
         val eventLog = decodedOrFail(lines)
 
         And("the event log holds the test's TestStarting, an AlertProvided assigned to the run, and the test's TestSucceeded, in that order")
         StatedLines.mismatchWhenHoldsInOrder(lines, slowSuiteAlertedWithAnyMessage) shouldBe None
         EventLogComparison.mismatchWhenHoldsInOrder(eventLog, built(slowSuiteAlerted.eventLogInNotation)) shouldBe None
 
-        And("for each AlertProvided the emitter receives before the run ends, it holds one assigned to the run with that message, in the order the emitter received them")
+        And("for each AlertProvided the emitter receives before the run ends, the event log holds a run: AlertProvided with that alert's message, in the order the emitter received the alerts")
         // The recording reporter observes what the emitter receives. The slowpoke timer hands each alert to the
         // emitter, then queues it for the reporters, all on its one thread, and no reporter reorders an alert assigned
         // to no suite. So the reporter receives the alerts in the emitter's order, and each it receives before

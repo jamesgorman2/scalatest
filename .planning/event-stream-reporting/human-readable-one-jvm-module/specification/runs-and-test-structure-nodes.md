@@ -1,13 +1,17 @@
 # Consolidated human-readable output for one JVM module: the nodes shown
 
-Acceptance criteria for which suites, scopes, tests and failures the human-readable output shows, and in what order. Part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them; [layout.md](layout.md) gives where each line sits and its text and colour.
+This part contains the acceptance criteria for which suites, scopes, tests and failures the human-readable output shows, and in what order. It is part of [runs-and-test-structure.md](runs-and-test-structure.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria defines the notation these criteria use for an event log. [layout.md](layout.md) contains the criteria for where each line sits and for each line's text and colour.
 
 ## Order
 
 ```gherkin
 Feature: The order of suites, scopes and tests
 
-  Rule: A label's top-level suites appear in ascending order by name (R-079)
+  Background:
+    Given the consolidation library is used directly, without Mill, with colour on
+    And the library consolidates a run under the test run label `core.test`
+
+  Rule: A label's top-level suites appear in ascending lexicographic order by name
     Scenario: AC-065 Suites whose names sort apart from their classes and the order they ran in
       Given an event log holding:
         """
@@ -47,7 +51,7 @@ Feature: The order of suites, scopes and tests
             - zeta
         """
 
-  Rule: Below a top-level suite, a node's children appear in declared order (R-105)
+  Rule: Below a top-level suite, a node's children appear in declared order
     Scenario: AC-066 Scopes and tests declared out of name order and run out of declared order
       Given an event log holding:
         """
@@ -90,9 +94,11 @@ Feature: The order of suites, scopes and tests
 ```gherkin
 Feature: Outcomes
 
-  Rule: No line shows an outcome rolled up from the nodes below it (R-098)
+  Rule: No line shows an outcome rolled up from the nodes below it
     Scenario: AC-067 A failed test leaves its scope, suite and label without a suffix
-      Given an event log holding:
+      Given the consolidation library is used directly, without Mill, with colour on
+      And the library consolidates a run under the test run label `core.test`
+      And an event log holding:
         """
         run started
         structure
@@ -111,21 +117,33 @@ Feature: Outcomes
         run ended completed
         """
       When the library consolidates it
-      Then the test run label's line is `[core.test]`, the suite's name line `FailingFunSpec:` and the scope's line `A Stack`
+      Then the test run label's line is `[core.test]`
+      And the suite's name line is `FailingFunSpec:`
+      And the scope's line is `A Stack`
       And the test's line is `- is empty *** FAILED ***`
 
-  Rule: A suite whose constructor throws is aborted, and the module's other suites still run (R-099)
+  Rule: A suite whose constructor throws is aborted, and the module's other suites still run
     Scenario: AC-068 A suite's constructor throws
-      Given suite class `samples.BrokenCtorSpec`, an `AnyFunSuite` whose constructor throws `IllegalStateException("no config")`
-      And suite `SqrtPropSpec` of `layout-tree.md` AC-002
+      Given a Mill 1.3.1 build whose JVM test module `core.test` tests with `com.edc::scalatest` at the release under test
+      And the build's `build.mill` header adds the Mill plugin, `com.edc::scalatest-mill` at that release, to its `mvnDeps`
+      And `core.test` has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
+      And the test command is invoked as `mill scalatest/test core.test`
+      And Mill colours its console output
+      And human-readable output is compared without the prefix, such as `1] `, that Mill puts on each line the test command's own task writes
+      And suite `BrokenCtorSpec`, class `samples.BrokenCtorSpec`, an `AnyFunSuite` whose constructor throws `IllegalStateException("no config")`
+      And suite `SqrtPropSpec`, class `samples.SqrtPropSpec`, an `AnyPropSpec` whose one property, `sqrt of a square is the root`, labelled `- sqrt of a square is the root`, succeeds
       When the test command runs the module
-      Then the lines for the suite named `BrokenCtorSpec` begin:
+      Then the lines for `BrokenCtorSpec` begin:
         """
         BrokenCtorSpec:
           samples.BrokenCtorSpec *** ABORTED ***
         """
       And a line under `samples.BrokenCtorSpec *** ABORTED ***` is `java.lang.IllegalStateException: no config`
-      And the lines for `SqrtPropSpec` are those `layout-tree.md` AC-002 gives
+      And the lines for `SqrtPropSpec` are:
+        """
+        SqrtPropSpec:
+          - sqrt of a square is the root
+        """
 ```
 
 ## Nodes that share a name
@@ -133,7 +151,11 @@ Feature: Outcomes
 ```gherkin
 Feature: Nodes that share a name
 
-  Rule: Nodes that share a name are never merged (R-104)
+  Background:
+    Given the consolidation library is used directly, without Mill, with colour on
+    And the library consolidates a run under the test run label `core.test`
+
+  Rule: Nodes that share a name are never merged
     Scenario: AC-069 Two scopes share a name
       Given an event log holding:
         """
@@ -188,9 +210,10 @@ Feature: Nodes that share a name
         """
       When the library consolidates it
       Then the human-readable output holds two `SameSuite:` lines
-      And the lines for one are `SameSuite:` and `- in a`, and for the other `SameSuite:` and `- in b`
+      And the lines for one of those suites are `SameSuite:` and `- in a`
+      And the lines for the other are `SameSuite:` and `- in b`
 
-  Rule: A suite that starts in one execution of its parent beside more siblings sharing its suite ID than the parent's structure declares sits directly after the last of them, with the scopes and tests its own structure gives it (R-104, R-105)
+  Rule: Where one execution of a parent runs more nested suites sharing a suite ID than the parent declares, each extra suite sits directly after the last sibling sharing that suite ID, with the scopes and tests that the extra suite registers
     Scenario: AC-163 A nested suite that ran twice in one run of its parent
       Given an event log holding:
         """
@@ -236,7 +259,15 @@ Feature: Nodes that share a name
 ```gherkin
 Feature: Filtered tests
 
-  Rule: A test a filter excludes is shown only as ScalaTest 3.2.20 reports it (R-112)
+  Background:
+    Given a Mill 1.3.1 build whose JVM test module `core.test` tests with `com.edc::scalatest` at the release under test
+    And the build's `build.mill` header adds the Mill plugin, `com.edc::scalatest-mill` at that release, to its `mvnDeps`
+    And `core.test` has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
+    And the test command is invoked as `mill scalatest/test core.test`
+    And Mill colours its console output
+    And human-readable output is compared without the prefix, such as `1] `, that Mill puts on each line the test command's own task writes
+
+  Rule: A test that a filter excludes is shown only through the events ScalaTest 3.2.20 reports for that test
     Scenario: AC-071 A tag the module's own arguments exclude
       Given suite `SpeedSuite`, class `samples.SpeedSuite`, an `AnyFunSuite` with tests `fast` and `slow`, labelled `- fast` and `- slow`, each succeeding where it runs, of which `slow` is tagged `samples.Slow` and writes `slow ran` to stdout
       And nothing else in the run writes to stdout or stderr or sends a message outside a suite
@@ -255,20 +286,56 @@ Feature: Filtered tests
 ```gherkin
 Feature: Failures
 
-  Rule: A failure message reaches the human-readable output unchanged (R-010, R-011)
+  Rule: A failure message reaches the human-readable output unchanged
     Scenario: AC-072 A multi-line, non-ASCII failure message
       Given suite `UnicodeSuite`, class `samples.UnicodeSuite`, an `AnyFunSuite` whose test `reports`, labelled `- reports`, calls `fail("first line\nsecond line: ü ß 日本 ✓")` at line 7 of `UnicodeSuite.scala`
-      And a run of `UnicodeSuite` through `Framework` with the runner argument, whose test event log, decoded with core's codec, is fed to the consolidation library directly
-      When the library consolidates it
+      And `UnicodeSuite` runs through ScalaTest's `Framework`, outside Mill, given the ScalaTest runner argument that writes the run's test event log to a file
+      And the consolidation library is used directly, without Mill, with colour on
+      When the library consolidates that test event log as a run under the test run label `core.test`
       Then the lines under `- reports *** FAILED ***` begin:
         """
         first line
         second line: ü ß 日本 ✓ (UnicodeSuite.scala:7)
         """
 
-  Rule: Every suite, scope, test, failure and line of captured output a run holds is shown (R-021)
+  Rule: Every suite, scope, test, failure and line of captured output of a run is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution
     Scenario: AC-073 The compatibility fixture
-      Given the module's suites are the compatibility fixture, in which the suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` does not abort
+      Given a Mill 1.3.1 build whose JVM test module `core.test` tests with `com.edc::scalatest` at the release under test
+      And the build's `build.mill` header adds the Mill plugin, `com.edc::scalatest-mill` at that release, to its `mvnDeps`
+      And `core.test` has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
+      And the test command is invoked as `mill scalatest/test core.test`
+      And human-readable output is compared without the prefix, such as `1] `, that Mill puts on each line the test command's own task writes
+      And the module's suites are the compatibility fixture, which holds at least one suite of each of these styles:
+        | `AnyFunSuite`, `AsyncFunSuite`, `FixtureAnyFunSuite`, `FixtureAsyncFunSuite`                    |
+        | `AnyPropSpec`, `FixtureAnyPropSpec`                                                             |
+        | `AnyFunSpec`, `AsyncFunSpec`, `FixtureAnyFunSpec`, `FixtureAsyncFunSpec`, `PathAnyFunSpec`      |
+        | `AnyFreeSpec`, `AsyncFreeSpec`, `FixtureAnyFreeSpec`, `FixtureAsyncFreeSpec`, `PathAnyFreeSpec` |
+        | `AnyWordSpec`, `AsyncWordSpec`, `FixtureAnyWordSpec`, `FixtureAsyncWordSpec`                    |
+        | `AnyFlatSpec`, `AsyncFlatSpec`, `FixtureAnyFlatSpec`, `FixtureAsyncFlatSpec`                    |
+        | `AnyFeatureSpec`, `AsyncFeatureSpec`, `FixtureAnyFeatureSpec`, `FixtureAsyncFeatureSpec`        |
+        | `RefSpec`                                                                                       |
+      And the compatibility fixture's suites hold between them:
+        | nested suites                                                                                                                          |
+        | scopes, one of them pending                                                                                                            |
+        | tests that succeed, fail, are ignored, are pending and are cancelled                                                                   |
+        | `info`, `note`, `alert` and `markup` messages from suites, scopes and tests, and all four from a `PathAnyFunSpec` test and a `PathAnyFreeSpec` test |
+        | a suite whose `beforeAll` throws                                                                                                       |
+        | a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, with a scope, that does not abort                                       |
+        | a test that writes to stdout and to stderr                                                                                             |
       When the test command runs the module with Mill's `--color false`
-      Then its human-readable output shows every suite, scope and test of the run, every failure with its message, and every line the fixture writes to stdout or stderr
+      Then the human-readable output shows every suite, scope and test of the run, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution
+      And the human-readable output shows every failure with its message, and every line the fixture writes to stdout or stderr
 ```
+
+## Requirements covered
+
+| Requirement | Criteria                       |
+|-------------|--------------------------------|
+| R-011       | AC-072                         |
+| R-021       | AC-073                         |
+| R-079       | AC-065                         |
+| R-098       | AC-067                         |
+| R-099       | AC-068                         |
+| R-104       | AC-069, AC-070, AC-163         |
+| R-105       | AC-066, AC-163                 |
+| R-112       | AC-071                         |

@@ -26,7 +26,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
   Feature("Messages sit under the node they attach to, each marked with its kind") {
 
-    Scenario("A test's messages sit under it in arrival order: info, note and markup in green, alerts in yellow") {
+    Scenario("A test's messages sit under it in the order the run reported them: info, note and markup in green, alerts in yellow") {
       Given("an event log of a test that sends an info, a note, an alert and a markup message, then succeeds")
       val eventLog = testWithMessages("""test "is empty": InfoProvided(message: "checked size")""")
 
@@ -126,9 +126,9 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
     }
   }
 
-  Feature("A suite's or scope's message sits among the node's children") {
+  Feature("A suite's or scope's message sits after the last of the node's children that started before the run reported it, and before the next child") {
 
-    Scenario("A scope's message sits after the children that had started when it arrived, and before the next") {
+    Scenario("A scope's message sits after the children that had started before the run reported it, and before the next") {
       Given("an event log of a scope whose info arrives after its first test and before its nested scope opens")
       val eventLog =
         """
@@ -167,7 +167,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {green}- pops{reset}""".stripExpectedMargin
     }
 
-    Scenario("A suite's messages sit under its name line, each after the children that had started when it arrived") {
+    Scenario("A suite's messages sit under its name line, each after the children that had started before the run reported it") {
       Given("an event log of a suite that sends a message before its first test, two after it, and one after its nested suite")
       val eventLog =
         """
@@ -198,7 +198,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("each message sits under the suite's name line, placed by the children that had started, in the order they arrived")
+      Then("each message sits under the suite's name line, placed by the children that had started, in the order the run reported them")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}OuterSpec:{reset}
@@ -250,7 +250,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
   Feature("A test's messages sit among the suites it ran") {
 
-    Scenario("A test's message sits after the suites it had started when the message arrived, and before the next, below its failure") {
+    Scenario("A test's message sits after the last suite that started before the run reported the message, and before the next, below its failure") {
       Given("an event log of a test that sends an info, runs a helper suite, sends another info, then fails")
       val eventLog =
         """

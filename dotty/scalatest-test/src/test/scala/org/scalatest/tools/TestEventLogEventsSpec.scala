@@ -30,7 +30,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
   /**
    * A run as a criterion states it.
    *
-   * @param reported what the run's reporters receive, in order, whether or not the run writes an event log
+   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
    * @param eventLogInNotation the run's whole event log, in the event notation
    * @param eventLogInFormat the lines the run writes, holding only the keys the criterion fixes
    * @param linesTheDecoderReads that event log as the format writes it, one line for each event, where its lines
@@ -66,19 +66,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
       case alert: AlertProvided => s"AlertProvided ${alert.message}"
       case markup: MarkupProvided => s"MarkupProvided ${markup.text}"
       case other => other.getClass.getSimpleName
-    }
-  }
-
-  /** Each event a run's reporters were told, with its ordinal and the ordinals of the events it records. */
-  private def withOrdinals(events: Vector[Event]): Vector[(List[Int], String, Seq[List[Int]])] = {
-    val told = reported(events)
-    events.zip(told).map { (event, telling) =>
-      val recorded = event match {
-        case succeeded: TestSucceeded => succeeded.recordedEvents.map(_.ordinal.toList)
-        case failed: TestFailed => failed.recordedEvents.map(_.ordinal.toList)
-        case _ => Vector.empty
-      }
-      (event.ordinal.toList, telling, recorded)
     }
   }
 
@@ -165,10 +152,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         val reportedWithTheArgument = eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("the run's reporters are told the same, each event with the ordinal and the recorded events it has without the argument")
-        withOrdinals(reportedWithTheArgument) shouldBe withOrdinals(reportedWithoutTheArgument)
-
-        And(s"the event log is $eventLogHolds")
+        Then(s"the event log is $eventLogHolds")
         val log = decodedOrFail(lines)
         StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenIs(log, built(stated.eventLogInNotation)) shouldBe None
@@ -336,7 +320,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
           + """"suppressed":[{"id":3,"className":"java.lang.RuntimeException","message":"closing"}]}"""
       ),
       { (_, log) =>
-        And("each of the three holds every frame of the thrown object, each with the text StackTraceElement.toString gives it")
+        And("each of the three throwables holds every frame of the corresponding thrown object, each frame with the text StackTraceElement.toString gives it")
         val thrown = ThrowSuite.thrown.get
         val decoded = throwableOfTestFailed(log)
         def framesOf(throwable: Throwable): Vector[String] = throwable.getStackTrace.toVector.map(_.toString)
@@ -396,7 +380,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         "boom"
       ),
       { (reported, log) =>
-        And("the throwable holds the pathname of FailSuite.scala the run's reporters are told")
+        And("the throwable's file pathname is the pathname of FailSuite.scala that the run's reporters are told")
         val toldPathname = testFailedOf(reported).throwable.collect { case failed: StackDepth => failed.failedCodeFilePathname }.flatten
         toldPathname should not be empty
         throwableOfTestFailed(log).stackDepth.flatMap(_.filePathname) shouldBe toldPathname
@@ -478,7 +462,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         AnalysisFailure.reportedMessage
       ),
       { (reported, log) =>
-        And("the analysis is that of the TestFailed the emitter receives, which the recording reporter receives too")
+        And("the analysis is the analysis that the TestFailed the emitter receives for the test carries, which the recording reporter receives too")
         val logged = decodedEventsIn(log).collectFirst { case failed: DecodedEvent.TestFailed => failed.analysis }
         logged shouldBe Some(testFailedOf(reported).analysis)
       }

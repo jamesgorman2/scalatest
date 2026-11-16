@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  Feature("The tree of the human-readable output") {
+  Feature("The tree of the consolidation library's human-readable output") {
 
     Scenario("Nested suites sit under the suite that nests them") {
       Given("an event log of a suite nesting two suites, each with one test that succeeds")
@@ -157,7 +157,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("The order of suites, scopes and tests") {
 
-    Scenario("A label's top-level suites appear in ascending order by name, whatever their classes and the order they ran in") {
+    Scenario("A label's top-level suites appear in ascending lexicographic order by name, whatever their classes and the order they ran in") {
       Given("an event log of suites run in descending order by name, whose classes sort in the order they ran")
       val eventLog =
         """
@@ -189,7 +189,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the suites appear in ascending order by name")
+      Then("the suites appear in ascending lexicographic order by name")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}AlphaSuite:{reset}
@@ -312,7 +312,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       output should (equal(s"{cyan}[core.test]{reset}\n$suiteA\n$suiteB") or equal(s"{cyan}[core.test]{reset}\n$suiteB\n$suiteA"))
     }
 
-    Scenario("A nested suite that ran twice in one run of its parent sits directly after the sibling sharing its suite ID") {
+    Scenario("A nested suite that ran twice in one run of its parent sits directly after the last sibling sharing its suite ID") {
       Given("an event log of a suite whose first nested suite ran a second time, before the second nested suite")
       val eventLog =
         """
@@ -343,7 +343,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the second run of the first nested suite follows the first, with the tests its own structure gives it")
+      Then("the second run of the first nested suite follows the first, with the tests that the extra suite registers")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}OuterSuites:{reset}

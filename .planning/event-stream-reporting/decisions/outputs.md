@@ -2,17 +2,28 @@
 
 Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output holds, newest first.
 
-## A suite, scope or test that ran more than once at one place is one node with many executions, and the human-readable output shows each.
+## A suite, scope or test that ran more than once at one place is one node with one execution for each running.
+
+**Alternatives** One node per running makes the test structure depend on how the run went, so a test's declared position, and whether it is *not run*, change with reruns.
+
+**Reasoning** With one node for each place, the test structure stays what the run registered, however the tests ran (`../SPECIFICATION.md` R-130).
+
+**Costs** The event log, every writer and every reader must handle a node with several executions, and the JSON output's layout for such a node is not fixed (`../JSON-LAYOUT.md` § Not yet fixed).
+
+**Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
+
+---
+
+## The human-readable output shows each execution of a suite, scope or test with what that execution alone produced.
 
 **Alternatives**
 
-- One node per running makes the test structure depend on how the run went, so a test's declared position, and whether it is *not run*, change with reruns.
 - Showing only the last execution hides a failure that a later running of the same test followed with a success (`../SPECIFICATION.md` R-021).
 - One line with a rolled-up outcome gives a node an outcome no event carries, which R-098 leaves to readers; it is deferred (`../ROADMAP.md` § Deferred).
 
-**Reasoning** ScalaTest 3.2.20 prints every running of a test with its own outcome, failure and messages, so showing each execution keeps R-106 and R-021 while the test structure stays what the run registered (R-130).
+**Reasoning** ScalaTest 3.2.20 prints every running of a test with its own outcome, failure and messages, so showing each execution keeps that output's content (R-106, R-131).
 
-**Costs** The event log, every writer and every reader must handle a node with several executions, and a test run many times prints as many lines. The JSON output's layout for such a node is not fixed (`../JSON-LAYOUT.md` § Not yet fixed).
+**Costs** A test run many times prints as many lines.
 
 **Settled by** [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 
@@ -74,7 +85,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 **Reasoning** Mill's own colour decision already weighs `--color`, an interactive console, `FORCE_COLOR`, `NO_COLOR` and BSP mode, so following it colours the test command's output exactly where Mill's output around it is coloured (`../SPECIFICATION.md` R-124).
 
-**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, so there the test command's output is uncoloured unless `--color true` is given. ScalaTest under Mill's own test tasks does colour its output there.
+**Costs** Mill gives a task its decision only as `Task.log.prompt.colored`, which is `private[mill]`, so the plugin reads Mill API with no compatibility promise. That value was `false` under ConPTY and MinTTY, so there the test command's output is uncoloured unless `--color true` is given, though ScalaTest under Mill's own test tasks is coloured there.
 
 **Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
 
@@ -116,5 +127,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 **Reasoning** Every reader of the JSON output needs a node's state and its place, and the tree gives the place. One record per node, with one key per value, is what the format's documentation can describe and keep stable under semantic versioning (`../SPECIFICATION.md` R-108, R-084).
 
 **Costs** The JSON output does not hold every field of every event, and a tool that reads only the JSON cannot recover the order of events across nodes.
+
+**Settled by** [How is a run's test structure laid out as JSON?](https://github.com/jamesgorman2/scalatest/issues/19).
 
 ---

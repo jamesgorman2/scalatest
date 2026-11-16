@@ -83,7 +83,7 @@ The JVM column is the JVM `Framework`, the path Mill drives. Where `Runner` diff
 
 ## 1. Structure
 
-**Need.** A run's test structure: the run at its root, then suites, nested suites under the suite that nests them, scopes and tests (`ESR` R-096, R-010, R-022). Messages attach to the node that emitted them (`ESR` R-097).
+**Need.** A run's test structure: the run at its root, then suites, nested suites under the suite that nests them, scopes and tests (`ESR` R-096, R-130, R-022). Messages attach to the node that emitted them (`ESR` R-097).
 
 **In memory.**
 
@@ -107,7 +107,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 2. Identity
 
-**Need.** No node holds another run's events (`ESR` R-022). Each run writes one test event log (`ESR` R-010), and the Mill plugin gives each selected test module its test run label (`ESR` R-025), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`ESR` R-104).
+**Need.** No node holds another run's events (`ESR` R-022). Each run writes one test event log (`.planning/event-stream-reporting/ARCHITECTURE.md` § APIs § The emitter and the Mill plugin), and the Mill plugin gives each selected test module its test run label (`ESR` R-025), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`ESR` R-104).
 
 **In memory and `toJson`.**
 
@@ -157,7 +157,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 6. Test output
 
-**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-010, R-012; `JL` § Nodes, `output`).
+**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-012, R-021; `JL` § Nodes, `output`).
 
 - No event type carries output (`EV/Event.scala`), and ScalaTest captures none (`EMC` § 4; the search was re-run for this note).
 - **Absent** on every runtime. Capture mechanisms per runtime: `JSN` § 4.

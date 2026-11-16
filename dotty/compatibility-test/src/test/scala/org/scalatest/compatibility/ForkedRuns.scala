@@ -104,19 +104,33 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
 
   def ofFixture(launch: Launch, arguments: Seq[String], emitter: Emitter = Emitter.Off): Compared[RunOutput] =
     Compared(
-      ofFixtureOn(Library.Upstream, launch, arguments, Emitter.Off),
-      ofFixtureOn(Library.Fork, launch, arguments, emitter)
+      ofFixtureOn(Library.Upstream, launch, arguments, Emitter.Off, CompatibilityFixture.suiteClassNames),
+      ofFixtureOn(Library.Fork, launch, arguments, emitter, CompatibilityFixture.suiteClassNames)
     )
 
-  def ofFixtureOnFork(launch: Launch, arguments: Seq[String], emitter: Emitter): RunOutput =
-    ofFixtureOn(Library.Fork, launch, arguments, emitter)
+  def ofFixtureOnFork(launch: Launch, arguments: Seq[String], emitter: Emitter, moreSuiteClassNames: Seq[String] = Nil): RunOutput =
+    ofFixtureOn(Library.Fork, launch, arguments, emitter, CompatibilityFixture.suiteClassNames ++ moreSuiteClassNames)
 
   /** Gives the argument list to the launch, without running any suite. */
   def ofArguments(launch: Launch, arguments: Seq[String]): Compared[ArgumentsOutcome] =
     ofArgumentsNamingAFile(launch, _ => arguments)
 
   /** Gives the launch the argument list that `arguments` builds from a file path in the run's own directory, without running any suite. */
-  def ofArgumentsNamingAFile(launch: Launch, arguments: Path => Seq[String]): Compared[ArgumentsOutcome] = {
+  def ofArgumentsNamingAFile(launch: Launch, arguments: Path => Seq[String]): Compared[ArgumentsOutcome] =
+    ofArgumentsOnEach(launch, (_, file) => arguments(file))
+
+  /** Gives 3.2.20's launch the argument list, and the fork's the runner argument, naming a file in the run's own directory, followed by the list. */
+  def ofArgumentsGivingTheForkTheRunnerArgument(launch: Launch, arguments: Seq[String]): Compared[ArgumentsOutcome] =
+    ofArgumentsOnEach(
+      launch,
+      (library, file) =>
+        library match {
+          case Library.Upstream => arguments
+          case Library.Fork => TestEventLogArgument.forFile(file.toString) ++ arguments
+        }
+    )
+
+  private def ofArgumentsOnEach(launch: Launch, arguments: (Library, Path) => Seq[String]): Compared[ArgumentsOutcome] = {
     def outcomeOn(library: Library): ArgumentsOutcome = {
       val directory = newRunDirectory("arguments", library)
       val outcome = directory.resolve("outcome.txt")
@@ -125,7 +139,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
         directory,
         List("-Dcompatibility.outcome=" + outcome, "-Dcompatibility.events=" + directory.resolve("events.txt")),
         "compatibility.recorders.ArgumentsLauncher",
-        launch.named +: arguments(directory.resolve("file-named"))
+        launch.named +: arguments(library, directory.resolve("file-named"))
       )
       ArgumentsOutcome(exitCode, lines(outcome), text(directory.resolve("stdout.txt")), text(directory.resolve("stderr.txt")))
     }
@@ -142,7 +156,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     Compared(shapesOn(Library.Upstream), shapesOn(Library.Fork))
   }
 
-  private def ofFixtureOn(library: Library, launch: Launch, arguments: Seq[String], emitter: Emitter): RunOutput = {
+  private def ofFixtureOn(library: Library, launch: Launch, arguments: Seq[String], emitter: Emitter, suiteClassNames: Seq[String]): RunOutput = {
     val directory = newRunDirectory(launch.toString, library)
     val events = directory.resolve("events.txt")
     val eventFields = directory.resolve("event-fields.txt")
@@ -163,8 +177,8 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
         "-Dcompatibility.threads=" + threads
       )
     val (suiteOptions, suiteArguments) = launch match {
-      case Launch.RunnerRun => (Nil, CompatibilityFixture.suiteClassNames.flatMap(List("-s", _)))
-      case Launch.Framework => (List("-Dcompatibility.suites=" + CompatibilityFixture.suiteClassNames.mkString(",")), Nil)
+      case Launch.RunnerRun => (Nil, suiteClassNames.flatMap(List("-s", _)))
+      case Launch.Framework => (List("-Dcompatibility.suites=" + suiteClassNames.mkString(",")), Nil)
     }
     val workingDirectory = run(library, directory, recorderFiles ++ suiteOptions, launch.mainClass, suiteArguments ++ arguments ++ runnerArgument)
     RunOutput(

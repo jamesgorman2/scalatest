@@ -40,34 +40,36 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
     }
   }
 
-  /** The uncoloured human-readable output of one run, each line of its event log decoded and fed in turn. */
+  /** The coloured human-readable output of one run, colours marked, each line of its event log decoded and fed in turn. */
   private def consolidatedFrom(eventLog: Vector[String]): Vector[String] = {
     val output = new OutputSink
-    val consolidation = Consolidation.start(output, coloured = false)
+    val consolidation = Consolidation.start(output, coloured = true)
     val feed = consolidation.addRun(moduleLabel)
     eventLog.foreach(line => feed.add(RunEvent.decode(line).fold(reason => fail(s"$reason, in $line"), identity)))
     feed.endEventStream()
     consolidation.end()
-    output.lines
+    output.lines.map(ConsolidatedRuns.withColoursMarked)
   }
 
   Feature("A failure message reaches the human-readable output unchanged") {
 
     Scenario("A multi-line, non-ASCII failure message") {
       Given("a suite whose test fails with a multi-line, non-ASCII message")
-      And("a Framework run of it with the runner argument, producing a test event log")
+      And("the suite runs through `Framework`, outside Mill, given the ScalaTest runner argument that writes the run's test event log to a file")
       val eventLog = eventLogOfFrameworkRun(classOf[samples.UnicodeSuite].getName)
 
-      When("the library consolidates it")
+      And("the consolidation library is used directly, without Mill, with colour on")
+      When("the library consolidates that test event log as a run under the test run label `core.test`")
       val output = consolidatedFrom(eventLog)
 
-      Then("the lines under the failed test are the message, ending with the failing code's file and line")
-      val failedLine = output.indexOf("    - reports *** FAILED ***")
+      Then("the output is under `core.test`, and the lines under the failed test begin with the message in red, ending with the failing code's file and line")
+      val failedLine = output.indexOf("    {red}- reports *** FAILED ***{reset}")
       withClue(output.mkString("\n")) {
+        output.headOption shouldBe Some("{cyan}[core.test]{reset}")
         failedLine should be >= 0
         output.slice(failedLine + 1, failedLine + 3).mkString("\n") shouldBe
-          """      first line
-            |      second line: ü ß 日本 ✓ (UnicodeSuite.scala:7)""".stripExpectedMargin
+          """      {red}first line{reset}
+            |      {red}second line: ü ß 日本 ✓ (UnicodeSuite.scala:7){reset}""".stripExpectedMargin
       }
     }
   }

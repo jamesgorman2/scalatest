@@ -39,6 +39,35 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
           |    {red}(2 suites, 1 scope, 3 tests not run){reset}""".stripExpectedMargin
     }
 
+    Scenario("The count line adds `s` only where a kind's count is not 1") {
+      Given("an event log of a suite that aborts before any of its 1 nested suite, 2 scopes and 1 test starts")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "BrokenCacheSpec", class "samples.BrokenCacheSpec"
+            scope "A cache", label "A cache"
+              scope "when cold", label "when cold"
+                test "misses", label "- should miss"
+            suite "InnerSpec", class "samples.InnerSpec"
+        suite "BrokenCacheSpec": SuiteStarting
+        suite "BrokenCacheSpec": SuiteAborted(throwable: java.lang.RuntimeException "cache unreachable")
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the suite's count line is `(1 suite, 2 scopes, 1 test not run)`, in red, after the suite's abort lines")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}BrokenCacheSpec:{reset}
+          |    {red}samples.BrokenCacheSpec *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: cache unreachable{reset}
+          |        {red}...{reset}
+          |    {red}(1 suite, 2 scopes, 1 test not run){reset}""".stripExpectedMargin
+    }
+
     Scenario("A collapsed root with nothing below it shows no count line") {
       Given("an event log of a suite with no scopes or tests that aborts")
       val eventLog =

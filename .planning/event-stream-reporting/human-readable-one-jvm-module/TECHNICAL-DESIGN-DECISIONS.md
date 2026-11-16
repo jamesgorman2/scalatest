@@ -2,19 +2,19 @@
 
 Decisions behind [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md), newest first.
 
-## A registration takes a suite's `suiteId` and `suiteName` from the first reads 3.2.20 makes of them in the run, and the suite's `structure` is written where the last of them is read.
+## A registration takes a suite's `suiteId` and `suiteName` from the first reads 3.2.20 makes of them in the run.
 
 **Alternatives**
 
-- Reading `suiteId` and `suiteName` where the instance registers calls overridable members, which user code can make throw or depend on state, at a point where 3.2.20 does not call them (`../SPECIFICATION.md` R-002).
-- Writing the `structure` at the first engine site of the run, `runImpl`, needs both before 3.2.20 reads either, since its first `suiteName` read is `Suite.run`'s thread rename and its first `suiteId` read can be `Suite.runTests`' filter.
+- Reading `suiteId` and `suiteName` where the instance registers calls overridable members, which user code can make throw or depend on state, at a point where 3.2.20 does not call them, which can change the test-interface events the build tool receives (`../SPECIFICATION.md` R-051).
+- Reading both at the first engine site of the run, `runImpl`, to write the `structure` there, reads them before 3.2.20 reads either: 3.2.20's first `suiteName` read is `Suite.run`'s thread rename, and its first `suiteId` read can be `Suite.runTests`' filter.
 
 **Reasoning** 3.2.20 reads both before the instance's first scope or test event:
 
 - `suiteName` in a `SuiteStarting`, `Suite.run`'s thread rename or a send helper;
 - `suiteId` in `Framework`'s task for a top-level suite, in the `SuiteStarting` that `runNestedSuites` or the distributor's `SuiteRunner` builds, in `Suite.runTests`' filter, or as a send helper builds an event.
 
-Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite's structure. Taking each there calls nothing 3.2.20 and the wrapper do not, and still writes the `structure` before the node's scope and test events.
+Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite's structure. Taking each value at that first read calls nothing that 3.2.20 and the wrapper do not already call. The `structure`, written where the last of the two is read, still precedes the node's scope and test events.
 
 **Costs** Each core site that makes such a read must pass the value to the registration, and send sites must build an origin against a registration whose node path is not yet known. Where an event is handed off before both reads, the emitter reads the missing value itself.
 
@@ -26,17 +26,37 @@ Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite'
 
 **Alternatives**
 
-- A thread-local flag, set while a wrapper forwards, breaks where a reporter between wrappers holds events back and releases them later, as ScalaTest's `TestSortingReporter` or a user's buffering reporter does.
+- A thread-local flag, set while a wrapper forwards, breaks where a reporter between wrappers withholds events and releases them later, as ScalaTest's `TestSortingReporter` or a user's buffering reporter does.
 - Skipping an event by its `suiteId` and `testName` fails for an event with no test name, such as the `SuiteAborted` of a `DistributedTestRunnerSuite` running one test, and drops an event that bypassed its test's wrapper instead of letting the next wrapper it reaches hand it off.
 
-**Reasoning** `../SPECIFICATION.md` R-002 forbids changing an event, and the reporters between a send site and the wrappers can hold events back and release them on other threads. An event's identity tells it apart whichever reporter holds it and whichever thread releases it.
+**Reasoning** The structure wrapper changes no event (`../ARCHITECTURE.md` § Modules § ScalaTest core, Structure wrapper), and the reporters between a send site and the wrappers can withhold events and release them on other threads. An event's identity tells it apart whichever reporter withholds it and whichever thread releases it.
 
-**Costs** Each event costs one insert and one remove under the emitter's write lock. An event that never reaches its top-level suite's wrapper stays in the emitter's set until that suite's run completes, then in the wrapper's set while the wrapper is reachable. Where a reporter forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
+**Costs** Each event costs one insert and one remove under the emitter's write lock, and an event that never reaches its top-level suite's wrapper stays in a set, the emitter's and then the wrapper's, until the wrapper is unreachable. Where a reporter forwards a copy of an event rather than the event, the copy is handed off again and duplicated in the event log.
 
 **Settled by**
 
 - [How does a test's structure wrapper find its test's node ID?](https://github.com/jamesgorman2/scalatest/issues/69).
 - [How are a run's events written to the test event log apart from its test structure?](https://github.com/jamesgorman2/scalatest/issues/110).
+
+---
+
+## A suite run through `ConfigMapWrapperSuite` has the structure its class registers with an empty config map until the instance that runs registers another.
+
+**Alternatives**
+
+- Keeping the empty config map's structure for the whole run leaves a test only the run's config map registers without a node, and shows a test only the empty config map registers as not run.
+- Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor earlier than 3.2.20: one that throws given that config map then throws before `SuiteStarting`, where 3.2.20 reports `SuiteStarting` and then `SuiteAborted`, so the build tool would no longer receive the test-interface events 3.2.20 sends (`../SPECIFICATION.md` R-051).
+- Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.20 does, before `SuiteStarting`.
+- A structure of the suite's test names alone, as for a suite with no registration tree, drops a wrapped style's scopes and labels, against `specification/test-event-log-structure.md` AC-103's Rule.
+
+**Reasoning** 3.2.20 already constructs the class with an empty config map before `SuiteStarting`, as `ConfigMapWrapperSuite`'s `wrappedSuite`: `Framework`'s task reads its `suiteId`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading what that instance registers runs no user code earlier than 3.2.20 does, so the test-interface events the build tool receives do not change (`../SPECIFICATION.md` R-051). The instance that runs is built after `SuiteStarting`, as in 3.2.20, and where it registers a different tree a further `structure` replaces the first (`specification/test-event-log-structure.md` AC-131).
+
+**Costs** Where a suite's tests depend on its config map, the event log first contains a structure that disagrees with what runs: a run that dies between the suite's `SuiteStarting` and the further `structure` leaves the empty config map's structure as the one shown.
+
+**Settled by**
+
+- [Which instance supplies a ConfigMapWrapperSuite-wrapped suite's structure, and which class name does it carry?](https://github.com/jamesgorman2/scalatest/issues/70).
+- [What does the human-readable output show for an event assigned to an ancestor of the node that emitted it?](https://github.com/jamesgorman2/scalatest/issues/71).
 
 ---
 
@@ -56,7 +76,7 @@ Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite'
 
 **Alternatives** Encoding each run with core's codec and feeding the library its decoded events makes every library test depend on the event log's format.
 
-**Reasoning** The library takes decoded events, not an event log (`../decisions/architecture-library-and-modules.md` "The consolidation library takes each run's event stream, not its test event log."), and each side of the codec is tested against the format, so the library's tests need only the events. A drift between builder and decoder still fails a test (`technical-design/testing.md` § Testing § Runs the criteria describe).
+**Reasoning** The library takes decoded events (`../decisions/architecture-library-and-modules.md` "The consolidation library takes each run's event stream…"), and each side of the codec is tested against the format, so the library's tests need only the events. A drift between builder and decoder still fails a test (`technical-design/testing.md` § Testing § Runs the criteria describe).
 
 **Costs** The builder must yield what the decoder yields, and only those comparisons keep the two in step.
 
@@ -84,7 +104,7 @@ Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite'
 
 **Reasoning** The split needs each flag's arity (`technical-design/test-command.md` § Critical code paths § A module's own ScalaTest arguments). A table of the splitter's own leaves the parser every run uses as it is, apart from the one branch that accepts the runner argument.
 
-**Costs** A second arity table, kept in step with `parseArgs` only by that test.
+**Costs** The splitter's table repeats the arities `parseArgs` encodes, and only that test keeps the two in step.
 
 **Settled by** [How does the human-readable output look?](https://github.com/jamesgorman2/scalatest/issues/58).
 
@@ -94,7 +114,7 @@ Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite'
 
 **Alternatives** Dropping captured lines that match `Running Test Class <name>` also drops a test's own line of the same text.
 
-**Reasoning** At `Info` Mill never writes the line. ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which `../SPECIFICATION.md` R-041 already silences, so nothing else is lost. R-053 does not require the worker to run at the module's own log level.
+**Reasoning** At `Info` Mill never writes the line. ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which `../SPECIFICATION.md` R-002 already silences, so nothing else is lost. R-053 does not require the worker to run at the module's own log level.
 
 **Costs** Under the test command, Debug-level worker lines from a later Mill release are hidden even where the module sets `Debug`.
 

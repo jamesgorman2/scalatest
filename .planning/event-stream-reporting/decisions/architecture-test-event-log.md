@@ -6,12 +6,12 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Alternatives**
 
-- The plugin dropping the summary lines from a worker's captured stdout needs text matching, which the feature rules out.
-- Leaving the summary in the captured stdout puts it in the run's block, against `../SPECIFICATION.md` R-045 and AC-088.
+- The plugin dropping the summary lines from a worker's captured stdout needs captured lines matched by text, which the feature `human-readable-one-jvm-module` rules out.
+- Leaving the summary in the captured stdout puts it in the run's block, against `../SPECIFICATION.md` R-045.
 
-**Reasoning** Mill's worker prints what `done()` returns to its stdout, and the test command captures that stdout into the run's block. Not returning the summary is the only way to keep it out of the block without text matching. Mill 1.3.1 prints nothing for an empty result, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it. When Scala.js and Native land, their `MasterRunner.done` returns `""` under the argument too.
+**Reasoning** Mill's worker prints what `done()` returns to its stdout, and the test command captures that stdout into the run's block. Not returning the summary is the only way to keep it out of the block without text matching. Mill 1.3.1 prints nothing for an empty result, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it.
 
-**Costs** Each runtime's runner must repeat the change to `done` in `jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`.
+**Costs** Each runtime's runner must repeat the change to `done`: `Framework.done` on the JVM, `MasterRunner.done` on Scala.js and Native.
 
 **Settled by** [Consolidated human-readable output for one JVM module - Process capture and the console](https://github.com/jamesgorman2/scalatest/issues/94).
 
@@ -38,7 +38,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Reasoning** The run events already reach the emitter by the hand-off for events sent outside every structure wrapper (`architecture-test-structure.md` "Events sent outside every structure wrapper reach the emitter…"), so the emitter writes them like any other ScalaTest event assigned to the run. The `runEnded` event needs no run event, so a run whose runner sends none still ends (`../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 
-**Costs** A run whose event stream holds its closing run event but no `runEnded` event does not finish, though that event says how it ended. This happens when the `runEnded` event is torn or the process dies between the two writes.
+**Costs** A run whose event stream contains its closing run event but no `runEnded` event does not finish, though that event says how it ended. This happens when the `runEnded` event is torn or the process dies between the two writes.
 
 **Settled by** [What is the test event log's format: its framing, its encoding, and how it carries the run's own state, throwables and the events of item 3?](https://github.com/jamesgorman2/scalatest/issues/67).
 
@@ -69,7 +69,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Reasoning** jsdom forwards the window's `console.log` synchronously to Node's stdout, which the launcher sends to a file, so each event leaves the VM as it is written. The `runStarted` event arrived for every run that died at its runner's construction, and no event was lost or corrupted. Lines forged with the prefix and a wrong nonce passed through as ordinary output, never taken as events, and no event appeared among the passed-through lines. Events reached the plugin with a median delay of 5–6 ms.
 
-**Costs** The event log shares the VM's stdout with test output, so it holds only while every event is one whole framed line.
+**Costs** The event log shares the VM's stdout with test output, so it stays readable only while every event is one whole framed line.
 
 **Settled by** [Which channel carries a Scala.js run's event stream in the `JsDom` JS environment?](https://github.com/jamesgorman2/scalatest/issues/52).
 
@@ -86,8 +86,8 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 - A socket lost every byte not yet read on Windows when the JVM worker died (`../research/emitter-plugin-spike.md` § 4), against `../SPECIFICATION.md` R-073.
 - A JVM worker's stdout shares one pipe with test output, Mill's own runner lines and the `done()` string, so a write to file descriptor 1 from native code or a child process can land inside one of the event log's events (`../research/mill-worker-channels.md` § 3.3).
-- Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and hold only while every event is one whole framed line.
-- On the JVM, a folder per module holding every run's file, each named by its run, leaves the test command unable to tie a file, or the lack of one, to the worker it started.
+- Under `NodeJs`, framed lines in the launcher's stdout file, as under `JsDom`, share the stream with test output and stay readable only while every event is one whole framed line.
+- On the JVM, a folder per module containing every run's file, each named by its run, leaves the test command unable to tie a file, or the lack of one, to the worker it started.
 
 **Reasoning** Every byte a JVM worker, Node VM or native binary had written to its file before it halted, killed itself or was force-killed reached the plugin, on Windows and on Linux, whether or not the reader had fallen behind; Node also lost nothing when it exited because the test adapter closed its connection to the VM. Wherever a process outlived the plugin's first read, Mill's process read its file while it appended, with no sharing error on Windows and a median per-file maximum delay of 10–28 ms at a 10 ms poll; files of processes that ended sooner were read whole afterwards. A run given no task, or whose process died as its runner was constructed, left at least its first event. On the JVM the file has one fixed name in the worker's `processFolder`, which the test command chose and in which Mill starts at most one JVM, so the folder ties the file to its worker, and a folder without one is a worker in which no run existed.
 
@@ -112,7 +112,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Alternatives**
 
-- A lock the run holds beyond end of file, which the operating system releases on death, worked on the JVM, but needs the emitter to hold an exclusive lock for its process's life and the plugin to try it on every file at every poll.
+- A lock the run takes beyond end of file, which the operating system releases on death, worked on the JVM, but needs the emitter to keep an exclusive lock for its process's life and the plugin to try it on every file at every poll.
 - The return of `callTestRunnerSubprocess`, the `@experimental` Mill call by which the plugin starts each JVM worker, as the end of every JVM run ties the signal to Mill API where `ProcessHandle` is plain JDK, and leaves Scala.js and Native on `ProcessHandle` anyway.
 - The end of a Scala.js or Native module's Mill test task comes before its process has exited, while lines are still to come, and marks a module, not a run.
 - The exit of a Scala.js VM's launcher on Windows was signalled up to 16 ms before the VM's.
@@ -143,6 +143,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 - A JVM system property works on the JVM only, and needs the module's `forkArgs`, which the plugin cannot change without a trait (`../SPECIFICATION.md` R-092).
 - An environment variable set by the plugin's task-context fork cannot be read by `JsDom` window code, which has no `process`.
+- The emitter as a `-C` reporter opened on `RunStarting` cannot send the `runStarted` event before the runner's construction returns: on the JVM such a reporter can open later (`../research/jvm-file-channel.md` § 5), and ScalaTest's Scala.js and Native runners ignore `-C` reporters and build no `RunStarting` (`../research/node-native-file-channel.md` § 1).
 
 **Reasoning** Framework arguments are the only route into `JsDom` window code (`../research/js-environment-channels.md` § 2.2), and they reach the runner alike on every runtime.
 

@@ -7,12 +7,12 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 **Alternatives**
 
 - Scala 3.9.0, the version the fork's consumer builds with, has an unknown cost in the macros of Scalactic and ScalaTest, and raises the JDK the artifacts need.
-- The compilers upstream 3.2.20 builds with, Scala 3.1.3 on the JVM and Scala.js and 3.3.3 on Native, serve only modules on Scala 3.1 and 3.2, which `../SPECIFICATION.md` § Scope does not cover. They also put two compiler versions over one set of sources, holding the emitter and the codec to the older language level.
-- Scala Native 0.5.10, the version upstream 3.2.20 builds with, has no Scala 3.3.8 library: its newest `scala3lib_native0.5_3` for the 3.3 line is `3.3.7+0.5.10`. Keeping it would put Scala 3.3.7 on Native and 3.3.8 elsewhere.
+- The compilers upstream 3.2.20 builds with, Scala 3.1.3 on the JVM and Scala.js and 3.3.3 on Native, serve only modules on Scala 3.1 and 3.2, which `../SPECIFICATION.md` § Scope does not cover, and would restrict the emitter and the codec to the older of two language levels over one set of sources.
+- Scala Native 0.5.10, the version upstream 3.2.20 builds with, has no Scala 3.3.8 library (its newest `scala3lib_native0.5_3` for the 3.3 line is `3.3.7+0.5.10`), so keeping it puts Scala 3.3.7 on Native and 3.3.8 elsewhere.
 
 **Reasoning** Upstream's 3.3 line, whose sources are near-identical to these, builds with Scala 3.3.8, so these sources are known to compile on it. A module on a later Scala 3 version, such as 3.9.0, uses a library built with 3.3.8 unchanged. On Native the build uses Scala Native 0.5.12: `scala3lib_native0.5_3` for Scala 3.3.8 is published only as `3.3.8+0.5.12`. The artifacts keep the `native0.5` suffix, so MiMa still compares them with upstream's.
 
-**Costs** A module on Scala 3.1 or 3.2 (JVM or Scala.js), or on Scala.js before 1.20.2, cannot use the fork's artifacts, as it can upstream's. The emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3. A problem MiMa reports against upstream's jars, built with older compilers, can come from the compiler and not from the fork's sources.
+**Costs** A module on Scala 3.1 or 3.2 (JVM or Scala.js), or on Scala.js before 1.20.2, cannot use the fork's artifacts as it can upstream's, and the emitter, the codec and the consolidation library can use no Scala syntax or library API later than 3.3. A problem MiMa reports against upstream's jars, built with older compilers, can come from the compiler and not from the fork's sources.
 
 **Settled by** [What binary compatibility does the fork promise, given its base is upstream 3.3.0-alpha.2?](https://github.com/jamesgorman2/scalatest/issues/107).
 
@@ -36,7 +36,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 ## The consolidation library, not the Mill plugin, decides whether the test command has failed.
 
-**Alternatives** Having the **Decode** handle expose each event's facts, so that the plugin derives the result, repeats in the plugin the rules by which the library decides how each run ended (`../SPECIFICATION.md` R-082), and widens what the plugin sees of core's events.
+**Alternatives** Having the **Decode** handle expose each event's facts, so that the plugin derives the result, repeats in the plugin the rules by which the library decides how each run ended (`../SPECIFICATION.md` R-074, R-102), and widens what the plugin sees of core's events.
 
 **Reasoning** For its output the library already decides what `../SPECIFICATION.md` R-046 turns on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-046 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin derives no result from any event.
 
@@ -50,7 +50,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 **Alternatives**
 
-- Keeping `org.scalatest` gives a fork release the same coordinates as upstream's release of that version, `org.scalatest:scalatest` 3.2.20, so a build cannot tell which it resolved. Against any other upstream version, conflict resolution silently keeps one and evicts the other.
+- Keeping `org.scalatest` gives a fork release the coordinates of upstream's release of that version, such as `org.scalatest:scalatest` 3.2.20, so a build cannot tell which of the two it resolved, and against any other upstream version conflict resolution silently evicts one of the two.
 - Renaming the artifacts under `org.scalatest` also separates the coordinates, but publishes under a group this fork does not own, which Maven Central refuses.
 
 **Reasoning** A test module must test with this fork's release for the test command to run it (`../SPECIFICATION.md` R-059). Under a group of its own, the fork's artifacts stay on a module's resolved classpath whatever else the module resolves, and their coordinates alone tell them from upstream's.
@@ -73,11 +73,23 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 ---
 
-## The consolidation library builds on scalatest-core and shares its formatting.
+## The consolidation library's human-readable output is formatted by scalatest-core's formatting.
 
-**Alternatives** A standalone library with its own event-stream model and renderer needs the plugin to translate every decoded event stream into that model, and its human-readable output can diverge from the ScalaTest 3.2.20 format `../SPECIFICATION.md` R-106 requires.
+**Alternatives** A renderer of the library's own can diverge from the ScalaTest 3.2.20 format `../SPECIFICATION.md` R-106 requires.
 
-**Reasoning** A test event log is read only by the release that wrote it (`event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form. Sharing core's formatting keeps the human-readable output in the format R-106 requires.
+**Reasoning** Core's formatting is what prints the 3.2.20 format, so sharing it keeps the human-readable output in the format R-106 requires.
+
+**Costs** Core's formatting must serve decoded events as well as live ones, and the existing reporters' output must stay unchanged through that change (`../SPECIFICATION.md` R-001).
+
+**Settled by** [What are the epic's components, and how does data flow between them?](https://github.com/jamesgorman2/scalatest/issues/31).
+
+---
+
+## The consolidation library builds on scalatest-core.
+
+**Alternatives** A standalone library with its own event-stream model needs the plugin to translate every decoded event stream into that model.
+
+**Reasoning** A test event log is read only by the release that wrote it (`event-log-contract.md` "A test event log is read only by the release of this fork that wrote it."), so one codec in core serves both the emitter and the plugin's event log reading with no version skew, and the event stream it decodes is already in core's form.
 
 **Costs** Core's internals carry the library's needs, and the plugin loads scalatest-core's JVM build into Mill's JVM.
 

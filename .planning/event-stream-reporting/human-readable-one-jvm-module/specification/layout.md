@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: layout
 
-Acceptance criteria for how the human-readable output lays out its lines: its tree, where each line sits, each line's text and colour, and Mill's prefix. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them.
+This document indexes the acceptance criteria for how the human-readable output lays out its lines: its tree, where each line sits, each line's text and colour, and Mill's prefix. It is part of [../SPECIFICATION.md](../SPECIFICATION.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria defines the notation these criteria use for an event log.
 
 ## Parts
 

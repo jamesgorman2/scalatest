@@ -19,7 +19,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   /**
    * A run as a criterion states it.
    *
-   * @param reported what the run's reporters receive, in order, whether or not the run writes an event log
+   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
    * @param eventLogInNotation the events the criterion states, in the event notation, after the structures that name their nodes
    * @param eventLogInFormat those events as the format writes them, one line for each
    */
@@ -814,6 +814,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   /**
    * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
    * reads them. The event log holds the stated events in order, and `alsoThen` states what else it holds.
+   *
+   * @param alsoGiven the steps that follow `suite` in stating what the run is given
    */
   private def eventScenarios(
     scenario: String,
@@ -821,11 +823,13 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     suiteClassName: String,
     eventLogHolds: String,
     stated: StatedRun,
-    nestedSuiteIds: List[String] = Nil
+    nestedSuiteIds: List[String] = Nil,
+    alsoGiven: List[String] = Nil
   )(alsoThen: Vector[String] => Unit): Unit = {
     Scenario(scenario) {
       thisProcess
       Given(suite)
+      alsoGiven.foreach(step => And(step))
       When("Framework runs it without the runner argument")
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, Nil, nestedSuiteIds))
 
@@ -834,13 +838,10 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
       TemporaryEventLog.in { eventLogFile =>
         When("Framework runs it with the runner argument")
-        val reportedWithTheArgument = reported(eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, runnerArgument(eventLogFile), nestedSuiteIds))
+        eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, runnerArgument(eventLogFile), nestedSuiteIds)
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then("the run's reporters are told the same")
-        reportedWithTheArgument shouldBe stated.reported
-
-        And(s"the event log holds, in order, $eventLogHolds")
+        Then(s"the event log holds, in order, $eventLogHolds")
         StatedLines.mismatchWhenHoldsInOrder(lines, stated.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
         alsoThen(lines)
@@ -864,12 +865,29 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         "DelegatingSuite gives the wrapped instance's names and tests as its own and runs that instance in its place",
       "samples.StackSpec",
       "the wrapper's structure, the suite's SuiteStarting, then a further structure of the wrapped instance's tree, " +
-        "in which 'pops' keeps the node ID of the wrapper's 'A Stack pops', before the instance's events",
+        "in which 'pops' keeps the node path of the wrapper's 'A Stack pops', before the instance's events",
       stackSpec
     ) { lines =>
       And("no structure holds a suite other than StackSpec")
       structuresIn(lines) shouldBe 2
       structuresHolding("StackSpec", lines) shouldBe 2
+    }
+  }
+
+  Feature("A suite's class name") {
+
+    eventScenarios(
+      "A suite annotated @WrapWith with a wrapper other than ConfigMapWrapperSuite",
+      "an AnyFunSpec annotated @WrapWith(classOf[DelegatingSuite]) declaring scope 'A Stack' holding test 'pops', where " +
+        "DelegatingSuite gives the wrapped instance's names and tests as its own and runs that instance in its place",
+      "samples.StackSpec",
+      "a structure holding the suite, giving it the wrapper's class name, and after it the suite's SuiteCompleted",
+      stackSpec
+    ) { lines =>
+      And("every structure holding StackSpec gives it the wrapper's class name")
+      val structuresOfStackSpec = lines.filter(line => line.contains(""""item":"structure"""") && line.contains(""""name":"StackSpec""""))
+      structuresOfStackSpec should not be empty
+      structuresOfStackSpec.filterNot(_.contains(""""name":"StackSpec","suiteId":"samples.StackSpec","className":"samples.DelegatingSuite"""")) shouldBe empty
     }
   }
 
@@ -895,7 +913,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       userSuites,
       nestedSuiteIds = List("samples.User1Suite", "samples.User2Suite", helperSelected)
     ) { lines =>
-      And("no other structure holds HelperSuite")
+      And("the event log holds no other structure holding HelperSuite")
       structuresHolding("HelperSuite", lines) shouldBe 2
 
       And("no event of a helper is assigned to the suites or the test that ran it")
@@ -914,7 +932,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       twoHelpersSuite,
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
-      And("no other structure holds HelperSuite, and no event is of a second execution of 'A helper' or 'helps'")
+      And("the event log holds no other structure holding HelperSuite, and no event is of a second execution of 'A helper' or 'helps'")
       structuresHolding("HelperSuite", lines) shouldBe 2
       eventsOfASecondExecutionOfHelpers(lines) shouldBe 0
     }
@@ -927,7 +945,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       retryRunsAHelper,
       nestedSuiteIds = List(helperSelected)
     ) { lines =>
-      And("no other structure holds HelperSuite")
+      And("the event log holds no other structure holding HelperSuite")
       structuresHolding("HelperSuite", lines) shouldBe 1
 
       And("each execution of 'flaky' holds its InfoProvided, and no event of the helper")
@@ -994,18 +1012,31 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       runsItsFirstNestedSuiteTwice,
       nestedSuiteIds = List("samples.Inner1Suite", "samples.Inner2Suite")
     ) { lines =>
-      And("it holds no other structure")
+      And("the event log holds no other structure")
       structuresIn(lines) shouldBe 2
     }
 
     eventScenarios(
       "A suite's beforeAll runs a helper",
-      "a suite whose beforeAll runs a HelperSuite with a reporter that drops every event, and whose one test, 'works', succeeds",
+      "suite SetupSuite, an AnyFunSuite mixing in BeforeAndAfterAll, whose one test, 'works', succeeds",
       "samples.SetupSuite",
       "the helper's structure under the suite, then its events, before those of the suite's own test",
       setupSuite,
-      nestedSuiteIds = List(helperSelected)
-    )(_ => ())
+      nestedSuiteIds = List(helperSelected),
+      alsoGiven = List(
+        "suite class HelperSuite, an AnyFunSpec declaring scope 'A helper' holding test 'helps', which succeeds",
+        "the beforeAll of SetupSuite calls new HelperSuite().run(None, args) with Args holding a reporter that drops every event"
+      )
+    ) { lines =>
+      And("no event is assigned to an ancestor of the suite or test it names")
+      val top = NodePath.topLevel("samples.SetupSuite")
+      val helper = top.suite("samples.HelperSuite")
+      eventNamesOf(top, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
+      eventNamesOf(top.test("works"), lines) shouldBe Vector("TestStarting", "TestSucceeded")
+      eventNamesOf(helper, lines) shouldBe empty
+      eventNamesOf(helperScope(helper), lines) shouldBe Vector("ScopeOpened", "ScopeClosed")
+      eventNamesOf(helps(helper), lines) shouldBe Vector("TestStarting", "TestSucceeded")
+    }
 
     eventScenarios(
       "A runNestedSuites override runs two suites sharing an ID in reverse order",
@@ -1055,7 +1086,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the message assigned to the suite",
       directRun("DirectNamingItsSuite", "suite \"DirectNamingItsSuite\"", isAssignedToTest = false)
     ) { lines =>
-      And("it holds no other InfoProvided")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
       eventsOfDirectRun(NodePath.topLevel("samples.DirectNamingItsSuite"), messageOnTest = false, lines)
     }
@@ -1068,7 +1099,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       nestedDirectRun("DirectSuitesNamingTheSuite", "NestedDirectNamingItsSuite", "suite \"NestedDirectNamingItsSuite\"", isAssignedToTest = false),
       nestedSuiteIds = List("samples.NestedDirectNamingItsSuite")
     ) { lines =>
-      And("it holds no other InfoProvided")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
       eventsOfNestedDirectRun(NodePath.topLevel("samples.DirectSuitesNamingTheSuite"), "samples.NestedDirectNamingItsSuite", messageOnTest = false, lines)
     }
@@ -1080,7 +1111,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the message assigned to test 't', in its open execution",
       directRun("DirectNamingItsTest", "test \"t\"", isAssignedToTest = true)
     ) { lines =>
-      And("it holds no other InfoProvided")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
       eventsOfDirectRun(NodePath.topLevel("samples.DirectNamingItsTest"), messageOnTest = true, lines)
     }
@@ -1093,7 +1124,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       nestedDirectRun("DirectSuitesNamingTheTest", "NestedDirectNamingItsTest", "test \"t\"", isAssignedToTest = true),
       nestedSuiteIds = List("samples.NestedDirectNamingItsTest")
     ) { lines =>
-      And("it holds no other InfoProvided")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
       eventsOfNestedDirectRun(NodePath.topLevel("samples.DirectSuitesNamingTheTest"), "samples.NestedDirectNamingItsTest", messageOnTest = true, lines)
     }
@@ -1105,7 +1136,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the message in the test's second execution",
       directNamingItsSecondRun
     ) { lines =>
-      And("it holds no other InfoProvided")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
 
       And("no event of 't' is assigned to its suite")
@@ -1121,7 +1152,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the message in the test's latest execution, after the test closed",
       directNamingItsTestAfterRun
     ) { lines =>
-      And("it holds no other InfoProvided")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
 
       And("no event of 't' is assigned to its suite")

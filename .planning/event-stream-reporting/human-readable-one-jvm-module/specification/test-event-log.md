@@ -1,6 +1,8 @@
 # Consolidated human-readable output for one JVM module: the test event log
 
-Acceptance criteria for what a run given the runner argument writes to its test event log on the JVM, event by event, and for the ScalaTest behaviour that stays unchanged. Part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria sets the terms these criteria use, *an event log holding* events among them.
+## Summary
+
+This document indexes the acceptance criteria for what a run on the JVM writes to its test event log, event by event, when given the ScalaTest runner argument that turns the emitter on, and for the ScalaTest behaviour that stays unchanged. It is part of [../SPECIFICATION.md](../SPECIFICATION.md). [../SPECIFICATION.md](../SPECIFICATION.md) § Acceptance criteria defines the notation these criteria use for an event log.
 
 ## Parts
 

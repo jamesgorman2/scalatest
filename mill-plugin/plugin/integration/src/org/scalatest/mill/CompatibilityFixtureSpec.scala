@@ -262,7 +262,7 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
       |    [stdout] a line on stdout
       |    [stderr] a line on stderr""".stripMargin
 
-  Feature("Every suite, scope, test and failure the run holds is shown") {
+  Feature("Every suite, scope, test, failure and line of captured output a run holds is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution") {
 
     Scenario("The compatibility fixture") {
       withTester("compatibility-fixture") { tester =>
@@ -272,7 +272,7 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
         When("the test command runs core.test with Mill's --color false")
         val result = TestCommandResult(tester.eval(Seq("--color", "false", "scalatest/test", "core.test")))
 
-        Then("the human-readable output shows every suite, scope and test, every failure with its message, and every line the fixture wrote to stdout or stderr")
+        Then("the human-readable output shows every suite, scope and test, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution, every failure with its message, and every line the fixture wrote to stdout or stderr")
         withClue(result.debugString) {
           CapturedLines.byStream(StackFrames.collapsed(result.humanReadableOutput)).mkString("\n") shouldBe expectedOutput.replace("\r\n", "\n")
         }

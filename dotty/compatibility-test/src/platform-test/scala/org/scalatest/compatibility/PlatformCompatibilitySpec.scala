@@ -20,7 +20,7 @@ final class PlatformCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
       val withArguments = if (arguments.isEmpty) "no runner arguments" else "the runner arguments " + arguments.mkString(" ")
 
       Scenario(s"Framework given $withArguments sends its event handler and loggers what 3.2.20 sends them") {
-        Given(s"the compatibility fixture, compiled once against ScalaTest 3.2.20 for ${runs.platform}")
+        Given(s"a set of suites holding at least one suite of each style the build for ${runs.platform} ships, compiled once against ScalaTest 3.2.20 for ${runs.platform}")
         When(s"Framework runs it as linked with 3.2.20 and as linked with this fork, given $withArguments")
         val output = runs.ofFixture(arguments)
 

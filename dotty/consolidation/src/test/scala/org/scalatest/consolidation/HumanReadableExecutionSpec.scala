@@ -245,9 +245,12 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {green}HelperSuite:{reset}
           |        {green}A helper{reset}
           |          {green}- helps{reset}""".stripExpectedMargin
+
+      And("neither execution of the helper suite shows an abort line, though ScalaTest reported no event naming the suite")
+      output should not include "samples.HelperSuite ***"
     }
 
-    Scenario("A suite that ran twice in one execution of the test that ran it shows its name line once, with both executions under it") {
+    Scenario("A suite that ran twice in one execution of the test that ran it shows its name line once, with both executions under it, and no abort line") {
       Given("an event log of a test that ran a helper suite twice")
       val eventLog =
         """
@@ -287,6 +290,9 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |          {green}- helps{reset}
           |        {green}A helper{reset}
           |          {green}- helps{reset}""".stripExpectedMargin
+
+      And("neither execution of the helper suite shows an abort line, though ScalaTest reported no event naming the suite")
+      output should not include "samples.HelperSuite ***"
     }
 
     Scenario("A suite that each of two tests ran sits under each test's line, as two nodes") {
@@ -374,10 +380,10 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
     }
   }
 
-  Feature("A suite whose structure the event log holds more than once") {
+  Feature("A suite that registers its scopes and tests more than once") {
 
-    Scenario("Every execution of a node is shown at the parent, position and label the suite's last structure gives it") {
-      Given("an event log whose further structure reorders a scope's tests, relabels one and moves one under the scope")
+    Scenario("Every execution of a scope or test is shown at the parent, position and label the last registration of the suite's scopes and tests gives it") {
+      Given("an event log whose later registration reorders a scope's tests, relabels one and moves one under the scope")
       val eventLog =
         """
         run started
@@ -413,7 +419,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("each execution's tests appear in the last structure's order and with its labels, the moved test under the scope")
+      Then("each execution's tests appear in the last registration's order and with its labels, the moved test under the scope")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackSpec:{reset}
@@ -427,8 +433,8 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {green}- must pop{reset}""".stripExpectedMargin
     }
 
-    Scenario("A test that ran but the last structure lacks keeps its place, after the test the last structure holds there") {
-      Given("an event log whose further structure drops a test that ran, and adds one that never starts")
+    Scenario("A test that ran but the last registration lacks keeps its place, after the test the last registration holds there") {
+      Given("an event log whose later registration drops a test that ran, and adds one that never starts")
       val eventLog =
         """
         run started
@@ -466,8 +472,8 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {red}- peeks *** NOT RUN ***{reset}""".stripExpectedMargin
     }
 
-    Scenario("A scope whose test ran but the last structure lacks keeps its place, after the scope the last structure holds there") {
-      Given("an event log whose further structure drops a scope whose test ran")
+    Scenario("A scope whose test ran but the last registration lacks keeps its place, after the scope the last registration holds there") {
+      Given("an event log whose later registration drops a scope whose test ran")
       val eventLog =
         """
         run started
@@ -523,8 +529,8 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         $events
         """
 
-    Scenario("A test that never started and the last structure lacks is not shown") {
-      Given("an event log whose further structure replaces a test that never started with one that runs")
+    Scenario("A test that never started and the last registration lacks is not shown") {
+      Given("an event log whose later registration replaces a test that never started with one that runs")
       val eventLog = replacedTestThen(
         """
         scope "A config": ScopeOpened
@@ -539,7 +545,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("only the test the last structure holds is shown")
+      Then("only the test the last registration holds is shown")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}ConfigSpec:{reset}
@@ -547,8 +553,8 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {green}- remote{reset}""".stripExpectedMargin
     }
 
-    Scenario("A test that never started and the last structure lacks is not counted in a collapsed subtree") {
-      Given("an event log whose further structure replaces a test, then whose suite aborts before any test starts")
+    Scenario("A test that never started and the last registration lacks is not counted in a collapsed subtree") {
+      Given("an event log whose later registration replaces a test, then whose suite aborts before any test starts")
       val eventLog = replacedTestThen(
         """
         suite "ConfigSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
@@ -559,7 +565,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the count line counts the scope and the one test the last structure holds")
+      Then("the count line counts the scope and the one test the last registration holds")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}ConfigSpec:{reset}

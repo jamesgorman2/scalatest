@@ -84,19 +84,19 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     Scenario("One run, with and without Mill") {
       withTester("library-without-mill") { tester =>
-        Given("the test command has run core.test, holding CalculatorSuite, with Mill's --color false")
+        Given("the test command, invoked as mill scalatest/test core.test with Mill's --color false, has run core.test, a module holding CalculatorSuite")
         val testCommand = TestCommandResult(tester.eval(Seq("--ticker", "true", "--color", "false", "scalatest/test", "core.test")))
         withClue(testCommand.debugString) {
           testCommand.succeeded shouldBe true
           testCommand.humanReadableOutput should not be empty
         }
 
-        When("CalculatorSuite runs through Framework outside Mill with the runner argument")
+        When("CalculatorSuite runs through Framework outside Mill, given the ScalaTest runner argument that turns the emitter on and names the file to which the run writes its test event log")
         val run = runOutsideMill(tester, "samples.CalculatorSuite")
-        And("its event log, decoded with core's codec, and its stdout and stderr lines are fed to the library, with colour off")
+        And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label core.test, with colour off")
         val output = consolidated(run)
 
-        Then("the library's human-readable output is the test command's, with Mill's prefix removed from each line")
+        Then("the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")
         withClue(testCommand.debugString) {
           output shouldBe testCommand.humanReadableOutput
         }

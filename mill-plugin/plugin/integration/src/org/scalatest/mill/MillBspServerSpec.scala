@@ -58,25 +58,25 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
     requests.filterNot(_ == testRequest).foreach { request =>
       Scenario(request) {
         givenTheFixture()
-        When(s"a BSP client connected to Mill's BSP server sends $request, in the build without the plugin, and in the same build with it")
-        Then("the client receives the same response under both, apart from durations, timestamps and task IDs")
+        When("the session runs in a build that adds the plugin, and in the same build without it")
+        Then(s"the client receives the same response to $request under both, apart from durations, timestamps and task IDs")
         sameResponses(request)
       }
     }
 
     Scenario(s"$testRequest, which Mill 1.3.1 fails with or without the plugin") {
       givenTheFixture()
-      When(s"a BSP client connected to Mill's BSP server sends $testRequest, in the build without the plugin, and in the same build with it")
-      Then("the client receives an error, and the same one under both")
+      When("the session runs in a build that adds the plugin, and in the same build without it")
+      Then(s"the client receives an error in response to $testRequest, and the same one under both")
       sessions.withoutPlugin.responses(testRequest) should startWith("error ")
       sameResponses(testRequest)
     }
 
     Scenario("the notifications of a session that sends every request") {
       givenTheFixture()
-      When("a BSP client connected to Mill's BSP server sends every request in one session, in the build without the plugin, and in the same build with it")
+      When("the session runs in a build that adds the plugin, and in the same build without it")
       withClue(sessions.describe(_.describe)) {
-        Then("the client receives the same notifications under both, apart from durations, timestamps and task IDs")
+        Then("the client receives the same notifications in the session under both, apart from durations, timestamps and task IDs")
         sessions.withoutPlugin.notifications should not be empty
         sessions.withPlugin.notifications shouldBe sessions.withoutPlugin.notifications
 
@@ -88,8 +88,10 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
     }
   }
 
-  private def givenTheFixture(): Unit =
-    Given("core.test holds CalculatorSuite, whose test writes dividing now to stdout, and StackFlatSpec, whose test fails")
+  private def givenTheFixture(): Unit = {
+    Given("a BSP client holds one session with Mill's BSP server, from initialization until the server closes the connection")
+    And("in that session the client sends each of workspace/buildTargets, buildTarget/scalaTestClasses for core.test, buildTarget/jvmTestEnvironment for core.test and buildTarget/test for core.test")
+  }
 
   private def testRequest: String = requests.last
 

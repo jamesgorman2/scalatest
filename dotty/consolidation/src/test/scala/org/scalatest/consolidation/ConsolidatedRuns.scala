@@ -46,6 +46,13 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     feed
   }
 
+  /**
+   * Each way of feeding the captured lines, in their order, among the event log's events: before the first, between
+   * any two, or after the last. An event is a line at the event log's least indentation with the lines indented below it.
+   */
+  def capturedLinesAtEveryPoint(eventLog: String, lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
+    ConsolidatedRuns.interleavings(ConsolidatedRuns.eventsOf(eventLog).map(TestRunPart.Events(_)), lines)
+
   /** The single event the notation describes, built by the test-only builder. */
   def runEvent(notation: String): RunEvent =
     TestRunBuilder.build(TestRunPart.Events(notation)).map(_.items) match {
@@ -79,4 +86,25 @@ private[consolidation] object ConsolidatedRuns {
 
   def withColoursMarked(line: String): String =
     markers.foldLeft(line) { case (marked, (sequence, marker)) => marked.replace(sequence, marker) }
+
+  private def eventsOf(eventLog: String): Vector[String] = {
+    val lines = eventLog.linesIterator.filter(_.trim.nonEmpty).toVector
+    val leastIndentation = lines.map(_.takeWhile(_ == ' ').length).min
+    lines.foldLeft(Vector.empty[String]) { (events, line) =>
+      if (line.takeWhile(_ == ' ').length == leastIndentation || events.isEmpty) {
+        events :+ line
+      } else {
+        events.init :+ (events.last + "\n" + line)
+      }
+    }
+  }
+
+  private def interleavings(first: Vector[TestRunPart], second: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
+    if (first.isEmpty) {
+      Vector(second)
+    } else if (second.isEmpty) {
+      Vector(first)
+    } else {
+      interleavings(first.tail, second).map(first.head +: _) ++ interleavings(first, second.tail).map(second.head +: _)
+    }
 }

@@ -113,7 +113,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
 
-    Scenario("A failure's analysis follows its message under an `Analysis:` line") {
+    Scenario("A failure's analysis follows its message, after an `Analysis:` line") {
       Given("an event log of a test that fails with a `TestFailedException` and an analysis")
       val eventLog = testEndingWith(
         """test "have size 0": TestFailed(throwable: org.scalatest.exceptions.TestFailedException "Stack(1) did not equal Stack(0)" at StackFlatSpec.scala:9, analysis: ["Stack(size: 1 -> 0)"])"""

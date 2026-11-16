@@ -13,6 +13,14 @@ class SqrtPropSpec extends AnyPropSpec {
 }
 
 @DoNotDiscover
+class AddSuite extends AnyFunSuite {
+
+  test("adds") {
+    assert(1 + 1 == 2)
+  }
+}
+
+@DoNotDiscover
 class AbortSuite extends AnyFunSuite {
 
   test("throws on pop") {

@@ -135,15 +135,18 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
    * Framework, given a suite by name, runs none of the tests of the suites it nests, unless the task also selects
    * those suites by their suite IDs.
    */
-  protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger, nestedSuiteIds: Seq[String]): Unit = {
-    val ignoringEvents: EventHandler = _ => ()
+  protected def execute(runner: SbtRunner, suiteClassName: String, eventHandler: EventHandler, logger: Logger, nestedSuiteIds: Seq[String]): Unit = {
     val fingerprint = new Framework().fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
     val selectors = Array[Selector](new SuiteSelector) ++ nestedSuiteIds.map(suiteId => new NestedSuiteSelector(suiteId))
     var tasks = runner.tasks(Array(new TaskDef(suiteClassName, fingerprint, true, selectors))).toList
     while (tasks.nonEmpty) {
-      tasks = tasks.head.execute(ignoringEvents, Array(logger)).toList ::: tasks.tail
+      tasks = tasks.head.execute(eventHandler, Array(logger)).toList ::: tasks.tail
     }
   }
+
+  /** Executes the suite's task and the tasks it returns, ignoring the test-interface events they send. */
+  protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger, nestedSuiteIds: Seq[String]): Unit =
+    execute(runner, suiteClassName, _ => (), logger, nestedSuiteIds)
 
   /** Executes the suite's task and the tasks it returns, running no test of a suite it nests. */
   protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Unit = execute(runner, suiteClassName, logger, Nil)

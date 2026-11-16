@@ -126,7 +126,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   Feature("The module's own ScalaTest arguments") {
 
-    Scenario("An argument whose flag ScalaTest does not recognise fails the test command, naming it") {
+    Scenario("A module's own ScalaTest argument whose flag the Runner does not recognise fails the test command, naming that argument") {
       Given("CalculatorSuite, in a module whose own ScalaTest arguments are -l samples.Slow -x")
       When("the test command runs core.test")
       withSuites("-l", "samples.Slow", "-x")("CalculatorSuite") { tester =>

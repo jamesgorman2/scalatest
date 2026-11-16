@@ -11,7 +11,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 
 **Reasoning** A nested suite that never started is a suite node aborted with reason *not run* (`../SPECIFICATION.md` R-100), so a test class that never started takes the same shape and a reader meets one form for both. Classes left in a queue and classes a dead process took are shown alike (`../SPECIFICATION.md` R-095).
 
-**Costs** A suite that names no run record is a new case for readers of the JSON output. Progress output need not show these classes, which `../SPECIFICATION.md` R-068 had required of classes left in a queue.
+**Costs** A suite that names no run record is a new case for readers of the JSON output. Progress output need not show these classes.
 
 **Settled by** The user, in conversation on 2026-11-11, under no sub-issue of the plan. The spec review of that day's test manifest amendment found that `../SPECIFICATION.md` R-078 gave a test run label only the top-level suites of its runs as children, so a test class shown as not run had no stated place, order or JSON shape.
 
@@ -25,7 +25,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 - Each run sending its whole intended tree before running anything is impossible under Mill's test queue, where no worker knows which suites it will claim.
 - Showing nothing for a suite no run constructed leaves no record of the classes a process was to run when it dies before reporting them.
 
-**Reasoning** Only a run knows a suite's scopes and tests, and only once it constructs the suite; the test command knows every test class before any test starts. A test class no run reported is therefore shown by name, as not run (`../SPECIFICATION.md` R-066, R-094). The user must rerun it anyway, so its structure would tell them little.
+**Reasoning** Only a run knows a suite's scopes and tests, and only once it constructs the suite; the test command knows every test class before any test starts. A test class no run reported is therefore shown by name, as not run (`../SPECIFICATION.md` R-123). The user must rerun it anyway, so its structure would tell them little.
 
 **Costs** A test class no run reported shows no nested suites, scopes or tests, so a reader cannot tell from the output how many tests were not run. The test command must compile a test manifest to supply those classes (`architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
 

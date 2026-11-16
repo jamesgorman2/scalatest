@@ -37,14 +37,17 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
     }
 
     Scenario("Every line of the human-readable output on stdout carries Mill's prefix") {
-      Given("core.test holds SqrtPropSpec")
+      Given("the module is at Mill's default testLogLevel")
+      And("SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
+      And("the run writes nothing to stdout or stderr, sends no message outside a suite, and completes")
+      And("Mill colours its console output")
       When("the test command runs core.test, with Mill's ticker on as by default")
       val result = withTester("without-plugin-scala-3.3") { tester =>
         addPlugin(tester)
         runTestCommandWithTicker(tester, "core.test")
       }
 
-      Then("each line of the human-readable output on stdout begins with one prefix of Mill's, ahead of its indentation")
+      Then("each line of the human-readable output on stdout begins with the prefix Mill puts on every line the test command's own task writes, ahead of the line's indentation")
       val prefixes = result.humanReadableStdoutLines.map(line => TestCommandResult.millPrefix.findPrefixOf(line))
       withClue(result.debugString) {
         result.humanReadableStdoutLines should have size 3
@@ -78,11 +81,12 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
   Feature("A suite whose constructor throws is aborted, and the module's other suites still run") {
 
     Scenario("A suite's constructor throws") {
-      Given("core.test holds BrokenCtorSpec, whose constructor throws IllegalStateException(\"no config\"), and SqrtPropSpec")
+      Given("suite BrokenCtorSpec, class samples.BrokenCtorSpec, an AnyFunSuite whose constructor throws IllegalStateException(\"no config\")")
+      And("suite SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
       When("the test command runs core.test")
       val result = brokenConstructorRun
 
-      Then("BrokenCtorSpec's lines show it aborted")
+      Then("the lines for BrokenCtorSpec begin with BrokenCtorSpec: and samples.BrokenCtorSpec *** ABORTED ***")
       val brokenLines = result.linesFor("BrokenCtorSpec:")
       withClue(result.debugString) {
         brokenLines.take(2) shouldBe Seq("BrokenCtorSpec:", "  samples.BrokenCtorSpec *** ABORTED ***")

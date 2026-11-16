@@ -23,6 +23,9 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     "    [stdout] dividing now"
   )
 
+  /** A line the JVM's unified logging writes with its default decorators: uptime, level and tags. */
+  private val jvmUnifiedLoggingLine: String = """\[stdout\] \[[0-9]+[.,][0-9]+s\]\[info\]\[gc\] Using Serial"""
+
   private val millModes: Seq[(String, Boolean)] = Seq("Mill's daemon" -> true, "--no-daemon" -> false)
 
   /**
@@ -54,22 +57,24 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     millModes.foreach { case (mode, daemonMode) =>
       Scenario(s"A test's stdout line is shown in the run's block, under $mode") {
         Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
+        And("Mill colours its console output")
         When("the test command runs core.test")
         val result = withSuitesIn(daemonMode)("CalculatorSuite") { tester =>
-          runTestCommand(tester, "core.test")
+          evalTestCommand(tester, "--color", "true")
         }
 
-        Then("the human-readable output is the suite, then the run's block holding the line")
+        Then("the human-readable output is the module's label, the suite, then the run's block holding the line")
         withClue(result.debugString) {
-          result.humanReadableOutput shouldBe calculatorSuiteOutput
+          result.humanReadableOutputMarkingColours shouldBe calculatorSuiteOutputMarkingColours
         }
       }
 
       Scenario(s"Each stream's lines keep their order, under $mode") {
         Given("ChattySuite, whose one test writes out 1 to out 2000 to stdout and err 1 to err 2000 to stderr, alternating")
+        And("Mill colours its console output")
         When("the test command runs core.test")
         val result = withSuitesIn(daemonMode)("ChattySuite") { tester =>
-          runTestCommand(tester, "core.test")
+          evalTestCommand(tester, "--color", "true")
         }
         val block = result.linesFor("Output outside any suite:").drop(1).map(_.trim)
 
@@ -85,18 +90,26 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     Scenario("A test's line and the JVM's own line take one form") {
       Given("CalculatorSuite, in a module whose forkArgs make the worker's JVM write a line ending Using Serial to stdout")
+      And("Mill colours its console output")
       When("the test command runs core.test")
       val result = withSuites("CalculatorSuite") { tester =>
         addToTestModule(tester, """def forkArgs = Seq("-XX:+UseSerialGC", "-Xlog:gc:stdout")""")
-        runTestCommand(tester, "core.test")
+        evalTestCommand(tester, "--color", "true")
       }
       val block = result.linesFor("Output outside any suite:").drop(1).map(_.trim)
+      val written = result.humanReadableOutputMarkingColours.map(_.trim)
 
-      Then("the run's block holds the test's line and the JVM's line, each as [stdout] and the line written")
+      Then("the run's block holds [stdout] dividing now and a line [stdout] <text> whose text ends Using Serial")
       withClue(result.debugString) {
         block should contain("[stdout] dividing now")
         block.filter(_.endsWith("Using Serial")) should have size 1
-        block.filter(_.endsWith("Using Serial")).head should startWith("[stdout] [")
+      }
+
+      And("each of those two lines is [stdout] followed by nothing but the line written")
+      withClue(result.debugString) {
+        written should contain("[stdout] dividing now")
+        written.filter(_.endsWith("Using Serial")) should have size 1
+        written.filter(_.endsWith("Using Serial")).head should fullyMatch regex jvmUnifiedLoggingLine
       }
     }
   }
@@ -123,7 +136,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
   }
 
-  Feature("Human-readable output on stdout is coloured where Mill colours its own console output") {
+  Feature("Human-readable output on stdout is coloured where Mill colours its own console output and uncoloured otherwise") {
 
     Scenario("The same text with colour on and off") {
       Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds")
@@ -132,7 +145,12 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         (evalTestCommand(tester, "--color", "true"), evalTestCommand(tester, "--color", "false"))
       }
 
-      Then("the first human-readable output is the suite and the run's block, in colour")
+      Then("the first human-readable output, with Mill's prefix and every ANSI escape sequence removed from each line, is the module's label, the suite and the run's block")
+      withClue(coloured.debugString) {
+        coloured.humanReadableOutput shouldBe calculatorSuiteOutput
+      }
+
+      And("in the first human-readable output, [core.test] and Output outside any suite: are cyan, - adds two numbers is green and [stdout] dividing now is uncoloured")
       withClue(coloured.debugString) {
         coloured.humanReadableOutputMarkingColours shouldBe calculatorSuiteOutputMarkingColours
       }
@@ -150,8 +168,9 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
   Feature("A test sees the environment and working directory Mill's testForked gives it") {
 
     Scenario("A forkEnv variable and the working directory with test sandboxing off") {
-      Given("WhereSuite, which writes FIXTURE_ENV and its working directory to stdout")
-      And("a module whose forkEnv sets FIXTURE_ENV to from-forkEnv, and whose testSandboxWorkingDir is false")
+      Given("the build adds the Mill plugin at that release as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps, without changing the module's definition")
+      And("the module's forkEnv sets FIXTURE_ENV to from-forkEnv, and its testSandboxWorkingDir is false")
+      And("WhereSuite, which writes FIXTURE_ENV and its working directory to stdout")
       When("the test command runs core.test, and testForked runs it")
       val (result, testForked) = withSuites("WhereSuite") { tester =>
         addToTestModule(
