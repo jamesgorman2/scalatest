@@ -61,15 +61,9 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
   /**
    * The stdout lines of the human-readable output, as written: from the first that, without Mill's prefix, is a test
-   * run label, and each indented line after it.
+   * run label, each indented line after it, then the summary line.
    */
-  def humanReadableStdoutLines: Seq[String] =
-    stdoutLines
-      .dropWhile(line => !TestCommandResult.withoutMillPrefix(line).startsWith("["))
-      .takeWhile { line =>
-        val unprefixed = TestCommandResult.withoutMillPrefix(line)
-        unprefixed.startsWith("[") || unprefixed.startsWith(" ")
-      }
+  def humanReadableStdoutLines: Seq[String] = treeStdoutLines ++ summaryStdoutLine
 
   /** The console's lines outside the human-readable output, stdout's then stderr's. */
   def consoleLinesOutsideHumanReadableOutput: Seq[String] = {
@@ -79,14 +73,37 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
     outsideOnStdout ++ eval.err.linesIterator.map(TestCommandResult.withoutEscapes)
   }
 
-  /** The human-readable output, without Mill's prefix. */
-  def humanReadableOutput: Seq[String] = humanReadableStdoutLines.map(TestCommandResult.withoutMillPrefix)
+  /** The human-readable output apart from its summary line, without Mill's prefix. */
+  def humanReadableOutput: Seq[String] = treeStdoutLines.map(TestCommandResult.withoutMillPrefix)
 
   /**
-   * The human-readable output, without Mill's prefix, with each ANSI SGR sequence replaced by a marker naming it, such
-   * as `{red}` or `{reset}`.
+   * The human-readable output apart from its summary line, without Mill's prefix, with each ANSI SGR sequence replaced
+   * by a marker naming it, such as `{red}` or `{reset}`.
    */
-  def humanReadableOutputMarkingColours: Seq[String] = {
+  def humanReadableOutputMarkingColours: Seq[String] = humanReadableStdoutLinesMarkingColours.take(treeStdoutLines.size)
+
+  /** The summary line, the last line of the human-readable output, without Mill's prefix. */
+  def summaryLine: Option[String] = summaryStdoutLine.map(TestCommandResult.withoutMillPrefix)
+
+  /** The summary line, without Mill's prefix, with each ANSI SGR sequence replaced by a marker naming it. */
+  def summaryLineMarkingColours: Option[String] = humanReadableStdoutLinesMarkingColours.drop(treeStdoutLines.size).headOption
+
+  private def treeStdoutLines: Seq[String] =
+    stdoutLines
+      .dropWhile(line => !TestCommandResult.withoutMillPrefix(line).startsWith("["))
+      .takeWhile { line =>
+        val unprefixed = TestCommandResult.withoutMillPrefix(line)
+        unprefixed.startsWith("[") || unprefixed.startsWith(" ")
+      }
+
+  // The summary line is the one unindented line after the tree's lines.
+  private def summaryStdoutLine: Option[String] =
+    stdoutLines
+      .drop(stdoutLines.indexOfSlice(treeStdoutLines) + treeStdoutLines.size)
+      .headOption
+      .filter(line => treeStdoutLines.nonEmpty && TestCommandResult.withoutMillPrefix(line).startsWith("Suites: "))
+
+  private def humanReadableStdoutLinesMarkingColours: Seq[String] = {
     // `eval.out` has its ANSI escape sequences stripped; the process's own output keeps them.
     val written = eval.result.out.text().linesIterator.toSeq
     val start = written.map(TestCommandResult.withoutEscapes).indexOfSlice(humanReadableStdoutLines)
@@ -135,6 +152,12 @@ object TestCommandResult {
       line,
       sequence => Regex.quoteReplacement(colourMarkers.getOrElse(sequence.group(1), s"{sgr ${sequence.group(1)}}"))
     )
+
+  /**
+   * The marked line with each `{reset}` directly followed by another colour removed. Mill, re-rendering a line it
+   * prefixes, drops a foreground reset that the next colour overrides, so the line's characters keep their colours.
+   */
+  def withResetsBeforeAColourRemoved(marked: String): String = marked.replaceAll("""\{reset\}(?=\{(?!reset\}))""", "")
 
   private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
 

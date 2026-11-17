@@ -48,7 +48,7 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
     eventLog.foreach(line => feed.add(RunEvent.decode(line).fold(reason => fail(s"$reason, in $line"), identity)))
     feed.endEventStream()
     consolidation.end()
-    output.lines.map(ConsolidatedRuns.withColoursMarked)
+    output.linesApartFromSummaryLine.map(ConsolidatedRuns.withColoursMarked)
   }
 
   Feature("A failure message reaches the human-readable output unchanged") {

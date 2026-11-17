@@ -69,7 +69,8 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
     }
 
   /**
-   * Ends the consolidation and writes the human-readable output. Nothing is written before this.
+   * Ends the consolidation and writes the human-readable output, whose last line is the summary line. Nothing is
+   * written before this.
    *
    * @throws IllegalArgumentException if the consolidation has ended, or a run's event stream has not
    */

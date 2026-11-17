@@ -186,7 +186,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
         val uncoloured = outputLines(coloured = false)
         uncoloured.mkString should not include "\u001b"
         uncoloured shouldBe outputLines(coloured = true).map(_.replaceAll("\u001b\\[[0-9;]*m", ""))
-        uncoloured shouldBe Vector("[core.test]", "  CalculatorSuite:", "    - adds *** FAILED ***")
+        uncoloured.dropRight(1) shouldBe Vector("[core.test]", "  CalculatorSuite:", "    - adds *** FAILED ***")
       }
     }
   }

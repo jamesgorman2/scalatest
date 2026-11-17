@@ -312,15 +312,19 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = consolidatedOutput(eventLog)
 
       Then("the marked test shows `!!! IGNORED !!!` in yellow, and the unmarked one `*** NOT RUN ***` in red")
-      output shouldBe
+      output.apartFromSummaryLine shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- is empty{reset}
           |    {yellow}- peeks !!! IGNORED !!!{reset}
           |    {red}- pops *** NOT RUN ***{reset}""".stripExpectedMargin
+
+      And("the summary line counts the marked test as ignored, and the unmarked one as expected and not run")
+      output.summaryLineText shouldBe
+        "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 2 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
     }
 
     Scenario("The count line of a suite that did not start leaves its marked test out") {
@@ -343,16 +347,20 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = consolidatedOutput(eventLog)
 
       Then("the suite is not run, and its count line counts only the unmarked test")
-      output shouldBe
+      output.apartFromSummaryLine shouldBe
         """{cyan}[core.test]{reset}
           |  {green}HeapFunSuite:{reset}
           |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}
           |    {red}(1 test not run){reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- is empty{reset}""".stripExpectedMargin
+
+      And("the summary line counts the marked test as ignored, though its suite did not start")
+      output.summaryLineText shouldBe
+        "Suites: 1 of 2 completed, 0 aborted. Tests: 1 of 2 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
     }
 
     Scenario("A suite that did not start, whose only test is marked ignored, shows no count line") {
@@ -394,14 +402,18 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = consolidatedOutput(eventLog)
 
       Then("the test shows `!!! IGNORED !!!`, in yellow")
-      output shouldBe
+      output.apartFromSummaryLine shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- is empty{reset}
           |    {yellow}- peeks !!! IGNORED !!!{reset}""".stripExpectedMargin
+
+      And("the summary line counts the test as ignored")
+      output.summaryLineText shouldBe
+        "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
     }
 
     Scenario("A marked test that succeeded shows its execution's outcome") {
@@ -420,13 +432,17 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = consolidatedOutput(eventLog)
 
       Then("the test's line is its label alone, in green")
-      output shouldBe
+      output.apartFromSummaryLine shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- peeks{reset}""".stripExpectedMargin
+
+      And("the summary line counts the test as succeeded, not as ignored")
+      output.summaryLineText shouldBe
+        "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
     }
   }
 }

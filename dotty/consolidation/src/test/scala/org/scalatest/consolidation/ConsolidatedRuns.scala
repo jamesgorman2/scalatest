@@ -27,8 +27,27 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
     def lines: Vector[String] = synchronized(received.toVector)
 
-    /** The lines joined with LF, each ANSI SGR sequence replaced by a marker naming it. */
-    def markedText: String = lines.map(ConsolidatedRuns.withColoursMarked).mkString("\n")
+    /** Every line but the last, the summary line. */
+    def linesApartFromSummaryLine: Vector[String] = lines.dropRight(1)
+
+    /** The lines apart from the summary line, joined with LF, each ANSI SGR sequence replaced by a marker naming it. */
+    def markedTextApartFromSummaryLine: String = markedOutput.apartFromSummaryLine
+
+    /** The lines, each ANSI SGR sequence replaced by a marker naming it. */
+    def markedOutput: MarkedOutput = MarkedOutput(lines.map(ConsolidatedRuns.withColoursMarked))
+  }
+
+  /** The lines of human-readable output, each ANSI SGR sequence replaced by a marker naming it. */
+  final case class MarkedOutput(lines: Vector[String]) {
+
+    /** The lines apart from the summary line, joined with LF. */
+    def apartFromSummaryLine: String = lines.dropRight(1).mkString("\n")
+
+    /** The last line. */
+    def summaryLine: String = lines.lastOption.getOrElse(fail("the human-readable output has no line"))
+
+    /** The last line, without its colour markers. */
+    def summaryLineText: String = summaryLine.replaceAll("\\{(reset|red|green|yellow|cyan)\\}", "")
   }
 
   /** Adds the run to the consolidation, feeding each event and captured line in the order the parts give them. */
@@ -61,16 +80,25 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
       case Left(reason) => fail(reason)
     }
 
-  /** The coloured human-readable output of one run whose event stream has ended, with colours marked. */
+  /** The coloured human-readable output of one run whose event stream has ended, apart from its summary line, with colours marked. */
   def consolidated(eventLog: String): String = consolidated(TestRunPart.Events(eventLog))
 
+  /**
+   * The coloured human-readable output, apart from its summary line, with colours marked, of one run built from its
+   * parts whose event stream has ended.
+   */
+  def consolidated(parts: TestRunPart*): String = consolidatedOutput(parts*).apartFromSummaryLine
+
+  /** The coloured human-readable output of one run whose event stream has ended, with colours marked. */
+  def consolidatedOutput(eventLog: String): MarkedOutput = consolidatedOutput(TestRunPart.Events(eventLog))
+
   /** The coloured human-readable output, with colours marked, of one run built from its parts whose event stream has ended. */
-  def consolidated(parts: TestRunPart*): String = {
+  def consolidatedOutput(parts: TestRunPart*): MarkedOutput = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)
     addRun(consolidation, parts*).endEventStream()
     consolidation.end()
-    output.markedText
+    output.markedOutput
   }
 }
 

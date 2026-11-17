@@ -50,9 +50,26 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       Then("each line of the human-readable output on stdout begins with the prefix Mill puts on every line the test command's own task writes, ahead of the line's indentation")
       val prefixes = result.humanReadableStdoutLines.map(line => TestCommandResult.millPrefix.findPrefixOf(line))
       withClue(result.debugString) {
-        result.humanReadableStdoutLines should have size 3
-        prefixes.flatten should have size 3
+        result.humanReadableStdoutLines should have size 4
+        prefixes.flatten should have size 4
         prefixes.distinct should have size 1
+      }
+
+      And("the last line of the human-readable output on stdout, with every ANSI escape sequence removed, is that prefix followed by the summary line")
+      withClue(result.debugString) {
+        result.humanReadableStdoutLines.last shouldBe
+          prefixes.head.get + "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+      }
+
+      And("in that line 0 aborted and failed 0 are red, succeeded 1 is green, canceled 0, ignored 0 and pending 0 are yellow, and every other character after the prefix is cyan")
+      withClue(result.debugString) {
+        result.summaryLineMarkingColours.map(TestCommandResult.withResetsBeforeAColourRemoved) shouldBe Some(
+          TestCommandResult.withResetsBeforeAColourRemoved(
+            "{cyan}Suites: 1 of 1 completed, {reset}{red}0 aborted{reset}" +
+              "{cyan}. Tests: 1 of 1 run: {reset}{green}succeeded 1{reset}{cyan}, {reset}{red}failed 0{reset}" +
+              "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
+          )
+        )
       }
     }
 

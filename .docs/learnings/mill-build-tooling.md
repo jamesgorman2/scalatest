@@ -98,7 +98,8 @@ date: 2026-11-17
 With its ticker on, Mill 1.3.1 re-renders each line a task writes through `Task.log.streams.out` when it adds its prefix (such as `1] `):
 
 - where Mill colours its console output, the prefix itself is coloured, as `ESC[34m1]ESC[39m `;
-- an ANSI reset `ESC[0m` in the task's line comes out as `ESC[39m`.
+- an ANSI reset `ESC[0m` in the task's line comes out as `ESC[39m`;
+- a reset directly followed by another colour is dropped: `ESC[36mA ESC[0m ESC[31mB` comes out as `ESC[36mA ESC[31mB`. Each character keeps its colour.
 
-The task's own colours reach stdout under `--color false` too. `mill.testkit.IntegrationTester` runs with `--ticker false`, which hides both effects, so pass `--ticker true` to test what a user sees. A test comparing colours on prefixed lines must allow colour sequences around the prefix and treat `39` as a foreground reset.
+The task's own colours reach stdout under `--color false` too. `mill.testkit.IntegrationTester` runs with `--ticker false`, which hides these effects, so pass `--ticker true` to test what a user sees. A test comparing colours on prefixed lines must allow colour sequences around the prefix, treat `39` as a foreground reset, and, for a line of several colours, remove each reset directly followed by a colour from both actual and expected before comparing.
 </learning>

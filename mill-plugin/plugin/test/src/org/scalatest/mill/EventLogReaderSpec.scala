@@ -104,7 +104,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
           reading.runsAdded.get shouldBe 1
           reading.processesEndedBeforeAnyRun.get shouldBe 0
-          reading.output.toSeq shouldBe Seq("[core.test]")
+          reading.output.toSeq.dropRight(1) shouldBe Seq("[core.test]")
         }
       }
     }

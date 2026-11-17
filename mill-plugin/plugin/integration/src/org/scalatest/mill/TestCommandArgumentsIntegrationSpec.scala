@@ -15,6 +15,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     "    [stdout] dividing now"
   )
 
+  private val calculatorSuiteSummaryLine: String =
+    "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+
   /**
    * Runs `test` on a copy of the `arguments` fixture whose `core.test` holds the given suites from the fixture's
    * `suites` folder, and whose own ScalaTest arguments are `moduleArguments`.
@@ -46,9 +49,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           runTestCommandWithTicker(tester, ("core.test" +: outputArguments)*)
         }
 
-        Then("the human-readable output is Run 1:, holding the suite and then the test's line")
+        Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
         withClue(result.debugString) {
           result.humanReadableOutput shouldBe calculatorSuiteOutput
+          result.summaryLine shouldBe Some(calculatorSuiteSummaryLine)
         }
 
         And("no other stdout line carries the test command's prefix")
@@ -71,9 +75,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
       val console = result.stdoutLines ++ result.eval.err.linesIterator
 
-      Then("the console holds no line of human-readable output, and no line holding dividing now")
+      Then("the console holds no line of human-readable output, its summary line included, and no line holding dividing now")
       withClue(result.debugString) {
         result.humanReadableOutput shouldBe empty
+        console.filter(_.contains(calculatorSuiteSummaryLine)) shouldBe empty
         console.filter(_.contains("dividing now")) shouldBe empty
       }
 

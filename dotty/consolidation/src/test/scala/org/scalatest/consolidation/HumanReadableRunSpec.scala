@@ -120,7 +120,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the module shows Run 1: with the first run's suite and line, then Run 2: with the second's")
-      output.markedText shouldBe
+      output.markedTextApartFromSummaryLine shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 1:{reset}
           |    {green}ZetaSuite:{reset}
@@ -148,7 +148,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the second run's line is Run 2:")
-      output.markedText shouldBe
+      output.markedTextApartFromSummaryLine shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 2:{reset}
           |    [stdout] dividing now""".stripExpectedMargin
@@ -251,7 +251,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the root's line heads the module's lines, then the root's captured line")
-      output.markedText shouldBe
+      output.markedTextApartFromSummaryLine shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -277,7 +277,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the root's line heads the module's lines, then the root's abort with the failure's message under it")
-      output.markedText shouldBe
+      output.markedTextApartFromSummaryLine shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -303,7 +303,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the root's captured lines come in the order attached, then its abort with each failure's message in the order attached")
-      output.markedText shouldBe
+      output.markedTextApartFromSummaryLine shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -327,7 +327,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the run's line and its abort sit under the module's line, itself under the root's line")
-      output.markedText shouldBe
+      output.markedTextApartFromSummaryLine shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {cyan}Run 1:{reset}
