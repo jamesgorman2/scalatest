@@ -52,9 +52,9 @@ private[consolidation] enum Outcome {
  *
  * @param inDeclaredOrder its scopes, tests and suites with a position, each further run of a suite with a position
  *                        directly after it
- * @param inNameOrder     its other suites, whose executions are ordered by suite name and then by start
+ * @param withoutPosition its other suites, whose executions are still to be sorted by suite name and then by start
  */
-private[consolidation] final case class OrderedChildren(inDeclaredOrder: Vector[StructureNode], inNameOrder: Vector[StructureNode])
+private[consolidation] final case class OrderedChildren(inDeclaredOrder: Vector[StructureNode], withoutPosition: Vector[StructureNode])
 
 /** A message of a suite, scope or test, placed after the first `childrenBefore` of the children shown under its execution. */
 private[consolidation] final case class PlacedMessage(event: DecodedEvent, childrenBefore: Int)
@@ -211,7 +211,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
       val shownChildren = shownChildrenOf(id)
       def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =
         children.flatMap(assembledUnder(_, id, number, latest, abortedSuiteAround))
-      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.inNameOrder))
+      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.withoutPosition))
       val started = execution.nonEmpty || children.exists(_.started)
       AssembledExecution(
         number,
@@ -306,7 +306,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
 
   // Reads the execution path against the latest structure. Its last number is the node's, and each number before it
   // belongs to the next node up, counting each scope between a test and its suite. An execution keeps the parent
-  // execution it first had. The executions one path starts are numbered from the top down.
+  // execution it first had. The executions get their start numbers from the top down, so a parent's start precedes its child's.
   private def recordExecutionPath(nodeExecution: NodeExecution): Unit = {
     val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(RunAssembly.parentOf)))).toVector
     val executionsUp = nodesUp.zip(nodeExecution.executions.reverse).map((node, number) => ExecutionOfNode(node, number))
