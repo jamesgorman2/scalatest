@@ -270,7 +270,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       And("a failure attached to the root whose message is `test discovery failed`")
       consolidation.addRootFailure("test discovery failed")
 
-      Then("the consolidation state is failed before the operation returns")
+      And("the consolidation state is already failed")
       consolidation.state shouldBe ConsolidationState.OpenFailed
 
       When("the library consolidates it")
