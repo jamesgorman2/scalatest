@@ -9,9 +9,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
     "[core.test]",
-    "  CalculatorSuite:",
-    "    - adds two numbers",
-    "  Output outside any suite:",
+    "  Run 1:",
+    "    CalculatorSuite:",
+    "      - adds two numbers",
     "    [stdout] dividing now"
   )
 
@@ -53,7 +53,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           runTestCommandWithTicker(tester, ("core.test" +: outputArguments)*)
         }
 
-        Then("the human-readable output is the suite, then the run's block")
+        Then("the human-readable output is Run 1:, holding the suite and then the test's line")
         withClue(result.debugString) {
           result.humanReadableOutput shouldBe calculatorSuiteOutput
         }

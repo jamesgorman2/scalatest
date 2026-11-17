@@ -9,17 +9,17 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
     "[core.test]",
-    "  CalculatorSuite:",
-    "    - adds two numbers",
-    "  Output outside any suite:",
+    "  Run 1:",
+    "    CalculatorSuite:",
+    "      - adds two numbers",
     "    [stdout] dividing now"
   )
 
   private val calculatorSuiteOutputMarkingColours: Seq[String] = Seq(
     "{cyan}[core.test]{reset}",
-    "  {green}CalculatorSuite:{reset}",
-    "    {green}- adds two numbers{reset}",
-    "  {cyan}Output outside any suite:{reset}",
+    "  {cyan}Run 1:{reset}",
+    "    {green}CalculatorSuite:{reset}",
+    "      {green}- adds two numbers{reset}",
     "    [stdout] dividing now"
   )
 
@@ -52,10 +52,10 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
   private def evalTestCommand(tester: IntegrationTester, millArguments: String*): TestCommandResult =
     TestCommandResult(tester.eval(millArguments ++ Seq("scalatest/test", "core.test")))
 
-  Feature("A run's block holds what its worker wrote to stdout and stderr") {
+  Feature("A run's line holds what its worker wrote to stdout and stderr") {
 
     millModes.foreach { case (mode, daemonMode) =>
-      Scenario(s"A test's stdout line is shown in the run's block, under $mode") {
+      Scenario(s"A test's stdout line is shown under Run 1:, under $mode") {
         Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
         And("Mill colours its console output")
         When("the test command runs core.test")
@@ -63,7 +63,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
           evalTestCommand(tester, "--color", "true")
         }
 
-        Then("the human-readable output is the module's label, the suite, then the run's block holding the line")
+        Then("the human-readable output is the module's line, then Run 1: holding the suite and then the line")
         withClue(result.debugString) {
           result.humanReadableOutputMarkingColours shouldBe calculatorSuiteOutputMarkingColours
         }
@@ -76,15 +76,15 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         val result = withSuitesIn(daemonMode)("ChattySuite") { tester =>
           evalTestCommand(tester, "--color", "true")
         }
-        val block = result.linesFor("Output outside any suite:").drop(1).map(_.trim)
+        val underRunLine = result.linesFor("Run 1:").drop(1).map(_.trim)
 
-        Then("the run's block's stdout lines are out 1 to out 2000, in that order")
+        Then("the [stdout] lines under Run 1: are out 1 to out 2000, in that order")
         withClue(result.debugString.take(10000)) {
-          block.filter(_.startsWith("[stdout] ")) shouldBe (1 to 2000).map(i => s"[stdout] out $i")
+          underRunLine.filter(_.startsWith("[stdout] ")) shouldBe (1 to 2000).map(i => s"[stdout] out $i")
         }
 
-        And("its stderr lines are err 1 to err 2000, in that order")
-        block.filter(_.startsWith("[stderr] ")) shouldBe (1 to 2000).map(i => s"[stderr] err $i")
+        And("the [stderr] lines under Run 1: are err 1 to err 2000, in that order")
+        underRunLine.filter(_.startsWith("[stderr] ")) shouldBe (1 to 2000).map(i => s"[stderr] err $i")
       }
     }
 
@@ -96,13 +96,13 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         addToTestModule(tester, """def forkArgs = Seq("-XX:+UseSerialGC", "-Xlog:gc:stdout")""")
         evalTestCommand(tester, "--color", "true")
       }
-      val block = result.linesFor("Output outside any suite:").drop(1).map(_.trim)
+      val underRunLine = result.linesFor("Run 1:").drop(1).map(_.trim)
       val written = result.humanReadableOutputMarkingColours.map(_.trim)
 
-      Then("the run's block holds [stdout] dividing now and a line [stdout] <text> whose text ends Using Serial")
+      Then("the lines under Run 1: hold [stdout] dividing now and a line [stdout] <text> whose text ends Using Serial")
       withClue(result.debugString) {
-        block should contain("[stdout] dividing now")
-        block.filter(_.endsWith("Using Serial")) should have size 1
+        underRunLine should contain("[stdout] dividing now")
+        underRunLine.filter(_.endsWith("Using Serial")) should have size 1
       }
 
       And("each of those two lines is [stdout] followed by nothing but the line written")
@@ -114,7 +114,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
   }
 
-  Feature("A run's block holds the worker's output whatever the module's testLogLevel") {
+  Feature("A run's line holds the worker's output whatever the module's testLogLevel") {
 
     Scenario("A module whose testLogLevel is Debug") {
       Given("CalculatorSuite, in a module whose testLogLevel is Debug, at which Mill prints Running Test Class")
@@ -125,9 +125,9 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
       val console = result.stdoutLines ++ result.eval.err.linesIterator
 
-      Then("the run's block holds the test's line")
+      Then("the lines under Run 1: hold the test's line")
       withClue(result.debugString) {
-        result.linesFor("Output outside any suite:").map(_.trim) should contain("[stdout] dividing now")
+        result.linesFor("Run 1:").map(_.trim) should contain("[stdout] dividing now")
       }
 
       And("no line of the human-readable output or of the console holds Running Test Class")
@@ -145,12 +145,12 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         (evalTestCommand(tester, "--color", "true"), evalTestCommand(tester, "--color", "false"))
       }
 
-      Then("the first human-readable output, with Mill's prefix and every ANSI escape sequence removed from each line, is the module's label, the suite and the run's block")
+      Then("the first human-readable output, with Mill's prefix and every ANSI escape sequence removed from each line, is the module's line, then Run 1: holding the suite and the test's line")
       withClue(coloured.debugString) {
         coloured.humanReadableOutput shouldBe calculatorSuiteOutput
       }
 
-      And("in the first human-readable output, [core.test] and Output outside any suite: are cyan, - adds two numbers is green and [stdout] dividing now is uncoloured")
+      And("in the first human-readable output, [core.test] and Run 1: are cyan, - adds two numbers is green and [stdout] dividing now is uncoloured")
       withClue(coloured.debugString) {
         coloured.humanReadableOutputMarkingColours shouldBe calculatorSuiteOutputMarkingColours
       }
@@ -180,18 +180,18 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         )
         (runTestCommand(tester, "core.test"), tester.eval(Seq("core.test.testForked")))
       }
-      val block = result.linesFor("Output outside any suite:").drop(1).map(_.trim)
+      val underRunLine = result.linesFor("Run 1:").drop(1).map(_.trim)
 
-      Then("the run's block holds the forkEnv value")
+      Then("a line under Run 1: holds the forkEnv value")
       withClue(result.debugString) {
-        block should contain("[stdout] env=from-forkEnv")
+        underRunLine should contain("[stdout] env=from-forkEnv")
       }
 
       And("its working directory line is the one testForked wrote")
       val testForkedLines = testForked.out.linesIterator.filter(_.contains("cwd=")).map(line => line.substring(line.indexOf("cwd="))).toSeq
       withClue(testForked.debugString) {
         testForkedLines should have size 1
-        block.filter(_.startsWith("[stdout] cwd=")) shouldBe testForkedLines.map("[stdout] " + _)
+        underRunLine.filter(_.startsWith("[stdout] cwd=")) shouldBe testForkedLines.map("[stdout] " + _)
       }
     }
   }
@@ -253,7 +253,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         first.succeeded shouldBe false
       }
 
-      Then("the second human-readable output is the suite and the run's block alone")
+      Then("the second human-readable output is Run 1:, holding the suite and the test's line, alone")
       withClue(second.debugString) {
         second.humanReadableOutput shouldBe calculatorSuiteOutput
       }

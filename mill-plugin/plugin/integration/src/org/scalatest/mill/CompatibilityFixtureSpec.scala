@@ -21,244 +21,244 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
 
   private val expectedOutput: String =
     """[core.test]
-      |  AnyFeatureSpecSpec:
-      |    Feature: A feature
-      |      Scenario: succeeds
-      |      Scenario: fails *** FAILED ***
-      |        3 did not equal 4 (FeatureSpecSpecs.scala:18)
-      |      - Scenario: is ignored !!! IGNORED !!!
-      |      Scenario: is pending (pending)
-      |      Scenario: is cancelled !!! CANCELED !!!
-      |        cancelled by the test (FeatureSpecSpecs.scala:27)
-      |  AnyFlatSpecSpec:
-      |    A subject
-      |      - should succeed
-      |      - must fail *** FAILED ***
-      |        3 did not equal 4 (FlatSpecSpecs.scala:17)
-      |      - should be ignored !!! IGNORED !!!
-      |    Another subject
-      |      - can be pending (pending)
-      |      - should be cancelled !!! CANCELED !!!
-      |        cancelled by the test (FlatSpecSpecs.scala:29)
-      |  AnyFreeSpecSpec:
-      |    A scope
-      |      - succeeds
-      |      - fails *** FAILED ***
-      |        3 did not equal 4 (FreeSpecSpecs.scala:19)
-      |      - is ignored !!! IGNORED !!!
-      |      - is pending (pending)
-      |      holding a nested scope
-      |        - is cancelled !!! CANCELED !!!
-      |          cancelled by the test (FreeSpecSpecs.scala:29)
-      |    A pending scope (pending)
-      |  AnyFunSpecSpec:
-      |    A scope
-      |      [info] info from a scope
-      |      [note] note from a scope
-      |      [alert] alert from a scope
-      |      [markup] markup from a scope
-      |      - succeeds
-      |      - fails *** FAILED ***
-      |        3 did not equal 4 (FunSpecSpecs.scala:24)
-      |      - is ignored !!! IGNORED !!!
-      |      - is pending (pending)
-      |      - is cancelled !!! CANCELED !!!
-      |        cancelled by the test (FunSpecSpecs.scala:33)
-      |      - sends messages
-      |        [info] info from a test
-      |        [note] note from a test
-      |        [alert] alert from a test
-      |        [markup] markup from a test
-      |      holding a nested scope
-      |        - succeeds
-      |    A pending scope (pending)
-      |  AnyFunSuiteSpec:
-      |    [info] info from a suite
-      |    [note] note from a suite
-      |    [alert] alert from a suite
-      |    [markup] markup from a suite
-      |    - succeeds
-      |    - fails *** FAILED ***
-      |      3 did not equal 4 (FunSuiteSpecs.scala:22)
-      |    - is ignored !!! IGNORED !!!
-      |    - is pending (pending)
-      |    - is cancelled !!! CANCELED !!!
-      |      cancelled by the test (FunSuiteSpecs.scala:31)
-      |    - writes to stdout and to stderr
-      |    - throws an exception that has a cause *** FAILED ***
-      |      java.lang.IllegalStateException: outer
-      |        at …
-      |        ...
-      |      Cause: java.io.IOException: inner
-      |        at …
-      |        ...
-      |  AnyPropSpecSpec:
-      |    - succeeds
-      |    - fails *** FAILED ***
-      |      scala.List.apply[scala.Int](1, 2, 3).forall(((_$2: scala.Int) => _$2.>(1))) was false (PropSpecSpecs.scala:12)
-      |    - is ignored !!! IGNORED !!!
-      |  AnyWordSpecSpec:
-      |    A subject
-      |      when in a state
+      |  Run 1:
+      |    AnyFeatureSpecSpec:
+      |      Feature: A feature
+      |        Scenario: succeeds
+      |        Scenario: fails *** FAILED ***
+      |          3 did not equal 4 (FeatureSpecSpecs.scala:18)
+      |        - Scenario: is ignored !!! IGNORED !!!
+      |        Scenario: is pending (pending)
+      |        Scenario: is cancelled !!! CANCELED !!!
+      |          cancelled by the test (FeatureSpecSpecs.scala:27)
+      |    AnyFlatSpecSpec:
+      |      A subject
       |        - should succeed
-      |        - should fail *** FAILED ***
-      |          3 did not equal 4 (WordSpecSpecs.scala:19)
+      |        - must fail *** FAILED ***
+      |          3 did not equal 4 (FlatSpecSpecs.scala:17)
       |        - should be ignored !!! IGNORED !!!
-      |    Another subject
-      |      - can be pending (pending)
-      |      - can be cancelled !!! CANCELED !!!
-      |        cancelled by the test (WordSpecSpecs.scala:31)
-      |  AsyncFeatureSpecSpec:
-      |    Feature: A feature
-      |      - Scenario: succeeds
-      |      - Scenario: fails *** FAILED ***
-      |        3 did not equal 4 (FeatureSpecSpecs.scala:38)
-      |      - Scenario: is ignored !!! IGNORED !!!
-      |  AsyncFlatSpecSpec:
-      |    A subject
-      |      - should succeed
-      |      - must fail *** FAILED ***
-      |        3 did not equal 4 (FlatSpecSpecs.scala:38)
-      |  AsyncFreeSpecSpec:
-      |    A scope
+      |      Another subject
+      |        - can be pending (pending)
+      |        - should be cancelled !!! CANCELED !!!
+      |          cancelled by the test (FlatSpecSpecs.scala:29)
+      |    AnyFreeSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - fails *** FAILED ***
+      |          3 did not equal 4 (FreeSpecSpecs.scala:19)
+      |        - is ignored !!! IGNORED !!!
+      |        - is pending (pending)
+      |        holding a nested scope
+      |          - is cancelled !!! CANCELED !!!
+      |            cancelled by the test (FreeSpecSpecs.scala:29)
+      |      A pending scope (pending)
+      |    AnyFunSpecSpec:
+      |      A scope
+      |        [info] info from a scope
+      |        [note] note from a scope
+      |        [alert] alert from a scope
+      |        [markup] markup from a scope
+      |        - succeeds
+      |        - fails *** FAILED ***
+      |          3 did not equal 4 (FunSpecSpecs.scala:24)
+      |        - is ignored !!! IGNORED !!!
+      |        - is pending (pending)
+      |        - is cancelled !!! CANCELED !!!
+      |          cancelled by the test (FunSpecSpecs.scala:33)
+      |        - sends messages
+      |          [info] info from a test
+      |          [note] note from a test
+      |          [alert] alert from a test
+      |          [markup] markup from a test
+      |        holding a nested scope
+      |          - succeeds
+      |      A pending scope (pending)
+      |    AnyFunSuiteSpec:
+      |      [info] info from a suite
+      |      [note] note from a suite
+      |      [alert] alert from a suite
+      |      [markup] markup from a suite
       |      - succeeds
+      |      - fails *** FAILED ***
+      |        3 did not equal 4 (FunSuiteSpecs.scala:22)
+      |      - is ignored !!! IGNORED !!!
+      |      - is pending (pending)
       |      - is cancelled !!! CANCELED !!!
-      |        cancelled in a future (FreeSpecSpecs.scala:44)
-      |  AsyncFunSpecSpec:
-      |    A scope
-      |      - succeeds
-      |      - fails with an exception *** FAILED ***
-      |        java.lang.IllegalArgumentException: thrown in a future
+      |        cancelled by the test (FunSuiteSpecs.scala:31)
+      |      - writes to stdout and to stderr
+      |      - throws an exception that has a cause *** FAILED ***
+      |        java.lang.IllegalStateException: outer
       |          at …
       |          ...
-      |  AsyncFunSuiteSpec:
-      |    - succeeds
-      |    - fails *** FAILED ***
-      |      3 did not equal 4 (FunSuiteSpecs.scala:47)
-      |  AsyncWordSpecSpec:
-      |    A subject
-      |      when in a state
-      |        - should succeed
-      |    Another subject
-      |      - can fail *** FAILED ***
-      |        3 did not equal 4 (WordSpecSpecs.scala:46)
-      |  BeforeAllThrowsSpec:
-      |    compatibility.fixture.BeforeAllThrowsSpec *** ABORTED ***
-      |      java.lang.IllegalStateException: beforeAll failed
-      |        at …
-      |        ...
-      |    (1 test not run)
-      |  ConfigMapWrappedSpec:
-      |    A scope of a wrapped suite
+      |        Cause: java.io.IOException: inner
+      |          at …
+      |          ...
+      |    AnyPropSpecSpec:
       |      - succeeds
       |      - fails *** FAILED ***
-      |        Map() was empty (ConfigMapWrappedSpec.scala:14)
-      |  FixtureAnyFeatureSpecSpec:
-      |    Feature: A feature
-      |      Scenario: succeeds
-      |      Scenario: fails without the fixture *** FAILED ***
-      |        3 did not equal 4 (FeatureSpecSpecs.scala:56)
-      |      - Scenario: is ignored !!! IGNORED !!!
-      |      - Scenario: is ignored without the fixture !!! IGNORED !!!
-      |  FixtureAnyFlatSpecSpec:
-      |    A subject
-      |      - should succeed
-      |    Another subject
-      |      - can be cancelled !!! CANCELED !!!
-      |        "[]fixture" did not equal "[another ]fixture" (FlatSpecSpecs.scala:54)
-      |  FixtureAnyFreeSpecSpec:
-      |    A scope
+      |        scala.List.apply[scala.Int](1, 2, 3).forall(((_$2: scala.Int) => _$2.>(1))) was false (PropSpecSpecs.scala:12)
+      |      - is ignored !!! IGNORED !!!
+      |    AnyWordSpecSpec:
+      |      A subject
+      |        when in a state
+      |          - should succeed
+      |          - should fail *** FAILED ***
+      |            3 did not equal 4 (WordSpecSpecs.scala:19)
+      |          - should be ignored !!! IGNORED !!!
+      |      Another subject
+      |        - can be pending (pending)
+      |        - can be cancelled !!! CANCELED !!!
+      |          cancelled by the test (WordSpecSpecs.scala:31)
+      |    AsyncFeatureSpecSpec:
+      |      Feature: A feature
+      |        - Scenario: succeeds
+      |        - Scenario: fails *** FAILED ***
+      |          3 did not equal 4 (FeatureSpecSpecs.scala:38)
+      |        - Scenario: is ignored !!! IGNORED !!!
+      |    AsyncFlatSpecSpec:
+      |      A subject
+      |        - should succeed
+      |        - must fail *** FAILED ***
+      |          3 did not equal 4 (FlatSpecSpecs.scala:38)
+      |    AsyncFreeSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - is cancelled !!! CANCELED !!!
+      |          cancelled in a future (FreeSpecSpecs.scala:44)
+      |    AsyncFunSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - fails with an exception *** FAILED ***
+      |          java.lang.IllegalArgumentException: thrown in a future
+      |            at …
+      |            ...
+      |    AsyncFunSuiteSpec:
       |      - succeeds
       |      - fails *** FAILED ***
-      |        "[]fixture" did not equal "[another ]fixture" (FreeSpecSpecs.scala:59)
-      |        Analysis:
-      |        "[]fixture" -> "[another ]fixture"
-      |  FixtureAnyFunSpecSpec:
-      |    A scope
-      |      - succeeds
-      |      - is pending (pending)
-      |  FixtureAnyFunSuiteSpec:
-      |    - succeeds
-      |    - is cancelled !!! CANCELED !!!
-      |      "[]fixture" did not equal "[another ]fixture" (FunSuiteSpecs.scala:60)
-      |  FixtureAnyPropSpecSpec:
-      |    - succeeds
-      |    - fails *** FAILED ***
-      |      numbers.forall(((_$5: scala.Int) => _$5.>(1))) was false (PropSpecSpecs.scala:28)
-      |  FixtureAnyWordSpecSpec:
-      |    A subject
-      |      when in a state
+      |        3 did not equal 4 (FunSuiteSpecs.scala:47)
+      |    AsyncWordSpecSpec:
+      |      A subject
+      |        when in a state
+      |          - should succeed
+      |      Another subject
+      |        - can fail *** FAILED ***
+      |          3 did not equal 4 (WordSpecSpecs.scala:46)
+      |    BeforeAllThrowsSpec:
+      |      compatibility.fixture.BeforeAllThrowsSpec *** ABORTED ***
+      |        java.lang.IllegalStateException: beforeAll failed
+      |          at …
+      |          ...
+      |      (1 test not run)
+      |    ConfigMapWrappedSpec:
+      |      A scope of a wrapped suite
+      |        - succeeds
+      |        - fails *** FAILED ***
+      |          Map() was empty (ConfigMapWrappedSpec.scala:14)
+      |    FixtureAnyFeatureSpecSpec:
+      |      Feature: A feature
+      |        Scenario: succeeds
+      |        Scenario: fails without the fixture *** FAILED ***
+      |          3 did not equal 4 (FeatureSpecSpecs.scala:56)
+      |        - Scenario: is ignored !!! IGNORED !!!
+      |        - Scenario: is ignored without the fixture !!! IGNORED !!!
+      |    FixtureAnyFlatSpecSpec:
+      |      A subject
       |        - should succeed
-      |    Another subject
-      |      - can be cancelled !!! CANCELED !!!
-      |        "[]fixture" did not equal "[another ]fixture" the fixture is not the one assumed (WordSpecSpecs.scala:65)
-      |  FixtureAsyncFeatureSpecSpec:
-      |    Feature: A feature
-      |      - Scenario: succeeds
-      |      - Scenario: fails *** FAILED ***
-      |        "[]fixture" did not equal "[another ]fixture" (FeatureSpecSpecs.scala:77)
-      |        Analysis:
-      |        "[]fixture" -> "[another ]fixture"
-      |      - Scenario: is ignored !!! IGNORED !!!
-      |  FixtureAsyncFlatSpecSpec:
-      |    A subject
-      |      - should succeed
-      |      - should be ignored !!! IGNORED !!!
-      |  FixtureAsyncFreeSpecSpec:
-      |    A scope
+      |      Another subject
+      |        - can be cancelled !!! CANCELED !!!
+      |          "[]fixture" did not equal "[another ]fixture" (FlatSpecSpecs.scala:54)
+      |    FixtureAnyFreeSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - fails *** FAILED ***
+      |          "[]fixture" did not equal "[another ]fixture" (FreeSpecSpecs.scala:59)
+      |          Analysis:
+      |          "[]fixture" -> "[another ]fixture"
+      |    FixtureAnyFunSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - is pending (pending)
+      |    FixtureAnyFunSuiteSpec:
+      |      - succeeds
+      |      - is cancelled !!! CANCELED !!!
+      |        "[]fixture" did not equal "[another ]fixture" (FunSuiteSpecs.scala:60)
+      |    FixtureAnyPropSpecSpec:
+      |      - succeeds
+      |      - fails *** FAILED ***
+      |        numbers.forall(((_$5: scala.Int) => _$5.>(1))) was false (PropSpecSpecs.scala:28)
+      |    FixtureAnyWordSpecSpec:
+      |      A subject
+      |        when in a state
+      |          - should succeed
+      |      Another subject
+      |        - can be cancelled !!! CANCELED !!!
+      |          "[]fixture" did not equal "[another ]fixture" the fixture is not the one assumed (WordSpecSpecs.scala:65)
+      |    FixtureAsyncFeatureSpecSpec:
+      |      Feature: A feature
+      |        - Scenario: succeeds
+      |        - Scenario: fails *** FAILED ***
+      |          "[]fixture" did not equal "[another ]fixture" (FeatureSpecSpecs.scala:77)
+      |          Analysis:
+      |          "[]fixture" -> "[another ]fixture"
+      |        - Scenario: is ignored !!! IGNORED !!!
+      |    FixtureAsyncFlatSpecSpec:
+      |      A subject
+      |        - should succeed
+      |        - should be ignored !!! IGNORED !!!
+      |    FixtureAsyncFreeSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - is ignored !!! IGNORED !!!
+      |    FixtureAsyncFunSpecSpec:
+      |      A scope
+      |        - succeeds
+      |        - fails *** FAILED ***
+      |          "[]fixture" did not equal "[another ]fixture" (FunSpecSpecs.scala:88)
+      |          Analysis:
+      |          "[]fixture" -> "[another ]fixture"
+      |    FixtureAsyncFunSuiteSpec:
       |      - succeeds
       |      - is ignored !!! IGNORED !!!
-      |  FixtureAsyncFunSpecSpec:
-      |    A scope
-      |      - succeeds
-      |      - fails *** FAILED ***
-      |        "[]fixture" did not equal "[another ]fixture" (FunSpecSpecs.scala:88)
-      |        Analysis:
-      |        "[]fixture" -> "[another ]fixture"
-      |  FixtureAsyncFunSuiteSpec:
-      |    - succeeds
-      |    - is ignored !!! IGNORED !!!
-      |  FixtureAsyncWordSpecSpec:
-      |    A subject
-      |      when in a state
-      |        - should succeed
-      |    Another subject
-      |      - can be pending (pending)
-      |  NestingSpec:
-      |    FirstNestedSpec:
-      |      - succeeds in the first nested suite
-      |    SecondNestedSpec:
-      |      - fails in the second nested suite *** FAILED ***
-      |        3 did not equal 4 (NestingSpec.scala:19)
-      |  PathAnyFreeSpecSpec:
-      |    A scope
-      |      - sends messages
-      |        [info] info from a path test
-      |        [note] note from a path test
-      |        [alert] alert from a path test
-      |        [markup] markup from a path test
-      |      - is pending (pending)
-      |      holding a nested scope
-      |        - succeeds
-      |  PathAnyFunSpecSpec:
-      |    A scope
-      |      - sends messages
-      |        [info] info from a path test
-      |        [note] note from a path test
-      |        [alert] alert from a path test
-      |        [markup] markup from a path test
-      |      - fails *** FAILED ***
-      |        3 did not equal 4 (FunSpecSpecs.scala:105)
-      |      holding a nested scope
-      |        - succeeds
-      |  RefSpecSpec:
-      |    A scope
-      |      - fails in it *** FAILED ***
-      |        3 did not equal 4 (RefSpecSpec.scala:10)
-      |      - is ignored in it !!! IGNORED !!!
-      |      - is pending in it (pending)
-      |      - succeeds in it
-      |  Output outside any suite:
+      |    FixtureAsyncWordSpecSpec:
+      |      A subject
+      |        when in a state
+      |          - should succeed
+      |      Another subject
+      |        - can be pending (pending)
+      |    NestingSpec:
+      |      FirstNestedSpec:
+      |        - succeeds in the first nested suite
+      |      SecondNestedSpec:
+      |        - fails in the second nested suite *** FAILED ***
+      |          3 did not equal 4 (NestingSpec.scala:19)
+      |    PathAnyFreeSpecSpec:
+      |      A scope
+      |        - sends messages
+      |          [info] info from a path test
+      |          [note] note from a path test
+      |          [alert] alert from a path test
+      |          [markup] markup from a path test
+      |        - is pending (pending)
+      |        holding a nested scope
+      |          - succeeds
+      |    PathAnyFunSpecSpec:
+      |      A scope
+      |        - sends messages
+      |          [info] info from a path test
+      |          [note] note from a path test
+      |          [alert] alert from a path test
+      |          [markup] markup from a path test
+      |        - fails *** FAILED ***
+      |          3 did not equal 4 (FunSpecSpecs.scala:105)
+      |        holding a nested scope
+      |          - succeeds
+      |    RefSpecSpec:
+      |      A scope
+      |        - fails in it *** FAILED ***
+      |          3 did not equal 4 (RefSpecSpec.scala:10)
+      |        - is ignored in it !!! IGNORED !!!
+      |        - is pending in it (pending)
+      |        - succeeds in it
       |    [stdout] a line on stdout
       |    [stderr] a line on stderr""".stripMargin
 

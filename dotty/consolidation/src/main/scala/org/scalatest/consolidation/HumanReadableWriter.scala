@@ -36,21 +36,26 @@ private[consolidation] object HumanReadableWriter {
 
   private val runStoppedLine = "*** RUN STOPPED ***"
 
-  private val runBlockHeading = "Output outside any suite:"
-
+  // A run that completed with no output attached shows no line, and its suites take the depth its line would have had.
+  // A line's depth is therefore the number of its node's ancestors that show a line.
   def lines(runs: Seq[RunAssembly]): Vector[OutputLine] =
-    runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsUnderLabel) =>
-      val suites = runsUnderLabel.toVector.flatMap(_.topLevelSuites).sortBy(_.name)
-      linesOf("[" + label.value + "]", 0, AnsiCyan) ++ suites.flatMap(nodeLines(_, 1)) ++ runsUnderLabel.toVector.flatMap(runBlockLines(_, 1))
+    runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsOfModule) =>
+      linesOf("[" + label.value + "]", 0, AnsiCyan) ++ runsOfModule.toVector.sortBy(_.number).flatMap(runLines(_, 1))
     }
 
-  // A run's block holds its messages, then its captured lines, then, if the run aborted or stopped, how it ended. A
-  // run with none of these shows no block.
-  private def runBlockLines(run: RunAssembly, depth: Int): Vector[OutputLine] = {
-    val content =
-      run.runMessages.flatMap(messageLines(_, depth + 1)) ++ run.capturedLines.flatMap(capturedLineLines(_, depth + 1)) ++ runEndLines(run, depth + 1)
-    if (content.isEmpty) Vector.empty else linesOf(runBlockHeading, depth, AnsiCyan) ++ content
+  // Under a run's line come the lines for its suites, then its messages and captured lines in the order they were fed,
+  // then, if the run aborted or stopped, how it ended.
+  private def runLines(run: RunAssembly, depth: Int): Vector[OutputLine] = {
+    val outputAndEnd = run.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(run, depth + 1)
+    if (outputAndEnd.isEmpty) run.topLevelSuites.flatMap(nodeLines(_, depth))
+    else linesOf(s"Run ${run.number}:", depth, AnsiCyan) ++ run.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++ outputAndEnd
   }
+
+  private def outputLines(output: RunOutput, depth: Int): Vector[OutputLine] =
+    output match {
+      case RunOutput.Message(event) => messageLines(event, depth)
+      case RunOutput.Captured(line) => capturedLineLines(line, depth)
+    }
 
   private def capturedLineLines(line: CapturedLine, depth: Int): Vector[OutputLine] =
     line match {

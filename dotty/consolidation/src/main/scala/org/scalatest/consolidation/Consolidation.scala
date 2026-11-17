@@ -16,7 +16,8 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
   def state: ConsolidationState = currentState
 
   /**
-   * Adds a run. Its event stream and captured lines go to the returned feed.
+   * Adds a run. Its event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in
+   * the order they are added, and a run's line in the human-readable output shows its number.
    *
    * @param label the test run label to show the run's suites under
    * @throws IllegalArgumentException if the consolidation has ended
@@ -24,7 +25,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
   def addRun(label: TestRunLabel): RunFeed =
     synchronized {
       requireOpen()
-      val run = new RunAssembly(label)
+      val run = new RunAssembly(label, runs.count(_.label == label) + 1)
       runs += run
       new RunFeed(this, run)
     }

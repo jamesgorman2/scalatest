@@ -52,8 +52,8 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
           run.withPlugin.stdoutLines shouldBe run.withoutPlugin.stdoutLines
           run.withPlugin.stderrLines shouldBe run.withoutPlugin.stderrLines
 
-          And("neither console holds a line [core.test] or Output outside any suite:")
-          all(Seq(run.withoutPlugin, run.withPlugin).flatMap(_.lines).map(_.trim)) should (not be "[core.test]" and not be "Output outside any suite:")
+          And("neither console holds a line [core.test]")
+          all(Seq(run.withoutPlugin, run.withPlugin).flatMap(_.lines).map(_.trim)) should not be "[core.test]"
         }
       }
     }

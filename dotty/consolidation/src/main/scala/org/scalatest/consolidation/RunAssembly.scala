@@ -106,11 +106,19 @@ private[consolidation] final case class AssembledNode(node: StructureNode, execu
   def descendants: Vector[AssembledNode] = execution.descendants
 }
 
+/** A message attached to a run rather than to a node, or a line captured from the run's processes. */
+private[consolidation] enum RunOutput {
+  case Message(event: DecodedEvent)
+  case Captured(line: CapturedLine)
+}
+
 /**
  * Builds one run's test structure from its event stream as the stream arrives. It keeps each node's structure by
  * node path, and the node's executions separately, by execution number.
+ *
+ * @param number the run's place, from 1, among its module's runs in the order they were added
  */
-private[consolidation] final class RunAssembly(val label: TestRunLabel) {
+private[consolidation] final class RunAssembly(val label: TestRunLabel, val number: Int) {
 
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
   private val childIds = mutable.Map.empty[NodeId, mutable.Set[NodeId]]
@@ -118,8 +126,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   private val firstScopeOrTestPosition = mutable.Map.empty[NodeId, Option[Int]]
   private val executions = mutable.Map.empty[NodeId, SortedMap[Int, Execution]]
   private var executionsStarted = 0
-  private var lines = Vector.empty[CapturedLine]
-  private var messages = Vector.empty[DecodedEvent]
+  private var received = Vector.empty[RunOutput]
   private var abort = Option.empty[DecodedEvent.RunAborted]
   private var ending = Option.empty[RunOutcome]
   private var eventStreamOpen = true
@@ -129,14 +136,11 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   /** How the run ended, from its `runEnded` event alone: absent until that event arrives. */
   def outcome: Option[RunOutcome] = ending
 
-  /** The messages attached to the run rather than to a node, in the order they arrived. */
-  def runMessages: Vector[DecodedEvent] = messages
-
   /** The run's first `RunAborted`, whose message and throwable explain an aborted run's end. */
   def runAborted: Option[DecodedEvent.RunAborted] = abort
 
-  /** The lines captured from the run's processes, stdout and stderr interleaved in the order they were fed. */
-  def capturedLines: Vector[CapturedLine] = lines
+  /** The run's messages and captured lines, in the order they were fed. */
+  def output: Vector[RunOutput] = received
 
   def add(event: TestEventLogEvent): Unit = {
     require(eventStreamOpen, s"the event stream of a run under ${label.value} has ended")
@@ -154,7 +158,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     }
   }
 
-  def add(line: CapturedLine): Unit = lines :+= line
+  def add(line: CapturedLine): Unit = received :+= RunOutput.Captured(line)
 
   def endEventStream(): Unit = eventStreamOpen = false
 
@@ -290,7 +294,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
   private def addToRun(event: DecodedEvent): Unit =
     event match {
       case aborted: DecodedEvent.RunAborted => if (abort.isEmpty) abort = Some(aborted)
-      case message if RunAssembly.isMessage(message) => messages :+= message
+      case message if RunAssembly.isMessage(message) => received :+= RunOutput.Message(message)
       case _ => ()
     }
 

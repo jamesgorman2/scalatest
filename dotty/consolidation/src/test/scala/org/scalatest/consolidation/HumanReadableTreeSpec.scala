@@ -129,7 +129,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |      {green}Scenario: paying by card{reset}""".stripExpectedMargin
     }
 
-    Scenario("A test run label heads its run's suites, unindented and in cyan") {
+    Scenario("A module's line heads its suites, unindented and in cyan") {
       Given("an event log of one suite whose one property succeeds")
       val eventLog =
         """
@@ -144,10 +144,10 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         run ended completed
         """
 
-      When("the library consolidates it under the test run label `core.test`")
+      When("the library consolidates it as a run of the module `core.test`")
       val output = consolidated(eventLog)
 
-      Then("the first line is the label, with the suite under it")
+      Then("the first line is the module's line, with the suite under it")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SqrtPropSpec:{reset}
@@ -157,7 +157,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("The order of suites, scopes and tests") {
 
-    Scenario("A label's top-level suites appear in ascending lexicographic order by name, whatever their classes and the order they ran in") {
+    Scenario("A run's top-level suites appear in ascending lexicographic order by name, whatever their classes and the order they ran in") {
       Given("an event log of suites run in descending order by name, whose classes sort in the order they ran")
       val eventLog =
         """

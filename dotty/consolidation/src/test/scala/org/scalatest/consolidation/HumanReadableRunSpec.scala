@@ -17,25 +17,27 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     consolidation.state
   }
 
-  Feature("A run's block") {
+  Feature("A run's line") {
 
-    Scenario("The run's messages come before its captured output") {
-      Given("an event log of a completed run with an alert attached to the run, and a stdout line fed before the alert")
+    Scenario("A captured line fed before one of the run's messages comes before that message") {
+      Given("an event log of a completed run with an alert attached to the run")
+      And("a stdout line fed before the alert, and a stderr line fed after it")
       When("the library consolidates it")
-      val output = consolidated(runWithAlertAndStdoutLine*)
+      val output = consolidated(runWithAlertBetweenCapturedLines*)
 
-      Then("the run's block follows the suites, with the alert, then the stdout line")
+      Then("the run's line holds the suite, then the stdout line, the alert and the stderr line, in the order fed")
       output shouldBe
         """{cyan}[core.test]{reset}
-          |  {green}CalculatorSuite:{reset}
-          |    {green}- adds two numbers{reset}
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}CalculatorSuite:{reset}
+          |      {green}- adds two numbers{reset}
+          |    [stdout] dividing now
           |    {yellow}[alert] Test still running after 1 minute, 2 seconds: suite name: CalculatorSuite, test name: adds two numbers.{reset}
-          |    [stdout] dividing now""".stripExpectedMargin
+          |    {yellow}[stderr] warn: slow{reset}""".stripExpectedMargin
     }
 
     Scenario("Captured stdout and stderr lines keep the order they were fed, wherever they are fed among the events") {
-      Given("an event log holding `run started`, then `run ended completed`, consolidated under the test run label `core.test`")
+      Given("an event log holding `run started`, then `run ended completed`, consolidated as a run of the module `core.test`")
       And("stderr, stdout and stderr lines captured, fed in that order at each combination of points among the event log's events")
       val runs = capturedLinesAtEveryPoint(
         "run started\nrun ended completed",
@@ -50,16 +52,16 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates each")
       val outputs = runs.map(parts => consolidated(parts*))
 
-      Then("each run's block shows each line's stream and text, in the order fed, with stderr lines yellow")
+      Then("each run's line holds each line's stream and text, in the order fed, with stderr lines yellow")
       all(outputs) shouldBe
         """{cyan}[core.test]{reset}
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 1:{reset}
           |    {yellow}[stderr] SLF4J: No SLF4J providers were found.{reset}
           |    [stdout] dividing now
           |    {yellow}[stderr] warn: about to divide{reset}""".stripExpectedMargin
     }
 
-    Scenario("Run events and a DiscoverySuite's events assigned to the run show no line") {
+    Scenario("A completed run with no output attached shows no line, so its suites sit under the module's line") {
       Given("an event log of a completed run holding run events and a DiscoverySuite's events, all assigned to the run")
       val eventLog =
         """
@@ -83,15 +85,15 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the output holds the suite and no run block")
+      Then("the suite sits directly under the module's line, and the output holds no run's line")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SqrtPropSpec:{reset}
           |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
     }
 
-    Scenario("Each run under a label shows its own block after all the label's suites") {
-      Given("two runs under one label, each with a suite and a stdout line")
+    Scenario("Each run of a module shows its own suites and output under its own line, numbered in the order the runs were added") {
+      Given("two runs of one module, each with a suite and a stdout line, the first run's suite sorting after the second's")
       def run(suite: String, line: String): Vector[TestRunPart] =
         Vector(
           TestRunPart.Events(
@@ -117,44 +119,63 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates them")
       consolidation.end()
 
-      Then("the label shows both suites, then the first run's block, then the second's")
+      Then("the module shows Run 1: with the first run's suite and line, then Run 2: with the second's")
       output.markedText shouldBe
         """{cyan}[core.test]{reset}
-          |  {green}AlphaSuite:{reset}
-          |    {green}- runs{reset}
-          |  {green}ZetaSuite:{reset}
-          |    {green}- runs{reset}
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}ZetaSuite:{reset}
+          |      {green}- runs{reset}
           |    [stdout] from the first run
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 2:{reset}
+          |    {green}AlphaSuite:{reset}
+          |      {green}- runs{reset}
           |    [stdout] from the second run""".stripExpectedMargin
+    }
+
+    Scenario("A run keeps its number when an earlier run of its module shows no line") {
+      Given("two runs of one module, the first completed with no output, the second with a stdout line")
+      val output = new OutputSink
+      val consolidation = Consolidation.start(output, coloured = true)
+      addRun(consolidation, TestRunPart.Events("run started\nrun ended completed")).endEventStream()
+      addRun(
+        consolidation,
+        TestRunPart.Events("run started"),
+        TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
+        TestRunPart.Events("run ended completed")
+      ).endEventStream()
+
+      When("the library consolidates them")
+      consolidation.end()
+
+      Then("the second run's line is Run 2:")
+      output.markedText shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 2:{reset}
+          |    [stdout] dividing now""".stripExpectedMargin
     }
   }
 
   Feature("Runs that abort or stop") {
 
     Scenario("A test's fatal error aborts the run") {
-      Given("an event log of a run that aborts while a suite, two scopes and a test are open, consolidated under the test run label `core.test`")
-      And("a captured stderr line, fed at each point among the event log's events")
-      val runs = capturedLinesAtEveryPoint(abortedRunEventLog, Vector(codeCacheFullLine))
-      runs should have size 12
+      Given("an event log of a run that aborts while a suite, two scopes and a test are open, consolidated as a run of the module `core.test`")
+      And("a captured stderr line, fed after the alert attached to the run")
+      When("the library consolidates it")
+      val output = consolidated(abortedRun*)
 
-      When("the library consolidates each")
-      val outputs = runs.map(parts => consolidated(parts*))
-
-      Then("the open nodes are aborted, the nodes that never started are not run, and the block ends with the run's abort, its message keeping its trailing space")
-      all(outputs) shouldBe
+      Then("the open nodes are aborted, the nodes that never started are not run, and the run's abort comes last under the run's line, its message keeping its trailing space")
+      output shouldBe
         """{cyan}[core.test]{reset}
-          |  {green}AbortingFunSpec:{reset}
-          |    {green}A Stack{reset}{red} *** ABORTED ***{reset}
-          |      {green}when empty{reset}{red} *** ABORTED ***{reset}
-          |        {green}- is empty{reset}
-          |        {red}- throws on pop *** ABORTED ***{reset}
-          |        {red}- has size 0 *** NOT RUN ***{reset}
-          |      {green}when full{reset}{red} *** NOT RUN ***{reset}
-          |        {red}(1 test not run){reset}
-          |    {red}samples.AbortingFunSpec *** ABORTED ***{reset}
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}AbortingFunSpec:{reset}
+          |      {green}A Stack{reset}{red} *** ABORTED ***{reset}
+          |        {green}when empty{reset}{red} *** ABORTED ***{reset}
+          |          {green}- is empty{reset}
+          |          {red}- throws on pop *** ABORTED ***{reset}
+          |          {red}- has size 0 *** NOT RUN ***{reset}
+          |        {green}when full{reset}{red} *** NOT RUN ***{reset}
+          |          {red}(1 test not run){reset}
+          |      {red}samples.AbortingFunSpec *** ABORTED ***{reset}
           |    {yellow}[alert] Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.{reset}
           |    {yellow}[stderr] OpenJDK 64-Bit Server VM warning: CodeCache is full.{reset}
           |    {red}*** RUN ABORTED ***{reset}
@@ -168,28 +189,28 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates it")
       val output = consolidated(stoppedRun*)
 
-      Then("the suite that never started is not run, and the block holds the run's stop")
+      Then("the suite that never started is not run, and the run's stop comes last under the run's line")
       output shouldBe
         """{cyan}[core.test]{reset}
-          |  {green}OuterSuites:{reset}
-          |    {green}Inner1Suite:{reset}
-          |      {green}- inner one{reset}
-          |    {green}Inner2Suite:{reset}
-          |      {red}samples.Inner2Suite *** NOT RUN ***{reset}
-          |      {red}(1 test not run){reset}
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}OuterSuites:{reset}
+          |      {green}Inner1Suite:{reset}
+          |        {green}- inner one{reset}
+          |      {green}Inner2Suite:{reset}
+          |        {red}samples.Inner2Suite *** NOT RUN ***{reset}
+          |        {red}(1 test not run){reset}
           |    {red}*** RUN STOPPED ***{reset}""".stripExpectedMargin
     }
 
-    Scenario("A run that ends aborted without a RunAborted shows only its abort line") {
+    Scenario("A run that ends aborted without a RunAborted shows only its abort line under the run's line") {
       Given("an event log of a run that starts and ends aborted")
       When("the library consolidates it")
       val output = consolidated("run started\nrun ended aborted")
 
-      Then("the block holds only the run's abort line")
+      Then("the run's line holds only the run's abort line")
       output shouldBe
         """{cyan}[core.test]{reset}
-          |  {cyan}Output outside any suite:{reset}
+          |  {cyan}Run 1:{reset}
           |    {red}*** RUN ABORTED ***{reset}""".stripExpectedMargin
     }
 
@@ -205,7 +226,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the run shows no block")
+      Then("the run shows no line")
       output shouldBe "{cyan}[core.test]{reset}"
     }
   }
@@ -213,10 +234,10 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
   Feature("The consolidation state of a run that ends") {
 
     Scenario("A run that ends completed") {
-      Given("an event log of a run that ends completed, with an alert and a stdout line fed before the alert")
+      Given("an event log of a run that ends completed, with an alert attached to the run between a stdout and a stderr line")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended")
-      stateAfterEnd(runWithAlertAndStdoutLine*) shouldBe ConsolidationState.Ended
+      stateAfterEnd(runWithAlertBetweenCapturedLines*) shouldBe ConsolidationState.Ended
     }
 
     Scenario("A run that ends aborted") {
@@ -264,7 +285,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
 private object HumanReadableRunSpec {
 
-  val runWithAlertAndStdoutLine: Vector[TestRunPart] = Vector(
+  val runWithAlertBetweenCapturedLines: Vector[TestRunPart] = Vector(
     TestRunPart.Events(
       """
       run started
@@ -279,6 +300,11 @@ private object HumanReadableRunSpec {
     TestRunPart.Events(
       """
       run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: CalculatorSuite, test name: adds two numbers.")
+      """
+    ),
+    TestRunPart.CapturedLine(CapturedStream.Stderr, "warn: slow"),
+    TestRunPart.Events(
+      """
       test "adds two numbers": TestSucceeded
       suite "CalculatorSuite": SuiteCompleted
       run ended completed
@@ -286,32 +312,36 @@ private object HumanReadableRunSpec {
     )
   )
 
-  val abortedRunEventLog: String =
-    """
-    run started
-    structure
-      suite "AbortingFunSpec", class "samples.AbortingFunSpec"
-        scope "A Stack", label "A Stack"
-          scope "when empty", label "when empty"
-            test "is empty", label "- is empty"
-            test "throws on pop", label "- throws on pop"
-            test "has size 0", label "- has size 0"
-          scope "when full", label "when full"
-            test "pops last pushed", label "- pops last pushed"
-    suite "AbortingFunSpec": SuiteStarting
-    scope "A Stack": ScopeOpened
-    scope "when empty": ScopeOpened
-    test "is empty": TestStarting
-    test "is empty": TestSucceeded
-    test "throws on pop": TestStarting
-    run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.")
-    run: RunAborted(message: "An exception or error caused a run to abort: Java heap space ", throwable: java.lang.OutOfMemoryError "Java heap space")
-    run ended aborted
-    """
-
-  val codeCacheFullLine: TestRunPart = TestRunPart.CapturedLine(CapturedStream.Stderr, "OpenJDK 64-Bit Server VM warning: CodeCache is full.")
-
-  val abortedRun: Vector[TestRunPart] = Vector(TestRunPart.Events(abortedRunEventLog), codeCacheFullLine)
+  val abortedRun: Vector[TestRunPart] = Vector(
+    TestRunPart.Events(
+      """
+      run started
+      structure
+        suite "AbortingFunSpec", class "samples.AbortingFunSpec"
+          scope "A Stack", label "A Stack"
+            scope "when empty", label "when empty"
+              test "is empty", label "- is empty"
+              test "throws on pop", label "- throws on pop"
+              test "has size 0", label "- has size 0"
+            scope "when full", label "when full"
+              test "pops last pushed", label "- pops last pushed"
+      suite "AbortingFunSpec": SuiteStarting
+      scope "A Stack": ScopeOpened
+      scope "when empty": ScopeOpened
+      test "is empty": TestStarting
+      test "is empty": TestSucceeded
+      test "throws on pop": TestStarting
+      run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: AbortingFunSpec, test name: A Stack when empty throws on pop.")
+      """
+    ),
+    TestRunPart.CapturedLine(CapturedStream.Stderr, "OpenJDK 64-Bit Server VM warning: CodeCache is full."),
+    TestRunPart.Events(
+      """
+      run: RunAborted(message: "An exception or error caused a run to abort: Java heap space ", throwable: java.lang.OutOfMemoryError "Java heap space")
+      run ended aborted
+      """
+    )
+  )
 
   val stoppedRun: Vector[TestRunPart] = Vector(
     TestRunPart.Events(

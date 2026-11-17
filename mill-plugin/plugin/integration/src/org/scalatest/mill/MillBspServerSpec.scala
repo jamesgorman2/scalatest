@@ -80,10 +80,8 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
         sessions.withoutPlugin.notifications should not be empty
         sessions.withPlugin.notifications shouldBe sessions.withoutPlugin.notifications
 
-        And("no notification under either holds [core.test] or Output outside any suite:")
-        all(sessions.withoutPlugin.notifications ++ sessions.withPlugin.notifications) should (
-          not include "[core.test]" and not include "Output outside any suite:"
-        )
+        And("no notification under either holds [core.test]")
+        all(sessions.withoutPlugin.notifications ++ sessions.withPlugin.notifications) should not include "[core.test]"
       }
     }
   }
