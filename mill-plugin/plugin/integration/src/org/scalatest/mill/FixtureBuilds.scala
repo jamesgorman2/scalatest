@@ -123,8 +123,8 @@ object TestCommandResult {
   private val sgrSequence = "\u001b\\[([0-9;]*)m".r
 
   /**
-   * Both `0` and `39` mark `{reset}`: the human-readable output colours only the foreground, and Mill re-renders a line
-   * it prefixes, ending each colour with `39` where the line had `0`.
+   * `0` and `39` both map to `{reset}`: the human-readable output colours only the foreground, and Mill turns the `0`
+   * that ends each colour in a line it prefixes into `39`.
    */
   private val colourMarkers: Map[String, String] =
     Map("0" -> "{reset}", "39" -> "{reset}", "31" -> "{red}", "32" -> "{green}", "33" -> "{yellow}", "36" -> "{cyan}")

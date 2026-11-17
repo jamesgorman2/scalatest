@@ -62,7 +62,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
     RunOutsideMill(os.read.lines(eventLog), result.out.lines(), result.err.lines())
   }
 
-  /** The human-readable output, in colour, the library writes for the run, under test run label `core.test`. */
+  /** The coloured human-readable output the library writes for the run, under test run label `core.test`. */
   private def consolidated(run: RunOutsideMill): Seq[String] = {
     val output = mutable.ArrayBuffer.empty[String]
     val consolidation = Consolidation.start(line => output += line, coloured = true)
