@@ -1,6 +1,5 @@
 package org.scalatest.events
 
-import java.time.Instant
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -131,7 +130,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "match a runStarted event whatever its PID and start time" in {
-      EventLogComparison.mismatchWhenIs(Vector(TestEventLogEvent.RunStarted(4242L, Instant.parse("2026-11-13T02:54:37.123456Z"))), expected("run started")) shouldBe None
+      EventLogComparison.mismatchWhenIs(Vector(TestEventLogEvent.RunStarted(4242L, "2026-11-13T02:54:37.123456Z")), expected("run started")) shouldBe None
     }
   }
 

@@ -647,7 +647,7 @@ private[scalatest] object TestEventLogEmitter {
   def started(eventLogFile: Path, processIdentity: Either[String, ProcessIdentity]): TestEventLogEmitter = {
     processIdentity match {
       case Right(identity) =>
-        val runStarted = TestEventLogEncoder.runStarted(identity.pid, identity.startTime)
+        val runStarted = TestEventLogEncoder.runStarted(identity.pid, identity.startTime.toString)
         val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
         // Created anew, so a link planted under its name in a shared folder is never followed. A file an earlier run
         // left there is replaced.

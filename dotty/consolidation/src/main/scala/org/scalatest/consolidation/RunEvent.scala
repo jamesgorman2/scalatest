@@ -1,11 +1,15 @@
 package org.scalatest.consolidation
 
 import java.time.Instant
+import java.time.format.DateTimeParseException
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 
 /** One event of a run's test event log, as [[RunEvent.decode]] returns it. Only the run's process can be read from it. */
-opaque type RunEvent = TestEventLogEvent
+opaque type RunEvent = DecodedRunEvent
+
+/** A decoded event, with the process its `runStarted` event names, whose start time is parsed once, on decoding. */
+private[scalatest] final case class DecodedRunEvent(event: TestEventLogEvent, runProcess: Option[RunProcess])
 
 /** An operating-system process ID. */
 opaque type Pid = Long
@@ -29,19 +33,29 @@ object RunEvent {
    *
    * @return the event the line holds, or why it cannot be decoded
    */
-  def decode(line: String): Either[String, RunEvent] = TestEventLogDecoder.decode(line)
+  def decode(line: String): Either[String, RunEvent] = TestEventLogDecoder.decode(line).flatMap(of)
 
-  private[scalatest] def apply(event: TestEventLogEvent): RunEvent = event
+  /** The event, or why it cannot be one: a `runStarted` event whose start time is not an instant. */
+  private[scalatest] def of(event: TestEventLogEvent): Either[String, RunEvent] =
+    event match {
+      case TestEventLogEvent.RunStarted(pid, startTime) =>
+        parsedStartTime(startTime).map(instant => DecodedRunEvent(event, Some(RunProcess(Pid(pid), instant))))
+      case _ =>
+        Right(DecodedRunEvent(event, None))
+    }
+
+  private def parsedStartTime(startTime: String): Either[String, Instant] =
+    try {
+      Right(Instant.parse(startTime))
+    } catch {
+      case _: DateTimeParseException => Left(s"the run's start time is not an instant: $startTime")
+    }
 
   extension (event: RunEvent) {
 
     /** The run's process, if this is its `runStarted` event. */
-    def runProcess: Option[RunProcess] =
-      event match {
-        case TestEventLogEvent.RunStarted(pid, startTime) => Some(RunProcess(Pid(pid), startTime))
-        case _ => None
-      }
+    def runProcess: Option[RunProcess] = event.runProcess
 
-    private[consolidation] def decoded: TestEventLogEvent = event
+    private[consolidation] def decoded: TestEventLogEvent = event.event
   }
 }

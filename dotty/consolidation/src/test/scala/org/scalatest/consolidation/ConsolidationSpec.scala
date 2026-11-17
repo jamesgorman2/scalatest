@@ -203,7 +203,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
     "it holds the run's start with a start time that is not an instant" should {
       "not be decoded" in {
         RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"yesterday"}""") shouldBe
-          Left("startTime is not an instant")
+          Left("the run's start time is not an instant: yesterday")
       }
     }
 

@@ -1,6 +1,5 @@
 package org.scalatest.events
 
-import java.time.Instant
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -98,7 +97,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
     "reading the runStarted event" should {
       "yield its PID and start time" in {
         TestEventLogDecoder.decode(runStartedLine) shouldBe
-          Right(TestEventLogEvent.RunStarted(4242L, Instant.parse("2026-11-13T02:54:37.123456Z")))
+          Right(TestEventLogEvent.RunStarted(4242L, "2026-11-13T02:54:37.123456Z"))
       }
     }
 
@@ -317,9 +316,9 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       }
       "yield the largest and the smallest Long" in {
         TestEventLogDecoder.decode("""{"item":"runStarted","pid":9223372036854775807,"startTime":"1970-01-01T00:00:00Z"}""") shouldBe
-          Right(TestEventLogEvent.RunStarted(Long.MaxValue, Instant.EPOCH))
+          Right(TestEventLogEvent.RunStarted(Long.MaxValue, "1970-01-01T00:00:00Z"))
         TestEventLogDecoder.decode("""{"item":"runStarted","pid":-9223372036854775808,"startTime":"1970-01-01T00:00:00Z"}""") shouldBe
-          Right(TestEventLogEvent.RunStarted(Long.MinValue, Instant.EPOCH))
+          Right(TestEventLogEvent.RunStarted(Long.MinValue, "1970-01-01T00:00:00Z"))
       }
     }
 
@@ -533,10 +532,6 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         TestEventLogDecoder.decode(
           s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","ignored":false}]}"""
         ) shouldBe Left("ignored is not true")
-      }
-      "report a start time that is not an instant" in {
-        TestEventLogDecoder.decode("""{"item":"runStarted","pid":1,"startTime":"yesterday"}""") shouldBe
-          Left("startTime is not an instant")
       }
       "report a throwable whose propertyCheck is false, which the format never writes" in {
         TestEventLogDecoder.decode(suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":false}""")) shouldBe

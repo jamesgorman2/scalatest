@@ -440,15 +440,10 @@ object GenScalaTestDotty {
       copyDir("scalatest/src/main/scala/org/scalatest/tools" + packagePath, packagePath, targetDir, skipList)
     }.toList*/
 
-  // The test event log's codec reads and writes java.time, which Scala.js and Scala Native lack. Only the JVM's
-  // emitter and the consolidation library use it.
-  private val testEventLogCodecSources =
-    List("Json.scala", "TestEventLogDecoder.scala", "TestEventLogEncoder.scala", "TestEventLogEvent.scala")
-
   def genScalaJS(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty, ScalaJsLineEnding) ++
-    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, testEventLogCodecSources, ScalaJsLineEnding) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDir("js/core/src/main/scala/org/scalatest/compatible", "org/scalatest/compatible", targetDir, List.empty, ScalaJsLineEnding) ++
     copyDir("js/core/src/main/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, List.empty, ScalaJsLineEnding) ++
@@ -510,7 +505,7 @@ object GenScalaTestDotty {
   def genScalaNative(targetDir: File, version: String, scalaVersion: String): Seq[File] =
     copyDir("dotty/core/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty) ++
-    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, testEventLogCodecSources) ++
+    copyDir("dotty/core/src/main/scala/org/scalatest/events", "org/scalatest/events", targetDir, List.empty) ++
     copyDir("dotty/core/src/main/scala/org/scalatest/expectations", "org/scalatest/expectations", targetDir, List.empty) ++ 
     copyDir("native/core/src/main/scala/org/scalatest/compatible", "org/scalatest/compatible", targetDir, List.empty) ++ 
     copyDir("native/core/src/main/scala/org/scalatest/concurrent", "org/scalatest/concurrent", targetDir, List.empty) ++ 

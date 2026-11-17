@@ -117,7 +117,7 @@ date: 2026-11-18
 ---
 The Scala.js and Scala Native core builds have no source directories of their own for shared code: `GenScalaTestDotty.genScalaJS` and `genScalaNative` copy the Scala 3 core's top-level `org/scalatest`, `events`, `enablers` and `expectations` directories, and the JVM core's `tools` directory less a skip list, into `src_managed`. The Scala 3 core's `tools` directory is not copied, so it is JVM-only.
 
-A file in a copied directory that uses a JVM-only API, such as `java.time`, breaks both builds. Put it in the generator's skip list for both platforms, or in a directory that is not copied, and compile `scalatestCoreDottyJS` and `scalatestCoreDottyNative` to confirm.
+A file in a copied directory that uses a JVM-only API, such as `java.time`, breaks both builds. Keep the JVM-only part in a directory that is not copied, or in a JVM-only project such as `scalatestConsolidation`, rather than adding the file to a `copyDir` skip list: a skipped file is missing from Scala.js and Native for any code there that needs it. Compile `scalatestCoreDottyJS` and `scalatestCoreDottyNative` to confirm.
 
 `copyDir` never deletes a file dropped from the copy. The stale file stays in `src_managed` but is not compiled, since only the generators' output is. Scala Native's incremental compile also leaves the dropped file's `.nir` files in `classes`; clean the project before trusting its `classes` directory.
 </learning>

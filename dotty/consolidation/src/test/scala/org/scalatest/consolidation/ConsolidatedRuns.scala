@@ -56,7 +56,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     TestRunBuilder.build(parts*) match {
       case Right(run) =>
         run.items.foreach {
-          case BuiltRunItem.Event(built) => feed.add(RunEvent(built.event))
+          case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event).fold(fail(_), identity))
           case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
           case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
         }
@@ -75,7 +75,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   /** The single event the notation describes, built by the test-only builder. */
   def runEvent(notation: String): RunEvent =
     TestRunBuilder.build(TestRunPart.Events(notation)).map(_.items) match {
-      case Right(Vector(BuiltRunItem.Event(built))) => RunEvent(built.event)
+      case Right(Vector(BuiltRunItem.Event(built))) => RunEvent.of(built.event).fold(fail(_), identity)
       case Right(items) => fail(s"expected one event, but the notation built $items")
       case Left(reason) => fail(reason)
     }

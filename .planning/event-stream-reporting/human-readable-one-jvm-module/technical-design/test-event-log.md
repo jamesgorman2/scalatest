@@ -80,7 +80,7 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
 - The test command's folder for a module is `modules/<module path>`, beside the command's `test.dest`: `out/org.scalatest.mill.TestCommandModule/modules/core.test` for `core.test`. Mill clears `test.dest` but not its siblings, so the test command clears the module's folder itself before it runs discovery. The module's one worker uses that folder as its `processFolder`.
 - Event log reading polls each file every 10 ms, the only interval measured (`../../research/jvm-file-channel.md` § 2).
 - On Windows, opening the event log file just after the emitter moves it into place can fail for a moment with a sharing violation, which Java throws as a `FileNotFoundException`. Event log reading retries the open at its poll interval, up to 500 times, before it fails the test command.
-- The handle **Decode** returns (`../../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is `org.scalatest.consolidation.RunEvent`, a public opaque type in the library over core's decoded event, whose classes are `private[scalatest]`. **Decode** is `RunEvent.decode`.
+- The handle **Decode** returns (`../../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) is `org.scalatest.consolidation.RunEvent`, a public opaque type in the library over core's decoded event, whose classes are `private[scalatest]`. **Decode** is `RunEvent.decode`. It parses a `runStarted` event's start time to an `Instant` once, as it decodes the line, and rejects the event where `Instant.parse` cannot parse it. The `RunEvent` keeps the `Instant`, so reading the run's process parses nothing.
 - **Start** is `org.scalatest.consolidation.Consolidation.start`. The `Consolidation` it returns has the other operations:
   - **Add a run** is `addRun`. It takes the module the run belongs to and returns a `RunFeed`. The caller adds the run's events and captured lines to the feed, then ends the feed's event stream.
   - **Add a process that ended before any run existed in it** is `addProcessEndedBeforeAnyRun`.
@@ -285,7 +285,7 @@ Each event is a JSON object (`../TECHNICAL-DESIGN-DECISIONS.md` "Each event of a
 Each event's first key is `item`, naming its kind. The events are those of `../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, and the keys of each, in order, are:
 
 - The `runStarted` event: `item` `runStarted`; `pid`; `startTime`, the text `Instant.toString` gives, read back with `Instant.parse`, so it equals `ProcessHandle`'s exactly.
-  - Core's codec takes and yields `startTime` as an `Instant`. Scala.js and Scala Native have no `java.time`, so the codec's sources build for the JVM only.
+  - Core's codec takes and yields `startTime` as that text, since core builds for the JVM, Scala.js and Scala Native, and Scala.js and Scala Native have no `java.time`. The emitter's JVM sources format it, and the consolidation library, which is JVM-only, parses it to an `Instant`.
 - A `structure` event: `item` `structure`; `nodes`, an array of the suite's nodes in depth-first pre-order, each node's children in declared order.
   - A node's keys are `id`, `kind` (`suite`, `scope` or `test`), `parent` (its parent's `id`), `position` (its declared position, from 0), `name`, `label`, `ignored`, `suiteId` and `className`. Each key is present only on the nodes that `../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin gives it to.
   - `ignored` is `true`, on a test the structure marks ignored, and absent from every other node. The decoded test node, `StructureNode.Test`, has it as a `Boolean`. A line whose `ignored` is `false`, or is on a suite or scope, cannot be decoded.
@@ -331,7 +331,7 @@ A line cannot be decoded where it:
 - lacks a required key;
 - contains an `item`, `event`, `kind` or `outcome` value this section does not give;
 - contains a value whose JSON type is not the one this section gives its key, `null` included;
-- contains a `startTime` that `Instant.parse` cannot parse;
+- contains a `startTime` that `Instant.parse` cannot parse, which the consolidation library's **Decode** rejects, though core's decoder yields it as text;
 - contains an `ignored`, `propertyCheck` or `isNative` that is `false`, since the format writes each only as `true`;
 - contains an integer that does not fit its field's `Int` or `Long`, or one below the least this section gives its key: 0 for a `position` and an `index`, 1 for an element of `executions` and a throwable's `id`;
 - contains a `ref` to an `id` the event has not yet written, or two throwables with one `id`.

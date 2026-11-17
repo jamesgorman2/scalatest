@@ -1,6 +1,5 @@
 package org.scalatest.events
 
-import java.time.Instant
 import org.scalatest.ConfigMap
 import org.scalatest.exceptions.PropertyCheckFailedException
 import org.scalatest.exceptions.StackDepth
@@ -17,8 +16,8 @@ private[scalatest] object TestEventLogEncoder {
 
   private type Field = Option[(String, JsonValue)]
 
-  def runStarted(pid: Long, startTime: Instant): String =
-    line(text("item", "runStarted"), integer("pid", pid), text("startTime", startTime.toString))
+  def runStarted(pid: Long, startTime: String): String =
+    line(text("item", "runStarted"), integer("pid", pid), text("startTime", startTime))
 
   def structure(nodes: Seq[StructureNode]): String =
     line(text("item", "structure"), array("nodes", nodes.map(node)))

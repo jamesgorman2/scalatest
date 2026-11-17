@@ -1,7 +1,5 @@
 package org.scalatest.events
 
-import java.time.Instant
-import java.time.format.DateTimeParseException
 import scala.annotation.tailrec
 import scala.collection.mutable
 
@@ -35,7 +33,7 @@ private[scalatest] object TestEventLogDecoder {
       case "runStarted" =>
         for {
           pid <- reader.long("pid")
-          startTime <- reader.instant("startTime")
+          startTime <- reader.text("startTime")
         } yield TestEventLogEvent.RunStarted(pid, startTime)
       case "structure" =>
         for {
@@ -393,16 +391,6 @@ private[scalatest] object TestEventLogDecoder {
   }
 }
 
-private object ParsedInstant {
-
-  def unapply(text: String): Option[Instant] =
-    try {
-      Some(Instant.parse(text))
-    } catch {
-      case _: DateTimeParseException => None
-    }
-}
-
 // Records each key it is asked for. A key never asked for is one the format does not give the object.
 private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
 
@@ -423,10 +411,6 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
 
   def optionalText(key: String): Either[String, Option[String]] =
     optional(key, "a string") { case JsonValue.Text(value) => value }
-
-  /** An instant written as the text `Instant.toString` gives. */
-  def instant(key: String): Either[String, Instant] =
-    required(key, optional(key, "an instant") { case JsonValue.Text(ParsedInstant(value)) => value })
 
   def long(key: String): Either[String, Long] = required(key, optionalLong(key))
 
