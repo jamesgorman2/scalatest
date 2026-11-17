@@ -115,7 +115,7 @@ _Avoid_: Channel, event stream, event file
 Said of a run whose event stream ends without recording how the run ended, completed, aborted or stopped, as when its process dies.
 
 **Test manifest**:
-The test classes one test command is to run for one module, each either claimed by one or more of the module's test processes or not yet claimed by any. It names classes only, not their nested suites, scopes or tests. Shortened to "manifest" where nothing else could be meant.
+The test classes one test command is to run for one module, each either claimed (picked up to run) by one or more of the module's test processes or not yet claimed by any. It names classes only, not their nested suites, scopes or tests. Shortened to "manifest" where nothing else could be meant.
 _Avoid_: Test plan, class list, expected tests
 
 **Test command**:

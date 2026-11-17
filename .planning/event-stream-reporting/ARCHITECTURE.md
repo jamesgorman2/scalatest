@@ -259,7 +259,7 @@ flowchart LR
   - Each top-level suite's structure, its nested suites' structures included, arrives as the suite starts. When the process dies, the library therefore knows every scope and test that the first-constructed instance of each started suite, and of each suite that suite nests, registered (`SPECIFICATION.md` R-095a). The library does not know a scope or test that only a further `structure` event would have added. A top-level suite that the run never started sent nothing, so the library knows only that suite's class, from the module's test manifest.
   - What the process wrote to stdout and stderr still reaches the library through process capture.
   - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it claimed.
-  - On the JVM the library still reports each class the dead worker claimed that no run reported, from the worker's claims (§ Modules § Mill plugin, Test manifest). A worker claims one class at a time, so the only such class is the class the worker last claimed before it died. Each class that no worker claimed stays in its fork group's queue, and the test command adds it with **Add a test class** (`SPECIFICATION.md` R-095a).
+  - On the JVM the library still reports, from the worker's claims, the one class the dead worker claimed that no run reported (§ Modules § Mill plugin, Test manifest). A worker claims one class at a time, so that class is the last one it claimed before it died. Each class that no worker claimed stays in its fork group's queue, and the test command adds it with **Add a test class** (`SPECIFICATION.md` R-095a).
 
 ## External systems
 
