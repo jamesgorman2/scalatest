@@ -154,8 +154,8 @@ private[scalatest] abstract class SuiteRegistration {
 
   /**
    * For an instance with no registration tree, writes a further structure of the suite where the tests the filter
-   * keeps, in the order run, differ from the suite's latest structure. Each test is given with whether the filter
-   * ignores it, as `Filter.apply` pairs it, and is marked ignored where it does.
+   * keeps, in the order run, differ from the suite's latest structure. Each test name is paired with whether the
+   * filter ignores it, as `Filter.apply` returns them. A test the filter ignores is marked ignored.
    */
   def updateStructureFromTestNames(keptTests: => Seq[(String, Boolean)]): Unit
 

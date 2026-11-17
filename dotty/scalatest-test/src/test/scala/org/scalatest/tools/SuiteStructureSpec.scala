@@ -59,7 +59,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
   private def ignoredTest(name: String, testName: String, label: String): ScopeOrTest = ScopeOrTest.Test(name, testName, label, ignored = true)
 
   "The structure read from a suite with a registration tree" should {
-    "hold each scope, and the tests the filter keeps, in the order registered, each test the filter ignores marked ignored" in {
+    "hold each scope and each test the filter keeps, in the order registered, marking each test the filter ignores as ignored" in {
       SuiteStructure.read(new ScopedSuite, excludingSlow).scopesAndTests shouldBe List(
         ScopeOrTest.Scope("first", "first", "first", List(keptTest("runs", "first runs", "- runs"))),
         ScopeOrTest.Scope("second", "second", "second", Nil),
@@ -83,7 +83,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
   }
 
   "The structure read from a suite with no registration tree" should {
-    "hold a test for each test name the filter keeps, in the order of the suite's test names, each the filter ignores marked ignored, and no scope" in {
+    "hold a test for each test name the filter keeps, in the order of the suite's test names, marked ignored where the filter ignores it, and no scope" in {
       SuiteStructure.read(new UnregisteredSuite, excludingSlow).scopesAndTests shouldBe
         List(keptTest("b", "b", "- b"), ignoredTest("a", "a", "- a"), keptTest("test: d", "test: d", "- d"))
     }
@@ -147,7 +147,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
   }
 
   "The tests of a suite with no registration tree" should {
-    "each be marked ignored where the filter pairs its name with true" in {
+    "mark a test ignored where its name is paired with true" in {
       SuiteStructure.ofTestNames(List("b" -> false, "a" -> true)) shouldBe List(keptTest("b", "b", "- b"), ignoredTest("a", "a", "- a"))
     }
   }

@@ -437,7 +437,7 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
   def isTrue(key: String): Either[String, Boolean] =
     optional(key, "true or false") { case JsonValue.Bool(value) => value }.map(_.getOrElse(false))
 
-  /** Whether the key is present. It may only be `true`, since a key that is `true` or absent is never written `false`. */
+  /** Whether the key is present. A present key must be `true`, as the format never writes `false`. */
   def trueOrAbsent(key: String): Either[String, Boolean] =
     optional(key, "true") { case JsonValue.Bool(true) => true }.map(_.isDefined)
 

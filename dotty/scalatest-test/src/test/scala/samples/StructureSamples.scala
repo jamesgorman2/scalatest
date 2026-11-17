@@ -83,7 +83,7 @@ class ShelvedSuite extends AnyFunSuite {
   }
 }
 
-// Suite.runTests locates the TestIgnored of a test it ignores by a public method of the test's name, so a has one.
+// Suite.runTests needs a public method named for an ignored test to locate its TestIgnored, so a has one.
 @DoNotDiscover
 class IgnoringPlainSuite extends Suite {
 

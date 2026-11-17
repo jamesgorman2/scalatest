@@ -10,7 +10,7 @@ import org.scalatest.TestsBeforeNestedSuites
 
 /**
  * A scope or test of a suite's structure. A scope's `text` is the text it is registered with, which may hold more
- * words than its name. A test's `ignored` says whether the filter ignores it, which marks it ignored in the structure.
+ * words than its name. A test's `ignored` is true where the filter ignores it, which marks it ignored in the structure.
  */
 private[scalatest] enum ScopeOrTest {
   case Scope(name: String, text: String, label: String, scopesAndTests: List[ScopeOrTest])
@@ -74,7 +74,7 @@ private[scalatest] object SuiteStructure {
 
   /**
    * The tests of a suite with no registration tree, in the order given, each labelled as `Suite.runTests` labels a
-   * test it ignores. Each is given with whether it is ignored, as `Filter.apply` pairs a test name it keeps.
+   * test it ignores. Each name is paired with whether the filter ignores it, as `Filter.apply` pairs the names it keeps.
    */
   def ofTestNames(testNames: Seq[(String, Boolean)]): List[ScopeOrTest] =
     testNames.toList.map { (testName, isIgnored) =>

@@ -173,7 +173,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private val asyncConfigDependentSpec = configDependent("AsyncConfigDependentSpec")
 
-  /** A run of a suite run through ConfigMapWrapperSuite that registers test remote, ignored, where its config map holds db, and test local where it does not. */
+  /** A run of a suite wrapped by ConfigMapWrapperSuite. The suite registers test remote, marked ignored, where its config map holds db, and test local where it does not. */
   private val configDependentIgnoredSpec: StatedRun = {
     val suite = "ConfigDependentIgnoredSpec"
     val top = NodePath.topLevel(s"samples.$suite")
@@ -724,8 +724,8 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'remote', " +
         "declared with ignore, where its config map holds db, and test 'local' where it does not",
       "samples.ConfigDependentIgnoredSpec",
-      "the structure the empty config map registers, the suite's SuiteStarting, then a further structure of what the " +
-        "run's config map registers, marking remote ignored, before remote's TestIgnored",
+      "the structure the empty config map registers, then the suite's SuiteStarting, then a further structure of what the " +
+        "run's config map registers, marking remote ignored, then remote's TestIgnored",
       configDependentIgnoredSpec,
       arguments = List("-Ddb=on")
     )

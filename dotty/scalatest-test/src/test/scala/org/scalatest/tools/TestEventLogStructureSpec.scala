@@ -36,10 +36,11 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
   }
 
   /**
-   * What a criterion states of a run's events besides the suite's structure.
+   * The events a criterion states for a run, besides the suite's structure.
    *
+   * @param description the criterion's text, shown as an And step
    * @param holdsInOrder the events the run holds after the structure, in order, in the event notation
-   * @param mustNotHold whether a line is of an event the run must not hold
+   * @param mustNotHold tests whether a log line is an event the run must not hold
    */
   private final case class StatedEvents(description: String, holdsInOrder: List[String], mustNotHold: String => Boolean)
 
