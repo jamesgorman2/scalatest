@@ -62,10 +62,10 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
     RunOutsideMill(os.read.lines(eventLog), result.out.lines(), result.err.lines())
   }
 
-  /** The human-readable output, without colour, the library writes for the run, under test run label `core.test`. */
+  /** The human-readable output, in colour, the library writes for the run, under test run label `core.test`. */
   private def consolidated(run: RunOutsideMill): Seq[String] = {
     val output = mutable.ArrayBuffer.empty[String]
-    val consolidation = Consolidation.start(line => output += line, coloured = false)
+    val consolidation = Consolidation.start(line => output += line, coloured = true)
     val feed = consolidation.addRun(TestRunLabel("core.test"))
     run.eventLogLines.foreach { line =>
       RunEvent.decode(line) match {
@@ -84,8 +84,8 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     Scenario("One run, with and without Mill") {
       withTester("library-without-mill") { tester =>
-        Given("the test command, invoked as mill scalatest/test core.test with Mill's --color false, has run core.test, a module holding CalculatorSuite")
-        val testCommand = TestCommandResult(tester.eval(Seq("--ticker", "true", "--color", "false", "scalatest/test", "core.test")))
+        Given("the test command, invoked as mill scalatest/test core.test, has run core.test, a module holding CalculatorSuite")
+        val testCommand = TestCommandResult(tester.eval(Seq("--ticker", "true", "scalatest/test", "core.test")))
         withClue(testCommand.debugString) {
           testCommand.succeeded shouldBe true
           testCommand.humanReadableOutput should not be empty
@@ -93,12 +93,12 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
         When("CalculatorSuite runs through Framework outside Mill, given the ScalaTest runner argument that turns the emitter on and names the file to which the run writes its test event log")
         val run = runOutsideMill(tester, "samples.CalculatorSuite")
-        And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label core.test, with colour off")
+        And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label core.test, with colour on")
         val output = consolidated(run)
 
         Then("the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")
         withClue(testCommand.debugString) {
-          output shouldBe testCommand.humanReadableOutput
+          output.map(TestCommandResult.withColourMarkers) shouldBe testCommand.humanReadableOutputMarkingColours
         }
       }
     }

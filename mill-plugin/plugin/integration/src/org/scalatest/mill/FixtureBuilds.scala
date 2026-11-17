@@ -92,7 +92,7 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
     val start = written.map(TestCommandResult.withoutEscapes).indexOfSlice(humanReadableStdoutLines)
     written
       .slice(start, start + humanReadableStdoutLines.size)
-      .map(line => TestCommandResult.withColourMarkers(TestCommandResult.withoutMillPrefix(line)))
+      .map(line => TestCommandResult.withColourMarkers(TestCommandResult.withoutColouredMillPrefix(line)))
   }
 
   /** The line `nodeLine` of the human-readable output and every line under it, with its indentation removed. */
@@ -122,14 +122,24 @@ object TestCommandResult {
 
   private val sgrSequence = "\u001b\\[([0-9;]*)m".r
 
+  /**
+   * Both `0` and `39` mark `{reset}`: the human-readable output colours only the foreground, and Mill re-renders a line
+   * it prefixes, ending each colour with `39` where the line had `0`.
+   */
   private val colourMarkers: Map[String, String] =
-    Map("0" -> "{reset}", "31" -> "{red}", "32" -> "{green}", "33" -> "{yellow}", "36" -> "{cyan}")
+    Map("0" -> "{reset}", "39" -> "{reset}", "31" -> "{red}", "32" -> "{green}", "33" -> "{yellow}", "36" -> "{cyan}")
 
-  private def withColourMarkers(line: String): String =
+  /** The line with each ANSI SGR sequence replaced by a marker naming it, such as `{red}` or `{reset}`. */
+  def withColourMarkers(line: String): String =
     sgrSequence.replaceAllIn(
       line,
       sequence => Regex.quoteReplacement(colourMarkers.getOrElse(sequence.group(1), s"{sgr ${sequence.group(1)}}"))
     )
 
   private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
+
+  /** Mill's prefix as written, which Mill colours where it colours its own console output. */
+  private val colouredMillPrefix: Regex = "^(?:\u001b\\[[0-9;]*m)*[0-9][0-9-]*\\](?:\u001b\\[[0-9;]*m)* ".r
+
+  private def withoutColouredMillPrefix(line: String): String = colouredMillPrefix.replaceFirstIn(line, "")
 }

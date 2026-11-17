@@ -269,8 +269,8 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
         Given("core.test's suites are the compatibility fixture")
         addFixtureSuites(tester)
 
-        When("the test command runs core.test with Mill's --color false")
-        val result = TestCommandResult(tester.eval(Seq("--color", "false", "scalatest/test", "core.test")))
+        When("the test command runs core.test")
+        val result = TestCommandResult(tester.eval(Seq("scalatest/test", "core.test")))
 
         Then("the human-readable output shows every suite, scope and test, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution, every failure with its message, and every line the fixture wrote to stdout or stderr")
         withClue(result.debugString) {

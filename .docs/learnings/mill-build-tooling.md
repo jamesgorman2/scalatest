@@ -91,3 +91,14 @@ To drive Mill 1.3.1's BSP server from a test:
 
 `buildTarget/scalaTestClasses` is deprecated in bsp4j; calling it under `-Werror` needs `@nowarn("cat=deprecation")`.
 </learning>
+
+<learning>
+date: 2026-11-17
+---
+With its ticker on, Mill 1.3.1 re-renders each line a task writes through `Task.log.streams.out` when it adds its prefix (such as `1] `):
+
+- where Mill colours its console output, the prefix itself is coloured, as `ESC[34m1]ESC[39m `;
+- an SGR reset `ESC[0m` in the task's line comes out as `ESC[39m`.
+
+The task's own SGR colours reach stdout under `--color false` too. `mill.testkit.IntegrationTester` runs with `--ticker false`, which hides both effects, so pass `--ticker true` to test what a user sees. A test comparing colours on prefixed lines must allow SGR sequences around the prefix and treat `39` as a foreground reset.
+</learning>

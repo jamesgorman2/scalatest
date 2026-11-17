@@ -136,32 +136,26 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
   }
 
-  Feature("Human-readable output on stdout is coloured where Mill colours its own console output and uncoloured otherwise") {
+  Feature("Human-readable output on stdout is coloured whether or not Mill colours its own console output") {
 
-    Scenario("The same text with colour on and off") {
+    Scenario("The same output with Mill's colour on and off") {
       Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds")
-      When("the test command runs core.test once with --color true and once with --color false")
-      val (coloured, uncoloured) = withSuites("CalculatorSuite") { tester =>
-        (evalTestCommand(tester, "--color", "true"), evalTestCommand(tester, "--color", "false"))
+      When("the test command runs core.test once with Mill's --color true and once with Mill's --color false")
+      val outputs = withSuites("CalculatorSuite") { tester =>
+        Seq("true", "false").map(colour => colour -> evalTestCommand(tester, "--ticker", "true", "--color", colour))
       }
 
-      Then("the first human-readable output, with Mill's prefix and every ANSI escape sequence removed from each line, is the module's line, then Run 1: holding the suite and the test's line")
-      withClue(coloured.debugString) {
-        coloured.humanReadableOutput shouldBe calculatorSuiteOutput
-      }
+      outputs.foreach { case (colour, result) =>
+        Then(s"under --color $colour, the human-readable output, with Mill's prefix and every ANSI escape sequence removed from each line, is the module's line, then Run 1: holding the suite and the test's line")
+        withClue(result.debugString) {
+          result.humanReadableOutput shouldBe calculatorSuiteOutput
+        }
 
-      And("in the first human-readable output, [core.test] and Run 1: are cyan, - adds two numbers is green and [stdout] dividing now is uncoloured")
-      withClue(coloured.debugString) {
-        coloured.humanReadableOutputMarkingColours shouldBe calculatorSuiteOutputMarkingColours
+        And(s"under --color $colour, [core.test] and Run 1: are cyan, - adds two numbers is green and [stdout] dividing now is uncoloured")
+        withClue(result.debugString) {
+          result.humanReadableOutputMarkingColours shouldBe calculatorSuiteOutputMarkingColours
+        }
       }
-
-      And("the second holds no ANSI escape sequence")
-      withClue(uncoloured.debugString) {
-        uncoloured.humanReadableOutputMarkingColours shouldBe uncoloured.humanReadableOutput
-      }
-
-      And("it equals the first with every ANSI escape sequence removed")
-      uncoloured.humanReadableOutput shouldBe coloured.humanReadableOutput
     }
   }
 

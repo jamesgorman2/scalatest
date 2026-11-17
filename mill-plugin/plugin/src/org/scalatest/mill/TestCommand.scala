@@ -3,7 +3,6 @@ package org.scalatest.mill
 import mill.api.BuildCtx
 import mill.api.Evaluator
 import mill.api.TaskCtx
-import mill.scalatestplugin.MillColour
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.TestRunLabel
@@ -18,7 +17,7 @@ private[mill] object TestCommand {
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       if (commandArguments.humanReadableOnStdout) line => output.println(line) else _ => ()
-    val consolidation = Consolidation.start(humanReadableOutput, coloured = MillColour.colours(ctx.log))
+    val consolidation = Consolidation.start(humanReadableOutput, coloured = true)
     val run = new JvmTestModuleRun(TestRunLabel(module.path), inputs, scalaTestArguments, moduleFolder(ctx, module.path), ctx)
     BuildCtx.withFilesystemCheckerDisabled {
       run.run(consolidation)
