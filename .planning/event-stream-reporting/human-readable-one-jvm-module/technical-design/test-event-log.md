@@ -26,6 +26,7 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
 - `Framework.runner` given the runner argument and no reporter argument builds no `SbtLogInfoReporter`. A sub-process runner, one given remote arguments, ignores the runner argument: sbt gives it the main runner's arguments, and the event log file is the main runner's.
 - `org.scalatest.tools.Runner.run`, and the runner `org.scalatest.tools.Framework.runner` constructs, each start the emitter, `org.scalatest.tools.TestEventLogEmitter`, once they have parsed and checked their arguments. Starting it writes the `runStarted` event, before `RunStarting` (`../specification/test-event-log-structure.md` AC-094).
 - The emitter writes the `runStarted` event to a file of another name in the same folder, the event log's name followed by `.tmp`. It moves that file to the event log's name with `java.nio.file.Files.move` and `ATOMIC_MOVE`, then opens it to append every later event (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+  - It creates the other file with `CREATE_NEW`, so a link planted under that name in a shared folder is never followed. It first deletes a regular file an earlier run left under that name.
   - Event log reading never reads the other name, so a worker that dies before the move has no event log file.
   - In the same folder, the move is one rename within one file system.
   - The `runStarted` event precedes every other event, so nothing is appended between the move and the reopening.
@@ -47,6 +48,8 @@ The `runStarted` event's start time must equal `ProcessHandle.of(pid).info().sta
   - the dispatcher's thread;
   - test threads, including for messages a test's informers hand straight to the emitter;
   - the `-W` slowpoke timer's thread.
+
+  Each member of the emitter, its registrations and its node tables that must hold the lock asserts on entry that its thread holds it, through `TestEventLogEmitter.assertLockHeld`.
 - The emitter encodes an event before it takes the write lock. Encoding calls `getMessage`, `getStackTrace`, `getCause` and `getSuppressed` on the run's throwables and `toString` on its config map's values. Any of these can block or be slow, and none may delay another thread's hand-off. The emitter calls no user code under the lock. There it only:
   - checks that the event log is still open;
   - registers a suite instance: finds its place in the tables and starts its run's execution (§ Suite instances and their nodes);

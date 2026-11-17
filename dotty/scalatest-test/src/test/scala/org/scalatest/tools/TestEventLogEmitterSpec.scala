@@ -158,6 +158,18 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         }
       }
     }
+
+    "replace a file an earlier run left under the name of the file it moves to the event log's name" in {
+      TemporaryEventLog.in { eventLogFile =>
+        Files.write(eventLogFile.resolveSibling("events.log.tmp"), "an earlier run's start\n".getBytes(StandardCharsets.UTF_8))
+        val emitter = TestEventLogEmitter.started(eventLogFile, identity)
+        try {
+          (TemporaryEventLog.namesIn(eventLogFile.getParent), TemporaryEventLog.lines(eventLogFile)) shouldBe ((Set("events.log"), Vector(runStartedLine)))
+        } finally {
+          emitter.runEvent(runCompleted)
+        }
+      }
+    }
   }
 
   "An emitter that cannot write the file it moves to the event log's name" should {
@@ -167,6 +179,27 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         an[IOException] should be thrownBy TestEventLogEmitter.started(eventLogFile, identity)
         TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set("events.log.tmp")
       }
+    }
+  }
+
+  "An emitter that finds a link under the name of the file it moves to the event log's name" should {
+    "fail to start without writing to the link's target" in {
+      TemporaryEventLog.in { eventLogFile =>
+        val target = Files.write(eventLogFile.resolveSibling("target"), "the target's own content\n".getBytes(StandardCharsets.UTF_8))
+        try Files.createSymbolicLink(eventLogFile.resolveSibling("events.log.tmp"), target)
+        catch { case notPermitted: IOException => cancel(s"This user cannot create a symbolic link: $notPermitted") }
+        an[IOException] should be thrownBy TestEventLogEmitter.started(eventLogFile, identity)
+        (TemporaryEventLog.namesIn(eventLogFile.getParent), Files.readString(target)) shouldBe ((Set("events.log.tmp", "target"), "the target's own content\n"))
+      }
+    }
+  }
+
+  "A registration of an emitter's run" should {
+    "fail where its node table is read without the emitter's lock" in {
+      val emitter = TestEventLogEmitter.appendingTo(new java.io.ByteArrayOutputStream)
+      val registration = new RegisteredSuite(emitter, new Suite {}, None)
+      (the[AssertionError] thrownBy registration.table).getMessage should include ("The test event log emitter's lock is not held")
+      emitter.synchronized(registration.table) shouldBe None
     }
   }
 
@@ -424,8 +457,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       }
 
       "return a node table holding each test's node by its test name" in {
-        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
-        table.tests shouldBe Map("s t" -> nodeId(outerPlace, NodePlace.Test("s t")), "flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
+        val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
+        val table = emitter.topLevelSuite(nestedThenScopesAndTests)
+        emitter.synchronized(table.tests) shouldBe Map("s t" -> nodeId(outerPlace, NodePlace.Test("s t")), "flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
       }
 
       "return a node table holding each scope's node by its path of registered texts, telling sibling scopes of one text apart by their place" in {
@@ -438,8 +472,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
               ScopeOrTest.Scope("s", "s", "s", Nil)
             )
           )
-        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(structure)
-        table.scopes shouldBe Map(
+        val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
+        val table = emitter.topLevelSuite(structure)
+        emitter.synchronized(table.scopes) shouldBe Map(
           List(ScopePlace("s", 0)) -> nodeId(outerPlace, NodePlace.Scope("s", 0)),
           List(ScopePlace("s", 0), ScopePlace("u which", 0)) -> nodeId(outerPlace, NodePlace.Scope("s", 0), NodePlace.Scope("u which", 0)),
           List(ScopePlace("s", 1)) -> nodeId(outerPlace, NodePlace.Scope("s", 1))
@@ -447,10 +482,11 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       }
 
       "return a node table holding the parent of each scope and test" in {
-        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
+        val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
+        val table = emitter.topLevelSuite(nestedThenScopesAndTests)
         val outerId = nodeId(outerPlace)
         val firstS = nodeId(outerPlace, NodePlace.Scope("s", 0))
-        table.parents shouldBe Map(
+        emitter.synchronized(table.parents) shouldBe Map(
           firstS -> outerId,
           nodeId(outerPlace, NodePlace.Test("s t")) -> firstS,
           nodeId(outerPlace, NodePlace.Scope("s", 1)) -> outerId,
@@ -459,8 +495,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       }
 
       "return a node table holding each nested suite's table at its position" in {
-        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
-        table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites)) shouldBe
+        val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
+        val table = emitter.topLevelSuite(nestedThenScopesAndTests)
+        emitter.synchronized(table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites))) shouldBe
           Vector(
             (
               nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0)),
@@ -497,7 +534,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         emitter.endWithoutRunEnded()
         val table = emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
         eventLog.writes shouldBe Vector.empty
-        table.tests shouldBe Map("flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
+        emitter.synchronized(table.tests) shouldBe Map("flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
       }
 
       "not throw where its event log rejects the write, and close the event log" in {

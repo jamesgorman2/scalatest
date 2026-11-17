@@ -30,18 +30,19 @@ private[scalatest] enum TreeNode {
  *
  * @param places the scope's path, from its suite down
  */
-private[scalatest] final class ScopeExecution(val places: List[ScopePlace], val above: Option[ScopeExecution]) {
+private[scalatest] final class ScopeExecution(emitter: TestEventLogEmitter, val places: List[ScopePlace], val above: Option[ScopeExecution]) {
 
-  val execution = new Execution
+  val execution = new Execution(emitter)
 
   // Read and written only under the emitter's lock.
   private var executionOfItsRun = Option.empty[Execution]
 
   /**
    * The execution of the run the scope opened in: that of the scope above it, else `latestRun`, fixed when an event
-   * naming the scope is first handed off. Called under the emitter's lock.
+   * naming the scope is first handed off.
    */
   def executionOfRun(latestRun: => Execution): Execution = {
+    emitter.assertLockHeld()
     val ofRun = executionOfItsRun.getOrElse(above.fold(latestRun)(_.executionOfRun(latestRun)))
     executionOfItsRun = Some(ofRun)
     ofRun
@@ -176,47 +177,60 @@ private[scalatest] final class RegisteredSuite(
 
   private def identitySet(): java.util.Set[Event] = Collections.newSetFromMap(new IdentityHashMap[Event, java.lang.Boolean])
 
-  /** Whether this registration's own instance is `suite`. */
   def isOf(suite: Suite): Boolean = instance eq suite
 
-  /** Whether the node of the instance's run is fixed. */
   def isNodeFixed: Boolean = nodeIsFixed
 
   /** Whether the node of the instance's run is fixed, and its node table found, added, or known to be none. */
   def isTableSettled: Boolean = tableIsSettled
 
-  /** The node table of the instance's node, where it has one. Called under the emitter's lock. */
-  def table: Option[SuiteNodeTable] = tableOfNode
+  /** The node table of the instance's node, where it has one. */
+  def table: Option[SuiteNodeTable] = {
+    emitter.assertLockHeld()
+    tableOfNode
+  }
 
-  /** Marks the top-level suite's registration removed. Called under the emitter's lock. */
-  def markRemoved(): Unit = topLevel.isRemoved = true
+  /** Marks the top-level suite's registration removed. */
+  def markRemoved(): Unit = {
+    emitter.assertLockHeld()
+    topLevel.isRemoved = true
+  }
 
-  /** Whether the top-level suite's registration has been removed. Called under the emitter's lock. */
-  def hasBeenRemoved: Boolean = topLevel.isRemoved
+  /** Whether the top-level suite's registration has been removed. */
+  def hasBeenRemoved: Boolean = {
+    emitter.assertLockHeld()
+    topLevel.isRemoved
+  }
 
   /**
    * Keeps an event handed off for this top-level suite's run, at its send site or by an inner wrapper, which had not
-   * reached this suite's wrapper when this registration was removed. Called under the emitter's lock.
+   * reached this suite's wrapper when this registration was removed.
    */
-  def keepHandedOffBeforeRemoval(event: Event): Unit = handedOffBeforeRemoval.add(event)
+  def keepHandedOffBeforeRemoval(event: Event): Unit = {
+    emitter.assertLockHeld()
+    handedOffBeforeRemoval.add(event)
+  }
 
-  /**
-   * Stops keeping an event handed off before this registration was removed, and returns whether it was kept. Called
-   * under the emitter's lock.
-   */
-  def takeHandedOffBeforeRemoval(event: Event): Boolean = handedOffBeforeRemoval.remove(event)
+  /** Stops keeping an event handed off before this registration was removed, and returns whether it was kept. */
+  def takeHandedOffBeforeRemoval(event: Event): Boolean = {
+    emitter.assertLockHeld()
+    handedOffBeforeRemoval.remove(event)
+  }
 
   /**
    * Keeps a closing event of a test of this top-level suite's run, sent after this registration was removed, whose
-   * messages the test handed off one by one. Called under the emitter's lock.
+   * messages the test handed off one by one.
    */
-  def keepClosingEventWithMessagesHandedOff(event: Event): Unit = closingEventsWithMessagesHandedOff.add(event)
+  def keepClosingEventWithMessagesHandedOff(event: Event): Unit = {
+    emitter.assertLockHeld()
+    closingEventsWithMessagesHandedOff.add(event)
+  }
 
-  /**
-   * Stops keeping a closing event whose messages its test handed off one by one, and returns whether it was kept.
-   * Called under the emitter's lock.
-   */
-  def takeClosingEventWithMessagesHandedOff(event: Event): Boolean = closingEventsWithMessagesHandedOff.remove(event)
+  /** Stops keeping a closing event whose messages its test handed off one by one, and returns whether it was kept. */
+  def takeClosingEventWithMessagesHandedOff(event: Event): Boolean = {
+    emitter.assertLockHeld()
+    closingEventsWithMessagesHandedOff.remove(event)
+  }
 
   /**
    * Makes this the registration of a top-level suite, whose node table the emitter built from the suite's structure.
@@ -232,18 +246,20 @@ private[scalatest] final class RegisteredSuite(
 
   /**
    * The registrations, outermost first, of this instance and of each instance whose run it started in, whose node
-   * tables are not settled. Called under the emitter's lock.
+   * tables are not settled.
    */
   def unsettledFromOutermost: List[RegisteredSuite] = {
+    emitter.assertLockHeld()
     val outer = startedIn.map(_.registration.unsettledFromOutermost).getOrElse(Nil)
     if (tableIsSettled) outer else outer :+ this
   }
 
   /**
    * Whether the instance's node has, or may yet have once fixed and named, a node table. One started in the run or a
-   * test of an instance with none has none. Called under the emitter's lock.
+   * test of an instance with none has none.
    */
   def canHaveTable: Boolean = {
+    emitter.assertLockHeld()
     if (nodeIsFixed) {
       tableOfNode.isDefined || newNodeAwaitingName.isDefined
     } else {
@@ -253,32 +269,41 @@ private[scalatest] final class RegisteredSuite(
 
   /**
    * Keeps the suite ID the instance's run read, where its node is not fixed and the run has read none before, until
-   * the node is fixed from it. Called under the emitter's lock.
+   * the node is fixed from it.
    */
   def keepSuiteIdItsRunRead(suiteId: String): Unit = {
+    emitter.assertLockHeld()
     if (!nodeIsFixed && suiteIdItsRunRead.isEmpty) {
       suiteIdItsRunRead = Some(suiteId)
     }
   }
 
-  /** The first suite ID the instance's run read, where its node is not yet fixed. Called under the emitter's lock. */
-  def suiteIdReadByItsRun: Option[String] = Option.when(!nodeIsFixed)(suiteIdItsRunRead).flatten
+  /** The first suite ID the instance's run read, where its node is not yet fixed. */
+  def suiteIdReadByItsRun: Option[String] = {
+    emitter.assertLockHeld()
+    Option.when(!nodeIsFixed)(suiteIdItsRunRead).flatten
+  }
 
-  /** Keeps the suite name the instance's run read, where its run has read none before. Called under the emitter's lock. */
+  /** Keeps the suite name the instance's run read, where its run has read none before. */
   def keepSuiteNameItsRunRead(suiteName: String): Unit = {
+    emitter.assertLockHeld()
     if (suiteNameItsRunRead.isEmpty) {
       suiteNameItsRunRead = Some(suiteName)
     }
   }
 
-  /** The first suite name the instance's run read, if any. Called under the emitter's lock. */
-  def suiteNameReadByItsRun: Option[String] = suiteNameItsRunRead
+  /** The first suite name the instance's run read, if any. */
+  def suiteNameReadByItsRun: Option[String] = {
+    emitter.assertLockHeld()
+    suiteNameItsRunRead
+  }
 
   /**
    * Whether the emitter is to read the instance's suite name itself: where its fixed node awaits its name, its run
-   * has read none, and the emitter has not read it before. Called under the emitter's lock.
+   * has read none, and the emitter has not read it before.
    */
   def takeReadOfSuiteName(): Boolean = {
+    emitter.assertLockHeld()
     val takes = newNodeAwaitingName.isDefined && suiteNameItsRunRead.isEmpty && !emitterReadsSuiteName
     emitterReadsSuiteName ||= takes
     takes
@@ -286,9 +311,10 @@ private[scalatest] final class RegisteredSuite(
 
   /**
    * Whether the emitter is to read the instance's suite ID itself: where its node is not fixed, its run has read no
-   * suite ID, it may have a node table, and the emitter has not read it before. Called under the emitter's lock.
+   * suite ID, it may have a node table, and the emitter has not read it before.
    */
   def takeReadOfSuiteId(): Boolean = {
+    emitter.assertLockHeld()
     val takes = !nodeIsFixed && suiteIdItsRunRead.isEmpty && !emitterReadsSuiteId && canHaveTable
     emitterReadsSuiteId ||= takes
     takes
@@ -297,9 +323,10 @@ private[scalatest] final class RegisteredSuite(
   /**
    * Fixes the node of the instance's run from its suite ID, where it is not yet fixed: with no node, and so no node
    * table, where the suite ID is none. Where a structure holds the node, or it has no table, its table is settled and
-   * this returns the structure it keeps to write, if any. Called under the emitter's lock, outermost first.
+   * this returns the structure it keeps to write, if any. Called outermost first.
    */
   def fixNode(suiteId: Option[String]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
+    emitter.assertLockHeld()
     if (nodeIsFixed) {
       None
     } else {
@@ -308,7 +335,7 @@ private[scalatest] final class RegisteredSuite(
       nodeIsFixed = true
       suiteIdItsRunRead = None
       if (startsARunOnceNodeIsFixed) {
-        startRunUnderLock()
+        executionOfStartingRun()
       }
       if (newNodeAwaitingName.isDefined) {
         None
@@ -325,9 +352,10 @@ private[scalatest] final class RegisteredSuite(
    * Settles the table of a fixed node that no structure holds: adds a node table named `suiteName` under the suite or
    * test the node sits under, and returns the nodes of its first `structure` event, the suite with the scopes and
    * tests the instance's run keeps. Where `suiteName` is none, as where reading it threw, the node has no table.
-   * Called under the emitter's lock, once the node is fixed.
+   * Called once the node is fixed.
    */
   def addNewNode(suiteName: Option[String]): Option[Vector[StructureNode]] = {
+    emitter.assertLockHeld()
     val awaiting = newNodeAwaitingName
     newNodeAwaitingName = None
     tableIsSettled = true
@@ -342,6 +370,7 @@ private[scalatest] final class RegisteredSuite(
 
   // Gives the instance its node, and the node's table where a structure holds it.
   private def placeBy(ofRun: String): Unit = {
+    emitter.assertLockHeld()
     startedIn match {
       case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfRun.contains(ofRun) =>
         val outer = inRun.registration
@@ -366,6 +395,7 @@ private[scalatest] final class RegisteredSuite(
   // Places the instance at that index among the suites of that suite ID under `parentNode`, the outer instance's
   // suite node or one of its tests.
   private def placeUnder(outer: RegisteredSuite, parentNode: Option[NodeId], above: NamedExecutions, ofRun: String, index: Int): Unit = {
+    emitter.assertLockHeld()
     nodePath = parentNode.map(path => NodeId(path.places :+ NodePlace.Suite(ofRun, index)))
     executionsAbove = Some(above)
     tableOfNode = outer.tableOfNode.flatMap(_.childSuites.find(child => nodePath.contains(child.node)))
@@ -376,9 +406,10 @@ private[scalatest] final class RegisteredSuite(
 
   /**
    * Starts an execution for a run of the instance, whose node is fixed, or takes the one started before the run's
-   * first engine site where no run has taken it yet. Called under the emitter's lock.
+   * first engine site where no run has taken it yet.
    */
-  def startRunUnderLock(): Execution = {
+  def executionOfStartingRun(): Execution = {
+    emitter.assertLockHeld()
     runOfSuite match {
       case Some(suite) => suite.executionOfRun()
       case None if latestRunAwaitsItsStart =>
@@ -389,40 +420,47 @@ private[scalatest] final class RegisteredSuite(
   }
 
   private def newRun(): Execution = {
-    val execution = tableOfNode.fold(new Execution)(_.takeExecutionForStartingRun())
+    emitter.assertLockHeld()
+    val execution = tableOfNode.fold(new Execution(emitter))(_.takeExecutionForStartingRun())
     executionOfLatestRun = Some(execution)
     execution
   }
 
   /**
    * The execution of the instance's latest run, starting one, for the run's first engine site to take, where no site
-   * has. Called under the emitter's lock.
+   * has.
    */
-  def executionOfRun(): Execution = runOfSuite.fold(executionOfLatestRun.getOrElse(runAwaitingItsStart()))(_.executionOfRun())
+  def executionOfRun(): Execution = {
+    emitter.assertLockHeld()
+    runOfSuite.fold(executionOfLatestRun.getOrElse(runAwaitingItsStart()))(_.executionOfRun())
+  }
 
   private def runAwaitingItsStart(): Execution = {
+    emitter.assertLockHeld()
     val execution = newRun()
     latestRunAwaitsItsStart = true
     execution
   }
 
-  // The execution the instance's SuiteStarting opens, which its run then takes. Called under the emitter's lock.
-  private def executionOpenedBySuiteStarting(): Execution = runOfSuite.fold(runAwaitingItsStart())(_.executionOfRun())
+  // The execution the instance's SuiteStarting opens, which its run then takes.
+  private def executionOpenedBySuiteStarting(): Execution = {
+    emitter.assertLockHeld()
+    runOfSuite.fold(runAwaitingItsStart())(_.executionOfRun())
+  }
 
-  /** Starts a run where the node is fixed, and otherwise once it is. Called under the emitter's lock. */
+  /** Starts a run where the node is fixed, and otherwise once it is. */
   def startRunOnceNodeIsFixed(): Unit = {
+    emitter.assertLockHeld()
     if (nodeIsFixed) {
-      startRunUnderLock()
+      executionOfStartingRun()
     } else {
       startsARunOnceNodeIsFixed = true
     }
   }
 
-  /**
-   * Writes the run's structure where the node's table is settled, and otherwise once it is. Called under the emitter's
-   * lock.
-   */
+  /** Returns the run's structure for the emitter to write where the node's table is settled, and otherwise keeps it until it is. */
   def structureOnceTableIsSettled(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
+    emitter.assertLockHeld()
     if (tableIsSettled) {
       tableOfNode.map(table => (table, scopesAndTestsFor(table)))
     } else {
@@ -447,7 +485,7 @@ private[scalatest] final class RegisteredSuite(
     if (scopes.isEmpty) {
       new OriginOfSuite
     } else {
-      new OriginOfScope(new ScopeExecution(scopes, scopeInContext.filter(_.places == scopes.init)))
+      new OriginOfScope(new ScopeExecution(emitter, scopes, scopeInContext.filter(_.places == scopes.init)))
     }
   }
 
@@ -543,8 +581,10 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  private def executionsInRun(ofRun: Execution, ofScopes: Map[List[ScopePlace], Execution], ofOwnNode: Option[Execution]): NamedExecutions =
+  private def executionsInRun(ofRun: Execution, ofScopes: Map[List[ScopePlace], Execution], ofOwnNode: Option[Execution]): NamedExecutions = {
+    emitter.assertLockHeld()
     NamedExecutions(executionsAbove, ofRun, ofScopes, ofOwnNode)
+  }
 
   // The origin of the suite-level events of the instance's run, which take the run's execution.
   private final class OriginOfSuite extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.OfSuite) {
@@ -574,8 +614,11 @@ private[scalatest] final class RegisteredSuite(
   }
 
   // The scope execution of a suite's run that this instance's run started in, where the instance is that suite.
-  // Called under the emitter's lock, once the node is fixed.
-  private def scopeOfSuiteItIs: Option[ScopeExecution] = scopeItStartedIn.filter(_ => runOfSuite.isDefined)
+  // Called once the node is fixed.
+  private def scopeOfSuiteItIs: Option[ScopeExecution] = {
+    emitter.assertLockHeld()
+    scopeItStartedIn.filter(_ => runOfSuite.isDefined)
+  }
 
   // The origin of the events of one execution of a test. The test ran in the run in flight when its first event was
   // handed off. Where it ran in a scope execution, that is `scopeOpened` where the instance's run opened it, else
@@ -583,13 +626,14 @@ private[scalatest] final class RegisteredSuite(
   private final class OriginOfTestExecution(testName: String, scopeOpened: Option[ScopeExecution])
       extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.Test(testName)) {
 
-    private val execution = new Execution
+    private val execution = new Execution(emitter)
     // Read and written only under the emitter's lock.
     private var executionOfItsRun = Option.empty[Execution]
 
     def executionsOf(event: Event): NamedExecutions = executions()
 
     private def executions(): NamedExecutions = {
+      emitter.assertLockHeld()
       val scope = scopeOpened.orElse(scopeOfSuiteItIs)
       val ofRun = executionOfItsRun.getOrElse(scope.fold(executionOfRun())(_.executionOfRun(executionOfRun())))
       executionOfItsRun = Some(ofRun)

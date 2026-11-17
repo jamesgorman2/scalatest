@@ -1004,8 +1004,8 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
-    SuiteRegistration.registeredRun(thisSuite, args) { (registration, registeredArgs) =>
-    import registeredArgs._
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, args) =>
+    import args._
 
     val theTestNames = testNames
 
@@ -1013,7 +1013,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     // so that exceptions are caught and transformed
     // into error messages on the standard error stream.
     val report = wrapReporterIfNecessary(thisSuite, reporter)
-    val newArgs = registeredArgs.copy(reporter = report)
+    val newArgs = args.copy(reporter = report)
 
     // Read in the order 3.2.20 passes them to the filter.
     def tagsAndSuiteId: (Map[String, Set[String]], String) = {
@@ -1113,8 +1113,8 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
-    SuiteRegistration.registeredRun(thisSuite, args) { (registration, registeredArgs) =>
-    import registeredArgs._
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, args) =>
+    import args._
 
     val originalThreadName = Thread.currentThread.getName
     try {
@@ -1123,7 +1123,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, theSuiteName))
 
       val report = wrapReporterIfNecessary(thisSuite, reporter)
-      val newArgs = registeredArgs.copy(reporter = report)
+      val newArgs = args.copy(reporter = report)
 
       val nestedSuitesStatus = 
         testName match {

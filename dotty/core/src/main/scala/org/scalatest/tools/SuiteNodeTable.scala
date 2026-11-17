@@ -13,12 +13,13 @@ import scala.collection.mutable
  *
  * Read and written only under the emitter's lock.
  */
-private[scalatest] final class Execution {
+private[scalatest] final class Execution(emitter: TestEventLogEmitter) {
 
   private val startedOfSuiteId = mutable.HashMap.empty[String, Int]
 
   /** The index of a suite of this suite ID starting in this execution among those started in it before, which it then counts. */
   def indexOfStartingSuite(suiteId: String): Int = {
+    emitter.assertLockHeld()
     val index = startedOfSuiteId.getOrElse(suiteId, 0)
     startedOfSuiteId(suiteId) = index + 1
     index
@@ -30,7 +31,7 @@ private[scalatest] final class Execution {
  *
  * Read and written only under the emitter's lock.
  */
-private[scalatest] final class NodeExecutions {
+private[scalatest] final class NodeExecutions(emitter: TestEventLogEmitter) {
 
   private val numbers = new IdentityHashMap[Execution, Integer]
   private var open = List.empty[Execution]
@@ -38,6 +39,7 @@ private[scalatest] final class NodeExecutions {
 
   /** The execution's number among the node's. An execution not yet numbered takes the next, and is then the node's latest, and open. */
   def number(execution: Execution): Int = {
+    emitter.assertLockHeld()
     Option(numbers.get(execution)) match {
       case Some(number) => number
       case None =>
@@ -49,19 +51,34 @@ private[scalatest] final class NodeExecutions {
     }
   }
 
-  def close(execution: Execution): Unit = open = open.filterNot(_ eq execution)
+  def close(execution: Execution): Unit = {
+    emitter.assertLockHeld()
+    open = open.filterNot(_ eq execution)
+  }
 
   /** The execution that opened last and has not closed. */
-  def openedLast: Option[Execution] = open.headOption
+  def openedLast: Option[Execution] = {
+    emitter.assertLockHeld()
+    open.headOption
+  }
 
   /** The execution numbered last. */
-  def latest: Option[Execution] = started
+  def latest: Option[Execution] = {
+    emitter.assertLockHeld()
+    started
+  }
+
+  /** A new execution of the node, which has no number until an event naming it is written. */
+  def newExecution(): Execution = new Execution(emitter)
 
   /**
    * The number of the execution an event below this node ran in, where nothing names it: the execution that opened
    * last and has not closed, else the latest, else a new first one.
    */
-  def numberOfCurrent: Int = number(openedLast.orElse(latest).getOrElse(new Execution))
+  def numberOfCurrent: Int = {
+    emitter.assertLockHeld()
+    number(openedLast.orElse(latest).getOrElse(newExecution()))
+  }
 }
 
 /**
@@ -98,6 +115,7 @@ private[scalatest] object ScopeAndTestIds {
  *
  * It also keeps the suite's latest structure, and the executions of the suite and of its scopes and tests.
  *
+ * @param emitter the emitter under whose lock the table is read and written once it is shared
  * @param parentSuite the table of the suite node this one sits under, if any
  * @param parent the node it sits under, if any: its parent suite's node, or one of that suite's tests
  * @param position its place among that node's children, if it has one: a nested suite node added after its parent's first structure has none
@@ -106,6 +124,7 @@ private[scalatest] object ScopeAndTestIds {
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
  */
 private[scalatest] final class SuiteNodeTable(
+  emitter: TestEventLogEmitter,
   val node: NodeId,
   val name: String,
   val suiteId: String,
@@ -142,19 +161,29 @@ private[scalatest] final class SuiteNodeTable(
    * The tables of the suites under it, directly or under one of its tests: those of its first structure in declared
    * order, then those added later, in the order added.
    */
-  def childSuites: Vector[SuiteNodeTable] = nestedSuites ++ nestedSuitesAdded
+  def childSuites: Vector[SuiteNodeTable] = {
+    emitter.assertLockHeld()
+    nestedSuites ++ nestedSuitesAdded
+  }
 
   /** Whether an event has ended an execution of the suite: a `SuiteCompleted` or `SuiteAborted`. */
-  def hasEnded: Boolean = hasEndedOnce
+  def hasEnded: Boolean = {
+    emitter.assertLockHeld()
+    hasEndedOnce
+  }
 
-  def markEnded(): Unit = hasEndedOnce = true
+  def markEnded(): Unit = {
+    emitter.assertLockHeld()
+    hasEndedOnce = true
+  }
 
   /**
    * Adds a suite node directly under `parentNode`, this suite's node or that of one of its tests, after the suites
    * already under it. Its first structure holds the suite alone, and is the caller's to write.
    */
   def addSuiteUnder(parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
-    val id = SuiteNodeTable.nestedSuiteId(parentNode, suiteId, childSuites.filter(_.parent.contains(parentNode)).map(_.suiteId))
+    emitter.assertLockHeld()
+    val id = SuiteNodeTable.nestedSuitePath(parentNode, suiteId, childSuites.filter(_.parent.contains(parentNode)).map(_.suiteId))
     addSuite(id, parentNode, name, suiteId, className)
   }
 
@@ -163,25 +192,39 @@ private[scalatest] final class SuiteNodeTable(
    * after the other suites under this one. Its first structure holds the suite alone, and is the caller's to write.
    */
   def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
-    val added = new SuiteNodeTable(id, name, suiteId, className, Some(this), Some(parentNode), None, Nil, ScopeAndTestIds.none, Map.empty)
+    emitter.assertLockHeld()
+    val added = new SuiteNodeTable(emitter, id, name, suiteId, className, Some(this), Some(parentNode), None, Nil, ScopeAndTestIds.none, Map.empty)
     nestedSuitesAdded :+= added
     added
   }
 
   /** Each test's node, by test name. */
-  def tests: Map[String, NodeId] = ids.tests
+  def tests: Map[String, NodeId] = {
+    emitter.assertLockHeld()
+    ids.tests
+  }
 
   /** Each scope's node, by its path: the place of each scope from the suite down to it. */
-  def scopes: Map[List[ScopePlace], NodeId] = ids.scopes
+  def scopes: Map[List[ScopePlace], NodeId] = {
+    emitter.assertLockHeld()
+    ids.scopes
+  }
 
-  /** The parent of each scope and test. */
-  def parents: Map[NodeId, NodeId] = ids.parents
+  def parents: Map[NodeId, NodeId] = {
+    emitter.assertLockHeld()
+    ids.parents
+  }
 
   /** The scopes and tests of the suite's latest structure. */
-  def scopesAndTests: List[ScopeOrTest] = latestScopesAndTests
+  def scopesAndTests: List[ScopeOrTest] = {
+    emitter.assertLockHeld()
+    latestScopesAndTests
+  }
 
-  /** Whether the suite's latest structure holds a test of this test name. */
-  def latestHoldsTest(testName: String): Boolean = testNamesOfLatest.contains(testName)
+  def latestHoldsTest(testName: String): Boolean = {
+    emitter.assertLockHeld()
+    testNamesOfLatest.contains(testName)
+  }
 
   /**
    * What the filter says of each test of `testNames`, as `Filter.apply` says it for one test. A test an earlier
@@ -190,6 +233,7 @@ private[scalatest] final class SuiteNodeTable(
    * result for later structures.
    */
   def filterKeepingEarlier(testNames: List[String], filtered: String => (Boolean, Boolean)): Map[String, (Boolean, Boolean)] = {
+    emitter.assertLockHeld()
     val filteredNow = testNames.map(testName => testName -> filteredTests.getOrElse(testName, filtered(testName))).toMap
     filteredTests = filteredTests ++ filteredNow
     filteredNow
@@ -200,6 +244,7 @@ private[scalatest] final class SuiteNodeTable(
    * them: the suite, then its scopes and tests, positioned from 0 among themselves.
    */
   def replaceLatestStructure(scopesAndTests: List[ScopeOrTest]): Vector[StructureNode] = {
+    emitter.assertLockHeld()
     val nodes = Vector.newBuilder[StructureNode]
     nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
     val added = new SuiteNodeTable.ScopesAndTests(ids, node, nodes)
@@ -212,6 +257,7 @@ private[scalatest] final class SuiteNodeTable(
 
   /** The node of a scope or test, or none for the suite itself and for a scope or test no structure of the suite holds. */
   def scopeOrTest(treeNode: TreeNode): Option[NodeId] = {
+    emitter.assertLockHeld()
     treeNode match {
       case TreeNode.OfSuite => None
       case TreeNode.Scope(places) => scopes.get(places)
@@ -219,7 +265,10 @@ private[scalatest] final class SuiteNodeTable(
     }
   }
 
-  def executionsOf(node: NodeId): NodeExecutions = executionsOfNodes.getOrElseUpdate(node, new NodeExecutions)
+  def executionsOf(node: NodeId): NodeExecutions = {
+    emitter.assertLockHeld()
+    executionsOfNodes.getOrElseUpdate(node, new NodeExecutions(emitter))
+  }
 
   /**
    * The execution path of an event of this suite, without the suite's own execution. Each node above it, from its
@@ -227,6 +276,7 @@ private[scalatest] final class SuiteNodeTable(
    * a test runs within that test's execution, and so within the executions of the scopes the test sits in.
    */
   def executionPathAboveSuite(named: Option[NamedExecutions]): Vector[Int] = {
+    emitter.assertLockHeld()
     parentSuite.fold(Vector.empty[Int]) { above =>
       val namedAbove = named.flatMap(_.ofNodeAbove)
       parent.filter(_ != above.node) match {
@@ -242,6 +292,7 @@ private[scalatest] final class SuiteNodeTable(
    * one, as each node above the suite does. A test's scopes are those its latest structure puts it in.
    */
   def executionPathAbove(scopeOrTest: NodeId, named: Option[NamedExecutions]): Vector[Int] = {
+    emitter.assertLockHeld()
     def scopeAbove(below: NodeId): Option[NodeId] = parents.get(below).filter(_ != node)
     val scopesAbove = Iterator.unfold(scopeAbove(scopeOrTest))(scope => scope.map(id => (id, scopeAbove(id)))).toVector.reverse
     val namedScopes = named.fold(Map.empty[NodeId, Execution])(_.ofScopes.flatMap((path, execution) => scopes.get(path).map(_ -> execution)))
@@ -250,19 +301,27 @@ private[scalatest] final class SuiteNodeTable(
 
   // The number of a node's execution: the one named, else its current one.
   private def numberOf(node: NodeId, execution: Option[Execution]): Int = {
+    emitter.assertLockHeld()
     val executions = executionsOf(node)
     execution.fold(executions.numberOfCurrent)(executions.number)
   }
 
   /** Keeps the execution the suite's `SuiteStarting` opened for the suite's next run to take. */
-  def awaitRun(execution: Execution): Unit = openedBySuiteStarting = Some(execution)
+  def awaitRun(execution: Execution): Unit = {
+    emitter.assertLockHeld()
+    openedBySuiteStarting = Some(execution)
+  }
 
   /** Forgets the execution the suite's `SuiteStarting` opened, where that execution has closed with no run. */
-  def forgetUnrunExecution(execution: Execution): Unit = openedBySuiteStarting = openedBySuiteStarting.filterNot(_ eq execution)
+  def forgetUnrunExecution(execution: Execution): Unit = {
+    emitter.assertLockHeld()
+    openedBySuiteStarting = openedBySuiteStarting.filterNot(_ eq execution)
+  }
 
   /** The execution of a run that starts: the one the suite's `SuiteStarting` opened where no run has taken it, and otherwise a new one. */
   def takeExecutionForStartingRun(): Execution = {
-    val execution = openedBySuiteStarting.getOrElse(new Execution)
+    emitter.assertLockHeld()
+    val execution = openedBySuiteStarting.getOrElse(new Execution(emitter))
     openedBySuiteStarting = None
     execution
   }
@@ -273,7 +332,7 @@ private[scalatest] object SuiteNodeTable {
   private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[String] = SuiteStructure.testsIn(scopesAndTests).map(_.testName).toSet
 
   // The node path of a suite of this suite ID nested in `parent`, after nested suites of the suite IDs `earlier`.
-  private def nestedSuiteId(parent: NodeId, suiteId: String, earlier: Vector[String]): NodeId =
+  private def nestedSuitePath(parent: NodeId, suiteId: String, earlier: Vector[String]): NodeId =
     NodeId(parent.places :+ NodePlace.Suite(suiteId, earlier.count(_ == suiteId)))
 
   /**
@@ -281,14 +340,15 @@ private[scalatest] object SuiteNodeTable {
    * its index among the run's top-level suites of that `suiteId`. Returns the suite's table, and the nodes as a
    * `structure` event holds them: in depth-first pre-order, each node's children in declared order.
    */
-  def ofTopLevelSuite(structure: SuiteStructure, index: Int): (SuiteNodeTable, Vector[StructureNode]) = {
+  def ofTopLevelSuite(emitter: TestEventLogEmitter, structure: SuiteStructure, index: Int): (SuiteNodeTable, Vector[StructureNode]) = {
     val nodes = Vector.newBuilder[StructureNode]
-    val table = suite(structure, NodeId(Vector(NodePlace.Suite(structure.suiteId, index))), None, None, nodes)
+    val table = suite(emitter, structure, NodeId(Vector(NodePlace.Suite(structure.suiteId, index))), None, None, nodes)
     (table, nodes.result())
   }
 
   // Recurses once for each suite nested in another, as reading the structure does.
   private def suite(
+    emitter: TestEventLogEmitter,
     structure: SuiteStructure,
     id: NodeId,
     parentSuite: Option[SuiteNodeTable],
@@ -305,6 +365,7 @@ private[scalatest] object SuiteNodeTable {
       nodes ++= nodesOfScopesAndTests.result()
     }
     val table = new SuiteNodeTable(
+      emitter,
       id,
       structure.name,
       structure.suiteId,
@@ -318,8 +379,8 @@ private[scalatest] object SuiteNodeTable {
     )
     val nested = structure.nestedSuites.toVector
     table.holdNestedSuitesOfFirstStructure(nested.zipWithIndex.map { (nestedSuite, index) =>
-      val nestedId = nestedSuiteId(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
-      suite(nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
+      val nestedId = nestedSuitePath(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
+      suite(emitter, nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
     })
     if (!structure.testsBeforeNestedSuites) {
       nodes ++= nodesOfScopesAndTests.result()

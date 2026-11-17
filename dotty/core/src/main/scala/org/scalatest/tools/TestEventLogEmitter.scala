@@ -4,9 +4,11 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.util.IdentityHashMap
 import org.scalatest.Filter
 import org.scalatest.RegisteredNode
@@ -57,6 +59,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   // wrapper, each mapped to that suite's registration. Keyed by the event's identity, since an event's `equals`
   // compares its fields, which hold the run's own objects. Read and written only under this emitter's lock.
   private val handedOff = new IdentityHashMap[Event, RegisteredSuite]
+
+  /** Fails where the calling thread does not hold this emitter's lock. Each member that must hold it calls this first. */
+  def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "The test event log emitter's lock is not held")
+
+  // Runs `body` under the lock, then keeps what it returns from the caller as `runEvent` keeps what encoding or writing
+  // throws.
+  private def underLockKeepingThrown(body: => Option[Throwable]): Unit =
+    synchronized(body).foreach(TestEventLogEmitter.rethrowIfUncontained)
 
   /**
    * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
@@ -113,7 +123,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       topLevelSuitesOfSuiteId(structure.suiteId) = earlier + 1
       earlier
     }
-    val (table, nodes) = SuiteNodeTable.ofTopLevelSuite(structure, index)
+    val (table, nodes) = SuiteNodeTable.ofTopLevelSuite(this, structure, index)
     append(TestEventLogEmitter.caught(TestEventLogEncoder.structure(nodes)), None)
     table
   }
@@ -129,10 +139,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     lacking.foreach { table =>
       registered.foreach { tree =>
         // The latest structure is read again under the lock, since another instance of the suite may have changed it.
-        val thrown = synchronized {
-          SuiteStructure.withTestAdded(tree, table.scopesAndTests, testName).flatMap(writeStructureWhereChangedUnderLock(table, _))
+        underLockKeepingThrown {
+          SuiteStructure.withTestAdded(tree, table.scopesAndTests, testName).flatMap(writeStructureWhereChanged(table, _))
         }
-        thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
       }
     }
   }
@@ -147,14 +156,13 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * the other. What writing throws is kept from the caller as `runEvent` keeps it.
    */
   def writeStructureOnceTableIsSettled(registration: RegisteredSuite)(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Unit = {
-    val thrown = synchronized {
+    underLockKeepingThrown {
       if (isOpen) {
-        registration.structureOnceTableIsSettled(scopesAndTestsFor).flatMap(writeStructureWhereChangedUnderLock(_, _))
+        registration.structureOnceTableIsSettled(scopesAndTestsFor).flatMap(writeStructureWhereChanged(_, _))
       } else {
         None
       }
     }
-    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
   /**
@@ -184,7 +192,13 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         Nil
       }
     }
-    unsettled.forall(one => fixNodeOf(one, handingOff) && settleTableOf(one, handingOff))
+    // Stops at the first instance left unsettled: each instance after it is placed below it.
+    val remaining = unsettled.iterator
+    var isSettled = true
+    while (isSettled && remaining.hasNext) {
+      val one = remaining.next()
+      isSettled = fixNodeOf(one, handingOff) && settleTableOf(one, handingOff)
+    }
   }
 
   // Returns whether the node is fixed.
@@ -200,7 +214,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
             registration.fixNode(None)
             Some(thrownByRead)
           case Right(Some(id)) =>
-            TestEventLogEmitter.caught(registration.fixNode(Some(id))).fold(Some(_), _.flatMap(writeStructureWhereChangedUnderLock(_, _)))
+            TestEventLogEmitter.caught(registration.fixNode(Some(id))).fold(Some(_), _.flatMap(writeStructureWhereChanged(_, _)))
           case Right(None) =>
             // Read by another thread, which fixes the node, unless the instance can have no node table.
             if (!registration.canHaveTable) {
@@ -231,7 +245,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
             registration.addNewNode(None)
             Some(thrownByRead)
           case Right(Some(name)) =>
-            TestEventLogEmitter.caught(registration.addNewNode(Some(name))).fold(Some(_), _.flatMap(writeStructureUnderLock))
+            TestEventLogEmitter.caught(registration.addNewNode(Some(name))).fold(Some(_), _.flatMap(writeStructure))
           case Right(None) =>
             None
         }
@@ -243,15 +257,17 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   // Encoding a structure calls no user code, so it is encoded under the lock that makes it the latest.
-  private def writeStructureWhereChangedUnderLock(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
+  private def writeStructureWhereChanged(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
+    assertLockHeld()
     if (isOpen && table.scopesAndTests != scopesAndTests) {
-      writeStructureUnderLock(table.replaceLatestStructure(scopesAndTests))
+      writeStructure(table.replaceLatestStructure(scopesAndTests))
     } else {
       None
     }
   }
 
-  private def writeStructureUnderLock(nodes: Vector[StructureNode]): Option[Throwable] = {
+  private def writeStructure(nodes: Vector[StructureNode]): Option[Throwable] = {
+    assertLockHeld()
     val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(nodes)))
     if (written.isLeft) {
       close()
@@ -287,20 +303,19 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
     if (synchronized(handsOffAtSendSite(registration, event, messagesHandedOff))) {
       val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
-      val thrown = synchronized {
+      underLockKeepingThrown {
         if (handsOffAtSendSite(registration, event, messagesHandedOff)) {
           handedOff.put(event, registration.topLevel)
-          writeUnderLock(encoded, assignWithOrigin(origin, event))
+          writeEvent(encoded, assignWithOrigin(origin, event))
         } else {
           None
         }
       }
-      thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
     }
   }
 
-  // Called under the lock.
   private def handsOffAtSendSite(registration: RegisteredSuite, event: Event, messagesHandedOff: Boolean): Boolean = {
+    assertLockHeld()
     val hasTable = isOpen && registration.table.isDefined
     if (hasTable && registration.hasBeenRemoved && messagesHandedOff) {
       registration.topLevel.keepClosingEventWithMessagesHandedOff(event)
@@ -363,18 +378,20 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     messagesHandedOffWhereFirstHandedOff(wrapper, event).foreach { messagesHandedOff =>
       // Encoded outside the lock, as `runEvent` encodes.
       val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
-      val thrown = synchronized(if (isOpen) writeUnderLock(encoded, assignFromItsOwnData(wrapper, event)) else encoded.left.toOption)
-      thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+      underLockKeepingThrown(if (isOpen) writeEvent(encoded, assignFromItsOwnData(wrapper, event)) else encoded.left.toOption)
     }
   }
 
   // Writes the lines of an event and of the messages its closing event records, each assigned as `assigned` gives,
-  // closing the event log where they cannot be written.
-  private def writeUnderLock(encoded: Either[Throwable, Vector[EncodedEvent]], assigned: => NodeExecution): Option[Throwable] = {
+  // after the further structure assigning them needs, if any. They are assigned only where they were encoded. Closes
+  // the event log where they cannot be assigned or written.
+  private def writeEvent(encoded: Either[Throwable, Vector[EncodedEvent]], assigned: => TestEventLogEmitter.Assignment): Option[Throwable] = {
+    assertLockHeld()
     val written = encoded.flatMap { events =>
       TestEventLogEmitter.caught {
-        val execution = assigned
-        events.foreach(one => write(TestEventLogEncoder.line(one, Some(execution))))
+        val assignment = assigned
+        assignment.furtherStructure.foreach(nodes => write(TestEventLogEncoder.structure(nodes)))
+        events.foreach(one => write(TestEventLogEncoder.line(one, Some(assignment.execution))))
       }
     }
     if (written.isLeft) {
@@ -393,10 +410,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    */
   def writeTestMessage(origin: OriginInRegisteredSuite, built: Either[Throwable, (Event, EncodedEvent)]): Unit = {
     val registration = origin.registration
-    val thrown = synchronized {
+    underLockKeepingThrown {
       if (isOpen && registration.table.isDefined && !registration.hasBeenRemoved) {
         built match {
-          case Right((message, encoded)) => writeUnderLock(Right(Vector(encoded)), assignWithOrigin(origin, message))
+          case Right((message, encoded)) => writeEvent(Right(Vector(encoded)), assignWithOrigin(origin, message))
           case Left(thrownByBuild) =>
             close()
             Some(thrownByBuild)
@@ -405,7 +422,6 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         built.left.toOption
       }
     }
-    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
   // Returns `None` where this wrapper is not to hand the event off. Otherwise returns `Some` of whether the event is a
@@ -436,50 +452,55 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Called under the lock, where the origin's instance has a node table. Numbers the executions the origin names,
-  // where the event is the first to name them. A scope or test the suite's structure does not hold has no node, so
-  // its event is assigned to the suite.
-  private def assignWithOrigin(origin: OriginInRegisteredSuite, event: Event): NodeExecution = {
+  // Called where the origin's instance has a node table. Numbers the executions the origin names, where the event is
+  // the first to name them. A scope or test the suite's structure does not hold has no node, so its event is assigned
+  // to the suite.
+  private def assignWithOrigin(origin: OriginInRegisteredSuite, event: Event): TestEventLogEmitter.Assignment = {
+    assertLockHeld()
     val table = origin.registration.table.get
     val named = Some(origin.executionsOf(event))
-    table.scopeOrTest(origin.node) match {
+    val execution = table.scopeOrTest(origin.node) match {
       case Some(scopeOrTest) => assignToScopeOrTest(table, scopeOrTest, named, event)
       case None => assignToSuite(table, named, event)
     }
+    TestEventLogEmitter.Assignment(execution, None)
   }
 
-  // Called under the lock. The suite an event's data names is the wrapper's own suite, else one at or below the
-  // wrapper's node, and is otherwise given a node directly under the wrapper's node. A test its suite's table lacks is
-  // given a node directly under the suite, not marked ignored, since nothing filtered it. Either node is written in a
-  // further structure.
-  private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): NodeExecution = {
+  // The suite an event's data names is the wrapper's own suite, else one at or below the wrapper's node, and is
+  // otherwise given a node directly under the wrapper's node. A test its suite's table lacks is given a node directly
+  // under the suite, not marked ignored, since nothing filtered it. Either node is added to the suite's latest
+  // structure, which the assignment returns for the caller to write before the event.
+  private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): TestEventLogEmitter.Assignment = {
+    assertLockHeld()
     val ofWrapper = wrapper.registration.table.get
     val wrapperNode = ofWrapper.scopeOrTest(wrapper.treeNode)
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
       case None =>
-        wrapperNode match {
+        val execution = wrapperNode match {
           case Some(scopeOrTest) => assignToScopeOrTest(ofWrapper, scopeOrTest, None, event)
           case None => assignToSuite(ofWrapper, None, event)
         }
+        TestEventLogEmitter.Assignment(execution, None)
       case Some(names) =>
         val found = TestEventLogEmitter.tableNamed(ofWrapper, wrapperNode, names.suiteId)
         val table = found.getOrElse {
           ofWrapper.addSuiteUnder(wrapperNode.getOrElse(ofWrapper.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId))
         }
         val lackedTest = names.testName.filterNot(table.tests.contains)
-        if (found.isEmpty || lackedTest.isDefined) {
-          val scopesAndTests = table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_ -> false))
-          write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests)))
+        val furtherStructure = Option.when(found.isEmpty || lackedTest.isDefined) {
+          table.replaceLatestStructure(table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_ -> false)))
         }
-        names.testName.flatMap(table.tests.get) match {
+        val execution = names.testName.flatMap(table.tests.get) match {
           case Some(test) => assignToScopeOrTest(table, test, None, event)
           case None => assignToSuite(table, None, event)
         }
+        TestEventLogEmitter.Assignment(execution, furtherStructure)
     }
   }
 
   // Where the event has an origin, its node's execution and those above it are those the origin names.
   private def assignToScopeOrTest(table: SuiteNodeTable, node: NodeId, named: Option[NamedExecutions], event: Event): NodeExecution = {
+    assertLockHeld()
     val executions = table.executionsOf(node)
     val execution = named.flatMap(_.ofOwnNode).getOrElse(TestEventLogEmitter.executionWithNoOrigin(executions, event))
     val assigned = NodeExecution(node, table.executionPathAbove(node, named) :+ executions.number(execution))
@@ -490,6 +511,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   private def assignToSuite(table: SuiteNodeTable, named: Option[NamedExecutions], event: Event): NodeExecution = {
+    assertLockHeld()
     val executions = table.executionsOf(table.node)
     val execution = named match {
       case Some(fromOrigin) => fromOrigin.ofSuite
@@ -522,7 +544,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   // Writes a line, and after it that the run ended where the line closes the run. A line that could not be encoded
   // or written closes the event log.
   private def append(encoded: Either[Throwable, String], runEnded: Option[String]): Unit = {
-    val thrown = synchronized {
+    underLockKeepingThrown {
       if (isOpen) {
         val written = encoded.flatMap(line => TestEventLogEmitter.caught((line +: runEnded.toList).foreach(write)))
         if (written.isLeft || runEnded.isDefined) {
@@ -533,12 +555,15 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         encoded.left.toOption
       }
     }
-    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
   }
 
-  private def write(line: String): Unit = eventLog.write(line.getBytes(StandardCharsets.UTF_8))
+  private def write(line: String): Unit = {
+    assertLockHeld()
+    eventLog.write(line.getBytes(StandardCharsets.UTF_8))
+  }
 
   private def close(): Unit = {
+    assertLockHeld()
     isOpen = false
     handedOff.clear()
     try eventLog.close() catch { case contained: Throwable if TestEventLogEmitter.isContained(contained) => () }
@@ -546,6 +571,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 }
 
 private[scalatest] object TestEventLogEmitter {
+
+  // The node and executions an event is assigned to, and the further structure that must be written before the event,
+  // where assigning it gave a suite or test a node.
+  private final case class Assignment(execution: NodeExecution, furtherStructure: Option[Vector[StructureNode]])
 
   // The messages a test's closing event carries, which no reporter receives as events of their own.
   private def recordedIn(event: Event): Vector[RecordableEvent] = {
@@ -565,7 +594,7 @@ private[scalatest] object TestEventLogEmitter {
       case _: SuiteStarting | _: TestStarting | _: ScopeOpened | _: TestIgnored => true
       case _ => false
     }
-    executions.openedLast.getOrElse(if (opensAnExecution) new Execution else executions.latest.getOrElse(new Execution))
+    executions.openedLast.getOrElse(if (opensAnExecution) executions.newExecution() else executions.latest.getOrElse(executions.newExecution()))
   }
 
   def closesItsScopeOrTest(event: Event): Boolean = {
@@ -623,7 +652,12 @@ private[scalatest] object TestEventLogEmitter {
       case Right(identity) =>
         val runStarted = TestEventLogEncoder.runStarted(identity.pid, identity.startTime.toString)
         val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
-        Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8))
+        // Created anew, so a link planted under its name in a shared folder is never followed. A file an earlier run
+        // left there is replaced.
+        if (Files.isRegularFile(unmoved, LinkOption.NOFOLLOW_LINKS)) {
+          Files.delete(unmoved)
+        }
+        Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
         Files.move(unmoved, eventLogFile, StandardCopyOption.ATOMIC_MOVE)
         // Not a FileChannel: interrupting a thread that is writing to one closes it for every thread.
         appendingTo(new FileOutputStream(eventLogFile.toFile, true))
