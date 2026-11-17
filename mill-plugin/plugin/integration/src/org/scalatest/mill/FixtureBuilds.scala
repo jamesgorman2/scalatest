@@ -50,6 +50,10 @@ trait FixtureBuilds {
   protected def runTestCommandWithTicker(tester: IntegrationTester, arguments: String*): TestCommandResult =
     TestCommandResult(tester.eval(Seq("--ticker", "true", "scalatest/test") ++ arguments))
 
+  /** Runs the test command with Mill's ticker on and Mill colouring its own console output. */
+  protected def runTestCommandWithTickerAndColour(tester: IntegrationTester, arguments: String*): TestCommandResult =
+    TestCommandResult(tester.eval(Seq("--ticker", "true", "--color", "true", "scalatest/test") ++ arguments))
+
   /** Whether any test worker was started in the tester's workspace: Mill writes each worker's `testargs`. */
   protected def anyTestWorkerStarted(tester: IntegrationTester): Boolean =
     os.exists(tester.workspacePath / "out") && os.walk(tester.workspacePath / "out").exists(_.last == "testargs")

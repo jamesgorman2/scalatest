@@ -5,6 +5,8 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
+import scala.util.matching.Regex
+
 final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
@@ -20,6 +22,13 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   /** The test command's task, which Mill names on stderr, with the task's prefix, when it starts and when it ends. */
   private val testCommandTaskName: String = "org.scalatest.mill.TestCommandModule/test"
+
+  /**
+   * Mill's own stderr line naming a task, after the task's prefix: the task's name alone when it starts, and followed by
+   * its duration when it ends.
+   */
+  private def isMillsTaskNameLine(prefix: String, line: String): Boolean =
+    line.matches(Regex.quote(prefix + testCommandTaskName) + """( [0-9]+(\.[0-9]+)?(ms|s|m))?""")
 
   /**
    * Runs `test` on a copy of the `arguments` fixture whose `core.test` holds the given suites from the fixture's
@@ -47,9 +56,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     for ((what, outputArguments) <- Seq("no -o" -> Nil, "-oH" -> Seq("-oH"))) {
       Scenario(s"With $what, stdout holds the human-readable output and nothing else the test command writes") {
         Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
+        And("Mill colours its console output")
         When(s"the test command runs core.test with $what, with Mill's ticker on")
         val (result, workerStarted) = withSuites()("CalculatorSuite") { tester =>
-          (runTestCommandWithTicker(tester, ("core.test" +: outputArguments)*), anyTestWorkerStarted(tester))
+          (runTestCommandWithTickerAndColour(tester, ("core.test" +: outputArguments)*), anyTestWorkerStarted(tester))
         }
 
         Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
@@ -65,7 +75,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           result.stdoutLines.filter(_.startsWith(prefix.get)) shouldBe result.humanReadableStdoutLines
           result.stderrLines
             .filter(_.startsWith(prefix.get))
-            .filterNot(_.startsWith(prefix.get + testCommandTaskName)) shouldBe empty
+            .filterNot(isMillsTaskNameLine(prefix.get, _)) shouldBe empty
         }
 
         And("the test command succeeds, having started a test worker")
@@ -106,9 +116,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     for ((what, (outputArguments, rejected)) <- rejectedArguments) {
       Scenario(s"${outputArguments.mkString(" ")}, holding $what, fails the test command") {
         Given("CalculatorSuite")
+        And("Mill colours its console output")
         When(s"the test command runs core.test with ${outputArguments.mkString(" ")}")
         withSuites()("CalculatorSuite") { tester =>
-          val result = runTestCommand(tester, ("core.test" +: outputArguments)*)
+          val result = runTestCommandWithColour(tester, ("core.test" +: outputArguments)*)
 
           Then("the test command fails before any test starts")
           shouldFailBeforeAnyTestStarts(tester, result)

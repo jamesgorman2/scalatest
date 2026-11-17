@@ -104,7 +104,11 @@ date: 2026-11-18
 ---
 `mill.testkit.IntegrationTester` (Mill 1.3.1) runs Mill with `--ticker false`. Without the ticker, Mill puts no prefix such as `1] ` on the lines a task writes, so a test of what a user sees at a console misses the prefix.
 
-To test the prefix, pass `--ticker true` ahead of the task in the arguments to `eval`; Mill takes the later flag. Under the ticker, Mill may also put the task's name after the prefix on the first line the task writes: a task `banner` printing `building banner` shows as `1] banner building banner`. Mill also writes to stderr, with the task's prefix, a line naming the task when it starts and again with its duration when it ends (`1] mymodule/mytask`, `1] mymodule/mytask 3s`). Assert that a line holds a prefix and ends with the text, never that it is the prefix followed by the text, and allow those task-name lines on stderr when checking which lines carry a task's prefix.
+To test the prefix, pass `--ticker true` ahead of the task in the arguments to `eval`; Mill takes the later flag. Under the ticker:
+
+- Mill may put the task's name after the prefix on the first line the task writes: a task `banner` printing `building banner` shows as `1] banner building banner`. Assert that a line holds a prefix and ends with the text, never that it is the prefix followed by the text.
+- Mill writes to stderr, with the task's prefix, a line naming the task when it starts and again with its duration when it ends (`1] mymodule/mytask`, `1] mymodule/mytask 3s`).
+- When checking which lines carry a task's prefix, allow those task-name lines on stderr by matching them exactly: the prefix and the task's name, optionally followed by a space and a duration. Matching on the prefix and task name alone also passes the task's own first line, which carries the task's name too.
 
 `--ticker true` does not make Mill draw its progress prompt: without a terminal, Mill prints no prompt, and the only status line is the final one (`146/146, 1 FAILED] …`). `testForked` still writes its task's progress line naming the class it runs (`146] core.test.testForked Running Test Class samples.QueueFlatSpec`) to stderr, but never a count such as `1/1 completed`. A test can show the class-name progress line, but cannot assert that Mill's progress count is absent; observe it under a pseudo-terminal.
 </learning>

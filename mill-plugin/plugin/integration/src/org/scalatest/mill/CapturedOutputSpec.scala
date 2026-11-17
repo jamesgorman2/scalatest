@@ -214,13 +214,13 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       And("no line on the console outside the human-readable output is a reporter's, Mill's progress or the run's")
       val outside = result.consoleLinesOutsideHumanReadableOutput
       withClue(result.debugString) {
-        Seq("QueueFlatSpec:", "- should be empty", "samples.QueueFlatSpec", "1/1 completed", "dividing now", "warn: careful")
+        Seq("QueueFlatSpec:", "- should be empty", "samples.QueueFlatSpec", "dividing now", "warn: careful")
           .filter(text => outside.exists(_.contains(text))) shouldBe empty
       }
 
       And("without the plugin, Mill's own test task prints a reporter's lines, Mill's progress line naming the test class, and the run's lines")
       withClue(withoutPlugin.debugString) {
-        Seq("QueueFlatSpec:", "- should be empty", "samples.QueueFlatSpec", "dividing now", "warn: careful")
+        Seq("QueueFlatSpec:", "- should be empty", "Running Test Class samples.QueueFlatSpec", "dividing now", "warn: careful")
           .filterNot(text => withoutPlugin.lines.exists(_.contains(text))) shouldBe empty
       }
     }
