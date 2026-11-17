@@ -39,6 +39,10 @@ trait FixtureBuilds {
   protected def runTestCommand(tester: IntegrationTester, arguments: String*): TestCommandResult =
     TestCommandResult(tester.eval(Seq("scalatest/test") ++ arguments))
 
+  /** Runs the test command with Mill colouring its own console output. */
+  protected def runTestCommandWithColour(tester: IntegrationTester, arguments: String*): TestCommandResult =
+    TestCommandResult(tester.eval(Seq("--color", "true", "scalatest/test") ++ arguments))
+
   /**
    * Runs the test command with Mill's ticker on, as Mill runs by default. The tester turns it off, and with it the
    * prefix Mill puts on each line a task writes.
@@ -59,6 +63,9 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
   /** Each stdout line, with ANSI escape sequences removed. */
   def stdoutLines: Seq[String] = eval.out.linesIterator.map(TestCommandResult.withoutEscapes).toSeq
 
+  /** Each stderr line, with ANSI escape sequences removed. */
+  def stderrLines: Seq[String] = eval.err.linesIterator.map(TestCommandResult.withoutEscapes).toSeq
+
   /**
    * The stdout lines of the human-readable output, as written: from the first that, without Mill's prefix, is a test
    * run label, each indented line after it, then the summary line.
@@ -70,7 +77,7 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
     val start = stdoutLines.indexOfSlice(humanReadableStdoutLines)
     val outsideOnStdout =
       if (humanReadableStdoutLines.isEmpty) stdoutLines else stdoutLines.patch(start, Nil, humanReadableStdoutLines.size)
-    outsideOnStdout ++ eval.err.linesIterator.map(TestCommandResult.withoutEscapes)
+    outsideOnStdout ++ stderrLines
   }
 
   /** The human-readable output apart from its summary line, without Mill's prefix. */
@@ -84,6 +91,12 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
   /** The summary line, the last line of the human-readable output, without Mill's prefix. */
   def summaryLine: Option[String] = summaryStdoutLine.map(TestCommandResult.withoutMillPrefix)
+
+  /**
+   * The human-readable output with its summary line, without Mill's prefix, with each ANSI SGR sequence replaced by a
+   * marker naming it.
+   */
+  def humanReadableOutputWithSummaryLineMarkingColours: Seq[String] = humanReadableStdoutLinesMarkingColours
 
   /** The summary line, without Mill's prefix, with each ANSI SGR sequence replaced by a marker naming it. */
   def summaryLineMarkingColours: Option[String] = humanReadableStdoutLinesMarkingColours.drop(treeStdoutLines.size).headOption

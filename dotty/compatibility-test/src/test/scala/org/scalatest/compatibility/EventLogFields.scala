@@ -1,5 +1,6 @@
 package org.scalatest.compatibility
 
+import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodePlace
@@ -108,7 +109,8 @@ object EventLogFields {
 /**
  * How far the recording shows the order in which the emitter received its events: across the whole run, or only
  * within each suite. It is only within each suite where the recording reporter sits behind `Framework`'s
- * `SuiteSortingReporter`, which reorders events across suites.
+ * `SuiteSortingReporter`. That reporter holds back a nested suite's events until the suite enclosing it completes,
+ * though it keeps the order in which suites start.
  */
 enum EmitterOrder {
   case AcrossTheRun
@@ -164,4 +166,18 @@ object EventLogCoverage {
 
     missingReceived ++ missingRecorded
   }
+
+  /** The quoted IDs of the suites whose `SuiteStarting` events the emitter received, in the order it received them. */
+  def suitesStartedAsReceived(recording: Seq[String]): Seq[String] =
+    recording
+      .filter(_.startsWith(receivedPrefix))
+      .map(_.stripPrefix(receivedPrefix))
+      .filter(event => event.startsWith(s"suite ${EventLogFields.suiteOf(event)} SuiteStarting("))
+      .map(EventLogFields.suiteOf)
+
+  /** The quoted IDs of the suites whose `SuiteStarting` events the event log holds, in its order. */
+  def suitesStartedAsLogged(eventLog: Seq[TestEventLogEvent.ScalaTestEvent]): Seq[String] =
+    eventLog
+      .filter(_.event.isInstanceOf[DecodedEvent.SuiteStarting])
+      .map(logged => EventLogFields.suiteOf(EventLogFields.of(logged, withTimeStamp = false)))
 }

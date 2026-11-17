@@ -18,6 +18,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private val calculatorSuiteSummaryLine: String =
     "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
 
+  /** The test command's task, which Mill names on stderr, with the task's prefix, when it starts and when it ends. */
+  private val testCommandTaskName: String = "org.scalatest.mill.TestCommandModule/test"
+
   /**
    * Runs `test` on a copy of the `arguments` fixture whose `core.test` holds the given suites from the fixture's
    * `suites` folder, and whose own ScalaTest arguments are `moduleArguments`.
@@ -45,8 +48,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Scenario(s"With $what, stdout holds the human-readable output and nothing else the test command writes") {
         Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
         When(s"the test command runs core.test with $what, with Mill's ticker on")
-        val result = withSuites()("CalculatorSuite") { tester =>
-          runTestCommandWithTicker(tester, ("core.test" +: outputArguments)*)
+        val (result, workerStarted) = withSuites()("CalculatorSuite") { tester =>
+          (runTestCommandWithTicker(tester, ("core.test" +: outputArguments)*), anyTestWorkerStarted(tester))
         }
 
         Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
@@ -55,15 +58,19 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           result.summaryLine shouldBe Some(calculatorSuiteSummaryLine)
         }
 
-        And("no other stdout line carries the test command's prefix")
+        And("no other line on stdout, and no line on stderr but Mill's own line naming the task, carries the test command's prefix")
         val prefix = TestCommandResult.millPrefix.findPrefixOf(result.humanReadableStdoutLines.head)
         withClue(result.debugString) {
           prefix shouldBe defined
           result.stdoutLines.filter(_.startsWith(prefix.get)) shouldBe result.humanReadableStdoutLines
+          result.stderrLines
+            .filter(_.startsWith(prefix.get))
+            .filterNot(_.startsWith(prefix.get + testCommandTaskName)) shouldBe empty
         }
 
-        And("the test command succeeds")
+        And("the test command succeeds, having started a test worker")
         result.succeeded shouldBe true
+        workerStarted shouldBe true
       }
     }
 
@@ -73,7 +80,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       val result = withSuites()("CalculatorSuite") { tester =>
         runTestCommand(tester, "core.test", "-o")
       }
-      val console = result.stdoutLines ++ result.eval.err.linesIterator
+      val console = result.stdoutLines ++ result.stderrLines
 
       Then("the console holds no line of human-readable output, its summary line included, and no line holding dividing now")
       withClue(result.debugString) {
@@ -156,9 +163,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     Scenario("A test whose tag the module's own arguments exclude is not shown") {
       Given("SpeedSuite, whose test slow is tagged samples.Slow and writes slow ran, in a module whose own ScalaTest arguments are -l samples.Slow")
+      And("Mill colours its console output")
       When("the test command runs core.test")
       val result = withSuites("-l", "samples.Slow")("SpeedSuite") { tester =>
-        runTestCommand(tester, "core.test")
+        runTestCommandWithColour(tester, "core.test")
       }
 
       Then("the human-readable output shows fast alone")
@@ -181,7 +189,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Then("the human-readable output is the one the test command writes with no module arguments")
         withClue(result.debugString + withoutArguments.debugString) {
           withoutArguments.humanReadableOutput.map(_.trim) should contain allOf ("CalculatorSuite:", "OtherSuite:")
+          withoutArguments.summaryLine shouldBe defined
           result.humanReadableOutput shouldBe withoutArguments.humanReadableOutput
+          result.summaryLine shouldBe withoutArguments.summaryLine
         }
 
         And("no line on the console outside the human-readable output holds adds two numbers or Run completed in")

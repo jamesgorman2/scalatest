@@ -20,7 +20,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
   private lazy val brokenConstructorRun: TestCommandResult =
     withTester("broken-constructor") { tester =>
-      runTestCommand(tester, "core.test")
+      runTestCommandWithColour(tester, "core.test")
     }
 
   Feature("The human-readable output is the module's test run label, with its suites under it") {
@@ -100,6 +100,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A suite's constructor throws") {
       Given("suite BrokenCtorSpec, class samples.BrokenCtorSpec, an AnyFunSuite whose constructor throws IllegalStateException(\"no config\")")
       And("suite SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
+      And("Mill colours its console output")
       When("the test command runs core.test")
       val result = brokenConstructorRun
 

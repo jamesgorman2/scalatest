@@ -50,7 +50,7 @@ The tests of `../specification/runs-and-test-structure-runs.md` AC-172 and AC-17
 
 ### Mill's console output
 
-The plugin's integration tests assert that Mill's list of failed tests and ScalaTest's end-of-run summary do not reach the console. They cannot assert the same of Mill's runner progress: without a terminal Mill prints no progress prompt, even under `testForked` with `--ticker true`, so its absence proves nothing. Suppressing the progress is covered by construction (`../../decisions/capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…") and by `../../research/mill-runner-progress-without-trait.md`, which observed it under pseudo-terminals.
+The plugin's integration tests assert that Mill's list of failed tests and ScalaTest's end-of-run summary do not reach the console. They assert it of the progress line naming each test class, which Mill's own `testForked` prints under `--ticker true` even without a terminal, as a control run of the same build without the plugin shows. They cannot assert it of Mill's progress count, such as `1/1 completed`: without a terminal Mill prints no progress prompt, so its absence proves nothing. Suppressing the progress is covered by construction (`../../decisions/capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…") and by `../../research/mill-runner-progress-without-trait.md`, which observed it under pseudo-terminals.
 
 ### The compatibility fixture's output
 
@@ -73,7 +73,7 @@ This serves `../specification/compatibility-and-library.md` AC-056 and AC-057, `
 - The harness that forks a pair of runs takes the arguments only the fork's run is given, so a test with the emitter on passes the runner argument there.
 - A test of AC-108 runs the fixture on the fork alone, once through `Runner.run` and once through `Framework`, with the runner argument and a `-C` reporter that records every field the event log keeps of each event.
   - That reporter receives the events the emitter receives, so the test compares each event in the event log with the recording.
-  - Within each suite, the reporter receives events in the order core sends them, which is the emitter's order. Under `Framework`, `SuiteSortingReporter` reorders events across suites, so there the test checks the order within each suite only.
+  - Within each suite, the reporter receives events in the order core sends them, which is the emitter's order. Under `Framework`, `SuiteSortingReporter` holds back a nested suite's events until the suite enclosing it completes, though it keeps the order in which suites start. There the test checks the order within each suite, and the order of the suites' `SuiteStarting` events across the run.
 - A test of AC-113 forks the same pair of JVMs.
   - In each, a recorder writes one line for each class of `org.scalatest.events`: whether it is an event class, its declared fields with their erased types, and its constructors with their parameter types.
   - Scala 3.1 and 3.3 implement a lazy `val` with different fields. The recorder leaves out the two kinds of field only one of them adds, `OFFSET$<n>` and `<n>bitmap$<n>`. It writes the field that stores the value, `<name>$lzy<n>`, by name alone, without its modifiers and type. A lazy `val` or nested object the fork adds therefore still shows as an added field.

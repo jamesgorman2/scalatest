@@ -112,6 +112,9 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         output.eventFields.count(_.startsWith("recorded ")) should be > 0
         EventLogCoverage.missing(output.eventFields, logged, emitterOrderIn(launch)) shouldBe Nil
         timedMessagesNotStampedWithTheirCall(logged) shouldBe Nil
+
+        And("the event log holds the suites' SuiteStarting events in the order the emitter received them")
+        EventLogCoverage.suitesStartedAsLogged(logged) shouldBe EventLogCoverage.suitesStartedAsReceived(output.eventFields)
       }
     }
   }
@@ -350,7 +353,8 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     }
   }
 
-  // Framework's SuiteSortingReporter sits between the emitter and the recording reporter, and reorders events across suites.
+  // Framework's SuiteSortingReporter sits between the emitter and the recording reporter, and holds back a nested suite's
+  // events until the suite enclosing it completes.
   private def emitterOrderIn(launch: Launch): EmitterOrder =
     launch match {
       case Launch.RunnerRun => EmitterOrder.AcrossTheRun

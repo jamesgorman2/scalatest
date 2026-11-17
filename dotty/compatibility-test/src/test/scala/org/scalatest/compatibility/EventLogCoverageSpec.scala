@@ -59,6 +59,25 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
     }
   }
 
+  "The suites' starts" when {
+    val otherSuiteStarting = new TestEventLogEvent.ScalaTestEvent(
+      Some(NodeExecution(NodeId(Vector(NodePlace.Suite("other", 0))), Vector(1))),
+      DecodedEvent.SuiteStarting(None, "main", 4L)
+    )
+    val received = List(suiteStarting, testStarting, otherSuiteStarting).map(event => "received " + EventLogFields.of(event, withTimeStamp = true))
+
+    "received by the emitter" should {
+      "be the suites' IDs, in the order received" in {
+        EventLogCoverage.suitesStartedAsReceived(received) shouldBe List("\"s\"", "\"other\"")
+      }
+    }
+    "held by the event log" should {
+      "be the suites' IDs, in the log's order" in {
+        EventLogCoverage.suitesStartedAsLogged(List(otherSuiteStarting, testStarting, suiteStarting)) shouldBe List("\"other\"", "\"s\"")
+      }
+    }
+  }
+
   "An event recorded in another" when {
     val recorded = List("recorded " + EventLogFields.of(infoProvided, withTimeStamp = false))
 

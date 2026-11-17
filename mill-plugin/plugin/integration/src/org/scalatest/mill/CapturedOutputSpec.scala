@@ -123,7 +123,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         addToTestModule(tester, "def testLogLevel = mill.api.daemon.internal.TestReporter.LogLevel.Debug")
         runTestCommand(tester, "core.test")
       }
-      val console = result.stdoutLines ++ result.eval.err.linesIterator
+      val console = result.stdoutLines ++ result.stderrLines
 
       Then("the lines under Run 1: hold the test's line")
       withClue(result.debugString) {
@@ -194,11 +194,15 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     Scenario("A failing test that writes to both streams") {
       Given("QueueFlatSpec, whose test be empty succeeds, and have size 0 writes to stdout and stderr, then fails")
-      When("the test command runs core.test")
-      val result = withSuites("QueueFlatSpec") { tester =>
-        runTestCommand(tester, "core.test")
+      And("Mill's ticker is on and Mill colours its console output")
+      When("the test command runs core.test, and Mill's own test task runs core.test in the same build without the plugin")
+      val (result, withoutPlugin) = withSuites("QueueFlatSpec") { tester =>
+        val result = evalTestCommand(tester, "--ticker", "true", "--color", "true")
+        val buildFile = tester.workspacePath / "build.mill"
+        os.write.over(buildFile, os.read(buildFile).linesIterator.filterNot(_.startsWith("//| mvnDeps:")).mkString("\n"))
+        (result, MillConsole(tester.eval(Seq("--ticker", "true", "--color", "true", "core.test"))))
       }
-      val console = result.stdoutLines ++ result.eval.err.linesIterator
+      val console = result.stdoutLines ++ result.stderrLines
 
       Then("no line on the console holds ScalaTest's end-of-run summary or Mill's list of failed tests")
       withClue(result.debugString) {
@@ -213,6 +217,12 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         Seq("QueueFlatSpec:", "- should be empty", "samples.QueueFlatSpec", "1/1 completed", "dividing now", "warn: careful")
           .filter(text => outside.exists(_.contains(text))) shouldBe empty
       }
+
+      And("without the plugin, Mill's own test task prints a reporter's lines, Mill's progress line naming the test class, and the run's lines")
+      withClue(withoutPlugin.debugString) {
+        Seq("QueueFlatSpec:", "- should be empty", "samples.QueueFlatSpec", "dividing now", "warn: careful")
+          .filterNot(text => withoutPlugin.lines.exists(_.contains(text))) shouldBe empty
+      }
     }
 
     Scenario("Output of a task named before the test command") {
@@ -223,13 +233,19 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
 
       Then("the console holds building banner outside the human-readable output, with Mill's prefix")
+      val bannerLines = result.consoleLinesOutsideHumanReadableOutput.filter(_.endsWith("building banner"))
       withClue(result.debugString) {
-        result.consoleLinesOutsideHumanReadableOutput.filter(_.endsWith("building banner")) should have size 1
-        TestCommandResult.millPrefix.findPrefixOf(result.consoleLinesOutsideHumanReadableOutput.filter(_.endsWith("building banner")).head) shouldBe defined
+        bannerLines should have size 1
+        TestCommandResult.millPrefix.findPrefixOf(bannerLines.head) shouldBe defined
       }
 
-      And("no line of the human-readable output holds building banner")
-      result.humanReadableOutput.filter(_.contains("building banner")) shouldBe empty
+      And("the human-readable output is the module's line with AddSuite and its test under it, then the summary line")
+      withClue(result.debugString) {
+        result.humanReadableOutput shouldBe Seq("[core.test]", "  AddSuite:", "    - adds")
+        result.summaryLine shouldBe Some(
+          "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+        )
+      }
     }
 
     Scenario("A second test command after a test is fixed") {

@@ -96,9 +96,11 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
         And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label core.test, with colour on")
         val output = consolidated(run)
 
-        Then("the library's human-readable output, apart from its summary line, is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")
+        Then("the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")
         withClue(testCommand.debugString) {
-          output.dropRight(1).map(TestCommandResult.withColourMarkers) shouldBe testCommand.humanReadableOutputMarkingColours
+          testCommand.summaryLineMarkingColours shouldBe defined
+          output.map(line => TestCommandResult.withResetsBeforeAColourRemoved(TestCommandResult.withColourMarkers(line))) shouldBe
+            testCommand.humanReadableOutputWithSummaryLineMarkingColours.map(TestCommandResult.withResetsBeforeAColourRemoved)
         }
       }
     }
