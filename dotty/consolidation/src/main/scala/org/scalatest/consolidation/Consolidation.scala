@@ -19,7 +19,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
    * Adds a run. Its event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in
    * the order they are added, and a run's line in the human-readable output shows its number.
    *
-   * @param label the test run label to show the run's suites under
+   * @param label the run's module, which heads the module's line in the human-readable output
    * @throws IllegalArgumentException if the consolidation has ended
    */
   def addRun(label: TestRunLabel): RunFeed =
