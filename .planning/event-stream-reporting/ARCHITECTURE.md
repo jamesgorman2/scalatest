@@ -4,7 +4,7 @@ Decisions: [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md).
 
 ## Summary
 
-Every run a test command starts must get its events, test structure and captured output out of its process on the JVM, Scala.js and Native, while the build tool still receives the test-interface events ScalaTest 3.2.20 sends (`SPECIFICATION.md` R-051). A run with the emitter off must leave what every reporter receives unchanged (`SPECIFICATION.md` R-001). The test classes a process took to run must be known even where it dies before it sends anything. One Mill command must consolidate what every run sends, while Mill's own test tasks behave as they do without the plugin.
+Every run a test command starts must get its events, test structure and captured output out of its process on the JVM, Scala.js and Native, while the build tool still receives the test-interface events ScalaTest 3.2.20 sends (`SPECIFICATION.md` R-051). A run with the emitter off must leave what every reporter receives unchanged (`SPECIFICATION.md` R-001). The test classes a process claimed must be known even where it dies before it sends anything. One Mill command must consolidate what every run sends, while Mill's own test tasks behave as they do without the plugin.
 
 ## Modules
 
@@ -54,7 +54,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - Each node takes the parent its `structure` declares, which for a suite or scope the format requires to be its node path without the last place. A suite or scope takes its name from the `structure` that contains it. A test takes its parent scope, its name and its label from the latest `structure` that contains the test.
   - A node the latest structure lacks stays at the place it last had, whether or not it has events (`SPECIFICATION.md` R-130b).
 - **Runs that do not finish** — applies `SPECIFICATION.md` R-095a, R-095b and R-102 to each run whose event stream ends without its `runEnded` event (§ APIs § The emitter and the Mill plugin, "What the library takes").
-  - Among the test classes each process took, it finds each class that no run reported as a suite, and adds that class as a suite node aborted with reason *not run* (`SPECIFICATION.md` R-095a; § Modules § Mill plugin, Test manifest).
+  - Among the test classes each process claimed, it finds each class that no run reported as a suite, and adds that class as a suite node aborted with reason *not run* (`SPECIFICATION.md` R-095a; § Modules § Mill plugin, Test manifest).
 - **Consolidation** — builds the one node tree every output uses (`SPECIFICATION.md` R-020, R-096a, R-136): the root, each module under the root, and each run under its module, beside what the library's other operations add (§ APIs § The Mill plugin and the consolidation library).
   - A run is one execution of `Runner`, so each module whose tests start has at least one run (`.docs/ubiquitous-language.md` **Run**).
   - A run in a forked JVM is a run node under its module, and the run's top-level suites sit under that run node. Any other run has no run node: its top-level suites sit directly under its module (`SPECIFICATION.md` R-135).
@@ -71,14 +71,14 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - The plugin's integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command warns on the console and in every file output…").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
-- **Test manifest** — gives the library the test classes each of a module's processes took, and those none took. A class's nested suites, scopes and tests are known only from a suite the run constructed (§ APIs § The emitter and the Mill plugin, the `structure` event). The test command writes no file for it (`decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
+- **Test manifest** — gives the library the test classes each of a module's processes claimed, and those none claimed. A class's nested suites, scopes and tests are known only from a suite the run constructed (§ APIs § The emitter and the Mill plugin, the `structure` event). The test command writes no file for it (`decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
   - On the JVM it is the files of Mill's own test queue, which the test command lays out before it starts any worker (`research/mill-test-worker-args.md` § 1.2): each fork group's `test-classes/` queue, with one file for each class the test command's class globs keep, and each worker's `claim/` folder and `claim.log` in its `processFolder`. A fork group is known by its queue folder.
-    - A class is either unclaimed in its group's queue or recorded in a worker's `claim.log`; a worker took each class its `claim.log` records. The test command compiles the manifest from these files once a worker has ended (§ APIs § The emitter and the Mill plugin).
+    - A class is either unclaimed in its group's queue or recorded in a worker's `claim.log`; a worker claimed each class its `claim.log` records. The test command compiles the manifest from these files once a worker has ended (§ APIs § The emitter and the Mill plugin).
     - A worker's claims are tied to the worker by its `processFolder`, even where the worker dies before it writes an event log: the test command starts each worker in a folder it chose.
-    - On Windows two workers' `claim.log` can record one class while its file is in one `claim/` folder (`research/emitter-plugin-spike.md` § 2). Such a class is taken by both, and counts as reported if any run reported it.
+    - On Windows two workers' `claim.log` can record one class while its file is in one `claim/` folder (`research/emitter-plugin-spike.md` § 2). Such a class is claimed by both, and counts as reported if any run reported it.
     - The queue and claim layout is `@internal` to Mill. The test command already relies on it to drive the queue (`research/mill-test-worker-args.md` § 2.2; `research/mill-parallel-worker-capture.md` § 6).
     - The files last until the next test command clears the module's folder (§ APIs § The emitter and the Mill plugin).
-  - Scala.js and Native have no queue and no claims. The test command keeps the module's test classes in memory (§ Data flow), and the module's one process takes them all (§ External systems).
+  - Scala.js and Native have no queue and no claim files. The test command keeps the module's test classes in memory (§ Data flow), and the module's one process claims them all (§ External systems).
 - **Event log reading** — reads each run's test event log live and turns it into that run's event stream (§ APIs § The Mill plugin and the consolidation library, **Decode**). It reads the event log file in each JVM worker's `processFolder`, each Scala.js `NodeJs` or Native module's one event log file and, under `JsDom`, the launchers' stdout files, and ends each stream as § APIs § The emitter and the Mill plugin describes.
 - **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-097b). On Scala.js and Native it takes them from launchers' files, each tied to its run by its header (§ APIs § The emitter and the Mill plugin), so that R-040 and R-097a are met there (`decisions/architecture-running-tests.md` "Every Scala.js VM starts through a launcher…" and "Every Native test binary starts through a launcher…").
 - **Scala.js launcher** — starts every Scala.js VM, under `NodeJs` and `JsDom` alike, in place of the `executable` in the module's `jsEnvConfig`. It carries the module's launcher folder and the original `executable`, which it starts with the arguments and environment it receives: the config's `args` and `env`.
@@ -175,8 +175,8 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - The caller adds a stream's unterminated last line once that stream ends, so a process that dies keeps its last line (R-097a).
   - The caller tells the library when the run's event stream has ended (§ APIs § The emitter and the Mill plugin, "Each event" and "The end of a run's event stream").
 
-  Once the run's process has ended, the caller adds the test classes that process took, from the module's test manifest (§ Modules § Mill plugin).
-- **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its module, the test classes it took, and the output captured from its stdout and stderr, in the form **Add a run** takes it. The library attaches that output to the module, the most specific node the process identifies.
+  Once the run's process has ended, the caller adds the test classes that process claimed, from the module's test manifest (§ Modules § Mill plugin).
+- **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its module, the test classes it claimed, and the output captured from its stdout and stderr, in the form **Add a run** takes it. The library attaches that output to the module, the most specific node the process identifies.
 - **Add a module whose tests did not start** (R-098e), naming the module and, where a failure stopped them, that failure.
 - **Add a test class** left in a fork group's queue when the group's last worker ended, with its module. The library adds the class as a suite node aborted with reason *not run* (R-095a).
 - **Attach output or a failure to the root**: the output and the failure of a runner that is not a run, such as Mill's discovery runner, which adds no node (R-072), and a failure of the test command itself (R-098f). Output is in the form **Add a run** takes it.
@@ -244,7 +244,7 @@ flowchart LR
   PROC -- "stdout and stderr (JVM), less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
-  CMD -- "each run's module, selectors, test classes each process took, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version" --> LIB
+  CMD -- "each run's module, selectors, test classes each process claimed, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version" --> LIB
   LIB -- "runner argument; consolidation state" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]
@@ -258,8 +258,8 @@ flowchart LR
   - The run's event stream ends without its `runEnded` event, so the library treats the run as one that does not finish (§ APIs § The emitter and the Mill plugin, "What the library takes"; `SPECIFICATION.md` § A run whose process failed).
   - Each top-level suite's structure, its nested suites' structures included, arrives as the suite starts. When the process dies, the library therefore knows every scope and test that the first-constructed instance of each started suite, and of each suite that suite nests, registered (`SPECIFICATION.md` R-095a). The library does not know a scope or test that only a further `structure` event would have added. A top-level suite that the run never started sent nothing, so the library knows only that suite's class, from the module's test manifest.
   - What the process wrote to stdout and stderr still reaches the library through process capture.
-  - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it took.
-  - On the JVM the library still reports each class the dead worker took that no run reported, from the worker's claims (§ Modules § Mill plugin, Test manifest). A worker claims one class at a time, so the only such class is the class the worker last claimed before it died. Each class that no worker claimed stays in its fork group's queue, and the test command adds it with **Add a test class** (`SPECIFICATION.md` R-095a).
+  - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it claimed.
+  - On the JVM the library still reports each class the dead worker claimed that no run reported, from the worker's claims (§ Modules § Mill plugin, Test manifest). A worker claims one class at a time, so the only such class is the class the worker last claimed before it died. Each class that no worker claimed stays in its fork group's queue, and the test command adds it with **Add a test class** (`SPECIFICATION.md` R-095a).
 
 ## External systems
 
