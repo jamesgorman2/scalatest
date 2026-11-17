@@ -61,6 +61,65 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    {yellow}[stderr] warn: about to divide{reset}""".stripExpectedMargin
     }
 
+    Scenario("Captured lines sit after the lines for the run's suites, wherever they are fed among the events") {
+      Given("an event log of a completed run of a suite with one test, consolidated as a run of the module `core.test`")
+      And("a stdout line and a stderr line captured, fed in that order at each combination of points among the event log's events")
+      val runs = capturedLinesAtEveryPoint(
+        calculatorSuiteEventLog,
+        Vector(
+          TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
+          TestRunPart.CapturedLine(CapturedStream.Stderr, "warn: slow")
+        )
+      )
+      runs should have size 36
+
+      When("the library consolidates each")
+      val outputs = runs.map(parts => consolidated(parts*))
+
+      Then("each run's line holds the suite's lines, then the captured lines in the order fed")
+      all(outputs) shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}CalculatorSuite:{reset}
+          |      {green}- adds two numbers{reset}
+          |    [stdout] dividing now
+          |    {yellow}[stderr] warn: slow{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A run's messages sit after the lines for its suites: info, note and markup in green, alerts in yellow") {
+      Given("an event log of a completed run that sends an info, a note, an alert and a markup message, before and while its suite runs")
+      val eventLog =
+        """
+        run started
+        run: InfoProvided(message: "discovered 1 suite")
+        structure
+          suite "CalculatorSuite", class "samples.CalculatorSuite"
+            test "adds two numbers", label "- adds two numbers"
+        suite "CalculatorSuite": SuiteStarting
+        run: NoteProvided(message: "using 4 threads")
+        test "adds two numbers": TestStarting
+        run: AlertProvided(message: "Test still running after 1 minute, 2 seconds: suite name: CalculatorSuite, test name: adds two numbers.")
+        test "adds two numbers": TestSucceeded
+        run: MarkupProvided(text: "*all added*")
+        suite "CalculatorSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the run's line holds the suite's lines, then each message marked with its kind, in the order sent")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}CalculatorSuite:{reset}
+          |      {green}- adds two numbers{reset}
+          |    {green}[info] discovered 1 suite{reset}
+          |    {green}[note] using 4 threads{reset}
+          |    {yellow}[alert] Test still running after 1 minute, 2 seconds: suite name: CalculatorSuite, test name: adds two numbers.{reset}
+          |    {green}[markup] *all added*{reset}""".stripExpectedMargin
+    }
+
     Scenario("A completed run with no output attached shows no line, so its suites sit under the module's line") {
       Given("an event log of a completed run holding run events and a DiscoverySuite's events, all assigned to the run")
       val eventLog =
@@ -213,6 +272,29 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
         """{cyan}[core.test]{reset}
           |  {cyan}Run 1:{reset}
           |    {red}*** RUN ABORTED ***{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A run that reports RunAborted twice shows the first abort's message and throwable") {
+      Given("an event log of a run that reports two RunAborted events, each with its own message and throwable, then ends aborted")
+      val eventLog =
+        """
+        run started
+        run: RunAborted(message: "An exception or error caused a run to abort: Java heap space ", throwable: java.lang.OutOfMemoryError "Java heap space")
+        run: RunAborted(message: "An exception or error caused a run to abort: Metaspace ", throwable: java.lang.OutOfMemoryError "Metaspace")
+        run ended aborted
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the run's abort line holds the first RunAborted's message and throwable, and nothing of the second")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 1:{reset}
+          |    {red}*** RUN ABORTED ***{reset}
+          |      {red}An exception or error caused a run to abort: Java heap space {reset}
+          |      {red}java.lang.OutOfMemoryError: Java heap space{reset}
+          |        {red}...{reset}""".stripExpectedMargin
     }
 
     Scenario("A run's outcome comes from its runEnded event alone") {
@@ -561,6 +643,19 @@ private object HumanReadableRunSpec {
     test "sqrt of a square is the root": TestStarting
     test "sqrt of a square is the root": TestSucceeded
     suite "SqrtPropSpec": SuiteCompleted
+    run ended completed
+    """
+
+  val calculatorSuiteEventLog: String =
+    """
+    run started
+    structure
+      suite "CalculatorSuite", class "samples.CalculatorSuite"
+        test "adds two numbers", label "- adds two numbers"
+    suite "CalculatorSuite": SuiteStarting
+    test "adds two numbers": TestStarting
+    test "adds two numbers": TestSucceeded
+    suite "CalculatorSuite": SuiteCompleted
     run ended completed
     """
 

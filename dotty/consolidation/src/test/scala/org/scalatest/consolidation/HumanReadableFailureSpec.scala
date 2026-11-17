@@ -113,6 +113,50 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
 
+    Scenario("A failure whose message differs from its `StackDepth` throwable's shows its own message with the failed code's file and line") {
+      Given("an event log of a test that fails with a message of its own and a `TestFailedException` with another")
+      val eventLog = testEndingWith(
+        """test "have size 0": TestFailed(message: "Expected an empty stack, but it held 1 item", throwable: org.scalatest.exceptions.TestFailedException "1 did not equal 0" at StackFlatSpec.scala:9)"""
+      )
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the failure's own message and the failed code's file and line sit under the test's line, and the throwable's message shows nowhere")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFlatSpec:{reset}
+          |    {green}A Stack{reset}
+          |      {red}- must have size 0 *** FAILED ***{reset}
+          |        {red}Expected an empty stack, but it held 1 item (StackFlatSpec.scala:9){reset}
+          |        {green}[info] checked{reset}
+          |        {green}[note] a note{reset}
+          |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A failure whose message differs from its other throwable's shows the throwable's first line, as ScalaTest 3.2.20 does") {
+      Given("an event log of a test that fails with a message of its own and an `IllegalStateException` with another")
+      val eventLog = testEndingWith(
+        """test "have size 0": TestFailed(message: "Expected an empty stack", throwable: java.lang.IllegalStateException "not empty" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"])"""
+      )
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the throwable's first line and frames sit under the test's line, and the failure's own message shows nowhere")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFlatSpec:{reset}
+          |    {green}A Stack{reset}
+          |      {red}- must have size 0 *** FAILED ***{reset}
+          |        {red}java.lang.IllegalStateException: not empty{reset}
+          |          {red}at samples.StackFlatSpec.check(StackFlatSpec.scala:9){reset}
+          |          {red}...{reset}
+          |        {green}[info] checked{reset}
+          |        {green}[note] a note{reset}
+          |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
+    }
+
     Scenario("A failure's analysis follows its message, after an `Analysis:` line") {
       Given("an event log of a test that fails with a `TestFailedException` and an analysis")
       val eventLog = testEndingWith(
@@ -171,6 +215,25 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |  {green}SetupFailsSpec:{reset}
           |    {red}samples.SetupFailsSpec *** ABORTED ***{reset}
           |      {red}Exception encountered when invoking run on a nested suite - database unreachable (SetupFailsSpec.scala:5){reset}
+          |    {red}(1 scope, 2 tests not run){reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite aborted with a message that differs from its other throwable's shows the throwable's lines, as ScalaTest 3.2.20 does") {
+      Given("an event log of a suite that aborts with a message of its own and a `RuntimeException` with another")
+      val eventLog = suiteAbortingWith(
+        """suite "SetupFailsSpec": SuiteAborted(message: "Exception encountered when attempting to run a suite with class name: samples.SetupFailsSpec", throwable: java.lang.RuntimeException "database unreachable")"""
+      )
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the abort line and the throwable's lines sit under the suite's name line, and the abort's own message shows nowhere")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SetupFailsSpec:{reset}
+          |    {red}samples.SetupFailsSpec *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: database unreachable{reset}
+          |        {red}...{reset}
           |    {red}(1 scope, 2 tests not run){reset}""".stripExpectedMargin
     }
 

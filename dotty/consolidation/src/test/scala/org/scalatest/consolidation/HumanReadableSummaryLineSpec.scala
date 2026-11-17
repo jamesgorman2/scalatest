@@ -111,6 +111,75 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
     }
   }
 
+  Feature("An attributed suite or test is not counted") {
+
+    Scenario("Two sibling suites sharing a suite ID run in reverse order, each running the test the other registered") {
+      Given("an event log of two suites sharing a suite ID, in which each suite's registered test is attributed to the test the other ran")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "PairSuites", class "samples.PairSuites"
+            suite "ModeSuite", class "samples.ModeSuite"
+              test "fast", label "- fast"
+            suite "ModeSuite", class "samples.ModeSuite"
+              test "slow", label "- slow"
+        suite "PairSuites": SuiteStarting
+        structure under suite "PairSuites"
+          suite "ModeSuite" #1, class "samples.ModeSuite"
+            test "slow", label "- slow"
+        test "slow" #2: TestStarting
+        test "slow" #2: TestSucceeded
+        structure under suite "PairSuites"
+          suite "ModeSuite" #2, class "samples.ModeSuite"
+            test "fast", label "- fast"
+        test "fast" #2: TestStarting
+        test "fast" #2: TestSucceeded
+        suite "PairSuites": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      Then("the summary line counts the two tests that ran, and neither attributed test")
+      consolidatedOutput(eventLog).summaryLine shouldBe
+        "{cyan}Suites: 3 of 3 completed, {reset}{red}0 aborted{reset}" +
+          "{cyan}. Tests: 2 of 2 run: {reset}{green}succeeded 2{reset}{cyan}, {reset}{red}failed 0{reset}" +
+          "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
+    }
+
+    Scenario("A suite registered at two places runs at one") {
+      Given("an event log of two suites sharing a suite ID, of which only the first runs, so the second and its test are attributed")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "TwinSuites", class "samples.TwinSuites"
+            suite "InnerSuite", class "samples.InnerSuite"
+              scope "A Stack", label "A Stack"
+                test "pops", label "- pops"
+            suite "InnerSuite", class "samples.InnerSuite"
+              scope "A Stack", label "A Stack"
+                test "pops", label "- pops"
+        suite "TwinSuites": SuiteStarting
+        suite "InnerSuite" #1: SuiteStarting
+        scope "A Stack" #1: ScopeOpened
+        test "pops" #1: TestStarting
+        test "pops" #1: TestSucceeded
+        scope "A Stack" #1: ScopeClosed
+        suite "InnerSuite" #1: SuiteCompleted
+        suite "TwinSuites": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      Then("the summary line counts the suites and the test that ran, and neither the attributed suite nor its test")
+      consolidatedOutput(eventLog).summaryLine shouldBe
+        "{cyan}Suites: 2 of 2 completed, {reset}{red}0 aborted{reset}" +
+          "{cyan}. Tests: 1 of 1 run: {reset}{green}succeeded 1{reset}{cyan}, {reset}{red}failed 0{reset}" +
+          "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
+    }
+  }
+
   Feature("A part of the summary line keeps its colour where its count is 0") {
 
     Scenario("A run whose tests succeed, are ignored or are pending") {

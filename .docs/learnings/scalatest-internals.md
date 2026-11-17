@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, on a reporter a run constructs from its class name, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, on a reporter a run constructs from its class name, on which of an error event's message and throwable lines a reporter prints, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
 ---
 
 <learning>
@@ -155,4 +155,12 @@ A reporter given to a run by class name, with `-C`, is constructed by the run: `
 sbt runs a project's test classes in parallel in one JVM unless `Test / parallelExecution` is false, so that static store is shared by every spec that launches such a run. A run launched outside the recording's lock, or one that timed out and is still running, writes its events, such as a `DiscoverySuite`'s, into whichever recording is open. The symptom is an intermittent failure in an unrelated scenario.
 
 Launch every run given a recording reporter while holding one lock, and have the reporter capture the store current when it is constructed, with each recording installing a fresh store rather than clearing a shared one.
+</learning>
+
+<learning>
+date: 2026-11-18
+---
+`StringReporter.stringsToPrintOnError` prints an error event's explicit `message` on its own line only where the event's throwable is a `StackDepth` (with the failed code's file and line appended) or a `PropertyCheckFailedException`. With any other throwable, it prints no line for the message, even one that differs from the throwable's, and shows only the throwable's `<class name>: <throwable message>` line and frames. With no throwable, it prints no message line at all.
+
+A `TestFailed` or `SuiteAborted` carrying both a message and, say, a `RuntimeException` therefore loses the message in output that reproduces 3.2.20's. Write expected output from the throwable's kind, not from the event's `message`.
 </learning>

@@ -41,7 +41,10 @@ Each comparison of events is made by `org.scalatest.events.EventLogComparison`, 
 
 A drift between builder and decoder in what a criterion fixes then fails those tests, as well as the criteria run under Mill.
 
-Each test of human-readable output compares the output apart from its summary line, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour. Only the tests of `../specification/layout-lines.md` AC-171, AC-174 to AC-176, AC-194 to AC-197 and AC-044, and of `../specification/test-command.md` AC-076, read the summary line, so a change to its format (`../../ROADMAP.md` § 9) changes those tests alone.
+Each test of human-readable output compares the output apart from its summary line, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour. Only these tests read the summary line, so a change to its format (`../../ROADMAP.md` § 9) changes them alone:
+
+- the tests of `../specification/layout-lines.md` AC-171, AC-174 to AC-176, AC-194 to AC-197 and AC-044, and of its § The summary line's rule that an attributed suite or test is not counted;
+- the test of `../specification/test-command.md` AC-076.
 
 The tests of `../specification/runs-and-test-structure-runs.md` AC-172 and AC-173 attach the root's captured output and failure through the library's own operations (`test-event-log.md` § The test event log on the JVM), beside a run the builder builds.
 
