@@ -123,9 +123,10 @@ private[consolidation] object HumanReadableWriter {
         messagesAfter(execution.children.size)
   }
 
-  private def countLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] =
-    if (execution.isCollapsed && execution.children.nonEmpty) linesOf(countLine(execution.descendants), depth, AnsiRed)
-    else Vector.empty
+  private def countLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
+    val notRun = if (execution.isCollapsed) execution.descendants.filter(_.execution.outcome.contains(Outcome.NotRun)) else Vector.empty
+    if (notRun.isEmpty) Vector.empty else linesOf(countLine(notRun), depth, AnsiRed)
+  }
 
   private def countLine(hidden: Vector[AssembledNode]): String = {
     def count(kind: String, n: Int): Option[String] = if (n == 0) None else Some(s"$n $kind" + (if (n == 1) "" else "s"))

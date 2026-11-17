@@ -55,7 +55,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A test that was ignored shows `!!! IGNORED !!!`, in yellow") {
       Given("an event log of an ignored test whose label has no leading `- `")
       val eventLog = eventLogOf(
-        """test "adds", label "Scenario: adds"""",
+        """test "adds", label "Scenario: adds", ignored""",
         """test "adds": TestIgnored"""
       )
 
@@ -289,6 +289,144 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {red}samples.AbortedSpec *** ABORTED ***{reset}
           |      {red}java.lang.RuntimeException: database unreachable{reset}
           |        {red}...{reset}""".stripExpectedMargin
+    }
+  }
+
+  Feature("A test marked ignored") {
+
+    Scenario("A marked test with no execution, in a suite that completed, is ignored, not not run") {
+      Given("an event log of a suite that completes without running a test it marks ignored or a test it does not mark")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+            test "peeks", label "- peeks", ignored
+            test "pops", label "- pops"
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the marked test shows `!!! IGNORED !!!` in yellow, and the unmarked one `*** NOT RUN ***` in red")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}
+          |    {yellow}- peeks !!! IGNORED !!!{reset}
+          |    {red}- pops *** NOT RUN ***{reset}""".stripExpectedMargin
+    }
+
+    Scenario("The count line of a suite that did not start leaves its marked test out") {
+      Given("an event log of a suite that does not start, holding a test it marks ignored and one it does not")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+        structure
+          suite "HeapFunSuite", class "samples.HeapFunSuite"
+            test "sifts", label "- sifts"
+            test "merges", label "- merges", ignored
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the suite is not run, and its count line counts only the unmarked test")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}HeapFunSuite:{reset}
+          |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}
+          |    {red}(1 test not run){reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite that did not start, whose only test is marked ignored, shows no count line") {
+      Given("an event log of a suite that does not start, holding only a test it marks ignored")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "HeapFunSuite", class "samples.HeapFunSuite"
+            test "merges", label "- merges", ignored
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the suite is not run, with nothing below it to count")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}HeapFunSuite:{reset}
+          |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A test that no structure marks ignored and that sends `TestIgnored` is ignored") {
+      Given("an event log of a suite that sends `TestIgnored` for a test it does not mark ignored")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+            test "peeks", label "- peeks"
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
+        test "peeks": TestIgnored
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the test shows `!!! IGNORED !!!`, in yellow")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}
+          |    {yellow}- peeks !!! IGNORED !!!{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A marked test that succeeded shows its execution's outcome") {
+      Given("an event log of a suite running a test it marks ignored, which succeeds")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "peeks", label "- peeks", ignored
+        suite "StackFunSuite": SuiteStarting
+        test "peeks": TestStarting
+        test "peeks": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the test's line is its label alone, in green")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- peeks{reset}""".stripExpectedMargin
     }
   }
 }

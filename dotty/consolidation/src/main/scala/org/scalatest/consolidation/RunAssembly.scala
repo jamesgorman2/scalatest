@@ -5,9 +5,13 @@ import scala.collection.mutable
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
+import org.scalatest.events.NodePlace
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
 import org.scalatest.events.TestEventLogEvent
+
+/** What attributes a test with no execution to a test that ran: the suite ID of the nearest suite above it, and its test name. */
+private[consolidation] final case class AttributionKey(suiteId: String, testName: String)
 
 /** One execution of a node, by the node's ID and the execution's number. */
 private[consolidation] final case class ExecutionOfNode(node: NodeId, number: Int)
@@ -162,18 +166,40 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
 
   def endEventStream(): Unit = eventStreamOpen = false
 
-  /** The run's top-level suites, once for each execution, by name and then by the order the executions started. */
+  /**
+   * The run's top-level suites, once for each execution, by name and then by the order the executions started. Each
+   * attributed node is left out, so attribution is decided only once the event stream has ended.
+   */
   def topLevelSuites: Vector[AssembledNode] = {
+    require(!eventStreamOpen, s"the event stream of a run under ${label.value} has not ended")
     val runEndedAbnormally = RunAssembly.isAbnormal(ending)
     val childrenByParent = structure.values.toVector.groupBy(RunAssembly.parentOf)
     val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
+    val keysOfTestsThatRan = executions.keysIterator.flatMap(RunAssembly.attributionKeyOf).toSet
 
     def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
 
     def started(id: NodeId): Boolean = executions.contains(id) || childrenOf(id).exists(child => started(RunAssembly.idOf(child)))
 
-    def shownChildrenOf(id: NodeId): OrderedChildren =
-      orderedChildren(id, childrenOf(id).filter(child => !isDropped(child) || started(RunAssembly.idOf(child))))
+    def testsBelow(id: NodeId): Vector[NodeId] =
+      childrenOf(id).flatMap {
+        case test: StructureNode.Test => Vector(test.id)
+        case suiteOrScope => testsBelow(RunAssembly.idOf(suiteOrScope))
+      }
+
+    def isAttributedTest(id: NodeId): Boolean =
+      !executions.contains(id) && RunAssembly.attributionKeyOf(id).exists(keysOfTestsThatRan)
+
+    def isAttributed(node: StructureNode): Boolean =
+      node match {
+        case test: StructureNode.Test => isAttributedTest(test.id)
+        case suiteOrScope =>
+          val id = RunAssembly.idOf(suiteOrScope)
+          val tests = testsBelow(id)
+          !started(id) && tests.nonEmpty && tests.forall(isAttributedTest)
+      }
+
+    def shownChildrenOf(id: NodeId): OrderedChildren = orderedChildren(id, childrenOf(id).filterNot(isAttributed))
 
     def executionNumbersOf(id: NodeId): Vector[Option[Int]] = {
       val numbers = executionsOf(id).map(_.number)
@@ -228,7 +254,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
     }
 
     inNameAndStartOrder(
-      childrenByParent.getOrElse(None, Vector.empty).flatMap(suite => assembledNodes(suite, executionNumbersOf(RunAssembly.idOf(suite)), false))
+      childrenByParent.getOrElse(None, Vector.empty).filterNot(isAttributed).flatMap(suite => assembledNodes(suite, executionNumbersOf(RunAssembly.idOf(suite)), false))
     )
   }
 
@@ -377,6 +403,13 @@ private[consolidation] object RunAssembly {
       case test: StructureNode.Test => Some(test.parent)
     }
 
+  // A test's place is directly after its suite's, so the place before it gives the suite ID.
+  private def attributionKeyOf(id: NodeId): Option[AttributionKey] =
+    id.places.takeRight(2) match {
+      case Vector(NodePlace.Suite(suiteId, _), NodePlace.Test(testName)) => Some(AttributionKey(suiteId, testName))
+      case _ => None
+    }
+
   private def pathAbove(id: NodeId): Option[NodeId] =
     if (id.places.size > 1) Some(NodeId(id.places.init)) else None
 
@@ -423,6 +456,7 @@ private[consolidation] object RunAssembly {
   ): Option[Outcome] =
     (node, execution) match {
       case (_: StructureNode.Suite, _) => suiteOutcome(node, execution, runEndedAbnormally, started)
+      case (test: StructureNode.Test, None) => Some(if (test.ignored) Outcome.Ignored else Outcome.NotRun)
       case (_, None) => Some(Outcome.NotRun)
       case (_: StructureNode.Scope, Some(execution)) => scopeOutcome(execution, openScopeOrTestAborted)
       case (_: StructureNode.Test, Some(execution)) => testOutcome(execution, openScopeOrTestAborted)

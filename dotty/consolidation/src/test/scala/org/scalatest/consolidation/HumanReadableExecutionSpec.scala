@@ -515,9 +515,10 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {green}- pops{reset}""".stripExpectedMargin
     }
 
-    /** An event log whose further structure replaces a test that never started, followed by `events`, indented as these lines are. */
-    def replacedTestThen(events: String): String =
-      s"""
+    Scenario("A test only an earlier registration holds, that never started, and whose test name never ran, is not run") {
+      Given("an event log whose later registration replaces a test that never started with one that runs")
+      val eventLog =
+        """
         run started
         structure
           suite "ConfigSpec", class "samples.ConfigSpec"
@@ -528,13 +529,6 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           suite "ConfigSpec", class "samples.ConfigSpec"
             scope "A config", label "A config"
               test "remote", label "- remote"
-        $events
-        """
-
-    Scenario("A test that never started and the last registration lacks is not shown") {
-      Given("an event log whose later registration replaces a test that never started with one that runs")
-      val eventLog = replacedTestThen(
-        """
         scope "A config": ScopeOpened
         test "remote": TestStarting
         test "remote": TestSucceeded
@@ -542,39 +536,130 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         suite "ConfigSpec": SuiteCompleted
         run ended completed
         """
-      )
 
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("only the test the last registration holds is shown")
+      Then("the replaced test is not run, after the test the last registration holds at its position")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}ConfigSpec:{reset}
           |    {green}A config{reset}
-          |      {green}- remote{reset}""".stripExpectedMargin
+          |      {green}- remote{reset}
+          |      {red}- local *** NOT RUN ***{reset}""".stripExpectedMargin
     }
+  }
 
-    Scenario("A test that never started and the last registration lacks is not counted in a collapsed subtree") {
-      Given("an event log whose later registration replaces a test, then whose suite aborts before any test starts")
-      val eventLog = replacedTestThen(
+  Feature("A registered test that ran at another place") {
+
+    Scenario("Two sibling suites sharing a suite ID run in reverse order, and neither shows the test the other ran") {
+      Given("an event log of two suites sharing a suite ID, each running the test the other registered")
+      val eventLog =
         """
-        suite "ConfigSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+        run started
+        structure
+          suite "PairSuites", class "samples.PairSuites"
+            suite "ModeSuite", class "samples.ModeSuite"
+              test "fast", label "- fast"
+            suite "ModeSuite", class "samples.ModeSuite"
+              test "slow", label "- slow"
+        suite "PairSuites": SuiteStarting
+        structure under suite "PairSuites"
+          suite "ModeSuite" #1, class "samples.ModeSuite"
+            test "slow", label "- slow"
+        test "slow" #2: TestStarting
+        test "slow" #2: TestSucceeded
+        structure under suite "PairSuites"
+          suite "ModeSuite" #2, class "samples.ModeSuite"
+            test "fast", label "- fast"
+        test "fast" #2: TestStarting
+        test "fast" #2: TestSucceeded
+        suite "PairSuites": SuiteCompleted
         run ended completed
         """
-      )
 
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the count line counts the scope and the one test the last registration holds")
+      Then("each suite shows only the test it ran")
       output shouldBe
         """{cyan}[core.test]{reset}
-          |  {green}ConfigSpec:{reset}
-          |    {red}samples.ConfigSpec *** ABORTED ***{reset}
-          |      {red}java.lang.RuntimeException: database unreachable{reset}
-          |        {red}...{reset}
-          |    {red}(1 scope, 1 test not run){reset}""".stripExpectedMargin
+          |  {green}PairSuites:{reset}
+          |    {green}ModeSuite:{reset}
+          |      {green}- slow{reset}
+          |    {green}ModeSuite:{reset}
+          |      {green}- fast{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite registered at two places and run at one shows no line at the other") {
+      Given("an event log of two suites sharing a suite ID, of which only the first runs")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "TwinSuites", class "samples.TwinSuites"
+            suite "InnerSuite", class "samples.InnerSuite"
+              scope "A Stack", label "A Stack"
+                test "pops", label "- pops"
+            suite "InnerSuite", class "samples.InnerSuite"
+              scope "A Stack", label "A Stack"
+                test "pops", label "- pops"
+        suite "TwinSuites": SuiteStarting
+        suite "InnerSuite" #1: SuiteStarting
+        scope "A Stack" #1: ScopeOpened
+        test "pops" #1: TestStarting
+        test "pops" #1: TestSucceeded
+        scope "A Stack" #1: ScopeClosed
+        suite "InnerSuite" #1: SuiteCompleted
+        suite "TwinSuites": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the suite that did not run, its scope and its test show no line")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}TwinSuites:{reset}
+          |    {green}InnerSuite:{reset}
+          |      {green}A Stack{reset}
+          |        {green}- pops{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite registered at two places and run at one is not run at the other where it holds a test that never ran") {
+      Given("an event log of two suites sharing a suite ID, of which only the first runs, and only the second registers `peeks`")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "UnevenSuites", class "samples.UnevenSuites"
+            suite "InnerSuite", class "samples.InnerSuite"
+              test "pops", label "- pops"
+            suite "InnerSuite", class "samples.InnerSuite"
+              test "pops", label "- pops"
+              test "peeks", label "- peeks"
+        suite "UnevenSuites": SuiteStarting
+        suite "InnerSuite" #1: SuiteStarting
+        test "pops" #1: TestStarting
+        test "pops" #1: TestSucceeded
+        suite "InnerSuite" #1: SuiteCompleted
+        suite "UnevenSuites": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the second suite is not run, and its count line counts `peeks` but not the `pops` that ran at the other place")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}UnevenSuites:{reset}
+          |    {green}InnerSuite:{reset}
+          |      {green}- pops{reset}
+          |    {green}InnerSuite:{reset}
+          |      {red}samples.InnerSuite *** NOT RUN ***{reset}
+          |      {red}(1 test not run){reset}""".stripExpectedMargin
     }
   }
 }
