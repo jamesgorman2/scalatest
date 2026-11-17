@@ -100,6 +100,12 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           s""""parent":$stackSpecText,"position":1,"name":"QueueSpec","suiteId":"example.QueueSpec","className":"example.QueueSpec"}""" +
           """]}""" + "\n"
       }
+      "write ignored as true, after its label, on a test the structure marks ignored" in {
+        TestEventLogEncoder.structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = true))) shouldBe
+          """{"item":"structure","nodes":[""" +
+          s"""{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop","ignored":true}""" +
+          """]}""" + "\n"
+      }
       "write each place of a node path below the places above it, with a scope's or suite's index" in {
         val secondHelper = NodeId(pop.places :+ NodePlace.Suite("example.HelperSpec", 1))
         val inner = NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2))

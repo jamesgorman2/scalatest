@@ -154,9 +154,10 @@ private[scalatest] abstract class SuiteRegistration {
 
   /**
    * For an instance with no registration tree, writes a further structure of the suite where the tests the filter
-   * keeps, in the order run, differ from the suite's latest structure.
+   * keeps, in the order run, differ from the suite's latest structure. Each test is given with whether the filter
+   * ignores it, as `Filter.apply` pairs it, and is marked ignored where it does.
    */
-  def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit
+  def updateStructureFromTestNames(keptTests: => Seq[(String, Boolean)]): Unit
 
   /** Keeps the suite name a site read for the instance's run, where it is the first read of it. */
   def suiteNameRead(suiteName: String): Unit
@@ -196,7 +197,7 @@ private[scalatest] object SuiteRegistration {
     def startWith(reporter: Reporter): SuiteStart = SuiteStart.inTheContextItFinds(reporter)
     def runningInItsContext[A](body: => A): A = body
     def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = ()
-    def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = ()
+    def updateStructureFromTestNames(keptTests: => Seq[(String, Boolean)]): Unit = ()
     def suiteNameRead(suiteName: String): Unit = ()
     def suiteIdRead(suiteId: String): Unit = ()
   }

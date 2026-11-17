@@ -220,14 +220,14 @@ private final class RunUnderConstruction {
           hold(id, NodeKind.Scope, name, Some(above.id))
           built += StructureNode.Scope(id, above.id, above.nextPosition(), name, label)
           open = new OpenTreeNode(line.depth, id, NodeKind.Scope, above.suite, above.scopeNames :+ name) :: open
-        case WrittenNode.Test(name, label, writtenTestName) =>
+        case WrittenNode.Test(name, label, writtenTestName, ignored) =>
           val testName = writtenTestName.getOrElse((above.scopeNames :+ name).mkString(" "))
           if (!testNames.add((above.suite, testName))) {
             fail(s"two tests of one suite have the test name \"$testName\": give '${line.text}' its own test name")
           }
           val id = NodeId(above.suite.places :+ NodePlace.Test(testName))
           hold(id, NodeKind.Test, name, Some(above.id))
-          built += StructureNode.Test(id, above.id, above.nextPosition(), name, label)
+          built += StructureNode.Test(id, above.id, above.nextPosition(), name, label, ignored)
       }
     }
     built.result()

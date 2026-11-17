@@ -338,9 +338,9 @@ private[scalatest] object SuiteNodeTable {
     // Recurses once for each scope nested in another, as registering them does.
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
-        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label), index)) =>
+        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), index)) =>
           val id = NodeId(suite.places :+ NodePlace.Test(testName))
-          nodes += StructureNode.Test(id, parent, firstPosition + index, name, label)
+          nodes += StructureNode.Test(id, parent, firstPosition + index, name, label, ignored)
           added = added.copy(tests = added.tests.updated(testName, id), parents = added.parents.updated(id, parent))
           scopesSoFarByText
         case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), index)) =>

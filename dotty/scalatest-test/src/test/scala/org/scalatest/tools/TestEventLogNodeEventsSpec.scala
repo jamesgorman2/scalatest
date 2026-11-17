@@ -421,7 +421,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       structure
         suite "FilteredSuite", class "samples.FilteredSuite"
           test "fast", label "- fast"
-          test "later", label "- later"
+          test "later", label "- later", ignored
       suite "FilteredSuite": SuiteStarting
       test "fast": TestStarting
       test "fast": TestSucceeded
@@ -434,7 +434,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         (TestEventLogLine.structure(
           TestEventLogLine.suite("FilteredSuite", "samples.FilteredSuite"),
           TestEventLogLine.test(fast, top, 0, "fast", "- fast"),
-          TestEventLogLine.test(later, top, 1, "later", "- later")
+          TestEventLogLine.ignoredTest(later, top, 1, "later", "- later")
         ) :: suiteStarting(top) :: startingAndSucceeded(fast, List(1, 1))) ::: List(nodeEvent(later, List(1, 1), "TestIgnored"), suiteCompleted(top))*
       )
     )
@@ -790,7 +790,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       structure
         suite "UnregisteredSuite", class "samples.UnregisteredSuite"
           test "b", label "- b"
-          test "a", label "- a"
+          test "a", label "- a", ignored
       suite "UnregisteredSuite": SuiteStarting
       test "b": TestStarting
       test "b": TestSucceeded
@@ -803,7 +803,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         (TestEventLogLine.structure(
           TestEventLogLine.suite("UnregisteredSuite", "samples.UnregisteredSuite"),
           TestEventLogLine.test(b, top, 0, "b", "- b"),
-          TestEventLogLine.test(a, top, 1, "a", "- a")
+          TestEventLogLine.ignoredTest(a, top, 1, "a", "- a")
         ) :: suiteStarting(top) :: startingAndSucceeded(b, List(1, 1))) ::: List(nodeEvent(a, List(1, 1), "TestIgnored"), suiteCompleted(top))*
       )
     )
@@ -874,7 +874,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         suite "StackAsyncFunSpec", class "samples.StackAsyncFunSpec"
           scope "A Stack", label "A Stack"
             test "is empty", label "- is empty"
-            test "pops", label "- pops"
+            test "pops", label "- pops", ignored
       suite "StackAsyncFunSpec": SuiteStarting
       scope "A Stack": ScopeOpened
       test "is empty": TestStarting
@@ -890,7 +890,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           TestEventLogLine.suite("StackAsyncFunSpec", "samples.StackAsyncFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
-          TestEventLogLine.test(pops, aStack, 1, "pops", "- pops")
+          TestEventLogLine.ignoredTest(pops, aStack, 1, "pops", "- pops")
         ),
         suiteStarting(top),
         nodeEvent(aStack, List(1, 1), "ScopeOpened"),

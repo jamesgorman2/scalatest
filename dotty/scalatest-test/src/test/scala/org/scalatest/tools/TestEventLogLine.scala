@@ -57,6 +57,10 @@ private[tools] object TestEventLogLine {
   def test(id: NodePath, parent: NodePath, position: Int, name: String, label: String): String =
     s"""{"id":${id.json},"kind":"test","parent":${parent.json},"position":$position,"name":"$name","label":"$label"}"""
 
+  /** A test the structure marks ignored. */
+  def ignoredTest(id: NodePath, parent: NodePath, position: Int, name: String, label: String): String =
+    s"""{"id":${id.json},"kind":"test","parent":${parent.json},"position":$position,"name":"$name","label":"$label","ignored":true}"""
+
   private val fieldsNoCriterionFixes = """"threadName":"any thread","timeStamp":1"""
 
   /** A ScalaTest event assigned to the run. `fields` holds the event's own fields, each followed by a comma. */

@@ -16,10 +16,11 @@ private[scalatest] enum NodePlace {
 /** A node's ID: its node path, its places from its top-level suite down. */
 private[scalatest] final case class NodeId(places: Vector[NodePlace])
 
+/** A node of a `structure` event. A test's `ignored` says whether the structure marks it ignored. */
 private[scalatest] enum StructureNode {
   case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String)
   case Scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String)
-  case Test(id: NodeId, parent: NodeId, position: Int, name: String, label: String)
+  case Test(id: NodeId, parent: NodeId, position: Int, name: String, label: String, ignored: Boolean = false)
 }
 
 /**

@@ -450,7 +450,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   // Called under the lock. The suite an event's data names is the wrapper's own suite, else one at or below the
   // wrapper's node, and is otherwise given a node directly under the wrapper's node. A test its suite's table lacks is
-  // given a node directly under the suite. Either node is written in a further structure.
+  // given a node directly under the suite, not marked ignored, since nothing filtered it. Either node is written in a
+  // further structure.
   private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): NodeExecution = {
     val ofWrapper = wrapper.registration.table.get
     val wrapperNode = ofWrapper.scopeOrTest(wrapper.treeNode)
@@ -467,7 +468,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         }
         val lackedTest = names.testName.filterNot(table.tests.contains)
         if (found.isEmpty || lackedTest.isDefined) {
-          val scopesAndTests = table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList)
+          val scopesAndTests = table.scopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_ -> false))
           write(TestEventLogEncoder.structure(table.replaceLatestStructure(scopesAndTests)))
         }
         names.testName.flatMap(table.tests.get) match {

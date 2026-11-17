@@ -44,6 +44,24 @@ class ConfigDependentSpec(configMap: Map[String, Any]) extends AnyFunSpec {
   }
 }
 
+// Registers test remote, declared with ignore, where its config map holds db, and test local where it does not.
+@DoNotDiscover
+@WrapWith(classOf[ConfigMapWrapperSuite])
+class ConfigDependentIgnoredSpec(configMap: Map[String, Any]) extends AnyFunSpec {
+
+  describe("A config") {
+    if (configMap.contains("db")) {
+      ignore("remote") {
+        succeed
+      }
+    } else {
+      it("local") {
+        succeed
+      }
+    }
+  }
+}
+
 // Registers test reads whatever its config map, then test remote where the map holds db, and test local where it does not.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])

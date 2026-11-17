@@ -526,9 +526,9 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  def updateStructureFromTestNames(keptTestNames: => Seq[String]): Unit = {
-    val testNames = keptTestNames.toList
-    emitter.writeStructureOnceTableIsSettled(this)(_ => SuiteStructure.ofTestNames(testNames))
+  def updateStructureFromTestNames(keptTests: => Seq[(String, Boolean)]): Unit = {
+    val tests = keptTests.toList
+    emitter.writeStructureOnceTableIsSettled(this)(_ => SuiteStructure.ofTestNames(tests))
   }
 
   def suiteNameRead(suiteName: String): Unit = {

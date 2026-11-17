@@ -71,7 +71,11 @@ private[scalatest] object TestEventLogDecoder {
             className <- reader.text("className")
           } yield StructureNode.Suite(id, parent, position, name, suiteId, className)
         case "scope" => scopeOrTest(reader)(StructureNode.Scope(id, _, _, name, _))
-        case "test" => scopeOrTest(reader)(StructureNode.Test(id, _, _, name, _))
+        case "test" =>
+          for {
+            ignored <- reader.trueOrAbsent("ignored")
+            test <- scopeOrTest(reader)(StructureNode.Test(id, _, _, name, _, ignored))
+          } yield test
         case other => Left(s"unknown kind $other")
       }
     } yield node
@@ -432,6 +436,10 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
 
   def isTrue(key: String): Either[String, Boolean] =
     optional(key, "true or false") { case JsonValue.Bool(value) => value }.map(_.getOrElse(false))
+
+  /** Whether the key is present. It may only be `true`, since a key that is `true` or absent is never written `false`. */
+  def trueOrAbsent(key: String): Either[String, Boolean] =
+    optional(key, "true") { case JsonValue.Bool(true) => true }.map(_.isDefined)
 
   def optionalObject(key: String): Either[String, Option[JsonObjectReader]] =
     optional(key, "an object") { case JsonValue.Object(nestedFields) => new JsonObjectReader(nestedFields) }

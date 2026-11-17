@@ -16,7 +16,7 @@ private[events] final case class NodeReference(kind: NodeKind, name: String, ord
 private[events] enum WrittenNode {
   case Suite(name: String, number: Option[Int], className: String, suiteId: Option[String])
   case Scope(name: String, label: String)
-  case Test(name: String, label: String, testName: Option[String])
+  case Test(name: String, label: String, testName: Option[String], ignored: Boolean)
 }
 
 private[events] final case class TreeLine(depth: Int, node: WrittenNode, text: String)
@@ -153,7 +153,8 @@ private[events] object EventNotation {
         val name = cursor.quoted()
         cursor.expect(", label ")
         val label = cursor.quoted()
-        WrittenNode.Test(name, label, if (cursor.accepts(", test name ")) Some(cursor.quoted()) else None)
+        val testName = if (cursor.accepts(", test name ")) Some(cursor.quoted()) else None
+        WrittenNode.Test(name, label, testName, cursor.accepts(", ignored"))
       } else {
         cursor.fail("expected suite, scope or test")
       }

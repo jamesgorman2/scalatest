@@ -8,10 +8,13 @@ import org.scalatest.RegisteredTest
 import org.scalatest.Suite
 import org.scalatest.TestsBeforeNestedSuites
 
-/** A scope or test of a suite's structure. A scope's `text` is the text it is registered with, which may hold more words than its name. */
+/**
+ * A scope or test of a suite's structure. A scope's `text` is the text it is registered with, which may hold more
+ * words than its name. A test's `ignored` says whether the filter ignores it, which marks it ignored in the structure.
+ */
 private[scalatest] enum ScopeOrTest {
   case Scope(name: String, text: String, label: String, scopesAndTests: List[ScopeOrTest])
-  case Test(name: String, testName: String, label: String)
+  case Test(name: String, testName: String, label: String, ignored: Boolean = false)
 }
 
 /**
@@ -55,7 +58,7 @@ private[scalatest] object SuiteStructure {
         val tags = readFrom.tags
         val filteredTests = testNamesIn(registered).map(testName => testName -> filter(testName, tags, suiteId)).toMap
         (kept(registered, filteredTests), filteredTests)
-      case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId).map((testName, _) => testName)), Map.empty)
+      case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId)), Map.empty)
     }
     SuiteStructure(
       suite,
@@ -69,11 +72,14 @@ private[scalatest] object SuiteStructure {
     )
   }
 
-  /** The tests of a suite with no registration tree, in the order given, each labelled as `Suite.runTests` labels a test it ignores. */
-  def ofTestNames(testNames: Seq[String]): List[ScopeOrTest] =
-    testNames.toList.map { testName =>
+  /**
+   * The tests of a suite with no registration tree, in the order given, each labelled as `Suite.runTests` labels a
+   * test it ignores. Each is given with whether it is ignored, as `Filter.apply` pairs a test name it keeps.
+   */
+  def ofTestNames(testNames: Seq[(String, Boolean)]): List[ScopeOrTest] =
+    testNames.toList.map { (testName, isIgnored) =>
       val test = RegisteredNode.unregisteredTest(testName)
-      ScopeOrTest.Test(test.name, test.testName, test.label)
+      ScopeOrTest.Test(test.name, test.testName, test.label, isIgnored)
     }
 
   /**
@@ -85,13 +91,13 @@ private[scalatest] object SuiteStructure {
       case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, kept(nodes, filtered)))
       case RegisteredTest(name, testName, label, labelWhenIgnored) =>
         val (isDropped, isIgnored) = filtered(testName)
-        if (isDropped) None else Some(ScopeOrTest.Test(name, testName, if (isIgnored) labelWhenIgnored else label))
+        if (isDropped) None else Some(ScopeOrTest.Test(name, testName, if (isIgnored) labelWhenIgnored else label, isIgnored))
     }
   }
 
   /**
    * A registration tree's scopes, holding only the tests `latest` holds, as `latest` holds them, and the test named
-   * `added`. `None` where the tree holds no test of that name.
+   * `added`, which is not marked ignored. `None` where the tree holds no test of that name.
    */
   def withTestAdded(registered: List[RegisteredNode], latest: List[ScopeOrTest], added: String): Option[List[ScopeOrTest]] = {
     val latestTests = testsIn(latest).map(test => test.testName -> test).toMap
@@ -100,7 +106,7 @@ private[scalatest] object SuiteStructure {
       nodes.flatMap {
         case RegisteredScope(name, text, label, scopesAndTests) => Some(ScopeOrTest.Scope(name, text, label, nodesIn(scopesAndTests)))
         case RegisteredTest(name, testName, label, _) =>
-          latestTests.get(testName).orElse(Option.when(testName == added)(ScopeOrTest.Test(name, testName, label)))
+          latestTests.get(testName).orElse(Option.when(testName == added)(ScopeOrTest.Test(name, testName, label, ignored = false)))
       }
     Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
   }

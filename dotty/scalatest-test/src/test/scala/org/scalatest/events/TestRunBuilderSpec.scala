@@ -71,6 +71,9 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
   private def test(id: NodeId, parent: NodeId, position: Int, name: String, label: String): StructureNode =
     StructureNode.Test(id, parent, position, name, label)
 
+  private def ignoredTest(id: NodeId, parent: NodeId, position: Int, name: String, label: String): StructureNode =
+    StructureNode.Test(id, parent, position, name, label, ignored = true)
+
   private def execution(node: NodeId, executionPath: Int*): Option[NodeExecution] = Some(NodeExecution(node, executionPath.toVector))
 
   "The test run builder" when {
@@ -144,6 +147,24 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     }
 
     "given a suite's first structure" should {
+      "mark ignored each test whose line ends ignored, and no other test" in {
+        structuresOf(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+              test "pops", label "- pops", ignored
+              test "peeks", label "- peeks", test name "stack peeks", ignored
+              test "pushes", label "- pushes"
+          """
+        ) shouldBe Vector(
+          Vector(
+            suite(stackSuiteId, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+            ignoredTest(under(stackSuiteId, testAt("pops")), stackSuiteId, 0, "pops", "- pops"),
+            ignoredTest(under(stackSuiteId, testAt("stack peeks")), stackSuiteId, 1, "peeks", "- peeks"),
+            test(under(stackSuiteId, testAt("pushes")), stackSuiteId, 2, "pushes", "- pushes")
+          )
+        )
+      }
       "give each node its node path, its parent's node path and its declared position among its siblings" in {
         val outer = id(suiteAt("samples.OuterSuite"))
         val aStack = under(outer, scopeAt("A Stack"))

@@ -121,6 +121,17 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           )
         )
       }
+      "yield a test the structure marks ignored as ignored" in {
+        val line =
+          s"""{"item":"structure","nodes":[{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop","ignored":true}]}"""
+        TestEventLogDecoder.decode(line) shouldBe
+          Right(TestEventLogEvent.Structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = true))))
+      }
+      "yield a test without ignored as not ignored" in {
+        val line = s"""{"item":"structure","nodes":[{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop"}]}"""
+        TestEventLogDecoder.decode(line) shouldBe
+          Right(TestEventLogEvent.Structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = false))))
+      }
       "yield each place of a node path below the places above it, with a scope's or suite's index" in {
         val secondHelperText =
           """[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"},{"suiteId":"example.HelperSpec","index":1}]"""
@@ -420,6 +431,8 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","label":"S","suiteId":"s","className":"c"}]}""" -> ("label", "a suite node"),
         s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","suiteId":"s"}]}""" -> ("suiteId", "a test node"),
         s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"scope","parent":$aSuite,"position":0,"name":"t","label":"t","className":"c"}]}""" -> ("className", "a scope node"),
+        s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"scope","parent":$aSuite,"position":0,"name":"t","label":"t","ignored":true}]}""" -> ("ignored", "a scope node"),
+        s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","suiteId":"s","className":"c","ignored":true}]}""" -> ("ignored", "a suite node"),
         """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0,"scope":"t"}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("scope", "a suite's place"),
         """{"item":"structure","nodes":[{"id":[{"scope":"t","index":0,"test":"t"}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("test", "a scope's place"),
         s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","parent":[{"test":"t","index":0}],"name":"S","suiteId":"s","className":"c"}]}""" -> ("index", "a test's place"),
@@ -514,6 +527,11 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       }
       "report an unknown outcome" in {
         TestEventLogDecoder.decode("""{"item":"runEnded","outcome":"paused"}""") shouldBe Left("unknown outcome paused")
+      }
+      "report a test whose ignored is false, which the format never writes" in {
+        TestEventLogDecoder.decode(
+          s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","ignored":false}]}"""
+        ) shouldBe Left("ignored is not true")
       }
     }
 

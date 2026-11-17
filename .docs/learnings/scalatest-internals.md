@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
 ---
 
 <learning>
@@ -135,4 +135,12 @@ date: 2026-11-15
 On Scala.js, a `StackTraceElement` can name its method with braces, as `{anonymous}()`, so a `J` reporter's `stackTraces` JSON holds `{` and `}` inside its strings. A pattern that skips a stack frame as `\{[^{}]*\}` then fails to match, and the frames, which differ between two links of the same code, are compared.
 
 Match a JSON object's strings as strings, `"(?:[^"\]|\.)*"`, when skipping or blanking part of a reporter's JSON.
+</learning>
+
+<learning>
+date: 2026-11-17
+---
+On Scala 3, ScalaTest 3.2.20's `FixtureAsyncFlatSpecLike.registerIgnoredAsyncTest` registers a test that runs, not an ignored one: its `//DOTTY-ONLY` inline body calls `registerAsyncTestImpl` rather than `registerIgnoredAsyncTestImpl` (`jvm/flatspec/src/main/scala/org/scalatest/flatspec/FixtureAsyncFlatSpecLike.scala`). The test is not tagged `org.scalatest.Ignore`, so the filter never ignores it and it reports `TestStarting` and its outcome, not `TestIgnored`. `AnyFlatSpec`, `AsyncFlatSpec` and `FixtureAnyFlatSpec` register theirs ignored.
+
+A test that expects every FlatSpec style's `registerIgnored*Test` to give an ignored test fails for `FixtureAsyncFlatSpec` alone. Expect the 3.2.20 behaviour for that style; the fork keeps it for compatibility.
 </learning>

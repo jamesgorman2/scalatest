@@ -91,20 +91,21 @@ private[scalatest] object TestEventLogEncoder {
           text("className", className)
         )
       case StructureNode.Scope(id, parent, position, name, label) =>
-        scopeOrTest("scope", id, parent, position, name, label)
-      case StructureNode.Test(id, parent, position, name, label) =>
-        scopeOrTest("test", id, parent, position, name, label)
+        scopeOrTest("scope", id, parent, position, name, label, ignored = false)
+      case StructureNode.Test(id, parent, position, name, label, ignored) =>
+        scopeOrTest("test", id, parent, position, name, label, ignored)
     }
   }
 
-  private def scopeOrTest(kind: String, id: NodeId, parent: NodeId, position: Int, name: String, label: String): JsonValue =
+  private def scopeOrTest(kind: String, id: NodeId, parent: NodeId, position: Int, name: String, label: String, ignored: Boolean): JsonValue =
     record(
       nested("id", Some(nodePath(id))),
       text("kind", kind),
       nested("parent", Some(nodePath(parent))),
       integer("position", position.toLong),
       text("name", name),
-      text("label", label)
+      text("label", label),
+      trueOrAbsent("ignored", ignored)
     )
 
   private def nodePath(id: NodeId): JsonValue =

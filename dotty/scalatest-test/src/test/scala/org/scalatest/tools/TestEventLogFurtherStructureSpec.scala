@@ -173,6 +173,63 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private val asyncConfigDependentSpec = configDependent("AsyncConfigDependentSpec")
 
+  /** A run of a suite run through ConfigMapWrapperSuite that registers test remote, ignored, where its config map holds db, and test local where it does not. */
+  private val configDependentIgnoredSpec: StatedRun = {
+    val suite = "ConfigDependentIgnoredSpec"
+    val top = NodePath.topLevel(s"samples.$suite")
+    val aConfig = top.scope("A config")
+    val local = top.test("A config local")
+    val remote = top.test("A config remote")
+    StatedRun(
+      Vector(
+        "RunStarting",
+        s"SuiteStarting $suite",
+        "ScopeOpened A config",
+        "TestIgnored",
+        "ScopeClosed A config",
+        s"SuiteCompleted $suite",
+        "RunCompleted"
+      ),
+      s"""
+      run started
+      run: RunStarting
+      structure
+        suite "$suite", class "samples.$suite"
+          scope "A config", label "A config"
+            test "local", label "- local"
+      suite "$suite": SuiteStarting
+      structure
+        suite "$suite", class "samples.$suite"
+          scope "A config", label "A config"
+            test "remote", label "- remote", ignored
+      scope "A config": ScopeOpened
+      test "remote": TestIgnored
+      scope "A config": ScopeClosed
+      suite "$suite": SuiteCompleted
+      run: RunCompleted
+      run ended completed
+      """,
+      frameworkRunOf(
+        """"db":"on"""",
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
+          TestEventLogLine.test(local, aConfig, 0, "local", "- local")
+        ),
+        nodeEvent(top, List(1), "SuiteStarting"),
+        TestEventLogLine.structure(
+          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
+          TestEventLogLine.ignoredTest(remote, aConfig, 0, "remote", "- remote")
+        ),
+        nodeEvent(aConfig, List(1, 1), "ScopeOpened"),
+        nodeEvent(remote, List(1, 1, 1), "TestIgnored"),
+        nodeEvent(aConfig, List(1, 1), "ScopeClosed"),
+        nodeEvent(top, List(1), "SuiteCompleted")
+      )
+    )
+  }
+
   private val nestedConfigDependentSpec = NodePath.topLevel("samples.NestsConfigDependentSpec").suite("samples.ConfigDependentSpec")
 
   private val nestedAConfig = nestedConfigDependentSpec.scope("A config")
@@ -659,6 +716,17 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "the structure the empty config map registers, the suite's SuiteStarting, then a further structure of what the " +
         "run's config map registers, before the events of the scope and test it holds",
       configDependentSpec,
+      arguments = List("-Ddb=on")
+    )
+
+    eventScenarios(
+      "A further structure marks an ignored test that only the suite instance that runs registers",
+      "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'remote', " +
+        "declared with ignore, where its config map holds db, and test 'local' where it does not",
+      "samples.ConfigDependentIgnoredSpec",
+      "the structure the empty config map registers, the suite's SuiteStarting, then a further structure of what the " +
+        "run's config map registers, marking remote ignored, before remote's TestIgnored",
+      configDependentIgnoredSpec,
       arguments = List("-Ddb=on")
     )
 

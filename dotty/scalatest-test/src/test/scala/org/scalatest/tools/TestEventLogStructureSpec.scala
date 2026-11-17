@@ -35,11 +35,28 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     def line: String = TestEventLogLine.structure((TestEventLogLine.suite(suiteName, suiteClassName) :: nodesInFormat(NodePath.topLevel(suiteClassName)))*)
   }
 
-  private def runHolding(structure: StatedStructure): String =
-    List("run started", "run: RunStarting", structure.inNotation, "run: RunCompleted", "run ended completed").mkString("\n")
+  /**
+   * What a criterion states of a run's events besides the suite's structure.
+   *
+   * @param holdsInOrder the events the run holds after the structure, in order, in the event notation
+   * @param isLineHeldNone whether a line is of the events the run holds none of
+   */
+  private final case class StatedEvents(description: String, holdsInOrder: List[String], isLineHeldNone: String => Boolean)
+
+  private object StatedEvents {
+    val none: StatedEvents = StatedEvents("", Nil, _ => false)
+  }
+
+  private def runHolding(structure: StatedStructure, events: StatedEvents): String =
+    (List("run started", "run: RunStarting", structure.inNotation) ++ events.holdsInOrder ++ List("run: RunCompleted", "run ended completed")).mkString("\n")
 
   private def structureLinesOf(lines: Seq[String]): Vector[String] =
     lines.toVector.filter(_.contains(""""item":"structure""""))
+
+  private def isEvent(eventName: String)(line: String): Boolean = line.contains(s""""event":"$eventName"""")
+
+  private def isEventOfTest(eventName: String, testName: String)(line: String): Boolean =
+    isEvent(eventName)(line) && line.contains(s"""{"test":"$testName"}""")
 
   /** Registers the scenario of the run that writes a suite's structure, and the scenario of the decoder that reads it. */
   private def structureScenarios(
@@ -48,7 +65,8 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     arguments: List[String],
     holds: String,
     structure: StatedStructure,
-    launch: Launch = Launch.ByFramework
+    launch: Launch = Launch.ByFramework,
+    events: StatedEvents = StatedEvents.none
   ): Unit = {
     Scenario(scenario) {
       thisProcess
@@ -59,8 +77,12 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         val lines = TemporaryEventLog.lines(eventLogFile)
 
         Then(s"the event log's one structure holds $holds")
+        if (events.description.nonEmpty) {
+          And(events.description)
+        }
         structureLinesOf(lines) shouldBe Vector(structure.line)
-        EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(structure))) shouldBe None
+        EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(structure, events))) shouldBe None
+        lines.filter(events.isLineHeldNone) shouldBe empty
       }
     }
 
@@ -305,10 +327,23 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       }
     ),
     LabelledDeclaration(
-      List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec", "FixtureAsyncFlatSpec"),
+      List("AnyFlatSpec", "AsyncFlatSpec", "FixtureAnyFlatSpec"),
       """registerTest("can open a file"); registerIgnoredTest("should close it"), or the async style's registerAsyncTest and registerIgnoredAsyncTest""",
       "WithRegisterTest",
-      "test 'can open a file', labelled '- can open a file', and test 'should close it', labelled '- should close it'",
+      "test 'can open a file', labelled '- can open a file', and test 'should close it', labelled '- should close it' and marked ignored",
+      "test \"can open a file\", label \"- can open a file\"\ntest \"should close it\", label \"- should close it\", ignored",
+      suite =>
+        List(
+          TestEventLogLine.test(suite.test("can open a file"), suite, 0, "can open a file", "- can open a file"),
+          TestEventLogLine.ignoredTest(suite.test("should close it"), suite, 1, "should close it", "- should close it")
+        )
+    ),
+    // ScalaTest 3.2.20's FixtureAsyncFlatSpec registers a test given to registerIgnoredAsyncTest as one that runs.
+    LabelledDeclaration(
+      List("FixtureAsyncFlatSpec"),
+      """registerAsyncTest("can open a file"); registerIgnoredAsyncTest("should close it")""",
+      "WithRegisterTest",
+      "test 'can open a file', labelled '- can open a file', and test 'should close it', labelled '- should close it', which runs",
       "test \"can open a file\", label \"- can open a file\"\ntest \"should close it\", label \"- should close it\"",
       suite =>
         List(
@@ -352,9 +387,15 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       List("AnyFeatureSpec", "AsyncFeatureSpec", "FixtureAnyFeatureSpec", "FixtureAsyncFeatureSpec"),
       """Feature("s") { ignore("t") }""",
       "WithIgnoredScenario",
-      "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t'",
-      featureHoldingScenarioWithIcon,
-      scopeHoldingTests("Feature: s", "Feature: s Scenario: t" -> "- Scenario: t")
+      "scope s, labelled 'Feature: s', holding test t, labelled '- Scenario: t' and marked ignored",
+      featureHoldingScenarioWithIcon + ", ignored",
+      { suite =>
+        val scope = suite.scope("Feature: s")
+        List(
+          TestEventLogLine.scope(scope, 0, "s", "Feature: s"),
+          TestEventLogLine.ignoredTest(suite.test("Feature: s Scenario: t"), scope, 0, "t", "- Scenario: t")
+        )
+      }
     ),
     LabelledDeclaration(
       List("RefSpec"),
@@ -519,13 +560,15 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "A suite with a tag excluded and a test ignored",
       "a suite declaring tests fast, slow and later, of which slow is tagged samples.Slow and later is ignored",
       List("-l", "samples.Slow"),
-      "fast and later, and not slow",
+      "fast, and later marked ignored, and not slow",
       StatedStructure(
         "FilteredSuite",
         "samples.FilteredSuite",
-        "test \"fast\", label \"- fast\"\ntest \"later\", label \"- later\"",
-        suite => List(TestEventLogLine.test(suite.test("fast"), suite, 0, "fast", "- fast"), TestEventLogLine.test(suite.test("later"), suite, 1, "later", "- later"))
-      )
+        "test \"fast\", label \"- fast\"\ntest \"later\", label \"- later\", ignored",
+        suite =>
+          List(TestEventLogLine.test(suite.test("fast"), suite, 0, "fast", "- fast"), TestEventLogLine.ignoredTest(suite.test("later"), suite, 1, "later", "- later"))
+      ),
+      events = StatedEvents("the event log holds the TestIgnored of later", List("test \"later\": TestIgnored"), _ => false)
     )
 
     structureScenarios(
@@ -552,6 +595,60 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         "test \"b\", label \"- b\"\ntest \"a\", label \"- a\"",
         suite => List(TestEventLogLine.test(suite.test("b"), suite, 0, "b", "- b"), TestEventLogLine.test(suite.test("a"), suite, 1, "a", "- a"))
       )
+    )
+  }
+
+  Feature("Tests marked ignored") {
+
+    structureScenarios(
+      "Every test of a suite annotated @Ignore",
+      "an AnyFunSuite annotated @Ignore, declaring tests a and b",
+      Nil,
+      "a and b, each marked ignored",
+      StatedStructure(
+        "ShelvedSuite",
+        "samples.ShelvedSuite",
+        "test \"a\", label \"- a\", ignored\ntest \"b\", label \"- b\", ignored",
+        suite => List(TestEventLogLine.ignoredTest(suite.test("a"), suite, 0, "a", "- a"), TestEventLogLine.ignoredTest(suite.test("b"), suite, 1, "b", "- b"))
+      ),
+      events = StatedEvents(
+        "the event log holds the TestIgnored of a and of b, and no TestStarting",
+        List("test \"a\": TestIgnored", "test \"b\": TestIgnored"),
+        isEvent("TestStarting")
+      )
+    )
+
+    structureScenarios(
+      "A test tagged org.scalatest.Ignore in a suite with no registration tree",
+      "a Suite that overrides testNames as b, a and c, tags a with org.scalatest.Ignore, and overrides runTest",
+      Nil,
+      "b, then a marked ignored, then c",
+      StatedStructure(
+        "IgnoringPlainSuite",
+        "samples.IgnoringPlainSuite",
+        "test \"b\", label \"- b\"\ntest \"a\", label \"- a\", ignored\ntest \"c\", label \"- c\"",
+        suite =>
+          List(
+            TestEventLogLine.test(suite.test("b"), suite, 0, "b", "- b"),
+            TestEventLogLine.ignoredTest(suite.test("a"), suite, 1, "a", "- a"),
+            TestEventLogLine.test(suite.test("c"), suite, 2, "c", "- c")
+          )
+      ),
+      events = StatedEvents("the event log holds the TestIgnored of a, and no TestStarting of a", List("test \"a\": TestIgnored"), isEventOfTest("TestStarting", "a"))
+    )
+
+    structureScenarios(
+      "An ignored test that the filter drops is not in the structure",
+      "an AnyFunSuite declaring tests fast and later, of which later is declared with ignore and tagged samples.Slow",
+      List("-l", "samples.Slow"),
+      "fast alone",
+      StatedStructure(
+        "IgnoredAndExcludedSuite",
+        "samples.IgnoredAndExcludedSuite",
+        "test \"fast\", label \"- fast\"",
+        suite => List(TestEventLogLine.test(suite.test("fast"), suite, 0, "fast", "- fast"))
+      ),
+      events = StatedEvents("the event log holds no TestIgnored", Nil, isEvent("TestIgnored"))
     )
   }
 

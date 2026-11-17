@@ -5,6 +5,7 @@ import java.nio.file.Paths
 import org.scalatest.Args
 import org.scalatest.DoNotDiscover
 import org.scalatest.Filter
+import org.scalatest.Ignore
 import org.scalatest.RandomTestOrder
 import org.scalatest.StepwiseNestedSuiteExecution
 import org.scalatest.Status
@@ -66,6 +67,48 @@ class PlainSuite extends Suite {
     args.reporter(TestStarting(args.tracker.nextOrdinal(), suiteName, suiteId, Some(getClass.getName), testName, testName))
     args.reporter(TestSucceeded(args.tracker.nextOrdinal(), suiteName, suiteId, Some(getClass.getName), testName, testName, Vector.empty))
     SucceededStatus
+  }
+}
+
+@DoNotDiscover
+@Ignore
+class ShelvedSuite extends AnyFunSuite {
+
+  test("a") {
+    succeed
+  }
+
+  test("b") {
+    succeed
+  }
+}
+
+// Suite.runTests locates the TestIgnored of a test it ignores by a public method of the test's name, so a has one.
+@DoNotDiscover
+class IgnoringPlainSuite extends Suite {
+
+  override def testNames: Set[String] = ListSet("b", "a", "c")
+
+  override def tags: Map[String, Set[String]] = Map("a" -> Set("org.scalatest.Ignore"))
+
+  def a(): Unit = ()
+
+  override protected def runTest(testName: String, args: Args): Status = {
+    args.reporter(TestStarting(args.tracker.nextOrdinal(), suiteName, suiteId, Some(getClass.getName), testName, testName))
+    args.reporter(TestSucceeded(args.tracker.nextOrdinal(), suiteName, suiteId, Some(getClass.getName), testName, testName, Vector.empty))
+    SucceededStatus
+  }
+}
+
+@DoNotDiscover
+class IgnoredAndExcludedSuite extends AnyFunSuite {
+
+  test("fast") {
+    succeed
+  }
+
+  ignore("later", Slow) {
+    succeed
   }
 }
 

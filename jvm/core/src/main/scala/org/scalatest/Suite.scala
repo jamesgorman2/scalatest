@@ -1043,7 +1043,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         val (theTags, theSuiteId) = tagsAndSuiteId
         val keptTests = filter(theTestNames, theTags, theSuiteId)
         // Kept before the suite ID is, so that a suite no structure holds has its tests in its first structure.
-        registration.updateStructureFromTestNames(keptTests.map((testName, _) => testName))
+        registration.updateStructureFromTestNames(keptTests)
         registration.suiteIdRead(theSuiteId)
         for ((tn, ignoreTest) <- keptTests) {
           if (!stopper.stopRequested) {

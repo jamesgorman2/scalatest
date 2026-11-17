@@ -270,6 +270,28 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
     }
 
+    "report a test the log marks ignored where the expected structure does not" in {
+      EventLogComparison.mismatchWhenIs(
+        log(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+              test "pops", label "- pops", ignored
+          """
+        ),
+        expected(
+          """
+          structure
+            suite "StackSuite", class "samples.StackSuite"
+              test "pops", label "- pops"
+          """
+        )
+      ) shouldBe Some(
+        "event 1 of the log is not 'structure\n  suite \"StackSuite\", class \"samples.StackSuite\"\n    test \"pops\", label \"- pops\"': " +
+          "its node 2 is test \"pops\", label \"- pops\", position 0, ignored, not test \"pops\", label \"- pops\", position 0"
+      )
+    }
+
     "report a nested suite at another position" in {
       EventLogComparison.mismatchWhenIs(
         log(
