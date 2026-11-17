@@ -59,7 +59,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
   Feature("The run in its test event log") {
 
     Scenario("A Framework runner is constructed") {
-      val process = thisProcess
+      val process = ProcessHandle.current()
+      val startTime = process.info().startInstant()
+      assume(startTime.isPresent, "this process has no start time")
+      val pid = process.pid()
+      val startTimeText = startTime.get.toString
       TemporaryEventLog.in { eventLogFile =>
         When("a Framework runner is constructed with the runner argument")
         val runner = frameworkRunner(runnerArgument(eventLogFile))
@@ -67,10 +71,10 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("before it is given a task, the event log's first event is the run's start")
-          And("that event's PID and process start time are those of the run's process")
-          lines.head shouldBe TestEventLogLine.runStarted(process.pid, process.startTime.toString)
+          And("that event's PID and process start time are those ProcessHandle.current() gives in the run's process")
+          lines.head shouldBe TestEventLogLine.runStarted(pid, startTimeText)
           val events = decodedOrFail(lines)
-          events.head shouldBe TestEventLogEvent.RunStarted(process.pid, process.startTime.toString)
+          events.head shouldBe TestEventLogEvent.RunStarted(pid, startTimeText)
           EventLogComparison.mismatchWhenIs(events.take(1), built("run started")) shouldBe None
 
           And("the event log holds no structure")

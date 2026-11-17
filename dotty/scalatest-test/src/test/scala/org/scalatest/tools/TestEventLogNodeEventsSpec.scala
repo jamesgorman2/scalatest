@@ -1400,6 +1400,27 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private def classFilesOf(simpleNames: String*): List[String] = simpleNames.toList.map(name => s"samples/discovered/$name.class")
 
+  /**
+   * Each `SuiteStarting` and `SuiteCompleted` the event log assigns to the run, with the suite name the run's reporters
+   * were told it with. `Runner.run` without `-P` tells its reporters each event in the order the event log holds it, so
+   * the event log's ScalaTest events pair with the told events by position, and each pair shares its thread and time.
+   */
+  private def suiteEventsOfTheRunAsTold(events: Vector[TestEventLogEvent], told: Vector[Event]): Vector[String] = {
+    val logged = events.collect { case event: TestEventLogEvent.ScalaTestEvent => event }
+    logged.size shouldBe told.size
+    logged.zip(told).flatMap {
+      case (TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.SuiteStarting(_, threadName, timeStamp)), starting: SuiteStarting)
+          if starting.threadName == threadName && starting.timeStamp == timeStamp =>
+        Some(s"SuiteStarting ${starting.suiteName}")
+      case (TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.SuiteCompleted(_, _, threadName, timeStamp)), completed: SuiteCompleted)
+          if completed.threadName == threadName && completed.timeStamp == timeStamp =>
+        Some(s"SuiteCompleted ${completed.suiteName}")
+      case (TestEventLogEvent.ScalaTestEvent(None, logged @ (_: DecodedEvent.SuiteStarting | _: DecodedEvent.SuiteCompleted)), other) =>
+        fail(s"the event log's $logged pairs with the told $other")
+      case _ => None
+    }
+  }
+
   private def isAlert(event: TestEventLogEvent): Boolean = {
     event match {
       case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.AlertProvided) => true
@@ -1655,7 +1676,8 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           When("Runner.run discovers and runs the runpath's suites without the runner argument, and again with it")
           val arguments = List("-R", runpath, "-C", classOf[RunRecordingReporter].getName)
           val reportedWithoutTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments)))
-          val reportedWithTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile))))
+          val toldWithTheArgument = RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile)))
+          val reportedWithTheArgument = reported(toldWithTheArgument)
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
@@ -1666,6 +1688,8 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val runInOrderDiscovered = runsOfDiscoveredSuites.filter(_.reported == reportedWithTheArgument)
           runInOrderDiscovered.map(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat)) shouldBe List(None)
           runInOrderDiscovered.map(run => EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(run.eventLogInNotation))) shouldBe List(None)
+          suiteEventsOfTheRunAsTold(decodedOrFail(lines), toldWithTheArgument) shouldBe
+            Vector("SuiteStarting DiscoverySuite", "SuiteCompleted DiscoverySuite")
         }
       }
     }

@@ -99,11 +99,13 @@ To test what an async suite's reporters receive while a test is pending, give th
 </learning>
 
 <learning>
-date: 2026-11-14
+date: 2026-11-18
 ---
 Scalactic's `source.Position.filePathname`, and so a `StackDepthException`'s `failedCodeFilePathname`, holds the source file's path only where the environment variable `SCALACTIC_FILL_FILE_PATHNAMES` is `yes` when the calling code is compiled. Otherwise it holds the text `Please set the environment variable SCALACTIC_FILL_FILE_PATHNAMES to yes at compile time to enable this feature.`
 
-A test that expects a pathname ending in the file's name therefore fails in a build that does not set the variable. Compare the pathname with the one the run's reporters receive, never with a path built from the file's name.
+A test that expects a pathname ending in the file's name therefore fails in a build that does not set the variable. Compare the pathname with the one the run's reporters receive, never with a path built from the file's name. Where a test must also check the path itself, check it only when the pathname is not that text, and otherwise check that it is.
+
+sbt's incremental compiler does not track the variable: setting it and re-running recompiles nothing, so already-compiled code keeps the text. To exercise the path branch locally, set the variable and change the calling source file's content, such as by appending a comment, then restore it.
 </learning>
 
 <learning>

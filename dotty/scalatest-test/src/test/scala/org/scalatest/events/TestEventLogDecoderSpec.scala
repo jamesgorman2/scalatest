@@ -561,64 +561,113 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
     }
 
     "given a line that is not one JSON object" should {
-      val descriptionsAndLines = Seq(
-        "an empty line" -> "",
-        "a blank line" -> "  ",
-        "an array" -> "[]",
-        "a string" -> "\"runStarted\"",
-        "a number" -> "42",
-        "a boolean" -> "true",
-        "null" -> "null",
-        "two objects" -> (runEndedLine + runEndedLine),
-        "an object followed by other text" -> (runEndedLine + " x"),
-        "an object that is not closed" -> """{"item":"runEnded","outcome":"completed"""",
-        "an object with a trailing comma" -> """{"item":"runEnded","outcome":"completed",}""",
-        "an object with an unquoted key" -> """{item:"runEnded","outcome":"completed"}""",
-        "an object with a repeated key" -> """{"item":"runEnded","item":"runEnded","outcome":"completed"}""",
-        "an object with a null value" -> """{"item":"runEnded","outcome":null}""",
-        "a string with an unescaped control character" -> infoLine("some" + "\t" + "info"),
-        "a string with an unknown escape" -> infoLine("""some \x info"""),
-        "a string with a short unicode escape" -> infoLine("""some \u12"""),
-        "a string with a unicode escape in fullwidth digits" -> infoLine("some \\u" + "\uFF10\uFF10\uFF16\uFF13 info"),
-        "a number with a leading zero" -> """{"item":"runStarted","pid":01,"startTime":"1970-01-01T00:00:00Z"}""",
-        "arrays nested 100000 deep and not closed" -> ("[" * 100000),
-        "arrays nested 100000 deep" -> ("[" * 100000 + "]" * 100000)
+      val descriptionsLinesAndReasons = Seq(
+        ("an empty line", "", "the text ends where a value should start, at offset 0"),
+        ("a blank line", "  ", "the text ends where a value should start, at offset 2"),
+        ("an array", "[]", "the line is not a JSON object"),
+        ("a string", "\"runStarted\"", "the line is not a JSON object"),
+        ("a number", "42", "the line is not a JSON object"),
+        ("a boolean", "true", "the line is not a JSON object"),
+        ("null", "null", "no value starts at offset 0"),
+        ("two objects", runEndedLine + runEndedLine, "text follows the value at offset 41"),
+        ("an object followed by other text", runEndedLine + " x", "text follows the value at offset 42"),
+        ("an object that is not closed", """{"item":"runEnded","outcome":"completed"""", "neither ',' nor '}' is at offset 40"),
+        ("an object with a trailing comma", """{"item":"runEnded","outcome":"completed",}""", "no key starts at offset 41"),
+        ("an object with an unquoted key", """{item:"runEnded","outcome":"completed"}""", "no key starts at offset 1"),
+        ("an object with a repeated key", """{"item":"runEnded","item":"runEnded","outcome":"completed"}""", "the key item is repeated"),
+        ("an object with a null value", """{"item":"runEnded","outcome":null}""", "no value starts at offset 29"),
+        ("a string with an unescaped control character", infoLine("some" + "\t" + "info"), "an unescaped control character is at offset 54"),
+        ("a string with an unknown escape", infoLine("""some \x info"""), "an unknown escape is at offset 55"),
+        ("a string with a short unicode escape", infoLine("""some \u12"""), "a \\u escape lacks four hexadecimal digits at offset 57"),
+        (
+          "a string with a unicode escape in fullwidth digits",
+          infoLine("some \\u" + "\uFF10\uFF10\uFF16\uFF13 info"),
+          "a \\u escape lacks four hexadecimal digits at offset 57"
+        ),
+        (
+          "a number with a leading zero",
+          """{"item":"runStarted","pid":01,"startTime":"1970-01-01T00:00:00Z"}""",
+          "a number has a leading zero at offset 27"
+        ),
+        ("arrays nested 100000 deep and not closed", "[" * 100000, "the text ends where a value should start, at offset 100000"),
+        ("arrays nested 100000 deep", "[" * 100000 + "]" * 100000, "the line is not a JSON object")
       )
-      descriptionsAndLines.foreach { case (description, line) =>
+      descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line).isLeft shouldBe true
+          TestEventLogDecoder.decode(line) shouldBe Left(reason)
         }
       }
     }
 
     "given a line holding a value of the wrong type" should {
-      val descriptionsAndLines = Seq(
-        "an integer written as a string" -> """{"item":"runStarted","pid":"1","startTime":"1970-01-01T00:00:00Z"}""",
-        "a string written as a number" -> """{"item":"event","event":"DiscoveryStarting","threadName":7,"timeStamp":1}""",
-        "nodes written as an object" -> """{"item":"structure","nodes":{}}""",
-        "a node written as a string" -> """{"item":"structure","nodes":["suite"]}""",
-        "an analysis line written as a number" ->
+      val descriptionsLinesAndReasons = Seq(
+        ("an integer written as a string", """{"item":"runStarted","pid":"1","startTime":"1970-01-01T00:00:00Z"}""", "pid is not an integer"),
+        (
+          "a string written as a number",
+          """{"item":"event","event":"DiscoveryStarting","threadName":7,"timeStamp":1}""",
+          "threadName is not a string"
+        ),
+        ("nodes written as an object", """{"item":"structure","nodes":{}}""", "nodes is not an array of objects"),
+        ("a node written as a string", """{"item":"structure","nodes":["suite"]}""", "nodes is not an array of objects"),
+        (
+          "an analysis line written as a number",
           s"""{"item":"event","node":$aTest,"executions":[1,1],"event":"TestFailed","message":"m","analysis":[1],"threadName":"main","timeStamp":1}""",
-        "a node's id written as a number" -> """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
-        "a node's id written as null" -> """{"item":"structure","nodes":[{"id":null,"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
-        "a place written as a string" -> """{"item":"structure","nodes":[{"id":["s"],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
-        "a suite's place's suiteId written as a number" ->
+          "analysis is not an array of strings"
+        ),
+        (
+          "a node's id written as a number",
+          """{"item":"structure","nodes":[{"id":1,"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+          "id is not an array of objects"
+        ),
+        (
+          "a node's id written as null",
+          """{"item":"structure","nodes":[{"id":null,"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+          "no value starts at offset 35"
+        ),
+        (
+          "a place written as a string",
+          """{"item":"structure","nodes":[{"id":["s"],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
+          "id is not an array of objects"
+        ),
+        (
+          "a suite's place's suiteId written as a number",
           """{"item":"structure","nodes":[{"id":[{"suiteId":1,"index":0}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""",
-        "a test's place's name written as null" ->
+          "suiteId is not a string"
+        ),
+        (
+          "a test's place's name written as null",
           s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"test":null}],"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t"}]}""",
-        "an event's node written as an object" ->
+          "no value starts at offset 70"
+        ),
+        (
+          "an event's node written as an object",
           """{"item":"event","node":{"suiteId":"s","index":0},"executions":[1],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
-        "an event's executions written as a number" ->
+          "node is not an array of objects"
+        ),
+        (
+          "an event's executions written as a number",
           s"""{"item":"event","node":$aSuite,"executions":1,"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
-        "an execution number written as a string" ->
+          "executions is not an array of 32-bit integers from 1"
+        ),
+        (
+          "an execution number written as a string",
           s"""{"item":"event","node":$aSuite,"executions":["1"],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
-        "a config map value written as a number" ->
+          "executions is not an array of 32-bit integers from 1"
+        ),
+        (
+          "a config map value written as a number",
           """{"item":"event","event":"RunStarting","testCount":1,"configMap":{"key":1},"threadName":"main","timeStamp":1}""",
-        "a property check mark written as a string" -> suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":"true"}""")
+          "key is not a string"
+        ),
+        (
+          "a property check mark written as a string",
+          suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":"true"}"""),
+          "propertyCheck is not true"
+        )
       )
-      descriptionsAndLines.foreach { case (description, line) =>
+      descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line).isLeft shouldBe true
+          TestEventLogDecoder.decode(line) shouldBe Left(reason)
         }
       }
     }

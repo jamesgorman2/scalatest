@@ -87,6 +87,10 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       }
     }
 
+    structureDecoderScenario(scenario, holds, structure)
+  }
+
+  private def structureDecoderScenario(scenario: String, holds: String, structure: StatedStructure): Unit = {
     Scenario(s"The decoder reads the structure of: $scenario") {
       When("the decoder is given the line of the suite's structure")
       val event = TestEventLogDecoder.decode(structure.line)
@@ -94,6 +98,27 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       Then(s"it yields a structure that holds $holds")
       EventLogComparison.mismatchWhenIs(event.toSeq, built(structure.inNotation)) shouldBe None
     }
+  }
+
+  private val startedTest = """"node":\[[^\n]*\{"test":"([^"]*)"\}\],"executions":\[[0-9,]*\],"event":"TestStarting"""".r
+
+  /** The names of the tests that start, in the order the event log holds their `TestStarting`. */
+  private def testsInTheOrderTheyStarted(lines: Seq[String]): Vector[String] =
+    lines.toVector.flatMap(line => startedTest.findFirstMatchIn(line).map(_.group(1)))
+
+  // A run starts the tests in declared order with a chance of 1 in 6, so all of these runs do with a chance below 1 in 10^23.
+  private val runsToStartTheTestsOutOfDeclaredOrder = 30
+
+  /** The lines of the event log of the first of the suite's runs whose tests start in an order other than `declared`. */
+  private def linesOfARunOutOfDeclaredOrder(structure: StatedStructure, declared: Vector[String]): Vector[String] = {
+    Iterator
+      .continually(TemporaryEventLog.in { eventLogFile =>
+        launched(Launch.ByFramework, structure.suiteClassName, runnerArgument(eventLogFile))
+        TemporaryEventLog.lines(eventLogFile)
+      })
+      .take(runsToStartTheTestsOutOfDeclaredOrder)
+      .find(lines => testsInTheOrderTheyStarted(lines) != declared)
+      .getOrElse(fail(s"each of $runsToStartTheTestsOutOfDeclaredOrder runs started the tests in declared order"))
   }
 
   private def thrownBy(throwable: Option[Throwable]): String = throwable.fold("nothing")(thrown => s"${thrown.getClass.getName}: ${thrown.getMessage}")
@@ -572,18 +597,26 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       events = StatedEvents("the event log holds `test \"later\": TestIgnored`, and no event is assigned to `slow`", List("test \"later\": TestIgnored"), _.contains("""{"test":"slow"}"""))
     )
 
-    structureScenarios(
-      "A suite whose tests run in random order",
-      "a suite mixing in RandomTestOrder that registers tests a, b and c in that order",
-      Nil,
-      "a, b and c in that order, whatever order the tests ran in",
-      StatedStructure(
-        "ShuffledSuite",
-        "samples.ShuffledSuite",
-        "test \"a\", label \"- a\"\ntest \"b\", label \"- b\"\ntest \"c\", label \"- c\"",
-        suite => List("a", "b", "c").zipWithIndex.map((name, position) => TestEventLogLine.test(suite.test(name), suite, position, name, s"- $name"))
-      )
+    val shuffledSuite = StatedStructure(
+      "ShuffledSuite",
+      "samples.ShuffledSuite",
+      "test \"a\", label \"- a\"\ntest \"b\", label \"- b\"\ntest \"c\", label \"- c\"",
+      suite => List("a", "b", "c").zipWithIndex.map((name, position) => TestEventLogLine.test(suite.test(name), suite, position, name, s"- $name"))
     )
+
+    Scenario("A suite whose tests run in random order") {
+      thisProcess
+      Given("a suite mixing in RandomTestOrder that registers tests a, b and c in that order")
+      When("Framework runs it with the runner argument, and again until its tests start in another order")
+      val lines = linesOfARunOutOfDeclaredOrder(shuffledSuite, Vector("a", "b", "c"))
+
+      Then("the event log's one structure holds a, b and c in that order, though the tests ran in another")
+      testsInTheOrderTheyStarted(lines).sorted shouldBe Vector("a", "b", "c")
+      structureLinesOf(lines) shouldBe Vector(shuffledSuite.line)
+      EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(shuffledSuite, StatedEvents.none))) shouldBe None
+    }
+
+    structureDecoderScenario("A suite whose tests run in random order", "a, b and c in that order, whatever order the tests ran in", shuffledSuite)
 
     structureScenarios(
       "A suite with no registration tree",

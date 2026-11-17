@@ -598,6 +598,9 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private def structuresIn(lines: Seq[String]): Int = lines.count(_.contains(""""item":"structure""""))
 
+  /** A suite's name, and the class name every `structure` that holds it must give it. */
+  private final case class SuiteClassName(suiteName: String, className: String)
+
   /**
    * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
    * reads them. Where `isWhole`, the event log is the stated events; otherwise it holds them in order.
@@ -611,7 +614,8 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     launch: Launch = Launch.ByFramework,
     arguments: List[String] = Nil,
     isWhole: Boolean = true,
-    structures: Option[Int] = None
+    structures: Option[Int] = None,
+    classNameOfEveryStructure: Option[SuiteClassName] = None
   ): Unit = {
     Scenario(scenario) {
       thisProcess
@@ -638,6 +642,12 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         structures.foreach { count =>
           And(s"the event log holds $count structure${if (count == 1) "" else "s"}")
           structuresIn(lines) shouldBe count
+        }
+        classNameOfEveryStructure.foreach { case SuiteClassName(suiteName, className) =>
+          And(s"every structure holding $suiteName gives it class name $className")
+          val classNames = classNamesGivenTo(suiteName, decodedOrFail(lines))
+          classNames should not be empty
+          classNames.distinct shouldBe Vector(className)
         }
       }
     }
@@ -858,7 +868,8 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "samples.ConfigSetupFailsSpec",
       "a structure holding the suite, every structure holding it giving it the wrapped class's name, and in this order after it the suite's SuiteAborted",
       configSetupFailsSpec,
-      isWhole = false
+      isWhole = false,
+      classNameOfEveryStructure = Some(SuiteClassName("ConfigSetupFailsSpec", "samples.ConfigSetupFailsSpec"))
     )
 
     eventScenarios(
@@ -868,7 +879,8 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "a structure holding the suite, every structure holding it giving it the wrapped class's name, and in this order after it the suite's SuiteAborted",
       configWithDbFailsSpec,
       arguments = List("-Ddb=on"),
-      isWhole = false
+      isWhole = false,
+      classNameOfEveryStructure = Some(SuiteClassName("ConfigWithDbFailsSpec", "samples.ConfigWithDbFailsSpec"))
     )
   }
 

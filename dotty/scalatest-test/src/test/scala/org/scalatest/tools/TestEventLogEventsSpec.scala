@@ -1,5 +1,6 @@
 package org.scalatest.tools
 
+import java.nio.file.Paths
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.DecodedEvent
@@ -364,6 +365,9 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
       )
     }
 
+    // What Scalactic gives as a pathname in code compiled without SCALACTIC_FILL_FILE_PATHNAMES=yes.
+    val pathnameUnfilled = "Please set the environment variable SCALACTIC_FILL_FILE_PATHNAMES to yes at compile time to enable this feature."
+
     def testFailedOf(reported: Vector[Event]): TestFailed =
       reported.collectFirst { case failed: TestFailed => failed }.getOrElse(fail("the reporters were told of no TestFailed"))
 
@@ -380,10 +384,17 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         "boom"
       ),
       { (reported, log) =>
-        And("the throwable's file pathname is the pathname of FailSuite.scala that the run's reporters are told")
+        And("the throwable's file pathname is the pathname of samples/FailSuite.scala that the run's reporters are told")
         val toldPathname = testFailedOf(reported).throwable.collect { case failed: StackDepth => failed.failedCodeFilePathname }.flatten
         toldPathname should not be empty
         throwableOfTestFailed(log).stackDepth.flatMap(_.filePathname) shouldBe toldPathname
+        toldPathname.foreach { pathname =>
+          if (pathname == pathnameUnfilled) {
+            info("FailSuite.scala was compiled without SCALACTIC_FILL_FILE_PATHNAMES=yes, so the run gives no pathname to compare")
+          } else {
+            Paths.get(pathname).endsWith(Paths.get("samples", "FailSuite.scala")) shouldBe true
+          }
+        }
       }
     )
 

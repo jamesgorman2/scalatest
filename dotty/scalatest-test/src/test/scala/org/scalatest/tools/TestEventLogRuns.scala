@@ -14,6 +14,7 @@ import org.scalatest.Assertions
 import org.scalatest.Reporter
 import org.scalatest.events.Event
 import org.scalatest.events.BuiltEvent
+import org.scalatest.events.StructureNode
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunBuilder
@@ -95,6 +96,12 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     lines.toVector.map(line => TestEventLogDecoder.decode(line).fold(reason => fail(s"$reason, in $line"), identity))
 
   protected def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
+
+  /** The class name each `structure` of the events that holds a suite of the name gives it, in order. */
+  protected def classNamesGivenTo(suiteName: String, events: Seq[TestEventLogEvent]): Vector[String] =
+    events.toVector
+      .collect { case TestEventLogEvent.Structure(nodes) => nodes }
+      .flatMap(_.collect { case suite: StructureNode.Suite if suite.name == suiteName => suite.className })
 
   protected def thisProcess: ProcessIdentity = {
     val current = ProcessIdentity.current

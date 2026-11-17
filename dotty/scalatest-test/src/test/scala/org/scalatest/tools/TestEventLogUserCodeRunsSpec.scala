@@ -22,8 +22,19 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
    * @param reported what the run's reporters receive, in order, in a run not given the runner argument
    * @param eventLogInNotation the events the criterion states, in the event notation, after the structures that name their nodes
    * @param eventLogInFormat those events as the format writes them, one line for each
+   * @param eventsOfEachNode the names of the events assigned to each node that holds any, in order: those of the suite,
+   *   scope or test each event names, so that no ancestor of that node holds them
    */
-  private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
+  private final case class StatedRun(
+    reported: Vector[String],
+    eventLogInNotation: String,
+    eventLogInFormat: List[String],
+    eventsOfEachNode: Map[NodePath, Vector[String]]
+  )
+
+  private val ofASuite = Vector("SuiteStarting", "SuiteCompleted")
+  private val ofAScope = Vector("ScopeOpened", "ScopeClosed")
+  private val ofATest = Vector("TestStarting", "TestSucceeded")
 
   /** What a run's reporters were told, in the order they were told it. */
   private def reported(events: Vector[Event]): Vector[String] = {
@@ -54,13 +65,19 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   private def infosIn(lines: Seq[String]): Int = lines.count(_.contains(""""event":"InfoProvided""""))
 
-  private def eventsOf(node: NodePath, lines: Seq[String]): Int = lines.count(_.contains(s""""node":${node.json},"""))
+  private val nodeAndEventName = """"node":(\[.*?\]),"executions":\[[0-9,]*\],"event":"([A-Za-z]+)"""".r
 
-  private val eventName = """"event":"([A-Za-z]+)"""".r
+  /** The names of the events assigned to each node that holds any, in the order the event log holds them, by the node's path in the format. */
+  private def eventsOfEachNodeIn(lines: Seq[String]): Map[String, Vector[String]] =
+    lines.toVector
+      .flatMap(line => nodeAndEventName.findFirstMatchIn(line).map(found => found.group(1) -> found.group(2)))
+      .groupMap(_._1)(_._2)
 
-  /** The names of the events assigned to a node, in the order the event log holds them. */
-  private def eventNamesOf(node: NodePath, lines: Seq[String]): Vector[String] =
-    lines.toVector.filter(_.contains(s""""node":${node.json},""")).flatMap(line => eventName.findFirstMatchIn(line).map(_.group(1)))
+  /** Asserts that each event is assigned to the suite, scope or test it names, and so to no ancestor of that node. */
+  private def assertNoEventIsAssignedToAnAncestor(lines: Seq[String], stated: StatedRun): Unit = {
+    And("no event is assigned to an ancestor of the suite or test it names")
+    eventsOfEachNodeIn(lines) shouldBe stated.eventsOfEachNode.map((node, events) => node.json -> events)
+  }
 
   private val stackSpec = {
     val top = NodePath.topLevel("samples.StackSpec")
@@ -108,7 +125,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(pops, List(1, 1, 1), "TestSucceeded"),
         nodeEvent(aStack, List(1, 1), "ScopeClosed"),
         nodeEvent(top, List(1), "SuiteCompleted")
-      )
+      ),
+      Map(top -> ofASuite, aStack -> ofAScope, pops -> ofATest)
     )
   }
 
@@ -191,7 +209,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed"),
         nodeEvent(usesAHelper, List(1, 1), "TestSucceeded"),
         nodeEvent(top, List(1), "SuiteCompleted")
-      )
+      ),
+      Map(top -> ofASuite, usesAHelper -> ofATest, helperScope(helper) -> ofAScope, helps(helper) -> ofATest)
     )
   }
 
@@ -229,7 +248,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(helpsOnAThread, List(1, 1, 1, 1), "TestStarting"),
         nodeEvent(helpsOnAThread, List(1, 1, 1, 1), "TestSucceeded"),
         nodeEvent(usesAHelperOnAThread, List(1, 1), "TestSucceeded")
-      )
+      ),
+      Map(top -> ofASuite, usesAHelperOnAThread -> ofATest, helperOnAThread -> ofAScope, helpsOnAThread -> ofATest)
     )
   }
 
@@ -291,6 +311,17 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         helperStructure(helperUnder(usesTwo)),
         nodeEvent(helps(helperUnder(usesTwo)), List(1, 1, 1, 1, 1, 1), "TestStarting"),
         nodeEvent(usesTwo, List(1, 1, 1), "TestSucceeded")
+      ),
+      Map(
+        userSuitesTop -> ofASuite,
+        user1 -> ofASuite,
+        user2 -> ofASuite,
+        usesOne -> ofATest,
+        usesTwo -> ofATest,
+        helperScope(helperUnder(usesOne)) -> ofAScope,
+        helps(helperUnder(usesOne)) -> ofATest,
+        helperScope(helperUnder(usesTwo)) -> ofAScope,
+        helps(helperUnder(usesTwo)) -> ofATest
       )
     )
   }
@@ -351,6 +382,15 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(second, List(1, 1), "TestStarting")
       ) ++ helperEvents(second) ++ List(
         nodeEvent(second, List(1, 1), "TestSucceeded")
+      ),
+      Map(
+        top -> ofASuite,
+        first -> ofATest,
+        second -> ofATest,
+        helperScope(helperUnder(first)) -> ofAScope,
+        helps(helperUnder(first)) -> ofATest,
+        helperScope(helperUnder(second)) -> ofAScope,
+        helps(helperUnder(second)) -> ofATest
       )
     )
   }
@@ -404,6 +444,12 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(flaky, List(1, 2), "TestStarting")
       ) ++ helperEvents(List(1, 2, 2, 2)) ++ List(
         nodeEvent(flaky, List(1, 2), "TestSucceeded")
+      ),
+      Map(
+        top -> ofASuite,
+        flaky -> Vector("TestStarting", "InfoProvided", "TestFailed", "TestStarting", "InfoProvided", "TestSucceeded"),
+        helperScope(helper) -> (ofAScope ++ ofAScope),
+        helps(helper) -> (ofATest ++ ofATest)
       )
     )
   }
@@ -442,7 +488,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(helps(helper), List(1, 1, 1, 1, 1), "TestSucceeded"),
         nodeEvent(helperScope(helper), List(1, 1, 1, 1), "ScopeClosed"),
         nodeEvent(usesIt, List(1, 1), "TestSucceeded")
-      )
+      ),
+      Map(top -> ofASuite, usesIt -> ofATest, helperScope(helper) -> ofAScope, helps(helper) -> ofATest)
     )
   }
 
@@ -483,7 +530,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(works, List(1, 1), "TestStarting"),
         nodeEvent(works, List(1, 1), "TestSucceeded"),
         nodeEvent(top, List(1), "SuiteCompleted")
-      )
+      ),
+      Map(top -> ofASuite, works -> ofATest, helperScope(helper) -> ofAScope, helps(helper) -> ofATest)
     )
   }
 
@@ -525,7 +573,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(innerTwo, List(1, 1, 1), "TestStarting"),
         nodeEvent(innerTwo, List(1, 1, 1), "TestSucceeded"),
         nodeEvent(runsItsNestedSuitesNode, List(1), "SuiteCompleted")
-      )
+      ),
+      Map(runsItsNestedSuitesNode -> ofASuite, innerOne -> ofATest, innerTwo -> ofATest)
     )
   }
 
@@ -572,7 +621,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(second.test("inner one"), List(1, 1, 1), "TestStarting"),
         nodeEvent(second.test("inner one"), List(1, 1, 1), "TestSucceeded"),
         nodeEvent(top, List(1), "SuiteCompleted")
-      )
+      ),
+      Map(top -> ofASuite, declared.test("inner one") -> ofATest, second.test("inner one") -> ofATest)
     )
   }
 
@@ -625,7 +675,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(second.test("fast"), List(1, 1, 1), "TestStarting"),
         nodeEvent(second.test("fast"), List(1, 1, 1), "TestSucceeded"),
         nodeEvent(top, List(1), "SuiteCompleted")
-      )
+      ),
+      Map(top -> ofASuite, first.test("slow") -> ofATest, second.test("fast") -> ofATest)
     )
   }
 
@@ -657,7 +708,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(twiceRunA, List(1, 1), "TestSucceeded"),
         nodeEvent(twiceRunA, List(1, 2), "TestStarting"),
         nodeEvent(twiceRunA, List(1, 2), "TestSucceeded")
-      )
+      ),
+      Map(top -> ofASuite, twiceRunA -> (ofATest ++ ofATest))
     )
   }
 
@@ -681,7 +733,14 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(t, List(1, 1), "TestStarting"),
         if (isAssignedToTest) nodeEvent(t, List(1, 1), "InfoProvided", direct) else nodeEvent(top, List(1), "InfoProvided", direct),
         nodeEvent(t, List(1, 1), "TestSucceeded")
-      )
+      ),
+      {
+        if (isAssignedToTest) {
+          Map(top -> ofASuite, t -> Vector("TestStarting", "InfoProvided", "TestSucceeded"))
+        } else {
+          Map(top -> Vector("SuiteStarting", "InfoProvided", "SuiteCompleted"), t -> ofATest)
+        }
+      }
     )
   }
 
@@ -719,7 +778,14 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(t, List(1, 1, 1), "TestStarting"),
         if (isAssignedToTest) nodeEvent(t, List(1, 1, 1), "InfoProvided", direct) else nodeEvent(nestedNode, List(1, 1), "InfoProvided", direct),
         nodeEvent(t, List(1, 1, 1), "TestSucceeded")
-      )
+      ),
+      {
+        if (isAssignedToTest) {
+          Map(nestedNode.parent -> ofASuite, nestedNode -> ofASuite, t -> Vector("TestStarting", "InfoProvided", "TestSucceeded"))
+        } else {
+          Map(nestedNode.parent -> ofASuite, nestedNode -> Vector("SuiteStarting", "InfoProvided", "SuiteCompleted"), t -> ofATest)
+        }
+      }
     )
   }
 
@@ -758,7 +824,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(t, List(1, 2), "TestStarting"),
         nodeEvent(t, List(1, 2), "InfoProvided", direct),
         nodeEvent(t, List(1, 2), "TestSucceeded")
-      )
+      ),
+      Map(top -> ofASuite, t -> Vector("TestStarting", "TestSucceeded", "TestStarting", "InfoProvided", "TestSucceeded"))
     )
   }
 
@@ -791,29 +858,15 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         nodeEvent(t, List(1, 1), "TestStarting"),
         nodeEvent(t, List(1, 1), "TestSucceeded"),
         nodeEvent(t, List(1, 1), "InfoProvided", direct)
-      )
+      ),
+      Map(top -> ofASuite, t -> Vector("TestStarting", "TestSucceeded", "InfoProvided"))
     )
-  }
-
-  /** Asserts each node's events in a run whose test `t` sends a message straight to a reporter, on `t` or on its suite. */
-  private def eventsOfDirectRun(suite: NodePath, messageOnTest: Boolean, lines: Seq[String]): Unit = {
-    And(if (messageOnTest) "no event of 't' is assigned to its suite" else "the suite holds the message beside its own events, and 't' holds only its own")
-    val ofSuite = if (messageOnTest) Vector("SuiteStarting", "SuiteCompleted") else Vector("SuiteStarting", "InfoProvided", "SuiteCompleted")
-    val ofTest = if (messageOnTest) Vector("TestStarting", "InfoProvided", "TestSucceeded") else Vector("TestStarting", "TestSucceeded")
-    eventNamesOf(suite, lines) shouldBe ofSuite
-    eventNamesOf(suite.test("t"), lines) shouldBe ofTest
-  }
-
-  /** Asserts each node's events in a run as `eventsOfDirectRun` does, where the suite of `t` is nested in `outer`. */
-  private def eventsOfNestedDirectRun(outer: NodePath, nested: String, messageOnTest: Boolean, lines: Seq[String]): Unit = {
-    eventsOfDirectRun(outer.suite(nested), messageOnTest, lines)
-    And("no event of the nested suite is assigned to the suite nesting it")
-    eventNamesOf(outer, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
   }
 
   /**
    * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
-   * reads them. The event log holds the stated events in order, and `alsoThen` states what else it holds.
+   * reads them. The event log holds the stated events in order, each node holds the events stated of it, and
+   * `alsoThen` states what else the event log holds.
    *
    * @param alsoGiven the steps that follow `suite` in stating what the run is given
    */
@@ -825,7 +878,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     stated: StatedRun,
     nestedSuiteIds: List[String] = Nil,
     alsoGiven: List[String] = Nil
-  )(alsoThen: Vector[String] => Unit): Unit = {
+  )(alsoThen: Vector[String] => Unit = _ => ()): Unit = {
     Scenario(scenario) {
       thisProcess
       Given(suite)
@@ -844,6 +897,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         Then(s"the event log holds, in order, $eventLogHolds")
         StatedLines.mismatchWhenHoldsInOrder(lines, stated.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
+        assertNoEventIsAssignedToAnAncestor(lines, stated)
         alsoThen(lines)
       }
     }
@@ -915,13 +969,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other structure holding HelperSuite")
       structuresHolding("HelperSuite", lines) shouldBe 2
-
-      And("no event of a helper is assigned to the suites or the test that ran it")
-      eventNamesOf(userSuitesTop, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(user1, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(user2, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(usesOne, lines) shouldBe Vector("TestStarting", "TestSucceeded")
-      eventNamesOf(usesTwo, lines) shouldBe Vector("TestStarting", "TestSucceeded")
     }
 
     eventScenarios(
@@ -947,10 +994,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other structure holding HelperSuite")
       structuresHolding("HelperSuite", lines) shouldBe 1
-
-      And("each execution of 'flaky' holds its InfoProvided, and no event of the helper")
-      eventNamesOf(flaky, lines) shouldBe Vector("TestStarting", "InfoProvided", "TestFailed", "TestStarting", "InfoProvided", "TestSucceeded")
-      eventNamesOf(flaky.parent, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
     }
 
     eventScenarios(
@@ -960,7 +1003,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the helper's structure under the test that ran it, then its events, assigned to its own nodes and inside the test that ran it",
       asyncOuterSuite,
       nestedSuiteIds = List(helperSelected)
-    )(_ => ())
+    )()
 
     eventScenarios(
       "A test runs a helper on a thread of its own",
@@ -972,12 +1015,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("no structure holds a scope under HelperSuite")
       lines.count(line => line.contains(""""suiteId":"samples.HelperSuite"""") && line.contains(""""kind":"scope"""")) shouldBe 0
-
-      And("no event of the helper is assigned to the suite or the test that ran it")
-      eventNamesOf(usesAHelperOnAThread.parent, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(usesAHelperOnAThread, lines) shouldBe Vector("TestStarting", "TestSucceeded")
-      eventNamesOf(helpsOnAThread, lines) shouldBe Vector("TestStarting", "TestSucceeded")
-      eventNamesOf(helperOnAThread, lines) shouldBe Vector("ScopeOpened", "ScopeClosed")
     }
   }
 
@@ -995,13 +1032,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       suiteEventsOf("samples.Inner1Suite", lines) shouldBe 0
       suiteEventsOf("samples.Inner2Suite", lines) shouldBe 0
       structuresIn(lines) shouldBe 1
-
-      And("no event of a nested suite is assigned to a suite above its test")
-      eventNamesOf(runsItsNestedSuitesNode, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(inner1, lines) shouldBe empty
-      eventNamesOf(inner2, lines) shouldBe empty
-      eventNamesOf(inner1.test("inner one"), lines) shouldBe Vector("TestStarting", "TestSucceeded")
-      eventNamesOf(inner2.test("inner two"), lines) shouldBe Vector("TestStarting", "TestSucceeded")
     }
 
     eventScenarios(
@@ -1027,16 +1057,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         "suite class HelperSuite, an AnyFunSpec declaring scope 'A helper' holding test 'helps', which succeeds",
         "the beforeAll of SetupSuite calls new HelperSuite().run(None, args) with Args holding a reporter that drops every event"
       )
-    ) { lines =>
-      And("no event is assigned to an ancestor of the suite or test it names")
-      val top = NodePath.topLevel("samples.SetupSuite")
-      val helper = top.suite("samples.HelperSuite")
-      eventNamesOf(top, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(top.test("works"), lines) shouldBe Vector("TestStarting", "TestSucceeded")
-      eventNamesOf(helper, lines) shouldBe empty
-      eventNamesOf(helperScope(helper), lines) shouldBe Vector("ScopeOpened", "ScopeClosed")
-      eventNamesOf(helps(helper), lines) shouldBe Vector("TestStarting", "TestSucceeded")
-    }
+    )()
 
     eventScenarios(
       "A runNestedSuites override runs two suites sharing an ID in reverse order",
@@ -1045,7 +1066,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the structure, then each ModeSuite at the place its start gives it, with a further structure of its own test before that test's events",
       pairSuites,
       nestedSuiteIds = List("samples.ModeSuite")
-    )(_ => ())
+    )()
   }
 
   Feature("A test run more than once") {
@@ -1056,13 +1077,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "samples.TwiceRunPlainSuite",
       "test 'a' in a first execution and then a second",
       twiceRunPlainSuite
-    ) { lines =>
-      And("no other event is assigned to 'a'")
-      eventsOf(twiceRunA, lines) shouldBe 4
-
-      And("no event of 'a' is assigned to its suite")
-      eventNamesOf(twiceRunA.parent, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-    }
+    )()
   }
 
   Feature("Messages sent straight to a reporter") {
@@ -1074,9 +1089,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       "the message assigned to the suite, between the test's events",
       directRun("DirectNamelessSuite", "suite \"DirectNamelessSuite\"", isAssignedToTest = false)
     ) { lines =>
-      And("no InfoProvided is assigned to test 't'")
+      And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-      eventsOfDirectRun(NodePath.topLevel("samples.DirectNamelessSuite"), messageOnTest = false, lines)
     }
 
     eventScenarios(
@@ -1088,7 +1102,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-      eventsOfDirectRun(NodePath.topLevel("samples.DirectNamingItsSuite"), messageOnTest = false, lines)
     }
 
     eventScenarios(
@@ -1101,7 +1114,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-      eventsOfNestedDirectRun(NodePath.topLevel("samples.DirectSuitesNamingTheSuite"), "samples.NestedDirectNamingItsSuite", messageOnTest = false, lines)
     }
 
     eventScenarios(
@@ -1113,7 +1125,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-      eventsOfDirectRun(NodePath.topLevel("samples.DirectNamingItsTest"), messageOnTest = true, lines)
     }
 
     eventScenarios(
@@ -1126,7 +1137,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-      eventsOfNestedDirectRun(NodePath.topLevel("samples.DirectSuitesNamingTheTest"), "samples.NestedDirectNamingItsTest", messageOnTest = true, lines)
     }
 
     eventScenarios(
@@ -1138,11 +1148,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-
-      And("no event of 't' is assigned to its suite")
-      val top = NodePath.topLevel("samples.DirectNamingItsSecondRun")
-      eventNamesOf(top, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(top.test("t"), lines) shouldBe Vector("TestStarting", "TestSucceeded", "TestStarting", "InfoProvided", "TestSucceeded")
     }
 
     eventScenarios(
@@ -1154,11 +1159,6 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     ) { lines =>
       And("the event log holds no other InfoProvided")
       infosIn(lines) shouldBe 1
-
-      And("no event of 't' is assigned to its suite")
-      val top = NodePath.topLevel("samples.DirectNamingItsTestAfterRun")
-      eventNamesOf(top, lines) shouldBe Vector("SuiteStarting", "SuiteCompleted")
-      eventNamesOf(top.test("t"), lines) shouldBe Vector("TestStarting", "TestSucceeded", "InfoProvided")
     }
   }
 }
