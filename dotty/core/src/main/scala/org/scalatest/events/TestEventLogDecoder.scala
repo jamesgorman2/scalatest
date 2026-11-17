@@ -69,8 +69,13 @@ private[scalatest] object TestEventLogDecoder {
             position <- reader.optionalIntFrom("position", 0)
             suiteId <- reader.text("suiteId")
             className <- reader.text("className")
+            _ <- parentOnNodePath(id, parent)
           } yield StructureNode.Suite(id, parent, position, name, suiteId, className)
-        case "scope" => scopeOrTest(reader)(StructureNode.Scope(id, _, _, name, _))
+        case "scope" =>
+          for {
+            scope <- scopeOrTest(reader)(StructureNode.Scope(id, _, _, name, _))
+            _ <- parentOnNodePath(id, scope.parentId)
+          } yield scope
         case "test" =>
           for {
             ignored <- reader.trueOrAbsent("ignored")
@@ -87,6 +92,14 @@ private[scalatest] object TestEventLogDecoder {
       position <- reader.intFrom("position", 0)
       label <- reader.text("label")
     } yield build(parent, position, label)
+  }
+
+  // A suite's or scope's parent is its node path without the last place, which a top-level suite's path lacks.
+  private def parentOnNodePath(id: NodeId, parent: Option[NodeId]): Either[String, Unit] = {
+    val pathParent = Option.when(id.places.size > 1)(NodeId(id.places.init))
+    if (parent == pathParent) Right(())
+    else if (parent.isEmpty) Left("missing key parent")
+    else Left("parent is not the node's id without its last place")
   }
 
   // An empty node path is read as an omitted key, as an empty array is written.

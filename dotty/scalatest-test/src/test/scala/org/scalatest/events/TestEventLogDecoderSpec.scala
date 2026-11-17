@@ -469,6 +469,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","suiteId":"s","className":"c"}]}""" -> ("name", "a suite node"),
         s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","className":"c"}]}""" -> ("suiteId", "a suite node"),
         s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","suiteId":"s"}]}""" -> ("className", "a suite node"),
+        """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"suiteId":"n","index":0}],"kind":"suite","name":"N","suiteId":"n","className":"c"}]}""" -> ("parent", "a nested suite node"),
         """{"item":"structure","nodes":[{"id":[{"suiteId":"s"}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}""" -> ("index", "a suite's place"),
         """{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"scope":"t"}],"kind":"scope","parent":[{"suiteId":"s","index":0}],"position":0,"name":"t","label":"t"}]}""" -> ("index", "a scope's place"),
         s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","position":0,"name":"t","label":"- t"}]}""" -> ("parent", "a test node"),
@@ -532,6 +533,21 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         TestEventLogDecoder.decode(
           s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","ignored":false}]}"""
         ) shouldBe Left("ignored is not true")
+      }
+      "report a nested suite whose parent is not its id without the last place" in {
+        TestEventLogDecoder.decode(
+          s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"suiteId":"n","index":0}],"kind":"suite","parent":$aTest,"name":"N","suiteId":"n","className":"c"}]}"""
+        ) shouldBe Left("parent is not the node's id without its last place")
+      }
+      "report a top-level suite that has a parent" in {
+        TestEventLogDecoder.decode(
+          s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","parent":$aSuite,"name":"S","suiteId":"s","className":"c"}]}"""
+        ) shouldBe Left("parent is not the node's id without its last place")
+      }
+      "report a scope whose parent is not its id without the last place" in {
+        TestEventLogDecoder.decode(
+          s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"scope":"t","index":0}],"kind":"scope","parent":$aTest,"position":0,"name":"t","label":"t"}]}"""
+        ) shouldBe Left("parent is not the node's id without its last place")
       }
       "report a throwable whose propertyCheck is false, which the format never writes" in {
         TestEventLogDecoder.decode(suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":false}""")) shouldBe

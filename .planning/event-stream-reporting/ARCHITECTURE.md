@@ -51,7 +51,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
   - It keeps each node's events against the node's ID, by execution, apart from the structure. The writers report each suite's latest structure, with those events.
-  - A suite or scope takes its parent from its node path and its name from the `structure` that contains it. A test takes its parent scope, its name and its label from the latest `structure` that contains the test.
+  - Each node takes the parent its `structure` declares, which for a suite or scope the format requires to be its node path without the last place. A suite or scope takes its name from the `structure` that contains it. A test takes its parent scope, its name and its label from the latest `structure` that contains the test.
   - A node the latest structure lacks stays at the place it last had, whether or not it has events (`SPECIFICATION.md` R-130b).
 - **Runs that do not finish** — applies `SPECIFICATION.md` R-095a, R-095b and R-102 to each run whose event stream ends without its `runEnded` event (§ APIs § The emitter and the Mill plugin, "What the library takes").
   - Among the test classes each process took, it finds each class that no run reported as a suite, and adds that class as a suite node aborted with reason *not run* (`SPECIFICATION.md` R-095a; § Modules § Mill plugin, Test manifest).

@@ -332,6 +332,7 @@ A line cannot be decoded where it:
 - contains an `item`, `event`, `kind` or `outcome` value this section does not give;
 - contains a value whose JSON type is not the one this section gives its key, `null` included;
 - contains a `startTime` that `Instant.parse` cannot parse, which the consolidation library's **Decode** rejects, though core's decoder yields it as text;
+- contains a suite or scope whose `parent` is not its `id` without the last place: a nested suite or a scope without `parent`, a top-level suite with one, or a `parent` that differs;
 - contains an `ignored`, `propertyCheck` or `isNative` that is `false`, since the format writes each only as `true`;
 - contains an integer that does not fit its field's `Int` or `Long`, or one below the least this section gives its key: 0 for a `position` and an `index`, 1 for an element of `executions` and a throwable's `id`;
 - contains a `ref` to an `id` the event has not yet written, or two throwables with one `id`.

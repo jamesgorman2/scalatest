@@ -70,6 +70,7 @@ private[consolidation] object SummaryCounts {
   private val testRun: SummaryCounts = none.copy(testsExpected = 1, testsRun = 1)
 }
 
+/** The last line of the human-readable output. */
 private[consolidation] object SummaryLine {
 
   /**
