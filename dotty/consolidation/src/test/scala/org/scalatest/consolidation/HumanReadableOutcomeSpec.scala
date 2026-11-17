@@ -376,7 +376,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}""".stripExpectedMargin
     }
 
-    Scenario("A test that no structure marks ignored and that sends `TestIgnored` is ignored") {
+    Scenario("A test that sends `TestIgnored` is ignored although no structure marks it ignored") {
       Given("an event log of a suite that sends `TestIgnored` for a test it does not mark ignored")
       val eventLog =
         """

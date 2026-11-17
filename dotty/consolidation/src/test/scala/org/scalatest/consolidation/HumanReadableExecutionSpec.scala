@@ -515,7 +515,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {green}- pops{reset}""".stripExpectedMargin
     }
 
-    Scenario("A test only an earlier registration holds, that never started, and whose test name never ran, is not run") {
+    Scenario("A test only an earlier registration holds, with no test of its name run, is not run") {
       Given("an event log whose later registration replaces a test that never started with one that runs")
       val eventLog =
         """
@@ -540,7 +540,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the replaced test is not run, after the test the last registration holds at its position")
+      Then("the replaced test is not run, shown after the test the last registration holds")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}ConfigSpec:{reset}
@@ -627,7 +627,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |        {green}- pops{reset}""".stripExpectedMargin
     }
 
-    Scenario("A suite registered at two places and run at one is not run at the other where it holds a test that never ran") {
+    Scenario("A suite registered at two places and run at one is not run at the other, and counts the test it holds that never ran") {
       Given("an event log of two suites sharing a suite ID, of which only the first runs, and only the second registers `peeks`")
       val eventLog =
         """

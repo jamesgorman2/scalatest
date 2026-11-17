@@ -167,8 +167,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   def endEventStream(): Unit = eventStreamOpen = false
 
   /**
-   * The run's top-level suites, once for each execution, by name and then by the order the executions started. Each
-   * attributed node is left out, so attribution is decided only once the event stream has ended.
+   * The run's top-level suites, once for each execution, by name and then by the order the executions started. Attributed
+   * nodes are left out. Attribution needs the whole event stream, so this requires it to have ended.
    */
   def topLevelSuites: Vector[AssembledNode] = {
     require(!eventStreamOpen, s"the event stream of a run under ${label.value} has not ended")
@@ -403,7 +403,7 @@ private[consolidation] object RunAssembly {
       case test: StructureNode.Test => Some(test.parent)
     }
 
-  // A test's place is directly after its suite's, so the place before it gives the suite ID.
+  // The place before a test's is its suite's, which gives the suite ID.
   private def attributionKeyOf(id: NodeId): Option[AttributionKey] =
     id.places.takeRight(2) match {
       case Vector(NodePlace.Suite(suiteId, _), NodePlace.Test(testName)) => Some(AttributionKey(suiteId, testName))
