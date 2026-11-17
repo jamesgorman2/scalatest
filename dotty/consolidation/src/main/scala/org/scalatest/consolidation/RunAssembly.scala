@@ -137,6 +137,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   private var abort = Option.empty[DecodedEvent.RunAborted]
   private var ending = Option.empty[RunOutcome]
   private var eventStreamOpen = true
+  private var assembledTree = Vector.empty[AssembledNode]
 
   def isEventStreamOpen: Boolean = eventStreamOpen
 
@@ -167,7 +168,12 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
 
   def add(line: CapturedLine): Unit = received :+= RunOutput.Captured(line)
 
-  def endEventStream(): Unit = eventStreamOpen = false
+  /** Ends the event stream and assembles the run's tree, which every later reader of the tree shares. */
+  def endEventStream(): Unit =
+    if (eventStreamOpen) {
+      eventStreamOpen = false
+      assembledTree = new TreeAssembler().topLevelSuites
+    }
 
   /**
    * The run's top-level suites, once for each execution, by name and then by the order the executions started. Attributed
@@ -175,91 +181,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
    */
   def topLevelSuites: Vector[AssembledNode] = {
     require(!eventStreamOpen, s"the event stream of a run under ${label.value} has not ended")
-    val runFinished = ending.nonEmpty
-    val runEndedAbnormally = RunAssembly.isAbnormal(ending)
-    val childrenByParent = structure.values.toVector.groupBy(RunAssembly.parentOf)
-    val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
-    val keysOfTestsThatRan = executions.keysIterator.flatMap(RunAssembly.attributionKeyOf).toSet
-
-    def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
-
-    def started(id: NodeId): Boolean = executions.contains(id) || childrenOf(id).exists(child => started(RunAssembly.idOf(child)))
-
-    def testsBelow(id: NodeId): Vector[NodeId] =
-      childrenOf(id).flatMap {
-        case test: StructureNode.Test => Vector(test.id)
-        case suiteOrScope => testsBelow(RunAssembly.idOf(suiteOrScope))
-      }
-
-    def isAttributedTest(id: NodeId): Boolean =
-      !executions.contains(id) && RunAssembly.attributionKeyOf(id).exists(keysOfTestsThatRan)
-
-    def isAttributed(node: StructureNode): Boolean =
-      node match {
-        case test: StructureNode.Test => isAttributedTest(test.id)
-        case suiteOrScope =>
-          val id = RunAssembly.idOf(suiteOrScope)
-          val tests = testsBelow(id)
-          !started(id) && tests.nonEmpty && tests.forall(isAttributedTest)
-      }
-
-    def shownChildrenOf(id: NodeId): OrderedChildren = orderedChildren(id, childrenOf(id).filterNot(isAttributed))
-
-    def executionNumbersOf(id: NodeId): Vector[Option[Int]] = {
-      val numbers = executionsOf(id).map(_.number)
-      if (numbers.isEmpty) Vector(None) else numbers.map(Some(_))
-    }
-
-    // An execution sits under the parent execution its path names. A node with no execution, and an execution whose
-    // path names no execution of the node's latest parent, sit under the parent's latest.
-    def parentNumberOf(id: NodeId, number: Option[Int], parent: NodeId, parentsLatest: Option[Int]): Option[Int] =
-      number
-        .flatMap(executionNumber => executions.get(id).flatMap(_.get(executionNumber)))
-        .flatMap(_.parent)
-        .filter(named => named.node == parent && executions.get(parent).exists(_.contains(named.number)))
-        .map(_.number)
-        .orElse(parentsLatest)
-
-    def assembledNodes(node: StructureNode, numbers: Vector[Option[Int]], insideAbortedSuite: Boolean): Vector[AssembledNode] =
-      numbers.map(number => AssembledNode(node, assembledExecution(node, number, insideAbortedSuite)))
-
-    // A suite with no execution follows the executions of its name, in the order the structures first named those
-    // suites.
-    def inNameAndStartOrder(suites: Vector[AssembledNode]): Vector[AssembledNode] =
-      suites.sortBy { suite =>
-        val id = RunAssembly.idOf(suite.node)
-        val start = suite.execution.number.flatMap(number => executions.get(id).flatMap(_.get(number))).map(_.start)
-        (suite.name, start.fold((1, orderFirstHeld(id)))((0, _)))
-      }
-
-    def assembledUnder(child: StructureNode, parent: NodeId, parentNumber: Option[Int], parentsLatest: Option[Int], insideAbortedSuite: Boolean): Vector[AssembledNode] = {
-      val id = RunAssembly.idOf(child)
-      val numbersHere = executionNumbersOf(id).filter(number => parentNumberOf(id, number, parent, parentsLatest) == parentNumber)
-      assembledNodes(child, numbersHere, insideAbortedSuite)
-    }
-
-    def assembledExecution(node: StructureNode, number: Option[Int], insideAbortedSuite: Boolean): AssembledExecution = {
-      val id = RunAssembly.idOf(node)
-      val execution = number.flatMap(executionNumber => executions.get(id).flatMap(_.get(executionNumber)))
-      val abortedSuiteAround = insideAbortedSuite || RunAssembly.isAbortedSuite(node, execution)
-      val latest = executionNumbersOf(id).last
-      val shownChildren = shownChildrenOf(id)
-      def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =
-        children.flatMap(assembledUnder(_, id, number, latest, abortedSuiteAround))
-      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.unplacedSuites))
-      val started = execution.nonEmpty || children.exists(_.started)
-      AssembledExecution(
-        number,
-        RunAssembly.outcomeOf(node, execution, abortedSuiteAround || runEndedAbnormally, runFinished, runEndedAbnormally, started),
-        execution.flatMap(RunAssembly.endingOf),
-        execution.fold(Vector.empty[PlacedMessage])(_.messages.map(RunAssembly.placed(_, children))),
-        children
-      )
-    }
-
-    inNameAndStartOrder(
-      childrenByParent.getOrElse(None, Vector.empty).filterNot(isAttributed).flatMap(suite => assembledNodes(suite, executionNumbersOf(RunAssembly.idOf(suite)), false))
-    )
+    assembledTree
   }
 
   /**
@@ -268,6 +190,141 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
    */
   def holdsAbortedNode: Boolean =
     topLevelSuites.exists(suite => (suite +: suite.descendants).exists(_.execution.outcome.exists(_.isAborted)))
+
+  /**
+   * Assembles the run's tree from its whole event stream, once. It computes each node's attribution inputs, whether
+   * the node started and the tests below it, once per node.
+   */
+  private final class TreeAssembler {
+
+    private val runFinished = ending.nonEmpty
+    private val runEndedAbnormally = RunAssembly.isAbnormal(ending)
+    private val childrenByParent = structure.values.toVector.groupBy(RunAssembly.parentOf)
+    private val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
+    private val keysOfTestsThatRan = executions.keysIterator.flatMap(RunAssembly.attributionKeyOf).toSet
+    private val startedById = mutable.HashMap.empty[NodeId, Boolean]
+    private val testsBelowById = mutable.HashMap.empty[NodeId, Vector[NodeId]]
+    private val shownChildrenById = mutable.HashMap.empty[NodeId, OrderedChildren]
+
+    def topLevelSuites: Vector[AssembledNode] =
+      inNameAndStartOrder(
+        childrenByParent.getOrElse(None, Vector.empty).filterNot(isAttributed).flatMap(suite => assembledNodes(suite, executionNumbersOf(RunAssembly.idOf(suite)), insideAbortedSuite = false))
+      )
+
+    private def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
+
+    // Not `getOrElseUpdate`: each recursion would add to the map that call is updating.
+    private def started(id: NodeId): Boolean =
+      startedById.get(id).getOrElse {
+        val nodeStarted = executions.contains(id) || childrenOf(id).exists(child => started(RunAssembly.idOf(child)))
+        startedById(id) = nodeStarted
+        nodeStarted
+      }
+
+    private def testsBelow(id: NodeId): Vector[NodeId] =
+      testsBelowById.get(id).getOrElse {
+        val tests = childrenOf(id).flatMap {
+          case test: StructureNode.Test => Vector(test.id)
+          case suiteOrScope => testsBelow(RunAssembly.idOf(suiteOrScope))
+        }
+        testsBelowById(id) = tests
+        tests
+      }
+
+    private def isAttributedTest(id: NodeId): Boolean =
+      !executions.contains(id) && RunAssembly.attributionKeyOf(id).exists(keysOfTestsThatRan)
+
+    private def isAttributed(node: StructureNode): Boolean =
+      node match {
+        case test: StructureNode.Test => isAttributedTest(test.id)
+        case suiteOrScope =>
+          val id = RunAssembly.idOf(suiteOrScope)
+          val tests = testsBelow(id)
+          !started(id) && tests.nonEmpty && tests.forall(isAttributedTest)
+      }
+
+    private def shownChildrenOf(id: NodeId): OrderedChildren =
+      shownChildrenById.getOrElseUpdate(id, orderedChildren(id, childrenOf(id).filterNot(isAttributed)))
+
+    // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
+    // one it holds. A suite's nested suites sit before or after them, as its first structure placed them. A suite a
+    // later structure added that shares a suite ID with a placed sibling sits directly after the last sibling with that
+    // suite ID, in the order such suites arrived.
+    private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): OrderedChildren = {
+      val scopesAndTests = children.filter(RunAssembly.isScopeOrTest).sortBy(child => (RunAssembly.declaredPositionOf(child), isDropped(child)))
+      val suites = children.collect { case suite: StructureNode.Suite => suite }
+      val (placedSuites, suitesWithoutPosition) = suites.partition(_.position.nonEmpty)
+      val (furtherRunsOfPlacedSuites, otherSuites) = suitesWithoutPosition.partition(suite => placedSuites.exists(_.suiteId == suite.suiteId))
+      val firstScopeOrTest = firstScopeOrTestPosition.get(parent).flatten
+      val (suitesBefore, suitesAfter) =
+        placedSuites.sortBy(_.position).partition(suite => firstScopeOrTest.exists(first => suite.position.exists(_ < first)))
+      OrderedChildren(furtherRunsOfPlacedSuites.foldLeft(suitesBefore ++ scopesAndTests ++ suitesAfter)(RunAssembly.withAddedSuite), otherSuites)
+    }
+
+    private def isDropped(node: StructureNode): Boolean =
+      RunAssembly.isScopeOrTest(node) &&
+        !suiteOf(node).exists(suite => latestScopesAndTests.getOrElse(suite, Set.empty).contains(RunAssembly.idOf(node)))
+
+    private def suiteOf(node: StructureNode): Option[NodeId] =
+      node match {
+        case suite: StructureNode.Suite => Some(suite.id)
+        case scopeOrTest => RunAssembly.parentOf(scopeOrTest).flatMap(structure.get).flatMap(suiteOf)
+      }
+
+    private def executionNumbersOf(id: NodeId): Vector[Option[Int]] = {
+      val numbers = executionsOf(id).map(_.number)
+      if (numbers.isEmpty) Vector(None) else numbers.map(Some(_))
+    }
+
+    private def executionOf(id: NodeId, number: Option[Int]): Option[Execution] =
+      number.flatMap(executionNumber => executions.get(id).flatMap(_.get(executionNumber)))
+
+    // An execution sits under the parent execution its path names. A node with no execution, and an execution whose
+    // path names no execution of the node's latest parent, sit under the parent's latest.
+    private def parentNumberOf(id: NodeId, number: Option[Int], parent: NodeId, parentsLatest: Option[Int]): Option[Int] =
+      executionOf(id, number)
+        .flatMap(_.parent)
+        .filter(named => named.node == parent && executions.get(parent).exists(_.contains(named.number)))
+        .map(_.number)
+        .orElse(parentsLatest)
+
+    private def assembledNodes(node: StructureNode, numbers: Vector[Option[Int]], insideAbortedSuite: Boolean): Vector[AssembledNode] =
+      numbers.map(number => AssembledNode(node, assembledExecution(node, number, insideAbortedSuite)))
+
+    // A suite with no execution follows the executions of its name, in the order the structures first named those
+    // suites.
+    private def inNameAndStartOrder(suites: Vector[AssembledNode]): Vector[AssembledNode] =
+      suites.sortBy { suite =>
+        val id = RunAssembly.idOf(suite.node)
+        val start = executionOf(id, suite.execution.number).map(_.start)
+        (suite.name, start.fold((1, orderFirstHeld(id)))((0, _)))
+      }
+
+    private def assembledUnder(child: StructureNode, parent: NodeId, parentNumber: Option[Int], parentsLatest: Option[Int], insideAbortedSuite: Boolean): Vector[AssembledNode] = {
+      val id = RunAssembly.idOf(child)
+      val numbersHere = executionNumbersOf(id).filter(number => parentNumberOf(id, number, parent, parentsLatest) == parentNumber)
+      assembledNodes(child, numbersHere, insideAbortedSuite)
+    }
+
+    private def assembledExecution(node: StructureNode, number: Option[Int], insideAbortedSuite: Boolean): AssembledExecution = {
+      val id = RunAssembly.idOf(node)
+      val execution = executionOf(id, number)
+      val abortedSuiteAround = insideAbortedSuite || RunAssembly.isAbortedSuite(node, execution)
+      val latest = executionNumbersOf(id).last
+      val shownChildren = shownChildrenOf(id)
+      def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =
+        children.flatMap(assembledUnder(_, id, number, latest, abortedSuiteAround))
+      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.unplacedSuites))
+      val executionStarted = execution.nonEmpty || children.exists(_.started)
+      AssembledExecution(
+        number,
+        RunAssembly.outcomeOf(node, execution, abortedSuiteAround || runEndedAbnormally, runFinished, runEndedAbnormally, executionStarted),
+        execution.flatMap(RunAssembly.endingOf),
+        execution.fold(Vector.empty[PlacedMessage])(_.messages.map(RunAssembly.placed(_, children))),
+        children
+      )
+    }
+  }
 
   // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
   // and label it last had.
@@ -297,31 +354,6 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
     structure.get(id).flatMap(RunAssembly.parentOf).foreach(previousParent => childIds.get(previousParent).foreach(_ -= id))
     structure(id) = node
     RunAssembly.parentOf(node).foreach(parent => childIds.getOrElseUpdate(parent, mutable.Set.empty) += id)
-  }
-
-  private def isDropped(node: StructureNode): Boolean =
-    RunAssembly.isScopeOrTest(node) &&
-      !suiteOf(node).exists(suite => latestScopesAndTests.getOrElse(suite, Set.empty).contains(RunAssembly.idOf(node)))
-
-  private def suiteOf(node: StructureNode): Option[NodeId] =
-    node match {
-      case suite: StructureNode.Suite => Some(suite.id)
-      case scopeOrTest => RunAssembly.parentOf(scopeOrTest).flatMap(structure.get).flatMap(suiteOf)
-    }
-
-  // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
-  // one it holds. A suite's nested suites sit before or after them, as its first structure placed them. A suite a
-  // later structure added that shares a suite ID with a placed sibling sits directly after the last sibling with that
-  // suite ID, in the order such suites arrived.
-  private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): OrderedChildren = {
-    val scopesAndTests = children.filter(RunAssembly.isScopeOrTest).sortBy(child => (RunAssembly.declaredPositionOf(child), isDropped(child)))
-    val suites = children.collect { case suite: StructureNode.Suite => suite }
-    val (placedSuites, suitesWithoutPosition) = suites.partition(_.position.nonEmpty)
-    val (furtherRunsOfPlacedSuites, otherSuites) = suitesWithoutPosition.partition(suite => placedSuites.exists(_.suiteId == suite.suiteId))
-    val firstScopeOrTest = firstScopeOrTestPosition.get(parent).flatten
-    val (suitesBefore, suitesAfter) =
-      placedSuites.sortBy(_.position).partition(suite => firstScopeOrTest.exists(first => suite.position.exists(_ < first)))
-    OrderedChildren(furtherRunsOfPlacedSuites.foldLeft(suitesBefore ++ scopesAndTests ++ suitesAfter)(RunAssembly.withAddedSuite), otherSuites)
   }
 
   private def executionsOf(id: NodeId): Vector[Execution] = executions.get(id).fold(Vector.empty[Execution])(_.values.toVector)
