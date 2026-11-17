@@ -6,6 +6,7 @@ import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.RunnerArgument
 import org.scalatest.consolidation.TestRunLabel
 import scala.concurrent.duration.DurationInt
+import scala.util.Success
 import scala.util.Try
 
 /**
@@ -87,23 +88,29 @@ private[mill] object JvmTestModuleRun {
   val eventLogFileName: String = "scalatest-event-log.jsonl"
 
   /**
-   * Starts `reader`, runs the worker by `startWorker`, then ends `capture`'s streams and waits for the reader's run to
-   * end, whether or not starting the worker threw. What starting the worker or reading its event log threw is attached
-   * to the consolidation's root as a failure, so the consolidation can still end and write its output.
+   * Starts `reader` and calls `startWorker`. Then, whether or not that threw, it ends `capture`'s streams and waits for
+   * the reader to end the run's event stream. What starting the worker or reading its event log threw is attached to the
+   * consolidation's root as a failure, so the consolidation can still end and write its output. A fatal throwable from
+   * starting the worker is rethrown instead, once the reader has ended.
    */
   def runWorker(consolidation: Consolidation, label: TestRunLabel, reader: EventLogReader, capture: WorkerOutputCapture)(
       startWorker: => Unit
   ): Unit = {
     reader.start()
-    val workerRun = Try {
+    var reading: Try[Unit] = Success(())
+    val workerStart =
       try {
-        startWorker
+        Try {
+          try {
+            startWorker
+          } finally {
+            capture.endStreams()
+          }
+        }
       } finally {
-        capture.endStreams()
+        reading = Try(reader.awaitStreamEnd())
       }
-    }
-    val reading = Try(reader.awaitStreamEnd())
-    workerRun.failed.foreach(throwable => consolidation.addRootFailure(s"Running the worker of ${label.value} failed: $throwable"))
+    workerStart.failed.foreach(throwable => consolidation.addRootFailure(s"Starting the worker of ${label.value} failed: $throwable"))
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of ${label.value} failed: $throwable"))
   }
 }

@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.TestRunLabel
@@ -25,6 +26,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
     val capture: WorkerOutputCapture = new WorkerOutputCapture(StandardCharsets.UTF_8)
+    val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
     private val reader = new EventLogReader(
       eventLogFile,
       () => {
@@ -32,16 +34,22 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         capture.addTo(feed.add)
         feed
       },
-      () => consolidation.addProcessEndedBeforeAnyRun(),
+      () => {
+        processesEndedBeforeAnyRun.incrementAndGet()
+        consolidation.addProcessEndedBeforeAnyRun()
+      },
       _ => true,
       1.millis,
       open
     )
 
     def run(startWorker: => Unit): Unit = {
-      JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker)
+      runWorker(startWorker)
       consolidation.end()
     }
+
+    def runWorker(startWorker: => Unit): Unit =
+      JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker)
 
     def outputApartFromSummary: Seq[String] = output.toSeq.dropRight(1)
   }
@@ -95,14 +103,14 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
             "    Run 1:",
             "      [stdout] partial",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Running the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
           )
           workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
       }
     }
 
-    "starting the worker throws before any run exists in it" should {
+    "starting the worker throws before its event log exists" should {
       "attach what starting threw to the root and fail the consolidation" in {
         withEventLogFile { file =>
           val workerRun = new WorkerRun(file, path => new FileInputStream(path.toFile))
@@ -110,9 +118,19 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
           workerRun.outputApartFromSummary shouldBe Seq(
             "Consolidated tests:",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Running the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
           )
           workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
+    "starting the worker throws a fatal error before its event log exists" should {
+      "rethrow it once the reader has added the worker as a process that ended before any run" in {
+        withEventLogFile { file =>
+          val workerRun = new WorkerRun(file, path => new FileInputStream(path.toFile))
+          a[StackOverflowError] should be thrownBy workerRun.runWorker(throw new StackOverflowError("worker"))
+          workerRun.processesEndedBeforeAnyRun.get shouldBe 1
         }
       }
     }
