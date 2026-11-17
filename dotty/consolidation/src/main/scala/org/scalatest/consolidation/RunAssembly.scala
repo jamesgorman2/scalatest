@@ -50,11 +50,12 @@ private[consolidation] enum Outcome {
 /**
  * A node's children in two groups.
  *
- * @param inDeclaredOrder its scopes, tests and suites with a position, each further run of a suite with a position
+ * @param inDeclaredOrder its scopes, tests and suites with a declared position, each further run of such a suite
  *                        directly after it
- * @param withoutPosition its other suites, whose executions are still to be sorted by suite name and then by start
+ * @param unplacedSuites suites without a declared position that share no suite ID with a placed sibling; assembly
+ *                       orders their executions by name, then start number
  */
-private[consolidation] final case class OrderedChildren(inDeclaredOrder: Vector[StructureNode], withoutPosition: Vector[StructureNode])
+private[consolidation] final case class OrderedChildren(inDeclaredOrder: Vector[StructureNode], unplacedSuites: Vector[StructureNode])
 
 /** A message of a suite, scope or test, placed after the first `childrenBefore` of the children shown under its execution. */
 private[consolidation] final case class PlacedMessage(event: DecodedEvent, childrenBefore: Int)
@@ -188,8 +189,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
     def assembledNodes(node: StructureNode, numbers: Vector[Option[Int]], insideAbortedSuite: Boolean): Vector[AssembledNode] =
       numbers.map(number => AssembledNode(node, assembledExecution(node, number, insideAbortedSuite)))
 
-    // A suite with no execution sorts after the executions of the suites sharing its name, in the order the
-    // structures first held those suites.
+    // A suite with no execution follows the executions of its name, in the order the structures first named those
+    // suites.
     def inNameAndStartOrder(suites: Vector[AssembledNode]): Vector[AssembledNode] =
       suites.sortBy { suite =>
         val id = RunAssembly.idOf(suite.node)
@@ -211,7 +212,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
       val shownChildren = shownChildrenOf(id)
       def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =
         children.flatMap(assembledUnder(_, id, number, latest, abortedSuiteAround))
-      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.withoutPosition))
+      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.unplacedSuites))
       val started = execution.nonEmpty || children.exists(_.started)
       AssembledExecution(
         number,
@@ -306,7 +307,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel) {
 
   // Reads the execution path against the latest structure. Its last number is the node's, and each number before it
   // belongs to the next node up, counting each scope between a test and its suite. An execution keeps the parent
-  // execution it first had. The executions get their start numbers from the top down, so a parent's start precedes its child's.
+  // execution it first had. Start numbers go from the top down, so a parent's precedes its child's.
   private def recordExecutionPath(nodeExecution: NodeExecution): Unit = {
     val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(RunAssembly.parentOf)))).toVector
     val executionsUp = nodesUp.zip(nodeExecution.executions.reverse).map((node, number) => ExecutionOfNode(node, number))
