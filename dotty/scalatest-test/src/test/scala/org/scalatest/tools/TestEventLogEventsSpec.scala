@@ -390,7 +390,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         throwableOfTestFailed(log).stackDepth.flatMap(_.filePathname) shouldBe toldPathname
         toldPathname.foreach { pathname =>
           if (pathname == pathnameUnfilled) {
-            info("FailSuite.scala was compiled without SCALACTIC_FILL_FILE_PATHNAMES=yes, so the run gives no pathname to compare")
+            info("FailSuite.scala was compiled without SCALACTIC_FILL_FILE_PATHNAMES=yes, so the path's file name cannot be checked")
           } else {
             Paths.get(pathname).endsWith(Paths.get("samples", "FailSuite.scala")) shouldBe true
           }
