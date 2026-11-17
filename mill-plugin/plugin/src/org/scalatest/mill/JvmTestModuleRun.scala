@@ -6,11 +6,12 @@ import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.RunnerArgument
 import org.scalatest.consolidation.TestRunLabel
 import scala.concurrent.duration.DurationInt
+import scala.util.Try
 
 /**
  * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue. Adds the worker's
  * run, with the lines captured from its stdout and stderr, to a consolidation, or the worker itself where no run
- * existed in it.
+ * existed in it. What starting the worker or reading its event log throws is attached to the consolidation's root.
  *
  * Discovery and the worker each receive `scalaTestArguments`; the worker receives the runner argument after them.
  */
@@ -41,12 +42,7 @@ private[mill] final class JvmTestModuleRun(
       ProcessExit.hasExited,
       10.millis
     )
-    reader.start()
-    try {
-      startWorker(testClasses, capture)
-    } finally {
-      reader.awaitStreamEnd()
-    }
+    JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker(testClasses, capture))
   }
 
   private def discoveredTestClasses(): Seq[String] = {
@@ -82,7 +78,6 @@ private[mill] final class JvmTestModuleRun(
         util.callTestRunnerSubprocess(processFolder, processFolder / "result.log", Right((None, queue, claimFolder)), () => ())(using ctx)
       }
     }
-    capture.endStreams()
   }
 }
 
@@ -90,4 +85,25 @@ private[mill] object JvmTestModuleRun {
 
   /** The event log file's name in a worker's `processFolder`. Mill uses no file of that name there. */
   val eventLogFileName: String = "scalatest-event-log.jsonl"
+
+  /**
+   * Starts `reader`, runs the worker by `startWorker`, then ends `capture`'s streams and waits for the reader's run to
+   * end, whether or not starting the worker threw. What starting the worker or reading its event log threw is attached
+   * to the consolidation's root as a failure, so the consolidation can still end and write its output.
+   */
+  def runWorker(consolidation: Consolidation, label: TestRunLabel, reader: EventLogReader, capture: WorkerOutputCapture)(
+      startWorker: => Unit
+  ): Unit = {
+    reader.start()
+    val workerRun = Try {
+      try {
+        startWorker
+      } finally {
+        capture.endStreams()
+      }
+    }
+    val reading = Try(reader.awaitStreamEnd())
+    workerRun.failed.foreach(throwable => consolidation.addRootFailure(s"Running the worker of ${label.value} failed: $throwable"))
+    reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of ${label.value} failed: $throwable"))
+  }
 }
