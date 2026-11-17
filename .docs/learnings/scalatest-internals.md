@@ -148,7 +148,7 @@ A test that expects every FlatSpec style's `registerIgnored*Test` to give an ign
 <learning>
 date: 2026-11-18
 ---
-A reporter given to a run by class name, with `-C`, is constructed by the run: `Runner.run` constructs it on its own thread before it discovers or runs any suite, and `Framework.runner` when the runner is created. A test cannot hand it an instance, so a recording reporter reaches its store through static state.
+A reporter given to a run by class name, with `-C`, is constructed by the run: `Runner.run` constructs it before it discovers or runs any suite, and `Framework.runner` when the runner is created. A test cannot hand it an instance, so a recording reporter reaches its store through static state.
 
 sbt runs a project's test classes in parallel in one JVM unless `Test / parallelExecution` is false, so that static store is shared by every spec that launches such a run. A run launched outside the recording's lock, or one that timed out and is still running, writes its events, such as a `DiscoverySuite`'s, into whichever recording is open. The symptom is an intermittent failure in an unrelated scenario.
 
