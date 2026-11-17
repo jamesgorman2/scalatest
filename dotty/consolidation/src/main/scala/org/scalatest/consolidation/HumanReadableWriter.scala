@@ -96,7 +96,20 @@ private[consolidation] object HumanReadableWriter {
   // under any error event's first line.
   private def runAbortLines(aborted: DecodedEvent.RunAborted, depth: Int): Vector[OutputLine] = {
     val lines = StringReporter.stringsToPrintOnError(
-      Resources.abortedNote, _ => Resources.runAborted, aborted.message, aborted.throwable, Vector.empty, None, None, None, None, false, false, false, false, false
+      Resources.abortedNote,
+      _ => Resources.runAborted,
+      aborted.message,
+      aborted.throwable,
+      Vector.empty,
+      None,
+      None,
+      None,
+      None,
+      presentUnformatted = false,
+      presentAllDurations = false,
+      presentShortStackTraces = false,
+      presentFullStackTraces = false,
+      presentFilePathname = false
     )
     linesUnder(Vector(aborted.message).filter(_.nonEmpty) ++ lines.tail, aborted.throwable, depth, AnsiRed)
   }
@@ -128,7 +141,7 @@ private[consolidation] object HumanReadableWriter {
   }
 
   private def countLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
-    val notRun = if (execution.isCollapsed) execution.descendants.filter(_.execution.outcome.contains(Outcome.NotRun)) else Vector.empty
+    val notRun = if (execution.isCollapsed) execution.descendants.filter(_.execution.outcome.contains(NodeOutcome.NotRun)) else Vector.empty
     if (notRun.isEmpty) Vector.empty else linesOf(countLine(notRun), depth, AnsiRed)
   }
 
@@ -143,60 +156,60 @@ private[consolidation] object HumanReadableWriter {
   }
 
   private def suiteNameLine(name: String): String =
-    StringReporter.stringToPrintWhenNoError(Resources.suiteStarting _, formatterOf(name + ":"), name, None, None, false, false).mkString
+    StringReporter.stringToPrintWhenNoError(Resources.suiteStarting _, formatterOf(name + ":"), name, None, None, presentAllDurations = false, presentUnformatted = false).mkString
 
   private def suiteEndingLines(suite: StructureNode.Suite, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
     (execution.outcome, execution.ending) match {
-      case (Some(Outcome.NotRun), _) =>
+      case (Some(NodeOutcome.NotRun), _) =>
         linesOf(Resources.specTextAndNote(suite.className, notRunNote), depth, AnsiRed)
-      case (Some(Outcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
+      case (Some(NodeOutcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
         val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, suite.className, Some(suite.name), None)
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
-      case (Some(Outcome.Aborted), _) =>
+      case (Some(NodeOutcome.Aborted), _) =>
         linesOf(Resources.specTextAndNote(suite.className, Resources.abortedNote), depth, AnsiRed)
       case _ =>
         Vector.empty
     }
 
-  private def scopeLine(scope: StructureNode.Scope, outcome: Option[Outcome]): Vector[Segment] =
+  private def scopeLine(scope: StructureNode.Scope, outcome: Option[NodeOutcome]): Vector[Segment] =
     outcome match {
-      case Some(Outcome.Pending) =>
+      case Some(NodeOutcome.Pending) =>
         Vector(Segment(Resources.specTextAndNote(scope.label, Resources.pendingNote), AnsiYellow))
-      case Some(Outcome.Aborted) =>
+      case Some(NodeOutcome.Aborted) =>
         Vector(Segment(scopeText(scope), AnsiGreen), Segment(" " + Resources.abortedNote, AnsiRed))
-      case Some(Outcome.NotRun) =>
+      case Some(NodeOutcome.NotRun) =>
         Vector(Segment(scopeText(scope), AnsiGreen), Segment(" " + notRunNote, AnsiRed))
       case _ =>
         Vector(Segment(scopeText(scope), AnsiGreen))
     }
 
   private def scopeText(scope: StructureNode.Scope): String =
-    StringReporter.stringToPrintWhenNoError(Resources.scopeOpened, formatterOf(scope.label), "", None, Some(scope.name), false, false).mkString
+    StringReporter.stringToPrintWhenNoError(Resources.scopeOpened, formatterOf(scope.label), "", None, Some(scope.name), presentAllDurations = false, presentUnformatted = false).mkString
 
   private def testLines(test: StructureNode.Test, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
     (execution.outcome, execution.ending) match {
-      case (Some(Outcome.Failed), Some(failed: DecodedEvent.TestFailed)) =>
+      case (Some(NodeOutcome.Failed), Some(failed: DecodedEvent.TestFailed)) =>
         val lines = linesOnError(Resources.failedNote, Resources.testFailed _, failed.message, failed.throwable, failed.analysis, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, failed.throwable, depth + 1, AnsiRed)
-      case (Some(Outcome.Canceled), Some(canceled: DecodedEvent.TestCanceled)) =>
+      case (Some(NodeOutcome.Canceled), Some(canceled: DecodedEvent.TestCanceled)) =>
         val lines = linesOnError(Resources.canceledNote, Resources.testCanceled _, canceled.message, canceled.throwable, Vector.empty, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiYellow) ++ linesUnder(lines.tail, canceled.throwable, depth + 1, AnsiYellow)
       case (outcome, _) =>
         linesOf(Vector(testLine(test, outcome)), depth)
     }
 
-  private def testLine(test: StructureNode.Test, outcome: Option[Outcome]): Segment =
+  private def testLine(test: StructureNode.Test, outcome: Option[NodeOutcome]): Segment =
     outcome match {
-      case Some(Outcome.Ignored) =>
+      case Some(NodeOutcome.Ignored) =>
         Segment(Resources.specTextAndNote(test.label, Resources.ignoredNote), AnsiYellow)
-      case Some(Outcome.Pending) =>
+      case Some(NodeOutcome.Pending) =>
         Segment(Resources.specTextAndNote(test.label, Resources.pendingNote), AnsiYellow)
-      case Some(Outcome.Aborted) =>
+      case Some(NodeOutcome.Aborted) =>
         Segment(Resources.specTextAndNote(test.label, Resources.abortedNote), AnsiRed)
-      case Some(Outcome.NotRun) =>
+      case Some(NodeOutcome.NotRun) =>
         Segment(Resources.specTextAndNote(test.label, notRunNote), AnsiRed)
       case _ =>
-        Segment(StringReporter.stringToPrintWhenNoError(Resources.testSucceeded, formatterOf(test.label), "", Some(test.name), None, false, false).mkString, AnsiGreen)
+        Segment(StringReporter.stringToPrintWhenNoError(Resources.testSucceeded, formatterOf(test.label), "", Some(test.name), None, presentAllDurations = false, presentUnformatted = false).mkString, AnsiGreen)
     }
 
   // A message's own line is marked with its kind in place of ScalaTest 3.2.20's icon. The lines under it are as 3.2.20 prints them.
@@ -209,7 +222,7 @@ private[consolidation] object HumanReadableWriter {
       case alert: DecodedEvent.AlertProvided =>
         markedMessageLines("[alert] ", Resources.alertProvidedNote, Resources.alertProvided _, alert.message, alert.throwable, depth, AnsiYellow)
       case markup: DecodedEvent.MarkupProvided =>
-        StringReporter.stringToPrintWhenMarkup(formatterOf("[markup] " + markup.text), None, None, markup.text, false).flatMap(linesOf(_, depth, AnsiGreen))
+        StringReporter.stringToPrintWhenMarkup(formatterOf("[markup] " + markup.text), None, None, markup.text, presentUnformatted = false).flatMap(linesOf(_, depth, AnsiGreen))
       case _ =>
         Vector.empty
     }
@@ -239,14 +252,27 @@ private[consolidation] object HumanReadableWriter {
     testName: Option[String]
   ): Vector[String] =
     StringReporter.stringsToPrintOnError(
-      note, errorMessage, message, throwable, analysis.toVector, formatterOf(text), suiteName, testName, None, false, false, false, false, false
+      note,
+      errorMessage,
+      message,
+      throwable,
+      analysis.toVector,
+      formatterOf(text),
+      suiteName,
+      testName,
+      None,
+      presentUnformatted = false,
+      presentAllDurations = false,
+      presentShortStackTraces = false,
+      presentFullStackTraces = false,
+      presentFilePathname = false
     )
 
   // The lines under an event's first line: its message lines, then its stack trace lines. A throwable's first line and
   // each `Cause:` line sit at the message lines' depth, and each frame line one deeper. A line is classed as a frame
   // line before it is split, so a throwable message's continuation starting `at ` stays at its first line's depth.
   private def linesUnder(lines: Vector[String], throwable: Option[ThrowableView], depth: Int, colour: AnsiColor): Vector[OutputLine] = {
-    val stackTraceLineCount = StringReporter.stackTraceLines(throwable, false, false).size
+    val stackTraceLineCount = StringReporter.stackTraceLines(throwable, presentShortStackTraces = false, presentFullStackTraces = false).size
     val (messageLines, stackTraceLines) = lines.splitAt(lines.size - stackTraceLineCount)
     messageLines.flatMap(linesOf(_, depth, colour)) ++
       stackTraceLines.flatMap(line => linesOf(line, if (isFrameLine(line)) depth + 1 else depth, colour))

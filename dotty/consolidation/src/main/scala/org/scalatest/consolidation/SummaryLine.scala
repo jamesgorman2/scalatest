@@ -56,13 +56,13 @@ private[consolidation] object SummaryCounts {
   private def countsOf(node: AssembledNode): SummaryCounts =
     (node.node, node.execution.outcome) match {
       case (_: StructureNode.Suite, None) => none.copy(suitesExpected = 1, completed = 1)
-      case (_: StructureNode.Suite, Some(Outcome.Aborted)) => none.copy(suitesExpected = 1, aborted = 1)
+      case (_: StructureNode.Suite, Some(NodeOutcome.Aborted)) => none.copy(suitesExpected = 1, aborted = 1)
       case (_: StructureNode.Suite, _) => none.copy(suitesExpected = 1)
-      case (_: StructureNode.Test, Some(Outcome.Ignored)) => none.copy(ignored = 1)
-      case (_: StructureNode.Test, Some(Outcome.Succeeded)) => testRun.copy(succeeded = 1)
-      case (_: StructureNode.Test, Some(Outcome.Failed)) => testRun.copy(failed = 1)
-      case (_: StructureNode.Test, Some(Outcome.Canceled)) => testRun.copy(canceled = 1)
-      case (_: StructureNode.Test, Some(Outcome.Pending)) => testRun.copy(pending = 1)
+      case (_: StructureNode.Test, Some(NodeOutcome.Ignored)) => none.copy(ignored = 1)
+      case (_: StructureNode.Test, Some(NodeOutcome.Succeeded)) => testRun.copy(succeeded = 1)
+      case (_: StructureNode.Test, Some(NodeOutcome.Failed)) => testRun.copy(failed = 1)
+      case (_: StructureNode.Test, Some(NodeOutcome.Canceled)) => testRun.copy(canceled = 1)
+      case (_: StructureNode.Test, Some(NodeOutcome.Pending)) => testRun.copy(pending = 1)
       case (_: StructureNode.Test, _) => none.copy(testsExpected = 1)
       case (_: StructureNode.Scope, _) => none
     }
@@ -70,16 +70,15 @@ private[consolidation] object SummaryCounts {
   private val testRun: SummaryCounts = none.copy(testsExpected = 1, testsRun = 1)
 }
 
-/** The last line of the human-readable output. */
 private[consolidation] object SummaryLine {
 
   /**
    * The summary line of the runs, as segments. Each part (a word and its count) is coloured as a line of its kind,
    * whatever its count; every other character is cyan. Requires each run's event stream to have ended.
    */
-  def of(runs: Seq[RunAssembly]): Vector[Segment] = fragmentsOf(SummaryCounts.of(runs))
+  def of(runs: Seq[RunAssembly]): Vector[Segment] = segmentsOf(SummaryCounts.of(runs))
 
-  def fragmentsOf(counts: SummaryCounts): Vector[Segment] = {
+  private def segmentsOf(counts: SummaryCounts): Vector[Segment] = {
     import counts.*
     Vector(
       cyan(s"Suites: $completed of $suitesExpected completed, "),

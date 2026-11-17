@@ -21,6 +21,17 @@ private[scalatest] enum StructureNode {
   case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String)
   case Scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String)
   case Test(id: NodeId, parent: NodeId, position: Int, name: String, label: String, ignored: Boolean = false)
+
+  def id: NodeId
+
+  def name: String
+
+  def parentId: Option[NodeId] =
+    this match {
+      case suite: Suite => suite.parent
+      case scope: Scope => Some(scope.parent)
+      case test: Test => Some(test.parent)
+    }
 }
 
 /**

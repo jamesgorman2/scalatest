@@ -11,7 +11,6 @@ opaque type RunEvent = DecodedRunEvent
 /** A decoded event, with the process its `runStarted` event names, whose start time is parsed once, on decoding. */
 private[scalatest] final case class DecodedRunEvent(event: TestEventLogEvent, runProcess: Option[RunProcess])
 
-/** An operating-system process ID. */
 opaque type Pid = Long
 
 object Pid {

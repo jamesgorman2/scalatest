@@ -14,7 +14,6 @@ enum ScalaTestArgument {
    */
   case Flagged(flag: String, arguments: Seq[String])
 
-  /** An argument whose flag the runner does not recognise. */
   case Unrecognised(argument: String)
 }
 

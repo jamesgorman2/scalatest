@@ -99,14 +99,14 @@ private[scalatest] object EventLogComparison {
 
   private def withNodesOf(nodes: Map[NodeId, StructureNode], event: TestEventLogEvent): Map[NodeId, StructureNode] = {
     event match {
-      case TestEventLogEvent.Structure(tree) => nodes ++ tree.map(node => idOf(node) -> node)
+      case TestEventLogEvent.Structure(tree) => nodes ++ tree.map(node => node.id -> node)
       case _ => nodes
     }
   }
 
   /** The nodes above the given one, from its top-level suite down. A test's scopes are those of the latest structure. */
   private def ancestorsOf(node: NodeId, nodes: Map[NodeId, StructureNode]): Vector[NodeId] = {
-    def parentOfNode(id: NodeId): Option[NodeId] = nodes.get(id).flatMap(parentOf)
+    def parentOfNode(id: NodeId): Option[NodeId] = nodes.get(id).flatMap(_.parentId)
     Iterator.unfold(parentOfNode(node))(_.map(parent => (parent, parentOfNode(parent)))).toVector.reverse
   }
 
@@ -145,8 +145,8 @@ private[scalatest] object EventLogComparison {
             Left(s"its node ${index + 1} is ${inNotation(node)}, not ${inNotation(expectedNode)}")
           } else {
             val place = s"its node ${index + 1}"
-            soFar.matching(idOf(expectedNode), idOf(node)).toRight(s"$place is not the node an earlier structure held there").flatMap { withNode =>
-              (parentOf(expectedNode), parentOf(node)) match {
+            soFar.matching(expectedNode.id, node.id).toRight(s"$place is not the node an earlier structure held there").flatMap { withNode =>
+              (expectedNode.parentId, node.parentId) match {
                 case (Some(expectedParent), Some(parent)) =>
                   withNode.matching(expectedParent, parent).toRight(s"$place is under another parent")
                 case (None, None) => Right(withNode)
@@ -157,22 +157,6 @@ private[scalatest] object EventLogComparison {
           }
         case (mismatch, _) => mismatch
       }
-    }
-  }
-
-  private def idOf(node: StructureNode): NodeId = {
-    node match {
-      case suite: StructureNode.Suite => suite.id
-      case scope: StructureNode.Scope => scope.id
-      case test: StructureNode.Test => test.id
-    }
-  }
-
-  private def parentOf(node: StructureNode): Option[NodeId] = {
-    node match {
-      case suite: StructureNode.Suite => suite.parent
-      case scope: StructureNode.Scope => Some(scope.parent)
-      case test: StructureNode.Test => Some(test.parent)
     }
   }
 

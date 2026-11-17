@@ -24,8 +24,7 @@ private[mill] final class JvmTestModuleRun(
     ctx: TaskCtx
 ) {
 
-  private val processFolder: os.Path = moduleFolder
-  private val eventLogFile: os.Path = processFolder / JvmTestModuleRun.eventLogFileName
+  private val eventLogFile: os.Path = moduleFolder / JvmTestModuleRun.eventLogFileName
 
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
@@ -63,7 +62,7 @@ private[mill] final class JvmTestModuleRun(
     inputs.forkGroups.map(_.filter(discovered)).filter(_.nonEmpty) match {
       case Seq() => Nil
       case Seq(group) => group
-      case groups => ctx.fail(s"$label has ${groups.size} fork groups, but the test command runs one")
+      case groups => ctx.fail(s"${label.value} has ${groups.size} fork groups, but the test command runs one")
     }
   }
 
@@ -71,12 +70,12 @@ private[mill] final class JvmTestModuleRun(
   // Mill's call spawns the worker on this thread, reading `os.Inherit` here, and returns once both streams are read.
   private def startWorker(testClasses: Seq[String], capture: WorkerOutputCapture): Unit = {
     val util = inputs.testModuleUtil(scalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), ctx)
-    val queue = util.prepareTestClassesFolder(testClasses, processFolder)
-    val claimFolder = processFolder / "claim"
+    val queue = util.prepareTestClassesFolder(testClasses, moduleFolder)
+    val claimFolder = moduleFolder / "claim"
     os.makeDir.all(claimFolder)
     os.Inherit.out.withValue(os.ProcessOutput.ReadBytes(capture.stdout)) {
       os.Inherit.err.withValue(os.ProcessOutput.ReadBytes(capture.stderr)) {
-        util.callTestRunnerSubprocess(processFolder, processFolder / "result.log", Right((None, queue, claimFolder)), () => ())(using ctx)
+        util.callTestRunnerSubprocess(moduleFolder, moduleFolder / "result.log", Right((None, queue, claimFolder)), () => ())(using ctx)
       }
     }
   }
