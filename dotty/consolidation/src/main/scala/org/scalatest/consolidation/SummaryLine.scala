@@ -47,8 +47,8 @@ private[consolidation] object SummaryCounts {
   val none: SummaryCounts = SummaryCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
   /**
-   * The counts over the assembled tree of the runs, the tree the human-readable output prints. A collapsed subtree is
-   * still counted; an attributed node is not in the tree, so it is not. Requires each run's event stream to have ended.
+   * The counts over the assembled tree of the runs, the tree the human-readable output prints. Collapsed subtrees are
+   * counted. Attributed nodes are not in the tree, so they are not counted. Requires each run's event stream to have ended.
    */
   def of(runs: Seq[RunAssembly]): SummaryCounts =
     runs.flatMap(_.topLevelSuites).flatMap(suite => suite +: suite.descendants).map(countsOf).foldLeft(none)(_.plus(_))
@@ -74,8 +74,8 @@ private[consolidation] object SummaryCounts {
 private[consolidation] object SummaryLine {
 
   /**
-   * The summary line of the runs, as fragments. Each part, a word and its count, is in the colour of a line of its kind,
-   * whatever its count, and every other character is cyan. Requires each run's event stream to have ended.
+   * The summary line of the runs, as segments. Each part (a word and its count) is coloured as a line of its kind,
+   * whatever its count; every other character is cyan. Requires each run's event stream to have ended.
    */
   def of(runs: Seq[RunAssembly]): Vector[Segment] = fragmentsOf(SummaryCounts.of(runs))
 
