@@ -45,20 +45,32 @@ private[tools] final class RecordingLogger extends Logger {
   def trace(throwable: Throwable): Unit = record(String.valueOf(throwable))
 }
 
-/** The reporter a run is given with `-C` so that a test can read the events the run's reporters receive. */
+/**
+ * The reporter a run is given with `-C` so that a test can read the events the run's reporters receive.
+ *
+ * It records into the recording that is current when the run constructs it, so a run that outlives its recording,
+ * having timed out, cannot write into a later one.
+ */
 final class RunRecordingReporter extends Reporter {
-  def apply(event: Event): Unit = RunRecordingReporter.received.add(event)
+  private val recording = RunRecordingReporter.current.get
+  def apply(event: Event): Unit = recording.add(event)
 }
 
 object RunRecordingReporter {
 
-  private val received = new ConcurrentLinkedQueue[Event]
+  private val current = new AtomicReference(new ConcurrentLinkedQueue[Event])
 
-  /** Returns the events the recording reporters of the runs `launch` starts receive. One caller records at a time. */
+  /**
+   * Returns the events the recording reporters of the runs `launch` starts receive. One caller records at a time.
+   *
+   * Every run given a recording reporter must be launched here: specs run in parallel, and a run launched elsewhere
+   * would record into the recording of whichever caller holds the lock.
+   */
   def eventsReportedIn(launch: => Unit): Vector[Event] = synchronized {
-    received.clear()
+    val recording = new ConcurrentLinkedQueue[Event]
+    current.set(recording)
     launch
-    received.asScala.toVector
+    recording.asScala.toVector
   }
 }
 
@@ -94,6 +106,8 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
 
   // Runner.run blocks while a graphic reporter's window is open, so a run that wrongly opens one fails at the time limit.
   // Runner.run renames its thread, so a sample that must tell that thread apart is given the name of its thread group.
+  // A run that times out is left running: Runner.run constructs its reporters before it runs a suite, so a recording
+  // reporter it was given still records into the recording that has ended.
   protected def runnerRun(arguments: Seq[String], threadGroupName: Option[String] = None): Boolean = {
     val outcome = new AtomicReference[Option[Either[Throwable, Boolean]]](None)
     val threadGroup = threadGroupName.map { name =>

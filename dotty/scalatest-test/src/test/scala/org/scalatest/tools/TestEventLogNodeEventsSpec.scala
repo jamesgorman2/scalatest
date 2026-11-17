@@ -1848,7 +1848,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val whereTheConstructorThrows = Some(samples.discovered.BrokenCtorSpec.threadGroupItsConstructorThrowsIn)
           val reportedWithoutTheArgument =
             reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments, whereTheConstructorThrows)))
-          runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows)
+          RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows))
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")

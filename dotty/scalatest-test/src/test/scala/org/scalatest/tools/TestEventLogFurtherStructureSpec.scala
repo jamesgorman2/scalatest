@@ -688,7 +688,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           When("Runner.run discovers and runs the runpath's suites without the runner argument, and again with it")
           val arguments = List("-R", runpath, "-C", classOf[RunRecordingReporter].getName)
           val reportedWithoutTheArgument = reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments)))
-          runnerRun(arguments ++ runnerArgument(eventLogFile))
+          RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile)))
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
@@ -828,7 +828,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           val whereTheConstructorThrows = Some(samples.discovered.BrokenCtorSpec.threadGroupItsConstructorThrowsIn)
           val reportedWithoutTheArgument =
             reported(RunRecordingReporter.eventsReportedIn(runnerRun(arguments, whereTheConstructorThrows)))
-          runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows)
+          RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile), whereTheConstructorThrows))
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")

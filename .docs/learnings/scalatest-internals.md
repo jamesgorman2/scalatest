@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, on a reporter a run constructs from its class name, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
 ---
 
 <learning>
@@ -143,4 +143,14 @@ date: 2026-11-17
 On Scala 3, ScalaTest 3.2.20's `FixtureAsyncFlatSpecLike.registerIgnoredAsyncTest` registers a test that runs, not an ignored one: its `//DOTTY-ONLY` inline body calls `registerAsyncTestImpl` rather than `registerIgnoredAsyncTestImpl` (`jvm/flatspec/src/main/scala/org/scalatest/flatspec/FixtureAsyncFlatSpecLike.scala`). The test is not tagged `org.scalatest.Ignore`, so the filter never ignores it and it reports `TestStarting` and its outcome, not `TestIgnored`. `AnyFlatSpec`, `AsyncFlatSpec` and `FixtureAnyFlatSpec` register theirs ignored.
 
 A test that expects every FlatSpec style's `registerIgnored*Test` to give an ignored test fails for `FixtureAsyncFlatSpec` alone. Expect the 3.2.20 behaviour for that style; the fork keeps it for compatibility.
+</learning>
+
+<learning>
+date: 2026-11-18
+---
+A reporter given to a run by class name, with `-C`, is constructed by the run: `Runner.run` constructs it on its own thread before it discovers or runs any suite, and `Framework.runner` when the runner is created. A test cannot hand it an instance, so a recording reporter reaches its store through static state.
+
+sbt runs a project's test classes in parallel in one JVM unless `Test / parallelExecution` is false, so that static store is shared by every spec that launches such a run. A run launched outside the recording's lock, or one that timed out and is still running, writes its events, such as a `DiscoverySuite`'s, into whichever recording is open. The symptom is an intermittent failure in an unrelated scenario.
+
+Launch every run given a recording reporter while holding one lock, and have the reporter capture the store current when it is constructed, with each recording installing a fresh store rather than clearing a shared one.
 </learning>
