@@ -4,11 +4,10 @@ Technical design of how every artifact is built and published under `com.edc`, a
 
 ## Publishing
 
-The group change of `../../ARCHITECTURE.md` § Modules reaches both builds. Every artifact is published at one version, the fork's release, and the plugin depends on core and the library at its own version.
+The group change of `../../ARCHITECTURE.md` § Modules reaches both builds. Every artifact is published at one version, the fork's release, and the plugin depends on the library at its own version, which brings core transitively.
 
 - The fork's release is the sbt build's `releaseVersion`, `3.2.20`, so the JVM's core is `com.edc:scalatest-core_3:3.2.20`.
 - The plugin's `Versions.fork` in `mill-plugin/build.mill` repeats `releaseVersion`. `scalatestConsolidation/checkMillPluginVersion` fails when they differ, and `scalatestConsolidation/checkNoMillDependency` fails when the consolidation library's published artifact depends on Mill (`../specification/compatibility-and-library.md` AC-062). `test-all.sh`, `test-all.ps1` and `.github/workflows/ci.yml` run both.
-- The plugin declares only the consolidation library, which brings core transitively.
 - The fork builds and publishes only the Scala 3 projects of `project/DottyBuild.scala` and the Java-only `scalatestCompatible` of `project/scalatest.scala`, which `scalatestCoreDotty` and `scalatestAppDotty` depend on. Each has `organization` `com.edc`, including those that upstream publishes under `org.scalatest` or `org.scalactic`.
 - The build's Scala 2 projects stay as upstream wrote them, group included, so that a merge from upstream's `3.2.x-new` branch applies to them unchanged. The fork neither builds nor publishes them, and nothing keeps them compiling. `scalatestCompatible` is the one project of `project/scalatest.scala` the fork changes.
   - The build definition must still compile with the upgraded sbt plugins, so a Scala 2 project's setting changes where it no longer compiles. The change is the smallest that compiles and keeps the setting's behaviour. The one case is `scalatestTestJS` of `project/JsBuild.scala`: Scala.js 1.20.2 rejects `withStrictFloats`, so the call is removed. Strict floats are that version's default.
@@ -37,7 +36,7 @@ The group change of `../../ARCHITECTURE.md` § Modules reaches both builds. Ever
 - A task of the library's project checks `../specification/compatibility-and-library.md` AC-062. It publishes the library and the projects it depends on with `publishLocal`, resolves the published library transitively from the local Ivy repository and Maven Central alone, and fails on any dependency with group `com.lihaoyi` and a name beginning `mill-`.
 - The plugin's own Mill build is pinned to Mill 1.3.1 and runs through Mill's `mill` and `mill.bat` bootstrap scripts.
   - Module `plugin` compiles with Mill 1.3.1's Scala, 3.9.0, against `mill-libs` 1.3.1 in `provided` scope. `plugin.publishLocal` publishes `com.edc:scalatest-mill_mill1_3` at the fork's release to the local Ivy repository.
-  - Its dependencies on `scalatest-core_3` and `scalatest-consolidation_3` take a single colon before the version, since `::` would append the plugin's `_mill1` platform suffix.
+  - Its dependency on `scalatest-consolidation_3` takes a single colon before the version, since `::` would append the plugin's `_mill1` platform suffix.
   - `plugin.integration` uses `mill.testkit.IntegrationTester` to run a Mill 1.3.1 launcher, built from `mill-runner-launcher_3`, on each fixture build among the module's test resources.
   - The tests' `COURSIER_REPOSITORIES` lists the plugin's `publishLocalTestRepo` folder, then `ivy2Local|central`. A fixture therefore resolves the plugin as this build last compiled it, and the library and the fork from the local Ivy repository.
   - On Windows the launcher is copied to a `.bat` file, because Windows starts the extensionless script Mill's `launcher` writes only as a batch file. `CreateProcess` also rejects `assembly`'s jar, which has a script prepended.
