@@ -134,7 +134,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
 
-    Scenario("A failure whose message differs from its other throwable's shows the throwable's first line, as ScalaTest 3.2.20 does") {
+    Scenario("A failure whose message differs from that of a throwable that is not a `StackDepth` shows the throwable's first line, as ScalaTest 3.2.20 does") {
       Given("an event log of a test that fails with a message of its own and an `IllegalStateException` with another")
       val eventLog = testEndingWith(
         """test "have size 0": TestFailed(message: "Expected an empty stack", throwable: java.lang.IllegalStateException "not empty" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"])"""
@@ -218,7 +218,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {red}(1 scope, 2 tests not run){reset}""".stripExpectedMargin
     }
 
-    Scenario("A suite aborted with a message that differs from its other throwable's shows the throwable's lines, as ScalaTest 3.2.20 does") {
+    Scenario("A suite aborted with a message that differs from that of a throwable that is not a `StackDepth` shows the throwable's lines, as ScalaTest 3.2.20 does") {
       Given("an event log of a suite that aborts with a message of its own and a `RuntimeException` with another")
       val eventLog = suiteAbortingWith(
         """suite "SetupFailsSpec": SuiteAborted(message: "Exception encountered when attempting to run a suite with class name: samples.SetupFailsSpec", throwable: java.lang.RuntimeException "database unreachable")"""
