@@ -215,11 +215,11 @@ What the runs show against each requirement the issue names, in `SPECIFICATION.m
 | Requirement | Console, Windows | Console, Linux | WebSocket, Windows | WebSocket, Linux |
 |---|---|---|---|---|
 | R-011, nothing lost or altered | No gap or altered event in any run with a per-thread sink; test output never altered an event (§ 3) | The same. With one sink buffer for all writers, Mill's lines corrupted 2 events in 1 of 24 runs (§ 3) | No gap or altered event | No gap or altered event |
-| R-071, a run record for a run with no task, and for a death before its first task | The `runStarted` event arrived for every `empty`, `diehook` and `killstart` run (§ 7) | The same | The `runStarted` event lost for every `diehook` run: the VM died before `open` (§ 7) | The same |
+| A run with no task, and a run that dies before its first task, is still reported | The `runStarted` event arrived for every `empty`, `diehook` and `killstart` run (§ 7) | The same | The `runStarted` event lost for every `diehook` run: the VM died before `open` (§ 7) | The same |
 | R-073, everything handed to the OS arrives when the process dies | Every handed byte arrived, reader keeping up or paused (§ 4) | Paused reader and kill: 64 417 handed bytes lost in 2 of 2 runs (§ 4) | Paused reader: about 2.29 MB of handed bytes lost in 4 of 4 runs (§ 4) | Every handed byte arrived (§ 4) |
-| R-074, the test event log carries how the run ended | `DONE-RETURNED` arrived for every run that finished, and for no run that died (§ 5) | The same | The same; the socket's close was a reset whether or not the run finished (§ 6.2) | The same; the close was end of stream whether or not the run finished |
+| R-074a, the test event log carries how the run ended | `DONE-RETURNED` arrived for every run that finished, and for no run that died (§ 5) | The same | The same; the socket's close was a reset whether or not the run finished (§ 6.2) | The same; the close was end of stream whether or not the run finished |
 | R-076, output of a process that ended before any run | `dieload`'s stdout and stderr lines captured, with no event (§ 7) | The same | The same, through the same capture | The same |
-| R-088, each piece of output once | No event among the passed-through lines; each test line once (§ 3) | The same | Events never on stdout; each test line once | The same |
+| R-097a, each piece of output once | No event among the passed-through lines; each test line once (§ 3) | The same | Events never on stdout; each test line once | The same |
 
 ## 10. Against the source reading
 

@@ -40,8 +40,8 @@ Feature: A suite that runs another instance of itself
 
 | Requirement | Criteria |
 |-------------|----------|
-| R-096       | AC-135   |
-| R-130       | AC-135   |
+| R-130b      | AC-135   |
+| R-130d      | AC-135   |
 
 ## A suite run from a test
 
@@ -205,8 +205,9 @@ Feature: A suite run from a test
 
 | Requirement | Criteria                       |
 |-------------|--------------------------------|
-| R-096       | AC-136, AC-155, AC-167, AC-165 |
-| R-130       | AC-136, AC-155, AC-137, AC-162 |
+| R-130c      | AC-136, AC-155                 |
+| R-130d      | AC-136, AC-155, AC-167, AC-165 |
+| R-130e      | AC-137, AC-162                 |
 
 ## Nested suites
 
@@ -347,9 +348,9 @@ Feature: Nested suites run in other ways
 
 | Requirement | Criteria               |
 |-------------|------------------------|
-| R-096       | AC-138, AC-164, AC-166 |
 | R-104       | AC-139, AC-164         |
-| R-130       | AC-168                 |
+| R-130b      | AC-164, AC-168         |
+| R-130d      | AC-138, AC-164, AC-166 |
 
 ## A test run more than once
 
@@ -395,4 +396,4 @@ Feature: A test run more than once
 
 | Requirement | Criteria       |
 |-------------|----------------|
-| R-130       | AC-140, AC-156 |
+| R-130e      | AC-140, AC-156 |

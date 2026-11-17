@@ -44,14 +44,14 @@ Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite'
 
 **Alternatives**
 
-- Keeping the empty config map's structure for the whole run leaves a test only the run's config map registers without a node, and shows a test only the empty config map registers as not run.
+- Keeping the empty config map's structure for the whole run leaves a test only the run's config map registers without a node.
 - Constructing the running instance from the run's config map before `SuiteStarting` moves the user's constructor earlier than 3.2.20: one that throws given that config map then throws before `SuiteStarting`, where 3.2.20 reports `SuiteStarting` and then `SuiteAborted`, so the build tool would no longer receive the test-interface events 3.2.20 sends (`../SPECIFICATION.md` R-051).
 - Constructing a second instance from the run's config map, only for its structure, runs the user's constructor once more than 3.2.20 does, before `SuiteStarting`.
 - A structure of the suite's test names alone, as for a suite with no registration tree, drops a wrapped style's scopes and labels, against `specification/test-event-log-structure.md` AC-103's Rule.
 
-**Reasoning** 3.2.20 already constructs the class with an empty config map before `SuiteStarting`, as `ConfigMapWrapperSuite`'s `wrappedSuite`: `Framework`'s task reads its `suiteId`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading what that instance registers runs no user code earlier than 3.2.20 does, so the test-interface events the build tool receives do not change (`../SPECIFICATION.md` R-051). The instance that runs is built after `SuiteStarting`, as in 3.2.20, and where it registers a different tree a further `structure` replaces the first (`specification/test-event-log-structure.md` AC-131).
+**Reasoning** 3.2.20 already constructs the class with an empty config map before `SuiteStarting`, as `ConfigMapWrapperSuite`'s `wrappedSuite`: `Framework`'s task reads its `suiteId`, `runSuite` its `suiteName` for `SuiteStarting`, and `Runner` its `expectedTestCount` for `RunStarting`. Reading what that instance registers runs no user code earlier than 3.2.20 does, so the test-interface events the build tool receives do not change (`../SPECIFICATION.md` R-051). The instance that runs is built after `SuiteStarting`, as in 3.2.20, and where it registers a different tree a further `structure` follows the first (`specification/test-event-log-structure.md` AC-131).
 
-**Costs** Where a suite's tests depend on its config map, the event log first contains a structure that disagrees with what runs: a run that dies between the suite's `SuiteStarting` and the further `structure` leaves the empty config map's structure as the one shown.
+**Costs** Where a suite's tests depend on its config map, the event log first contains a structure that disagrees with what runs: a test only the empty config map registers is shown as not run (`specification/runs-and-test-structure-structures.md` AC-146), and so fails the test command (`specification/test-command.md` AC-182). A run that dies between the suite's `SuiteStarting` and the further `structure` leaves the empty config map's structure as the only one shown.
 
 **Settled by**
 
@@ -114,7 +114,7 @@ Under `Runner`, a top-level suite's wrapper reads `suiteId` first, in the suite'
 
 **Alternatives** Dropping captured lines that match `Running Test Class <name>` also drops a test's own line of the same text.
 
-**Reasoning** At `Info` Mill never writes the line. ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which `../SPECIFICATION.md` R-002 already silences, so nothing else is lost. R-053 does not require the worker to run at the module's own log level.
+**Reasoning** At `Info` Mill never writes the line. ScalaTest calls the test-interface `Logger` only at `info`, from `org.scalatest.tools.Framework`'s `SbtLogInfoReporter`, which `../SPECIFICATION.md` R-002 already silences, so nothing else is lost. This feature meets `../SPECIFICATION.md` R-053b only for the worker's working directory and environment (`SPECIFICATION.md` § Epic requirements met), so the worker need not run at the module's own log level.
 
 **Costs** Under the test command, Debug-level worker lines from a later Mill release are hidden even where the module sets `Debug`.
 

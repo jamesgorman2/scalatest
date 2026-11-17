@@ -9,7 +9,7 @@ Feature: Nodes that ran more than once
 
   Background:
     Given the consolidation library is used directly, without Mill, with colour on
-    And the library consolidates a run under the test run label `core.test`
+    And the library consolidates a run of the module `core.test`
 
   Rule: A test shows one line for each of its executions, each with that execution's outcome, failure and messages, and the test's executions that ran in one execution of the test's parent sit together at the test's declared position, in the order they started
     Scenario: AC-141 A test that failed, then succeeded when run again
@@ -152,7 +152,7 @@ Feature: Nodes that ran more than once
             - grows *** NOT RUN ***
         """
 
-  Rule: A suite shows its name line once under each execution of its parent that ran the suite, however many times the suite ran in that execution, and a suite execution for which ScalaTest reports no event naming the suite, but in which a node below the suite ran, shows no abort line
+  Rule: A suite shows its name line once for each of its executions, under the execution of the suite's parent that the suite's execution ran in. The executions of a suite that ran in one execution of the suite's parent appear in the order they started, each with the lines of the nodes that ran in it. Where the parent's structure declares the suite, the executions sit together at the suite's declared position. Where the suite has no declared position, each execution takes its place among the parent's other suites with no declared position, by name and then by the order the executions started. A suite execution for which ScalaTest reports no event naming the suite, but in which a node below the suite ran, shows no abort line
     Scenario: AC-143 A suite that a test ran in each of its two executions
       Given an event log holding:
         """
@@ -227,6 +227,7 @@ Feature: Nodes that ran more than once
             HelperSuite:
               A helper
                 - helps
+            HelperSuite:
               A helper
                 - helps
         """
@@ -281,14 +282,10 @@ Feature: Nodes that ran more than once
 
 ## Requirements covered
 
-| Requirement | Criteria                       |
-|-------------|--------------------------------|
-| R-096       | AC-159                         |
-| R-100       | AC-148, AC-143, AC-161         |
-| R-104       | AC-159                         |
-| R-105       | AC-141                         |
-| R-130       | AC-159                         |
-| R-131       | AC-141, AC-142, AC-149, AC-148 |
-| R-132       | AC-143, AC-161                 |
-| R-133       | AC-141, AC-142, AC-149         |
-| R-134       | AC-142, AC-149, AC-143, AC-161 |
+| Requirement | Criteria                                       |
+|-------------|------------------------------------------------|
+| R-095a      | AC-148, AC-143, AC-161                         |
+| R-104       | AC-159                                         |
+| R-105       | AC-141, AC-142, AC-149, AC-161                 |
+| R-130d      | AC-159, AC-142, AC-149, AC-143, AC-161         |
+| R-130e      | AC-141, AC-142, AC-149, AC-148, AC-143, AC-161 |

@@ -22,7 +22,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 **Alternatives**
 
-- **End** returning the result alone leaves `--halt-on-failure` (`../SPECIFICATION.md` R-057) with no way to learn of a failure while runs are still going.
+- **End** returning the result alone leaves `--halt-on-failure` (`../SPECIFICATION.md` R-055) with no way to learn of a failure while runs are still going.
 - A Boolean reads as passed before **End**, where false means only that nothing has failed yet.
 - A value that resolves once, on the first failure or at **End**, has three states and cannot tell failed and still open from failed and ended; as a future, it also needs a dependency or callbacks threaded through the library, which has neither.
 
@@ -36,9 +36,9 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 ## The consolidation library, not the Mill plugin, decides whether the test command has failed.
 
-**Alternatives** Having the **Decode** handle expose each event's facts, so that the plugin derives the result, repeats in the plugin the rules by which the library decides how each run ended (`../SPECIFICATION.md` R-074, R-102), and widens what the plugin sees of core's events.
+**Alternatives** Having the **Decode** handle expose each event's facts, so that the plugin derives the result, repeats in the plugin the rules by which the library decides how each run ended (`../SPECIFICATION.md` R-098d, R-102), and widens what the plugin sees of core's events.
 
-**Reasoning** For its output the library already decides what `../SPECIFICATION.md` R-046 turns on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-046 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin derives no result from any event.
+**Reasoning** For its output the library already decides what `../SPECIFICATION.md` R-046a, R-046b, R-046c and R-137 turn on: which events report a failure, how each run ended and which did not finish. It is also told of each process in which no run existed and each module whose tests did not start. Deciding R-137 there keeps one reading of those rules, so the test command's result cannot disagree with the output, and the plugin derives no result from any event.
 
 **Costs** The library does more than write output, and the test command's result rests on library state the plugin cannot inspect.
 
@@ -75,9 +75,9 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 ## The consolidation library's human-readable output is formatted by scalatest-core's formatting.
 
-**Alternatives** A renderer of the library's own can diverge from the ScalaTest 3.2.20 format `../SPECIFICATION.md` R-106 requires.
+**Alternatives** A renderer of the library's own can diverge from the ScalaTest formatted names `../SPECIFICATION.md` R-106a prints.
 
-**Reasoning** Core's formatting is what prints the 3.2.20 format, so sharing it keeps the human-readable output in the format R-106 requires.
+**Reasoning** Core's formatting is what produces ScalaTest's formatted names, so sharing it keeps the human-readable output's labels as R-106a requires.
 
 **Costs** Core's formatting must serve decoded events as well as live ones, and the existing reporters' output must stay unchanged through that change (`../SPECIFICATION.md` R-001).
 

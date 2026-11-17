@@ -15,13 +15,13 @@ Feature: The tree of the test command's human-readable output
     And Mill colours its console output
     And human-readable output is compared without the prefix, such as `1] `, that Mill puts on each line the test command's own task writes
 
-  Rule: The human-readable output is its test run labels, with every other line under them
-    Scenario: AC-002 A module's label heads its suites
+  Rule: A module's line heads the human-readable output, and a run that neither failed nor has output attached shows no line of its own, so that the run's suites sit under the module's line
+    Scenario: AC-002 A module's line heads its suites
       Given the module is at Mill's default `testLogLevel`
       And suite `SqrtPropSpec`, class `samples.SqrtPropSpec`, an `AnyPropSpec` whose one property, `sqrt of a square is the root`, labelled `- sqrt of a square is the root`, succeeds
       And the run writes nothing to stdout or stderr, sends no message outside a suite, and completes
       When the test command runs the module
-      Then the human-readable output is:
+      Then the human-readable output, apart from its summary line, is:
         """
         [core.test]
           SqrtPropSpec:
@@ -52,7 +52,7 @@ Feature: The tree of the consolidation library's human-readable output
 
   Background:
     Given the consolidation library is used directly, without Mill, with colour on
-    And the library consolidates a run under the test run label `core.test`
+    And the library consolidates a run of the module `core.test`
 
   Rule: Every suite shows its name line
     Scenario: AC-003 Nested suites sit under the suite that nests them
@@ -130,17 +130,19 @@ Feature: The tree of the consolidation library's human-readable output
         """
 ```
 
-| Requirement | Criteria               |
-|-------------|------------------------|
-| R-025       | AC-002                 |
-| R-078       | AC-002                 |
-| R-096       | AC-003                 |
-| R-106       | AC-003, AC-004, AC-119 |
-| R-129       | AC-002                 |
+| Requirement | Criteria                       |
+|-------------|--------------------------------|
+| R-082       | AC-002                         |
+| R-096a      | AC-002, AC-003                 |
+| R-106a      | AC-002, AC-004, AC-119         |
+| R-106b      | AC-002, AC-003, AC-004, AC-119 |
+| R-106g      | AC-002                         |
+| R-129       | AC-002                         |
+| R-130d      | AC-003                         |
 
 ## Where a node's lines sit
 
-Each row describes the human-readable output that the library, used directly with colour on and test run label `core.test`, writes when it consolidates an event log in which the run registers the line's node and reports the event the line comes from.
+Each row describes the human-readable output that the library, used directly with colour on and module `core.test`, writes when it consolidates an event log in which the run registers the line's node and reports the event the line comes from.
 
 | ID     | Line                                                                                                      | Sits under                                                         |
 |--------|-----------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
@@ -152,13 +154,19 @@ Each row describes the human-readable output that the library, used directly wit
 
 | Requirement | Criteria                               |
 |-------------|----------------------------------------|
-| R-096       | AC-158                                 |
-| R-097       | AC-007                                 |
-| R-106       | AC-007, AC-009, AC-010, AC-011, AC-158 |
+| R-097b      | AC-007                                 |
+| R-106b      | AC-007, AC-009, AC-010, AC-011, AC-158 |
+| R-106d      | AC-009, AC-010, AC-011                 |
+| R-106e      | AC-007                                 |
+| R-130d      | AC-158                                 |
 
 ## Collapsed subtrees
 
-Each row describes the human-readable output that the library, used directly with colour on and test run label `core.test`, writes when it consolidates an event log in which a suite aborts and the row's nodes, which the suite registered below it, never start.
+A subtree is *collapsed* when its root is aborted and every node below the root that is neither attributed nor an ignored test is aborted with the same reason. The root's own abort need not have that reason: a suite that an exception aborts, and whose tests never start, collapses. In every case this feature covers, the shared reason is *not run*: a node aborted for another reason has an execution, and a subtree with an execution below its root is not collapsed.
+
+The human-readable output shows a collapsed subtree as its root's lines, followed by one count line for the nodes the subtree hides (`layout-lines.md` AC-016). The count line counts each hidden suite, scope and test that is aborted with reason *not run*. It leaves out each attributed node and each ignored test, as the summary line leaves them out of its `<suites expected>` and `<tests expected>` (`layout-lines.md` § The summary line). A collapsed subtree with nothing to count shows no count line.
+
+Each row describes the human-readable output that the library, used directly with colour on and module `core.test`, writes when it consolidates an event log in which a suite aborts and the row's nodes, which the suite registered below it, never start.
 
 | ID     | Below the aborted suite     | Count line                             |
 |--------|-----------------------------|----------------------------------------|
@@ -170,9 +178,9 @@ Feature: Collapsed subtrees
 
   Background:
     Given the consolidation library is used directly, without Mill, with colour on
-    And the library consolidates a run under the test run label `core.test`
+    And the library consolidates a run of the module `core.test`
 
-  Rule: A suite whose tests never started collapses into its abort
+  Rule: A suite that aborts before any node below it starts shows its abort, then one line counting the nodes below it, and no line for any of those nodes
     Scenario: AC-039 A suite aborts before its first test
       Given an event log holding:
         """
@@ -198,7 +206,5 @@ Feature: Collapsed subtrees
 
 | Requirement | Criteria               |
 |-------------|------------------------|
-| R-021       | AC-039, AC-042         |
-| R-100       | AC-039, AC-042         |
-| R-107       | AC-039, AC-042, AC-043 |
-| R-131       | AC-039, AC-042         |
+| R-095a      | AC-039, AC-042         |
+| R-106c      | AC-039, AC-042, AC-043 |

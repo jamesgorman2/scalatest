@@ -1,6 +1,6 @@
 # Running a selected module's tests from the test command without a plugin trait
 
-At Mill `1.1.10`: whether an exclusive command can run a selected test module's tests on the JVM, Scala.js and Native, holding `.planning/event-stream-reporting/SPECIFICATION.md` R-053 and taking each run's stdout and stderr (R-040, R-042), when the module mixes in no trait the plugin provides (R-092). It covers public equivalents of the protected members Mill's test tasks use, building the inputs without them, calling them by reflection, and evaluating Mill's own test task from plugin code. For each route it gives the runtimes it worked on and how the Mill API it uses is marked. Answers [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45). Facts only; no route is chosen.
+At Mill `1.1.10`: whether an exclusive command can run a selected test module's tests on the JVM, Scala.js and Native, holding `.planning/event-stream-reporting/SPECIFICATION.md` R-053a and R-053b and taking each run's stdout and stderr (R-040, R-097a), when the module mixes in no trait the plugin provides (R-092). It covers public equivalents of the protected members Mill's test tasks use, building the inputs without them, calling them by reflection, and evaluating Mill's own test task from plugin code. For each route it gives the runtimes it worked on and how the Mill API it uses is marked. Answers [Can the test command run a module's tests without the module mixing in a plugin trait?](https://github.com/jamesgorman2/scalatest/issues/45). Facts only; no route is chosen.
 
 Notes this one builds on and does not repeat:
 
@@ -12,14 +12,14 @@ Notes this one builds on and does not repeat:
 
 ## Short answer
 
-- **Yes, with no trait and no reflection** (§ 3.4, § 4, § 5). The tests ran, with their output captured, on the JVM, Scala.js and Native; R-053's working directory, arguments and environment were compared on the JVM only. The plugin takes the module's public `testForked` or `testOnly` command. Mill evaluates the named tasks below it. The plugin itself calls `Task.evaluate` on the anonymous tasks between them and the command, then on the command itself, with its own `TaskCtx` and streams. Mill's own test body therefore runs unchanged for that module. On Native the plugin also replaces the value of `nativeLink` with a launcher (`NSW`).
+- **Yes, with no trait and no reflection** (§ 3.4, § 4, § 5). The tests ran, with their output captured, on the JVM, Scala.js and Native; the working directory, arguments and environment of R-053a and R-053b were compared on the JVM only. The plugin takes the module's public `testForked` or `testOnly` command. Mill evaluates the named tasks below it. The plugin itself calls `Task.evaluate` on the anonymous tasks between them and the command, then on the command itself, with its own `TaskCtx` and streams. Mill's own test body therefore runs unchanged for that module. On Native the plugin also replaces the value of `nativeLink` with a launcher (`NSW`).
   - No run's output reached the console, on Windows and Linux, under the daemon and `--no-daemon`. The plugin received each stream in order.
   - Against Mill's own `testForked` and `testOnly`, these matched: the classes run, the test results, the JUnit XML test cases, and each JVM worker's working directory, arguments and environment. The exceptions are the worker-count and duplicate-class variation `MPC` § 5 records, which Mill's own task shows too.
 - **The protected members have no public equivalent of the same value** (§ 2.1). `aheadOfTimeDiscoveredTestClassesIfNeeded` is `None` unless the module sets the protected `discoverTestsWithZinc`. Mill sets it only in `TestScalaJSModule.Junit4ScalaJs`. Building the JVM inputs with `None` from public tasks worked, and matched `testForked` on a module without Zinc discovery (§ 3.1). On Native, Scala Native's `TestAdapter` built from public tasks with a launcher worked (§ 3.5).
 - **Reflection on the protected members works** (§ 2.2, § 3.2, § 3.3). Scala's `protected` is `public` in bytecode, and `Class.getMethod` returned both members. A task-returning member yields a new `Task.Anon` per call. Mill evaluated it as an input of the plugin's task, and the named tasks under it are the module's own memoised instances.
 - **Every route needs `@experimental` API. `public` and `member` also need `@internal` `internalWorker`, and `adapter` needs `@internal` `TestRunner` and `TestRunnerUtils`** (§ 6). The `command` route needs no `@internal` API, and its only `@experimental` API is the type of the `fork` member of `TaskCtx`, which it implements. It relies on Mill's public, unmarked `Task.inputs` and `Task.evaluate`, and on Mill's own test body running correctly under a `TaskCtx` it did not build.
 - **A task built outside the module gets no `Task.dest` and is under Mill's filesystem checker** (§ 2.4). Every route supplied its own folder per module and turned the checker off around its writes.
-- **Not run:** Native on Linux; macOS; a pseudo-terminal; a killed worker; more than one round per case; R-053's working directory, arguments and environment on Scala.js and Native (§ 8).
+- **Not run:** Native on Linux; macOS; a pseudo-terminal; a killed worker; more than one round per case; the working directory, arguments and environment of R-053a and R-053b on Scala.js and Native (§ 8).
 
 ## Sources
 
@@ -120,7 +120,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`, Azul Zulu `21.0.10` 
 
 ### 3.1 `public`: the JVM inputs from public tasks, `None` for discovery
 
-- It ran on both platforms, both modes. The R-053 comparison of `jvm.test` is in § 4.
+- It ran on both platforms, both modes. The R-053a and R-053b comparison of `jvm.test` is in § 4.
 - On `zinc.test`, it passed `None` where Mill passes `Some(1 classes)` (§ 3.2). The suite still ran, found by class-file discovery. *Inference:* the two differ in which classes are discovered wherever class files and Zinc analysis disagree, which Mill's comment names as the reason for `Junit4ScalaJs` (`SJM` lines 442–444).
 - JVM only: Scala.js and Native do not use `TestModuleUtil`.
 
@@ -148,7 +148,7 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`, Azul Zulu `21.0.10` 
 - It ran on Windows under both modes. It built the adapter from `nativeLink`, `allForkEnv`, `runClasspath`, `compile`, `testArgsDefault`, `testFramework` and `testReportXml`, all public, with the plugin's own logger and launcher. It ran the framework through `TestRunner.runTestFramework` with discovery `None`, and reported through `TestModule.handleResults`.
 - `scala-native` `test-runner_2.13` `0.5.12` was on the build's own class path, as in `NSW` § 1, not loaded at the module's version from `bridgeFullClassPath`.
 
-## 4. Against R-053
+## 4. Against R-053a and R-053b
 
 Each route run was compared with Mill's own task of the same platform, mode and outcome: `testForked`, or `testOnly gamma.G0*` for class globs.
 
@@ -167,7 +167,7 @@ Each route run was compared with Mill's own task of the same platform, mode and 
 - **Scala.js and Native environment and arguments** were not recorded. *Inference:* the `hook` and `command` routes run Mill's own body with Mill's own input values, except Native's binary, which the launcher starts with the arguments and environment it receives (`NSW` § 1).
 - **Folders.** No route wrote into any `out/<module>/test/testForked.*` or `testOnly.*` path it was given. *Inference, not checked:* Mill's own test tasks' cached results and folders are untouched, since Mill never ran those groups (§ 2.3).
 
-## 5. Against R-040 and R-042
+## 5. Against R-040 and R-097a
 
 - **Nothing reached the console.** In every route run on both platforms, the console held none of the run's lines: no `SEQ-*`, `CHILD-*`, `X-*`, `Y-*` or `Z-*` line, no JVM warning, no `Running Test Class` and no ScalaTest summary. Under Mill's own tasks all of them did, except Native under the daemon, whose lines went to `out/mill-daemon/stdout` (`NSW` § 2).
 - **The plugin received every stream, in order.** Each JVM worker's stdout and stderr were kept under the worker's `fork.async` key. A single-class JVM run (`zinc.test`), which spawns on the calling thread (`MWC` § 2.2), was captured through `withStreams`' `os.Inherit`. The Scala.js VM's streams and the logger lines came through `withStreams`. The Native binary's streams came from the launcher's files. In every run, each `SEQ-OUT`, `SEQ-ERR`, `X-OUT` and `X-ERR` sequence ran 1 to N without gap or reordering. `[proto]` `results/windows-summary.txt` flags `xOut` and `xErr` out of order in the two Windows all-module `command` runs: there `analyse.py` joins `js.test`'s and `native.test`'s captured files under one key, and each module's own files run 1 to 20.
@@ -204,7 +204,7 @@ Mill's compatibility policy and MiMa coverage: `MNK` § 5. All the `mill.api` ty
 - `MWC` § 2.1 found that a `testTask` override calling `super.testTask` cannot take the raw streams. Under the `hook` and `command` routes the plugin, not Mill, evaluates that same task, with the plugin's ctx and streams, and does take them (§ 3.3, § 5).
 - `JNC` § 6.2 names `testTask` as Native's only overridable member. The `command` route runs Native's tests with the launcher without overriding it (§ 3.4).
 - `JNC` § 5.1 infers that the JS VM's `PipeOutputThread` writes to the streams of the thread that started the VM. Observed: with the plugin's `withStreams` around that start, the VM's stdout and stderr reached the plugin and not the console (§ 5).
-- `.planning/event-stream-reporting/SPECIFICATION.md` R-092: every route held it on the runtimes it ran on, since no fixture names anything of the prototype's (§ 1). Only `command` and `hook` held it on all three runtimes, and only `command` without reflection. `public` holds it by passing `None` for discovery. *Inference:* that breaks R-053 wherever class files and Zinc analysis disagree (§ 3.1).
+- `.planning/event-stream-reporting/SPECIFICATION.md` R-092: every route held it on the runtimes it ran on, since no fixture names anything of the prototype's (§ 1). Only `command` and `hook` held it on all three runtimes, and only `command` without reflection. `public` holds it by passing `None` for discovery. *Inference:* that breaks R-053a and R-053b wherever class files and Zinc analysis disagree (§ 3.1).
 
 ## 8. What was not run or not determined
 

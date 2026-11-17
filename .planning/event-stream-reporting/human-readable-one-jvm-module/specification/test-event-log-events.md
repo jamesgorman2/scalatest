@@ -124,7 +124,8 @@ Feature: Messages
 
 | Requirement                      | Criteria                                               |
 |----------------------------------|--------------------------------------------------------|
-| R-097                            | AC-105, AC-106, AC-107, AC-151, AC-134, AC-152, AC-153 |
+| R-043                            | AC-105, AC-106                                         |
+| R-097b                           | AC-105, AC-106, AC-107, AC-151, AC-134, AC-152, AC-153 |
 | `../../SPECIFICATION.md` § Scope | AC-106                                                 |
 
 ## What events carry
@@ -193,6 +194,7 @@ Feature: What the event log keeps of each event
 
 | Requirement                      | Criteria                       |
 |----------------------------------|--------------------------------|
+| R-011                            | AC-108, AC-109                 |
 | `../../SPECIFICATION.md` § Scope | AC-108, AC-109, AC-110, AC-111 |
 
 ## Captured output
@@ -247,6 +249,7 @@ Feature: The event log and reporters
 
 | Requirement                      | Criteria |
 |----------------------------------|----------|
+| R-063                            | AC-059   |
 | `../../SPECIFICATION.md` § Scope | AC-059   |
 
 ## Unchanged behaviour

@@ -6,7 +6,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Passing a cancelled test, as ScalaTest 3.2.20 does under sbt and Mill's test task, keeps existing builds green, but lets a build whose tests did not run for want of a precondition look green.
 
-**Reasoning** A test is cancelled where a precondition it needs is not met, so it did not test what it was written to test. If that did not fail the test command, a cancelled test would be an error a build could ignore, and no error should be ignorable (`../SPECIFICATION.md` R-046).
+**Reasoning** A test is cancelled where a precondition it needs is not met, so it did not test what it was written to test. If that did not fail the test command, a cancelled test would be an error a build could ignore, and no error should be ignorable (`../SPECIFICATION.md` R-046a, R-137).
 
 **Costs** A build with a cancelled test passes under Mill's test task and ScalaTest 3.2.20 and fails under the test command.
 
@@ -14,20 +14,15 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 ---
 
-## A run receives only those of its module's own ScalaTest arguments on an allow-list that holds no reporter, JUnit or TestNG argument.
+## A test module's `testArgsDefault` arguments outside `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W` are suppressed, and an argument ScalaTest does not recognise fails the test command before any test starts (`../SPECIFICATION.md` R-142).
 
 **Alternatives**
 
-- Passing the module's own arguments as Mill's task does lets a reporter the module configures print in each run, repeating the events as text in the consolidated output.
-- Withholding only `-o` and `-e` keeps reporters off the console, but still passes the module's other reporters, which write output of their own, and its JUnit and TestNG arguments.
-- A deny-list of every reporter, JUnit and TestNG argument still passes the arguments ScalaTest's `Framework` rejects (`-R`, `-s`, `-i`, `-q`, `-Q`, `-A`); the user named the arguments a run keeps instead.
-- Letting a module's own `-o` format the consolidated output formats one module apart from the rest, which has no meaning in output that consolidates every module.
+**Reasoning**
 
-**Reasoning** Under the test command all console output goes through the plugin, so a reporter in a run only repeats what the event log already carries (`../SPECIFICATION.md` R-041, R-125).
+**Costs**
 
-**Costs** Every argument `Framework` honours that the list does not name is withheld, so a module that configures an output of its own, such as a JUnit XML or HTML report (`-u`, `-h`) or a file of failed and canceled tests (`-M`), gets none under the test command. The plugin must withhold each argument with its values by ScalaTest's own argument arities, since a flag that takes a value consumes the next argument whatever it is.
-
-**Settled by** [Which ScalaTest 3.2.19 text configuration does the human-readable writer reproduce?](https://github.com/jamesgorman2/scalatest/issues/55).
+**Settled by**
 
 ---
 
@@ -48,21 +43,15 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 ---
 
-## On an unsupported Mill release, the test command runs and warns.
+## On an unsupported Mill release, the test command warns on the console and in every file output before any test starts, and its behaviour beyond the warning is undefined (`../SPECIFICATION.md` R-093).
 
 **Alternatives**
 
-- Failing before any test starts on every unsupported Mill release, as `../SPECIFICATION.md` R-059 does for an unsupported test module, blocks every Mill upgrade until a release of the fork lists the new one.
-- Failing the meta-build also breaks Mill's own test tasks and IDE and BSP import, which R-060 and R-003 require to work on every Mill release the plugin runs on.
-- A runtime check for the Mill internals the test command needs cannot show that R-044 and R-089 hold, since a Mill change can break them without a runtime failure.
+**Reasoning**
 
-**Reasoning** The warning and the recorded Mill version tell every reader of the output that its guarantees do not hold there (R-093, R-119). No requirement can be guaranteed there: any of them, R-046 and R-077 included, may fail silently or loudly when a Mill internal it depends on changes, and no integration test has run on that release. R-060 and R-003 still hold on every Mill 1.x release no older than the one the plugin is built against. Mill keeps its stable API backward binary compatible within a major version, and only classes that the test command alone loads use API beyond it.
+**Costs**
 
-**Costs** On an unsupported Mill release the test command guarantees only R-093, R-118 and R-119; below the release the plugin is built against, nothing holds, and a failure is whatever the JVM throws, possibly a linkage error as the meta-build loads.
-
-**Settled by** [Which Mill releases does the Mill plugin support, and what does the test command do on any other?](https://github.com/jamesgorman2/scalatest/issues/49).
-
-**See** `../research/mill-command-lifetime.md` § 7.
+**Settled by**
 
 ---
 
@@ -71,11 +60,11 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 **Alternatives**
 
 - `NodeJs` alone leaves jsdom, the usual host for testing Scala.js DOM code, with no consolidated output.
-- Adding the browsers that `Selenium` and `Playwright` drive would need R-011, R-042 and R-043 relaxed, because those JS environments capture only part of the page's console output and drop what it buffered at close.
+- Adding the browsers that `Selenium` and `Playwright` drive would need R-011, R-097a and R-043 relaxed, because those JS environments capture only part of the page's console output and drop what it buffered at close.
 - `ExoegoJsDomNodeJs` works only with jsdom before version 27, which `JsDom` has moved past.
 - `Phantom` works only if the module adds Jetty itself, and PhantomJS is no longer maintained.
 
-**Reasoning** `JsDom` runs the page in a Node process, and a run's test event log and its captured stdout and stderr there all come from the launcher's files, so every requirement holds on it unchanged and none is best effort on Scala.js (`../SPECIFICATION.md` § Scope).
+**Reasoning** `JsDom` runs the page in a Node process, and a run's test event log and its captured stdout and stderr there all come from the launcher's files, so every requirement holds on it unchanged (`../SPECIFICATION.md` § Scope).
 
 **Costs** Test code in a `JsDom` window has no `require`, so a run's event log there shares the VM's stdout with test output and depends on framing (`architecture-test-event-log.md` "Under `JsDom`, a run's test event log is framed lines…"). Modules tested in any other JS environment, browsers included, get no consolidated output.
 
@@ -93,7 +82,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** A plugin trait mixed into each test module, exposing the protected `testTask` and `aheadOfTimeDiscoveredTestClassesIfNeeded`, needs every module definition changed; a selected module without it would be neither run, as `../SPECIFICATION.md` § Scope requires, nor failed by R-059.
 
-**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). With no trait, evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime, and driving Mill's test queue from the plugin did so on the JVM. Both kept each run's output off the console, gave it to the plugin (R-040, R-042), and matched Mill's own task (R-053); driving the test queue also held R-044 (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime, though meeting them needs Mill API that Mill does not keep stable.").
+**Reasoning** `../SPECIFICATION.md` § Scope and the entry "Only an explicit test command produces consolidated output…" have the test command run any test module its selectors name, so the plugin must reach each module's tests from outside it (R-092). With no trait, evaluating the module's public `testForked` or `testOnly` with the plugin's own `TaskCtx` did so on every runtime, and driving Mill's test queue from the plugin did so on the JVM. Both kept each run's output off the console, gave it to the plugin (R-040, R-097a), and matched Mill's own task (R-053a, R-053b); driving the test queue also held R-044 (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime, though meeting them needs Mill API that Mill does not keep stable.").
 
 **Costs** On Scala.js and Native the plugin relies on Mill's own test body running correctly under a `TaskCtx` it did not build, and on the JVM it drives Mill's test queue itself (`architecture-running-tests.md` "The plugin runs a module's test discovery itself…"); a Mill change can break either route at run time, not compile time.
 
@@ -128,10 +117,10 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives**
 
-- Leaving it to Mill's own console error omits it from the report (`../SPECIFICATION.md` R-058).
+- Leaving it to Mill's own console error omits it from the report (`../SPECIFICATION.md` R-098e).
 - Showing it without failing the test command lets a build whose tests never ran look green.
 
-**Reasoning** A module that did not run is a gap in coverage whatever stopped it, so the test command fails (R-046) and the consolidated output shows both that it did not run and why (R-058). Counting it as a failure makes `--halt-on-failure` stop on it as on any other (R-057).
+**Reasoning** A module that did not run is a gap in coverage whatever stopped it, so the test command fails (R-046c, R-137) and the consolidated output shows both that it did not run and why (R-098e). Counting it as a failure makes `--halt-on-failure` stop on it as on any other (R-055).
 
 **Costs** One module that fails to compile fails the whole test command, and under `--halt-on-failure` it also skips the modules not yet started.
 
@@ -143,9 +132,9 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Compiling every selected module before any test starts gives an all-or-nothing start, but delays the first test until the slowest compile finishes.
 
-**Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`../SPECIFICATION.md` R-056).
+**Reasoning** Mill's test task starts each module's tests on its own compile, so waiting for every compile would make the test command slower than the task it replaces (`../SPECIFICATION.md` R-056b).
 
-**Costs** A failing compile no longer stops every test before it starts: other modules' tests may already be running, and `--halt-on-failure` stops only those not yet started (R-057).
+**Costs** A failing compile no longer stops every test before it starts: other modules' tests may already be running, and `--halt-on-failure` stops only those not yet started (R-055).
 
 **Settled by** [Which runs does one set of consolidated output cover, and how does the user start it?](https://github.com/jamesgorman2/scalatest/issues/35).
 
@@ -155,7 +144,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Always running every module, with no opt-in, loses fast feedback on a large build.
 
-**Reasoning** Where the user trades coverage for speed, the output still shows which modules did not run (`../SPECIFICATION.md` R-057, R-114).
+**Reasoning** Where the user trades coverage for speed, the output still shows which modules did not run.
 
 **Costs** Under it, which modules report depends on timing again, as under Mill's fail-fast, because modules run unordered and in parallel.
 
@@ -170,7 +159,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 - Failing fast unless `--keep-going` is given, as Mill does, suits a build; but modules run unordered and in parallel, so which modules report depends on timing.
 - Showing only the runs that started, as Mill does, hides that modules were skipped.
 
-**Reasoning** A test report's coverage should not vary with scheduling (`../SPECIFICATION.md` R-056).
+**Reasoning** A test report's coverage should not vary with scheduling (`../SPECIFICATION.md` R-056a).
 
 **Costs** The default differs from Mill's: `--keep-going` no longer decides which selected modules run. Unless the user opts into `--halt-on-failure`, a failing build takes as long as a passing one.
 
@@ -184,7 +173,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 - Running it as Mill does, showing only what its processes wrote to stdout and stderr and whether it passed, supports mixed builds, but every requirement on test structure, failures and test output would need an exemption for it.
 - Skipping it with a warning yields a report that looks complete when it is not.
-- Showing it as *could not start* (R-058) lets the other modules run, but spends a whole test run on a command already bound to fail.
+- Showing it with an outcome of its own (R-098e) lets the other modules run, but spends a whole test run on a command already bound to fail.
 
 **Reasoning** Every requirement then holds for every run in the consolidated output, and the failure comes before any time is spent on tests (`../SPECIFICATION.md` R-059).
 
@@ -201,7 +190,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Passing or failing it as Mill's test task does keeps the two results alike, but lets a build whose tests never finished look green.
 
-**Reasoning** A run that did not complete leaves tests unrun, a gap in coverage whatever ended it (`../SPECIFICATION.md` R-046).
+**Reasoning** A run that did not complete leaves tests unrun, a gap in coverage whatever ended it (`../SPECIFICATION.md` R-046c, R-137).
 
 **Costs** A build whose Native test binary crashes passes under Mill's test task and fails under the test command (`../research/native-stdio-wrapper.md` § 4).
 
@@ -213,7 +202,7 @@ Decisions behind `../SPECIFICATION.md` on which modules, JS environments and Mil
 
 **Alternatives** Holding only which tests run and their results, and leaving their processes to each feature, is cheaper to build but breaks a build whose tests rely on Mill's fork grouping, parallelism or sandbox working directory.
 
-**Reasoning** A user who runs the test command in place of Mill's test task expects the same tests to run in the same processes, working directory and environment (`../SPECIFICATION.md` R-053).
+**Reasoning** A user who runs the test command in place of Mill's test task expects the same tests to run in the same processes, working directory and environment (`../SPECIFICATION.md` R-053a, R-053b).
 
 **Costs** The plugin must take each run's output from the processes Mill's fork grouping and parallelism start, in Mill's sandbox working directory, rather than from processes it chooses because their output is easier to take, such as one worker for every module.
 

@@ -7,7 +7,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 **Alternatives**
 
 - The plugin dropping the summary lines from a worker's captured stdout needs captured lines matched by text, which the feature `human-readable-one-jvm-module` rules out.
-- Leaving the summary in the captured stdout puts it in the run's block, against `../SPECIFICATION.md` R-045.
+- Leaving the summary in the captured stdout puts it in the output attached to the run, against `../SPECIFICATION.md` R-044.
 
 **Reasoning** Mill's worker prints what `done()` returns to its stdout, and the test command captures that stdout into the run's block. Not returning the summary is the only way to keep it out of the block without text matching. Mill 1.3.1 prints nothing for an empty result, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it.
 
@@ -63,7 +63,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Alternatives**
 
-- jsdom's `WebSocket` lost the `runStarted` event whenever the VM died before the socket's `open`, which came 11–59 ms after the runner's construction (`../SPECIFICATION.md` R-071), sent events only when window code yielded, up to 850 ms late, and on Windows lost unread bytes when the connection reset.
+- jsdom's `WebSocket` lost the `runStarted` event whenever the VM died before the socket's `open`, which came 11–59 ms after the runner's construction, sent events only when window code yielded, up to 850 ms late, and on Windows lost unread bytes when the connection reset.
 - A synchronous `XMLHttpRequest` costs a `spawnSync` child Node process per request, plus a CORS preflight.
 - The test-interface `Logger` is owned by Mill's test task and usable only during `execute`.
 

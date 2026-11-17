@@ -75,7 +75,7 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 
 **Alternatives**
 
-- Reading the VM's stdout and stderr through Mill's pipes lost 64 417 bytes already handed to the operating system on Linux when the adapter's `destroyForcibly()` closed the pipe, and would have meant narrowing `../SPECIFICATION.md` R-073.
+- Reading the VM's stdout and stderr through Mill's pipes lost 64 417 bytes already handed to the operating system on Linux when the adapter's `destroyForcibly()` closed the pipe, and would have meant narrowing `../SPECIFICATION.md` R-097a.
 - A Node `--require` preload that sends `process.stdout` and `process.stderr` to files misses Node's fatal-error report, which bypasses `process.stderr`.
 - A `.cmd` or PowerShell launcher on Windows cannot place the VM in a job object without compiled code, so killing it would orphan the VM, as killing the C launcher without a job object did.
 
@@ -99,7 +99,7 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 - Every way of telling the discovery runner's file from a run's file fails in one case, and each leaves a discovery file that Windows cannot delete under the daemon.
 - Mill's own JVM test task, with a logger compiled in package `mill`, keeps the runner's progress off the console, but passes discovery the runner argument.
 
-**Reasoning** `../SPECIFICATION.md` R-072 keeps the discovery runner out of the consolidated output. With the argument withheld from discovery, no discovery file appeared, while the workers received it and ran the same classes with the same results.
+**Reasoning** `../SPECIFICATION.md` R-072 gives the discovery runner no node. With the argument withheld from discovery, no discovery file appeared, while the workers received it and ran the same classes with the same results.
 
 **Costs** On the JVM the plugin must drive Mill's test queue itself, since evaluating the module's own test task passes discovery the same arguments as the workers. That route needs reflection on Mill's protected discovery member, `@experimental` `TestModuleUtil`, `@internal` `internalWorker`, `TestResult` and `TestRunnerUtils.globFilter`, `mill.javalib.api.internal.ZincOp` and a copy of Mill's test-queue scheduling, any of which a Mill release can break at run time, not compile time.
 
@@ -122,10 +122,10 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 
 - Re-running the goals that fail-fast skipped, through public API only, starts their tests late and drops the console summary between rounds.
 - Falling back to such rounds when reflection fails adds a code path that runs only after a Mill change has likely broken other internals too.
-- Requiring `--keep-going` on the command line adds a flag to every run, and without it scheduling decides which modules report (`../SPECIFICATION.md` R-056).
+- Requiring `--keep-going` on the command line adds a flag to every run, and without it scheduling decides which modules report (`../SPECIFICATION.md` R-056a).
 - Setting `--keep-going` in the build's `mill-opts` turns fail-fast off for every Mill command in the project.
 
-**Reasoning** The nested evaluation is one `execute` call on a copy of `mill.exec.Execution`, made by reflection with `failFast` off, which meets `../SPECIFICATION.md` R-056 without `--keep-going`. R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…" and "On the console, progress output is a one-line summary…"; `test-command.md` "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Meeting R-056 through the copy adds one more such dependency, not a new kind of risk.
+**Reasoning** The nested evaluation is one `execute` call on a copy of `mill.exec.Execution`, made by reflection with `failFast` off, which meets `../SPECIFICATION.md` R-056a without `--keep-going`. R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…" and "Progress output is a summary of the number of suites and tests expected to run…"; `test-command.md` "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Meeting R-056a through the copy adds one more such dependency, not a new kind of risk.
 
 **Costs** The route reaches a `private val` of Mill's evaluator by reflection and copies `mill.exec.Execution`, both outside Mill's compatibility policy, so a Mill release that changes either breaks it at run time, not compile time. The copy may briefly draw its own failure count on Mill's prompt before the test command ends.
 

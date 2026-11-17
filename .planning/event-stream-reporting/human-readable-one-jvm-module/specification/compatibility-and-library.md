@@ -89,9 +89,9 @@ Feature: The consolidation library without Mill
       And a build whose JVM test module `core.test` holds the suite and tests with `com.edc::scalatest` at the release of this fork under test
       And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
       And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
-      And the test command, invoked as `mill scalatest/test core.test` with Mill's `--color false`, has run `core.test`
+      And the test command, invoked as `mill scalatest/test core.test`, has run `core.test`
       When the suite runs through `Framework` outside Mill, given the ScalaTest runner argument that turns the emitter on and names the file to which the run writes its test event log
-      And the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label `core.test`, with colour off
+      And the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, as a run of the module `core.test`, with colour on
       Then the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line
 
   Rule: The library writes human-readable output only once every run's event stream has ended
@@ -110,7 +110,7 @@ Feature: The consolidation library without Mill
         suite "SqrtPropSpec": SuiteCompleted
         run ended completed
         """
-      And the run is fed to the consolidation library under test run label `core.test`, with colour on
+      And the run is fed to the consolidation library as a run of the module `core.test`, with colour on
 
     Scenario: AC-064 A completed run whose event stream is held open
       When every event has been fed and the event stream is held open
@@ -119,7 +119,7 @@ Feature: The consolidation library without Mill
     Scenario: AC-118 A completed run whose event stream has ended
       Given every event has been fed and the event stream has ended
       When the caller ends the consolidation
-      Then the library writes the human-readable output:
+      Then the library writes the human-readable output, which, apart from its summary line, is:
         """
         [core.test]
           SqrtPropSpec:
@@ -130,5 +130,6 @@ Feature: The consolidation library without Mill
 | Requirement | Criteria       |
 |-------------|----------------|
 | R-023       | AC-062         |
-| R-113       | AC-063         |
 | R-027       | AC-064, AC-118 |
+| R-082       | AC-118         |
+| R-113       | AC-063         |

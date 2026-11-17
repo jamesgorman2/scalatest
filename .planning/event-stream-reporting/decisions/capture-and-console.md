@@ -2,30 +2,15 @@
 
 Decisions behind `../SPECIFICATION.md` on what is captured from each run and how the console is shared with Mill, newest first.
 
-## On the console, progress output is a one-line summary rewritten in place plus whole lines, both sharing Mill's prompt, rather than streamed single characters or output that needs `--ticker false`.
+## Progress output is a summary of the number of suites and tests expected to run and their current completion state, redrawn in place (`../SPECIFICATION.md` R-090a, R-090b, R-090c, R-090d, R-090e, R-089).
 
 **Alternatives**
 
-- Streaming a single character for each test result or suite failure needs raw writes, because `Task.log` passes only whole lines; the prompt's redraws overwrite raw writes.
-- Pausing Mill's prompt while the tests run, and writing raw, needs the `private[mill]` `withPromptPaused`.
-- Requiring Mill's `--ticker false` makes the user pass it on every command, since the plugin cannot set it.
-- Whole lines alone give no live sense of a long run's progress.
+**Reasoning**
 
-**Reasoning** `Task.log.ticker` and `Task.log` are public with no annotation: Mill rewrites the ticker's detail in place on the test command's own prompt line, and clears and redraws its prompt around `Task.log` lines, which left no stale prompt. The test command runs every selected module's tests in one evaluation nested inside it. The summary survives that evaluation only when the evaluation logs through the command's `Task.log`, which keys every nested task's prompt line to sort after the command's. Logged otherwise, nested tasks' lines hide the summary or take the command's prompt line, against `../SPECIFICATION.md` R-089 and R-091.
-
-**Costs** Progress output streams no single characters; its summary is cut to the console width and gone once that evaluation returns, while event streams may still be ending; and Mill has lost a `Task.log` line in some runs under Windows pseudo-consoles, for an unknown cause, against `../SPECIFICATION.md` R-091. R-089 rests on prompt ordering in `mill.internal`, which has no compatibility promise, so a Mill change there would break it silently; logging that evaluation through `Task.log` also prefixes its tasks' console lines `1-<n>]` instead of `<n>]` (R-050).
+**Costs**
 
 **Settled by**
-
-- [How do the consolidated progress output and Mill's own prompt share the console?](https://github.com/jamesgorman2/scalatest/issues/36).
-- [Does Task.log.ticker keep the test command's summary, and Task.log its lines, through the nested evaluation?](https://github.com/jamesgorman2/scalatest/issues/47).
-
-**See**
-
-- `../research/mill-command-lifetime.md` § 4.2.
-- `../research/mill-nested-keep-going.md` § 2.1, § 3.3.
-- `../research/emitter-plugin-spike.md` § 8.2, § 8.4.
-- `../research/nested-prompt-console.md` § 2–6.
 
 ---
 
@@ -33,7 +18,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Alternatives** Defining test output by write route and thread makes a test's `println` test output, but not the same line from a pool thread the test uses, or through a C `printf` on Native.
 
-**Reasoning** A reader means by test output what the suite, scope or test wrote, however it was written. Routes and thread rules then decide only which node output is captured against (`../SPECIFICATION.md` R-012).
+**Reasoning** A reader means by test output what the suite, scope or test wrote, however it was written. Routes and thread rules then decide only which node output is captured against (`../SPECIFICATION.md` R-097b).
 
 **Costs** A C `printf` in a Native test, and the output of concurrent async tests on Scala.js, are test output yet land on a broader node than the one that wrote them.
 
@@ -43,24 +28,12 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 ---
 
-## Output captured only against the run is shown without claiming its source.
-
-**Alternatives** Labelling run-level output as test output or worker output asserts what no capture route can tell: on Native, the process's descriptors carry a test's C write, a crash message and the code under test's own stdout alike.
-
-**Reasoning** Worker output is never captured against a suite, scope or test, so only output captured against the run is of uncertain source (`../SPECIFICATION.md` R-086, R-087).
-
-**Costs** A JSON reader cannot separate worker output from test output captured only against the run.
-
-**Settled by** [What do the capture requirements hold where a write cannot be caught, tied to one node, or kept off the console?](https://github.com/jamesgorman2/scalatest/issues/33).
-
----
-
-## `../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime, though meeting them needs Mill API that Mill does not keep stable.
+## `../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime, though meeting them needs Mill API that Mill does not keep stable.
 
 **Alternatives**
 
 - Holding only what Mill's stable API allows survives Mill releases, but its one route into a JVM worker's streams, a shim `testFramework`, takes only writes made through `System.out` and `System.err`, so JVM warnings, native code and child processes still write to the console.
-- Relaxing R-040, R-042 and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
+- Relaxing R-040, R-097a and R-044 on the runtimes where taking a run's output is hardest leaves that output interleaved on the console, which is the problem this epic addresses.
 - Running Mill's JVM test runner under a plugin `TaskCtx` with Mill's own logger takes each worker's streams but still shows that runner's progress (R-044).
 - Passing the public `Logger.DummyLogger` as that `TaskCtx`'s `log` keeps that runner's progress off the console, but still evaluates Mill's own JVM test task, which passes the runner argument to Mill's discovery runner (R-072; `architecture-running-tests.md` "The plugin runs a module's test discovery itself…").
 
@@ -95,7 +68,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`../SPECIFICATION.md` R-044).
 
-**Costs** The test command's result does not list the failed tests (`../SPECIFICATION.md` R-046), so a tool reading Mill's failure report sees only that the test command failed. A tool reading Mill's XML report sees less than the console shows, since it omits failures outside tests, and finds no report, or an earlier one, at Mill's usual path, since R-110 moves it.
+**Costs** The test command's result does not list the failed tests, so a tool reading Mill's failure report sees only that the test command failed. A tool reading Mill's XML report sees less than the console shows, since it omits failures outside tests, and finds no report, or an earlier one, at Mill's usual path, since R-110 moves it.
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
@@ -111,7 +84,7 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 **Reasoning** A JVM or native-code message is often the only explanation of a run that did not complete, and the run's results are where a reader looks for it. Capturing everything also means no run prints for itself, so nothing interleaves.
 
-**Costs** This output arrives apart from the test event log, so its place among the run's events is not kept (`../SPECIFICATION.md` R-043).
+**Costs**
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 

@@ -65,7 +65,7 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 
 **Reasoning** A hand-off at each send site is one route to the emitter on every runtime, visible where each event is sent. The senders outside every wrapper in a run the test command starts are a known, short list in ScalaTest core, so the risk that a missed or future site loses its events is worth taking for that one route.
 
-**Costs** A send site missed now, or added by an upstream merge, silently loses its events (`../SPECIFICATION.md` R-021, R-097), and no acceptance test finds an unknown site.
+**Costs** A send site missed now, or added by an upstream merge, silently loses its events (`../SPECIFICATION.md` R-130c, R-097a), and no acceptance test finds an unknown site.
 
 **Settled by** [How does the emitter receive and tag events sent outside every structure wrapper?](https://github.com/jamesgorman2/scalatest/issues/66).
 
@@ -75,7 +75,7 @@ Decisions behind `../ARCHITECTURE.md` on how each event's place in the test stru
 
 **Alternatives** Each run assembling its own test structure still leaves the library to assemble the test structure of a run whose process dies, and puts more code on Scala.js and Native.
 
-**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`../SPECIFICATION.md` R-064, R-100). Structure sent as each suite starts (`run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
+**Reasoning** A run's process can die at any point, so the library must build the test structure from whatever arrived (`../SPECIFICATION.md` R-095a, R-095b). Structure sent as each suite starts (`run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…"), after filtering, gives it every scope and test a constructed suite registered and none a filter excluded.
 
 **Costs** The test event log carries more, and the library must keep the place of a node that a later structure drops.
 

@@ -6,12 +6,15 @@ This part contains the acceptance criteria for which suites, scopes, tests and f
 
 ```gherkin
 Feature: The order of suites, scopes and tests
+  A suite, scope or test that its parent's structure declares has a declared position among that parent's children.
+  A top-level suite, a suite that a test ran, and a suite that its parent suite ran without declaring it have none.
+  Ascending alphanumeric order compares two names as Java's `String.compareTo` compares them.
 
   Background:
     Given the consolidation library is used directly, without Mill, with colour on
-    And the library consolidates a run under the test run label `core.test`
+    And the library consolidates a run of the module `core.test`
 
-  Rule: A label's top-level suites appear in ascending lexicographic order by name
+  Rule: A run's top-level suites appear in ascending alphanumeric order by name
     Scenario: AC-065 Suites whose names sort apart from their classes and the order they ran in
       Given an event log holding:
         """
@@ -40,7 +43,7 @@ Feature: The order of suites, scopes and tests
         run ended completed
         """
       When the library consolidates it
-      Then the human-readable output is:
+      Then the human-readable output, apart from its summary line, is:
         """
         [core.test]
           AlphaSuite:
@@ -51,7 +54,7 @@ Feature: The order of suites, scopes and tests
             - zeta
         """
 
-  Rule: Below a top-level suite, a node's children appear in declared order
+  Rule: The children that a suite's structure declares for a suite or scope appear in declared order
     Scenario: AC-066 Scopes and tests declared out of name order and run out of declared order
       Given an event log holding:
         """
@@ -87,6 +90,82 @@ Feature: The order of suites, scopes and tests
           A
             - m
         """
+
+  Rule: The suites that one execution of a test ran appear in ascending alphanumeric order by name
+    Scenario: AC-198 A test ran two suites out of name order
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "uses helpers", label "- uses helpers"
+        suite "OuterSuite": SuiteStarting
+        test "uses helpers": TestStarting
+        structure under test "uses helpers"
+          suite "ZetaHelper", class "a.ZetaHelper"
+            test "zeta", label "- zeta"
+        test "zeta": TestStarting
+        test "zeta": TestSucceeded
+        structure under test "uses helpers"
+          suite "AlphaHelper", class "z.AlphaHelper"
+            test "alpha", label "- alpha"
+        test "alpha": TestStarting
+        test "alpha": TestSucceeded
+        test "uses helpers": TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `OuterSuite` are:
+        """
+        OuterSuite:
+          - uses helpers
+            AlphaHelper:
+              - alpha
+            ZetaHelper:
+              - zeta
+        """
+
+  Rule: The suites that a suite ran without declaring them, and that share a suite ID with no suite the parent declares, appear after the parent's declared children, in ascending alphanumeric order by name
+    Scenario: AC-199 A suite ran two suites it does not declare, out of name order
+      Given an event log holding:
+        """
+        run started
+        structure
+          suite "OuterSuites", class "samples.OuterSuites"
+            suite "DeclaredSuite", class "samples.DeclaredSuite"
+              test "declared", label "- declared"
+            test "own", label "- own"
+        suite "OuterSuites": SuiteStarting
+        structure under suite "OuterSuites"
+          suite "ZetaSuite", class "a.ZetaSuite"
+            test "zeta", label "- zeta"
+        test "zeta": TestStarting
+        test "zeta": TestSucceeded
+        structure under suite "OuterSuites"
+          suite "AlphaSuite", class "z.AlphaSuite"
+            test "alpha", label "- alpha"
+        test "alpha": TestStarting
+        test "alpha": TestSucceeded
+        test "declared": TestStarting
+        test "declared": TestSucceeded
+        test "own": TestStarting
+        test "own": TestSucceeded
+        suite "OuterSuites": SuiteCompleted
+        run ended completed
+        """
+      When the library consolidates it
+      Then the lines for `OuterSuites` are:
+        """
+        OuterSuites:
+          DeclaredSuite:
+            - declared
+          - own
+          AlphaSuite:
+            - alpha
+          ZetaSuite:
+            - zeta
+        """
 ```
 
 ## Outcomes
@@ -95,9 +174,9 @@ Feature: The order of suites, scopes and tests
 Feature: Outcomes
 
   Rule: No line shows an outcome rolled up from the nodes below it
-    Scenario: AC-067 A failed test leaves its scope, suite and label without a suffix
+    Scenario: AC-067 A failed test leaves its scope, suite and module without a suffix
       Given the consolidation library is used directly, without Mill, with colour on
-      And the library consolidates a run under the test run label `core.test`
+      And the library consolidates a run of the module `core.test`
       And an event log holding:
         """
         run started
@@ -117,7 +196,7 @@ Feature: Outcomes
         run ended completed
         """
       When the library consolidates it
-      Then the test run label's line is `[core.test]`
+      Then the module's line is `[core.test]`
       And the suite's name line is `FailingFunSpec:`
       And the scope's line is `A Stack`
       And the test's line is `- is empty *** FAILED ***`
@@ -153,7 +232,7 @@ Feature: Nodes that share a name
 
   Background:
     Given the consolidation library is used directly, without Mill, with colour on
-    And the library consolidates a run under the test run label `core.test`
+    And the library consolidates a run of the module `core.test`
 
   Rule: Nodes that share a name are never merged
     Scenario: AC-069 Two scopes share a name
@@ -188,17 +267,14 @@ Feature: Nodes that share a name
             - pops
         """
 
-    Scenario: AC-070 Two suites share a name
+  Rule: Suites that share a name and have no declared position are never merged, and appear in the order they started
+    Scenario: AC-070 Two top-level suites share a name, and the suite registered second starts first
       Given an event log holding:
         """
         run started
         structure
           suite "SameSuite", class "a.SameSuite"
             test "in a", label "- in a"
-        suite "SameSuite" #1: SuiteStarting
-        test "in a": TestStarting
-        test "in a": TestSucceeded
-        suite "SameSuite" #1: SuiteCompleted
         structure
           suite "SameSuite", class "b.SameSuite"
             test "in b", label "- in b"
@@ -206,14 +282,23 @@ Feature: Nodes that share a name
         test "in b": TestStarting
         test "in b": TestSucceeded
         suite "SameSuite" #2: SuiteCompleted
+        suite "SameSuite" #1: SuiteStarting
+        test "in a": TestStarting
+        test "in a": TestSucceeded
+        suite "SameSuite" #1: SuiteCompleted
         run ended completed
         """
       When the library consolidates it
-      Then the human-readable output holds two `SameSuite:` lines
-      And the lines for one of those suites are `SameSuite:` and `- in a`
-      And the lines for the other are `SameSuite:` and `- in b`
+      Then the human-readable output, apart from its summary line, is:
+        """
+        [core.test]
+          SameSuite:
+            - in b
+          SameSuite:
+            - in a
+        """
 
-  Rule: Where one execution of a parent runs more nested suites sharing a suite ID than the parent declares, each extra suite sits directly after the last sibling sharing that suite ID, with the scopes and tests that the extra suite registers
+  Rule: Where a suite declares a nested suite, and one execution of the parent runs more nested suites sharing that suite ID than the parent declares, each extra suite sits directly after the last sibling sharing that suite ID, with the scopes and tests that the extra suite registers
     Scenario: AC-163 A nested suite that ran twice in one run of its parent
       Given an event log holding:
         """
@@ -273,7 +358,7 @@ Feature: Filtered tests
       And nothing else in the run writes to stdout or stderr or sends a message outside a suite
       And the module's own ScalaTest arguments are `-l samples.Slow`
       When the test command runs the module
-      Then the human-readable output is:
+      Then the human-readable output, apart from its summary line, is:
         """
         [core.test]
           SpeedSuite:
@@ -291,14 +376,14 @@ Feature: Failures
       Given suite `UnicodeSuite`, class `samples.UnicodeSuite`, an `AnyFunSuite` whose test `reports`, labelled `- reports`, calls `fail("first line\nsecond line: ü ß 日本 ✓")` at line 7 of `UnicodeSuite.scala`
       And `UnicodeSuite` runs through ScalaTest's `Framework`, outside Mill, given the ScalaTest runner argument that writes the run's test event log to a file
       And the consolidation library is used directly, without Mill, with colour on
-      When the library consolidates that test event log as a run under the test run label `core.test`
+      When the library consolidates that test event log as a run of the module `core.test`
       Then the lines under `- reports *** FAILED ***` begin:
         """
         first line
         second line: ü ß 日本 ✓ (UnicodeSuite.scala:7)
         """
 
-  Rule: Every suite, scope, test, failure and line of captured output of a run is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution
+  Rule: Every suite, scope, test, failure and line of captured output of a run is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and below whose root every node that is neither attributed nor an ignored test is aborted with the same reason, and apart from every test that has no execution where another test of the run with the same suite ID and the same test name has one, and every scope or suite that has not started, has a test below it, and has only such tests below it
     Scenario: AC-073 The compatibility fixture
       Given a Mill 1.3.1 build whose JVM test module `core.test` tests with `com.edc::scalatest` at the release under test
       And the build's `build.mill` header adds the Mill plugin, `com.edc::scalatest-mill` at that release, to its `mvnDeps`
@@ -322,20 +407,22 @@ Feature: Failures
         | a suite whose `beforeAll` throws                                                                                                       |
         | a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, with a scope, that does not abort                                       |
         | a test that writes to stdout and to stderr                                                                                             |
-      When the test command runs the module with Mill's `--color false`
-      Then the human-readable output shows every suite, scope and test of the run, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution
+      When the test command runs the module
+      Then the human-readable output shows every suite, scope and test of the run, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and below whose root every node that is neither attributed nor an ignored test is aborted with the same reason, and apart from every test that has no execution where another test of the run with the same suite ID and the same test name has one, and every scope or suite that has not started, has a test below it, and has only such tests below it
       And the human-readable output shows every failure with its message, and every line the fixture writes to stdout or stderr
 ```
 
 ## Requirements covered
 
-| Requirement | Criteria                       |
-|-------------|--------------------------------|
-| R-011       | AC-072                         |
-| R-021       | AC-073                         |
-| R-079       | AC-065                         |
-| R-098       | AC-067                         |
-| R-099       | AC-068                         |
-| R-104       | AC-069, AC-070, AC-163         |
-| R-105       | AC-066, AC-163                 |
-| R-112       | AC-071                         |
+| Requirement | Criteria                                       |
+|-------------|------------------------------------------------|
+| R-011       | AC-072                                         |
+| R-098b      | AC-067                                         |
+| R-098c      | AC-067, AC-068                                 |
+| R-098e      | AC-067                                         |
+| R-104       | AC-069, AC-070, AC-163                         |
+| R-105       | AC-065, AC-066, AC-070, AC-163, AC-198, AC-199 |
+| R-106c      | AC-073                                         |
+| R-106e      | AC-073                                         |
+| R-142       | AC-071                                         |
+| R-130c      | AC-073                                         |

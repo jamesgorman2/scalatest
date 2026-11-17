@@ -79,7 +79,7 @@ Feature: The run in its test event log
 
 | Requirement                      | Criteria                       |
 |----------------------------------|--------------------------------|
-| R-097                            | AC-121                         |
+| R-097b                           | AC-121                         |
 | `../../SPECIFICATION.md` § Scope | AC-094, AC-060, AC-120, AC-133 |
 
 ## Each suite's structure
@@ -249,7 +249,7 @@ Feature: Each suite's structure
         structure
           suite "FilteredSuite", class "samples.FilteredSuite"
             test "fast", label "- fast"
-            test "later", label "- later"
+            test "later", label "- later", ignored
         """
       And the event log holds `test "later": TestIgnored`, and no event is assigned to `slow`
 
@@ -268,13 +268,72 @@ Feature: Each suite's structure
             test "b", label "- b"
             test "a", label "- a"
         """
+
+  Rule: A `structure` marks ignored each test it contains that ScalaTest's filter says the suite ignores, and no other test: a test tagged `org.scalatest.Ignore`, as a test declared with `ignore` and every test of a suite annotated `@Ignore` are, that the filter does not drop
+    Scenario: AC-190 Every test of a suite annotated `@Ignore`
+      Given suite `ShelvedSuite`, class `samples.ShelvedSuite`, an `AnyFunSuite` annotated `@Ignore`, declaring tests `a` and `b`, labelled `- a` and `- b`
+      When `Framework` runs it with the runner argument
+      Then the event log's `structure` for `ShelvedSuite` is:
+        """
+        structure
+          suite "ShelvedSuite", class "samples.ShelvedSuite"
+            test "a", label "- a", ignored
+            test "b", label "- b", ignored
+        """
+      And the event log holds `test "a": TestIgnored` and `test "b": TestIgnored`, and no `TestStarting`
+
+    Scenario: AC-191 A test tagged `org.scalatest.Ignore` in a suite with no registration tree
+      Given suite `PlainSuite`, class `samples.PlainSuite`, a `Suite` that overrides `testNames` as `Seq("b", "a", "c")`, `tags` to tag `a` with `org.scalatest.Ignore`, and `runTest` to report `TestStarting` and `TestSucceeded` for the test it is given
+      When `Framework` runs it with the runner argument
+      Then the event log's `structure` for `PlainSuite` is:
+        """
+        structure
+          suite "PlainSuite", class "samples.PlainSuite"
+            test "b", label "- b"
+            test "a", label "- a", ignored
+            test "c", label "- c"
+        """
+      And the event log holds `test "a": TestIgnored`, and no `TestStarting` is assigned to `a`
+
+    Scenario: AC-192 An ignored test that the filter drops is not in the structure
+      Given suite `FilteredSuite`, class `samples.FilteredSuite`, an `AnyFunSuite` declaring tests `fast` and `later`, labelled `- fast` and `- later`, of which `later` is declared with `ignore` and tagged `samples.Slow`
+      When `Framework` runs it with the runner argument and `-l samples.Slow`
+      Then the event log's `structure` for `FilteredSuite` is:
+        """
+        structure
+          suite "FilteredSuite", class "samples.FilteredSuite"
+            test "fast", label "- fast"
+        """
+      And the event log holds no `TestIgnored`
+
+    Scenario: AC-193 A further `structure` marks an ignored test that only the suite instance that runs registers
+      Given suite `ConfigSpec`, class `samples.ConfigSpec`, an `AnyFunSpec` annotated `@WrapWith(classOf[ConfigMapWrapperSuite])`, whose constructor takes a `Map[String, Any]`, declaring scope `A config`, labelled `A config`
+      And scope `A config` holds test `remote`, labelled `- remote` and declared with `ignore`, when the config map of `ConfigSpec` holds key `db`, and test `local`, labelled `- local`, which succeeds, when it does not
+      When `Framework` runs it with the runner argument and `-Ddb=on`
+      Then the event log holds, in this order:
+        """
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+            scope "A config", label "A config"
+              test "local", label "- local"
+        suite "ConfigSpec": SuiteStarting
+        structure
+          suite "ConfigSpec", class "samples.ConfigSpec"
+            scope "A config", label "A config"
+              test "remote", label "- remote", ignored
+        test "remote": TestIgnored
+        suite "ConfigSpec": SuiteCompleted
+        """
 ```
 
-| Requirement                      | Criteria                                                       |
-|----------------------------------|----------------------------------------------------------------|
-| R-096                            | AC-096, AC-097, AC-098, AC-099, AC-100, AC-130, AC-131, AC-126 |
-| R-130                            | AC-128, AC-129, AC-131, AC-154                                 |
-| `../../SPECIFICATION.md` § Scope | AC-096, AC-097, AC-098, AC-130, AC-101, AC-102, AC-127         |
+| Requirement                      | Criteria                                                                       |
+|----------------------------------|--------------------------------------------------------------------------------|
+| R-096a                           | AC-099, AC-100, AC-126                                                         |
+| R-098a                           | AC-101, AC-190, AC-191, AC-193                                                 |
+| R-130a                           | AC-096, AC-097, AC-098, AC-130, AC-102, AC-190, AC-191                         |
+| R-130b                           | AC-131, AC-154, AC-193                                                         |
+| R-130d                           | AC-096, AC-097, AC-098, AC-099, AC-100, AC-128, AC-129, AC-130, AC-131, AC-126 |
+| `../../SPECIFICATION.md` § Scope | AC-096, AC-097, AC-098, AC-130, AC-101, AC-102, AC-127, AC-192                 |
 
 ## Labels
 
@@ -304,7 +363,7 @@ Feature: Labels
         | `AnyFlatSpec`, `AsyncFlatSpec`, `FixtureAnyFlatSpec`, `FixtureAsyncFlatSpec`                    | `behavior of "s"; it can "t" in`                                                                    | `scope "s", label "s"`, holding `test "t", label "- can t"`                                         |
         | `AnyFeatureSpec`, `FixtureAnyFeatureSpec`                                                       | `Feature("s") { Scenario("t") }`                                                                    | `scope "s", label "Feature: s"`, holding `test "t", label "Scenario: t"`                            |
         | `AsyncFeatureSpec`, `FixtureAsyncFeatureSpec`                                                   | `Feature("s") { Scenario("t") }`                                                                    | `scope "s", label "Feature: s"`, holding `test "t", label "- Scenario: t"`                          |
-        | `AnyFeatureSpec`, `AsyncFeatureSpec`, `FixtureAnyFeatureSpec`, `FixtureAsyncFeatureSpec`        | `Feature("s") { ignore("t") }`                                                                      | `scope "s", label "Feature: s"`, holding `test "t", label "- Scenario: t"`                          |
+        | `AnyFeatureSpec`, `AsyncFeatureSpec`, `FixtureAnyFeatureSpec`, `FixtureAsyncFeatureSpec`        | `Feature("s") { ignore("t") }`                                                                      | `scope "s", label "Feature: s"`, holding `test "t", label "- Scenario: t", ignored`                 |
         | `RefSpec`                                                                                       | ``object `s v` { def `t u`: Unit = () }``, the scope's object name and the test method's name each holding a space, as `RefSpec` requires of both | `scope "s v", label "s v"`, holding `test "t u", label "- t u"`                                     |
 ```
 

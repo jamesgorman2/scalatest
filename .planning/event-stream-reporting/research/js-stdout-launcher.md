@@ -250,11 +250,11 @@ What the runs show against each requirement the issue names, in `SPECIFICATION.m
 |---|---|---|
 | R-092, no change to the module | Held: only the plugin's evaluation saw the launcher (§ 2.1) | Held |
 | R-011, nothing lost or altered | No gap or unparseable event in 60 runs (§ 6) | The same, 52 runs |
-| R-071, a run with no task, and a death before its first task | The `runStarted` event arrived for every `empty`, `diehook` and `killstart` run (§ 9) | The same |
-| R-073 with R-042, everything handed to the OS arrives when the process dies | Every handed byte arrived, stdout and stderr, reader keeping up or paused (§ 5) | The same; `JDC`'s 64 417 B loss did not recur |
-| R-074, how the run ended | `DONE-RETURNED` arrived for every run that finished and for none that died (§ 6) | The same |
+| A run with no task, and a death before its first task | The `runStarted` event arrived for every `empty`, `diehook` and `killstart` run (§ 9) | The same |
+| R-073 with R-097a, everything handed to the OS arrives when the process dies | Every handed byte arrived, stdout and stderr, reader keeping up or paused (§ 5) | The same; `JDC`'s 64 417 B loss did not recur |
+| R-074a, how the run ended | `DONE-RETURNED` arrived for every run that finished and for none that died (§ 6) | The same |
 | R-076, output of a process that ended before any run | `dieload`'s stdout and stderr lines captured, with no event (§ 9) | The same |
-| R-088, each piece of output once | No event among the passed-through lines; Mill's pipes carried 0 B (§ 3.2) | The same |
+| R-097a, each piece of output once | No event among the passed-through lines; Mill's pipes carried 0 B (§ 3.2) | The same |
 
 ## 11. Against the earlier notes
 

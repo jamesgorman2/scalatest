@@ -13,7 +13,7 @@ Notes this one builds on and does not repeat:
 
 - **A framework argument per worker works, with no Mill API beyond what Route B already uses** (§ 1, § 2). A worker's framework arguments are the `args` constructor field of the `TestModuleUtil` on which `callTestRunnerSubprocess` is called. The test command already calls that method once per worker, so it can call it on a `TestModuleUtil` built for that worker, whose `args` end with the worker's own absolute path. *Ran:* on Windows and Linux, under the daemon and `--no-daemon`, every one of 95 worker JVMs wrote its file at the path its argument named, in its own `processFolder`, with sandboxing off and on, and no file appeared anywhere else.
 - **Nothing else must stay shared between those instances** (§ 1.2). `TestModuleUtil` holds no mutable state; the queue folder, claim folder, `processFolder` and result path are parameters of the call, and discovery, results and the JUnit XML report are the test command's own code under Route B.
-- **R-053 holds as far as it was checked** (§ 2.3). Between workers of one module, each worker's `testargs` differed only in `arguments` and in the three fields that differ per worker under Mill's own task. The comparison against `testForked` itself is `MPC` § 5's; it was not repeated with sandboxing off.
+- **R-053a and R-053b hold as far as they were checked** (§ 2.3). Between workers of one module, each worker's `testargs` differed only in `arguments` and in the three fields that differ per worker under Mill's own task. The comparison against `testForked` itself is `MPC` § 5's; it was not repeated with sandboxing off.
 - **Inside the worker, only the `testargs` path on the JVM command line names the worker** (§ 3). `sun.java.command` held it in all 95 JVMs, and its parent folder was the `processFolder`. It is a HotSpot property, space-joined, so a path holding a space cannot be split out of it for certain. `ProcessHandle` gave no arguments on either platform. No environment variable, system property or `TestArgs` field that names the worker reaches a test-interface `Runner`.
 - **A module-level folder with a name per run loses the worker tie** (§ 4). `callTestRunnerSubprocess` does not return the process, so the plugin has no PID to match the `runStarted` event's against. *Source-read and inferred; not run.*
 - **The same mechanism works with sandboxing on** (§ 2.2, § 5): the sandbox-on fixture ran under it with the same results.
@@ -113,12 +113,12 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`; workers on Azul Zulu
 - **A class on two workers.** On Windows a class ran on two or three workers of one group in every run, as `MPC` § 5 records. Each such worker's file was in its own folder and held that class.
 - **`CREATE_NEW`.** No worker failed to create its file: no folder was given to two JVMs.
 
-### 2.3 Against R-053
+### 2.3 Against R-053a and R-053b
 
 - Within each module, the top-level keys of a worker's `testargs` that differed from the first started worker's were `arguments`, `outputPath`, `resultPath` and `globSelectors`, in every run, and no others. The last three hold the worker's own `processFolder`, queue and claim paths, and differ per worker under Mill's own task (`MILL` § 2.1). `arguments` differed only in the per-worker argument, by construction (§ 2.1).
 - *Inference:* the JVM arguments, environment, class path and working directory of the spawn come from instance fields that are equal across the instances (§ 1.2), so they are as under one instance.
 - Route B against Mill's own `testForked`: `MPC` § 5, with sandboxing on. It was not repeated here with sandboxing off (§ 6).
-- `SPECIFICATION.md` R-053 allows the arguments "plus only what is required to turn the emitter on, with its test event log, …". *Inference:* an argument that differs per worker only in the event log path is within that; the files land in the folder the test command owns for the module (R-110), not in the working directory.
+- `SPECIFICATION.md` R-053a and R-053b have the tests run as Mill's `testOnly` or `testForked` runs them. *Inference:* an argument that differs per worker only in the event log path is within that; the files land in the folder the test command owns for the module (R-110), not in the working directory.
 
 ## 3. What else differs per worker inside the worker JVM
 

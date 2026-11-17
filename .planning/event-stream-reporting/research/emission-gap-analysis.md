@@ -2,7 +2,7 @@
 
 For each need of the consolidated progress, human-readable and JSON output: what ScalaTest's events carry in memory on the JVM, Scala.js and Native, what `Event.toJson` keeps of it, and whether new code is needed at the point of emission. Facts only; no design is chosen or recommended.
 
-The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from `.planning/event-stream-reporting/JSON-LAYOUT.md`, the JSON layout its R-028 and R-080 cite.
+The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from `.planning/event-stream-reporting/JSON-LAYOUT.md`, the JSON layout its R-028 cites.
 
 `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`, already lists what serialisation loses; this note does not repeat it.
 
@@ -83,7 +83,7 @@ The JVM column is the JVM `Framework`, the path Mill drives. Where `Runner` diff
 
 ## 1. Structure
 
-**Need.** A run's test structure: the run at its root, then suites, nested suites under the suite that nests them, scopes and tests (`ESR` R-096, R-130, R-022). Messages attach to the node that emitted them (`ESR` R-097).
+**Need.** A run's test structure: the run at its root, then suites, nested suites under the suite that nests them, scopes and tests (`ESR` R-096a, R-130c, R-130d). Messages attach to the node that emitted them (`ESR` R-097a, R-097b).
 
 **In memory.**
 
@@ -107,7 +107,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 2. Identity
 
-**Need.** No node holds another run's events (`ESR` R-022). Each run writes one test event log (`.planning/event-stream-reporting/ARCHITECTURE.md` § APIs § The emitter and the Mill plugin), and the Mill plugin gives each selected test module its test run label (`ESR` R-025), which tells apart runs on different runtimes (`.docs/ubiquitous-language.md` **Test run label**). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`ESR` R-104).
+**Need.** No node holds another run's events (`ESR` R-097b). Each run writes one test event log (`.planning/event-stream-reporting/ARCHITECTURE.md` § APIs § The emitter and the Mill plugin), and the consolidation library adds each run under its module, which tells apart runs on different runtimes (`ESR` R-096a, R-135). No event therefore needs to name its run, its runtime or its process. Nodes that share a name are never merged (`ESR` R-104).
 
 **In memory and `toJson`.**
 
@@ -120,7 +120,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 3. Order
 
-**Need.** The order of events within a node is kept (`ESR` R-011). Children appear in declared order where it is known, and each message keeps its place among them (`ESR` R-105, R-109).
+**Need.** The order of events within a node is kept (`ESR` R-043). Children appear in declared order where it is known, and each message keeps its place among them (`ESR` R-105; `JL` § Nodes).
 
 **In memory.** Every event holds an `Ordinal`; `Event.compare` orders by it (`EV/Event.scala` line 80; `EV/Ordinal.scala` lines 172, 232, 242). One tracker gives a total order of one process's events (`CORE/Tracker.scala` lines 64–70). Recorded messages are an ordered `IndexedSeq`, each with its own ordinal and `timeStamp` (`EV/Event.scala` line 358; `CORE/Suite.scala` line 1696).
 
@@ -133,7 +133,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 4. Outcome
 
-**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`ESR` R-098 to R-102, R-123; `JL` § Nodes and § Run records, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`ESR` R-011, R-028; `JL` § Throwables).
+**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`ESR` R-098a–R-098d, R-095a, R-095b, R-101, R-102; `JL` § Nodes and § Run nodes, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`ESR` R-011, R-028; `JL` § Throwables).
 
 **In memory and `toJson`.**
 
@@ -141,9 +141,9 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 - **Suite aborted.** `SuiteAborted` carries message and throwable (lines 935–949, 966). The JVM `Framework` turns a throwing constructor into a `DeferredAbortedSuite` and reports it (`TOOLS/Framework.scala` lines 443–458, 334, 358). **Provided** on the JVM.
 - **Constructor throws on Scala.js and Native.** `TaskRunner` instantiates the suite before it builds a reporter, outside any `try` (`JS/TaskRunner.scala` lines 79, 141, 149; `NAT/TaskRunner.scala` lines 79–83). No event is created. **Absent.**
 - **Run outcome.** The JVM `Framework` sends `RunCompleted` in `done()` and forwards a fork's `RunAborted` and `RunStopped` (`TOOLS/Framework.scala` lines 794, 921–924, 941). Scala.js and Native send no run-level event (`EMC` § 5). **Provided** on the JVM; **absent** on Scala.js and Native.
-- **Reasons.** No event has a reason field; the JSON output holds it as a node's or run record's `reason` (`JL` § Nodes, § Run records). **Absent.**
+- **Reasons.** No event has a reason field; the JSON output holds it as a node's or run's `reason` (`JL` § Nodes and § Run nodes). **Absent.**
 - **Throwable.** The event holds the `Throwable` itself. Of it, `toJson` keeps class, message and stack, which are **provided**, and drops the cause chain and suppressed exceptions, which are **lost** (`EMC` § 1.1). Also lost is a `StackDepthException`'s `failedCodeFilePathname`, which `JL` § Throwables and § Locations need as `filePath`.
-- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The JSON output holds neither (`ESR` R-108; `JL` § Nodes), and the test event log does not carry the payload (`ESR` § Out of scope).
+- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The JSON output holds neither (`JL` § Nodes), and the test event log does not carry the payload (`ESR` § Out of scope).
 
 ## 5. Duration
 
@@ -157,7 +157,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 6. Test output
 
-**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-012, R-021; `JL` § Nodes, `output`).
+**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-097a, R-097b, R-043; `JL` § Nodes, `output`).
 
 - No event type carries output (`EV/Event.scala`), and ScalaTest captures none (`EMC` § 4; the search was re-run for this note).
 - **Absent** on every runtime. Capture mechanisms per runtime: `JSN` § 4.
@@ -174,24 +174,24 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 8. Messages
 
-**Need.** `info`, `alert`, `note` and `markup` attach to their node and are never lost or reordered (`ESR` R-097, R-109; `JL` § Messages).
+**Need.** `info`, `alert`, `note` and `markup` attach to their node and are never lost or reordered (`ESR` R-097a, R-043; `JL` § Messages).
 
 - Notes and alerts are reported at once; info and markup inside a test arrive late (`EMC` § 5; `CORE/Engine.scala` lines 272–297, 310–315). `toJson` writes `recordedEvents` in full (`EV/Event.scala` line 383). **Provided.**
 - A test that never closes never sends its recorded messages. This is the unfinished-node case of § 10.
 
 ## 9. Run-level facts
 
-**Need.** A run record holds the run's expected test count, config map and summary counts (`ESR` R-080; `JL` § Run records). The JSON output's root records the ScalaTest version, which every run shares (`ESR` R-081). Progress output shows a current summary of the test command (`ESR` R-089).
+**Need.** A run's own state includes its expected test count, config map and summary counts (`JL` § Run nodes). The JSON output's root records the ScalaTest version, which every run shares (`JL` § Not yet fixed). Progress output shows a current summary of the test command (`ESR` R-090a).
 
 - **Expected test count.** The JVM `Framework` sends `RunStarting(…, 0, configMap)` (`TOOLS/Framework.scala` line 687); `Runner` sends the real count (`TOOLS/Runner.scala` line 1235). Scala.js and Native send no `RunStarting` (`EMC` § 5). **Absent** under every `Framework`.
 - **Config map.** In the JVM `RunStarting`. Scala.js and Native pass `ConfigMap.empty` to every suite and send no run event (`JS/TaskRunner.scala` line 146). **Provided** on the JVM; **absent** elsewhere.
 - **Summary.** JVM: `RunCompleted` carries the `Summary` (`TOOLS/Framework.scala` lines 791–794; `EV/Event.scala` lines 145–151). Scala.js and Native keep the counts for the `done()` string only (`JS/MasterRunner.scala` lines 132–150), counted from event class names (lines 192–213). **Derivable** there by counting event types, given every process's events.
 - **ScalaTest version.** No event carries it. **Absent.**
-- **Discovery.** Only `Runner` sends `DiscoveryStarting` and `DiscoveryCompleted` (`TOOLS/Runner.scala` lines 1109, 1150); a run record holds `discovery` only where the run reported them (`JL` § Run records).
+- **Discovery.** Only `Runner` sends `DiscoveryStarting` and `DiscoveryCompleted` (`TOOLS/Runner.scala` lines 1109, 1150); a run's own state holds `discovery` only where the run reported them (`JL` § Run nodes).
 
 ## 10. Nodes that never produce an event
 
-**Need.** Every node the run was to execute that never ran is aborted, *not run*: each nested suite, scope and test that never started, including those registered in a constructed suite that never ran (`ESR` R-100, R-065), and each test class a process took that no run reported as a suite (`ESR` R-066, R-095). A run that reports that it completed while a node that started in it has no event ending it is aborted, *process failed* (`ESR` R-102). The human-readable and JSON output show every such node (`ESR` R-021).
+**Need.** Every node the run was to execute that never ran is aborted, *not run*: each nested suite, scope and test that never started, including those registered in a constructed suite that never ran (`ESR` R-095a), and each test class a process took that no run reported as a suite (`ESR` R-095a). A run that reports that it completed while a node that started in it has no event ending it is aborted, *process failed* (`ESR` R-102). The human-readable and JSON output show every such node (`ESR` R-130c).
 
 - **Top-level suites.** Each runner learns them in `tasks(taskDefs)` and reports nothing (`TOOLS/Framework.scala` lines 750–767; `JS/MasterRunner.scala` lines 166–185). A suite's first event is its `SuiteStarting`, sent when its task executes (`TOOLS/Framework.scala` line 310).
 - **Tests and scopes.** `Engine` holds every registered test and scope from construction (`CORE/Engine.scala` lines 82–103, 688–689). A test's first event is its `TestStarting` (line 267).
@@ -207,7 +207,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 - Event order and content for suites not built on `Engine`: a hand-written `Suite`, `RefSpec`, and the JUnit and TestNG wrappers.
 - Whether Mill executes a JVM worker's tasks one at a time, which decides whether § 1's shared-tracker condition arises there. `JSN` § 1.3 establishes it for Scala.js and Native only.
 - What a `Throwable` holds on Scala.js and Native: stack frames, cause and suppressed exceptions.
-- What the progress output needs beyond `ESR` R-089 and R-090, which fix no fields.
+- What the progress output needs beyond `ESR` R-089 and R-090a–R-090e, which fix no fields.
 
 ## 12. A correction to an earlier note
 

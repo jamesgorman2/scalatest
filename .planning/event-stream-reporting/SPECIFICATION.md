@@ -15,7 +15,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the deployable units, the boundaries between the emitter, the Mill plugin and the consolidation library, and how each run's events reach the consolidated output.
 - [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md) — the decisions behind the architecture.
-- [JSON-LAYOUT.md](JSON-LAYOUT.md) — the layout of the JSON output: every key of a suite, scope, test, message, throwable, location and run record, what it means and when it is absent.
+- [JSON-LAYOUT.md](JSON-LAYOUT.md) — the layout of the JSON output.
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
@@ -91,7 +91,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
   - suite
   - scope
   - test
-- R-??? a non-forked run is reported as part of its module
+- R-135 a non-forked run is reported as part of its module
 - R-130a Where the structure is knowable up front, a structure event containing all registered tests is emitted. 
 - R-130b Multiple structure events may be emitted in a single run. The registered entities is the union of these trees.
 - R-130c The node tree contains each node that was registered and/or executed.
@@ -101,16 +101,13 @@ A throwable is compared on its class, its message and its chain of causes, and, 
   - all registered tests that can be attributed to any executed tests are not considered *not run*
   - any registered subtree where all its registered tests are not considered *not run* is also not considered *not run*
 - R-104 All nodes are identified by their position in the node tree
-- R-105 The node tree is ordered by:
-  - declaration order
-  - execution order
-  - alphanumeric by name
+- R-105 The node tree is ordered by declaration order, when known, otherwise alphanumeric by label, then execution order where two siblings have identical labels
 - R-097a All output is captured and attached to a node. Output is stdio, and `info`, `alert`, `note` and `markup` messages.
 - R-097b All output is attached to the most specific identifiable node.
 - R-043 All captured output keeps its order within a node, whatever its source.
 - R-076 Output captured from a forked execution, before any Runner is constructed, is associated with the most specific node that can be identified.
 - R-072 The execution of a runner that is not intended to produce test output, such as Mill's discovery runner, does not create nodes. Its failure state and output is attached to the root node.
-- R-??? The node tree is constructed from the consolidated test commands execution, claim files, and the events emitted by all Runners
+- R-136 The node tree is constructed from the consolidated test commands execution, claim files, and the events emitted by all Runners
 
 ### Outcomes and durations
 
@@ -147,6 +144,10 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-125b The consolidated test command fails on any unknown arguments
 - R-056a Unless `--halt-on-failure` is given, the consolidated test command runs the tests of every selected test module, whatever happens to other modules' runs as if Mill's `--keep-going` was given.
 
+### ScalaTest Arguments
+
+- R-142 any test module `testArgsDefault` arguments not in  `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W` are suppressed and not passed to ScalaTest. An argument ScalaTest does not recognise fails the consolidated test command before any test starts, naming it.
+
 ### Running the tests
 
 A task's *task folder* is the folder Mill gives that task to write its files in.
@@ -162,7 +163,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-046a Tests do not fail when ignored or pending
 - R-046b Scopes do not fail when pending
 - R-046c Other nodes fail when there is an error, including compilation, or when they or do not complete
-- R-??? the library and Mill return a failure if any node has failed 
+- R-137 the library and Mill return a failure if any node has failed 
 
 ### The consolidation plugin outputs
 
@@ -190,8 +191,8 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
   - `-fP` progress output only
   - `-fHP` progress and human-readable output
 - R-049b more than one `-f` argument may be provided
-- R-??? each `-o` and `-f` may be provided with filtering and formatting characters
-- R-??? filtering and formatting characters are local to the argument to which they are attached
+- R-138 each `-o` and `-f` may be provided with filtering and formatting characters
+- R-139 filtering and formatting characters are local to the argument to which they are attached
 - R-077 When the consolidated test command starts, before any test starts, the consolidated test command deletes or empties each existing file that it will write consolidated output to.
 - R-087 Worker output is captured against a run, module or root.
 
@@ -209,13 +210,15 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-127a Human-readable output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
 - R-127b Human-readable output omits a scope when all its children have been omitted by filtering characters. This is recursive.
 - R-082 Human-readable output omits the root and run nodes unless the node failed or there is output attached to the node
-- R-??? Human-readable output starts after the last progress output, if they are enabled together
-- R-??? Human-readable output ends with a summary line that is identical to the last progress output, regardless of whether progress output was enabled.
+- R-140 Human-readable output starts after the last progress output, if they are enabled together
+- R-141 Human-readable output ends with a summary line that is identical to the last progress output, regardless of whether progress output was enabled.
 
 ### JSON output
 
 - R-028 JSON output encodes the entire node tree, per `JSON-LAYOUT.md`.
 - R-084 JSON output is versioned against this fork
+- R-127c JSON output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes. 
+- R-127d JSON output omits a scope when all its children have been omitted by filtering characters. This is recursive.
 
 ### Progress output
 

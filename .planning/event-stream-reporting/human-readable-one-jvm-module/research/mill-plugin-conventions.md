@@ -164,7 +164,7 @@ A statement marked *inference* follows from the cited source and was not observe
 - **`testBatchFrameworkTasks`** (`TM`, a new public `T[Boolean]`, default `false`; `TMU`, `runTestBatchScheduler`).
   - When a module sets it, `runTests` skips `ZincOp.GetTestTasks` and runs one subprocess per fork group, with `Left(testClassList)` as the selector, so the group has no queue and no claim files. A group with no classes gets an empty queue folder and `claim/` folder.
   - The doc comment names Weaver's `GlobalResource` as the reason.
-  - *Inference:* a copy of the `1.1.10` queue scheduling runs such a module through the queue, unlike Mill's own task on `1.3.1` (`.planning/event-stream-reporting/SPECIFICATION.md` R-053). A test manifest compiled from claim files has no claims to read for it.
+  - *Inference:* a copy of the `1.1.10` queue scheduling runs such a module through the queue, unlike Mill's own task on `1.3.1` (`.planning/event-stream-reporting/SPECIFICATION.md` R-053b). A test manifest compiled from claim files has no claims to read for it.
 - **Discovery now ends its runner.** `TestRunnerUtils.getTestTasks0`, which serves `ZincOp.GetTestTasks`, calls `runner.done()` in a `finally`, and `getTestTasks` calls it when discovery throws. The `1.3.0` release note is "fix: call Runner.done() after test discovery (backport #7620)" (`[rel]`). The test command's own discovery runs through this same op (`MRP` § 7).
 - **Mill's Scala version.** `mill-build/src/millbuild/Deps.scala` `scalaVersion` is `3.8.2` at `[1110]` and `3.9.0` at `[131]` and `[14M2]` ("Update Scala to 3.9.0", `[131]` `changelog.adoc` § 1.3.0-M1).
   - *General:* a Scala 3 compiler reads TASTy from its own minor version or older. So a plugin compiled against `mill-libs` `1.3.1` needs Scala `3.9.x`, while one compiled on `3.8.2` against `1.1.10` loads on Mill's `3.9.0` runtime.
@@ -191,7 +191,7 @@ These are outside the issue's list. They are recorded because they bear on the r
 ### 8.1 Artifact naming
 
 - **`<name>_mill1_3` for the plugin** (`::<name>::<version>` in a header), the form every Mill 1.x plugin checked uses.
-  - Costs: none beyond choosing the name and group. The suffix says nothing about which 1.x releases are supported, which the plugin decides at run time (`.planning/event-stream-reporting/decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns.").
+  - Costs: none beyond choosing the name and group. The suffix says nothing about which 1.x releases are supported, which the plugin decides at run time (`.planning/event-stream-reporting/decisions/test-command.md` "On an unsupported Mill release, the test command warns on the console and in every file output…").
 - **A minor-version platform such as `_mill1.1_3`.**
   - Costs: no 1.x plugin does this, and `::` would not resolve it, because `$MILL_BIN_PLATFORM` is `1`. A build author would write the full artifact ID.
 - **The consolidation library as `<name>_3`,** Scala 3 only (§ 2).
@@ -226,7 +226,7 @@ These are outside the issue's list. They are recorded because they bear on the r
   - `1.1.10` is the last release of a line that `1.3` has superseded.
 - **`1.3.1`,** the newest stable 1.x.
   - Floor `1.3.1`, Scala `3.9.0`.
-  - Costs: the queue `MRP` § 3 observed must be re-run there, and `Execution` re-copied (§ 6). Users on `1.1.x` are below the floor, where nothing holds (`decisions/test-command.md` "On an unsupported Mill release, the test command runs and warns." Costs).
+  - Costs: the queue `MRP` § 3 observed must be re-run there, and `Execution` re-copied (§ 6). Users on `1.1.x` are below the floor, where nothing holds (`.planning/event-stream-reporting/SPECIFICATION.md` R-093).
   - The scheduling copy must follow `testSubprocessCount` and handle `testBatchFrameworkTasks` (§ 5).
 - **`1.4.0-M2`.**
   - Costs: a milestone, with `millBinPlatform` still `1`, but no stability promise; its `testargs` path mapping is new (§ 5).

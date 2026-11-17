@@ -4,7 +4,7 @@ This part contains the acceptance criteria for the text and colour of messages, 
 
 ## Messages
 
-Each row describes the human-readable output that the library, used directly with colour on and test run label `core.test`, writes when it consolidates an event log containing the message's event, `InfoProvided`, `NoteProvided`, `AlertProvided` or `MarkupProvided`, with `<text>` its `message`, or for markup its `text`.
+Each row describes the human-readable output that the library, used directly with colour on and module `core.test`, writes when it consolidates an event log containing the message's event, `InfoProvided`, `NoteProvided`, `AlertProvided` or `MarkupProvided`, with `<text>` its `message`, or for markup its `text`.
 
 | ID     | Kind   | Line              | Colour |
 |--------|--------|-------------------|--------|
@@ -18,7 +18,7 @@ Feature: Where messages sit
 
   Background:
     Given the consolidation library is used directly, without Mill, with colour on
-    And the library consolidates a run under the test run label `core.test`
+    And the library consolidates a run of the module `core.test`
 
   Rule: Messages sit under the node they attach to, after a test's failure or cancel lines, in the order the run reported them
     Scenario: AC-032 A test's messages sit under it, notes and alerts included
@@ -79,7 +79,7 @@ Feature: Where messages sit
         """
       And no line before `- must have size 0 *** FAILED ***` holds `a note` or `an alert`
 
-  Rule: A suite's or scope's message sits after the last of the node's children, in declared order, that started in the message's execution of the node before the run reported the message, and before the next child. Messages between the same two children keep the order the run reported them in
+  Rule: A suite's or scope's message sits after the last of the node's children, in the order the human-readable output shows them, that started in the message's execution of the node before the run reported the message, and before the next child. Messages between the same two children keep the order the run reported them in
     Scenario: AC-034 A scope's message sits among its children
       Given an event log holding:
         """
@@ -113,7 +113,7 @@ Feature: Where messages sit
             - pops
         """
 
-  Rule: Under a test's line, the test's failure or cancel lines come first, then the test's messages and the suites the test ran. Each message sits after the last suite that started in the message's execution of the test before the run reported the message, and before the next suite
+  Rule: Under a test's line, the test's failure or cancel lines come first, then the test's messages and the suites the test ran. Each message sits after the last suite, in the order the human-readable output shows the suites, that started in the message's execution of the test before the run reported the message, and before the next suite
     Scenario: AC-160 A test's messages sit among the suites it ran
       Given an event log holding:
         """
@@ -176,5 +176,9 @@ Feature: Where messages sit
 
 | Requirement | Criteria                                       |
 |-------------|------------------------------------------------|
-| R-097       | AC-032, AC-033, AC-034, AC-160                 |
-| R-106       | AC-028, AC-029, AC-030, AC-031, AC-160, AC-122 |
+| R-043       | AC-032, AC-033, AC-034, AC-160                 |
+| R-097a      | AC-028, AC-029, AC-030, AC-031                 |
+| R-097b      | AC-032, AC-033, AC-034, AC-160                 |
+| R-106b      | AC-032, AC-033, AC-034, AC-160, AC-122         |
+| R-106e      | AC-028, AC-029, AC-030, AC-031, AC-160, AC-122 |
+| R-106f      | AC-028, AC-029, AC-030, AC-031                 |

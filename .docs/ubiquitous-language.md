@@ -21,7 +21,7 @@ How a run schedules its suites and tests: *sequential*, one after another on one
 _Avoid_: Parallelism level, run mode
 
 **Module**:
-A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM. It is not a unit of consolidation; the Mill plugin and the sbt recipe give each module one test run label.
+A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM.
 _Avoid_: Project, subproject, target
 
 ## Test structure
@@ -31,12 +31,12 @@ The tree of a run's nodes as its tests are written, however many times each ran:
 _Avoid_: Test tree, hierarchy, nesting
 
 **Execution**:
-One running of a suite, scope or test at its place, inside one execution of its parent. A node has one for each time it ran, and none where it never started.
+One running of a suite, scope or test at its place, inside one execution of its parent.
 _Avoid_: Attempt, invocation, retry
 _Context_: A node of the test structure; unrelated to execution mode
 
 **Node**:
-An element in the test structure hierarchy as it is planned and executed. A single declaration (eg, suite, scope, test) may be referenced by multiple nodes when it is executed multiple times.
+An element in the test structure hierarchy as it is planned and/or executed. A single declaration (eg, suite, scope, test) may be referenced by multiple nodes when it is executed multiple times.
 _Avoid_: Element, item, entry, test case
 
 **Node path**:
@@ -49,7 +49,7 @@ _Avoid_: Test name, full name, text
 _Context_: A node of the test structure
 
 **Label**:
-A scope's or test's name as ScalaTest's formatter renders it, such as `when b` or `- should c`, without its indentation. Suites and the run node have none. It is not a test run label.
+A scope's or test's name as ScalaTest's formatter renders it, such as `when b` or `- should c`, without its indentation. Suites and the run node have none.
 _Avoid_: Formatted name, display name
 _Context_: A node of the test structure
 
@@ -121,17 +121,6 @@ _Avoid_: Test plan, class list, expected tests
 **Take**:
 A process's claim on a test class of its module's test manifest. On the JVM, a process takes each class it picks up from those of its fork group still waiting to run; on Scala.js and Native, it takes every test class the test command was to run for its module.
 _Context_: A test process and a test class
-
-**Not-run test class**:
-A test class the test command was to run that the human-readable and JSON output show as not run, because no run reported it as a suite: a suite node named by its class name, aborted with reason *not run*, with no children, that names no run record.
-
-**Test run label**:
-A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
-_Avoid_: Module, module name, group, tag
-
-**Run record**:
-One run's own state in consolidated JSON output, such as its outcome, timings, summary counts and the output captured against the run, held in a list on the run's test run label. Each of the run's suites names its run record.
-_Avoid_: Run node, worker record
 
 **Test command**:
 One evaluation of the command the Mill plugin adds for consolidated testing, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.

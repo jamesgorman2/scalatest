@@ -41,11 +41,13 @@ Each comparison of events is made by `org.scalatest.events.EventLogComparison`, 
 
 A drift between builder and decoder in what a criterion fixes then fails those tests, as well as the criteria run under Mill.
 
-Each test of human-readable output compares the whole output, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour.
+Each test of human-readable output compares the output apart from its summary line, written with colour on, against expected text in which each ANSI SGR sequence is replaced by a marker naming it, such as `{red}` or `{reset}`. One comparison checks text and colour. Only the tests of `../specification/layout-lines.md` AC-171, AC-174 to AC-176, AC-194 to AC-197 and AC-044, and of `../specification/test-command.md` AC-076, read the summary line, so a change to its format (`../../ROADMAP.md` § 9) changes those tests alone.
+
+The tests of `../specification/runs-and-test-structure-runs.md` AC-172 and AC-173 attach the root's captured output and failure through the library's own operations (`test-event-log.md` § The test event log on the JVM), beside a run the builder builds.
 
 ### Mill's console output
 
-The plugin's integration tests assert that Mill's list of failed tests and ScalaTest's end-of-run summary do not reach the console. They cannot assert the same of Mill's runner progress: without a terminal Mill prints no progress prompt, even under `testForked` with `--ticker true`, so its absence proves nothing. Suppressing the progress is covered by construction (`../../decisions/capture-and-console.md` "`../SPECIFICATION.md` R-040, R-042 and R-044 hold on every runtime…") and by `../../research/mill-runner-progress-without-trait.md`, which observed it under pseudo-terminals.
+The plugin's integration tests assert that Mill's list of failed tests and ScalaTest's end-of-run summary do not reach the console. They cannot assert the same of Mill's runner progress: without a terminal Mill prints no progress prompt, even under `testForked` with `--ticker true`, so its absence proves nothing. Suppressing the progress is covered by construction (`../../decisions/capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…") and by `../../research/mill-runner-progress-without-trait.md`, which observed it under pseudo-terminals.
 
 ### The compatibility fixture's output
 

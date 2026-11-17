@@ -1,6 +1,6 @@
 # Consolidated human-readable output for one JVM module: the test command
 
-Technical design of how the test command is reached, splits a module's arguments, captures a worker's output, takes its result and writes to stdout. Part of [../TECHNICAL-DESIGN.md](../TECHNICAL-DESIGN.md).
+Technical design of how the test command is reached, splits a module's arguments, captures a worker's output, takes its result, and writes to stdout in colour. Part of [../TECHNICAL-DESIGN.md](../TECHNICAL-DESIGN.md).
 
 ## Critical code paths
 
@@ -13,7 +13,7 @@ Technical design of how the test command is reached, splits a module's arguments
 
 ### A module's own ScalaTest arguments
 
-The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../../SPECIFICATION.md` R-125 allows. As in `testForked`, discovery receives the same arguments, without the runner argument.
+The test command reads the module's arguments from Mill's `TestModule.testArgsDefault`, where `testForked` takes them, and passes the worker those `../../SPECIFICATION.md` R-142 lists. As in `testForked`, discovery receives the same arguments, without the runner argument.
 
 - A flag cannot be told from a value by its leading `-`: in `-z -o`, `-o` is a test-name substring. The split therefore needs the arities of `org.scalatest.tools.ArgsParser.parseArgs`, but `ArgsParser` is `private[tools]`, only sorts arguments, and throws on one it does not recognise.
 - Core's argument splitter (`../../ARCHITECTURE.md` § Modules § ScalaTest core) is `org.scalatest.tools.ArgumentSplitter`, in core's Scala 3 JVM sources only. It returns the arguments in the order given, each as one of two kinds:
@@ -44,24 +44,30 @@ The worker's stdout and stderr become the tagged lines **Add a run** takes (`../
 - Each stream has its own line splitter, fed only by that stream's reader thread. It buffers bytes up to a `\n` byte, drops one `\r` directly before it, decodes the buffered bytes, and appends the line, tagged with its stream, to the run's one sequence under a lock.
   - Splitting before decoding never cuts a character in an ASCII-compatible charset whose multi-byte sequences never contain byte `0x0A`. That covers every encoding `native.encoding` names, among them UTF-8, the single-byte charsets, MS932, GBK, MS949 and Big5.
   - A lone `\r` stays in the line's text.
-  - Lines of the two streams enter the sequence in the order their splitters completed them. `../../SPECIFICATION.md` R-043 asks no more.
+  - Lines of the two streams enter the sequence in the order their splitters completed them.
+  - The run's events reach the library from event log reading's thread, which polls the event log file (`test-event-log.md` § The test event log on the JVM). Where one of the run's messages falls among its captured lines is therefore the order in which the library received them (`consolidation-library.md` § Critical code paths § The root and a run as nodes), which can differ from the order in which the worker wrote them. `../specification/runs-and-test-structure-runs.md` AC-054 asks no more.
+  - A line captured before the run's event log file exists is held, and is added to the run ahead of the run's first event.
 - When its stream ends, a splitter appends the line it still buffers, if that line has any bytes. Mill's call returns only once both reader threads have finished (`../../research/mill-worker-channels.md` § 2.3), so the sequence is complete when the call returns.
-- Mill's worker prints to stdout what its runner's `done` returns (`libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` `handleRunnerDone`, at Mill tag `1.3.1`). Mill prints nothing for the empty string that `org.scalatest.tools.Framework`'s `done` returns given the runner argument (`../../decisions/architecture-test-event-log.md` "Under the runner argument, `Framework.done` returns an empty string…"), so ScalaTest's end-of-run summary is never captured (`../../SPECIFICATION.md` R-045).
+- Mill's worker prints to stdout what its runner's `done` returns (`libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` `handleRunnerDone`, at Mill tag `1.3.1`). Mill prints nothing for the empty string that `org.scalatest.tools.Framework`'s `done` returns given the runner argument (`../../decisions/architecture-test-event-log.md` "Under the runner argument, `Framework.done` returns an empty string…"), so ScalaTest's end-of-run summary is never captured (`../../SPECIFICATION.md` R-044).
 - A worker writes a piped stdout and stderr in the platform's native encoding unless its `forkArgs` set `file.encoding`, `stdout.encoding` or `stderr.encoding`. The splitter decodes with the charset Mill's JVM names in its `native.encoding` system property, or `Charset.defaultCharset()` where that property is absent, and replaces malformed bytes with U+FFFD rather than dropping them.
 
 ### The test command's result
 
-This serves `../specification/test-command.md` AC-084 to AC-087 and AC-157.
+This serves `../specification/test-command.md` AC-084 to AC-087, AC-157 and AC-180 to AC-184, and `../specification/runs-and-test-structure-runs.md` AC-173.
 
 - The library keeps the consolidation state (`../../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**) readable from any thread without a lock: event log reading adds events on its own thread while the test command's thread reads the state.
   - Each operation that makes the state failed does so before it returns, so a read made after that operation returns sees the failure.
-  - The events that report a failure (`../../SPECIFICATION.md` R-046) are `TestFailed`, `TestCanceled` and `SuiteAborted`. A `RunAborted` or `RunStopped` is not among them (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "What the library takes").
+  - The events that report a failure (`../../SPECIFICATION.md` R-046c) are `TestFailed`, `TestCanceled` and `SuiteAborted`. A `RunAborted` or `RunStopped` is not among them (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "What the library takes"). Adding one of those events, or a `runEnded` event whose outcome is not completed, makes the state failed.
+  - No event reports a suite, scope or test that is aborted without a `SuiteAborted`, as one aborted with reason *not run* is. The operation that ends a run's event stream (`RunFeed.endEventStream`) therefore assembles the run's tree and makes the state failed where an execution of a suite, scope or test in the tree has the outcome aborted, whatever its reason and however the run ended. A run whose stream ends without its `runEnded` event makes the state failed in the same operation.
+    - The check cannot run earlier: a later event can start a node, and attribution is decided only once the stream has ended (`consolidation-library.md` § Critical code paths § A node's executions and its suite's latest structure).
+    - The check reads the assembled tree, from which attributed nodes are already left out, so an attributed node cannot fail the state, and the state agrees with the `*** NOT RUN ***` and `*** ABORTED ***` lines the writer prints from the same tree.
+    - The caller must end every run's event stream before **End**, so the state is failed before **End** returns.
 - The test command reads the state once, after **End** returns.
 - Mill's test-runner subprocess call returns a `Result[(String, Seq[TestResult])]` (`../../research/mill-worker-channels.md` § 2.3), which the test command leaves unread, a `Result.Failure` included.
   - A worker that dies makes the call return a `Result.Failure`, not throw (`../../research/mill-worker-channels.md` § 3.1, "A dead worker"). The captured line sequence is then complete (§ Capturing a JVM worker's stdout and stderr), and the test command adds the worker's run, or its process where the `processFolder` contains no event log file (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "On the JVM, on Scala.js under `NodeJs` and on Native").
   - The call throws where Mill's `CREATE_NEW` write of `testargs` is refused, before it starts the worker (`../../research/mill-test-worker-args.md` § 2.3), so that throw leaves no worker, no captured line and no event log. The write is not refused in a `processFolder` the test command has cleared and starts one worker in (`../../ARCHITECTURE.md` § APIs § The emitter and the Mill plugin, "On the JVM, on Scala.js under `NodeJs` and on Native").
   - `TestModuleUtil.runTests()` also throws when a worker future failed (`../../research/mill-worker-channels.md` § 5), but the test command drives the test queue itself (`../../ARCHITECTURE.md` § Data flow) and never calls it.
-  - A user interrupt does not reach this path: the command's thread does not regain control (`../../research/mill-command-lifetime.md` § 5; `../../SPECIFICATION.md` R-069, R-116).
+  - A user interrupt does not reach this path: the command's thread does not regain control (`../../research/mill-command-lifetime.md` § 5; `../../SPECIFICATION.md` R-069).
 - The test command meets `../specification/test-command.md` AC-087 without checking the module's framework or release.
   - MUnit and uTest have no emitter. 3.2.20's `ArgsParser`, which its `Framework.runner` calls, throws on the runner argument (`test-event-log.md` § The test event log on the JVM).
   - The worker's `processFolder` therefore contains no event log file when Mill's call returns, so the test command adds the worker as a process that ended before any run existed in it. That makes the consolidation state failed (`../../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
@@ -69,8 +75,8 @@ This serves `../specification/test-command.md` AC-084 to AC-087 and AC-157.
 ## Stdout
 
 - The test command writes human-readable output through `Task.log.streams.out`, whose lines reach stdout whole, with Mill's prefix (`../../research/emitter-plugin-spike.md` § 8.1, § 8.2).
-- It reads Mill's colour decision from `Task.log.prompt.colored` (`core/api/daemon/src/mill/api/daemon/Logger.scala` at Mill tag `1.3.1`). `Task.log.prompt` is `private[mill]`, so the class that reads it is in a package inside `mill` (`../../research/mill-runner-progress-without-trait.md` § 5.1).
-  - The value was `false` under ConPTY and MinTTY (`../../research/mill-runner-progress-without-trait.md` § 5.2), so there human-readable output is uncoloured unless Mill is given `--color true`.
-- The discovery runner puts nothing on the console, so the test command need not silence it (`../../SPECIFICATION.md` R-072, R-044). The discovery runner stays silent only while discovery is given no reporter argument. Discovery receives only the module arguments that R-125 allows, and those include no reporter argument.
+- The test command starts the consolidation with colour on, whatever Mill's own colour decision (`../specification/layout-lines.md` AC-053). It reads nothing of Mill's logger but `Task.log.streams.out`, so the plugin has no class in a package inside `mill`.
+  - `Task.log.streams.out` must pass ANSI SGR sequences through under Mill's `--color false`. The plugin's integration test of AC-053 reads the `mill` process's own stdout, with its escape sequences, to check that.
+- The discovery runner is given no runner argument, so it writes no event log and the test command adds no run for it (`../../SPECIFICATION.md` R-072; `../specification/test-command.md` AC-089). It puts nothing on the console, so the test command need not silence it (`../../SPECIFICATION.md` R-044), and the test command attaches nothing to the root. The discovery runner stays silent only while discovery is given no reporter argument. Discovery receives only the module arguments that R-142 lists, and those include no reporter argument.
   - `org.scalatest.tools.Framework` builds `SbtLogInfoReporter` only in a task's `execute`, which discovery never calls, and `Framework.runner` drops the standard-out reporter configuration from the reporters its runner dispatches to.
   - `ScalaTestRunner.done` returns ScalaTest's end-of-run summary rather than printing it. Mill's `TestRunnerUtils.getTestTasks0` (`libs/javalib/testrunner/src/mill/javalib/testrunner/TestRunnerUtils.scala` at Mill tag `1.3.1`) ends with `runner.done()` and discards that summary; only Mill's run path prints it, and given the runner argument there is none to print (§ Critical code paths § Capturing a JVM worker's stdout and stderr).
