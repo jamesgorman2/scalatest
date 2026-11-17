@@ -9,6 +9,7 @@ object Versions {
   val mill: String = "1.3.1"
   val scala: String = "3.9.0"
   // The fork's `releaseVersion` (`project/BuildCommons.scala`): the plugin is released with the fork.
+  // `sbt scalatestConsolidation/checkMillPluginVersion` fails if the two differ. Keep this line's form.
   val fork: String = "3.2.20"
   val testInterface: String = "1.0"
   // The BSP client library Mill's own BSP server is built with.
@@ -42,7 +43,6 @@ object plugin extends PluginScalaModule, PublishModule {
   protected def resolvedDepsWarnNonPlatform: T[Boolean] = false
   def compileMvnDeps: T[Seq[Dep]] = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
   def mvnDeps: T[Seq[Dep]] = Seq(
-    mvn"com.edc::scalatest-core:${Versions.fork}",
     mvn"com.edc::scalatest-consolidation:${Versions.fork}"
   )
 

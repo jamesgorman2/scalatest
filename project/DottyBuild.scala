@@ -406,6 +406,7 @@ trait DottyBuild { this: BuildCommons =>
 
   lazy val millDependencies = taskKey[Seq[ModuleID]]("The Mill artifacts among the transitive dependencies of the published artifact")
   lazy val checkNoMillDependency = taskKey[Unit]("Fails if the published artifact depends, transitively, on a Mill artifact")
+  lazy val checkMillPluginVersion = taskKey[Unit]("Fails if the Mill plugin's fork version differs from the release version")
 
   def isMillArtifact(module: ModuleID): Boolean =
     module.organization == "com.lihaoyi" && module.name.startsWith("mill-")
@@ -443,6 +444,12 @@ trait DottyBuild { this: BuildCommons =>
         val found = millDependencies.value
         if (found.nonEmpty)
           sys.error(moduleName.value + " depends on Mill: " + found.map(module => module.organization + ":" + module.name + ":" + module.revision).mkString(", "))
+      },
+      checkMillPluginVersion := {
+        val buildFile = (ThisBuild / baseDirectory).value / "mill-plugin" / "build.mill"
+        val forkVersion = """val fork: String = "([^"]*)"""".r.findFirstMatchIn(IO.read(buildFile)).map(_.group(1))
+        if (!forkVersion.contains(releaseVersion))
+          sys.error(buildFile + " sets Versions.fork to " + forkVersion.getOrElse("(not found)") + ", but releaseVersion in project/BuildCommons.scala is " + releaseVersion)
       }
     ).dependsOn(scalatestCoreDotty)
 

@@ -35,6 +35,8 @@ run_stage mima "$sbt" "all scalatestCompatible/mimaReportBinaryIssues scalacticD
 run_stage scalactic-jvm "$sbt" scalacticTestDotty/test
 run_stage scalatest-jvm "$sbt" scalatestTestDotty/test
 run_stage consolidation "$sbt" scalatestConsolidation/test
+run_stage consolidation-no-mill "$sbt" scalatestConsolidation/checkNoMillDependency
+run_stage mill-plugin-version "$sbt" scalatestConsolidation/checkMillPluginVersion
 run_stage scalactic-js "$sbt" scalacticTestDottyJS/test
 run_stage scalatest-js "$sbt" scalatestTestDottyJS/test
 run_stage scalactic-native "$sbt" scalacticTestDottyNative/test

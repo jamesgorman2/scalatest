@@ -51,6 +51,12 @@ jobs:
     - name: Test the consolidation library
       if: ${{ !cancelled() }}
       run: sbt scalatestConsolidation/test
+    - name: Check the consolidation library has no Mill dependency
+      if: ${{ !cancelled() }}
+      run: sbt scalatestConsolidation/checkNoMillDependency
+    - name: Check the Mill plugin's version is the release version
+      if: ${{ !cancelled() }}
+      run: sbt scalatestConsolidation/checkMillPluginVersion
 
   test-scala-js:
     runs-on: ubuntu-latest
