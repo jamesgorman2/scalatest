@@ -185,6 +185,7 @@ Enables:
 Settles:
 
 - The form of the progress summary (R-090a fixes what it reports, not its form), and whether it is debounced (R-090d). This feature may redefine the format of the summary line that the feature `human-readable-one-jvm-module` prints (`human-readable-one-jvm-module/specification/layout-lines.md` § The summary line), and that summary line then follows this feature's (R-141).
+- How progress output counts before a run's event stream ends, where attribution and the suites its end aborts are not yet decided, so that its last summary equals the summary line (R-141; `human-readable-one-jvm-module/technical-design/consolidation-library.md` § The summary line).
 - What a progress file contains, where nothing can be redrawn in place (R-089).
 - Which formatting and filtering characters other than `w` apply to progress output (R-090e names `w`; R-106g, R-127a and R-127b name only the human-readable output).
 

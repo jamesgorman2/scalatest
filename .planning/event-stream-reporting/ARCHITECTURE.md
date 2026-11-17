@@ -60,7 +60,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - A run in a forked JVM is a run node under its module, and the run's top-level suites sit under that run node. Any other run has no run node: its top-level suites sit directly under its module (`SPECIFICATION.md` R-135).
   - A run's own state and the output captured against the run are held on the run's run node, or on the run's module where the run has no run node.
 - **Writers** — write the progress, human-readable and JSON output (`SPECIFICATION.md` R-026, R-027). The human-readable and JSON writers run at **End** (§ APIs § The Mill plugin and the consolidation library).
-  - The human-readable output ends with a summary line. One function builds that line and progress output's summary, so the two are identical whether or not progress output is on (`SPECIFICATION.md` R-141).
+  - The human-readable output ends with a summary line. Once every event stream has ended, progress output's summary equals that line, whether or not progress output is on (`SPECIFICATION.md` R-141).
 - **Consolidation state** — records whether the consolidation has ended and whether anything has failed the test command (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
 
 ### Mill plugin
