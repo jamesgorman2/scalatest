@@ -289,7 +289,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.state shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("The root's captured lines and failures keep the order they were attached, after the lines for each module") {
+    Scenario("After the lines for each module, the root's captured lines then its failures, each in the order attached") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
       And("a failure, a stderr line, a stdout line and a second failure attached to the root, in that order")
       val output = new OutputSink

@@ -45,7 +45,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
 
   /**
    * Attaches a line captured from a runner that is not a run, such as a build tool's discovery runner, to the root.
-   * The root's lines follow the lines for every module, in the order they were attached.
+   * The root's captured lines follow the lines for every module, in the order they were attached.
    *
    * @throws IllegalArgumentException if the consolidation has ended
    */
@@ -56,7 +56,7 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
     }
 
   /**
-   * Attaches a failure of a runner that is not a run to the root, given as its message. This fails the test command.
+   * Attaches the message of a failure of a runner that is not a run to the root. This fails the test command.
    * The root's failures follow its captured lines, in the order they were attached.
    *
    * @throws IllegalArgumentException if the consolidation has ended
