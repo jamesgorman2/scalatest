@@ -294,7 +294,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
   Feature("A test marked ignored") {
 
-    Scenario("A marked test with no execution, in a suite that completed, is ignored, not not run") {
+    Scenario("A marked test with no execution, in a suite that completed, shows as ignored rather than 'not run'") {
       Given("an event log of a suite that completes without running a test it marks ignored or a test it does not mark")
       val eventLog =
         """
