@@ -76,15 +76,15 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         val result = withSuitesIn(daemonMode)("ChattySuite") { tester =>
           evalTestCommand(tester, "--color", "true")
         }
-        val underRunLine = result.linesFor("Run 1:").drop(1).map(_.trim)
+        val underRunLines = result.linesFor("Run 1:").drop(1).map(_.trim)
 
         Then("the [stdout] lines under Run 1: are out 1 to out 2000, in that order")
         withClue(result.debugString.take(10000)) {
-          underRunLine.filter(_.startsWith("[stdout] ")) shouldBe (1 to 2000).map(i => s"[stdout] out $i")
+          underRunLines.filter(_.startsWith("[stdout] ")) shouldBe (1 to 2000).map(i => s"[stdout] out $i")
         }
 
         And("the [stderr] lines under Run 1: are err 1 to err 2000, in that order")
-        underRunLine.filter(_.startsWith("[stderr] ")) shouldBe (1 to 2000).map(i => s"[stderr] err $i")
+        underRunLines.filter(_.startsWith("[stderr] ")) shouldBe (1 to 2000).map(i => s"[stderr] err $i")
       }
     }
 
@@ -96,13 +96,13 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         addToTestModule(tester, """def forkArgs = Seq("-XX:+UseSerialGC", "-Xlog:gc:stdout")""")
         evalTestCommand(tester, "--color", "true")
       }
-      val underRunLine = result.linesFor("Run 1:").drop(1).map(_.trim)
+      val underRunLines = result.linesFor("Run 1:").drop(1).map(_.trim)
       val written = result.humanReadableOutputMarkingColours.map(_.trim)
 
       Then("the lines under Run 1: hold [stdout] dividing now and a line [stdout] <text> whose text ends Using Serial")
       withClue(result.debugString) {
-        underRunLine should contain("[stdout] dividing now")
-        underRunLine.filter(_.endsWith("Using Serial")) should have size 1
+        underRunLines should contain("[stdout] dividing now")
+        underRunLines.filter(_.endsWith("Using Serial")) should have size 1
       }
 
       And("each of those two lines is [stdout] followed by nothing but the line written")
@@ -180,18 +180,18 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
         )
         (runTestCommand(tester, "core.test"), tester.eval(Seq("core.test.testForked")))
       }
-      val underRunLine = result.linesFor("Run 1:").drop(1).map(_.trim)
+      val underRunLines = result.linesFor("Run 1:").drop(1).map(_.trim)
 
       Then("a line under Run 1: holds the forkEnv value")
       withClue(result.debugString) {
-        underRunLine should contain("[stdout] env=from-forkEnv")
+        underRunLines should contain("[stdout] env=from-forkEnv")
       }
 
       And("its working directory line is the one testForked wrote")
       val testForkedLines = testForked.out.linesIterator.filter(_.contains("cwd=")).map(line => line.substring(line.indexOf("cwd="))).toSeq
       withClue(testForked.debugString) {
         testForkedLines should have size 1
-        underRunLine.filter(_.startsWith("[stdout] cwd=")) shouldBe testForkedLines.map("[stdout] " + _)
+        underRunLines.filter(_.startsWith("[stdout] cwd=")) shouldBe testForkedLines.map("[stdout] " + _)
       }
     }
   }

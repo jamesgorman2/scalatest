@@ -36,8 +36,7 @@ private[consolidation] object HumanReadableWriter {
 
   private val runStoppedLine = "*** RUN STOPPED ***"
 
-  // A run that completed with no output attached shows no line, and its suites take the depth its line would have had.
-  // A line's depth is therefore the number of its node's ancestors that show a line.
+  // A run that completed with no output attached shows no line; its suites take the depth its line would have had.
   def lines(runs: Seq[RunAssembly]): Vector[OutputLine] =
     runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsOfModule) =>
       linesOf("[" + label.value + "]", 0, AnsiCyan) ++ runsOfModule.toVector.sortBy(_.number).flatMap(runLines(_, 1))

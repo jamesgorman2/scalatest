@@ -163,7 +163,8 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates it")
       val output = consolidated(abortedRun*)
 
-      Then("the open nodes are aborted, the nodes that never started are not run, and the run's abort comes last under the run's line, its message keeping its trailing space")
+      Then("the open nodes are aborted, the nodes that never started are not run, and the run's abort comes last under the run's line")
+      And("the abort's message keeps its trailing space")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 1:{reset}
