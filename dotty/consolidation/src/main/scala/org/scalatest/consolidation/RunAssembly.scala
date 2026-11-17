@@ -459,7 +459,7 @@ private[consolidation] object RunAssembly {
   // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
   // - a suite still open when its run aborted or stopped;
   // - a suite, scope or test with a start event and no closing event, in a run that ended.
-  // A suite run by a test sends no start event, so it is never open.
+  // A suite run by a test sends no start event, so the last case never marks it aborted.
   private def outcomeOf(
     node: StructureNode,
     execution: Option[Execution],
