@@ -232,6 +232,122 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     }
   }
 
+  Feature("The root") {
+
+    def consolidationOfSqrtPropSpec(output: OutputSink): Consolidation = {
+      val consolidation = Consolidation.start(output, coloured = true)
+      addRun(consolidation, TestRunPart.Events(sqrtPropSpecEventLog)).endEventStream()
+      consolidation
+    }
+
+    Scenario("A runner that is not a run writes a line") {
+      Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
+      And("the root's captured output is the stdout line `discovering tests`")
+      val output = new OutputSink
+      val consolidation = consolidationOfSqrtPropSpec(output)
+      consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
+
+      When("the library consolidates it")
+      consolidation.end()
+
+      Then("the root's line heads the module's lines, then the root's captured line")
+      output.markedText shouldBe
+        """{cyan}Consolidated tests:{reset}
+          |  {cyan}[core.test]{reset}
+          |    {green}SqrtPropSpec:{reset}
+          |      {green}- sqrt of a square is the root{reset}
+          |  [stdout] discovering tests""".stripExpectedMargin
+
+      And("the consolidation state the library gives is ended")
+      consolidation.state shouldBe ConsolidationState.Ended
+    }
+
+    Scenario("A runner that is not a run fails") {
+      Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
+      val output = new OutputSink
+      val consolidation = consolidationOfSqrtPropSpec(output)
+
+      And("a failure attached to the root whose message is `test discovery failed`")
+      consolidation.addRootFailure("test discovery failed")
+
+      Then("the consolidation state is failed before the operation returns")
+      consolidation.state shouldBe ConsolidationState.OpenFailed
+
+      When("the library consolidates it")
+      consolidation.end()
+
+      Then("the root's line heads the module's lines, then the root's abort with the failure's message under it")
+      output.markedText shouldBe
+        """{cyan}Consolidated tests:{reset}
+          |  {cyan}[core.test]{reset}
+          |    {green}SqrtPropSpec:{reset}
+          |      {green}- sqrt of a square is the root{reset}
+          |  {red}*** CONSOLIDATED TESTS ABORTED ***{reset}
+          |    {red}test discovery failed{reset}""".stripExpectedMargin
+
+      And("the consolidation state the library gives is ended, failed")
+      consolidation.state shouldBe ConsolidationState.EndedFailed
+    }
+
+    Scenario("The root's captured lines and failures keep the order they were attached, after the lines for each module") {
+      Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
+      And("a failure, a stderr line, a stdout line and a second failure attached to the root, in that order")
+      val output = new OutputSink
+      val consolidation = consolidationOfSqrtPropSpec(output)
+      consolidation.addRootFailure("first failure")
+      consolidation.addRootOutput(CapturedLine.Stderr("warn: slow discovery"))
+      consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
+      consolidation.addRootFailure("second failure")
+
+      When("the library consolidates it")
+      consolidation.end()
+
+      Then("the root's captured lines come in the order attached, then its abort with each failure's message in the order attached")
+      output.markedText shouldBe
+        """{cyan}Consolidated tests:{reset}
+          |  {cyan}[core.test]{reset}
+          |    {green}SqrtPropSpec:{reset}
+          |      {green}- sqrt of a square is the root{reset}
+          |  {yellow}[stderr] warn: slow discovery{reset}
+          |  [stdout] discovering tests
+          |  {red}*** CONSOLIDATED TESTS ABORTED ***{reset}
+          |    {red}first failure{reset}
+          |    {red}second failure{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A run's line sits one level deeper under the root's line") {
+      Given("an event log of a run that ends aborted, consolidated as a run of the module `core.test`")
+      And("the stdout line `discovering tests` attached to the root")
+      val output = new OutputSink
+      val consolidation = Consolidation.start(output, coloured = true)
+      addRun(consolidation, TestRunPart.Events("run started\nrun ended aborted")).endEventStream()
+      consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
+
+      When("the library consolidates it")
+      consolidation.end()
+
+      Then("the run's line and its abort sit under the module's line, itself under the root's line")
+      output.markedText shouldBe
+        """{cyan}Consolidated tests:{reset}
+          |  {cyan}[core.test]{reset}
+          |    {cyan}Run 1:{reset}
+          |      {red}*** RUN ABORTED ***{reset}
+          |  [stdout] discovering tests""".stripExpectedMargin
+    }
+
+    Scenario("Nothing attached to the root leaves the output without the root's line") {
+      Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`, with nothing attached to the root")
+      When("the library consolidates it")
+      val output = consolidated(sqrtPropSpecEventLog)
+
+      Then("the module's line is unindented and the output holds no root's line")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SqrtPropSpec:{reset}
+          |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
+    }
+  }
+
   Feature("The consolidation state of a run that ends") {
 
     Scenario("A run that ends completed") {
@@ -285,6 +401,19 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 }
 
 private object HumanReadableRunSpec {
+
+  val sqrtPropSpecEventLog: String =
+    """
+    run started
+    structure
+      suite "SqrtPropSpec", class "samples.SqrtPropSpec"
+        test "sqrt of a square is the root", label "- sqrt of a square is the root"
+    suite "SqrtPropSpec": SuiteStarting
+    test "sqrt of a square is the root": TestStarting
+    test "sqrt of a square is the root": TestSucceeded
+    suite "SqrtPropSpec": SuiteCompleted
+    run ended completed
+    """
 
   val runWithAlertBetweenCapturedLines: Vector[TestRunPart] = Vector(
     TestRunPart.Events(

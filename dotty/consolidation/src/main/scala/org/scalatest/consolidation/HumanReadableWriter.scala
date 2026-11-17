@@ -36,11 +36,27 @@ private[consolidation] object HumanReadableWriter {
 
   private val runStoppedLine = "*** RUN STOPPED ***"
 
+  private val rootLine = "Consolidated tests:"
+
+  private val rootAbortedLine = "*** CONSOLIDATED TESTS ABORTED ***"
+
+  // The root shows a line only where output or a failure is attached to it; otherwise each module's line is unindented.
+  // Under the root's line come the lines for each module, then the root's captured lines, then its failures.
+  def lines(runs: Seq[RunAssembly], rootOutput: Seq[CapturedLine], rootFailures: Seq[String]): Vector[OutputLine] =
+    if (rootOutput.isEmpty && rootFailures.isEmpty) moduleLines(runs, 0)
+    else
+      linesOf(rootLine, 0, AnsiCyan) ++ moduleLines(runs, 1) ++ rootOutput.flatMap(capturedLineLines(_, 1)) ++
+        rootFailureLines(rootFailures, 1)
+
   // A run that completed with no output attached shows no line; its suites take the depth its line would have had.
-  def lines(runs: Seq[RunAssembly]): Vector[OutputLine] =
+  private def moduleLines(runs: Seq[RunAssembly], depth: Int): Vector[OutputLine] =
     runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsOfModule) =>
-      linesOf("[" + label.value + "]", 0, AnsiCyan) ++ runsOfModule.toVector.sortBy(_.number).flatMap(runLines(_, 1))
+      linesOf("[" + label.value + "]", depth, AnsiCyan) ++ runsOfModule.toVector.sortBy(_.number).flatMap(runLines(_, depth + 1))
     }
+
+  private def rootFailureLines(failures: Seq[String], depth: Int): Vector[OutputLine] =
+    if (failures.isEmpty) Vector.empty
+    else linesOf(rootAbortedLine, depth, AnsiRed) ++ failures.flatMap(linesOf(_, depth + 1, AnsiRed))
 
   // Under a run's line come the lines for its suites, then its messages and captured lines in the order they were fed,
   // then, if the run aborted or stopped, how it ended.

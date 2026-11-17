@@ -112,9 +112,10 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
         result.succeeded shouldBe true
       }
 
-      And("the human-readable output holds one SqrtPropSpec: line and no run's line")
-      result.humanReadableOutput.count(_.trim == "SqrtPropSpec:") shouldBe 1
-      result.humanReadableOutput.filter(_.trim.startsWith("Run ")) shouldBe empty
+      And("the human-readable output is the module's line with the suite and its property under it, with no root's line and no run's line")
+      withClue(result.debugString) {
+        result.humanReadableOutput shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
+      }
     }
 
     Scenario("Neither ScalaTest's end-of-run summary nor Mill's list of failed tests reaches the console") {
