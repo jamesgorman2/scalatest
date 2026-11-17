@@ -39,9 +39,9 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
    * What a criterion states of a run's events besides the suite's structure.
    *
    * @param holdsInOrder the events the run holds after the structure, in order, in the event notation
-   * @param isLineHeldNone whether a line is of the events the run holds none of
+   * @param mustNotHold whether a line is of an event the run must not hold
    */
-  private final case class StatedEvents(description: String, holdsInOrder: List[String], isLineHeldNone: String => Boolean)
+  private final case class StatedEvents(description: String, holdsInOrder: List[String], mustNotHold: String => Boolean)
 
   private object StatedEvents {
     val none: StatedEvents = StatedEvents("", Nil, _ => false)
@@ -82,7 +82,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         }
         structureLinesOf(lines) shouldBe Vector(structure.line)
         EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(structure, events))) shouldBe None
-        lines.filter(events.isLineHeldNone) shouldBe empty
+        lines.filter(events.mustNotHold) shouldBe empty
       }
     }
 
@@ -568,7 +568,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         suite =>
           List(TestEventLogLine.test(suite.test("fast"), suite, 0, "fast", "- fast"), TestEventLogLine.ignoredTest(suite.test("later"), suite, 1, "later", "- later"))
       ),
-      events = StatedEvents("the event log holds the TestIgnored of later", List("test \"later\": TestIgnored"), _ => false)
+      events = StatedEvents("the event log holds `test \"later\": TestIgnored`, and no event is assigned to `slow`", List("test \"later\": TestIgnored"), _.contains("""{"test":"slow"}"""))
     )
 
     structureScenarios(
