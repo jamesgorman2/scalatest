@@ -294,7 +294,7 @@ Each event's first key is `item`, naming its kind. The events are those of `../.
     - A scope's place is `{"scope": …, "index": …}`: the scope's registered text, and its index among the scopes of that text under its parent.
     - A test's place is `{"test": …}`, containing its test name. It comes directly after its suite's place.
   - A suite's or scope's `parent` is its `id` without the last place. A test's `parent` is the `id` of the scope or suite that the `structure` puts the test in.
-  - The first node is the event's root suite. A top-level suite has no `parent` or `position`. A nested suite that is the root has `parent`, the suite or test it sits under, and the `position` an earlier event gave it; one new to the event log has none (`consolidation-library.md` § Critical code paths § A node's executions and its suite's latest structure).
+  - The first node is the event's root suite. A top-level suite has no `parent` or `position`. A nested suite that is the root has `parent`, the suite or test it sits under, and the `position` an earlier event gave it; one new to the event log has no `position` (`consolidation-library.md` § Critical code paths § A node's executions and its suite's latest structure).
   - A further `structure` event has the same form. Its root is a suite an earlier event contains, or a suite new to the event log under a suite or test an earlier event contains. It contains the root's scopes and tests whole, their `position`s from 0 among themselves and each test with its `ignored`, and none of its nested suites. A suite an earlier event contains keeps its `className`.
 - A ScalaTest event:
   - `item` `event`;
