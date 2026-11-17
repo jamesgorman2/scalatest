@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import java.time.Instant
 import org.scalactic.source.Position
 import org.scalatest.ConfigMap
 import org.scalatest.exceptions.GeneratorDrivenPropertyCheckFailedException
@@ -77,7 +78,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
 
     "writing the runStarted event" should {
       "write the item, the PID and the start time, in that order, on one line" in {
-        TestEventLogEncoder.runStarted(4242L, "2026-11-13T02:54:37.123456Z") shouldBe
+        TestEventLogEncoder.runStarted(4242L, Instant.parse("2026-11-13T02:54:37.123456Z")) shouldBe
           """{"item":"runStarted","pid":4242,"startTime":"2026-11-13T02:54:37.123456Z"}""" + "\n"
       }
     }

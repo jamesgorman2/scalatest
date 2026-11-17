@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import java.time.Instant
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -96,7 +97,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         val divideSuiteId = id(suiteAt("samples.DivideSuite"))
 
         run.items shouldBe Vector(
-          BuiltRunItem.Event(BuiltEvent("run started", TestEventLogEvent.RunStarted(1L, "1970-01-01T00:00:00Z"), FixedParts.none)),
+          BuiltRunItem.Event(BuiltEvent("run started", TestEventLogEvent.RunStarted(1L, Instant.EPOCH), FixedParts.none)),
           BuiltRunItem.CapturedLine(CapturedStream.Stderr, "warn: about to divide"),
           BuiltRunItem.Event(
             BuiltEvent(

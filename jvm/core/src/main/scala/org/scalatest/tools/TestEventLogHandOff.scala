@@ -5,9 +5,7 @@ import org.scalatest.Reporter
 import org.scalatest.Suite
 import org.scalatest.SuiteStart
 import org.scalatest.events.Event
-import org.scalatest.events.RunAborted
-import org.scalatest.events.RunCompleted
-import org.scalatest.events.RunStopped
+import org.scalatest.events.RunOutcome
 
 private[scalatest] object TestEventLogHandOff {
 
@@ -18,11 +16,7 @@ private[scalatest] object TestEventLogHandOff {
    * Whether `DispatchReporter`, not the send site, hands the event off. It does for a closing run event, so that the
    * event handed off carries the summary `DispatchReporter` gives it.
    */
-  def isHandedOffByDispatchReporter(event: Event): Boolean =
-    event match {
-      case _: RunCompleted | _: RunStopped | _: RunAborted => true
-      case _ => false
-    }
+  def isHandedOffByDispatchReporter(event: Event): Boolean = RunOutcome.ofClosing(event).isDefined
 
   /**
    * How a top-level suite of a run that writes no test event log starts: with the reporter it would report to, under

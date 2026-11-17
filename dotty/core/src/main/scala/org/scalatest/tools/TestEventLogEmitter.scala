@@ -25,10 +25,7 @@ import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
 import org.scalatest.events.NoteProvided
 import org.scalatest.events.RecordableEvent
-import org.scalatest.events.RunAborted
-import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
-import org.scalatest.events.RunStopped
 import org.scalatest.events.ScopeClosed
 import org.scalatest.events.ScopeOpened
 import org.scalatest.events.ScopePending
@@ -85,7 +82,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     // Encoded outside the lock: encoding calls the methods of the run's own throwables and config map values, which
     // may block, and every thread of the run takes the lock.
     val encoded = TestEventLogEmitter.caught(TestEventLogEncoder.event(event, None))
-    append(encoded, TestEventLogEmitter.outcomeOfClosing(event).map(TestEventLogEncoder.runEnded))
+    append(encoded, RunOutcome.ofClosing(event).map(TestEventLogEncoder.runEnded))
   }
 
   /**
@@ -650,7 +647,7 @@ private[scalatest] object TestEventLogEmitter {
   def started(eventLogFile: Path, processIdentity: Either[String, ProcessIdentity]): TestEventLogEmitter = {
     processIdentity match {
       case Right(identity) =>
-        val runStarted = TestEventLogEncoder.runStarted(identity.pid, identity.startTime.toString)
+        val runStarted = TestEventLogEncoder.runStarted(identity.pid, identity.startTime)
         val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
         // Created anew, so a link planted under its name in a shared folder is never followed. A file an earlier run
         // left there is replaced.
@@ -742,15 +739,6 @@ private[scalatest] object TestEventLogEmitter {
       case _: StackOverflowError => true
       case _: VirtualMachineError | _: ThreadDeath => false
       case _ => true
-    }
-  }
-
-  private def outcomeOfClosing(event: Event): Option[RunOutcome] = {
-    event match {
-      case _: RunCompleted => Some(RunOutcome.Completed)
-      case _: RunStopped => Some(RunOutcome.Stopped)
-      case _: RunAborted => Some(RunOutcome.Aborted)
-      case _ => None
     }
   }
 }

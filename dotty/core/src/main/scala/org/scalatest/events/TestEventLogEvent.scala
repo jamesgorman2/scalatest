@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import java.time.Instant
 import org.scalatest.tools.StackDepthView
 import org.scalatest.tools.ThrowableView
 
@@ -34,14 +35,8 @@ private[scalatest] final case class NodeExecution(node: NodeId, executions: Vect
   def execution: Int = executions.last
 }
 
-private[scalatest] enum RunOutcome {
-  case Completed
-  case Aborted
-  case Stopped
-}
-
 private[scalatest] enum TestEventLogEvent {
-  case RunStarted(pid: Long, startTime: String)
+  case RunStarted(pid: Long, startTime: Instant)
   case Structure(nodes: IndexedSeq[StructureNode])
   case ScalaTestEvent(execution: Option[NodeExecution], event: DecodedEvent)
   case RunEnded(outcome: RunOutcome)

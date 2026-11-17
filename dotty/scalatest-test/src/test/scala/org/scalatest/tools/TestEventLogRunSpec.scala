@@ -5,6 +5,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.EventLogComparison
@@ -70,7 +71,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
           And("that event's PID and process start time are those of the run's process")
           lines.head shouldBe TestEventLogLine.runStarted(process.pid, process.startTime.toString)
           val events = decodedOrFail(lines)
-          events.head shouldBe TestEventLogEvent.RunStarted(process.pid, process.startTime.toString)
+          events.head shouldBe TestEventLogEvent.RunStarted(process.pid, process.startTime)
           EventLogComparison.mismatchWhenIs(events.take(1), built("run started")) shouldBe None
 
           And("the event log holds no structure")
@@ -87,7 +88,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       val event = TestEventLogDecoder.decode(TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z"))
 
       Then("it yields the run's start, with the line's PID and process start time")
-      event shouldBe Right(TestEventLogEvent.RunStarted(4242L, "2026-01-02T03:04:05.678Z"))
+      event shouldBe Right(TestEventLogEvent.RunStarted(4242L, Instant.parse("2026-01-02T03:04:05.678Z")))
       EventLogComparison.mismatchWhenIs(event.toSeq, built("run started")) shouldBe None
     }
 

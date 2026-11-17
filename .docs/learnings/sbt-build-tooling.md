@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins, incremental compilation and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, or linking Scala Native on Windows.
+description: How sbt, its plugins, incremental compilation and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, linking Scala Native on Windows, or adding JVM-only code to Scala 3 core sources.
 ---
 
 <learning>
@@ -110,4 +110,14 @@ date: 2026-11-15
 Scala Native needs clang only to link: `compile` produces NIR without it, but `nativeLink`, and so `test` and `run` of a Native project, fail before linking with `'clang' not found in PATH or via 'LLVM_BIN' environment variable.` A Windows machine may have neither LLVM on `PATH` nor the `clang.exe` of Visual Studio's LLVM component; Visual Studio's `VC/Tools/Llvm` can hold only `clang-format` and `clang-tidy`.
 
 On Windows, set `LLVM_BIN` to the `bin` directory of an LLVM release whose target is `x86_64-pc-windows-msvc` before starting sbt; with the MSVC build tools installed it links. Report a Native run that could not link as not run, never as passed.
+</learning>
+
+<learning>
+date: 2026-11-18
+---
+The Scala.js and Scala Native core builds have no source directories of their own for shared code: `GenScalaTestDotty.genScalaJS` and `genScalaNative` copy the Scala 3 core's top-level `org/scalatest`, `events`, `enablers` and `expectations` directories, and the JVM core's `tools` directory less a skip list, into `src_managed`. The Scala 3 core's `tools` directory is not copied, so it is JVM-only.
+
+A file in a copied directory that uses a JVM-only API, such as `java.time`, breaks both builds. Put it in the generator's skip list for both platforms, or in a directory that is not copied, and compile `scalatestCoreDottyJS` and `scalatestCoreDottyNative` to confirm.
+
+`copyDir` never deletes a file dropped from the copy. The stale file stays in `src_managed` but is not compiled, since only the generators' output is. Scala Native's incremental compile also leaves the dropped file's `.nir` files in `classes`; clean the project before trusting its `classes` directory.
 </learning>

@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import java.time.Instant
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -97,7 +98,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
     "reading the runStarted event" should {
       "yield its PID and start time" in {
         TestEventLogDecoder.decode(runStartedLine) shouldBe
-          Right(TestEventLogEvent.RunStarted(4242L, "2026-11-13T02:54:37.123456Z"))
+          Right(TestEventLogEvent.RunStarted(4242L, Instant.parse("2026-11-13T02:54:37.123456Z")))
       }
     }
 
@@ -315,10 +316,10 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Right(TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryStarting("main", 9007199254740993L)))
       }
       "yield the largest and the smallest Long" in {
-        TestEventLogDecoder.decode("""{"item":"runStarted","pid":9223372036854775807,"startTime":"t"}""") shouldBe
-          Right(TestEventLogEvent.RunStarted(Long.MaxValue, "t"))
-        TestEventLogDecoder.decode("""{"item":"runStarted","pid":-9223372036854775808,"startTime":"t"}""") shouldBe
-          Right(TestEventLogEvent.RunStarted(Long.MinValue, "t"))
+        TestEventLogDecoder.decode("""{"item":"runStarted","pid":9223372036854775807,"startTime":"1970-01-01T00:00:00Z"}""") shouldBe
+          Right(TestEventLogEvent.RunStarted(Long.MaxValue, Instant.EPOCH))
+        TestEventLogDecoder.decode("""{"item":"runStarted","pid":-9223372036854775808,"startTime":"1970-01-01T00:00:00Z"}""") shouldBe
+          Right(TestEventLogEvent.RunStarted(Long.MinValue, Instant.EPOCH))
       }
     }
 
@@ -426,7 +427,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "given a line holding a key the format does not give its object" should {
       val linesAndUnknownKeys = Seq(
-        """{"item":"runStarted","pid":1,"startTime":"t","extra":1}""" -> ("extra", "the runStarted event"),
+        """{"item":"runStarted","pid":1,"startTime":"1970-01-01T00:00:00Z","extra":1}""" -> ("extra", "the runStarted event"),
         """{"item":"runEnded","outcome":"completed","duration":1}""" -> ("duration", "the runEnded event"),
         s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","name":"S","label":"S","suiteId":"s","className":"c"}]}""" -> ("label", "a suite node"),
         s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","suiteId":"s"}]}""" -> ("suiteId", "a test node"),
@@ -458,8 +459,8 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "given a line lacking a required key" should {
       val linesAndMissingKeys = Seq(
-        """{"pid":1,"startTime":"t"}""" -> ("item", "any event"),
-        """{"item":"runStarted","startTime":"t"}""" -> ("pid", "the runStarted event"),
+        """{"pid":1,"startTime":"1970-01-01T00:00:00Z"}""" -> ("item", "any event"),
+        """{"item":"runStarted","startTime":"1970-01-01T00:00:00Z"}""" -> ("pid", "the runStarted event"),
         """{"item":"runStarted","pid":1}""" -> ("startTime", "the runStarted event"),
         """{"item":"runEnded"}""" -> ("outcome", "the runEnded event"),
         """{"item":"structure"}""" -> ("nodes", "a structure event"),
@@ -533,6 +534,19 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","ignored":false}]}"""
         ) shouldBe Left("ignored is not true")
       }
+      "report a start time that is not an instant" in {
+        TestEventLogDecoder.decode("""{"item":"runStarted","pid":1,"startTime":"yesterday"}""") shouldBe
+          Left("startTime is not an instant")
+      }
+      "report a throwable whose propertyCheck is false, which the format never writes" in {
+        TestEventLogDecoder.decode(suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":false}""")) shouldBe
+          Left("propertyCheck is not true")
+      }
+      "report a stack frame whose isNative is false, which the format never writes" in {
+        TestEventLogDecoder.decode(
+          suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m","isNative":false,"text":"c.m"}]}""")
+        ) shouldBe Left("isNative is not true")
+      }
     }
 
     "given a line that is not one JSON object" should {
@@ -555,7 +569,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         "a string with an unknown escape" -> infoLine("""some \x info"""),
         "a string with a short unicode escape" -> infoLine("""some \u12"""),
         "a string with a unicode escape in fullwidth digits" -> infoLine("some \\u" + "\uFF10\uFF10\uFF16\uFF13 info"),
-        "a number with a leading zero" -> """{"item":"runStarted","pid":01,"startTime":"t"}""",
+        "a number with a leading zero" -> """{"item":"runStarted","pid":01,"startTime":"1970-01-01T00:00:00Z"}""",
         "arrays nested 100000 deep and not closed" -> ("[" * 100000),
         "arrays nested 100000 deep" -> ("[" * 100000 + "]" * 100000)
       )
@@ -568,7 +582,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "given a line holding a value of the wrong type" should {
       val descriptionsAndLines = Seq(
-        "an integer written as a string" -> """{"item":"runStarted","pid":"1","startTime":"t"}""",
+        "an integer written as a string" -> """{"item":"runStarted","pid":"1","startTime":"1970-01-01T00:00:00Z"}""",
         "a string written as a number" -> """{"item":"event","event":"DiscoveryStarting","threadName":7,"timeStamp":1}""",
         "nodes written as an object" -> """{"item":"structure","nodes":{}}""",
         "a node written as a string" -> """{"item":"structure","nodes":["suite"]}""",
@@ -602,22 +616,22 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       val descriptionsLinesAndReasons = Seq(
         (
           "a pid written with a fraction",
-          """{"item":"runStarted","pid":1.0,"startTime":"t"}""",
+          """{"item":"runStarted","pid":1.0,"startTime":"1970-01-01T00:00:00Z"}""",
           "the number at offset 27 is not an integer"
         ),
         (
           "a pid written with an exponent",
-          """{"item":"runStarted","pid":1e3,"startTime":"t"}""",
+          """{"item":"runStarted","pid":1e3,"startTime":"1970-01-01T00:00:00Z"}""",
           "the number at offset 27 is not an integer"
         ),
         (
           "a pid above the greatest Long",
-          """{"item":"runStarted","pid":9223372036854775808,"startTime":"t"}""",
+          """{"item":"runStarted","pid":9223372036854775808,"startTime":"1970-01-01T00:00:00Z"}""",
           "the integer at offset 27 does not fit a Long"
         ),
         (
           "a pid below the least Long",
-          """{"item":"runStarted","pid":-9223372036854775809,"startTime":"t"}""",
+          """{"item":"runStarted","pid":-9223372036854775809,"startTime":"1970-01-01T00:00:00Z"}""",
           "the integer at offset 27 does not fit a Long"
         ),
         (

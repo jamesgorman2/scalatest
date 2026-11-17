@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+import java.time.Instant
 import scala.collection.mutable
 
 private[scalatest] enum CapturedStream {
@@ -46,7 +47,7 @@ private[scalatest] final case class BuiltRun(items: Vector[BuiltRunItem]) {
 private[scalatest] object TestRunBuilder {
 
   val defaultPid: Long = 1L
-  val defaultStartTime: String = "1970-01-01T00:00:00Z"
+  val defaultStartTime: Instant = Instant.EPOCH
   val defaultThreadName: String = "main"
   val defaultTimeStamp: Long = 0L
 

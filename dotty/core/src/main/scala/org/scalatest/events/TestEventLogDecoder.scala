@@ -1,5 +1,7 @@
 package org.scalatest.events
 
+import java.time.Instant
+import java.time.format.DateTimeParseException
 import scala.annotation.tailrec
 import scala.collection.mutable
 
@@ -33,7 +35,7 @@ private[scalatest] object TestEventLogDecoder {
       case "runStarted" =>
         for {
           pid <- reader.long("pid")
-          startTime <- reader.text("startTime")
+          startTime <- reader.instant("startTime")
         } yield TestEventLogEvent.RunStarted(pid, startTime)
       case "structure" =>
         for {
@@ -323,7 +325,7 @@ private[scalatest] object TestEventLogDecoder {
             className <- reader.text("className")
             message <- reader.optionalText("message")
             stackDepth <- reader.optionalObject("stackDepth").flatMap(ifPresent(_)(whole(_)(decodeStackDepth)))
-            isPropertyCheckFailure <- reader.isTrue("propertyCheck")
+            isPropertyCheckFailure <- reader.trueOrAbsent("propertyCheck")
             stackTrace <- reader.objects("stackTrace").flatMap(each(_)(whole(_)(frame)))
             cause <- reader.optionalObject("cause")
             suppressed <- reader.objects("suppressed")
@@ -355,7 +357,7 @@ private[scalatest] object TestEventLogDecoder {
         methodName <- reader.text("methodName")
         fileName <- reader.optionalText("fileName")
         lineNumber <- reader.optionalInt("lineNumber")
-        isNative <- reader.isTrue("isNative")
+        isNative <- reader.trueOrAbsent("isNative")
         text <- reader.text("text")
       } yield DecodedStackFrame(className, methodName, fileName, lineNumber, isNative, text)
     }
@@ -391,6 +393,16 @@ private[scalatest] object TestEventLogDecoder {
   }
 }
 
+private object ParsedInstant {
+
+  def unapply(text: String): Option[Instant] =
+    try {
+      Some(Instant.parse(text))
+    } catch {
+      case _: DateTimeParseException => None
+    }
+}
+
 // Records each key it is asked for. A key never asked for is one the format does not give the object.
 private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
 
@@ -411,6 +423,10 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
 
   def optionalText(key: String): Either[String, Option[String]] =
     optional(key, "a string") { case JsonValue.Text(value) => value }
+
+  /** An instant written as the text `Instant.toString` gives. */
+  def instant(key: String): Either[String, Instant] =
+    required(key, optional(key, "an instant") { case JsonValue.Text(ParsedInstant(value)) => value })
 
   def long(key: String): Either[String, Long] = required(key, optionalLong(key))
 
@@ -433,9 +449,6 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
       case JsonValue.Integer(value) if value.isValidInt && value >= minimum => value.toInt
     }
   }
-
-  def isTrue(key: String): Either[String, Boolean] =
-    optional(key, "true or false") { case JsonValue.Bool(value) => value }.map(_.getOrElse(false))
 
   /** Whether the key is present. A present key must be `true`, as the format never writes `false`. */
   def trueOrAbsent(key: String): Either[String, Boolean] =
