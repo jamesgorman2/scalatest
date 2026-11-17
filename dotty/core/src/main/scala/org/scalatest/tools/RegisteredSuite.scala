@@ -335,7 +335,7 @@ private[scalatest] final class RegisteredSuite(
       nodeIsFixed = true
       suiteIdItsRunRead = None
       if (startsARunOnceNodeIsFixed) {
-        executionOfStartingRun()
+        startExecutionOfRun()
       }
       if (newNodeAwaitingName.isDefined) {
         None
@@ -408,7 +408,7 @@ private[scalatest] final class RegisteredSuite(
    * Starts an execution for a run of the instance, whose node is fixed, or takes the one started before the run's
    * first engine site where no run has taken it yet.
    */
-  def executionOfStartingRun(): Execution = {
+  def startExecutionOfRun(): Execution = {
     emitter.assertLockHeld()
     runOfSuite match {
       case Some(suite) => suite.executionOfRun()
@@ -452,7 +452,7 @@ private[scalatest] final class RegisteredSuite(
   def startRunOnceNodeIsFixed(): Unit = {
     emitter.assertLockHeld()
     if (nodeIsFixed) {
-      executionOfStartingRun()
+      startExecutionOfRun()
     } else {
       startsARunOnceNodeIsFixed = true
     }

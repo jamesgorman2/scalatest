@@ -35,8 +35,8 @@ trait TestsBeforeNestedSuites extends SuiteMixin { thisSuite: Suite =>
 
     requireNonNull(testName, args)
 
-    SuiteRegistration.registeredRun(thisSuite, args) { (registration, registeredArgs) =>
-    import registeredArgs._
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, args) =>
+    import args._
 
     val originalThreadName = Thread.currentThread.getName
     try {
@@ -45,7 +45,7 @@ trait TestsBeforeNestedSuites extends SuiteMixin { thisSuite: Suite =>
       Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, theSuiteName))
 
       val report = wrapReporterIfNecessary(thisSuite, reporter)
-      val newArgs = registeredArgs.copy(reporter = report)
+      val newArgs = args.copy(reporter = report)
 
       val testsStatus = runTests(testName, newArgs)
 
