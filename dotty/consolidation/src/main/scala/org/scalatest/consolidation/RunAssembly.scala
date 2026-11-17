@@ -192,8 +192,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
     topLevelSuites.exists(suite => (suite +: suite.descendants).exists(_.execution.outcome.exists(_.isAborted)))
 
   /**
-   * Assembles the run's tree from its whole event stream, once. It computes each node's attribution inputs, whether
-   * the node started and the tests below it, once per node.
+   * Assembles the run's tree from its whole event stream, once. It works out once per node whether the node started
+   * and which tests are below it.
    */
   private final class TreeAssembler {
 
@@ -213,23 +213,16 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
 
     private def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
 
-    // Not `getOrElseUpdate`: each recursion would add to the map that call is updating.
     private def started(id: NodeId): Boolean =
-      startedById.get(id).getOrElse {
-        val nodeStarted = executions.contains(id) || childrenOf(id).exists(child => started(RunAssembly.idOf(child)))
-        startedById(id) = nodeStarted
-        nodeStarted
-      }
+      startedById.getOrElseUpdate(id, executions.contains(id) || childrenOf(id).exists(child => started(RunAssembly.idOf(child))))
 
     private def testsBelow(id: NodeId): Vector[NodeId] =
-      testsBelowById.get(id).getOrElse {
-        val tests = childrenOf(id).flatMap {
+      testsBelowById.getOrElseUpdate(id, {
+        childrenOf(id).flatMap {
           case test: StructureNode.Test => Vector(test.id)
           case suiteOrScope => testsBelow(RunAssembly.idOf(suiteOrScope))
         }
-        testsBelowById(id) = tests
-        tests
-      }
+      })
 
     private def isAttributedTest(id: NodeId): Boolean =
       !executions.contains(id) && RunAssembly.attributionKeyOf(id).exists(keysOfTestsThatRan)
