@@ -50,7 +50,7 @@ private[consolidation] enum Outcome {
   case Aborted
   case NotRun
 
-  /** Whether the outcome is aborted, with reason *not run* or any other. */
+  /** Whether the outcome is aborted, for any reason including *not run*. */
   def isAborted: Boolean = this == Aborted || this == NotRun
 }
 
@@ -263,8 +263,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   }
 
   /**
-   * Whether an execution of a suite, scope or test in the assembled tree has the outcome aborted, whatever its reason.
-   * Attributed nodes are left out of the tree, so they never count. This requires the event stream to have ended.
+   * Whether any suite, scope or test execution in the assembled tree is aborted, for any reason.
+   * Attributed nodes are not in the tree, so they never count. Requires the event stream to have ended.
    */
   def holdsAbortedNode: Boolean =
     topLevelSuites.exists(suite => (suite +: suite.descendants).exists(_.execution.outcome.exists(_.isAborted)))
@@ -459,7 +459,7 @@ private[consolidation] object RunAssembly {
   // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
   // - a suite still open when its run aborted or stopped;
   // - a suite, scope or test with a start event and no closing event, in a run that ended.
-  // A suite that a test runs has no start event of its own, so it is not open in a run that ends completed.
+  // A suite run by a test sends no start event, so it is never open.
   private def outcomeOf(
     node: StructureNode,
     execution: Option[Execution],

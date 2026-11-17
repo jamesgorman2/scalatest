@@ -430,7 +430,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       stateAfterEnd(TestRunPart.Events(twinSuitesEventLog)) shouldBe ConsolidationState.Ended
     }
 
-    Scenario("A suite, scope and test with a start event and no closing event, in a run that ends completed, are aborted") {
+    Scenario("A suite, scope and test that start and never close, in a run that ends completed, are aborted") {
       Given("an event log of a run that ends completed while a suite, a scope in it and a test in that scope are open")
       val parts = TestRunPart.Events(openNodesEventLog)
 
@@ -450,7 +450,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       stateAfterEnd(parts) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A suite a test runs sends no start event, so it is not aborted in a run that ends completed") {
+    Scenario("A suite run by a test sends no start event, so it is not aborted in a run that ends completed") {
       Given("an event log of a run that ends completed, in which a test ran a helper suite that sent no SuiteStarting")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended")
