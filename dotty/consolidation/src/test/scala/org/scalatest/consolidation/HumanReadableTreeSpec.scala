@@ -240,6 +240,90 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |    {green}A{reset}
           |      {green}- m{reset}""".stripExpectedMargin
     }
+
+    Scenario("The suites that a test ran appear in ascending lexicographic order by name, whatever the order they ran in") {
+      Given("an event log of a test that ran two helper suites in descending order by name")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuite", class "samples.OuterSuite"
+            test "uses helpers", label "- uses helpers"
+        suite "OuterSuite": SuiteStarting
+        test "uses helpers": TestStarting
+        structure under test "uses helpers"
+          suite "ZetaHelper", class "a.ZetaHelper"
+            test "zeta", label "- zeta"
+        test "zeta": TestStarting
+        test "zeta": TestSucceeded
+        structure under test "uses helpers"
+          suite "AlphaHelper", class "z.AlphaHelper"
+            test "alpha", label "- alpha"
+        test "alpha": TestStarting
+        test "alpha": TestSucceeded
+        test "uses helpers": TestSucceeded
+        suite "OuterSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the helper suites appear under the test in ascending lexicographic order by name")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuite:{reset}
+          |    {green}- uses helpers{reset}
+          |      {green}AlphaHelper:{reset}
+          |        {green}- alpha{reset}
+          |      {green}ZetaHelper:{reset}
+          |        {green}- zeta{reset}""".stripExpectedMargin
+    }
+
+    Scenario("The suites that a suite ran without declaring them appear after its declared children, in ascending lexicographic order by name") {
+      Given("an event log of a suite that ran two undeclared suites in descending order by name before its declared children")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "OuterSuites", class "samples.OuterSuites"
+            suite "DeclaredSuite", class "samples.DeclaredSuite"
+              test "declared", label "- declared"
+            test "own", label "- own"
+        suite "OuterSuites": SuiteStarting
+        structure under suite "OuterSuites"
+          suite "ZetaSuite", class "a.ZetaSuite"
+            test "zeta", label "- zeta"
+        test "zeta": TestStarting
+        test "zeta": TestSucceeded
+        structure under suite "OuterSuites"
+          suite "AlphaSuite", class "z.AlphaSuite"
+            test "alpha", label "- alpha"
+        test "alpha": TestStarting
+        test "alpha": TestSucceeded
+        test "declared": TestStarting
+        test "declared": TestSucceeded
+        test "own": TestStarting
+        test "own": TestSucceeded
+        suite "OuterSuites": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the undeclared suites follow the declared suite and test, in ascending lexicographic order by name")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OuterSuites:{reset}
+          |    {green}DeclaredSuite:{reset}
+          |      {green}- declared{reset}
+          |    {green}- own{reset}
+          |    {green}AlphaSuite:{reset}
+          |      {green}- alpha{reset}
+          |    {green}ZetaSuite:{reset}
+          |      {green}- zeta{reset}""".stripExpectedMargin
+    }
   }
 
   Feature("Nodes that share a name") {
@@ -281,18 +365,88 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
           |      {green}- pops{reset}""".stripExpectedMargin
     }
 
-    Scenario("Two suites that share a name are not merged") {
-      Given("an event log of two suites of one name and different classes, each with its own test")
+    Scenario("Two top-level suites that share a name are not merged, and appear in the order they started") {
+      Given("an event log of two suites of one name and different classes, the suite registered second starting first")
       val eventLog =
         """
         run started
         structure
           suite "SameSuite", class "a.SameSuite"
             test "in a", label "- in a"
+        structure
+          suite "SameSuite", class "b.SameSuite"
+            test "in b", label "- in b"
+        suite "SameSuite" #2: SuiteStarting
+        test "in b": TestStarting
+        test "in b": TestSucceeded
+        suite "SameSuite" #2: SuiteCompleted
         suite "SameSuite" #1: SuiteStarting
         test "in a": TestStarting
         test "in a": TestSucceeded
         suite "SameSuite" #1: SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the suite that started first comes first, each with its own test")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SameSuite:{reset}
+          |    {green}- in b{reset}
+          |  {green}SameSuite:{reset}
+          |    {green}- in a{reset}""".stripExpectedMargin
+    }
+
+    Scenario("Two executions of a suite are apart where a suite of the same name started between them") {
+      Given("an event log of a suite that ran, then a suite of the same name, then the first suite again")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "SameSuite", class "a.SameSuite"
+            test "in a", label "- in a"
+        structure
+          suite "SameSuite", class "b.SameSuite"
+            test "in b", label "- in b"
+        suite "SameSuite" #1: SuiteStarting
+        test "in a": TestStarting
+        test "in a": TestSucceeded
+        suite "SameSuite" #1: SuiteCompleted
+        suite "SameSuite" #2: SuiteStarting
+        test "in b": TestStarting
+        test "in b": TestSucceeded
+        suite "SameSuite" #2: SuiteCompleted
+        suite "SameSuite" #1 execution 2: SuiteStarting
+        test "in a" execution 2: TestStarting
+        test "in a" execution 2: TestSucceeded
+        suite "SameSuite" #1 execution 2: SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = consolidated(eventLog)
+
+      Then("the executions appear in the order they started")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SameSuite:{reset}
+          |    {green}- in a{reset}
+          |  {green}SameSuite:{reset}
+          |    {green}- in b{reset}
+          |  {green}SameSuite:{reset}
+          |    {green}- in a{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A suite that never started follows the executions of the suites that share its name") {
+      Given("an event log of two suites of one name, of which only the suite registered second starts")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "SameSuite", class "a.SameSuite"
+            test "in a", label "- in a"
         structure
           suite "SameSuite", class "b.SameSuite"
             test "in b", label "- in b"
@@ -306,10 +460,14 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the output holds two `SameSuite:` lines, one with `- in a` and the other with `- in b`")
-      val suiteA = "  {green}SameSuite:{reset}\n    {green}- in a{reset}"
-      val suiteB = "  {green}SameSuite:{reset}\n    {green}- in b{reset}"
-      output should (equal(s"{cyan}[core.test]{reset}\n$suiteA\n$suiteB") or equal(s"{cyan}[core.test]{reset}\n$suiteB\n$suiteA"))
+      Then("the suite that started comes first")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SameSuite:{reset}
+          |    {green}- in b{reset}
+          |  {green}SameSuite:{reset}
+          |    {red}a.SameSuite *** NOT RUN ***{reset}
+          |    {red}(1 test not run){reset}""".stripExpectedMargin
     }
 
     Scenario("A nested suite that ran twice in one run of its parent sits directly after the last sibling sharing its suite ID") {

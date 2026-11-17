@@ -250,7 +250,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       output should not include "samples.HelperSuite ***"
     }
 
-    Scenario("A suite that ran twice in one execution of the test that ran it shows its name line once, with both executions under it, and no abort line") {
+    Scenario("A suite that ran twice in one execution of the test that ran it shows its name line for each execution, and no abort line") {
       Given("an event log of a test that ran a helper suite twice")
       val eventLog =
         """
@@ -280,7 +280,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the helper suite's name line sits once under the test, followed by what each of its executions produced")
+      Then("the helper suite's name line sits under the test once for each execution, in the order they started, each with what it produced")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}OuterSuite:{reset}
@@ -288,6 +288,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |      {green}HelperSuite:{reset}
           |        {green}A helper{reset}
           |          {green}- helps{reset}
+          |      {green}HelperSuite:{reset}
           |        {green}A helper{reset}
           |          {green}- helps{reset}""".stripExpectedMargin
 
@@ -346,7 +347,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |          {green}- helps{reset}""".stripExpectedMargin
     }
 
-    Scenario("A suite that ran twice shows its name line once, then what each execution produced, in the order they started") {
+    Scenario("A suite that ran twice shows its name line for each execution, each with what it produced, in the order they started") {
       Given("an event log of a suite that aborted after its test ran, then ran again and completed")
       val eventLog =
         """
@@ -368,7 +369,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
       When("the library consolidates it")
       val output = consolidated(eventLog)
 
-      Then("the first execution's test and abort lines come before the second execution's test")
+      Then("the first execution's name, test and abort lines come before the second execution's name and test lines")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}TwiceSuite:{reset}
@@ -376,6 +377,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
           |    {red}samples.TwiceSuite *** ABORTED ***{reset}
           |      {red}java.lang.RuntimeException: database unreachable{reset}
           |        {red}...{reset}
+          |  {green}TwiceSuite:{reset}
           |    {green}- connects{reset}""".stripExpectedMargin
     }
   }

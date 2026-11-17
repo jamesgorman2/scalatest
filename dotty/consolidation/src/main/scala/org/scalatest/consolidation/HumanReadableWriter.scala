@@ -77,23 +77,19 @@ private[consolidation] object HumanReadableWriter {
     linesUnder(Vector(aborted.message).filter(_.nonEmpty) ++ lines.tail, aborted.throwable, depth, AnsiRed)
   }
 
-  // A suite shows its name line once, then what each of its executions produced. A scope or test shows a line for
-  // each execution. Under a test's line come its failure or cancel lines, then its messages and the suites it ran.
-  private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] =
+  // Under a test's line come its failure or cancel lines, then its messages and the suites it ran.
+  private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] = {
+    val execution = node.execution
     node.node match {
       case suite: StructureNode.Suite =>
-        linesOf(suiteNameLine(suite.name), depth, AnsiGreen) ++ node.executions.flatMap { execution =>
-          contentLines(execution, depth + 1) ++ suiteEndingLines(suite, execution, depth + 1) ++ countLines(execution, depth + 1)
-        }
+        linesOf(suiteNameLine(suite.name), depth, AnsiGreen) ++ contentLines(execution, depth + 1) ++
+          suiteEndingLines(suite, execution, depth + 1) ++ countLines(execution, depth + 1)
       case scope: StructureNode.Scope =>
-        node.executions.flatMap { execution =>
-          linesOf(scopeLine(scope, execution.outcome), depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
-        }
+        linesOf(scopeLine(scope, execution.outcome), depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
       case test: StructureNode.Test =>
-        node.executions.flatMap { execution =>
-          testLines(test, execution, depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
-        }
+        testLines(test, execution, depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
     }
+  }
 
   // A collapsed execution shows its messages alone. Any other shows each of its messages after the children that had
   // started in it when the message arrived.
