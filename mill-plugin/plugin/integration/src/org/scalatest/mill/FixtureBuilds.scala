@@ -28,6 +28,14 @@ trait FixtureBuilds {
     os.write.over(buildFile, s"$pluginHeaderLine\n${os.read(buildFile)}")
   }
 
+  /** Sets the module's own ScalaTest arguments, its `testArgsDefault`, in the tester's copy of a build whose test module depends on this fork at 3.2.20. */
+  protected def setModuleArguments(tester: IntegrationTester, moduleArguments: Seq[String]): Unit = {
+    val buildFile = tester.workspacePath / "build.mill"
+    val mvnDeps = """    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")"""
+    val testArgsDefault = moduleArguments.map(argument => s"\"$argument\"").mkString("    def testArgsDefault = Seq(", ", ", ")")
+    os.write.over(buildFile, os.read(buildFile).replace(mvnDeps, s"$mvnDeps\n$testArgsDefault"))
+  }
+
   protected def runTestCommand(tester: IntegrationTester, arguments: String*): TestCommandResult =
     TestCommandResult(tester.eval(Seq("scalatest/test") ++ arguments))
 

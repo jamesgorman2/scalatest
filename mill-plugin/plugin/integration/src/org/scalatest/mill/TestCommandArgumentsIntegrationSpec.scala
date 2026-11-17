@@ -30,13 +30,6 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       test(tester)
     }
 
-  private def setModuleArguments(tester: IntegrationTester, moduleArguments: Seq[String]): Unit = {
-    val buildFile = tester.workspacePath / "build.mill"
-    val mvnDeps = """    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")"""
-    val testArgsDefault = moduleArguments.map(argument => s"\"$argument\"").mkString("    def testArgsDefault = Seq(", ", ", ")")
-    os.write.over(buildFile, os.read(buildFile).replace(mvnDeps, s"$mvnDeps\n$testArgsDefault"))
-  }
-
   private def shouldFailBeforeAnyTestStarts(tester: IntegrationTester, result: TestCommandResult): Unit =
     withClue(result.debugString) {
       result.succeeded shouldBe false

@@ -20,7 +20,7 @@ A test is ignored where an execution of the test closed with `TestIgnored`. A te
 | AC-024 | scope, no outcome                                                                                             | `<label>`                  | green                   |
 | AC-025 | scope, pending                                                                                                | `<label> (pending)`        | yellow                  |
 | AC-026 | scope, aborted with reason *not run*                                                                          | `<label> *** NOT RUN ***`  | label green, suffix red |
-| AC-027 | scope, aborted because its suite or its run aborted while it was open                                         | `<label> *** ABORTED ***`  | label green, suffix red |
+| AC-027 | scope, aborted after it opened                                                                                | `<label> *** ABORTED ***`  | label green, suffix red |
 
 | Requirement                    | Criteria                                                                               |
 |--------------------------------|----------------------------------------------------------------------------------------|

@@ -49,6 +49,9 @@ private[consolidation] enum Outcome {
   case Canceled
   case Aborted
   case NotRun
+
+  /** Whether the outcome is aborted, with reason *not run* or any other. */
+  def isAborted: Boolean = this == Aborted || this == NotRun
 }
 
 /**
@@ -84,7 +87,7 @@ private[consolidation] final case class AssembledExecution(
 
   /** Whether the execution aborted or did not run and no node below it started, so the nodes below it show only as a count. */
   def isCollapsed: Boolean =
-    outcome.exists(outcome => outcome == Outcome.Aborted || outcome == Outcome.NotRun) && !children.exists(_.started)
+    outcome.exists(_.isAborted) && !children.exists(_.started)
 
   /** The nodes at any depth below this execution. */
   def descendants: Vector[AssembledNode] = children.flatMap(child => child +: child.descendants)
@@ -172,6 +175,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
    */
   def topLevelSuites: Vector[AssembledNode] = {
     require(!eventStreamOpen, s"the event stream of a run under ${label.value} has not ended")
+    val runFinished = ending.nonEmpty
     val runEndedAbnormally = RunAssembly.isAbnormal(ending)
     val childrenByParent = structure.values.toVector.groupBy(RunAssembly.parentOf)
     val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
@@ -246,7 +250,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
       val started = execution.nonEmpty || children.exists(_.started)
       AssembledExecution(
         number,
-        RunAssembly.outcomeOf(node, execution, abortedSuiteAround || runEndedAbnormally, runEndedAbnormally, started),
+        RunAssembly.outcomeOf(node, execution, abortedSuiteAround || runEndedAbnormally, runFinished, runEndedAbnormally, started),
         execution.flatMap(RunAssembly.endingOf),
         execution.fold(Vector.empty[PlacedMessage])(_.messages.map(RunAssembly.placed(_, children))),
         children
@@ -257,6 +261,13 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
       childrenByParent.getOrElse(None, Vector.empty).filterNot(isAttributed).flatMap(suite => assembledNodes(suite, executionNumbersOf(RunAssembly.idOf(suite)), false))
     )
   }
+
+  /**
+   * Whether an execution of a suite, scope or test in the assembled tree has the outcome aborted, whatever its reason.
+   * Attributed nodes are left out of the tree, so they never count. This requires the event stream to have ended.
+   */
+  def holdsAbortedNode: Boolean =
+    topLevelSuites.exists(suite => (suite +: suite.descendants).exists(_.execution.outcome.exists(_.isAborted)))
 
   // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
   // and label it last had.
@@ -446,27 +457,41 @@ private[consolidation] object RunAssembly {
 
   // Marks as aborted:
   // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
-  // - a suite still open when its run aborted or stopped.
+  // - a suite still open when its run aborted or stopped;
+  // - a suite, scope or test with a start event and no closing event, in a run that ended.
+  // A suite that a test runs has no start event of its own, so it is not open in a run that ends completed.
   private def outcomeOf(
     node: StructureNode,
     execution: Option[Execution],
     openScopeOrTestAborted: Boolean,
+    runFinished: Boolean,
     runEndedAbnormally: Boolean,
     started: Boolean
   ): Option[Outcome] =
     (node, execution) match {
-      case (_: StructureNode.Suite, _) => suiteOutcome(node, execution, runEndedAbnormally, started)
+      case (_: StructureNode.Suite, _) => suiteOutcome(node, execution, runFinished, runEndedAbnormally, started)
       case (test: StructureNode.Test, None) => Some(if (test.ignored) Outcome.Ignored else Outcome.NotRun)
       case (_, None) => Some(Outcome.NotRun)
-      case (_: StructureNode.Scope, Some(execution)) => scopeOutcome(execution, openScopeOrTestAborted)
-      case (_: StructureNode.Test, Some(execution)) => testOutcome(execution, openScopeOrTestAborted)
+      case (_: StructureNode.Scope, Some(execution)) =>
+        scopeOutcome(execution, openScopeOrTestAborted || (runFinished && execution.holds(_.isInstanceOf[DecodedEvent.ScopeOpened])))
+      case (_: StructureNode.Test, Some(execution)) =>
+        testOutcome(execution, openScopeOrTestAborted || (runFinished && execution.holds(_.isInstanceOf[DecodedEvent.TestStarting])))
     }
 
-  private def suiteOutcome(node: StructureNode, execution: Option[Execution], runEndedAbnormally: Boolean, started: Boolean): Option[Outcome] =
+  private def suiteOutcome(
+    node: StructureNode,
+    execution: Option[Execution],
+    runFinished: Boolean,
+    runEndedAbnormally: Boolean,
+    started: Boolean
+  ): Option[Outcome] = {
+    val completed = execution.exists(_.holds(_.isInstanceOf[DecodedEvent.SuiteCompleted]))
+    val opened = execution.exists(_.holds(_.isInstanceOf[DecodedEvent.SuiteStarting]))
     if (!started) Some(Outcome.NotRun)
     else if (isAbortedSuite(node, execution)) Some(Outcome.Aborted)
-    else if (runEndedAbnormally && !execution.exists(_.holds(_.isInstanceOf[DecodedEvent.SuiteCompleted]))) Some(Outcome.Aborted)
+    else if (!completed && (runEndedAbnormally || (runFinished && opened))) Some(Outcome.Aborted)
     else None
+  }
 
   private def scopeOutcome(execution: Execution, openScopeOrTestAborted: Boolean): Option[Outcome] =
     if (execution.holds(_.isInstanceOf[DecodedEvent.ScopePending]))

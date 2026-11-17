@@ -78,6 +78,49 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     }
   }
 
+  Feature("A registered test for which the run sends no event, and which is neither attributed nor marked ignored, fails the test command") {
+
+    Scenario("A suite skips one of its registered tests") {
+      Given("SkipSuite, whose test \"runs\" succeeds, and whose runTest returns SucceededStatus for \"skipped\" without running it")
+      When("the test command runs core.test")
+      val result = runResultFixture("SkipSuite.scala" -> "SkipSuite")()
+
+      Then("the human-readable output shows \"skipped\" as not run")
+      withClue(result.debugString) {
+        result.humanReadableOutput shouldBe Seq(
+          "[core.test]",
+          "  SkipSuite:",
+          "    - runs",
+          "    - skipped *** NOT RUN ***"
+        )
+      }
+
+      And("the test command fails")
+      shouldFail(result)
+    }
+
+    Scenario("A suite run through ConfigMapWrapperSuite registers a test with an empty config map that it does not register with the run's config map") {
+      Given("ConfigSpec, run through ConfigMapWrapperSuite, whose scope \"A config\" holds \"remote\" where its config map holds db, and \"local\" where it does not")
+      And("the module's own ScalaTest arguments are -Ddb=on")
+      When("the test command runs core.test")
+      val result = runResultFixture("ConfigSpec.scala" -> "ConfigSpec")(setModuleArguments(_, Seq("-Ddb=on")))
+
+      Then("the human-readable output shows \"remote\", then \"local\" as not run")
+      withClue(result.debugString) {
+        result.humanReadableOutput shouldBe Seq(
+          "[core.test]",
+          "  ConfigSpec:",
+          "    A config",
+          "      - remote",
+          "      - local *** NOT RUN ***"
+        )
+      }
+
+      And("the test command fails")
+      shouldFail(result)
+    }
+  }
+
   Feature("A worker that dies fails the test command, whether or not a run existed in it") {
 
     Scenario("A test calls System.exit(0)") {

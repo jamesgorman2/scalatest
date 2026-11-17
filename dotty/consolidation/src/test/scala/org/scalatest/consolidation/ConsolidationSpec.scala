@@ -118,7 +118,13 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
     "ended with nothing failed" should {
       "be ended" in {
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
-        addRun(consolidation, suiteWithTest("")).endEventStream()
+        addRun(
+          consolidation,
+          suiteWithTest(
+            """test "adds": TestStarting
+              |test "adds": TestSucceeded""".stripMargin
+          )
+        ).endEventStream()
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
       }

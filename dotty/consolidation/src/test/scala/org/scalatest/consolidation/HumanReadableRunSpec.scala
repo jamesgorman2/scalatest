@@ -397,10 +397,159 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       Then("the consolidation state is failed before the operation returns")
       consolidation.state shouldBe ConsolidationState.OpenFailed
     }
+
+    Scenario("A registered test has no event and is not attributed") {
+      Given("an event log of a run that ends completed, in which SkipSuite's test \"skipped\" has no event")
+      val parts = TestRunPart.Events(skippedTestEventLog)
+
+      When("the library consolidates it")
+      val output = consolidated(parts)
+
+      Then("the test shows as not run")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SkipSuite:{reset}
+          |    {green}- runs{reset}
+          |    {red}- skipped *** NOT RUN ***{reset}""".stripExpectedMargin
+
+      And("the consolidation state the library gives is ended, failed")
+      stateAfterEnd(parts) shouldBe ConsolidationState.EndedFailed
+    }
+
+    Scenario("A test only the first registration of its suite contains never starts, and no test of its suite ID and test name runs") {
+      Given("an event log of a run that ends completed, whose further structure drops the test \"local\" before it starts")
+      When("the library consolidates it")
+      Then("the consolidation state the library gives is ended, failed")
+      stateAfterEnd(TestRunPart.Events(droppedTestEventLog)) shouldBe ConsolidationState.EndedFailed
+    }
+
+    Scenario("A suite registered at two places runs at one, and every test of the other place is attributed") {
+      Given("an event log of a run that ends completed, in which the second InnerSuite's test is attributed to the first's")
+      When("the library consolidates it")
+      Then("the consolidation state the library gives is ended")
+      stateAfterEnd(TestRunPart.Events(twinSuitesEventLog)) shouldBe ConsolidationState.Ended
+    }
+
+    Scenario("A suite, scope and test with a start event and no closing event, in a run that ends completed, are aborted") {
+      Given("an event log of a run that ends completed while a suite, a scope in it and a test in that scope are open")
+      val parts = TestRunPart.Events(openNodesEventLog)
+
+      When("the library consolidates it")
+      val output = consolidated(parts)
+
+      Then("the suite, the scope and the test show as aborted")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}OpenSpec:{reset}
+          |    {green}A Stack{reset}{red} *** ABORTED ***{reset}
+          |      {green}- is empty{reset}
+          |      {red}- throws on pop *** ABORTED ***{reset}
+          |    {red}samples.OpenSpec *** ABORTED ***{reset}""".stripExpectedMargin
+
+      And("the consolidation state the library gives is ended, failed")
+      stateAfterEnd(parts) shouldBe ConsolidationState.EndedFailed
+    }
+
+    Scenario("A suite a test runs sends no start event, so it is not aborted in a run that ends completed") {
+      Given("an event log of a run that ends completed, in which a test ran a helper suite that sent no SuiteStarting")
+      When("the library consolidates it")
+      Then("the consolidation state the library gives is ended")
+      stateAfterEnd(TestRunPart.Events(helperSuiteEventLog)) shouldBe ConsolidationState.Ended
+    }
   }
 }
 
 private object HumanReadableRunSpec {
+
+  val skippedTestEventLog: String =
+    """
+    run started
+    structure
+      suite "SkipSuite", class "samples.SkipSuite"
+        test "runs", label "- runs"
+        test "skipped", label "- skipped"
+    suite "SkipSuite": SuiteStarting
+    test "runs": TestStarting
+    test "runs": TestSucceeded
+    suite "SkipSuite": SuiteCompleted
+    run ended completed
+    """
+
+  val droppedTestEventLog: String =
+    """
+    run started
+    structure
+      suite "ConfigSpec", class "samples.ConfigSpec"
+        scope "A config", label "A config"
+          test "local", label "- local"
+    suite "ConfigSpec": SuiteStarting
+    structure
+      suite "ConfigSpec", class "samples.ConfigSpec"
+        scope "A config", label "A config"
+          test "remote", label "- remote"
+    scope "A config": ScopeOpened
+    test "remote": TestStarting
+    test "remote": TestSucceeded
+    scope "A config": ScopeClosed
+    suite "ConfigSpec": SuiteCompleted
+    run ended completed
+    """
+
+  val twinSuitesEventLog: String =
+    """
+    run started
+    structure
+      suite "TwinSuites", class "samples.TwinSuites"
+        suite "InnerSuite", class "samples.InnerSuite"
+          scope "A Stack", label "A Stack"
+            test "pops", label "- pops"
+        suite "InnerSuite", class "samples.InnerSuite"
+          scope "A Stack", label "A Stack"
+            test "pops", label "- pops"
+    suite "TwinSuites": SuiteStarting
+    suite "InnerSuite" #1: SuiteStarting
+    scope "A Stack" #1: ScopeOpened
+    test "pops" #1: TestStarting
+    test "pops" #1: TestSucceeded
+    scope "A Stack" #1: ScopeClosed
+    suite "InnerSuite" #1: SuiteCompleted
+    suite "TwinSuites": SuiteCompleted
+    run ended completed
+    """
+
+  val openNodesEventLog: String =
+    """
+    run started
+    structure
+      suite "OpenSpec", class "samples.OpenSpec"
+        scope "A Stack", label "A Stack"
+          test "is empty", label "- is empty"
+          test "throws on pop", label "- throws on pop"
+    suite "OpenSpec": SuiteStarting
+    scope "A Stack": ScopeOpened
+    test "is empty": TestStarting
+    test "is empty": TestSucceeded
+    test "throws on pop": TestStarting
+    run ended completed
+    """
+
+  val helperSuiteEventLog: String =
+    """
+    run started
+    structure
+      suite "OuterSuite", class "samples.OuterSuite"
+        test "uses a helper", label "- uses a helper"
+    suite "OuterSuite": SuiteStarting
+    test "uses a helper": TestStarting
+    structure under test "uses a helper"
+      suite "HelperSuite", class "samples.HelperSuite"
+        test "helps", label "- helps"
+    test "helps": TestStarting
+    test "helps": TestSucceeded
+    test "uses a helper": TestSucceeded
+    suite "OuterSuite": SuiteCompleted
+    run ended completed
+    """
 
   val sqrtPropSpecEventLog: String =
     """

@@ -128,12 +128,13 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
 
   /**
    * Ends the run's event stream. No further event of the run may be added. A run whose stream ends without its
-   * `runEnded` event does not finish, which fails the test command.
+   * `runEnded` event does not finish, which fails the test command. So does a suite, scope or test of the run that is
+   * aborted, whatever its reason, as one not run is: no event reports it, so it is known only once the stream has ended.
    */
   def endEventStream(): Unit =
     consolidation.feed {
       run.endEventStream()
-      if (run.outcome.isEmpty) {
+      if (run.outcome.isEmpty || run.holdsAbortedNode) {
         consolidation.fail()
       }
     }
