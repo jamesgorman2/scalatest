@@ -35,6 +35,14 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
+      "succeed, and keep the file, where a parent is a regular file" in {
+        withFolder { folder =>
+          val blocker = Files.writeString(folder.resolve("blocker"), "a file")
+          new JsonOutputFile(blocker.resolve("report.json")).delete() shouldBe Right(())
+          read(blocker) shouldBe "a file"
+        }
+      }
+
       "fail, naming its path, and keep a folder at its path with what it holds" in {
         withFolder { folder =>
           val path = Files.createDirectory(folder.resolve("report.json"))
