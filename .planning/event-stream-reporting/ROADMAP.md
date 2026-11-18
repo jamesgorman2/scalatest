@@ -4,38 +4,6 @@ Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), i
 
 No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
 
-## 2. Consolidated JSON output
-
-`-fJ <path>` writes JSON output to the file at that path once every run has ended. Builds on feature 1.
-
-- The JSON output encodes the entire node tree in the layout `JSON-LAYOUT.md` gives (R-028). Its root records the ScalaTest version, the module selector with its module, and Mill's name and version (`JSON-LAYOUT.md` § Not yet fixed).
-- The test command deletes or empties the file before any test starts.
-- The format is documented for third-party readers (`JSON-LAYOUT.md` § Compatibility).
-
-Enables:
-
-- `SPECIFICATION.md` R-028, R-084, R-096a, R-130a–R-130f, R-104, R-105, R-097a, R-097b, R-043, R-098a–R-098d, R-095a, R-095b and R-103 (in JSON), R-055 (a JSON file), R-049a (`-fJ`), R-077, R-020, R-011, R-063, R-074a, R-113 (JSON)
-- `JSON-LAYOUT.md` § Compatibility, § Tree, § Nodes, § Messages, § Captured output, § Not yet fixed (the root: ScalaTest version; module selectors; Mill name and version), § Run nodes
-- `ARCHITECTURE.md` § Modules § Consolidation library (Writers: JSON), § APIs § The Mill plugin and the consolidation library (Start: a JSON file's sink; build tool name and version), § Data flow (each output a `-f` names: JSON)
-
-Settles:
-
-- Key names above the suites: the root, module nodes, module selectors and build tool (`JSON-LAYOUT.md` § Nodes fixes only the suites and below; `JSON-LAYOUT.md` § Run nodes fixes a run node's keys other than its identifier's).
-- The form and key of a run's identifier, unique within its module (`JSON-LAYOUT.md` § Run nodes).
-- How a module holds the state of a run that has no node, and tells that run's outcome from its own (R-135, R-098d, R-098e; `JSON-LAYOUT.md` § Tree).
-- How a node's children and messages are ordered among each other (`JSON-LAYOUT.md` § Nodes; R-105 and R-043 order each kind alone).
-- Whether a node that ran always has a `duration` (R-103 gives every node that ran one, falling back to the sum of its children's; `JSON-LAYOUT.md` § Nodes and § Run nodes leave `duration` absent where no event supplies it).
-- A module's outcome reasons, *not run* and *could not start*, under `--halt-on-failure` (R-098e gives a module an outcome only on an error).
-- The JSON output's compatibility promise (R-084 says only that the JSON output is versioned against this fork; the semantic-versioning promise is `JSON-LAYOUT.md` § Compatibility's alone).
-- The order of modules and of top-level suites (`JSON-LAYOUT.md` § Tree orders both by name; R-105 orders nodes by declaration order where it is known).
-- Whether a suite that has no events, and that a run was to execute, is written inside that run's node (R-101, R-136; `JSON-LAYOUT.md` § Tree writes every such suite as a child of its module).
-- Where the JSON documentation lives, beyond `JSON-LAYOUT.md`.
-
-Risks:
-
-- `decisions/outputs.md` "Each JSON node holds its final state, with nothing per event." (Costs)
-- `research/emission-gap-analysis.md` § 9 (run-level facts needing new code)
-
 ## 3. Every worker of a JVM module
 
 The test command runs a JVM module in the processes Mill's fork grouping, test parallelism and test queue start, and consolidates every run under the module's node: each forked run is a run node (R-096a), which the human-readable output shows only where the run failed or has output attached (R-082). Nothing of one run is shown on another. A worker given no task is still a run. Builds on features 1 and 2.
