@@ -331,7 +331,7 @@ private[consolidation] object JsonOutputWriter {
   }
 
   /** A throwable the record has visited, with the entry visiting it produced. */
-  private final case class VisitedThrowable(throwable: LinkedThrowable, entry: ThrowableEntry)
+  private final case class VisitedThrowable(linkedThrowable: LinkedThrowable, entry: ThrowableEntry)
 
   // Builds the record in two passes. Neither recurses, so a cause chain too long to recurse over is still written.
   //   1. Visit the throwables depth-first, cause before suppressed. A throwable seen for the first time, by identity, gets the
@@ -358,16 +358,16 @@ private[consolidation] object JsonOutputWriter {
       entryCount += 1
     }
     val visited = visitedThrowables.result()
-    val linkedByParent = visited.indices.groupBy(index => visited(index).throwable.parent.map(_.entryIndex))
+    val linkedByParent = visited.indices.groupBy(index => visited(index).linkedThrowable.parent.map(_.entryIndex))
     val written = new Array[JsonValue](visited.size)
     visited.indices.reverse.foreach { index =>
       val linked = linkedByParent.getOrElse(Some(index), Vector.empty)
-      def recordsLinkedAs(link: ThrowableLink): Vector[JsonValue] = linked.filter(visited(_).throwable.isLinkedAs(link)).map(written(_)).toVector
+      def recordsLinkedAs(link: ThrowableLink): Vector[JsonValue] = linked.filter(visited(_).linkedThrowable.isLinkedAs(link)).map(written(_)).toVector
       written(index) = visited(index).entry match {
         case ThrowableEntry.Ref(id) =>
           objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong))))
         case ThrowableEntry.Recorded(id) =>
-          throwableObject(id, visited(index).throwable.throwable, recordsLinkedAs(ThrowableLink.Cause).headOption, recordsLinkedAs(ThrowableLink.Suppressed))
+          throwableObject(id, visited(index).linkedThrowable.throwable, recordsLinkedAs(ThrowableLink.Cause).headOption, recordsLinkedAs(ThrowableLink.Suppressed))
       }
     }
     written(0)
