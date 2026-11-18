@@ -1,6 +1,7 @@
 package org.scalatest.consolidation
 
 import java.util.IdentityHashMap
+import org.scalactic.source.Position
 import org.scalatest.ScalaTestVersions
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedStackDepth
@@ -225,10 +226,16 @@ private[consolidation] object JsonOutputWriter {
   private def fileFields(location: Location): Vector[Field] =
     location match {
       case line: LineInFile =>
-        Vector(line.filePathname.fold[Field]("fileName" -> Some(JsonValue.Text(line.fileName)))(path => "filePath" -> Some(JsonValue.Text(path))))
+        Vector(fileField(Some(line.fileName), line.filePathname))
       case _ =>
         Vector.empty
     }
+
+  // Code compiled without SCALACTIC_FILL_FILE_PATHNAMES set to yes carries Scalactic's placeholder text in place of the path.
+  private def fileField(fileName: Option[String], filePathname: Option[String]): Field =
+    filePathname
+      .filterNot(_ == Position.unfilledFilePathname)
+      .fold[Field]("fileName" -> fileName.map(JsonValue.Text(_)))(path => "filePath" -> Some(JsonValue.Text(path)))
 
   private def configMapObject(configMap: Map[String, String]): JsonValue =
     JsonValue.Object(configMap.toVector.sortBy(_._1).map((key, value) => key -> JsonValue.Text(value)))
@@ -366,9 +373,7 @@ private[consolidation] object JsonOutputWriter {
     )
 
   private def failedCodeLocation(stackDepth: DecodedStackDepth): Option[JsonValue] = {
-    val file: Field =
-      stackDepth.filePathname.fold[Field]("fileName" -> stackDepth.fileName.map(JsonValue.Text(_)))(path => "filePath" -> Some(JsonValue.Text(path)))
-    val fields = Vector[Field](file, "lineNumber" -> stackDepth.lineNumber.map(line => JsonValue.Integer(line.toLong)))
+    val fields = Vector[Field](fileField(stackDepth.fileName, stackDepth.filePathname),"lineNumber" -> stackDepth.lineNumber.map(line => JsonValue.Integer(line.toLong)))
     Option.when(fields.exists(_._2.nonEmpty))(objectOf(fields))
   }
 

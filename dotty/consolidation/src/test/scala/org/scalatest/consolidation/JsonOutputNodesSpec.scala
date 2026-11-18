@@ -13,12 +13,18 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
   private def jsonOutputOf(eventLog: String): JsonSink = jsonOutputOfRun(TestRunPart.Events(eventLog))
 
   private def rowSuiteRunning(eventLinesBetweenSuiteStartAndCompletion: String*): String =
+    rowSuiteOf("adds", eventLinesBetweenSuiteStartAndCompletion)
+
+  private def rowSuiteWithTest(testName: String, eventLinesOfTest: String*): String =
+    rowSuiteOf(testName, ("TestStarting" +: eventLinesOfTest).map(line => s"""test "$testName": $line"""))
+
+  private def rowSuiteOf(testName: String, eventLinesBetweenSuiteStartAndCompletion: Seq[String]): String =
     s"""
     run started
     run: RunStarting
     structure
       suite "RowSuite", class "samples.RowSuite"
-        test "adds", label "- adds"
+        test "$testName", label "- $testName"
     suite "RowSuite": SuiteStarting
     ${eventLinesBetweenSuiteStartAndCompletion.mkString("\n    ")}
     suite "RowSuite": SuiteCompleted
@@ -27,23 +33,6 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
     """
 
   private def namesOf(nodes: JsonValue): Vector[JsonValue] = nodes.items.map(_("name"))
-
-  private def rowSuiteWithTest(testName: String, eventLinesOfTest: String*): String =
-    s"""
-    run started
-    run: RunStarting
-    structure
-      suite "RowSuite", class "samples.RowSuite"
-        test "$testName", label "- $testName"
-    suite "RowSuite": SuiteStarting
-    test "$testName": TestStarting
-    ${eventLinesOfTest.map(line => "test \"" + testName + "\": " + line).mkString("\n    ")}
-    suite "RowSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """
-
-  private def frameKeysOf(throwable: JsonValue): Vector[Vector[String]] = throwable("stackTrace").items.map(_.keys)
 
   private def withoutStackTraces(throwable: JsonValue): JsonValue =
     throwable match {
@@ -339,9 +328,11 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       Then("the throwable has no message key")
       throwable.keys should not contain "message"
 
-      And("each frame holds className and methodName, and none holds isNative false")
-      frameKeysOf(throwable).foreach(_ should contain allOf ("className", "methodName"))
-      throwable("stackTrace").items.foreach(_.get("isNative") should not contain JsonValue.Bool(false))
+      And("its stack trace is, in full, the two frames, neither holding isNative")
+      throwable("stackTrace") shouldBe arrayOf(
+        objectOf("className" -> text("samples.RowSuite"), "methodName" -> text("throws"), "fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(9L)),
+        objectOf("className" -> text("org.scalatest.Transformer"), "methodName" -> text("apply"), "fileName" -> text("Transformer.scala"), "lineNumber" -> integer(22L))
+      )
     }
 
     Scenario("A suite nested by another sits in that suite's contents, with its test in its own") {

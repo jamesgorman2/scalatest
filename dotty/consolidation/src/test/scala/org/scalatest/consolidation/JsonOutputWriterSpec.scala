@@ -1,6 +1,7 @@
 package org.scalatest.consolidation
 
 import java.time.Instant
+import org.scalactic.source.Position
 import org.scalatest.ScalaTestVersions
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.DecodedEvent
@@ -451,6 +452,19 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       }
     }
 
+    "its location is a line in a file compiled without file pathnames filled" should {
+      "give the file's name" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          s"""test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", Some("${Position.unfilledFilePathname}")))""",
+          """test "adds": TestSucceeded""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds")("location") shouldBe objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
+      }
+    }
+
     "it is canceled" should {
       "hold the outcome canceled and its TestCanceled's message" in {
         val json = jsonOutputOfRowSuite(
@@ -801,6 +815,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       }
     }
 
+    "it is a StackDepth exception whose failed code was compiled without file pathnames filled" should {
+      "give the file's name as its location" in {
+        recordOf(stackDepthException(DecodedStackDepth(Some("RowSuite.scala"), Some(Position.unfilledFilePathname), Some(7))))("location") shouldBe
+          objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
+      }
+    }
+
     "it is a StackDepth exception whose failed code is not known" should {
       "have neither a location nor a stack trace" in {
         recordOf(stackDepthException(DecodedStackDepth(None, None, None))).keys shouldBe Vector("id", "className", "message")
@@ -849,7 +870,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       }
     }
 
-    "two throwables are equal but not the same object" should {
+    "two throwables are alike but not the same object" should {
       "record each in full" in {
         val record = recordOf(linked(throwable("Outer"), cause = Some(throwable("Same", Some("same"))), suppressed = Vector(throwable("Same", Some("same")))))
         record("suppressed").only("id") shouldBe integer(3L)

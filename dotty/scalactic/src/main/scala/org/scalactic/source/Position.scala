@@ -61,8 +61,10 @@ object Position {
   private[scalactic] lazy val showScalacticFillFilePathnames: Boolean = 
     Option(System.getenv("SCALACTIC_FILL_FILE_PATHNAMES")) == Some("yes")
 
-  private[org] def filePathnames(path: String): String = 
-    if (showScalacticFillFilePathnames) path else Resources.pleaseDefineScalacticFillFilePathnameEnvVar
+  private[org] def unfilledFilePathname: String = Resources.pleaseDefineScalacticFillFilePathnameEnvVar
+
+  private[org] def filePathnames(path: String): String =
+    if (showScalacticFillFilePathnames) path else unfilledFilePathname
 
   /**
    * Helper method for Position macro.
