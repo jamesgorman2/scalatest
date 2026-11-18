@@ -46,7 +46,7 @@ Keys, in order:
 - `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's, in this order: the test worker failing to start, and its test event log failing to be read. Absent where there is none.
-- `startedAt`, `endedAt`, `duration` — the test command's start, end and duration, measured by the test command.
+- `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's tests are discovered until every run has ended.
 - `contents` — an array holding the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.
 
@@ -56,7 +56,7 @@ Keys, in order:
 
 - `kind` — `module`.
 - `name` — the module's Mill path, such as `core.test`.
-- `startedAt`, `endedAt`, `duration` — the module's start, end and duration, measured by the test command.
+- `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's worker starts until the worker has ended and its test event log is read.
 - `contents` — an array holding the module's run node, or `[]` where it has none (§ Tree).
 
 ## Run node

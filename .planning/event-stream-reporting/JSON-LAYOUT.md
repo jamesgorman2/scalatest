@@ -108,8 +108,8 @@ A throwable record's keys, in order:
 - `id` — an integer, numbered depth-first from 1 within one record: one node's or message's `throwable`.
 - `className`.
 - `message` — `getMessage`, absent when `null`.
-- for a `StackDepthException`, `TestFailedException` and `TestCanceledException` among them: `location` (§ Locations), giving the failed code's file and line number, each where defined; and no `stackTrace`.
-- for any other throwable: `stackTrace`, every frame as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`, with `fileName` absent when unknown, `lineNumber` absent when negative, and `isNative` present only when `true`.
+- for a throwable mixing in `org.scalatest.exceptions.StackDepth`, `TestFailedException` and `TestCanceledException` among them: `location` (§ Locations), giving the failed code's file and line number, each where defined; and no `stackTrace`.
+- for a throwable not mixing in `StackDepth`: `stackTrace`, every frame as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`, with `fileName` absent when unknown, `lineNumber` absent when negative, and `isNative` present only when `true`.
 - `cause` — recorded the same way, by its own type; absent when there is none.
 - `suppressed` — an array, in order, each recorded the same way; absent when empty.
 
