@@ -112,3 +112,11 @@ To test the prefix, pass `--ticker true` ahead of the task in the arguments to `
 
 `--ticker true` does not make Mill draw its progress prompt: without a terminal, Mill prints no prompt, and the only status line is the final one (`146/146, 1 FAILED] …`). `testForked` still writes its task's progress line naming the class it runs (`146] core.test.testForked Running Test Class samples.QueueFlatSpec`) to stderr, but never a count such as `1/1 completed`. A test can show the class-name progress line, but cannot assert that Mill's progress count is absent; observe it under a pseudo-terminal.
 </learning>
+
+<learning>
+date: 2026-11-18
+---
+Mill 1.3.1, through its bootstrap scripts and its launcher (`mill.launcher.MillLauncherMain`), takes the current working directory as the workspace root and never searches upward for `build.mill`. Run from a folder below the workspace root, it creates an `out` folder there, finds no build, and fails to resolve any task or external module the build adds, such as `Cannot resolve external module <name>/`. `mill.testkit.IntegrationTester.eval(..., cwd = <subfolder>)` behaves the same.
+
+A requirement or test that runs `mill` from a folder below the workspace root cannot pass under Mill 1.3.1. Inside a task, resolve a relative path argument against `mill.api.BuildCtx.workspaceRoot`, which under Mill 1.3.1 is always the folder `mill` was run from.
+</learning>
