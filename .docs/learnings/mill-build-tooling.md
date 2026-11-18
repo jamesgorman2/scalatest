@@ -120,3 +120,11 @@ Mill 1.3.1, through its bootstrap scripts and its launcher (`mill.launcher.MillL
 
 A requirement or test that runs `mill` from a folder below the workspace root cannot pass under Mill 1.3.1. Inside a task, resolve a relative path argument against `mill.api.BuildCtx.workspaceRoot`, which under Mill 1.3.1 is always the folder `mill` was run from.
 </learning>
+
+<learning>
+date: 2026-11-18
+---
+Under Mill's `testForked`, several test classes run in each worker JVM, and the ScalaTest `Tests: succeeded N` and `Suites: completed N` summary lines can repeat a worker's running total after each class (successive lines read 9, 12, 15, 18, 18). Summing those lines over a run gives a total that changes from run to run with no source change (218, then 205, for the same tests).
+
+Count tests from `out/<module>/testForked.dest/test-report.xml`, one `<testcase>` per test case, and never by summing summary lines.
+</learning>
