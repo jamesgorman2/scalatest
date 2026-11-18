@@ -298,6 +298,10 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
       val throwable = decoded("java.lang.IllegalStateException", Some("  boom  "), 0)
       Reporter.messageOrThrowablesDetailMessage("  ", Some(throwable)) shouldBe "boom"
     }
+    "give an empty message where the message is blank and the throwable has no message" in {
+      val throwable = decoded("java.lang.IllegalStateException", None, 0)
+      Reporter.messageOrThrowablesDetailMessage("", Some(throwable)) shouldBe ""
+    }
     "give an empty message where the message is blank and there is no throwable" in {
       Reporter.messageOrThrowablesDetailMessage("  ", None) shouldBe ""
     }
