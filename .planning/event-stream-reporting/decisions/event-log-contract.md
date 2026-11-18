@@ -58,7 +58,7 @@ Decisions behind `../SPECIFICATION.md` on what a test event log carries, who may
 
 ## The test event log's format is private to this fork.
 
-**Alternatives** A documented format that third parties may read is a second public contract beside the JSON output (`../SPECIFICATION.md` R-028), needing its own compatibility policy, and the goal names no reader for it.
+**Alternatives** A documented format that third parties may read is a second documented format beside the JSON output (`../SPECIFICATION.md` R-028), and the goal names no reader for it.
 
 **Reasoning** Tools already have a documented account of every run in the JSON output, so the event log need serve only this fork's own reader.
 

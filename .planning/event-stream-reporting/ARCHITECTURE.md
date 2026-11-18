@@ -170,12 +170,13 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - for each human-readable output, the formatting and filtering characters of the `-o` or `-f` that names it (R-138, R-139);
   - each module selector, with the test modules it resolved to;
   - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
-- **Add a run** under the module the caller names for it (§ Modules § Consolidation library, Consolidation): its event stream, fed live as the test event log is decoded, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-097a), as one sequence of lines in the order the caller read them, each line tagged with its stream.
+- **Add a run** under the module the caller names for it (§ Modules § Consolidation library, Consolidation): its event stream, fed live as the test event log is decoded, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-097a), as one sequence of lines in the order the caller read them, each line tagged with its stream and keeping its line terminator where it has one.
   - The caller splits each stream into lines and decodes them to text before adding them, since a stream reaches it in chunks that can split a line or a character (`research/mill-worker-channels.md` § 1.3).
   - The caller adds a stream's unterminated last line once that stream ends, so a process that dies keeps its last line (R-097a).
   - The caller tells the library when the run's event stream has ended (§ APIs § The emitter and the Mill plugin, "Each event" and "The end of a run's event stream").
 
   Once the run's process has ended, the caller adds the test classes that process claimed, from the module's test manifest (§ Modules § Mill plugin).
+- **Time the root and each module**: the caller gives a start event and an end event for the root, and for each module whose tests it starts, each timed by the caller's own clock: the root's start when the consolidation starts and its end once every run has ended, and a module's start when its tests start and its end once its last run has ended. These events supply the root's and the module's times in the JSON output (`JSON-LAYOUT.md` § Root and modules, `SPECIFICATION.md` R-103), and no test event log holds them.
 - **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its module, the test classes it claimed, and the output captured from its stdout and stderr, in the form **Add a run** takes it. The library attaches that output to the module, the most specific node the process identifies.
 - **Add a module whose tests did not start** (R-098e), naming the module and, where a failure stopped them, that failure.
 - **Add a test class** left in a fork group's queue when the group's last worker ended, with its module. The library adds the class as a suite node aborted with reason *not run* (R-095a).
@@ -244,7 +245,7 @@ flowchart LR
   PROC -- "stdout and stderr (JVM), less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
-  CMD -- "each run's module, selectors, test classes each process claimed, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version" --> LIB
+  CMD -- "each run's module, selectors, test classes each process claimed, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version, start and end events for the root and each module" --> LIB
   LIB -- "runner argument; consolidation state" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]

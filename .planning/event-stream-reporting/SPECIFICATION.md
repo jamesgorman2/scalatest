@@ -33,6 +33,8 @@ The Mill plugin runs on Mill 1.x releases no older than the one it is built agai
 
 A test event log's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them. Within one release of this fork, the consolidation library reads every test event log that the release's emitter writes.
 
+The JSON output is written for agents reading the test command that wrote it. Its format has no version of its own and carries no compatibility promise across releases of this fork: any release may change it.
+
 ### Out of scope
 
 - sbt and command-line front ends for the consolidation library.
@@ -119,7 +121,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-098f A root has an outcome only when the consolidated test command has an error. 
 - R-095a Any suite scheduled to be run, or any suite, scope or test that is recorded in a structure event, and has no subsequent test events is reported as aborted with reason *not run*.
 - R-095b Any node recorded with a start event but no end event is reported as aborted.
-- R-103 Each node that ran has a duration. The duration is as recorded by the events, or, as a fall-back, the sum of the durations of its children.
+- R-103 A node's duration is the one its events record, and a node whose events record none has no duration.
 
 ## The consolidation library
 
@@ -216,7 +218,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 ### JSON output
 
 - R-028 JSON output encodes the entire node tree, per `JSON-LAYOUT.md`.
-- R-084 JSON output is versioned against this fork
+- R-084 The JSON output records the release of this fork that wrote it.
 - R-127c JSON output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes. 
 - R-127d JSON output omits a scope when all its children have been omitted by filtering characters. This is recursive.
 
