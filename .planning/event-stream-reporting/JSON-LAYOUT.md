@@ -38,7 +38,7 @@ The root's keys, in order: `kind`, `scalaTestVersion`, `buildTool`, `moduleSelec
 - `scalaTestVersion` — the version of the release of this fork that wrote the JSON output, as that release was built, such as `3.2.20` (R-084). Always present.
 - `buildTool` — `{ "name", "version" }`: the build tool that started the runs and its running version. Under the consolidated test command, `name` is `Mill`. Absent where the consolidation library's caller gives no build tool.
 - `moduleSelectors` — always present, `[]` when empty: each module selector, in the order given, as `{ "selector", "modules" }`, where `selector` is the module selector as given and `modules` is the names of the test modules it resolved to.
-- `outcome` — `aborted`, only where a failure is attached to the root (R-072, R-098f).
+- `outcome` — `aborted`, present only where a failure is attached to the root (R-072, R-098f).
 - `failures` — each failure attached to the root, in the order attached, as `{ "message" }`. Absent where none is attached.
 - `startedAt`, `endedAt` — the root's start time and end time, which the consolidation library's caller gives. Each is absent where the caller gives none.
 - `duration` — `endedAt - startedAt`, absent unless both are present.
@@ -79,10 +79,10 @@ A suite's, scope's or test's keys, in order: `kind`, `name`, `label`, `suiteId`,
 - `endedAt` — the closing event's. For a node aborted without a closing event of its own, that of the `SuiteAborted` or `RunAborted` that aborted it, and absent where there is none.
 - `duration` — for a suite or test, its closing event's, absent where that event carries none, as `TestIgnored` never does. For a scope, and for a node aborted without a closing event of its own, `endedAt - startedAt`, absent unless both are present.
 - `threadName` — suites and tests only: the opening event's, else the closing event's.
-- `contents` — always present, `[]` when empty: the node's children, and nothing else (R-105).
+- `contents` — always present, `[]` when empty: the node's children, and nothing else (R-105). A suite's children are the suites it nests or ran, and its scopes and tests; a scope's are its scopes and tests, and a test's the suites it ran. Each child states its own `kind`. The children appear in this order:
   - Children whose place in the node's declaration is known appear first, in declared order.
   - The remaining children are suites. They follow in ascending order by name, compared as § Tree compares names.
-  - Children that share a declared place or a name, such as the nodes of a suite, scope or test that ran more than once in one parent, appear in the order they started, followed by those that never started. A suite's children are the suites it nests or ran, and its scopes and tests; a scope's are its scopes and tests, and a test's the suites it ran. Each child states its own `kind`.
+  - Children that share a declared place or a name, such as the nodes of a suite, scope or test that ran more than once in one parent, appear in the order they started, followed by those that never started.
 - `output` — the node's messages (§ Messages) and the output captured against it (§ Captured output), in one sequence. Absent where the node has neither.
 
 A suite scheduled to run that has no events (R-095a) has `kind` `suite`, `outcome` `aborted`, `reason` `notRun` and `contents` `[]`. For class `p.B`, the suite's `suiteId` and `location.className` are `p.B`. The suite has no times, `threadName`, `message`, `throwable` or `output`.

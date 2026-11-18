@@ -4,9 +4,9 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ## The JSON output's format carries no compatibility promise across releases of this fork (`../SPECIFICATION.md` § Scope).
 
-**Alternatives** Semantic versioning of the format, a patch release never changing it and a minor release only adding to it, binds every later release to additive change for third-party readers the goal does not name.
+**Alternatives** Semantic versioning of the format, under which a patch release never changes it and a minor release only adds to it, binds every later release to additive change for third-party readers the goal does not name.
 
-**Reasoning** The JSON output's readers are agents that started the test command and read its JSON output. Each agent reads the output against the documentation of the release that wrote it, so a change between releases costs it nothing.
+**Reasoning** The JSON output's readers are agents that started the test command. Each agent reads the output against the documentation of the release that wrote it, so a change between releases costs it nothing.
 
 **Costs** A tool that parses the JSON output across releases may break on any release.
 
@@ -30,7 +30,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 **Alternatives** Leaving the root and modules untimed gives a reader no time for the test command or for a module, though only the test command can observe either.
 
-**Reasoning** No run's events record when the test command or a module's tests start and end. The test command alone sees both, so only it can give the root and each module a measured time.
+**Reasoning** No run's events record when the test command or a module's tests start and end. Only the test command observes those times, so only it can give the root and each module a measured time.
 
 **Costs** The root and modules have no times when the consolidation library is called by a caller that gives none.
 

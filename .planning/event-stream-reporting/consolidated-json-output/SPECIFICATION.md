@@ -46,7 +46,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 
 ## Epic requirements met
 
-This feature meets each requirement below for JSON output, for one module selector, one JVM test module and one worker, and with the consolidation library called directly. Where a requirement carries a qualifier, this feature meets only the part the qualifier names.
+This feature meets each requirement below for JSON output, for one module selector, one JVM test module and one worker, and with the consolidation library called directly. Where a requirement is followed by a parenthesis, this feature meets only the part the parenthesis names.
 
 - R-028 (with no filtering characters), R-084, R-020 (human-readable output on stdout and JSON output in one file).
 - R-096a (the root, one module, one forked run, and the run's suites, scopes and tests), R-104, R-105, R-130a, R-130b, R-130c, R-130d, R-130e, R-130f.

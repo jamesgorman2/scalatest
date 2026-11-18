@@ -21,7 +21,7 @@ Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
 **Alternatives** Writing each node's events with every field, as ScalaTest 3.2.20's JSON lines do, repeats each event's suite name, suite ID and suite class name, and carries ordinals, formatters and rerunners, which only restate the order the tree already gives or have no meaning outside the run that wrote them.
 
-**Reasoning** Every reader of the JSON output is an agent that started the test command and reads its JSON output. Each such reader needs a node's state and its place, and the tree gives the place. One record per node, with one key per value, gives that state without the reader replaying events, and keeps the output small enough for an agent to read whole.
+**Reasoning** Every reader of the JSON output is an agent that started the test command. Each such reader needs a node's state and its place, and the tree gives the place. One record per node, with one key per value, gives that state without the reader replaying events, and keeps the output small enough for an agent to read whole.
 
 **Costs** The JSON output does not hold every field of every event, and a tool that reads only the JSON cannot recover the order of events across nodes.
 

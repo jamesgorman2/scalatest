@@ -175,9 +175,9 @@ Feature: Deleting and writing the `-fJ` file
       And the test command succeeds
 ```
 
-| Requirement                   | Criteria               |
-|-------------------------------|------------------------|
-| R-077                         | AC-008                 |
-| R-059                         | AC-008                 |
-| R-049a                        | AC-041, AC-042         |
+| Requirement                   | Criteria                               |
+|-------------------------------|----------------------------------------|
+| R-077                         | AC-008                                 |
+| R-059                         | AC-008                                 |
+| R-049a                        | AC-041, AC-042                         |
 | `../SPECIFICATION.md` § Scope | AC-008, AC-009, AC-010, AC-041, AC-042 |

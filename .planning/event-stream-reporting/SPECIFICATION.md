@@ -31,7 +31,7 @@ The emitter, the consolidation library and the Mill plugin cover runs on the JVM
 
 The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. Each release of the Mill plugin lists the Mill releases on which its integration tests passed. Each release of the Mill plugin supports exactly the Mill releases it lists, its *supported Mill releases*.
 
-A test event log's format, the consolidation library's API, the switch by which the Mill plugin turns the emitter on, and the JSON output's format carry no compatibility promise across releases of this fork: any release may change them. No caller outside this fork may rely on the first three. The JSON output's format has no version of its own. Within one release of this fork, the consolidation library reads every test event log that the release's emitter writes.
+A test event log's format, the consolidation library's API, the switch by which the Mill plugin turns the emitter on, and the JSON output's format carry no compatibility promise across releases of this fork: any release may change them. No caller outside this fork may rely on the test event log's format, the consolidation library's API or that switch. The JSON output's format has no version of its own. Within one release of this fork, the consolidation library reads every test event log that the release's emitter writes.
 
 ### Out of scope
 
