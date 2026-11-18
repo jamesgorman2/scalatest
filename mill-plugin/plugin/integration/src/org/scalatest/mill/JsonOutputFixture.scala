@@ -34,6 +34,7 @@ trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
 
   /** Invokes the test command as `mill scalatest/test core.test -fJ <report>`, and parses the JSON output. */
   protected def jsonOutputOfTestCommand(tester: IntegrationTester): ujson.Value = {
+    os.remove(report(tester))
     val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
     withClue(result.debugString) {
       os.exists(report(tester)) shouldBe true
