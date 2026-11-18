@@ -362,9 +362,9 @@ private[scalatest] object SuiteNodeTable {
       structure.filteredTests
     )
     val nested = structure.nestedSuites.toVector
-    table.holdNestedSuites(nested.zipWithIndex.map { (nestedSuite, index) =>
-      val nestedId = nestedSuitePath(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
-      suite(emitter, nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
+    table.holdNestedSuites(nested.zipWithIndex.map { (nestedSuite, position) =>
+      val nestedId = nestedSuitePath(id, nestedSuite.suiteId, nested.take(position).map(_.suiteId))
+      suite(emitter, nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + position), nodes)
     })
     if (!structure.testsBeforeNestedSuites) {
       nodes ++= nodesOfScopesAndTests.result()
