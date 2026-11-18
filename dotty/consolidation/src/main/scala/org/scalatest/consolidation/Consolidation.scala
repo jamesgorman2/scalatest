@@ -1,16 +1,26 @@
 package org.scalatest.consolidation
 
+import java.time.Instant
 import scala.collection.mutable
 
 /**
- * One consolidation: the runs of one test command, consolidated into human-readable output.
+ * One consolidation: the runs of one test command, consolidated into human-readable output and, where it is given a
+ * sink for it, JSON output.
  *
  * Every operation may be called from any thread. [[state]] takes no lock.
  */
-final class Consolidation private (humanReadableOutput: String => Unit, coloured: Boolean) {
+final class Consolidation private (
+  humanReadableOutput: String => Unit,
+  coloured: Boolean,
+  jsonOutput: Option[String => Unit],
+  moduleSelectors: Seq[ModuleSelector],
+  buildTool: Option[BuildTool],
+  startedAt: Option[Instant]
+) {
 
   @volatile private var currentState: ConsolidationState = ConsolidationState.Open
   private val runs = mutable.ArrayBuffer.empty[RunAssembly]
+  private val moduleTimes = mutable.Map.empty[TestRunLabel, MeasuredTimes]
   private val rootOutput = mutable.ArrayBuffer.empty[CapturedLine]
   private val rootFailures = mutable.ArrayBuffer.empty[String]
 
@@ -69,18 +79,42 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
     }
 
   /**
-   * Ends the consolidation and writes the human-readable output, whose last line is the summary line. Nothing is
-   * written before this.
+   * Gives a module's start and end time, each by the caller's clock and each where the caller measured it. A later call
+   * for the same module replaces the times an earlier one gave.
    *
+   * @param startedAt when the caller started the module's tests
+   * @param endedAt when the last of the module's test processes ended
+   * @throws IllegalArgumentException if the consolidation has ended
+   */
+  def timeModule(module: TestRunLabel, startedAt: Option[Instant], endedAt: Option[Instant]): Unit =
+    synchronized {
+      requireOpen()
+      moduleTimes(module) = MeasuredTimes(startedAt, endedAt)
+    }
+
+  /**
+   * Ends the consolidation and writes the human-readable output, whose last line is the summary line, then the JSON
+   * output where a sink was given for it. Nothing is written before this.
+   *
+   * @param endedAt the root's end time by the caller's clock: when every run had ended
    * @throws IllegalArgumentException if the consolidation has ended, or a run's event stream has not
    */
-  def end(): Unit =
+  def end(endedAt: Option[Instant] = None): Unit =
     synchronized {
       requireOpen()
       require(runs.forall(!_.isEventStreamOpen), "every run's event stream must have ended")
       HumanReadableWriter.lines(runs.toVector, rootOutput.toVector, rootFailures.toVector).foreach(line => humanReadableOutput(line.rendered(coloured)))
+      jsonOutput.foreach(sink => sink(JsonOutputWriter.text(root(endedAt))))
       currentState = currentState.withEnd
     }
+
+  private def root(endedAt: Option[Instant]): ConsolidatedRoot = {
+    val runsByModule = runs.toVector.groupBy(_.label)
+    val modules = (runsByModule.keySet ++ moduleTimes.keySet).toVector.sortBy(_.value).map { module =>
+      ConsolidatedModule(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty))
+    }
+    ConsolidatedRoot(buildTool, moduleSelectors, rootFailures.toVector, MeasuredTimes(startedAt, endedAt), modules, rootOutput.toVector)
+  }
 
   private[consolidation] def feed(add: => Unit): Unit =
     synchronized {
@@ -98,8 +132,21 @@ object Consolidation {
   /**
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
    * @param coloured whether that output is coloured with ANSI escape sequences
+   * @param jsonOutput the sink the JSON output is written to, as one text, once the consolidation ends; with none, no
+   *                   JSON output is made
+   * @param moduleSelectors each module selector, in the order given, with the test modules it resolved to
+   * @param buildTool the build tool that started the runs, where the caller gives one
+   * @param startedAt the root's start time by the caller's clock: when the consolidation started
    */
-  def start(humanReadableOutput: String => Unit, coloured: Boolean): Consolidation = new Consolidation(humanReadableOutput, coloured)
+  def start(
+    humanReadableOutput: String => Unit,
+    coloured: Boolean,
+    jsonOutput: Option[String => Unit] = None,
+    moduleSelectors: Seq[ModuleSelector] = Vector.empty,
+    buildTool: Option[BuildTool] = None,
+    startedAt: Option[Instant] = None
+  ): Consolidation =
+    new Consolidation(humanReadableOutput, coloured, jsonOutput, moduleSelectors, buildTool, startedAt)
 }
 
 /** Receives one run's event stream and captured lines, in the order they were read. */

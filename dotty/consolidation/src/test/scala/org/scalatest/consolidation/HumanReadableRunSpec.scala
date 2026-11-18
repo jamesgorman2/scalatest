@@ -61,6 +61,27 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    {yellow}[stderr] warn: about to divide{reset}""".stripExpectedMargin
     }
 
+    Scenario("A captured line's terminator adds no line") {
+      Given("an event log holding `run started`, then `run ended completed`, consolidated as a run of the module `core.test`")
+      And("a stdout line captured with its `\\n` and a stderr line captured with its `\\r\\n`")
+      val parts = Vector(
+        TestRunPart.Events("run started"),
+        TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now\n"),
+        TestRunPart.CapturedLine(CapturedStream.Stderr, "warn: about to divide\r\n"),
+        TestRunPart.Events("run ended completed")
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(parts*)
+
+      Then("each line is shown without its terminator")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 1:{reset}
+          |    [stdout] dividing now
+          |    {yellow}[stderr] warn: about to divide{reset}""".stripExpectedMargin
+    }
+
     Scenario("Captured lines sit after the lines for the run's suites, wherever they are fed among the events") {
       Given("an event log of a completed run of a suite with one test, consolidated as a run of the module `core.test`")
       And("a stdout line and a stderr line captured, fed in that order at each combination of points among the event log's events")

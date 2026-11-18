@@ -2,6 +2,37 @@
 
 Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
+## A run node is identified by `number`, its place from 1 among its module's runs in the order they were added, unique only within its module.
+
+**Alternatives**
+
+- A run's process ID is not known for a run whose `runStarted` event never arrived, and is not unique where the operating system reuses it.
+- An identifier unique across the whole JSON output, such as a module name joined to a number, repeats the module the tree already gives.
+
+**Reasoning** The human-readable output already shows each run as `Run <n>:` under its module, from the order the consolidation library was given the module's runs. Writing that number gives a reader the same name for a run in both outputs, and the tree gives its module.
+
+**Costs** A reader that collects runs across modules must pair each `number` with its module's `name`.
+
+**Settled by** [Library JSON output: encoding, root, module and run node](https://github.com/jamesgorman2/scalatest/issues/142).
+
+---
+
+## The root names the release as `scalaTestVersion`, the build tool as `buildTool` `{ "name", "version" }`, and each module selector as `moduleSelectors` `{ "selector", "modules" }`; a module is named by `name`.
+
+**Alternatives**
+
+- A flat `buildToolName` and `buildToolVersion` on the root splits one optional fact into two keys a reader must check together.
+- Making each module selector a node, with its modules beneath it, nests a module under every selector that resolved to it, so a module two selectors share would appear twice.
+- Writing modules as an object keyed by name loses the order § Tree gives and differs from the `contents` array every other node uses.
+
+**Reasoning** Each key names the one fact it holds in ScalaTest's and Mill's own words: ScalaTest's version, the build tool, the module selector as given and the Mill module path. Grouping the build tool's name and version makes it absent or present as a whole, as the caller gives it. Keeping module selectors as data on the root, with the modules they resolved to by name, leaves `contents` as the tree alone.
+
+**Costs** A reader that wants the selectors that chose a module must search `moduleSelectors` for its `name`.
+
+**Settled by** [Library JSON output: encoding, root, module and run node](https://github.com/jamesgorman2/scalatest/issues/142).
+
+---
+
 ## A node's messages and captured output are one ordered `output`, and its `contents` holds only its children.
 
 **Alternatives**

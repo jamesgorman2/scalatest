@@ -8,6 +8,7 @@ import org.scalatest.events.NodeId
 import org.scalatest.events.NodePlace
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
+import org.scalatest.events.Summary
 import org.scalatest.events.TestEventLogEvent
 
 /** What attributes a test with no execution to a test that ran: the suite ID of the nearest suite above it, and its test name. */
@@ -95,6 +96,11 @@ private[consolidation] final case class AssembledNode(node: StructureNode, execu
   def descendants: Vector[AssembledNode] = execution.descendants
 }
 
+/** What the run's closing event, its first `RunCompleted`, `RunStopped` or `RunAborted`, reports. */
+private[consolidation] final case class RunClosing(timeStamp: Long, duration: Option[Long], summary: Option[Summary])
+
+private[consolidation] final case class RunDiscovery(startedAt: Long, duration: Option[Long])
+
 /** A message attached to a run rather than to a node, or a line captured from the run's processes. */
 private[consolidation] enum RunOutput {
   case Message(event: DecodedEvent)
@@ -116,6 +122,10 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   private val executions = mutable.Map.empty[NodeId, SortedMap[Int, RecordedExecution]]
   private var executionsStarted = 0
   private var received = Vector.empty[RunOutput]
+  private var starting = Option.empty[DecodedEvent.RunStarting]
+  private var discoveryStart = Option.empty[DecodedEvent.DiscoveryStarting]
+  private var discoveryEnd = Option.empty[DecodedEvent.DiscoveryCompleted]
+  private var closingEvent = Option.empty[RunClosing]
   private var abort = Option.empty[DecodedEvent.RunAborted]
   private var ending = Option.empty[RunOutcome]
   private var eventStreamOpen = true
@@ -128,6 +138,15 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
 
   /** The run's first `RunAborted`, whose message and throwable explain an aborted run's end. */
   def runAborted: Option[DecodedEvent.RunAborted] = abort
+
+  /** The run's first `RunStarting`. */
+  def runStarting: Option[DecodedEvent.RunStarting] = starting
+
+  /** From the run's first `DiscoveryStarting` and first `DiscoveryCompleted`, where it reported both. */
+  def discovery: Option[RunDiscovery] =
+    for (started <- discoveryStart; completed <- discoveryEnd) yield RunDiscovery(started.timeStamp, completed.duration)
+
+  def closing: Option[RunClosing] = closingEvent
 
   def output: Vector[RunOutput] = received
 
@@ -339,14 +358,31 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
 
   private def executionsOf(id: NodeId): Vector[RecordedExecution] = executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
 
-  // An event assigned to the run rather than to a node shows no line, unless it is a message or the run's first
-  // `RunAborted`. These include a `DiscoverySuite`'s events, which the emitter assigns to the run.
+  // An event assigned to the run rather than to a node records the run's own state where it is a run or discovery
+  // event, and is the run's output where it is a message. Any other, such as a `DiscoverySuite`'s events, which the
+  // emitter assigns to the run, is dropped. The first of each kind of run or discovery event is kept.
   private def addToRun(event: DecodedEvent): Unit =
     event match {
-      case aborted: DecodedEvent.RunAborted => if (abort.isEmpty) abort = Some(aborted)
-      case message if RunAssembly.isMessage(message) => received :+= RunOutput.Message(message)
-      case _ => ()
+      case started: DecodedEvent.RunStarting =>
+        if (starting.isEmpty) starting = Some(started)
+      case started: DecodedEvent.DiscoveryStarting =>
+        if (discoveryStart.isEmpty) discoveryStart = Some(started)
+      case completed: DecodedEvent.DiscoveryCompleted =>
+        if (discoveryEnd.isEmpty) discoveryEnd = Some(completed)
+      case completed: DecodedEvent.RunCompleted =>
+        close(RunClosing(completed.timeStamp, completed.duration, completed.summary))
+      case stopped: DecodedEvent.RunStopped =>
+        close(RunClosing(stopped.timeStamp, stopped.duration, stopped.summary))
+      case aborted: DecodedEvent.RunAborted =>
+        if (abort.isEmpty) abort = Some(aborted)
+        close(RunClosing(aborted.timeStamp, aborted.duration, aborted.summary))
+      case message if RunAssembly.isMessage(message) =>
+        received :+= RunOutput.Message(message)
+      case _ =>
+        ()
     }
+
+  private def close(closed: RunClosing): Unit = if (closingEvent.isEmpty) closingEvent = Some(closed)
 
   private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
     recordExecutionPath(nodeExecution)
