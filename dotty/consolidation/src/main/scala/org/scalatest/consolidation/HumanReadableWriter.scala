@@ -10,7 +10,6 @@ import org.scalatest.tools.AnsiCyan
 import org.scalatest.tools.AnsiGreen
 import org.scalatest.tools.AnsiRed
 import org.scalatest.tools.AnsiYellow
-import org.scalatest.tools.StackDepthView
 import org.scalatest.tools.StringReporter
 import org.scalatest.tools.ThrowableView
 
@@ -87,22 +86,7 @@ private[consolidation] object HumanReadableWriter {
   // ScalaTest 3.2.20 prints a run abort's message on the line after `*** RUN ABORTED ***`, then the lines it prints
   // under any error event's first line.
   private def runAbortLines(aborted: DecodedEvent.RunAborted, depth: Int): Vector[OutputLine] = {
-    val lines = StringReporter.stringsToPrintOnError(
-      Resources.abortedNote,
-      _ => Resources.runAborted,
-      aborted.message,
-      formattableThrowable(aborted.message, aborted.throwable),
-      Vector.empty,
-      None,
-      None,
-      None,
-      None,
-      presentUnformatted = false,
-      presentAllDurations = false,
-      presentShortStackTraces = false,
-      presentFullStackTraces = false,
-      presentFilePathname = false
-    )
+    val lines = errorLines(Resources.abortedNote, _ => Resources.runAborted, aborted.message, aborted.throwable, Vector.empty, None, None, None)
     linesUnder(Vector(aborted.message).filter(_.nonEmpty) ++ lines.tail, aborted.throwable, depth, AnsiRed)
   }
 
@@ -245,59 +229,59 @@ private[consolidation] object HumanReadableWriter {
     suiteName: Option[String],
     testName: Option[String]
   ): Vector[String] =
-    StringReporter.stringsToPrintOnError(
-      note,
-      errorMessage,
-      message,
-      formattableThrowable(message, throwable),
-      analysis.toVector,
-      formatterOf(text),
-      suiteName,
-      testName,
-      None,
-      presentUnformatted = false,
-      presentAllDurations = false,
-      presentShortStackTraces = false,
-      presentFullStackTraces = false,
-      presentFilePathname = false
-    )
+    errorLines(note, errorMessage, message, throwable, analysis, formatterOf(text), suiteName, testName)
 
   // `StringReporter` throws a NullPointerException for a blank message with a throwable that has no message, as
-  // ScalaTest 3.2.20 does, and core keeps that. A throwable whose message is empty is formatted as one with no message
-  // is in every other case.
-  private def formattableThrowable(message: String, throwable: Option[ThrowableView]): Option[ThrowableView] =
-    throwable.map { view =>
-      if (message.trim.isEmpty && view.message.isEmpty) new ThrowableWithEmptyMessage(view) else view
+  // ScalaTest 3.2.20 does, and core keeps that. Those lines are built from its parts instead, as it would build them
+  // were the throwable's message empty.
+  private def errorLines(
+    note: String,
+    errorMessage: Any => String,
+    message: String,
+    throwable: Option[ThrowableView],
+    analysis: IndexedSeq[String],
+    formatter: Option[IndentedText],
+    suiteName: Option[String],
+    testName: Option[String]
+  ): Vector[String] = {
+    def linesWith(shown: Option[ThrowableView]): Vector[String] =
+      StringReporter.stringsToPrintOnError(
+        note,
+        errorMessage,
+        message,
+        shown,
+        analysis.toVector,
+        formatter,
+        suiteName,
+        testName,
+        None,
+        presentUnformatted = false,
+        presentAllDurations = false,
+        presentShortStackTraces = false,
+        presentFullStackTraces = false,
+        presentFilePathname = false
+      )
+    throwable match {
+      case Some(view) if message.trim.isEmpty && view.message.isEmpty =>
+        val withoutThrowable = linesWith(None)
+        withoutThrowable.head +: (lineNumberLines(view) ++ withoutThrowable.tail ++ stackTraceLinesOf(throwable))
+      case _ =>
+        linesWith(throwable)
     }
-
-  private final class ThrowableWithEmptyMessage(private val view: ThrowableView) extends ThrowableView {
-
-    def className: String = view.className
-
-    def message: Option[String] = Some("")
-
-    def stackDepth: Option[StackDepthView] = view.stackDepth
-
-    def isPropertyCheckFailure: Boolean = view.isPropertyCheckFailure
-
-    def frames: IndexedSeq[String] = view.frames
-
-    def cause: Option[ThrowableView] = view.cause
-
-    override def equals(other: Any): Boolean =
-      other match {
-        case same: ThrowableWithEmptyMessage => same.view == view
-        case _ => other == view
-      }
-
-    override def hashCode: Int = view.hashCode
   }
+
+  private def lineNumberLines(throwable: ThrowableView): Vector[String] =
+    if (throwable.isPropertyCheckFailure || throwable.stackDepth.isEmpty) Vector.empty
+    else Vector(StringReporter.withPossibleLineNumber("", Some(throwable), presentFilePathname = false)).filter(_.nonEmpty)
+
+  private def stackTraceLinesOf(throwable: Option[ThrowableView]): Vector[String] =
+    StringReporter.stackTraceLines(throwable, presentShortStackTraces = false, presentFullStackTraces = false).toVector
 
   // The lines under an event's first line: its message lines, then its stack trace lines. A throwable's first line and
   // each `Cause:` line sit at the message lines' depth, and each frame line one deeper. A line is classed as a frame
   // line before it is split, so a throwable message's continuation starting `at ` stays at its first line's depth.
   private def linesUnder(lines: Vector[String], throwable: Option[ThrowableView], depth: Int, colour: AnsiColor): Vector[OutputLine] = {
-    val stackTraceLineCount = StringReporter.stackTraceLines(throwable, presentShortStackTraces = false, presentFullStackTraces = false).size
+    val stackTraceLineCount = stackTraceLinesOf(throwable).size
     val (messageLines, stackTraceLines) = lines.splitAt(lines.size - stackTraceLineCount)
     messageLines.flatMap(linesOf(_, depth, colour)) ++
       stackTraceLines.flatMap(line => linesOf(line, if (isFrameLine(line)) depth + 1 else depth, colour))

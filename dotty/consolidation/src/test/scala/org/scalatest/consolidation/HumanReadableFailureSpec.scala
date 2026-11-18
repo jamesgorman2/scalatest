@@ -1,6 +1,9 @@
 package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
+import org.scalatest.events.DecodedEvent
+import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
@@ -378,6 +381,34 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
       Then("the failure shows the throwable's class and frames, and the second test and its message follow")
       output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SilentSpec:{reset}
+          |    {red}- first *** FAILED ***{reset}
+          |      {red}java.lang.IllegalStateException:{reset}
+          |        {red}at samples.SilentSpec.check(SilentSpec.scala:9){reset}
+          |        {red}...{reset}
+          |    {green}- second{reset}
+          |      {green}[info] still checked{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A failed test whose throwable is its own cause shows the throwable once") {
+      Given("an event log of a test that fails with an empty message and a throwable with no message that is its own cause")
+      val events = TestRunBuilder.build(TestRunPart.Events(eventLogOfTwoTestsWhoseFirstEndsWith(
+        """test "first": TestFailed(message: "", throwable: java.lang.IllegalStateException frames ["samples.SilentSpec.check(SilentSpec.scala:9)"])"""
+      ))).fold(fail(_), _.events.map(_.event))
+      events.collect { case TestEventLogEvent.ScalaTestEvent(_, failed: DecodedEvent.TestFailed) => failed.throwable }.flatten
+        .foreach(throwable => throwable.link(Some(throwable), Vector.empty))
+
+      When("the library consolidates it")
+      val output = new OutputSink
+      val consolidation = Consolidation.start(output, coloured = true)
+      val feed = consolidation.addRun(moduleLabel)
+      events.foreach(event => feed.add(RunEvent.of(event).fold(fail(_), identity)))
+      feed.endEventStream()
+      consolidation.end()
+
+      Then("the failure shows the throwable's class and frames once, with no `Cause:` line, and the second test follows")
+      output.colourMarkedTree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SilentSpec:{reset}
           |    {red}- first *** FAILED ***{reset}
