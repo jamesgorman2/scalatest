@@ -86,7 +86,6 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
         unprefixed.startsWith("[") || unprefixed.startsWith(" ")
       }
 
-  // The summary line is the one unindented line after the tree's lines.
   private def prefixedSummaryLine: Option[String] =
     stdoutLines
       .drop(stdoutLines.indexOfSlice(prefixedTreeLines) + prefixedTreeLines.size)

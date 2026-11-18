@@ -381,11 +381,11 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     branch match {
       case scope @ DescriptionBranch(parent, descriptionText, _, _) =>
         val declaredBefore = parent.subNodes.dropWhile(_ ne scope).drop(1)
-        val indexAmongScopesOfItsText = declaredBefore.count {
+        val index = declaredBefore.count {
           case DescriptionBranch(_, text, _, _) => text == descriptionText
           case _ => false
         }
-        scopePathTo(parent) :+ ScopePlace(descriptionText, indexAmongScopesOfItsText)
+        scopePathTo(parent) :+ ScopePlace(descriptionText, index)
       case _ => Nil
     }
 
@@ -499,6 +499,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
    * style's `runTest` passes `runTestImpl`. The name functions apply only where registration recorded no name in source.
    */
   def registeredNodes(includeIcon: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
+    // Recurses once for each scope nested in another, as registering and running them do.
     def nodesIn(branch: Branch): List[RegisteredNode] =
       branch.subNodes.reverse.collect {
         case test @ TestLeaf(_, testName, testText, _, _, _, _, _) =>

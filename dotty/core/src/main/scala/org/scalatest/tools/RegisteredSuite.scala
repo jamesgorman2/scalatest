@@ -268,7 +268,7 @@ private[scalatest] final class RegisteredSuite(
       None
     } else {
       suiteIdOfNode = suiteId
-      suiteId.foreach(placeBySuiteId)
+      suiteId.foreach(placeBy)
       nodeIsFixed = true
       firstSuiteIdItsRunRead = None
       if (startsARunOnceNodeIsFixed) {
@@ -304,7 +304,7 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  private def placeBySuiteId(suiteId: String): Unit = {
+  private def placeBy(suiteId: String): Unit = {
     emitter.assertLockHeld()
     startedIn match {
       case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfNode.contains(suiteId) =>
@@ -426,16 +426,16 @@ private[scalatest] final class RegisteredSuite(
   }
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeEventFromWrapper)
+    new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeEventFrom)
 
   def reporterAheadOf(reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), emitter.writeEventFromWrapper)
+    new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), emitter.writeEventFrom)
 
   def reporterOfSuite(reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.RegisteredByItsRun(this), emitter.writeEventFromWrapper)
+    new StructureWrapper(reporter, WrapperNode.RegisteredByItsRun(this), emitter.writeEventFrom)
 
   def startWith(reporter: Reporter): SuiteStart = {
-    val wrapper = new StructureWrapper(reporter, WrapperNode.NestedSuite(this), emitter.writeEventFromWrapper)
+    val wrapper = new StructureWrapper(reporter, WrapperNode.NestedSuite(this), emitter.writeEventFrom)
     new SuiteStart {
       def reporter: Reporter = wrapper
       def namesRead(suiteName: String, suiteId: String): Unit = {
@@ -448,7 +448,7 @@ private[scalatest] final class RegisteredSuite(
   }
 
   def startAsTopLevelSuite(reporter: Reporter): SuiteStart = {
-    val wrapper = new StructureWrapper(reporter, WrapperNode.TopLevelSuite(this), emitter.writeEventFromWrapper)
+    val wrapper = new StructureWrapper(reporter, WrapperNode.TopLevelSuite(this), emitter.writeEventFrom)
     new SuiteStart {
       def reporter: Reporter = wrapper
       def namesRead(suiteName: String, suiteId: String): Unit = ()

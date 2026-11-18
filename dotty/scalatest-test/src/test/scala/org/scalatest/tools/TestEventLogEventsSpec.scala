@@ -33,7 +33,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
    * @param linesTheDecoderReads the same event log with the keys the decoder needs and the criterion does not fix
    */
   private final case class StatedRun(
-    reportedToReporters: Vector[String],
+    reported: Vector[String],
     eventLogInNotation: String,
     eventLogInFormat: List[String],
     linesTheDecoderReads: Option[List[String]] = None
@@ -134,7 +134,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
       val reportedWithoutTheArgument = eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, Nil)
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reported(reportedWithoutTheArgument) shouldBe stated.reportedToReporters
+      reported(reportedWithoutTheArgument) shouldBe stated.reported
 
       TemporaryEventLog.in { eventLogFile =>
         MessageCallTimes.clear(suiteClassName)

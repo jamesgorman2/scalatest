@@ -17,7 +17,7 @@ import org.scalatest.tools.TestEventLogLine.nodeEvent
 final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
   private final case class StatedRun(
-    reportedToReporters: Vector[String],
+    reported: Vector[String],
     eventLogInNotation: String,
     eventLogInFormat: List[String],
     eventNamesOfEachNode: Map[NodePath, Vector[String]]
@@ -863,7 +863,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, Nil, nestedSuiteIds))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe stated.reportedToReporters
+      reportedWithoutTheArgument shouldBe stated.reported
 
       TemporaryEventLog.in { eventLogFile =>
         When("Framework runs it with the runner argument")

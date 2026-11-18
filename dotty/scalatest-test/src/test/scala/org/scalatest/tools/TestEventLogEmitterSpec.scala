@@ -497,7 +497,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "return a node table holding each nested suite's table at its position" in {
         val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
         val table = emitter.addTopLevelSuite(nestedThenScopesAndTests)
-        emitter.synchronized(table.nestedSuitesOfFirstStructure.map(nested => (nested.node, nested.suiteId, nested.className, nested.testsByName, nested.scopesByPath, nested.nestedSuitesOfFirstStructure))) shouldBe
+        emitter.synchronized(table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.testsByName, nested.scopesByPath, nested.nestedSuites))) shouldBe
           Vector(
             (
               nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0)),

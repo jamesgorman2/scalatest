@@ -2,8 +2,11 @@ package org.scalatest
 
 import org.scalatest.events.Event
 
-/** A scope among its parent's scopes. `text` is the text it is registered with. */
-private[scalatest] final case class ScopePlace(text: String, indexAmongScopesOfItsText: Int)
+/**
+ * A scope among its parent's scopes. `text` is the text it is registered with; `index` is its order among the parent's
+ * scopes of the same `text`.
+ */
+private[scalatest] final case class ScopePlace(text: String, index: Int)
 
 /**
  * What the site that sends an event knows of it, for a run that writes a test event log: the suite instance, the

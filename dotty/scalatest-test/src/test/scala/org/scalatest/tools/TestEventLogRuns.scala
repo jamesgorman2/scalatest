@@ -183,6 +183,7 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     )
   }
 
+  // Recurses once for each class loader between this class's and the JVM's own.
   private def classpathOf(loader: ClassLoader): List[URL] = {
     loader match {
       case null => Nil

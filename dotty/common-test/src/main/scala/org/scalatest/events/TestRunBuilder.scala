@@ -347,6 +347,7 @@ private final class WrittenFields(line: NotationLine.Event) {
 
 private object WrittenFields {
 
+  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   def decodedThrowable(written: WrittenThrowable): DecodedThrowable = {
     val message = written.message match {
       case WrittenMessage.Text(value) => Some(value)

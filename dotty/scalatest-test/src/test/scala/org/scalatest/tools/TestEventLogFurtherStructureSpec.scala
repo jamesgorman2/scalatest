@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 
 final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  private final case class StatedRun(reportedToReporters: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
+  private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
 
   private def reported(events: Vector[Event]): Vector[String] = {
     events.collect {
@@ -97,7 +97,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
   private val configSpecDiscovered = {
     val stated = configSpecHolds("samples.discovered.ConfigSpec")
     stated.copy(
-      reportedToReporters = Vector("DiscoveryStarting", "DiscoveryCompleted", "RunStarting", "SuiteStarting DiscoverySuite") ++
+      reported = Vector("DiscoveryStarting", "DiscoveryCompleted", "RunStarting", "SuiteStarting DiscoverySuite") ++
         reportedOfConfigSpec ++ Vector("SuiteCompleted DiscoverySuite", "RunCompleted")
     )
   }
@@ -608,7 +608,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe stated.reportedToReporters
+      reportedWithoutTheArgument shouldBe stated.reported
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
@@ -686,7 +686,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          reportedWithoutTheArgument shouldBe configSpecDiscovered.reportedToReporters
+          reportedWithoutTheArgument shouldBe configSpecDiscovered.reported
 
           And("the event log holds, in order, the structure of the wrapped class, then the suite's events, and no other structure")
           StatedLines.mismatchWhenHoldsInOrder(lines, configSpecDiscovered.eventLogInFormat) shouldBe None
@@ -754,7 +754,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       }
 
       When("Framework runs it without the runner argument")
-      thrownAndReported(Nil, _ => ()) shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reportedToReporters))
+      thrownAndReported(Nil, _ => ()) shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reported))
 
       TemporaryEventLog.in { eventLogFile =>
         When("Framework runs it with the runner argument")
@@ -787,7 +787,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(Launch.ByRunner, "samples.ConfigWithoutDbFailsSpec", Nil))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe configWithoutDbFailsBySuite.reportedToReporters
+      reportedWithoutTheArgument shouldBe configWithoutDbFailsBySuite.reported
 
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run runs it with the runner argument")
@@ -826,7 +826,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          reportedWithoutTheArgument shouldBe configWithoutDbFailsDiscovered.reportedToReporters
+          reportedWithoutTheArgument shouldBe configWithoutDbFailsDiscovered.reported
 
           And("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
           StatedLines.mismatchWhenHoldsInOrder(lines, configWithoutDbFailsDiscovered.eventLogInFormat) shouldBe None

@@ -205,7 +205,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     start
   }
 
-  private def linesAfterStructureRunning(suite: Suite, afterItsRunReturns: () => Unit = () => ()): Vector[String] = {
+  private def linesAfterStructureOf(suite: Suite, afterItsRunReturns: () => Unit = () => ()): Vector[String] = {
     val eventLog = new RecordingEventLog
     new SuiteRunner(
       suite,
@@ -468,7 +468,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           TestEventLogLine.nodeEvent(s, List(1, opening), "ScopeClosed")
         )
       } ::: List(TestEventLogLine.nodeEvent(spec, List(1), "SuiteCompleted"))
-      StatedLines.mismatchWhenIs(linesAfterStructureRunning(new RunsItsTestsTwiceSpec), stated) shouldBe None
+      StatedLines.mismatchWhenIs(linesAfterStructureOf(new RunsItsTestsTwiceSpec), stated) shouldBe None
     }
   }
 
@@ -477,7 +477,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OpensItsAsyncScopeTwiceSpec")
       val i = spec.test("s i")
       val queued = new QueuingExecutionContext
-      val written = linesAfterStructureRunning(new OpensItsAsyncScopeTwiceSpec(queued), () => queued.runAll())
+      val written = linesAfterStructureOf(new OpensItsAsyncScopeTwiceSpec(queued), () => queued.runAll())
       val stated = List(
         TestEventLogLine.nodeEvent(i, List(1, 2, 1), "TestIgnored"),
         TestEventLogLine.nodeEvent(i, List(1, 1, 2), "TestIgnored")
@@ -495,7 +495,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         TestEventLogLine.nodeEvent(nested.test("o"), List(1, 1, 1), "TestStarting"),
         TestEventLogLine.nodeEvent(nested.test("o"), List(1, 1, 1), "TestSucceeded")
       )
-      StatedLines.mismatchWhenHoldsInOrder(linesAfterStructureRunning(new RunsItsNestedSuiteFromAScopeSpec), stated) shouldBe None
+      StatedLines.mismatchWhenHoldsInOrder(linesAfterStructureOf(new RunsItsNestedSuiteFromAScopeSpec), stated) shouldBe None
     }
   }
 

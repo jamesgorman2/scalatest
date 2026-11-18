@@ -39,7 +39,7 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
     }
   }
 
-  private def colourMarkedTreeFrom(eventLog: Vector[String]): Vector[String] = {
+  private def colourMarkedTreeLinesFrom(eventLog: Vector[String]): Vector[String] = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)
     val feed = consolidation.addRun(moduleLabel)
@@ -58,7 +58,7 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
 
       And("the consolidation library is used directly, without Mill, with colour on")
       When("the library consolidates that test event log as a run under the test run label `core.test`")
-      val output = colourMarkedTreeFrom(eventLog)
+      val output = colourMarkedTreeLinesFrom(eventLog)
 
       Then("the output is under `core.test`, and the lines under the failed test begin with the message in red, ending with the failing code's file and line")
       val failedLine = output.indexOf("    {red}- reports *** FAILED ***{reset}")

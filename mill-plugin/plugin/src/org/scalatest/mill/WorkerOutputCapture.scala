@@ -12,11 +12,13 @@ private[mill] final class WorkerOutputCapture(charset: Charset) {
   private val stdoutLines = new StreamLines(charset, text => add(CapturedLine.Stdout(text)))
   private val stderrLines = new StreamLines(charset, text => add(CapturedLine.Stderr(text)))
 
-  // Each stream's bytes come only from that stream's reader. `endStreams` is called once neither reader is running.
+  /** Called only by stdout's reader. */
   def stdout(bytes: Array[Byte], length: Int): Unit = stdoutLines.append(bytes, length)
 
+  /** Called only by stderr's reader. */
   def stderr(bytes: Array[Byte], length: Int): Unit = stderrLines.append(bytes, length)
 
+  /** Called once neither stream's reader is running. */
   def endStreams(): Unit = {
     stdoutLines.end()
     stderrLines.end()

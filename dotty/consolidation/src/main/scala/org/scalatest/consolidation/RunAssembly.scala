@@ -90,7 +90,6 @@ private[consolidation] final case class AssembledNode(node: StructureNode, execu
 
   def name: String = node.name
 
-  // The node, or a node below it, has an execution.
   def started: Boolean = execution.started
 
   def descendants: Vector[AssembledNode] = execution.descendants
@@ -167,10 +166,10 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   }
 
   /**
-   * Whether any suite, scope or test execution in the assembled tree is aborted, for any reason.
+   * Whether any suite, scope or test execution in the assembled tree is aborted or not run.
    * Attributed nodes are not in the tree, so they never count. Requires the event stream to have ended.
    */
-  def holdsAbortedNode: Boolean =
+  def holdsAbortedOrNotRunNode: Boolean =
     topLevelSuites.exists(suite => (suite +: suite.descendants).exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
 
   /**

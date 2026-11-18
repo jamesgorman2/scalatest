@@ -138,14 +138,14 @@ private[scalatest] final class SuiteNodeTable(
   private var nestedSuitesAdded = Vector.empty[SuiteNodeTable]
   private var hasEndedOnce = false
 
-  /** Each at its position among them. */
-  def nestedSuitesOfFirstStructure: Vector[SuiteNodeTable] = firstStructureNestedSuites
+  /** Each at its position among the suite's nested suites. */
+  def nestedSuites: Vector[SuiteNodeTable] = heldNestedSuites
 
   // Set once, by the companion, after this table is built, so that each nested table's parent is a whole table. Set
   // before the table is shared, and never written again, so it is read without the emitter's lock.
-  private var firstStructureNestedSuites = Vector.empty[SuiteNodeTable]
+  private var heldNestedSuites = Vector.empty[SuiteNodeTable]
 
-  private def holdNestedSuitesOfFirstStructure(tables: Vector[SuiteNodeTable]): Unit = firstStructureNestedSuites = tables
+  private def holdNestedSuites(tables: Vector[SuiteNodeTable]): Unit = heldNestedSuites = tables
 
   /**
    * The tables of the suites under it, directly or under one of its tests: those of its first structure in declared
@@ -153,7 +153,7 @@ private[scalatest] final class SuiteNodeTable(
    */
   def childSuites: Vector[SuiteNodeTable] = {
     emitter.assertLockHeld()
-    nestedSuitesOfFirstStructure ++ nestedSuitesAdded
+    nestedSuites ++ nestedSuitesAdded
   }
 
   def hasEnded: Boolean = {
@@ -267,8 +267,8 @@ private[scalatest] final class SuiteNodeTable(
     parentSuite.fold(Vector.empty[Int]) { above =>
       val namedAbove = named.flatMap(_.ofNodeAbove)
       parent.filter(_ != above.node) match {
-        case Some(test) => above.executionPathAbove(test, namedAbove) :+ above.indexOfNamedElseCurrent(test, namedAbove.flatMap(_.ofOwnNode))
-        case None => above.executionPathAboveSuite(namedAbove) :+ above.indexOfNamedElseCurrent(above.node, namedAbove.map(_.ofSuite))
+        case Some(test) => above.executionPathAbove(test, namedAbove) :+ above.executionIndexOf(test, namedAbove.flatMap(_.ofOwnNode))
+        case None => above.executionPathAboveSuite(namedAbove) :+ above.executionIndexOf(above.node, namedAbove.map(_.ofSuite))
       }
     }
   }
@@ -283,10 +283,10 @@ private[scalatest] final class SuiteNodeTable(
     def scopeAbove(below: NodeId): Option[NodeId] = parents.get(below).filter(_ != node)
     val scopesAbove = Iterator.unfold(scopeAbove(scopeOrTest))(scope => scope.map(id => (id, scopeAbove(id)))).toVector.reverse
     val namedScopes = named.fold(Map.empty[NodeId, Execution])(_.ofScopes.flatMap((path, execution) => scopesByPath.get(path).map(_ -> execution)))
-    (executionPathAboveSuite(named) :+ indexOfNamedElseCurrent(node, named.map(_.ofSuite))) ++ scopesAbove.map(scope => indexOfNamedElseCurrent(scope, namedScopes.get(scope)))
+    (executionPathAboveSuite(named) :+ executionIndexOf(node, named.map(_.ofSuite))) ++ scopesAbove.map(scope => executionIndexOf(scope, namedScopes.get(scope)))
   }
 
-  private def indexOfNamedElseCurrent(node: NodeId, named: Option[Execution]): Int = {
+  private def executionIndexOf(node: NodeId, named: Option[Execution]): Int = {
     emitter.assertLockHeld()
     val executions = executionsOf(node)
     named.fold(executions.indexOfCurrent)(executions.indexOf)
@@ -331,6 +331,7 @@ private[scalatest] object SuiteNodeTable {
     (table, nodes.result())
   }
 
+  // Recurses once for each suite nested in another, as reading the structure does.
   private def suite(
     emitter: TestEventLogEmitter,
     structure: SuiteStructure,
@@ -362,7 +363,7 @@ private[scalatest] object SuiteNodeTable {
       structure.filteredTests
     )
     val nested = structure.nestedSuites.toVector
-    table.holdNestedSuitesOfFirstStructure(nested.zipWithIndex.map { (nestedSuite, index) =>
+    table.holdNestedSuites(nested.zipWithIndex.map { (nestedSuite, index) =>
       val nestedId = nestedSuitePath(id, nestedSuite.suiteId, nested.take(index).map(_.suiteId))
       suite(emitter, nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + index), nodes)
     })
@@ -379,6 +380,7 @@ private[scalatest] object SuiteNodeTable {
 
     def ids: ScopeAndTestIds = added
 
+    // Recurses once for each scope nested in another, as registering them does.
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
         case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), index)) =>

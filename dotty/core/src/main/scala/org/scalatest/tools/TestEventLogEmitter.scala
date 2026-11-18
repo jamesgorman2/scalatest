@@ -358,7 +358,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    *
    * What encoding or writing throws is kept from the caller as `writeRunEvent` keeps it.
    */
-  def writeEventFromWrapper(wrapper: WrapperNode, event: Event): Unit = {
+  def writeEventFrom(wrapper: WrapperNode, event: Event): Unit = {
     if (!wrapper.registration.isTableSettled && synchronized(isOpen && wrapper.registration.canHaveTable)) {
       fixNode(wrapper.registration, None, None, handingOff = true)
     }

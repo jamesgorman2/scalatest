@@ -281,6 +281,7 @@ private[events] object EventNotation {
     }
   }
 
+  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   private def throwable(cursor: LineCursor): WrittenThrowable = {
     val className = cursor.word("a throwable's class name")(part => part.isLetterOrDigit || part == '.' || part == '$' || part == '_')
     val message = {

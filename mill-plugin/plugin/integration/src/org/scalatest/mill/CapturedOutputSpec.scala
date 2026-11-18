@@ -15,7 +15,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     "    [stdout] dividing now"
   )
 
-  private val calculatorSuiteOutputMarkingColours: Seq[String] = Seq(
+  private val colourMarkedCalculatorSuiteOutput: Seq[String] = Seq(
     "{cyan}[core.test]{reset}",
     "  {cyan}Run 1:{reset}",
     "    {green}CalculatorSuite:{reset}",
@@ -60,7 +60,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         Then("the human-readable output is the module's line, then Run 1: holding the suite and then the line")
         withClue(result.debugString) {
-          result.colourMarkedTreeLines shouldBe calculatorSuiteOutputMarkingColours
+          result.colourMarkedTreeLines shouldBe colourMarkedCalculatorSuiteOutput
         }
       }
 
@@ -148,7 +148,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         And(s"under --color $colour, [core.test] and Run 1: are cyan, - adds two numbers is green and [stdout] dividing now is uncoloured")
         withClue(result.debugString) {
-          result.colourMarkedTreeLines shouldBe calculatorSuiteOutputMarkingColours
+          result.colourMarkedTreeLines shouldBe colourMarkedCalculatorSuiteOutput
         }
       }
     }

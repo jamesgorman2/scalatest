@@ -498,7 +498,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       stateAfterEnd(parts) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A test only the first registration of its suite holds, that never starts and has no test to attribute it to, fails the state") {
+    Scenario("A test that only its suite's first registration holds, never starts and has no test to attribute it to fails the state") {
       Given("an event log of a run that ends completed, whose further structure drops the test \"local\" before it starts")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended, failed")

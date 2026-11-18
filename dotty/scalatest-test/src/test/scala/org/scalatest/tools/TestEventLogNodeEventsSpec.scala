@@ -27,7 +27,7 @@ import org.scalatest.tools.TestEventLogLine.nodeEvent
 
 final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  private final case class StatedRun(reportedToReporters: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
+  private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
 
   private def recordedIn(recorded: Seq[RecordableEvent]): String = {
     val messages = recorded.collect { case info: InfoProvided => s"InfoProvided ${info.message}" }
@@ -89,7 +89,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments, nestedSuiteIds))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe stated.reportedToReporters
+      reportedWithoutTheArgument shouldBe stated.reported
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
@@ -1390,7 +1390,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
    * `Runner.run` without `-P` tells its reporters each event in the order the event log holds it, so the event log's
    * ScalaTest events pair with the told events by position, and each pair shares its thread and time.
    */
-  private def suiteEventsAssignedToTheRunWithToldSuiteNames(events: Vector[TestEventLogEvent], told: Vector[Event]): Vector[String] = {
+  private def suiteEventsAssignedToTheRun(events: Vector[TestEventLogEvent], told: Vector[Event]): Vector[String] = {
     val logged = events.collect { case event: TestEventLogEvent.ScalaTestEvent => event }
     logged.size shouldBe told.size
     logged.zip(told).flatMap {
@@ -1577,7 +1577,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     launch: Launch,
     arguments: List[String]
   ): Unit = {
-    val reportedInEveryOrder = runInEachOrder.map(_.reportedToReporters).distinct
+    val reportedInEveryOrder = runInEachOrder.map(_.reported).distinct
     Scenario(scenario) {
       thisProcess
       reportedInEveryOrder should have size 1
@@ -1656,14 +1656,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          runsOfDiscoveredSuites.map(_.reportedToReporters) should contain(reportedWithoutTheArgument)
+          runsOfDiscoveredSuites.map(_.reported) should contain(reportedWithoutTheArgument)
 
           And("each suite has its own structure, whose root is that suite, before its events, which are assigned to it and its test")
           And("no structure holds the discovery suite, whose SuiteStarting and SuiteCompleted are assigned to the run")
-          val runInOrderDiscovered = runsOfDiscoveredSuites.filter(_.reportedToReporters == reportedWithTheArgument)
+          val runInOrderDiscovered = runsOfDiscoveredSuites.filter(_.reported == reportedWithTheArgument)
           runInOrderDiscovered.map(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat)) shouldBe List(None)
           runInOrderDiscovered.map(run => EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(run.eventLogInNotation))) shouldBe List(None)
-          suiteEventsAssignedToTheRunWithToldSuiteNames(decodedOrFail(lines), toldWithTheArgument) shouldBe
+          suiteEventsAssignedToTheRun(decodedOrFail(lines), toldWithTheArgument) shouldBe
             Vector("SuiteStarting DiscoverySuite", "SuiteCompleted DiscoverySuite")
         }
       }
@@ -1851,7 +1851,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          reportedWithoutTheArgument shouldBe brokenCtorSpecDiscovered.reportedToReporters
+          reportedWithoutTheArgument shouldBe brokenCtorSpecDiscovered.reported
 
           And("the event log holds a structure holding the suite, every structure holding it giving it the class that failed to construct, and in this order after it the suite's SuiteAborted")
           StatedLines.mismatchWhenIs(lines, brokenCtorSpecDiscovered.eventLogInFormat) shouldBe None

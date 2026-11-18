@@ -100,12 +100,14 @@ private[scalatest] object SuiteStructure {
     Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
   }
 
+  // Recurses once for each scope nested in another, as registering them does.
   def testsIn(scopesAndTests: List[ScopeOrTest]): List[ScopeOrTest.Test] =
     scopesAndTests.flatMap {
       case test: ScopeOrTest.Test => List(test)
       case ScopeOrTest.Scope(_, _, _, nodes) => testsIn(nodes)
     }
 
+  // Recurses once for each scope nested in another, as registering them does.
   def testNamesIn(registered: List[RegisteredNode]): List[String] =
     registered.flatMap {
       case RegisteredScope(_, _, _, nodes) => testNamesIn(nodes)
