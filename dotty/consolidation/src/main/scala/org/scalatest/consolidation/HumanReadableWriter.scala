@@ -10,6 +10,7 @@ import org.scalatest.tools.AnsiCyan
 import org.scalatest.tools.AnsiGreen
 import org.scalatest.tools.AnsiRed
 import org.scalatest.tools.AnsiYellow
+import org.scalatest.tools.StackDepthView
 import org.scalatest.tools.StringReporter
 import org.scalatest.tools.ThrowableView
 
@@ -90,7 +91,7 @@ private[consolidation] object HumanReadableWriter {
       Resources.abortedNote,
       _ => Resources.runAborted,
       aborted.message,
-      aborted.throwable,
+      formattableThrowable(aborted.message, aborted.throwable),
       Vector.empty,
       None,
       None,
@@ -248,7 +249,7 @@ private[consolidation] object HumanReadableWriter {
       note,
       errorMessage,
       message,
-      throwable,
+      formattableThrowable(message, throwable),
       analysis.toVector,
       formatterOf(text),
       suiteName,
@@ -260,6 +261,37 @@ private[consolidation] object HumanReadableWriter {
       presentFullStackTraces = false,
       presentFilePathname = false
     )
+
+  // `StringReporter` throws a NullPointerException for a blank message with a throwable that has no message, as
+  // ScalaTest 3.2.20 does, and core keeps that. A throwable whose message is empty is formatted as one with no message
+  // is in every other case.
+  private def formattableThrowable(message: String, throwable: Option[ThrowableView]): Option[ThrowableView] =
+    throwable.map { view =>
+      if (message.trim.isEmpty && view.message.isEmpty) new ThrowableWithEmptyMessage(view) else view
+    }
+
+  private final class ThrowableWithEmptyMessage(private val view: ThrowableView) extends ThrowableView {
+
+    def className: String = view.className
+
+    def message: Option[String] = Some("")
+
+    def stackDepth: Option[StackDepthView] = view.stackDepth
+
+    def isPropertyCheckFailure: Boolean = view.isPropertyCheckFailure
+
+    def frames: IndexedSeq[String] = view.frames
+
+    def cause: Option[ThrowableView] = view.cause
+
+    override def equals(other: Any): Boolean =
+      other match {
+        case same: ThrowableWithEmptyMessage => same.view == view
+        case _ => other == view
+      }
+
+    override def hashCode: Int = view.hashCode
+  }
 
   // The lines under an event's first line: its message lines, then its stack trace lines. A throwable's first line and
   // each `Cause:` line sit at the message lines' depth, and each frame line one deeper. A line is classed as a frame

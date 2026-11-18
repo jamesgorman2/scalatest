@@ -660,9 +660,9 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
         rendered(summaryFlags, fragmentsFor(runEndCase.event, _, runEndCase.reminderEvents)) shouldBe recorded(runEndCase.name)
       }
     }
-    "return the throwable's class for a blank message and a throwable without a message" in {
+    "throw a NullPointerException for a blank message and a throwable without a message" in {
       val event = testFailed("", Some(plainFailureWithoutMessage), None)
-      fragmentsFor(event, eventFlags.head, Vector.empty).map(_.text).mkString("\n") should include ("java.lang.RuntimeException")
+      a[NullPointerException] should be thrownBy fragmentsFor(event, eventFlags.head, Vector.empty)
     }
   }
 
