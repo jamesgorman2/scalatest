@@ -101,8 +101,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       "an output letter other than H, beside H" -> (Seq("-oHP"), "-oHP"),
       "a formatting character" -> (Seq("-oHd"), "-oHd"),
       "a lowercase character that is neither a formatting nor a filtering character" -> (Seq("-oHy"), "-oHy"),
-      "an -f" -> (Seq("-fH", "report.txt"), "-fH"),
-      "an -f, beside -oH" -> (Seq("-oH", "-fJ", "report.txt"), "-fJ")
+      "an -f other than -fJ" -> (Seq("-fH", "report.txt"), "-fH")
     )
 
     for ((what, (outputArguments, rejected)) <- rejectedArguments) {
@@ -119,7 +118,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           And(s"the console names $rejected as the argument the test command rejects")
           withClue(result.debugString) {
             (result.eval.out + result.eval.err) should include(
-              s"The test command takes one output argument, -oH or -o, but was given: $rejected")
+              s"The test command takes one of -oH or a bare -o, and one -fJ followed by a path, but was given: $rejected")
           }
 
           And("the console holds no line of human-readable output")
