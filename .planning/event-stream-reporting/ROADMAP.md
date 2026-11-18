@@ -366,3 +366,4 @@ Risks:
 ## Deferred
 
 - Showing a test that ran more than once, such as one a retry wrapper reruns, as one line in the human-readable output. Each time it ran is shown as its own line.
+- Distinguishing suites that share a suite name but have different IDs, and relating runs of one suite ID under different suite names, in both the human-readable and JSON outputs. Siblings are ordered by suite name (R-105), so the former interleave indistinguishably by start order and the latter are not recognisable as the same suite.
