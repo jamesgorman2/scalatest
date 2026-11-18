@@ -4,12 +4,7 @@ import java.nio.charset.Charset
 import org.scalatest.consolidation.CapturedLine
 import scala.collection.mutable
 
-/**
- * Captures a worker's stdout and stderr as lines, each tagged with its stream, in the order the two streams' splitters
- * complete them.
- *
- * Lines captured before the worker's run exists are held, and passed to the run once [[addTo]] names it.
- */
+/** Lines captured before the worker's run exists are held until [[addTo]] names the run. */
 private[mill] final class WorkerOutputCapture(charset: Charset) {
 
   private val held = mutable.ArrayBuffer.empty[CapturedLine]
@@ -17,19 +12,16 @@ private[mill] final class WorkerOutputCapture(charset: Charset) {
   private val stdoutLines = new StreamLines(charset, text => add(CapturedLine.Stdout(text)))
   private val stderrLines = new StreamLines(charset, text => add(CapturedLine.Stderr(text)))
 
-  /** Adds bytes read from stdout. Called only by stdout's reader. */
+  // Each stream's bytes come only from that stream's reader. `endStreams` is called once neither reader is running.
   def stdout(bytes: Array[Byte], length: Int): Unit = stdoutLines.append(bytes, length)
 
-  /** Adds bytes read from stderr. Called only by stderr's reader. */
   def stderr(bytes: Array[Byte], length: Int): Unit = stderrLines.append(bytes, length)
 
-  /** Ends both streams, adding each one's unterminated last line. Called once neither stream's reader is running. */
   def endStreams(): Unit = {
     stdoutLines.end()
     stderrLines.end()
   }
 
-  /** Passes `run` every line captured so far, then each line as it is captured. */
   def addTo(run: CapturedLine => Unit): Unit =
     synchronized {
       held.foreach(run)

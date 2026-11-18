@@ -19,10 +19,6 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
     "buildTarget/test for core.test"
   )
 
-  /**
-   * What a BSP client received from Mill's BSP server in the `mill-own-tasks` build without the plugin, then with it. Each
-   * session sends every request in turn, on a build whose module has no output yet.
-   */
   private lazy val sessions: BuildComparison[BspSessionRecord] =
     withTester("mill-own-tasks", daemonMode = true) { tester =>
       val withoutPlugin = recordSession(tester, "without-plugin")

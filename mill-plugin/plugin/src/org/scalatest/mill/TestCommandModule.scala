@@ -6,7 +6,7 @@ import mill.api.ExternalModule
 import mill.api.Task
 import mill.util.TokenReaders.millEvaluatorTokenReader
 
-/** The module holding the test command. Nothing in a build refers to it: `mill scalatest/test` reaches it. */
+/** Nothing in a build refers to this module: `mill scalatest/test` reaches it. */
 object TestCommandModule extends ExternalModule {
 
   /**

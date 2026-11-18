@@ -7,10 +7,7 @@ import org.scalatest.matchers.should
 
 final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
-  /**
-   * Runs the test command on `core.test` of the `result` fixture, holding the given suites from the fixture's `suites`
-   * folder. Each source file is copied as `<its class>.scala`.
-   */
+  /** Each suite is a source file in the fixture's `suites` folder, and the name of the class it defines. */
   private def runResultFixture(suites: (String, String)*)(prepare: IntegrationTester => Unit = _ => ()): TestCommandResult =
     withTester("result") { tester =>
       val samples = tester.workspacePath / "core" / "test" / "src" / "samples"
@@ -87,7 +84,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
       Then("the human-readable output shows \"skipped\" as not run")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe Seq(
+        result.treeLines shouldBe Seq(
           "[core.test]",
           "  SkipSuite:",
           "    - runs",
@@ -107,7 +104,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
       Then("the human-readable output shows \"remote\", then \"local\" as not run")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe Seq(
+        result.treeLines shouldBe Seq(
           "[core.test]",
           "  ConfigSpec:",
           "    A config",
@@ -152,7 +149,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
       And("the human-readable output names \"have size 0\", and no other console line does")
       withClue(result.debugString) {
-        result.humanReadableOutput.exists(_.contains("have size 0")) shouldBe true
+        result.treeLines.exists(_.contains("have size 0")) shouldBe true
         result.consoleLinesOutsideHumanReadableOutput.filter(_.contains("have size 0")) shouldBe empty
       }
     }

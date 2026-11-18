@@ -21,7 +21,6 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
   private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
 
-  /** A worker run whose consolidation writes uncoloured output, and whose run's process has exited. */
   private final class WorkerRun(eventLogFile: Path, open: Path => InputStream) {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
@@ -38,9 +37,9 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         processesEndedBeforeAnyRun.incrementAndGet()
         consolidation.addProcessEndedBeforeAnyRun()
       },
-      _ => true,
-      1.millis,
-      open
+      hasExited = _ => true,
+      pollInterval = 1.millis,
+      open = open
     )
 
     def run(startWorker: => Unit): Unit = {
@@ -51,7 +50,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     def runWorker(startWorker: => Unit): Unit =
       JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker)
 
-    def outputApartFromSummary: Seq[String] = output.toSeq.dropRight(1)
+    def outputWithoutSummaryLine: Seq[String] = output.toSeq.dropRight(1)
   }
 
   private def withEventLogFile[A](test: Path => A): A = {
@@ -76,7 +75,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
           writeCompletedRun(file)
           val workerRun = new WorkerRun(file, sharingViolation)
           workerRun.run(())
-          workerRun.outputApartFromSummary shouldBe Seq(
+          workerRun.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  [core.test]",
             "  *** CONSOLIDATED TESTS ABORTED ***",
@@ -97,7 +96,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
             workerRun.capture.stdout(bytes, bytes.length)
             throw new IllegalStateException("testargs already exists")
           }
-          workerRun.outputApartFromSummary shouldBe Seq(
+          workerRun.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  [core.test]",
             "    Run 1:",
@@ -115,7 +114,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         withEventLogFile { file =>
           val workerRun = new WorkerRun(file, path => new FileInputStream(path.toFile))
           workerRun.run(throw new IllegalStateException("testargs already exists"))
-          workerRun.outputApartFromSummary shouldBe Seq(
+          workerRun.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  *** CONSOLIDATED TESTS ABORTED ***",
             "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"

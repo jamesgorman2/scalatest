@@ -9,13 +9,7 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Success
 import scala.util.Try
 
-/**
- * Runs a JVM test module's tests in one worker started in `moduleFolder`, through Mill's test queue. Adds the worker's
- * run, with the lines captured from its stdout and stderr, to a consolidation, or the worker itself where no run
- * existed in it. What starting the worker or reading its event log throws is attached to the consolidation's root.
- *
- * Discovery and the worker each receive `scalaTestArguments`; the worker receives the runner argument after them.
- */
+/** Runs the module's tests in one worker, through Mill's test queue. */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
     inputs: JvmTestModuleInputs,
@@ -83,14 +77,13 @@ private[mill] final class JvmTestModuleRun(
 
 private[mill] object JvmTestModuleRun {
 
-  /** The event log file's name in a worker's `processFolder`. Mill uses no file of that name there. */
+  /** Mill writes no file of this name in a worker's `processFolder`. */
   val eventLogFileName: String = "scalatest-event-log.jsonl"
 
   /**
-   * Starts `reader` and calls `startWorker`. Then, whether or not that threw, it ends `capture`'s streams and waits for
-   * the reader to end the run's event stream. What starting the worker or reading its event log threw is attached to the
-   * consolidation's root as a failure, so the consolidation can still end and write its output. A fatal throwable from
-   * starting the worker is rethrown instead, once the reader has ended.
+   * What starting the worker or reading its event log threw is attached to the consolidation's root as a failure, so the
+   * consolidation can still end and write its output. A fatal throwable from starting the worker is rethrown instead,
+   * once the reader has ended.
    */
   def runWorker(consolidation: Consolidation, label: TestRunLabel, reader: EventLogReader, capture: WorkerOutputCapture)(
       startWorker: => Unit

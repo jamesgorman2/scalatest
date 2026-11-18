@@ -15,7 +15,6 @@ import scala.collection.mutable
 
 final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
-  /** What a run through `Framework` outside Mill wrote: its test event log's lines, and its stdout and stderr lines. */
   private final case class RunOutsideMill(eventLogLines: Seq[String], stdoutLines: Seq[String], stderrLines: Seq[String])
 
   private def runClasspath(tester: IntegrationTester): Seq[os.Path] = {
@@ -28,15 +27,11 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   private def codeSource(loaded: Class[?]): os.Path = os.Path(java.nio.file.Paths.get(loaded.getProtectionDomain.getCodeSource.getLocation.toURI))
 
-  /**
-   * Runs `suite` through `Framework`, given the runner argument, in a JVM of its own outside Mill. The JVM's classpath is
-   * the module's run classpath, behind the fixture's launcher, the test interface and the Scala library these tests are
-   * compiled with, which the launcher needs.
-   */
   private def runOutsideMill(tester: IntegrationTester, suite: String): RunOutsideMill = {
     val runFolder = tester.workspacePath / os.up / s"${tester.workspacePath.last}-outside-mill"
     os.makeDir.all(runFolder)
     val eventLog = runFolder / "event-log.jsonl"
+    // The launcher needs the test interface and the Scala library these tests are compiled with.
     val classpath = Seq(
       codeSource(FrameworkLauncher.getClass),
       codeSource(classOf[sbt.testing.Framework]),
@@ -62,8 +57,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
     RunOutsideMill(os.read.lines(eventLog), result.out.lines(), result.err.lines())
   }
 
-  /** The coloured human-readable output the library writes for the run, under test run label `core.test`. */
-  private def consolidated(run: RunOutsideMill): Seq[String] = {
+  private def humanReadableOutputOf(run: RunOutsideMill): Seq[String] = {
     val output = mutable.ArrayBuffer.empty[String]
     val consolidation = Consolidation.start(line => output += line, coloured = true)
     val feed = consolidation.addRun(TestRunLabel("core.test"))
@@ -88,19 +82,19 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
         val testCommand = TestCommandResult(tester.eval(Seq("--ticker", "true", "scalatest/test", "core.test")))
         withClue(testCommand.debugString) {
           testCommand.succeeded shouldBe true
-          testCommand.humanReadableOutput should not be empty
+          testCommand.treeLines should not be empty
         }
 
         When("CalculatorSuite runs through Framework outside Mill, given the ScalaTest runner argument that turns the emitter on and names the file to which the run writes its test event log")
         val run = runOutsideMill(tester, "samples.CalculatorSuite")
         And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label core.test, with colour on")
-        val output = consolidated(run)
+        val output = humanReadableOutputOf(run)
 
         Then("the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")
         withClue(testCommand.debugString) {
-          testCommand.summaryLineMarkingColours shouldBe defined
-          output.map(line => TestCommandResult.withResetsBeforeAColourRemoved(TestCommandResult.withColourMarkers(line))) shouldBe
-            testCommand.humanReadableOutputWithSummaryLineMarkingColours.map(TestCommandResult.withResetsBeforeAColourRemoved)
+          testCommand.colourMarkedSummaryLine shouldBe defined
+          output.map(line => TestCommandResult.withoutResetsBeforeAColour(TestCommandResult.colourMarked(line))) shouldBe
+            testCommand.colourMarkedHumanReadableLines.map(TestCommandResult.withoutResetsBeforeAColour)
         }
       }
     }

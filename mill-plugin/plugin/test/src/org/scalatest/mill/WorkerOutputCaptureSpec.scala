@@ -14,7 +14,7 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
 
   private def stderr(capture: WorkerOutputCapture, text: String): Unit = capture.stderr(bytes(text), bytes(text).length)
 
-  private def run(capture: WorkerOutputCapture): mutable.ArrayBuffer[CapturedLine] = {
+  private def linesPassedToRun(capture: WorkerOutputCapture): mutable.ArrayBuffer[CapturedLine] = {
     val lines = mutable.ArrayBuffer.empty[CapturedLine]
     capture.addTo(line => lines += line)
     lines
@@ -27,7 +27,7 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
         stderr(capture, "warn: about")
         stdout(capture, "dividing now\n")
         stderr(capture, " to divide\n")
-        val lines = run(capture)
+        val lines = linesPassedToRun(capture)
         lines shouldBe Seq(CapturedLine.Stdout("dividing now"), CapturedLine.Stderr("warn: about to divide"))
       }
     }
@@ -36,7 +36,7 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
       "pass each to the run as it is completed, after those held" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
         stdout(capture, "before\n")
-        val lines = run(capture)
+        val lines = linesPassedToRun(capture)
         stderr(capture, "after\n")
         lines shouldBe Seq(CapturedLine.Stdout("before"), CapturedLine.Stderr("after"))
       }
@@ -45,7 +45,7 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
     "its streams end" should {
       "pass on each stream's unterminated last line" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
-        val lines = run(capture)
+        val lines = linesPassedToRun(capture)
         stdout(capture, "last out")
         stderr(capture, "last err")
         lines shouldBe empty

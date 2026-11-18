@@ -24,7 +24,6 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
   private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
   private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
 
-  /** A consolidation the reader adds its run to, and the reader's view of the run's process. */
   private final class Reading(eventLogFile: Path, open: Path => InputStream = path => new FileInputStream(path.toFile)) {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
@@ -50,7 +49,6 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       processExited.get
     }
 
-    /** The consolidation's state once the reader's run has ended and the consolidation has. */
     def stateAfterEnd(): ConsolidationState = {
       reader.awaitStreamEnd()
       consolidation.end()
@@ -67,7 +65,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  /** Opens the file, after failing `failures` times as Windows does while another process holds it. */
+  // Windows fails to open a file while another process holds it.
   private def openingAfterFailures(failures: Int): Path => InputStream = {
     val failed = new AtomicInteger(0)
     path =>

@@ -7,10 +7,8 @@ import mill.javalib.TestModule
 import mill.scalajslib.ScalaJSModule
 import mill.scalanativelib.ScalaNativeModule
 
-/** The one JVM test module the test command's module selector resolves to. */
 private[mill] final case class SelectedTestModule(module: TestModule) {
 
-  /** The module's path, such as `core.test`. */
   def path: String = module.moduleSegments.render
 }
 

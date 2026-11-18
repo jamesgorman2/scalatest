@@ -20,20 +20,12 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private val calculatorSuiteSummaryLine: String =
     "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
 
-  /** The test command's task, which Mill names on stderr, with the task's prefix, when it starts and when it ends. */
   private val testCommandTaskName: String = "org.scalatest.mill.TestCommandModule/test"
 
-  /**
-   * Mill's own stderr line naming a task, after the task's prefix: the task's name alone when it starts, and followed by
-   * its duration when it ends.
-   */
+  // Mill names a task on stderr, after the task's prefix, when it starts, and with its duration when it ends.
   private def isMillsTaskNameLine(prefix: String, line: String): Boolean =
     line.matches(Regex.quote(prefix + testCommandTaskName) + """( [0-9]+(\.[0-9]+)?(ms|s|m))?""")
 
-  /**
-   * Runs `test` on a copy of the `arguments` fixture whose `core.test` holds the given suites from the fixture's
-   * `suites` folder, and whose own ScalaTest arguments are `moduleArguments`.
-   */
   private def withSuites[A](moduleArguments: String*)(suites: String*)(test: IntegrationTester => A): A =
     withTester("arguments") { tester =>
       val samples = tester.workspacePath / "core" / "test" / "src" / "samples"
@@ -64,15 +56,15 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
         Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
         withClue(result.debugString) {
-          result.humanReadableOutput shouldBe calculatorSuiteOutput
+          result.treeLines shouldBe calculatorSuiteOutput
           result.summaryLine shouldBe Some(calculatorSuiteSummaryLine)
         }
 
         And("no other line on stdout, and no line on stderr but Mill's own line naming the task, carries the test command's prefix")
-        val prefix = TestCommandResult.millPrefix.findPrefixOf(result.humanReadableStdoutLines.head)
+        val prefix = TestCommandResult.millPrefix.findPrefixOf(result.prefixedHumanReadableLines.head)
         withClue(result.debugString) {
           prefix shouldBe defined
-          result.stdoutLines.filter(_.startsWith(prefix.get)) shouldBe result.humanReadableStdoutLines
+          result.stdoutLines.filter(_.startsWith(prefix.get)) shouldBe result.prefixedHumanReadableLines
           result.stderrLines
             .filter(_.startsWith(prefix.get))
             .filterNot(isMillsTaskNameLine(prefix.get, _)) shouldBe empty
@@ -94,7 +86,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
       Then("the console holds no line of human-readable output, its summary line included, and no line holding dividing now")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe empty
+        result.treeLines shouldBe empty
         console.filter(_.contains(calculatorSuiteSummaryLine)) shouldBe empty
         console.filter(_.contains("dividing now")) shouldBe empty
       }
@@ -131,7 +123,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           }
 
           And("the console holds no line of human-readable output")
-          result.humanReadableOutput shouldBe empty
+          result.treeLines shouldBe empty
 
           And("no file report.txt is written")
           os.walk(tester.workspacePath).filter(_.last == "report.txt") shouldBe empty
@@ -155,7 +147,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         }
 
         And("the console holds no line of human-readable output")
-        result.humanReadableOutput shouldBe empty
+        result.treeLines shouldBe empty
       }
     }
 
@@ -168,7 +160,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
       Then("the human-readable output shows parses -y alone")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe Seq("[core.test]", "  FlagSuite:", "    - parses -y")
+        result.treeLines shouldBe Seq("[core.test]", "  FlagSuite:", "    - parses -y")
       }
     }
 
@@ -182,7 +174,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
       Then("the human-readable output shows fast alone")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe Seq("[core.test]", "  SpeedSuite:", "    - fast")
+        result.treeLines shouldBe Seq("[core.test]", "  SpeedSuite:", "    - fast")
       }
     }
 
@@ -199,9 +191,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
         Then("the human-readable output is the one the test command writes with no module arguments")
         withClue(result.debugString + withoutArguments.debugString) {
-          withoutArguments.humanReadableOutput.map(_.trim) should contain allOf ("CalculatorSuite:", "OtherSuite:")
+          withoutArguments.treeLines.map(_.trim) should contain allOf ("CalculatorSuite:", "OtherSuite:")
           withoutArguments.summaryLine shouldBe defined
-          result.humanReadableOutput shouldBe withoutArguments.humanReadableOutput
+          result.treeLines shouldBe withoutArguments.treeLines
           result.summaryLine shouldBe withoutArguments.summaryLine
         }
 

@@ -16,10 +16,6 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
     Seq("__.test")
   )
 
-  /**
-   * Each task's run in the `mill-own-tasks` build without the plugin, then with it. Each runs on a build whose own
-   * compilation has finished and whose module has no output yet.
-   */
   private lazy val runs: Map[Seq[String], BuildComparison[MillConsole]] =
     withTester("mill-own-tasks") { tester =>
       val withoutPlugin = tasks.map(task => task -> runAlone(tester, task)).toMap

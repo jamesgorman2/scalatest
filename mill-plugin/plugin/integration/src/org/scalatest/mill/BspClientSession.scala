@@ -32,7 +32,6 @@ import scala.jdk.CollectionConverters.*
 /** The BSP requests these tests send, as Mill's BSP server serves them. */
 trait MillBuildServer extends BuildServer with ScalaBuildServer with JvmBuildServer
 
-/** What a BSP client received in one session: each request's response, and every notification, in the order received. */
 final case class BspSessionRecord(responses: Map[String, String], notifications: Seq[String]) {
 
   def describe: String =
@@ -40,18 +39,9 @@ final case class BspSessionRecord(responses: Map[String, String], notifications:
       notifications.map(notification => s"notification: $notification")).mkString("\n")
 }
 
-/**
- * A BSP client connected to Mill's BSP server, started in a tester's workspace as `.bsp/mill-bsp.json` would start it.
- *
- * Each response and notification is recorded as JSON, with each duration, timestamp and task ID left out.
- */
 final class BspClientSession private (server: MillBuildServer) {
 
-  /**
-   * Sends a request and records its response: the result, or the error the server answered with.
-   *
-   * @return the result, if the server answered with one, and the recorded response
-   */
+  /** @return the result, if the server answered with one, and the response or error as recorded */
   def exchange[A](request: MillBuildServer => CompletableFuture[A]): (Option[A], String) = {
     val response =
       try {
@@ -70,8 +60,8 @@ object BspClientSession {
   private val exitTimeoutMillis: Long = 30000
 
   /**
-   * Starts Mill's BSP server in the tester's workspace, initializes it, runs `use`, then shuts the server down and waits
-   * for it to close the connection, so that every notification it sent has been received.
+   * Starts the server as `.bsp/mill-bsp.json` would. Once `use` returns, shuts the server down and waits for it to close
+   * the connection, so that every notification it sent has been received.
    *
    * @return what `use` returned, and every notification the server sent in the session
    */
@@ -106,7 +96,6 @@ object BspClientSession {
           server.onBuildExit()
         }
       require(process.waitFor(exitTimeoutMillis), s"Mill's BSP server did not exit within $exitTimeoutMillis ms of build/exit")
-      // The client reads the server's output until it closes, so every notification the server sent is recorded.
       listening.get(exitTimeoutMillis, TimeUnit.MILLISECONDS)
       (result, client.notifications)
     } finally {

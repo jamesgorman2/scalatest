@@ -32,7 +32,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
       Then("the human-readable output is the label, with the suite and its property under it")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
+        result.treeLines shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
       }
     }
 
@@ -48,23 +48,23 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       }
 
       Then("each line of the human-readable output on stdout begins with the prefix Mill puts on every line the test command's own task writes, ahead of the line's indentation")
-      val prefixes = result.humanReadableStdoutLines.map(line => TestCommandResult.millPrefix.findPrefixOf(line))
+      val prefixes = result.prefixedHumanReadableLines.map(line => TestCommandResult.millPrefix.findPrefixOf(line))
       withClue(result.debugString) {
-        result.humanReadableStdoutLines should have size 4
+        result.prefixedHumanReadableLines should have size 4
         prefixes.flatten should have size 4
         prefixes.distinct should have size 1
       }
 
       And("the last line of the human-readable output on stdout, with every ANSI escape sequence removed, is that prefix followed by the summary line")
       withClue(result.debugString) {
-        result.humanReadableStdoutLines.last shouldBe
+        result.prefixedHumanReadableLines.last shouldBe
           prefixes.head.get + "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
       }
 
       And("in that line 0 aborted and failed 0 are red, succeeded 1 is green, canceled 0, ignored 0 and pending 0 are yellow, and every other character after the prefix is cyan")
       withClue(result.debugString) {
-        result.summaryLineMarkingColours.map(TestCommandResult.withResetsBeforeAColourRemoved) shouldBe Some(
-          TestCommandResult.withResetsBeforeAColourRemoved(
+        result.colourMarkedSummaryLine.map(TestCommandResult.withoutResetsBeforeAColour) shouldBe Some(
+          TestCommandResult.withoutResetsBeforeAColour(
             "{cyan}Suites: 1 of 1 completed, {reset}{red}0 aborted{reset}" +
               "{cyan}. Tests: 1 of 1 run: {reset}{green}succeeded 1{reset}{cyan}, {reset}{red}failed 0{reset}" +
               "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
@@ -82,15 +82,15 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
       Then("each suite's lines are its name line and its scopes' and test's labels")
       withClue(result.debugString) {
-        result.linesFor("CalcFunSuite:") shouldBe Seq("CalcFunSuite:", "  - adds")
-        result.linesFor("CalcPropSpec:") shouldBe Seq("CalcPropSpec:", "  - adds")
-        result.linesFor("CalcFunSpec:") shouldBe Seq("CalcFunSpec:", "  A calculator", "    - adds")
-        result.linesFor("CalcFreeSpec:") shouldBe Seq("CalcFreeSpec:", "  A calculator", "    - adds")
-        result.linesFor("CalcWordSpec:") shouldBe Seq("CalcWordSpec:", "  A calculator", "    when empty", "      - should add")
-        result.linesFor("CalcFlatSpec:") shouldBe Seq("CalcFlatSpec:", "  A calculator", "    - should add")
-        result.linesFor("CalcFeatureSpec:") shouldBe Seq("CalcFeatureSpec:", "  Feature: Addition", "    Scenario: adds")
-        result.linesFor("CalcAsyncFeatureSpec:") shouldBe Seq("CalcAsyncFeatureSpec:", "  Feature: Addition", "    - Scenario: adds")
-        result.linesFor("CalcRefSpec:") shouldBe Seq("CalcRefSpec:", "  A calculator", "    - adds two")
+        result.subtreeOf("CalcFunSuite:") shouldBe Seq("CalcFunSuite:", "  - adds")
+        result.subtreeOf("CalcPropSpec:") shouldBe Seq("CalcPropSpec:", "  - adds")
+        result.subtreeOf("CalcFunSpec:") shouldBe Seq("CalcFunSpec:", "  A calculator", "    - adds")
+        result.subtreeOf("CalcFreeSpec:") shouldBe Seq("CalcFreeSpec:", "  A calculator", "    - adds")
+        result.subtreeOf("CalcWordSpec:") shouldBe Seq("CalcWordSpec:", "  A calculator", "    when empty", "      - should add")
+        result.subtreeOf("CalcFlatSpec:") shouldBe Seq("CalcFlatSpec:", "  A calculator", "    - should add")
+        result.subtreeOf("CalcFeatureSpec:") shouldBe Seq("CalcFeatureSpec:", "  Feature: Addition", "    Scenario: adds")
+        result.subtreeOf("CalcAsyncFeatureSpec:") shouldBe Seq("CalcAsyncFeatureSpec:", "  Feature: Addition", "    - Scenario: adds")
+        result.subtreeOf("CalcRefSpec:") shouldBe Seq("CalcRefSpec:", "  A calculator", "    - adds two")
       }
     }
   }
@@ -105,7 +105,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       val result = brokenConstructorRun
 
       Then("the lines for BrokenCtorSpec begin with BrokenCtorSpec: and samples.BrokenCtorSpec *** ABORTED ***")
-      val brokenLines = result.linesFor("BrokenCtorSpec:")
+      val brokenLines = result.subtreeOf("BrokenCtorSpec:")
       withClue(result.debugString) {
         brokenLines.take(2) shouldBe Seq("BrokenCtorSpec:", "  samples.BrokenCtorSpec *** ABORTED ***")
       }
@@ -114,7 +114,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       brokenLines.drop(2).map(_.trim) should contain("java.lang.IllegalStateException: no config")
 
       And("SqrtPropSpec's lines are those of a module holding it alone")
-      result.linesFor("SqrtPropSpec:") shouldBe sqrtPropSpecLines
+      result.subtreeOf("SqrtPropSpec:") shouldBe sqrtPropSpecLines
     }
   }
 
@@ -132,7 +132,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
       And("the human-readable output is the module's line with the suite and its property under it, with no root's line and no run's line")
       withClue(result.debugString) {
-        result.humanReadableOutput shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
+        result.treeLines shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
       }
     }
 

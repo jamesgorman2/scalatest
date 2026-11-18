@@ -23,7 +23,7 @@ final class AddingThePluginSpec extends AnyFeatureSpec with GivenWhenThen with s
 
           Then("the human-readable output is SqrtPropSpec's")
           withClue(result.debugString) {
-            result.humanReadableOutput shouldBe Seq(
+            result.treeLines shouldBe Seq(
               "[core.test]",
               "  SqrtPropSpec:",
               "    - sqrt of a square is the root"

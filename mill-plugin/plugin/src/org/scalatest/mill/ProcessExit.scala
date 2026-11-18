@@ -5,7 +5,7 @@ import scala.jdk.OptionConverters.RichOptional
 
 private[mill] object ProcessExit {
 
-  /** Whether a run's process has exited: its PID is gone, has no start time, or names a later process. */
+  // The PID may since name a later process, which has another start time.
   def hasExited(process: RunProcess): Boolean =
     ProcessHandle.of(process.pid.value).toScala.forall { handle =>
       !handle.isAlive || !handle.info.startInstant.toScala.contains(process.startTime)

@@ -10,7 +10,6 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
   private val fixtureSuiteFolders: Seq[os.Path] =
     sys.env("COMPATIBILITY_FIXTURE_SUITES").split(java.io.File.pathSeparatorChar).toSeq.map(os.Path(_))
 
-  /** Copies the compatibility fixture's suites into the build's `core.test`. */
   private def addFixtureSuites(tester: IntegrationTester): Unit =
     for {
       folder <- fixtureSuiteFolders
@@ -274,7 +273,7 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
 
         Then("the human-readable output shows every suite, scope and test, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution, every failure with its message, and every line the fixture wrote to stdout or stderr")
         withClue(result.debugString) {
-          CapturedLines.byStream(StackFrames.collapsed(result.humanReadableOutput)).mkString("\n") shouldBe expectedOutput.replace("\r\n", "\n")
+          CapturedLines.byStream(StackFrames.collapsed(result.treeLines)).mkString("\n") shouldBe expectedOutput.replace("\r\n", "\n")
         }
       }
     }
