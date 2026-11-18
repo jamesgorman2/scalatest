@@ -9,16 +9,16 @@ Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 - Ordering top-level suites as their run started or discovered them changes between runs of the same build, since discovery order and parallel scheduling are not declared anywhere.
 - Ordering modules as the module selectors gave them makes one build's output depend on how the test command was invoked, and leaves no order for a module two selectors share.
 - Ordering by a locale's collation gives a different order on machines with different locales.
-- Ordering case-insensitively, as `String.CASE_INSENSITIVE_ORDER` does, leaves names that differ only in case, such as `ZebraSuite` and `zebraSuite`, with no order of their own, and makes a reader re-implement Java's case folding to reproduce the order.
+- Ordering case-insensitively, even with a `String.compareTo` tie-break for names that differ only in case, rests on case folding, which differs between languages' libraries outside ASCII, so a reader cannot reproduce the order without Java's exact rules.
 - Natural-number ordering, which puts `Suite2` before `Suite10`, has no standard definition: implementations differ on leading zeros, signs, decimal points and digits outside ASCII, so a reader cannot reproduce the order without the writer's exact rules.
 
 **Reasoning** R-105 orders the tree by declared order where it is known, otherwise alphanumerically by label, then by execution order where siblings share a label. Nothing declares the order of a build's modules or of a run's top-level suites, and neither has a label, so each sorts by its name, which stands where a label would: a module's Mill module path, a suite's suite name.
 
-Code-unit order is alphanumeric order in its plain sense: names are compared character by character, by each character's code. Digits sort before uppercase letters, and uppercase before lowercase, so `Suite10` precedes `Suite2` and `ZebraSuite` precedes `alphaSuite`. R-105 asks for an alphanumeric order, not a natural or case-insensitive one. `String.compareTo` gives that order on every machine, and a reader reproduces it by comparing UTF-16 code units.
+R-105 does not settle which alphanumeric order it means: the term names plain character-code order and natural ("Alphanum") order alike. The choice rests on reproducibility. `String.compareTo` is exactly defined, comparing UTF-16 code units, and gives the same order on every machine and in every reader that compares those units. Among ASCII names, digits sort before uppercase letters and uppercase before lowercase, so `Suite10` precedes `Suite2` and `ZebraSuite` precedes `alphaSuite`.
 
 Top-level suites that share a name fall back to the order they started, as R-105 gives for siblings with identical labels, with those that never started last.
 
-**Costs** The order differs from the order the human reading the build's source would list the modules or suites in, and from the order the suites ran. Numbered names sort as text, `Suite10` before `Suite2`, and a lowercase name after every uppercase one.
+**Costs** The order differs from the order the human reading the build's source would list the modules or suites in, and from the order the suites ran. Numbered names sort as text, `Suite10` before `Suite2`, and among ASCII names a lowercase name sorts after every uppercase one.
 
 **Settled by** [Consolidated JSON output - Suites, scopes and tests in the JSON output](https://github.com/jamesgorman2/scalatest/issues/143).
 
