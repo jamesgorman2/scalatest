@@ -134,7 +134,7 @@ private[consolidation] object JsonOutputWriter {
   private def locationOf(node: StructureNode, execution: AssembledExecution): Option[JsonValue] =
     node match {
       case suite: StructureNode.Suite => Some(suiteLocationObject(suite, execution))
-      case _ => scopeOrTestLocation(execution).flatMap(locationObject)
+      case _ => scopeOrTestLocation(node, execution).flatMap(locationObject)
     }
 
   // A suite's or test's closing event measures its duration. A scope's closing event carries none, and a node aborted
@@ -171,13 +171,18 @@ private[consolidation] object JsonOutputWriter {
       case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a message")
     }
 
-  // A `SeeStackDepthException` leaves the location to the throwable, so the closing event's is taken in its place.
-  private def scopeOrTestLocation(execution: AssembledExecution): Option[Location] =
-    (execution.opening ++ execution.closing).flatMap(_.location).find(_ != SeeStackDepthException)
+  // A `SeeStackDepthException` leaves a test's location to the throwable, so its closing event's is taken in its place.
+  private def scopeOrTestLocation(node: StructureNode, execution: AssembledExecution): Option[Location] = {
+    val events = node match {
+      case _: StructureNode.Scope => execution.opening.toVector
+      case _ => (execution.opening ++ execution.closing).toVector
+    }
+    events.flatMap(_.location).find(_ != SeeStackDepthException)
+  }
 
   // A suite's events give no line of its own, so only the file its scopes' and tests' locations all name is written.
   private def suiteLocationObject(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
-    val locations = ownScopesAndTestsOf(execution).flatMap(child => scopeOrTestLocation(child.execution))
+    val locations = ownScopesAndTestsOf(execution).flatMap(child => scopeOrTestLocation(child.node, child.execution))
     val files = locations.map(fileFields).distinct
     val sharedFile = files match {
       case Vector(file) if file.nonEmpty => file

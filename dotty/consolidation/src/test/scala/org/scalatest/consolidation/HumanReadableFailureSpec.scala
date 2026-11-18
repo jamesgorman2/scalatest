@@ -177,6 +177,32 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {green}[note] a note{reset}
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
+
+    Scenario("A test aborted by its DistributedTestRunnerSuite shows its abort line, then the throwable's lines under it") {
+      Given("an event log of a test that holds only the SuiteAborted of the DistributedTestRunnerSuite running it")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "ParAbortSuite", class "samples.ParAbortSuite"
+            test "a", label "- a"
+        suite "ParAbortSuite": SuiteStarting
+        test "a": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - no fixture", throwable: java.lang.RuntimeException "no fixture")
+        suite "ParAbortSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the test's abort line sits under the suite's name line, with the throwable's lines under it, in red")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}ParAbortSuite:{reset}
+          |    {red}- a *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: no fixture{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
   }
 
   Feature("A suite's abort sits under its name line") {

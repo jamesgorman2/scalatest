@@ -512,6 +512,7 @@ private[consolidation] object RunAssembly {
     }
 
   // Marks as aborted:
+  // - a test whose own execution holds a `SuiteAborted`, that of the `DistributedTestRunnerSuite` that ran it;
   // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
   // - a suite still open when its run aborted or stopped;
   // - a suite, scope or test with a start event and no closing event, in a run that ended.
@@ -565,6 +566,7 @@ private[consolidation] object RunAssembly {
       case _: DecodedEvent.TestIgnored => NodeOutcome.Ignored
       case _: DecodedEvent.TestPending => NodeOutcome.Pending
       case _: DecodedEvent.TestCanceled => NodeOutcome.Canceled
+      case _: DecodedEvent.SuiteAborted => NodeOutcome.Aborted
     }.orElse(abortedWhereOpen(openScopeOrTestAborted))
 
   private def abortedWhereOpen(openScopeOrTestAborted: Boolean): Option[NodeOutcome] =

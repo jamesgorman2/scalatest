@@ -184,6 +184,9 @@ private[consolidation] object HumanReadableWriter {
       case (Some(NodeOutcome.Canceled), Some(canceled: DecodedEvent.TestCanceled)) =>
         val lines = linesOnError(Resources.canceledNote, Resources.testCanceled _, canceled.message, canceled.throwable, Vector.empty, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiYellow) ++ linesUnder(lines.tail, canceled.throwable, depth + 1, AnsiYellow)
+      case (Some(NodeOutcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
+        val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, test.label, None, Some(test.name))
+        linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
       case (outcome, _) =>
         linesOf(Vector(testLine(test, outcome)), depth)
     }

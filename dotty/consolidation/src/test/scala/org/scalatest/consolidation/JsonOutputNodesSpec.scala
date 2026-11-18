@@ -10,8 +10,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   private def jsonOutputOf(eventLog: String): JsonSink = jsonOutputOfRun(TestRunPart.Events(eventLog))
 
-  // Each of the test events is one line of the event log, between suite RowSuite's start and completion.
-  private def rowSuiteRunning(testEvents: String*): String =
+  private def rowSuiteRunning(eventLinesBetweenSuiteStartAndCompletion: String*): String =
     s"""
     run started
     run: RunStarting
@@ -19,7 +18,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       suite "RowSuite", class "samples.RowSuite"
         test "adds", label "- adds"
     suite "RowSuite": SuiteStarting
-    ${testEvents.mkString("\n    ")}
+    ${eventLinesBetweenSuiteStartAndCompletion.mkString("\n    ")}
     suite "RowSuite": SuiteCompleted
     run: RunCompleted
     run ended completed
@@ -228,26 +227,26 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       tests.map(_("startedAt")) shouldBe Vector(integer(100L), integer(120L))
     }
 
-    Scenario("A run's top-level suites are ordered by name, not by class or start") {
-      Given("a run of suite ZebraSuite, class samples.RowSuite, followed by suite AlphaSuite, class samples.ZSuite")
+    Scenario("A run's top-level suites are ordered by their names' code units, so an uppercase name sorts before a lowercase one") {
+      Given("a run of suite alphaSuite, class samples.AlphaSuite, followed by suite ZebraSuite, class samples.ZebraSuite")
       val eventLog =
         """
         run started
         run: RunStarting
         structure
-          suite "ZebraSuite", class "samples.RowSuite"
+          suite "alphaSuite", class "samples.AlphaSuite"
+            test "alpha test", label "- alpha test"
+        suite "alphaSuite": SuiteStarting
+        test "alpha test": TestStarting
+        test "alpha test": TestSucceeded
+        suite "alphaSuite": SuiteCompleted
+        structure
+          suite "ZebraSuite", class "samples.ZebraSuite"
             test "zebra test", label "- zebra test"
         suite "ZebraSuite": SuiteStarting
         test "zebra test": TestStarting
         test "zebra test": TestSucceeded
         suite "ZebraSuite": SuiteCompleted
-        structure
-          suite "AlphaSuite", class "samples.ZSuite"
-            test "alpha test", label "- alpha test"
-        suite "AlphaSuite": SuiteStarting
-        test "alpha test": TestStarting
-        test "alpha test": TestSucceeded
-        suite "AlphaSuite": SuiteCompleted
         run: RunCompleted
         run ended completed
         """
@@ -255,8 +254,8 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       When("the library writes the JSON output")
       val runNode = jsonOutputOf(eventLog).runNode
 
-      Then("the run node's contents is suite AlphaSuite then suite ZebraSuite")
-      namesOf(runNode("contents")) shouldBe Vector(text("AlphaSuite"), text("ZebraSuite"))
+      Then("the run node's contents is suite ZebraSuite then suite alphaSuite, unlike their start order, their classes' order and their names' order ignoring case")
+      namesOf(runNode("contents")) shouldBe Vector(text("ZebraSuite"), text("alphaSuite"))
     }
 
     Scenario("A suite's tests are in declared order, not the order they ran") {
@@ -316,8 +315,8 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A DiscoverySuite's start and completion contribute to no node") {
-      Given("a run whose DiscoverySuite's SuiteStarting and SuiteCompleted are assigned to the run, around suite RowSuite")
+    Scenario("A suite's start and completion assigned to the run, as a DiscoverySuite's are, contribute to no node") {
+      Given("a run with a SuiteStarting and a SuiteCompleted assigned to the run, around suite RowSuite")
       val eventLog =
         """
         run started
@@ -340,6 +339,39 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
 
       Then("the run node's contents is suite RowSuite alone")
       namesOf(runNode("contents")) shouldBe Vector(text("RowSuite"))
+    }
+
+    Scenario("A test aborted by its DistributedTestRunnerSuite before it started holds that SuiteAborted's message and end time") {
+      Given("a run of suite RowSuite whose test adds holds only a SuiteAborted, as when a ParallelTestExecution suite's beforeEach throws")
+      val eventLog = rowSuiteRunning(
+        """test "adds": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - no fixture", timeStamp: 140)"""
+      )
+
+      When("the library writes the JSON output")
+      val adds = jsonOutputOf(eventLog).node("test", "adds")
+
+      Then("test adds holds the outcome aborted, the SuiteAborted's message and its time as endedAt, with no reason")
+      adds("outcome") shouldBe text("aborted")
+      adds("message") shouldBe text("Exception encountered when invoking run on a nested suite - no fixture")
+      adds("endedAt") shouldBe integer(140L)
+      adds.keys should not contain "reason"
+    }
+
+    Scenario("A test aborted by its DistributedTestRunnerSuite after it started holds that SuiteAborted's message and both times") {
+      Given("a run of suite RowSuite whose test adds starts, then holds a SuiteAborted")
+      val eventLog = rowSuiteRunning(
+        """test "adds": TestStarting(timeStamp: 100)""",
+        """test "adds": SuiteAborted(message: "no fixture", timeStamp: 140)"""
+      )
+
+      When("the library writes the JSON output")
+      val adds = jsonOutputOf(eventLog).node("test", "adds")
+
+      Then("test adds holds the outcome aborted, the SuiteAborted's message, and both times")
+      adds("outcome") shouldBe text("aborted")
+      adds("message") shouldBe text("no fixture")
+      adds("startedAt") shouldBe integer(100L)
+      adds("endedAt") shouldBe integer(140L)
     }
   }
 }

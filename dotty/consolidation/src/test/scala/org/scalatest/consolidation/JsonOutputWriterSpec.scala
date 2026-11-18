@@ -322,7 +322,6 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
   }
 
-  // A run of suite RowSuite, class samples.RowSuite, holding the structure lines, with each event one line of the event log.
   private def jsonOutputOfRowSuite(structure: Seq[String], events: String*): JsonSink =
     jsonOutputOfRun(
       TestRunPart.Events(
@@ -343,7 +342,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
   private val testsAddsAndSubtracts = Seq("""test "adds", label "- adds"""", """test "subtracts", label "- subtracts"""")
 
-  "A test of the JSON output" when {
+  "A test node in the JSON output" when {
 
     "it started and succeeded" should {
       "hold each value in the layout's key order" in {
@@ -366,6 +365,31 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           "threadName" -> text("pool-1"),
           "contents" -> arrayOf()
         )
+      }
+    }
+
+    "it failed" should {
+      "hold its outcome and then its message, each value in the layout's key order" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", None), threadName: "pool-1", timeStamp: 100)""",
+          """test "adds": TestFailed(message: "2 did not equal 3", duration: 8, timeStamp: 110)""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds").keys shouldBe
+          Vector("kind", "name", "label", "location", "outcome", "message", "startedAt", "endedAt", "duration", "threadName", "contents")
+      }
+    }
+
+    "it never started in a suite that aborted" should {
+      "hold its outcome and then its reason, each value in the layout's key order" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """suite "RowSuite": SuiteAborted(message: "no fixture")"""
+        )
+        json.node("test", "adds").keys shouldBe Vector("kind", "name", "label", "outcome", "reason", "contents")
       }
     }
 
@@ -463,7 +487,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
   }
 
-  "A scope of the JSON output" when {
+  "A scope node in the JSON output" when {
 
     "it is pending" should {
       "take its end time from its ScopePending and its duration from its times" in {
@@ -478,10 +502,34 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
         scope("endedAt") shouldBe integer(104L)
         scope("duration") shouldBe integer(4L)
       }
+
+      "hold each value in the layout's key order" in {
+        val json = jsonOutputOfRowSuite(
+          Seq("""scope "A Queue", label "A Queue""""),
+          """suite "RowSuite": SuiteStarting""",
+          """scope "A Queue": ScopeOpened(location: LineInFile(6, "RowSuite.scala", None), threadName: "pool-1", timeStamp: 100)""",
+          """scope "A Queue": ScopePending(timeStamp: 104)""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("scope", "A Queue").keys shouldBe Vector("kind", "name", "label", "location", "outcome", "startedAt", "endedAt", "duration", "contents")
+      }
+    }
+
+    "its ScopeOpened gives no location and its ScopeClosed gives one" should {
+      "have no location" in {
+        val json = jsonOutputOfRowSuite(
+          Seq("""scope "A Queue", label "A Queue""""),
+          """suite "RowSuite": SuiteStarting""",
+          """scope "A Queue": ScopeOpened""",
+          """scope "A Queue": ScopeClosed(location: LineInFile(6, "RowSuite.scala", None))""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("scope", "A Queue").keys should not contain "location"
+      }
     }
   }
 
-  "A suite of the JSON output" when {
+  "A suite node in the JSON output" when {
 
     "it completed, and its tests' locations share one file" should {
       "hold each value in the layout's key order, with that file in its location" in {
@@ -503,6 +551,36 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
         suite("endedAt") shouldBe integer(140L)
         suite("duration") shouldBe integer(30L)
         suite("threadName") shouldBe text("pool-1")
+      }
+    }
+
+    "it aborted" should {
+      "hold its outcome and then its message, each value in the layout's key order" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting(threadName: "pool-1", timeStamp: 100)""",
+          """suite "RowSuite": SuiteAborted(message: "no fixture", duration: 5, timeStamp: 105)"""
+        )
+        json.node("suite", "RowSuite").keys shouldBe
+          Vector("kind", "name", "suiteId", "location", "outcome", "message", "startedAt", "endedAt", "duration", "threadName", "contents")
+      }
+    }
+
+    "it completed and its SuiteCompleted carries no duration" should {
+      "have no duration, though it has both times and its tests have durations" in {
+        val json = jsonOutputOfRowSuite(
+          testsAddsAndSubtracts,
+          """suite "RowSuite": SuiteStarting(timeStamp: 100)""",
+          """test "adds": TestStarting(timeStamp: 105)""",
+          """test "adds": TestSucceeded(duration: 8, timeStamp: 113)""",
+          """test "subtracts": TestStarting(timeStamp: 120)""",
+          """test "subtracts": TestSucceeded(duration: 9, timeStamp: 129)""",
+          """suite "RowSuite": SuiteCompleted(timeStamp: 140)"""
+        )
+        val suite = json.node("suite", "RowSuite")
+        suite("contents").items.map(_("duration")) shouldBe Vector(integer(8L), integer(9L))
+        suite.keys should contain allOf ("startedAt", "endedAt")
+        suite.keys should not contain "duration"
       }
     }
 
