@@ -1,9 +1,10 @@
 package org.scalatest.mill
 
 import mill.testkit.IntegrationTester
+import org.scalatest.matchers.should
 import scala.util.matching.Regex
 
-trait FixtureBuilds {
+trait FixtureBuilds { this: should.Matchers =>
 
   protected val pluginVersion: String = sys.env("SCALATEST_MILL_VERSION")
   protected val fixtures: os.Path = os.Path(sys.env("MILL_TEST_RESOURCE_DIR"))
@@ -50,6 +51,17 @@ trait FixtureBuilds {
   // Mill writes a `testargs` file for each worker it starts.
   protected def anyTestWorkerStarted(tester: IntegrationTester): Boolean =
     os.exists(tester.workspacePath / "out") && os.walk(tester.workspacePath / "out").exists(_.last == "testargs")
+
+  protected def shouldSucceed(result: TestCommandResult): Unit =
+    withClue(result.debugString) {
+      result.succeeded shouldBe true
+    }
+
+  protected def shouldFailBeforeAnyTestStarts(tester: IntegrationTester, result: TestCommandResult): Unit =
+    withClue(result.debugString) {
+      result.succeeded shouldBe false
+      anyTestWorkerStarted(tester) shouldBe false
+    }
 }
 
 final case class TestCommandResult(eval: IntegrationTester.EvalResult) {

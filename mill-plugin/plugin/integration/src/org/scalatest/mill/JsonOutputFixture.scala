@@ -1,9 +1,10 @@
 package org.scalatest.mill
 
 import mill.testkit.IntegrationTester
+import org.scalatest.matchers.should
 
 /** The `json-output` fixture build, whose test module `core.test` holds the suites a scenario names. */
-trait JsonOutputFixture extends FixtureBuilds {
+trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
 
   protected def withJsonOutputFixture[A](suites: String*)(test: IntegrationTester => A): A =
     withTester("json-output") { tester =>

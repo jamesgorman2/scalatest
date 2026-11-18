@@ -37,12 +37,6 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       test(tester)
     }
 
-  private def shouldFailBeforeAnyTestStarts(tester: IntegrationTester, result: TestCommandResult): Unit =
-    withClue(result.debugString) {
-      result.succeeded shouldBe false
-      anyTestWorkerStarted(tester) shouldBe false
-    }
-
   Feature("The test command's output arguments") {
 
     for ((what, outputArguments) <- Seq("no -o" -> Nil, "-oH" -> Seq("-oH"))) {
@@ -118,7 +112,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           And(s"the console names $rejected as the argument the test command rejects")
           withClue(result.debugString) {
             (result.eval.out + result.eval.err) should include(
-              s"The test command takes one of -oH or a bare -o, and one -fJ followed by a path, but was given: $rejected")
+              s"The test command takes at most one of -oH or a bare -o, and at most one -fJ followed by a path, but was given: $rejected")
           }
 
           And("the console holds no line of human-readable output")

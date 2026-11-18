@@ -27,7 +27,7 @@ private[mill] object TestCommandArguments {
       case argument :: rest if stdoutArguments.contains(argument) && !stdoutGiven =>
         parseFrom(rest, parsed.copy(humanReadableOnStdout = stdoutArguments(argument)), stdoutGiven = true)
       case argument :: _ if argument.startsWith("-") =>
-        Left(s"The test command takes one of -oH or a bare -o, and one $jsonOutputArgument followed by a path, but was given: $argument")
+        Left(s"The test command takes at most one of -oH or a bare -o, and at most one $jsonOutputArgument followed by a path, but was given: $argument")
       case moduleSelector :: rest =>
         parseFrom(rest, parsed.copy(moduleSelectors = parsed.moduleSelectors :+ moduleSelector), stdoutGiven)
     }

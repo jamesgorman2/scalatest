@@ -53,7 +53,7 @@ The test command takes several module selectors, resolves each to its test modul
 
 - One module node per module, in the order R-105 gives; the JSON root records each module selector with its modules.
 - A module whose tests cannot start, as when it fails to compile, has an outcome showing that error (R-098e), and fails the test command.
-- A module that does not test with this release of the fork fails the test command before any test starts. Until features 11–13, so does every Scala.js and Native module.
+- A module that does not test with this release of the fork fails the test command before any test starts, leaving no file at the `-fJ` path, as `consolidated-json-output/specification/test-command.md` AC-008 requires of other failures before any test starts (R-059). Until features 11–13, so does every Scala.js and Native module.
 
 Enables:
 

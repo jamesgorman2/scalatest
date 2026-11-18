@@ -52,7 +52,7 @@ This feature meets each requirement below for JSON output, for one module select
 - R-096a (the root, one module, one forked run, and the run's suites, scopes and tests), R-104, R-105, R-130a, R-130b, R-130c, R-130d, R-130e, R-130f.
 - R-097a (`info`, `alert`, `note` and `markup` messages, and the stdout and stderr captured from the run's process and given for the root), R-097b (each piece of output on the node the human-readable output shows it under), R-043, R-011, R-063.
 - R-098a, R-098b, R-098c, R-098d, R-098f, R-095a (suites, scopes and tests recorded in a structure event, in runs that finish), R-095b (runs that finish), R-103, R-074a.
-- R-055 (one file receiving JSON output), R-049a (`-fJ`), R-077 and R-059 (the `-fJ` file), R-027 (JSON output).
+- R-055 (one file receiving JSON output), R-049a (`-fJ`), R-077 (the `-fJ` file), R-027 (JSON output).
 - R-113 (JSON output).
 
 ## Acceptance criteria

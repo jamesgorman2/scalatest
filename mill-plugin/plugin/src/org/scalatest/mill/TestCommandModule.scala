@@ -14,7 +14,7 @@ object TestCommandModule extends ExternalModule {
    * JSON output to a file.
    *
    * @param arguments the module selector, and optionally `-oH`, or a bare `-o` for no output on stdout, and `-fJ`
-   *   followed by the JSON output file's path, which a relative path names from the workspace root
+   *   followed by the JSON output file's path; a relative path resolves against the workspace root
    */
   def test(evaluator: Evaluator, arguments: mainargs.Leftover[String]): Task.Command[Unit] =
     Task.Command(exclusive = true) {

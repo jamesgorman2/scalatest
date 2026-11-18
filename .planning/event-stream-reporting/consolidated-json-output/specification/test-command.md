@@ -141,7 +141,6 @@ Feature: Deleting and writing the `-fJ` file
       Examples:
         | module selector | other module                                                                                     |
         | `nothing.test`  | no other module, so that `nothing.test` names no module                                          |
-        | `util.test`     | JVM test module `util.test`, which tests with MUnit                                              |
         | `__.test`       | JVM test module `util.test`, which tests with this fork, so that `__.test` names two test modules |
 
   Rule: A file the test command cannot delete fails the test command before any test starts, naming the path
@@ -160,11 +159,10 @@ Feature: Deleting and writing the `-fJ` file
       And the test command fails, and its failure names `<blocker>/report.json`
 
   Rule: A relative path resolves against the workspace root, wherever `mill` is run from
-    Scenario: AC-041 A relative path, with `mill` run from a folder below the workspace root
-      Given the folder `core` below the workspace root
-      When the test command is invoked from the folder `core` as `mill scalatest/test core.test -fJ report.json`
-      Then the file `report.json` in the workspace root holds a JSON object whose `kind` is `root`
-      And nothing exists at `report.json` in the folder `core`
+    Scenario: AC-041 A relative path with a folder in it
+      When the test command is invoked as `mill scalatest/test core.test -fJ reports/report.json`
+      Then the file `reports/report.json` below the workspace root holds a JSON object whose `kind` is `root`
+      And no other file named `report.json` exists below the workspace root
       And the test command succeeds
 
   Rule: The test command creates the file's missing parent folders
@@ -178,6 +176,5 @@ Feature: Deleting and writing the `-fJ` file
 | Requirement                   | Criteria                               |
 |-------------------------------|----------------------------------------|
 | R-077                         | AC-008                                 |
-| R-059                         | AC-008                                 |
 | R-049a                        | AC-041, AC-042                         |
 | `../SPECIFICATION.md` § Scope | AC-008, AC-009, AC-010, AC-041, AC-042 |

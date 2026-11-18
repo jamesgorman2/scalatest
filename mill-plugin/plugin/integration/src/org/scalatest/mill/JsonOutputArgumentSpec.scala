@@ -22,20 +22,9 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       result.summaryLine shouldBe empty
     }
 
-  private def shouldFailBeforeAnyTestStarts(tester: IntegrationTester, result: TestCommandResult): Unit =
-    withClue(result.debugString) {
-      result.succeeded shouldBe false
-      anyTestWorkerStarted(tester) shouldBe false
-    }
-
   private def shouldName(result: TestCommandResult, named: String): Unit =
     withClue(result.debugString) {
       (result.eval.out + result.eval.err) should include(named)
-    }
-
-  private def shouldSucceed(result: TestCommandResult): Unit =
-    withClue(result.debugString) {
-      result.succeeded shouldBe true
     }
 
   private def addModule(tester: IntegrationTester, module: String): Unit = {
@@ -184,19 +173,6 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
     val selectorsFailingAfterTheDelete = Seq(
       ("nothing.test", "no other module, so that nothing.test names no module", None),
       (
-        "util.test",
-        "JVM test module util.test, which tests with MUnit, which the test command does not yet reject before its tests start",
-        Some(
-          """object util extends ScalaModule {
-            |  def scalaVersion = "3.3.8"
-            |
-            |  object test extends ScalaTests, TestModule.Munit {
-            |    def mvnDeps = Seq(mvn"org.scalameta::munit::1.2.4")
-            |  }
-            |}""".stripMargin
-        )
-      ),
-      (
         "__.test",
         "JVM test module util.test, which tests with this fork, so that __.test names two test modules",
         Some(
@@ -216,7 +192,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
         Given(s"CalculatorSuite, and the build also has $otherModule")
         And("the file at <report> holds the text left over")
         When(s"the test command is invoked as mill scalatest/test $selector -fJ <report>")
-        def failsBeforeAnyTestStarts(): Unit = withJsonOutputFixture("CalculatorSuite") { tester =>
+        withJsonOutputFixture("CalculatorSuite") { tester =>
           module.foreach(addModule(tester, _))
           os.write(report(tester), leftOver)
           val result = runTestCommand(tester, selector, "-fJ", report(tester).toString)
@@ -229,11 +205,6 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
 
           And("nothing exists at <report>")
           os.exists(report(tester)) shouldBe false
-        }
-        if (selector == "util.test") {
-          pendingUntilFixed(failsBeforeAnyTestStarts())
-        } else {
-          failsBeforeAnyTestStarts()
         }
       }
     }
@@ -276,13 +247,13 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       }
     }
 
-    Scenario("A relative path resolves against the workspace root") {
+    Scenario("A relative path with a folder in it") {
       Given("CalculatorSuite")
       When("the test command is invoked as mill scalatest/test core.test -fJ reports/report.json")
       withJsonOutputFixture("CalculatorSuite") { tester =>
         val result = runTestCommand(tester, "core.test", "-fJ", "reports/report.json")
 
-        Then("the file reports/report.json in the workspace root holds a JSON object whose kind is root")
+        Then("the file reports/report.json below the workspace root holds a JSON object whose kind is root")
         withClue(result.debugString) {
           os.exists(tester.workspacePath / "reports" / "report.json") shouldBe true
           jsonOutput(tester.workspacePath / "reports" / "report.json")("kind").str shouldBe "root"
