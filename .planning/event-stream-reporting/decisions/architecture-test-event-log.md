@@ -6,7 +6,7 @@ Decisions behind `../ARCHITECTURE.md` on the test event log's format and codec, 
 
 **Alternatives**
 
-- The plugin dropping the summary lines from a worker's captured stdout needs captured lines matched by text, which the feature `human-readable-one-jvm-module` rules out.
+- The plugin dropping the summary lines from a worker's captured stdout needs captured lines matched by text, which would also drop a test's own line of the same text.
 - Leaving the summary in the captured stdout puts it in the output attached to the run, against `../SPECIFICATION.md` R-044.
 
 **Reasoning** Mill's worker prints what `done()` returns to its stdout, and the test command captures that stdout as the run's output. Not returning the summary is the only way to keep it out of that output without text matching. Mill 1.3.1 prints nothing for an empty result, so `""` adds no blank line. A run without the runner argument returns 3.2.20's summary unchanged, so the legacy outputs keep it.

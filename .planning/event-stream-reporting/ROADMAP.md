@@ -55,7 +55,7 @@ Risks:
 - `research/mill-parallel-worker-capture.md` § 5 and `research/mill-runner-progress-without-trait.md` § 6 (on Windows a class sometimes runs on two workers; worker counts vary, under Mill's own task too)
 - `research/emission-gap-analysis.md` § 11 (whether a JVM worker executes its tasks one at a time)
 - `research/jvm-file-channel.md` § 5 (a module with no test class spawns one worker)
-- `human-readable-one-jvm-module/research/mill-plugin-conventions.md` § 5 (at Mill 1.3.1 a module that sets `testBatchFrameworkTasks` runs one worker per fork group, each with its whole class list and no queue or claim files; a module that does not runs one worker per fork group with test parallelism off or one class selected)
+- `research/mill-plugin-conventions.md` § 5 (at Mill 1.3.1 a module that sets `testBatchFrameworkTasks` runs one worker per fork group, each with its whole class list and no queue or claim files; a module that does not runs one worker per fork group with test parallelism off or one class selected)
 - `research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
 - `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after the `runStarted` event; paths with spaces untried)
 
@@ -184,8 +184,11 @@ Enables:
 
 Settles:
 
-- The form of the progress summary (R-090a fixes what it reports, not its form), and whether it is debounced (R-090d). This feature may redefine the format of the summary line that the feature `human-readable-one-jvm-module` prints (`human-readable-one-jvm-module/specification/layout-lines.md` § The summary line), and that summary line then follows this feature's (R-141).
-- How progress output counts before a run's event stream ends, where attribution and the suites its end aborts are not yet decided, so that its last summary equals the summary line (R-141; `human-readable-one-jvm-module/technical-design/consolidation-library.md` § The summary line).
+- The form of the progress summary (R-090a fixes what it reports, not its form), and whether it is debounced (R-090d). This feature may redefine the format of the summary line that feature 1 prints, and that summary line then follows this feature's (R-141). Feature 1's summary line, the unindented last line of the human-readable output, is:
+  - text: `Suites: <completed> of <suites expected> completed, <aborted> aborted. Tests: <run> of <tests expected> run: succeeded <succeeded>, failed <failed>, canceled <canceled>, ignored <ignored>, pending <pending>`;
+  - counts: each suite and test of the node tree, once per execution and once where it has none, leaving out attributed nodes. A suite not run counts only in `<suites expected>`; an ignored test only in `<ignored>`; an aborted or not-run test only in `<tests expected>`;
+  - colours: each part, a word and its count, has the colour of a line of its kind whatever the count, 0 included: `<aborted> aborted` and `failed <failed>` red, `succeeded <succeeded>` green, `canceled <canceled>`, `ignored <ignored>` and `pending <pending>` yellow. Every other character is cyan.
+- How progress output counts before a run's event stream ends, where attribution and the suites its end aborts are not yet decided. One function produces the summary line's counts, text and colours by counting over the assembled tree, so it needs every run's event stream to have ended. So that its last output equals the summary line (R-141), progress output keeps the counts that arriving events give apart from the changes a run's end makes (attributed suites and tests leave the counts; a suite still open at the run's end is aborted), and shows that its counts equal that function's once every stream has ended.
 - What a progress file contains, where nothing can be redrawn in place (R-089).
 - Which formatting and filtering characters other than `w` apply to progress output (R-090e names `w`; R-106g, R-127a and R-127b name only the human-readable output).
 
