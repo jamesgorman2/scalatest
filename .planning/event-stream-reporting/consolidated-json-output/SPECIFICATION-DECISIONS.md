@@ -2,6 +2,21 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## The JSON output's format is documented in `mill-plugin/JSON.md`, linked from `mill-plugin/README.md`, which documents `-fJ <path>`.
+
+**Alternatives**
+
+- Documenting the format in `mill-plugin/README.md` buries the test command's usage under a key-by-key reference that only readers of the file need.
+- Pointing readers at `../JSON-LAYOUT.md` fails once the epic closes, since close-out deletes `.planning/`.
+
+**Reasoning** The format's readers are agents that read the file a test command wrote. A separate document beside the README, shipped in the repository with each release, gives them the format for the release that wrote the file, as `../decisions/outputs.md` requires.
+
+**Costs** `mill-plugin/JSON.md` restates the layout, and must change with each release that changes the JSON writer.
+
+**Settled by** [Consolidated JSON output - The JSON output's documentation](https://github.com/jamesgorman2/scalatest/issues/147).
+
+---
+
 ## The test command deletes the `-fJ` file once its arguments are accepted and before it resolves its module selectors, and leaves the file untouched when it rejects its arguments.
 
 **Alternatives**

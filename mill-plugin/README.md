@@ -9,7 +9,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
-- Human-readable output on stdout, and JSON output to a file. The only output arguments are `-oH`, a bare `-o` and `-fJ`.
+- Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
 
 ## Publishing
 
@@ -84,7 +84,7 @@ For example, `mill scalatest/test core.test`.
 - **Module selector**: exactly one, resolving to one JVM test module.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
-- **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output, whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
+- **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
 
 The module's own ScalaTest arguments (`testArgsDefault`) reach the run only if they are one of these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`.
 Every other flag, including every reporter flag, is withheld.
