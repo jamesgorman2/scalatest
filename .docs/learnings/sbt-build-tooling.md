@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins, incremental compilation and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, linking Scala Native on Windows, or adding JVM-only code to Scala 3 core sources.
+description: How sbt, its plugins, incremental compilation, generated sources and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, linking Scala Native on Windows, adding JVM-only code to Scala 3 core sources, or relying on a build-generated source being current after a version bump.
 ---
 
 <learning>
@@ -120,4 +120,12 @@ The Scala.js and Scala Native core builds have no source directories of their ow
 A file in a copied directory that uses a JVM-only API, such as `java.time`, breaks both builds. Keep the JVM-only part in a directory that is not copied, or in a JVM-only project such as `scalatestConsolidation`, rather than adding the file to a `copyDir` skip list: a skipped file is missing from Scala.js and Native for any code there that needs it. Compile `scalatestCoreDottyJS` and `scalatestCoreDottyNative` to confirm.
 
 `copyDir` never deletes a file dropped from the copy. The stale file stays in `src_managed` but is not compiled, since only the generators' output is. Scala Native's incremental compile also leaves the dropped file's `.nir` files in `classes`; clean the project before trusting its `classes` directory.
+</learning>
+
+<learning>
+date: 2026-11-18
+---
+A build that generates a source file holding the build's `version` can regenerate it only when the generator's own source changes, not when `version` changes. An incremental build after a version bump then compiles in the old version string, while a clean build is correct. Anything that reports the constant, such as a JSON output field recording the ScalaTest version, shows the stale value.
+
+Before trusting a version string read from a generated constant, run a clean build, or touch the generator's source, after any version bump.
 </learning>
