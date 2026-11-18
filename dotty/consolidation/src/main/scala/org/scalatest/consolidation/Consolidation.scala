@@ -80,7 +80,8 @@ final class Consolidation private (
 
   /**
    * Gives a module's start and end time, each by the caller's clock and each where the caller measured it. A later call
-   * for the same module replaces the times an earlier one gave.
+   * for the same module replaces the times an earlier one gave. A module timed but given no run is still a module of
+   * every output, with nothing under it.
    *
    * @param startedAt when the caller started the module's tests
    * @param endedAt when the last of the module's test processes ended
@@ -103,15 +104,16 @@ final class Consolidation private (
     synchronized {
       requireOpen()
       require(runs.forall(!_.isEventStreamOpen), "every run's event stream must have ended")
-      HumanReadableWriter.lines(runs.toVector, rootOutput.toVector, rootFailures.toVector).foreach(line => humanReadableOutput(line.rendered(coloured)))
-      jsonOutput.foreach(sink => sink(JsonOutputWriter.text(root(endedAt))))
+      val consolidated = root(endedAt)
+      HumanReadableWriter.lines(consolidated).foreach(line => humanReadableOutput(line.rendered(coloured)))
+      jsonOutput.foreach(sink => sink(JsonOutputWriter.text(consolidated)))
       currentState = currentState.withEnd
     }
 
   private def root(endedAt: Option[Instant]): ConsolidatedRoot = {
     val runsByModule = runs.toVector.groupBy(_.label)
     val modules = (runsByModule.keySet ++ moduleTimes.keySet).toVector.sortBy(_.value).map { module =>
-      ConsolidatedModule(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty))
+      ConsolidatedModule(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty).sortBy(_.number))
     }
     ConsolidatedRoot(buildTool, moduleSelectors, rootFailures.toVector, MeasuredTimes(startedAt, endedAt), modules, rootOutput.toVector)
   }

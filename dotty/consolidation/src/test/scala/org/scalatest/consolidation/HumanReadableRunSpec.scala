@@ -449,6 +449,24 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |  {green}SqrtPropSpec:{reset}
           |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
     }
+
+    Scenario("A module timed but given no run shows its line alone, among the other modules in order by name") {
+      Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
+      And("the module `app.test` timed but given no run")
+      val output = new OutputSink
+      val consolidation = consolidationOfSqrtPropSpec(output)
+      consolidation.timeModule(TestRunLabel("app.test"), None, None)
+
+      When("the library consolidates it")
+      consolidation.end()
+
+      Then("the line of `app.test` comes first, with nothing under it")
+      output.colourMarkedTree shouldBe
+        """{cyan}[app.test]{reset}
+          |{cyan}[core.test]{reset}
+          |  {green}SqrtPropSpec:{reset}
+          |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
+    }
   }
 
   Feature("The consolidation state of a run that ends") {

@@ -6,19 +6,6 @@ import org.scalatest.events.JsonWriter
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.Summary
 
-/** A module of the consolidation: its runs, each a run node, and its times. */
-private[consolidation] final case class ConsolidatedModule(label: TestRunLabel, times: MeasuredTimes, runs: Vector[RunAssembly])
-
-/** What the root of the consolidation holds once it has ended. */
-private[consolidation] final case class ConsolidatedRoot(
-  buildTool: Option[BuildTool],
-  moduleSelectors: Seq[ModuleSelector],
-  failures: Vector[String],
-  times: MeasuredTimes,
-  modules: Vector[ConsolidatedModule],
-  output: Vector[CapturedLine]
-)
-
 /**
  * Writes the JSON output: the root, its modules and their run nodes. Each node's keys are written in a fixed order,
  * and a key whose value is absent is left out, so no `null` is written.
@@ -61,7 +48,7 @@ private[consolidation] object JsonOutputWriter {
         "kind" -> Some(JsonValue.Text("module")),
         "name" -> Some(JsonValue.Text(module.label.value))
       ) ++ measuredTimeFields(module.times) :+
-        ("contents" -> Some(JsonValue.Array(module.runs.sortBy(_.number).map(runNode))))
+        ("contents" -> Some(JsonValue.Array(module.runs.map(runNode))))
     )
 
   private def measuredTimeFields(times: MeasuredTimes): Vector[Field] =

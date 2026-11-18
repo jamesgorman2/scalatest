@@ -47,7 +47,14 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
 ### Consolidation library
 
-`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it. It sits in core's package because it reuses four `private[scalatest]` parts of core: its formatting of human-readable output, its decoder, its argument splitter and its definition of the runner argument.
+`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it. It sits in core's package because it reuses `private[scalatest]` parts of core:
+
+- its formatting of human-readable output;
+- its decoder;
+- its argument splitter;
+- its definition of the runner argument;
+- its JSON encoder;
+- the version of this fork it was built at.
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
   - It keeps each node's events against the node's ID, by execution, apart from the structure. The writers report each suite's latest structure, with those events.

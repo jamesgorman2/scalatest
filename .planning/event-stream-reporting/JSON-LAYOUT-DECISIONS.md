@@ -2,6 +2,22 @@
 
 Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
+## The root holds each failure attached to it as an item `{ "message" }` of `failures`, in the order attached, beside `outcome` `aborted`.
+
+**Alternatives**
+
+- One `message` key, as a run node has, holds one failure, but the root can be given several.
+- An array of plain strings cannot gain a key, such as a throwable, without changing each item's type.
+- Putting failures in `output` mixes a failure of the test command with what its runners wrote, and a reader must search `output` to learn why the root aborted.
+
+**Reasoning** A failure attached to the root is why the root aborted, as a run node's `message` is why the run aborted, so it sits beside `outcome`. An object per failure keeps the order they were attached in and lets an item gain keys later.
+
+**Costs** A reader that wants one reason for the root's abort must join the messages itself.
+
+**Settled by** [Library JSON output: encoding, root, module and run node](https://github.com/jamesgorman2/scalatest/issues/142).
+
+---
+
 ## A run node is identified by `number`, its place from 1 among its module's runs in the order they were added, unique only within its module.
 
 **Alternatives**

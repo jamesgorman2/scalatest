@@ -21,11 +21,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     """
   )
 
-  private def runNodeFedWith(events: DecodedEvent*): JsonValue = {
+  private def runNodeFedWith(events: DecodedEvent*): JsonValue = runNodeOf(feed => events.foreach(event => feed.add(runEvent(event))))
+
+  private def runNodeOf(feedAfterRunStarted: RunFeed => Unit): JsonValue = {
     val json = new JsonSink
     val consolidation = startedWithoutMill(json)
     val feed = addRun(consolidation, TestRunPart.Events("run started"))
-    events.foreach(event => feed.add(runEvent(event)))
+    feedAfterRunStarted(feed)
     feed.endEventStream()
     consolidation.end()
     json.runNode
@@ -66,8 +68,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
   "The JSON output's root" when {
 
-    "given a build tool, module selectors and both of its times" should {
-      "hold them, with its duration, in the layout's key order" in {
+    "given a build tool, module selectors, both of its times, a failure and output" should {
+      "hold them, with its outcome and duration, in the layout's key order" in {
         val json = new JsonSink
         val consolidation = Consolidation.start(
           new OutputSink,
@@ -77,6 +79,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           buildTool = Some(BuildTool("Mill", "1.3.1")),
           startedAt = Some(Instant.ofEpochMilli(1000L))
         )
+        consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
+        consolidation.addRootFailure("discovery failed")
         consolidation.end(Some(Instant.ofEpochMilli(1600L)))
         json.root shouldBe objectOf(
           "kind" -> text("root"),
@@ -86,10 +90,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
             objectOf("selector" -> text("__.test"), "modules" -> arrayOf(text("app.test"), text("core.test"))),
             objectOf("selector" -> text("core.test"), "modules" -> arrayOf(text("core.test")))
           ),
+          "outcome" -> text("aborted"),
+          "failures" -> arrayOf(objectOf("message" -> text("discovery failed"))),
           "startedAt" -> integer(1000L),
           "endedAt" -> integer(1600L),
           "duration" -> integer(600L),
-          "contents" -> arrayOf()
+          "contents" -> arrayOf(),
+          "output" -> arrayOf(objectOf("kind" -> text("stdio"), "stream" -> text("stderr"), "text" -> text("discovering\n")))
         )
       }
     }
@@ -201,21 +208,26 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
   "A run node of the JSON output" when {
 
-    "its run reported every run-level event" should {
+    "its run reported every run-level event and a captured line" should {
       "hold each value in the layout's key order" in {
         val summary = Summary(1, 2, 3, 4, 5, 6, 7, 8)
-        val runNode = runNodeFedWith(
-          DecodedEvent.RunStarting(3, Map("zone" -> "UTC", "greeting" -> "hello"), None, "main", 100L),
-          DecodedEvent.DiscoveryStarting("main", 110L),
-          DecodedEvent.DiscoveryCompleted(Some(15L), "main", 125L),
-          DecodedEvent.RunAborted("boom", None, Some(400L), Some(summary), None, "main", 500L)
-        )
+        val runNode = runNodeOf { feed =>
+          Vector(
+            DecodedEvent.RunStarting(3, Map("zone" -> "UTC", "greeting" -> "hello"), None, "main", 100L),
+            DecodedEvent.DiscoveryStarting("main", 110L),
+            DecodedEvent.DiscoveryCompleted(Some(15L), "main", 125L),
+            DecodedEvent.RunAborted("boom", None, Some(400L), Some(summary), None, "main", 500L)
+          ).foreach(event => feed.add(runEvent(event)))
+          feed.add(CapturedLine.Stdout("dividing\n"))
+          feed.add("run ended aborted".toRunEvent)
+        }
         runNode shouldBe objectOf(
           "kind" -> text("run"),
           "number" -> integer(1L),
           "testCount" -> integer(3L),
           "configMap" -> objectOf("greeting" -> text("hello"), "zone" -> text("UTC")),
           "discovery" -> objectOf("startedAt" -> integer(110L), "duration" -> integer(15L)),
+          "outcome" -> text("aborted"),
           "message" -> text("boom"),
           "startedAt" -> integer(100L),
           "endedAt" -> integer(500L),
@@ -230,7 +242,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
             "suitesAbortedCount" -> integer(7L),
             "scopesPendingCount" -> integer(8L)
           ),
-          "contents" -> arrayOf()
+          "contents" -> arrayOf(),
+          "output" -> arrayOf(objectOf("kind" -> text("stdio"), "stream" -> text("stdout"), "text" -> text("dividing\n")))
         )
       }
     }
@@ -307,13 +320,5 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
         jsonOutputOfRun(completedRun).runNode.keys should not contain "output"
       }
     }
-  }
-
-  private def jsonOutputOfRun(parts: TestRunPart*): JsonSink = {
-    val json = new JsonSink
-    val consolidation = startedWithoutMill(json)
-    addRun(consolidation, parts*).endEventStream()
-    consolidation.end()
-    json
   }
 }

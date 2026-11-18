@@ -39,19 +39,17 @@ private[consolidation] object HumanReadableWriter {
 
   private val rootAbortedLine = "*** CONSOLIDATED TESTS ABORTED ***"
 
-  def lines(runs: Seq[RunAssembly], rootOutput: Seq[CapturedLine], rootFailures: Seq[String]): Vector[OutputLine] =
-    treeLines(runs, rootOutput, rootFailures) :+ OutputLine(0, SummaryLine.of(runs))
+  def lines(root: ConsolidatedRoot): Vector[OutputLine] =
+    treeLines(root) :+ OutputLine(0, SummaryLine.of(root.runs))
 
-  private def treeLines(runs: Seq[RunAssembly], rootOutput: Seq[CapturedLine], rootFailures: Seq[String]): Vector[OutputLine] =
-    if (rootOutput.isEmpty && rootFailures.isEmpty) moduleLines(runs, 0)
+  private def treeLines(root: ConsolidatedRoot): Vector[OutputLine] =
+    if (root.output.isEmpty && root.failures.isEmpty) root.modules.flatMap(moduleLines(_, 0))
     else
-      linesOf(rootLine, 0, AnsiCyan) ++ moduleLines(runs, 1) ++ rootOutput.flatMap(capturedLineLines(_, 1)) ++
-        rootFailureLines(rootFailures, 1)
+      linesOf(rootLine, 0, AnsiCyan) ++ root.modules.flatMap(moduleLines(_, 1)) ++ root.output.flatMap(capturedLineLines(_, 1)) ++
+        rootFailureLines(root.failures, 1)
 
-  private def moduleLines(runs: Seq[RunAssembly], depth: Int): Vector[OutputLine] =
-    runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsOfModule) =>
-      linesOf("[" + label.value + "]", depth, AnsiCyan) ++ runsOfModule.toVector.sortBy(_.number).flatMap(runLines(_, depth + 1))
-    }
+  private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] =
+    linesOf("[" + module.label.value + "]", depth, AnsiCyan) ++ module.runs.flatMap(runLines(_, depth + 1))
 
   private def rootFailureLines(failures: Seq[String], depth: Int): Vector[OutputLine] =
     if (failures.isEmpty) Vector.empty

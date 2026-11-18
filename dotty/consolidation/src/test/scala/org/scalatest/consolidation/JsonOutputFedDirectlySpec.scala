@@ -7,14 +7,6 @@ import org.scalatest.matchers.should.Matchers
 
 final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
 
-  private def jsonOutputOfRun(eventLog: String): JsonSink = {
-    val json = new JsonSink
-    val consolidation = startedWithoutMill(json)
-    addRun(consolidation, TestRunPart.Events(eventLog)).endEventStream()
-    consolidation.end()
-    json
-  }
-
   Feature("Runs and the root fed directly to the consolidation library") {
 
     Seq(
@@ -33,7 +25,7 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
           """
 
         When("the library writes the JSON output")
-        val runNode = jsonOutputOfRun(eventLog).runNode
+        val runNode = jsonOutputOfRun(TestRunPart.Events(eventLog)).runNode
 
         Then(if (held.isEmpty) "the run node has no outcome" else s"the run node holds ${held.map((key, value) => s"\"$key\": \"$value\"").mkString(" and ")}")
         held.foreach((key, value) => runNode(key) shouldBe text(value))
@@ -74,7 +66,7 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library writes the JSON output")
-      val json = jsonOutputOfRun(eventLog)
+      val json = jsonOutputOfRun(TestRunPart.Events(eventLog))
 
       Then("the root has no buildTool, startedAt, endedAt or duration key")
       json.root.keys should contain noneOf ("buildTool", "startedAt", "endedAt", "duration")

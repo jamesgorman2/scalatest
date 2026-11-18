@@ -1,6 +1,7 @@
 package org.scalatest.consolidation
 
 import java.nio.ByteBuffer
+import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import org.scalatest.events.JsonReader
@@ -14,6 +15,16 @@ final class JsonEncodingSpec extends AnyWordSpec with Matchers {
   private val textJsonMustEscape = "tab\t quote\" slash\\ bell\u0007 é 😀 lone\uD800 end"
 
   private def encoded(text: String): String = JsonWriter.write(JsonValue.Text(text))
+
+  private def strictlyEncodedUtf8(text: String): Array[Byte] = {
+    val buffer = StandardCharsets.UTF_8.newEncoder()
+      .onMalformedInput(CodingErrorAction.REPORT)
+      .onUnmappableCharacter(CodingErrorAction.REPORT)
+      .encode(CharBuffer.wrap(text))
+    val bytes = new Array[Byte](buffer.remaining())
+    buffer.get(bytes)
+    bytes
+  }
 
   private def strictlyDecodedUtf8(bytes: Array[Byte]): String =
     StandardCharsets.UTF_8.newDecoder()
@@ -41,13 +52,12 @@ final class JsonEncodingSpec extends AnyWordSpec with Matchers {
         encoded("lone\uD800 end") shouldBe "\"lone\\uD800 end\""
       }
 
-      "write text that is valid UTF-8 once encoded" in {
-        val bytes = encoded(textJsonMustEscape).getBytes(StandardCharsets.UTF_8)
-        noException should be thrownBy strictlyDecodedUtf8(bytes)
+      "write text that encodes to UTF-8" in {
+        noException should be thrownBy strictlyEncodedUtf8(encoded(textJsonMustEscape))
       }
 
       "write text that decodes to the string it was given" in {
-        val decoded = strictlyDecodedUtf8(encoded(textJsonMustEscape).getBytes(StandardCharsets.UTF_8))
+        val decoded = strictlyDecodedUtf8(strictlyEncodedUtf8(encoded(textJsonMustEscape)))
         JsonReader.read(decoded) shouldBe Right(JsonValue.Text(textJsonMustEscape))
       }
     }
