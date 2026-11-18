@@ -315,10 +315,11 @@ private[consolidation] object JsonOutputWriter {
     case Suppressed
   }
 
-  /** Where a throwable hangs in its record: the index of its parent's entry, and whether it is that throwable's cause or one of its suppressed throwables. */
+  /** A throwable's parent in the record: the parent's entry index, and whether the throwable is the parent's cause or one of its suppressed throwables. */
   private final case class ThrowableParent(entryIndex: Int, link: ThrowableLink)
 
-  private final case class ThrowableVisit(throwable: DecodedThrowable, parent: Option[ThrowableParent]) {
+  /** A throwable reached while building a record but not yet visited, with its parent, if any. */
+  private final case class PendingThrowable(throwable: DecodedThrowable, parent: Option[ThrowableParent]) {
 
     def isLinkedAs(link: ThrowableLink): Boolean = parent.exists(_.link == link)
   }
@@ -328,7 +329,8 @@ private[consolidation] object JsonOutputWriter {
     case Ref(id: Int)
   }
 
-  private final case class VisitedThrowable(visit: ThrowableVisit, entry: ThrowableEntry)
+  /** A visited throwable paired with the record entry it produced: its own entry or a ref to an earlier one. */
+  private final case class ThrowableRecordEntry(source: PendingThrowable, entry: ThrowableEntry)
 
   // Builds the record in two passes. Neither recurses, so a cause chain too long to recurse over is still written.
   //   1. Visit the throwables depth-first, cause before suppressed. A throwable seen for the first time, by identity, gets the
@@ -336,35 +338,35 @@ private[consolidation] object JsonOutputWriter {
   //   2. Build the record from the last entry back to the first.
   private def throwableRecord(throwable: DecodedThrowable): JsonValue = {
     val ids = new IdentityHashMap[DecodedThrowable, Int]
-    val entries = Vector.newBuilder[VisitedThrowable]
+    val entries = Vector.newBuilder[ThrowableRecordEntry]
     var entryCount = 0
-    var pending = List(ThrowableVisit(throwable, None))
+    var pending = List(PendingThrowable(throwable, None))
     while (pending.nonEmpty) {
-      val visit = pending.head
+      val current = pending.head
       pending = pending.tail
-      if (ids.containsKey(visit.throwable)) {
-        entries += VisitedThrowable(visit, ThrowableEntry.Ref(ids.get(visit.throwable)))
+      if (ids.containsKey(current.throwable)) {
+        entries += ThrowableRecordEntry(current, ThrowableEntry.Ref(ids.get(current.throwable)))
       } else {
         val id = ids.size + 1
-        ids.put(visit.throwable, id)
-        entries += VisitedThrowable(visit, ThrowableEntry.Recorded(id))
-        val linked = visit.throwable.cause.map(ThrowableVisit(_, Some(ThrowableParent(entryCount, ThrowableLink.Cause)))).toList :::
-          visit.throwable.suppressed.toList.map(ThrowableVisit(_, Some(ThrowableParent(entryCount, ThrowableLink.Suppressed))))
+        ids.put(current.throwable, id)
+        entries += ThrowableRecordEntry(current, ThrowableEntry.Recorded(id))
+        val linked = current.throwable.cause.map(PendingThrowable(_, Some(ThrowableParent(entryCount, ThrowableLink.Cause)))).toList :::
+          current.throwable.suppressed.toList.map(PendingThrowable(_, Some(ThrowableParent(entryCount, ThrowableLink.Suppressed))))
         pending = linked ::: pending
       }
       entryCount += 1
     }
     val visited = entries.result()
-    val linkedByParent = visited.indices.groupBy(index => visited(index).visit.parent.map(_.entryIndex))
+    val linkedByParent = visited.indices.groupBy(index => visited(index).source.parent.map(_.entryIndex))
     val written = new Array[JsonValue](visited.size)
     visited.indices.reverse.foreach { index =>
       val linked = linkedByParent.getOrElse(Some(index), Vector.empty)
-      def recordsLinkedAs(link: ThrowableLink): Vector[JsonValue] = linked.filter(visited(_).visit.isLinkedAs(link)).map(written(_)).toVector
+      def recordsLinkedAs(link: ThrowableLink): Vector[JsonValue] = linked.filter(visited(_).source.isLinkedAs(link)).map(written(_)).toVector
       written(index) = visited(index).entry match {
         case ThrowableEntry.Ref(id) =>
           objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong))))
         case ThrowableEntry.Recorded(id) =>
-          throwableObject(id, visited(index).visit.throwable, recordsLinkedAs(ThrowableLink.Cause).headOption, recordsLinkedAs(ThrowableLink.Suppressed))
+          throwableObject(id, visited(index).source.throwable, recordsLinkedAs(ThrowableLink.Cause).headOption, recordsLinkedAs(ThrowableLink.Suppressed))
       }
     }
     written(0)
