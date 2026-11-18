@@ -1,10 +1,9 @@
 package samples
-
 import org.scalatest.funsuite.AnyFunSuite
 
 final class CalculatorSuite extends AnyFunSuite {
   test("adds two numbers") {
-    println("dividing now")
+    print("dividing now\n")
     assert(1 + 1 == 2)
   }
 }

@@ -8,7 +8,75 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   private val eventLogItems: Set[String] = Set("runStarted", "structure", "event", "runEnded")
 
-  Feature("The root and the module in the JSON output") {
+  Feature("The root, the module and the run in the JSON output") {
+
+    Scenario("One run of one suite") {
+      Given("CalculatorSuite, whose one test adds two numbers, registered at line 5, prints dividing now and succeeds")
+      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
+      withJsonOutputFixture("CalculatorSuite") { tester =>
+        val json = jsonOutputOfTestCommand(tester)
+
+        Then("the JSON output is the root, holding this fork's release, Mill and the module selector, then the module, its run and the run's suite and test, each with its times")
+        shouldMatch(
+          json,
+          s"""
+          {
+            "kind": "root",
+            "scalaTestVersion": "$pluginVersion",
+            "buildTool": { "name": "Mill", "version": "${mill.api.BuildInfo.millVersion}" },
+            "moduleSelectors": [{ "selector": "core.test", "modules": ["core.test"] }],
+            "startedAt": <time>, "endedAt": <time>, "duration": <ms>,
+            "contents": [{
+              "kind": "module",
+              "name": "core.test",
+              "startedAt": <time>, "endedAt": <time>, "duration": <ms>,
+              "contents": [{
+                "kind": "run",
+                "number": 1,
+                "configMap": {},
+                "startedAt": <time>, "endedAt": <time>, "duration": <ms>,
+                "summary": {
+                  "testsSucceededCount": 1, "testsFailedCount": 0, "testsIgnoredCount": 0, "testsPendingCount": 0,
+                  "testsCanceledCount": 0, "suitesCompletedCount": 1, "suitesAbortedCount": 0, "scopesPendingCount": 0
+                },
+                "contents": [{
+                  "kind": "suite",
+                  "name": "CalculatorSuite",
+                  "suiteId": "samples.CalculatorSuite",
+                  "location": <class samples.CalculatorSuite in CalculatorSuite.scala>,
+                  "startedAt": <time>, "endedAt": <time>, "duration": <ms>,
+                  "threadName": <thread>,
+                  "contents": [{
+                    "kind": "test",
+                    "name": "adds two numbers",
+                    "label": "- adds two numbers",
+                    "location": <line 5 of CalculatorSuite.scala>,
+                    "outcome": "succeeded",
+                    "startedAt": <time>, "endedAt": <time>, "duration": <ms>,
+                    "threadName": <thread>,
+                    "contents": []
+                  }]
+                }],
+                "output": [{ "kind": "stdio", "stream": "stdout", "text": "dividing now\\n" }]
+              }]
+            }]
+          }
+          """
+        )
+      }
+    }
+
+    Scenario("A run's config map is written with each value's toString") {
+      Given("CalculatorSuite, and the module's testArgsDefault is -Dgreeting=hello")
+      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
+      withJsonOutputFixture("CalculatorSuite") { tester =>
+        setModuleArguments(tester, Seq("-Dgreeting=hello"))
+        val json = jsonOutputOfTestCommand(tester)
+
+        Then("the run node holds the config map greeting = hello")
+        shouldHold(node(json, "run"), """{ "configMap": { "greeting": "hello" } }""")
+      }
+    }
 
     Scenario("The root's times enclose the module's, the module's enclose the run's, and no test event log records the root's or the module's times") {
       Given("CalculatorSuite, whose test adds two numbers succeeds")
