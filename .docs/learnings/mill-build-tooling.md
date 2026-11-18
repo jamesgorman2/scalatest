@@ -126,5 +126,7 @@ date: 2026-11-18
 ---
 Under Mill's `testForked`, several test classes run in each worker JVM, and the ScalaTest `Tests: succeeded N` and `Suites: completed N` summary lines can repeat a worker's running total after each class (successive lines read 9, 12, 15, 18, 18). Summing those lines over a run gives a total that changes from run to run with no source change (218, then 205, for the same tests).
 
-Count tests from `out/<module>/testForked.dest/test-report.xml`, one `<testcase>` per test case, and never by summing summary lines.
+`out/<module>/testForked.dest/test-report.xml` miscounts too. Some test cases are repeated, and which ones changes from run to run: the same 126 tests gave 132 entries in one run and 134 in the next. Its `classname` attribution also shifts between runs.
+
+Count tests as the distinct `<testcase>` names in that report, and read failures, errors and skips from it. Never sum the summary lines.
 </learning>
