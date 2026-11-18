@@ -135,8 +135,7 @@ object Consolidation {
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
    * @param coloured whether that output is coloured with ANSI escape sequences
    * @param jsonOutput the sink given the JSON output once, when the consolidation ends, to write where it chooses; every
-   *                   other operation on the consolidation waits until the sink returns. With none, no JSON output is
-   *                   made
+   *                   operation but [[state]] waits until the sink returns. With none, no JSON output is made
    * @param moduleSelectors each module selector, in the order given, with the test modules it resolved to
    * @param buildTool the build tool that started the runs, where the caller gives one
    * @param startedAt the root's start time by the caller's clock: when the consolidation started
