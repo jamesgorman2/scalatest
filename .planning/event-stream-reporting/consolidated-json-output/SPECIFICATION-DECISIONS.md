@@ -10,7 +10,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 - Deleting the file only just before the first test starts leaves the previous test command's JSON output in place when a module selector fails to resolve, and an agent reading the file takes it for the output of the test command that just failed.
 - Emptying the file, which `../SPECIFICATION.md` R-077 also allows, leaves an empty file that a reader cannot parse as JSON and may take for a write that failed part-way.
 
-**Reasoning** The file's readers are agents reading the test command that wrote it (`../JSON-LAYOUT.md` § Compatibility). Once the arguments name the file, the file at that path must be either this test command's JSON output or absent, so a file present after a test command is never an earlier one's.
+**Reasoning** The file's readers are agents that started the test command and read its JSON output. Once the arguments name the file, the file at that path must be either this test command's JSON output or absent, so a file present after a test command is never an earlier one's.
 
 **Costs** A mistyped module selector deletes the previous test command's JSON output, though no test then runs.
 

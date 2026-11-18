@@ -1,15 +1,12 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output holds, newest first.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output records, newest first. The JSON output's layout has its own decisions, in `../JSON-LAYOUT-DECISIONS.md`.
 
-## The JSON output is written for agents reading the test command that wrote it, with no format version and no compatibility promise (`../SPECIFICATION.md` R-084).
+## The JSON output's format carries no compatibility promise across releases of this fork (`../SPECIFICATION.md` § Scope).
 
-**Alternatives**
+**Alternatives** Semantic versioning of the format, a patch release never changing it and a minor release only adding to it, binds every later release to additive change for third-party readers the goal does not name.
 
-- Semantic versioning of the format, a patch release never changing it and a minor release only adding to it, binds every later release to additive change for third-party readers the goal does not name.
-- A format version of its own beside the release version records nothing the release version does not, since only a release changes the format.
-
-**Reasoning** The JSON output's readers are agents reading the run they just started, which read the output against the documentation of the release that wrote it. A change between releases therefore costs them nothing, and the root's release version tells them which release's layout applies (`../JSON-LAYOUT.md` § Compatibility).
+**Reasoning** The JSON output's readers are agents that started the test command and read its JSON output. Each agent reads the output against the documentation of the release that wrote it, so a change between releases costs it nothing.
 
 **Costs** A tool that parses the JSON output across releases may break on any release.
 
@@ -17,31 +14,37 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ---
 
-## A node's messages and captured output are one ordered `output`, and its `contents` holds only its children.
+## The JSON output records the release of this fork that wrote it, and has no format version of its own (`../SPECIFICATION.md` R-084).
 
-**Alternatives**
+**Alternatives** A format version of its own beside the release version records nothing the release version does not, since only a release changes the format.
 
-- Placing each message among the node's children in `contents` needs a rule for where a message falls among children that ran concurrently or later, and splits the node's output between two keys.
-- Keeping captured output as `{ "stdout", "stderr" }` loses the order between the two streams, and between captured output and messages, which `../SPECIFICATION.md` R-043 keeps.
+**Reasoning** The release version tells a reader which release's documentation describes the layout, so a second version adds nothing a reader can act on.
 
-**Reasoning** `../SPECIFICATION.md` R-097a makes messages output, and R-043 keeps all output of a node in order whatever its source. One array in the order the output occurred is that order, and leaves `contents` as the tree alone.
-
-**Costs** A reader cannot tell from the JSON output which of a node's children had run when a message was emitted.
+**Costs** A reader that wants to know whether the layout changed between two releases must compare those releases' documentation.
 
 **Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
 
 ---
 
-## A node's duration comes only from its events, and the test command times the root and each module with start and end events of its own (`../SPECIFICATION.md` R-103).
+## The test command times the root and each module.
 
-**Alternatives**
+**Alternatives** Leaving the root and modules untimed gives a reader no time for the test command or for a module, though only the test command can observe either.
 
-- Falling back to the sum of a node's children's durations overstates the time of a node whose children ran concurrently, such as a module with parallel runs, and gives the node a value no event carries.
-- Leaving the root and modules untimed gives a reader no time for the test command or a module, though only the test command can observe them.
+**Reasoning** No run's events record when the test command or a module's tests start and end. The test command alone sees both, so only it can give the root and each module a measured time.
 
-**Reasoning** A duration that no event recorded is a guess a reader cannot tell from a measurement. The test command alone sees when the consolidation and each module's tests start and end, so its own start and end events give the root and each module measured times. Those events are written to no test event log, so nothing a run records changes.
+**Costs** The root and modules have no times when the consolidation library is called by a caller that gives none.
 
-**Costs** A suite or test whose closing event carries no duration, such as an ignored test, has none.
+**Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
+
+---
+
+## A node's duration is measured from that node's own start and end, never derived from its children's (`../SPECIFICATION.md` R-103).
+
+**Alternatives** Falling back to the sum of a node's children's durations overstates the time of a node whose children ran concurrently, such as a module with parallel runs, and gives the node a value nothing measured.
+
+**Reasoning** A duration that nothing measured is a guess a reader cannot tell from a measurement.
+
+**Costs** A node whose start or end was not measured, such as an ignored test, has no duration.
 
 **Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
 
@@ -122,17 +125,5 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 **Costs** CI tools that read only JUnit XML get nothing from the consolidation.
 
 **Settled by** [Is consolidated JUnit XML in scope?](https://github.com/jamesgorman2/scalatest/issues/34).
-
----
-
-## Each JSON node holds its final state, with nothing per event.
-
-**Alternatives** Writing each node's events with every field, as ScalaTest 3.2.20's JSON lines do, repeats each event's suite name, suite ID and suite class name, and carries ordinals, formatters and rerunners, which only restate the order the tree already gives or have no meaning outside the run that wrote them.
-
-**Reasoning** Every reader of the JSON output, an agent reading the test command that wrote it, needs a node's state and its place, and the tree gives the place. One record per node, with one key per value, gives that state without the reader replaying events, and keeps the output small enough for an agent to read whole.
-
-**Costs** The JSON output does not hold every field of every event, and a tool that reads only the JSON cannot recover the order of events across nodes.
-
-**Settled by** [How is a run's test structure laid out as JSON?](https://github.com/jamesgorman2/scalatest/issues/19).
 
 ---

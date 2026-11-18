@@ -2,13 +2,9 @@
 
 ## Summary
 
-This document fixes the layout of the consolidated JSON output that `SPECIFICATION.md` R-028 requires: how the object is encoded, the tree it holds, and every key of the root, a module, a run node, a suite, scope or test, a message, a piece of captured output, a throwable and a location, with what each means and when it is absent. Its readers are agents reading the test command that wrote it (§ Compatibility). § Not yet fixed lists the parts of the object whose keys this document does not yet name, and the statements of this document that later features settle against `SPECIFICATION.md`.
+This document fixes the layout of the consolidated JSON output that `SPECIFICATION.md` R-028 requires: how the object is encoded, the tree it holds, and every key of the root, a module, a run node, a suite, scope or test, a message, a piece of captured output, a throwable and a location, with what each means and when it is absent. § Not yet fixed lists the parts of the object whose keys this document does not yet name. The decisions behind this layout are in [JSON-LAYOUT-DECISIONS.md](JSON-LAYOUT-DECISIONS.md).
 
 Terms are defined in `.docs/ubiquitous-language.md`. R-numbers are those of `SPECIFICATION.md`.
-
-## Compatibility
-
-The JSON output is written for agents reading the test command that wrote it. The format has no version of its own and no compatibility promise: any release of this fork may change it. The root records the release of this fork that wrote it (R-084), so a reader can tell which release's layout applies.
 
 ## Encoding
 
@@ -16,13 +12,13 @@ The JSON output is written for agents reading the test command that wrote it. Th
 - The object is JSON text as RFC 8259 defines it (https://www.rfc-editor.org/rfc/rfc8259), and the JSON file is encoded in UTF-8.
 - An absent value omits its key; `null` is never written. An empty string is written `""`.
 - Keys are written in the order this document lists them.
-- `startedAt`, `endedAt` and a message's `at` are the supplying event's `timeStamp`, in epoch milliseconds. `duration` is in milliseconds.
+- `startedAt`, `endedAt` and a message's `at` are in epoch milliseconds. `duration` is in milliseconds.
 - Strings escape `"`, `\` and control characters. An unpaired UTF-16 surrogate, which a Java string can contain and UTF-8 cannot encode, is written as a `\uXXXX` escape (RFC 8259 § 8.2, https://www.rfc-editor.org/rfc/rfc8259#section-8.2).
 
 ## Tree
 
 - The root is the consolidated test command (R-096a). The root's children are its modules, in ascending order by name.
-- A run in a forked JVM is a run node (§ Run nodes), which is a child of the run's module (R-096a). The run node holds the run's own state and contains the run's top-level suites.
+- A run in a forked JVM is a run node (§ Run nodes), which is a child of the run's module (R-096a).
 - Any other run has no node and is written as part of its module (R-135). The top-level suites of a run that has no node are children of the run's module. The module records the state that a run node would record for that run (§ Run nodes).
 - A suite scheduled to run that has no events is written once, as a child of its module and inside no run node, aborted with reason *not run* (R-095a; § Nodes).
 - A module's children are its run nodes, the top-level suites of a run that has no node, and the suites scheduled to run that have no events.
@@ -44,19 +40,19 @@ The root's keys, in order: `kind`, `scalaTestVersion`, `buildTool`, `moduleSelec
 - `moduleSelectors` — always present, `[]` when empty: each module selector, in the order given, as `{ "selector", "modules" }`, where `selector` is the module selector as given and `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, only where a failure is attached to the root (R-072, R-098f).
 - `failures` — each failure attached to the root, in the order attached, as `{ "message" }`. Absent where none is attached.
-- `startedAt`, `endedAt` — those of the root's start and end events. The test command creates these events from its own clock: the start event when it begins consolidating, and the end event once every run has ended. No test event log holds them. Each is absent where the caller gives no such event.
+- `startedAt`, `endedAt` — the root's start time and end time, which the consolidation library's caller gives. Each is absent where the caller gives none.
 - `duration` — `endedAt - startedAt`, absent unless both are present.
 - `contents` — always present, `[]` when empty: the modules (§ Tree).
-- `output` — the output captured against the root (R-072, R-087), in the form § Captured output gives.
+- `output` — the output captured against the root (R-072, R-087), in the form § Captured output gives. Absent where nothing is captured against the root.
 
 A module's keys, in order: `kind`, `name`, `startedAt`, `endedAt`, `duration`, `contents`, `output`.
 
 - `kind` — `module`.
 - `name` — the module's name, its Mill module path such as `core.test` under the consolidated test command.
-- `startedAt`, `endedAt` — those of the module's start and end events. The test command creates these events from its own clock: the start event when it starts the module's tests, and the end event once the module's last run has ended. No test event log holds them. Each is absent where the caller gives no such event.
+- `startedAt`, `endedAt` — the module's start time and end time, which the consolidation library's caller gives. Each is absent where the caller gives none.
 - `duration` — `endedAt - startedAt`, absent unless both are present.
 - `contents` — always present, `[]` when empty: the module's children (§ Tree).
-- `output` — the output captured against the module (R-076, R-087), in the form § Captured output gives.
+- `output` — the output captured against the module (R-076, R-087), in the form § Captured output gives. Absent where nothing is captured against the module.
 
 ## Nodes
 
@@ -83,7 +79,10 @@ A suite's, scope's or test's keys, in order: `kind`, `name`, `label`, `suiteId`,
 - `endedAt` — the closing event's. For a node aborted without a closing event of its own, that of the `SuiteAborted` or `RunAborted` that aborted it, and absent where there is none.
 - `duration` — for a suite or test, its closing event's, absent where that event carries none, as `TestIgnored` never does. For a scope, and for a node aborted without a closing event of its own, `endedAt - startedAt`, absent unless both are present.
 - `threadName` — suites and tests only: the opening event's, else the closing event's.
-- `contents` — always present, `[]` when empty: the node's children, and nothing else. A node's children appear in declared order where it is known, and in ascending alphanumeric order by label where it is not; children with identical labels, such as the nodes of a suite, scope or test that ran more than once in one parent, appear in the order they started (R-105). A suite's children are the suites it nests or ran, and its scopes and tests; a scope's are its scopes and tests, and a test's the suites it ran. Each child states its own `kind`.
+- `contents` — always present, `[]` when empty: the node's children, and nothing else (R-105).
+  - Children whose place in the node's declaration is known appear first, in declared order.
+  - The remaining children are suites. They follow in ascending order by name, compared as § Tree compares names.
+  - Children that share a declared place or a name, such as the nodes of a suite, scope or test that ran more than once in one parent, appear in the order they started, followed by those that never started. A suite's children are the suites it nests or ran, and its scopes and tests; a scope's are its scopes and tests, and a test's the suites it ran. Each child states its own `kind`.
 - `output` — the node's messages (§ Messages) and the output captured against it (§ Captured output), in one sequence. Absent where the node has neither.
 
 A suite scheduled to run that has no events (R-095a) has `kind` `suite`, `outcome` `aborted`, `reason` `notRun` and `contents` `[]`. For class `p.B`, the suite's `suiteId` and `location.className` are `p.B`. The suite has no times, `threadName`, `message`, `throwable` or `output`.
@@ -126,7 +125,7 @@ ScalaTest's `Location`s fold into it:
 
 ## Captured output
 
-A node's `output` holds its messages and the output captured against it in one sequence, in the order they occurred (R-043, R-097a). A piece of captured output is an item with the keys `kind`, `stream`, `text`:
+Items of an `output` appear in the order they occurred (R-043, R-097a). A piece of captured output is an item with the keys `kind`, `stream`, `text`:
 
 - `kind` — `stdio`.
 - `stream` — `stdout` or `stderr`; absent where the stream is not known.
@@ -142,13 +141,13 @@ What an `output` holds:
 
 ## Run nodes
 
-A run node records one run's own state, including how the run ended (R-074a), and contains the run's top-level suites. Every run in a forked JVM has a run node (§ Tree), including a run with no suites and a run given no task. A run node has no `name`, `label`, `suiteId`, `location` or `threadName` key. A run node's keys, in order: `kind`, `number`, `testCount`, `configMap`, `discovery`, `outcome`, `reason`, `message`, `throwable`, `startedAt`, `endedAt`, `duration`, `summary`, `contents`, `output`.
+A run node records one run's own state, including how the run ended (R-074a). Every run in a forked JVM has a run node (§ Tree), including a run with no suites and a run given no task. A run node has no `name`, `label`, `suiteId`, `location` or `threadName` key. A run node's keys, in order: `kind`, `number`, `testCount`, `configMap`, `discovery`, `outcome`, `reason`, `message`, `throwable`, `startedAt`, `endedAt`, `duration`, `summary`, `contents`, `output`.
 
 No suite names its run. A suite in a run node belongs to that node's run. A top-level suite that has events and is a child of a module belongs to that module's run that has no node.
 
 - `kind` — `run`.
 - `number` — the run's identifier, unique within its module: the module's runs are numbered from 1 in the order they are added to the consolidation. Always present.
-- `testCount` — the expected test count the run reported in its `RunStarting`; absent unless the run reported one. A run under a build tool's `Framework` reports none: its `RunStarting` carries 0 in place of a count (`research/emission-gap-analysis.md` § 9).
+- `testCount` — the expected test count of the run's `RunStarting`; absent where that count is 0, as it is under a build tool's `Framework`.
 - `configMap` — `RunStarting`'s config map, as an object of each value's `toString`.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s `timeStamp` and `DiscoveryCompleted`'s `duration`; absent unless the run reported them.
 - `outcome` — `aborted` or `stopped`; absent where the run completed (R-098d).
@@ -162,20 +161,12 @@ No suite names its run. A suite in a run node belongs to that node's run. A top-
 
 A key is absent where the run never reported the event that supplies it, as when the runner sends no run events or the run does not finish before sending them.
 
-For a run that has no node, the run's module records the state this section gives a run node, and the module's children include the run's top-level suites (§ Tree).
-
 ## Not yet fixed
 
 This document states what the following contain; it does not yet name their keys or fix their form:
 
 - the root: whether the build tool's running version is a supported Mill release (R-093);
 - a module: its outcome and failure where the module has an error (R-098e), and the state of a run that has no node (R-135);
-- a process that ended before any run existed, and its output (R-076);
+- a process that ended before any run existed: how its module records the process, beyond the output § Tree writes on the module (R-076);
 - where a module's run nodes appear among the module's children, and the order of those run nodes;
 - whether the `name` of a suite scheduled to run that has no events is its simple or its fully qualified class name (R-095a).
-
-The features that own the following settle them, where this document differs from `SPECIFICATION.md` or goes beyond it (`ROADMAP.md`):
-
-- a module's outcome reasons, *not run* and *could not start*, under `--halt-on-failure`: R-098e gives a module an outcome only where the module has an error;
-- how a module tells the outcome of a run that has no node from the module's own outcome (R-098d, R-098e);
-- whether a suite that has no events, and that a run was to execute, is written inside that run's node (R-101, R-136): § Tree writes every such suite as a child of its module.

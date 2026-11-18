@@ -15,7 +15,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the deployable units, the boundaries between the emitter, the Mill plugin and the consolidation library, and how each run's events reach the consolidated output.
 - [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md) — the decisions behind the architecture.
-- [JSON-LAYOUT.md](JSON-LAYOUT.md) — the layout of the JSON output.
+- [JSON-LAYOUT.md](JSON-LAYOUT.md) — the layout of the JSON output, with its decisions in [JSON-LAYOUT-DECISIONS.md](JSON-LAYOUT-DECISIONS.md).
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
@@ -31,9 +31,7 @@ The emitter, the consolidation library and the Mill plugin cover runs on the JVM
 
 The Mill plugin runs on Mill 1.x releases no older than the one it is built against; older releases and other Mill major versions are out of scope. Every release of the Mill plugin is a release of this fork. Each release of the Mill plugin lists the Mill releases on which its integration tests passed. Each release of the Mill plugin supports exactly the Mill releases it lists, its *supported Mill releases*.
 
-A test event log's format, the consolidation library's API and the switch by which the Mill plugin turns the emitter on carry no compatibility promise across releases of this fork: any release may change them, and no caller outside this fork may rely on them. Within one release of this fork, the consolidation library reads every test event log that the release's emitter writes.
-
-The JSON output is written for agents reading the test command that wrote it. Its format has no version of its own and carries no compatibility promise across releases of this fork: any release may change it.
+A test event log's format, the consolidation library's API, the switch by which the Mill plugin turns the emitter on, and the JSON output's format carry no compatibility promise across releases of this fork: any release may change them. No caller outside this fork may rely on the first three. The JSON output's format has no version of its own. Within one release of this fork, the consolidation library reads every test event log that the release's emitter writes.
 
 ### Out of scope
 
@@ -79,7 +77,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 
 - R-063 Neither the emitter nor the consolidation plugin change their output based on any ScalaTest reporter configuration.
 - R-011 The test event log and consolidation plugin write captured values verbatim
-- R-074a The consolidated JSON output shows all completion states for each run.
+- R-074a The consolidated JSON output shows each run's completion state, whether successful or not.
 - R-074b The consolidated human-readable output shows only unsuccessful completion states for each run.
 
 ## Test structure
@@ -121,7 +119,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-098f A root has an outcome only when the consolidated test command has an error. 
 - R-095a Any suite scheduled to be run, or any suite, scope or test that is recorded in a structure event, and has no subsequent test events is reported as aborted with reason *not run*.
 - R-095b Any node recorded with a start event but no end event is reported as aborted.
-- R-103 A node's duration is the one its events record, and a node whose events record none has no duration.
+- R-103 A node's duration is measured from that node's own start and end, and a node whose start or end was not measured has no duration.
 
 ## The consolidation library
 
@@ -217,7 +215,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 ### JSON output
 
-- R-028 JSON output encodes the entire node tree, per `JSON-LAYOUT.md`.
+- R-028 JSON output encodes the node tree, per `JSON-LAYOUT.md`.
 - R-084 The JSON output records the release of this fork that wrote it.
 - R-127c JSON output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes. 
 - R-127d JSON output omits a scope when all its children have been omitted by filtering characters. This is recursive.

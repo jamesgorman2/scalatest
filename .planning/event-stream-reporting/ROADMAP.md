@@ -58,7 +58,7 @@ The test command takes several module selectors, resolves each to its test modul
 Enables:
 
 - `SPECIFICATION.md` R-055 (several module selectors), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
-- `JSON-LAYOUT.md` § Not yet fixed (the root: each module selector with its modules)
+- `JSON-LAYOUT.md` § Root and modules (`moduleSelectors` with several module selectors; several modules)
 - `ARCHITECTURE.md` § Modules § Mill plugin (Test command: resolves the module selectors), § APIs § The Mill plugin and the consolidation library (Start: module selectors; Add a module whose tests did not start), § Data flow (one nested evaluation with fail-fast off)
 
 Settles:
@@ -103,6 +103,10 @@ Enables:
 - `SPECIFICATION.md` R-055 (`--halt-on-failure`), R-056a (its exception under `--halt-on-failure`)
 - `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Add a module whose tests did not start: *not run*; Read the consolidation state: *open, failed* before each module starts), § Data flow (`--halt-on-failure` withholds modules not yet started)
 
+Settles:
+
+- Whether a module whose tests `--halt-on-failure` withheld, or whose tests could not start, has an outcome reason such as *not run* or *could not start* (R-098e gives a module an outcome only where the module has an error).
+
 Risks:
 
 - `decisions/test-command.md` "`--halt-on-failure` opts into starting no further selected module's tests…" (Costs: timing decides which modules report) and "A selected test module whose tests cannot start counts as a failure…" (Costs)
@@ -126,6 +130,7 @@ Enables:
 
 Settles:
 
+- Whether a suite that has no events, and that a run was to execute, is written inside that run's node (R-101, R-136; `JSON-LAYOUT.md` § Tree writes every such suite as a child of its module).
 - The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-095b aborts them and states no reason; R-102 gives the run *process failed*, and R-095a gives registered suites, scopes and tests that have no events *not run*).
 
 Risks:
@@ -202,6 +207,7 @@ Enables:
 
 Settles:
 
+- How a module records the state of a run that has no node, and tells that run's outcome from the module's own (R-135, R-098d, R-098e).
 - How the test command meets R-044 under Mill's own test task run with the plugin's `TaskCtx`, on Scala.js and, in feature 13, Native (`ARCHITECTURE.md` is silent; `research/native-stdio-wrapper.md` § 4 records Mill's own results line).
 - The C toolchain that cross-compiles the Windows launcher (`decisions/architecture-library-and-modules.md` "The Mill plugin is built by its own Mill build in this repo." Costs).
 - The names of each launcher's file pair in the launcher folder.

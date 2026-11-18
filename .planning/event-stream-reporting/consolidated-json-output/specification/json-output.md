@@ -1,18 +1,21 @@
 # Consolidated JSON output: what the JSON output holds
 
-This document contains the acceptance criteria for what the JSON output holds: the root, module and run; suites, scopes and tests, and their order; messages and captured output; throwables; encoding; the consolidation library without Mill; and the format's documentation. It is part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria defines the terms and notation these criteria use.
+This document contains the acceptance criteria for what the JSON output holds: the root, module and run; suites, scopes and tests, and their order; messages and captured output; throwables; encoding; the consolidation library without Mill; and the format's documentation. It is part of [../SPECIFICATION.md](../SPECIFICATION.md). `R-nnn` IDs in its coverage tables are those of `../../SPECIFICATION.md`.
 
 ## The root, the module and the run
 
 ```gherkin
 Feature: The root, the module and the run in the JSON output
-  `<report>` is an absolute path, in a folder that exists, at which nothing exists.
+  The test command is `mill scalatest/test`, run in the build's workspace root. The console is what the `mill` command writes to its stdout and stderr, and the human-readable output is the consolidated human-readable output the test command writes there.
+  `<report>` is an absolute path, in a folder that exists, at which nothing exists. The JSON output is the JSON value parsed from the file at `<report>`.
+  A JSON value given in full has exactly the keys written, in that order. A JSON object that holds keys has those keys with those values, in that order, and may have others. A node named by its `kind` and `name` is the one such node in the JSON output.
+  The run's test event log is the test event log the module's one worker writes.
   In a JSON value, each placeholder stands for one whole value: `<time>` any integer, `<ms>` any non-negative integer, `<thread>` any string, `<release>` the version string of the release of this fork under test, `<mill>` the version string of the Mill release running the test command.
   `<line n of F>` is a location object holding `lineNumber` n and either `filePath`, a path whose last segment is F, or `fileName` F, and no other key. `<class C in F>` is a location object holding `className` C and either such a `filePath` or `fileName` F, and no other key.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
     And suite `CalculatorSuite`, class `samples.CalculatorSuite` in `CalculatorSuite.scala`, an `AnyFunSuite` whose one test, `adds two numbers`, registered at line 5, writes `dividing now` followed by `\n` to stdout with `print` and succeeds
     And nothing else in the run writes to stdout or stderr or sends a message
@@ -65,7 +68,7 @@ Feature: The root, the module and the run in the JSON output
         }
         """
 
-  Rule: The test command times the root and the module by its own clock, around the run, and no test event log holds those times
+  Rule: The root's times enclose the module's, the module's enclose the run's, and no test event log records the root's or the module's times
     Scenario: AC-012 The root's, module's and run's times
       When the test command is invoked as `mill scalatest/test core.test -fJ <report>`
       Then in the JSON output the root's `startedAt` is no later than the module's, and the module's is no later than the run's
@@ -86,14 +89,13 @@ Feature: The root, the module and the run in the JSON output
 
   Rule: A run's config map is written with each value's `toString`
     Scenario: AC-014 A config map entry
-      Given the module's own ScalaTest arguments are `-Dgreeting=hello`
+      Given the module's `testArgsDefault` is `Seq("-Dgreeting=hello")`
       When the test command is invoked as `mill scalatest/test core.test -fJ <report>`
       Then the run node of the JSON output holds `"configMap": { "greeting": "hello" }`
 ```
 
 | Requirement | Criteria               |
 |-------------|------------------------|
-| R-028       | AC-011                 |
 | R-084       | AC-011                 |
 | R-096a      | AC-011                 |
 | R-104       | AC-011                 |
@@ -102,12 +104,17 @@ Feature: The root, the module and the run in the JSON output
 | R-097a      | AC-011                 |
 | R-097b      | AC-011                 |
 | R-103       | AC-011, AC-012         |
-| R-055       | AC-013                 |
+| R-028       | AC-011, AC-013         |
 | R-011       | AC-014                 |
 
 ## Suites, scopes and tests
 
-Each row is a criterion. Its module, under the Background of the Feature above, holds instead of `CalculatorSuite` the one suite `RowSuite`, class `samples.RowSuite` in `RowSuite.scala`, written as the row gives, and any suite the row names besides. The test command is invoked as `mill scalatest/test core.test -fJ <report>`. The JSON output then holds the row's values. A node named in the row is the one node of that `kind` and `name` in the JSON output.
+Each row is a criterion. Its build is the build of the Background of Feature "The root, the module and the run in the JSON output", with that Feature's terms and placeholders, and with two differences:
+
+- In place of `CalculatorSuite`, the module holds the one suite `RowSuite`, class `samples.RowSuite` in `RowSuite.scala`, written as the row gives, and any suite the row names besides.
+- Nothing in the run writes to stdout or stderr or sends a message, except as the row gives.
+
+The test command is invoked as `mill scalatest/test core.test -fJ <report>`. The JSON output then holds the row's values. A node named in the row is the one node of that `kind` and `name` in the JSON output. `<frames>` is a non-empty array of stack frames.
 
 | ID     | `RowSuite`                                                                                                                                                                          | The JSON output holds                                                                                                                                                                                                                                                                         |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -150,24 +157,29 @@ Each row is a criterion. Its module, under the Background of the Feature above, 
 
 ```gherkin
 Feature: The JSON output and the human-readable output hold one node tree
-  `<report>` is an absolute path, in a folder that exists, at which nothing exists.
+  The test command is `mill scalatest/test`, run in the build's workspace root. The console is what the `mill` command writes to its stdout and stderr, and the human-readable output is the consolidated human-readable output the test command writes there.
+  `<report>` is an absolute path, in a folder that exists, at which nothing exists. The JSON output is the JSON value parsed from the file at `<report>`.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
-    And suites of the module, between them, hold nested suites, scopes nested in scopes, a pending scope, tests that succeed, fail, are cancelled, are ignored and are pending, and a suite annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` with a scope, whose scopes and tests two instances of the suite register
+    And suites of the module, between them, hold nested suites, scopes nested in scopes, a pending scope, and tests that succeed, fail, are cancelled, are ignored and are pending
+    And one suite of the module is annotated `@WrapWith(classOf[ConfigMapWrapperSuite])` and holds a scope, whose tests are registered by two instances of the suite
     And no suite aborts
 
   Rule: Each suite, scope and test of the JSON output is a line of the human-readable output, in the same order
     Scenario: AC-031 Walking both outputs
       When the test command is invoked as `mill scalatest/test core.test -fJ <report>`
-      Then visiting the suites, scopes and tests of the JSON output depth-first, each node before its `contents` in order, gives each suite's `name` and each scope's and test's `label` and `outcome` in the order the human-readable output prints the lines for those suites, scopes and tests
+      Then the human-readable output holds one line for each suite, scope and test of the JSON output, in the order of a depth-first visit of the JSON output that takes each node before its `contents`
+      And each suite's line is its `name` followed by `:`, after the line's indentation
+      And each scope's and test's line starts with its `label`, after the line's indentation
+      And a line holds `*** FAILED ***`, `!!! CANCELED !!!`, `!!! IGNORED !!!` or `(pending)` where its node's `outcome` is `failed`, `canceled`, `ignored` or `pending` respectively, and the line of a node with no `outcome` or with `"outcome": "succeeded"` holds none of them
 
   Rule: The module's own ScalaTest reporter arguments do not change the JSON output
     Scenario: AC-032 Reporter arguments on the module
       Given the JSON output of the test command invoked as `mill scalatest/test core.test -fJ <report>`
-      When the module's own ScalaTest arguments are set to `-oDW` and the test command is invoked again the same way
+      When the module's `testArgsDefault` is set to `Seq("-oDW")` and the test command is invoked again the same way
       Then the JSON output is the same, apart from the values of `startedAt`, `endedAt`, `duration`, `at` and `threadName`
 ```
 
@@ -182,8 +194,10 @@ Feature: The JSON output and the human-readable output hold one node tree
 
 ```gherkin
 Feature: Runs and the root fed directly to the consolidation library
-  A run fed directly to the library is given to the consolidation library without Mill, as the events of its test event log in the order listed and the lines captured from its process, under module `core.test`, with module selector `core.test` resolving to `core.test`, no build tool, and no start or end events for the root or the module.
+  The consolidation library is started without Mill, with module selector `core.test` resolving to module `core.test`, no build tool, and no start or end time for the root or the module. The JSON output is the JSON value the library writes.
+  A run fed directly to the library is given to the library under module `core.test`, as the events of the run's test event log in the order listed and as the lines captured from the run's process, each with its line terminator.
   `runStarted`, `structure` and `runEnded` are the events this fork adds to a test event log; every other event is named by its `org.scalatest.events` class.
+  A JSON value given in full has exactly the keys written, in that order. A JSON object that holds keys has those keys with those values, in that order, and may have others. A node named by its `kind` and `name` is the one such node in the JSON output.
   In a JSON value, `<time>` is any integer, `<ms>` any non-negative integer and `<thread>` any string, each standing for one whole value.
 
   Rule: A run node records how the run ended
@@ -219,14 +233,21 @@ Feature: Runs and the root fed directly to the consolidation library
       Then suite `S` holds `"outcome": "aborted"` and `"message": "boom"`
       And test `t` holds `"outcome": "aborted"`, a `startedAt`, the `SuiteAborted`'s time as its `endedAt`, and a `duration` equal to its `endedAt` less its `startedAt`, with no `message`
 
+  Rule: A scope open when its suite aborts is aborted
+    Scenario: AC-043 A suite aborts inside a scope
+      Given a run fed directly to the library whose events are `runStarted`, `RunStarting`, a `structure` of suite `S`, class `samples.S`, holding scope `A` labelled `A`, which holds test `t` labelled `- t`, then `SuiteStarting` of `S`, `ScopeOpened` of `A`, `SuiteAborted` of `S` with message `boom`, `RunCompleted` and `runEnded` marking the run completed
+      When the library writes the JSON output
+      Then scope `A` holds `"outcome": "aborted"`, with no `message`
+
   Rule: Output and failures attached to the root are written on the root
     Scenario: AC-036 Discovery fails
-      Given a consolidation started directly, without Mill, to which the line `discovering\n` captured from stderr and the failure `Discovery failed` are attached for the root
+      Given the library is fed no run
+      And the library is given, as output and a failure of the root, the line `discovering\n` captured from stderr and the failure `Discovery failed`
       When the library writes the JSON output
       Then the root holds, in order, `"outcome": "aborted"`, `"failures": [{ "message": "Discovery failed" }]` and `"output": [{ "kind": "stdio", "stream": "stderr", "text": "discovering\n" }]`
 
   Rule: The root has a build tool and times only where the library's caller gives them
-    Scenario: AC-037 No build tool and no root or module events
+    Scenario: AC-037 No build tool and no root or module times
       Given a run fed directly to the library whose events are `runStarted`, `RunStarting`, `RunCompleted` and `runEnded` marking the run completed
       When the library writes the JSON output
       Then the root has no `buildTool`, `startedAt`, `endedAt` or `duration` key
@@ -240,7 +261,8 @@ Feature: Runs and the root fed directly to the consolidation library
 | R-043       | AC-034         |
 | R-011       | AC-034         |
 | R-097a      | AC-034, AC-036 |
-| R-095b      | AC-035         |
+| R-095b      | AC-035, AC-043 |
+| R-098b      | AC-043         |
 | R-103       | AC-035, AC-037 |
 | R-098f      | AC-036         |
 
@@ -248,19 +270,23 @@ Feature: Runs and the root fed directly to the consolidation library
 
 ```gherkin
 Feature: The same JSON output with and without Mill
-  `<report>` is an absolute path, in a folder that exists, at which nothing exists.
+  The test command is `mill scalatest/test`, run in the build's workspace root. The console is what the `mill` command writes to its stdout and stderr, and the human-readable output is the consolidated human-readable output the test command writes there.
+  `<report>` is an absolute path, in a folder that exists, at which nothing exists. The JSON output is the JSON value parsed from the file at `<report>`.
+  The run's test event log is the test event log the module's one worker writes. Feeding it directly to the consolidation library means giving the library, without Mill, the log's events in order and the lines captured from the run's process, each with its line terminator.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
     And suite `CalculatorSuite`, class `samples.CalculatorSuite`, an `AnyFunSuite` whose one test, `adds two numbers`, writes `dividing now` followed by `\n` to stdout with `print` and succeeds
 
   Rule: Given the same run and inputs, the library writes the same JSON output without Mill as under the test command
     Scenario: AC-038 Replaying the run
       Given the test command was invoked as `mill scalatest/test core.test -fJ <report>`
-      When the run's test event log is fed directly to the consolidation library, without Mill, with the `text` of each item of the run node's `output` in the file at `<report>` as a line captured from that item's `stream`, module `core.test`, module selector `core.test` resolving to `core.test`, build tool `Mill` at the version the file's `buildTool` gives, and start and end events for the root and the module at the times the file gives them
-      Then the library's JSON output is the JSON output in the file at `<report>`
+      When the run's test event log is fed directly to the consolidation library under module `core.test`, with module selector `core.test` resolving to `core.test`, and with build tool `Mill` at the version the JSON output's `buildTool` gives
+      And the `text` of each `stdio` item of the `output` of the JSON output's run node is fed as a line captured from that item's `stream`
+      And the library is given the root's and the module's start and end times as the JSON output gives them
+      Then the JSON value the library writes is the JSON output
 ```
 
 | Requirement | Criteria |
@@ -271,19 +297,20 @@ Feature: The same JSON output with and without Mill
 
 ```gherkin
 Feature: Encoding of the JSON output
-  `<report>` is an absolute path, in a folder that exists, at which nothing exists.
+  The test command is `mill scalatest/test`, run in the build's workspace root. The console is what the `mill` command writes to its stdout and stderr, and the human-readable output is the consolidated human-readable output the test command writes there.
+  `<report>` is an absolute path, in a folder that exists, at which nothing exists. The JSON output is the JSON value parsed from the file at `<report>`.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
 
   Rule: Text is written verbatim, as UTF-8 JSON, with a lone surrogate escaped
     Scenario: AC-039 A message holding characters JSON must escape
       Given suite `EscapeSuite`, class `samples.EscapeSuite`, an `AnyFunSuite` whose test `escapes` calls `info` with the Java string `"tab\t quote\" slash\\ bell\u0007 é 😀 lone\uD800 end"`
       When the test command is invoked as `mill scalatest/test core.test -fJ <report>`
-      Then the file at `<report>` is valid UTF-8 and holds no `null`
-      And the file writes the lone surrogate as the escape `\uD800`, in either case
+      Then the file at `<report>` is valid UTF-8 and holds no JSON `null` value
+      And the file holds the lone surrogate as the escape `\uD800` or `\ud800`
       And the `message` of test `escapes`'s one `output` item, decoded as JSON text into UTF-16, is that Java string
 ```
 

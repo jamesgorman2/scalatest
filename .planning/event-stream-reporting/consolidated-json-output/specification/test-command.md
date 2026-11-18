@@ -1,16 +1,19 @@
 # Consolidated JSON output: the test command
 
-This document contains the acceptance criteria for the `-fJ` argument: which output arguments the test command accepts and rejects, when it deletes and writes the file, and its result. It is part of [../SPECIFICATION.md](../SPECIFICATION.md), whose § Acceptance criteria defines the terms and notation these criteria use.
+This document contains the acceptance criteria for the `-fJ` argument: which output arguments the test command accepts and rejects, when it deletes and writes the file, and its result. It is part of [../SPECIFICATION.md](../SPECIFICATION.md). `R-nnn` IDs in its coverage tables are those of `../../SPECIFICATION.md`.
 
 ## Accepted arguments
 
 ```gherkin
 Feature: The `-fJ` argument
+  The test command is `mill scalatest/test`, run in the build's workspace root, the folder holding its `build.mill`, unless a scenario says otherwise.
+  The console is what the `mill` command writes to its stdout and stderr. The human-readable output is the consolidated human-readable output the test command writes there.
   `<report>` and `<other>` are absolute paths, each in a folder that exists, at which nothing exists unless a scenario says otherwise.
+  The JSON output is the JSON value parsed from the file at `<report>`. A JSON object that holds keys has those keys with those values, in that order, and may have others.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
     And suite `CalculatorSuite`, class `samples.CalculatorSuite`, an `AnyFunSuite` whose one test, `adds two numbers`, labelled `- adds two numbers`, writes the line `dividing now` to stdout and succeeds
 
@@ -44,7 +47,7 @@ Feature: The `-fJ` argument
     Scenario: AC-004 A test that looks for the file while it runs
       Given the file at `<report>` holds the text `left over`
       And suite `ProbeSuite`, class `samples.ProbeSuite`, an `AnyFunSuite` whose one test, `finds no report`, succeeds only where nothing exists at the path its config map gives under `report`
-      And the module's own ScalaTest arguments are `-Dreport=<report>`
+      And the module's `testArgsDefault` is `Seq("-Dreport=<report>")`
       When the test command is invoked as `mill scalatest/test core.test -fJ <report>`
       Then the JSON output in the file at `<report>` holds a test node named `finds no report` whose `outcome` is `succeeded`
 
@@ -69,34 +72,36 @@ Feature: The `-fJ` argument
 
 ```gherkin
 Feature: Output arguments the test command rejects
+  The test command is `mill scalatest/test`, run in the build's workspace root, the folder holding its `build.mill`, unless a scenario says otherwise.
+  The console is what the `mill` command writes to its stdout and stderr. The human-readable output is the consolidated human-readable output the test command writes there.
   `<report>` and `<other>` are absolute paths, each in a folder that exists, at which nothing exists unless a scenario says otherwise.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
     And suite `CalculatorSuite`, class `samples.CalculatorSuite`, an `AnyFunSuite` whose one test, `adds two numbers`, labelled `- adds two numbers`, writes the line `dividing now` to stdout and succeeds
     And the file at `<report>` holds the text `left over`
 
   Rule: An `-f` other than one `-fJ` followed by a path, or an `-o` other than `-oH` or a bare `-o`, fails the test command before any test starts, and leaves every file untouched
     Scenario Outline: AC-006 <arguments>
-      When the test command is invoked as `mill scalatest/test core.test <arguments>`, which hold <what>
+      When the test command is invoked as `mill scalatest/test core.test <arguments>`
       Then the test command fails before any test starts, and its failure names `<rejected>`
       And the console holds no line of human-readable output
       And the file at `<report>` holds the text `left over`
       And nothing exists at `<other>`
 
       Examples:
-        | arguments                       | rejected | what                                          |
-        | `-fH <report>`                  | `-fH`    | an output letter other than `J`               |
-        | `-fP <report>`                  | `-fP`    | an output letter other than `J`               |
-        | `-fHP <report>`                 | `-fHP`   | output letters other than `J`                 |
-        | `-fJH <report>`                 | `-fJH`   | an output letter other than `J`, beside `J`   |
-        | `-fJc <report>`                 | `-fJc`   | a lowercase character                         |
-        | `-f <report>`                   | `-f`     | no output letter                              |
-        | `-fJ <report> -fJ <other>`      | `-fJ`    | a second `-f`                                 |
-        | `-oJ -fJ <other>`               | `-oJ`    | an `-o` output letter other than `H`          |
-        | `-oP -fJ <other>`               | `-oP`    | an `-o` output letter other than `H`          |
+        | arguments                  | rejected |
+        | `-fH <report>`             | `-fH`    |
+        | `-fP <report>`             | `-fP`    |
+        | `-fHP <report>`            | `-fHP`   |
+        | `-fJH <report>`            | `-fJH`   |
+        | `-fJc <report>`            | `-fJc`   |
+        | `-f <report>`              | `-f`     |
+        | `-fJ <report> -fJ <other>` | `-fJ`    |
+        | `-oJ -fJ <other>`          | `-oJ`    |
+        | `-oP -fJ <other>`          | `-oP`    |
 
     Scenario: AC-007 `-fJ` with nothing after it
       When the test command is invoked as `mill scalatest/test core.test -fJ`
@@ -114,11 +119,13 @@ Feature: Output arguments the test command rejects
 
 ```gherkin
 Feature: Deleting and writing the `-fJ` file
+  The test command is `mill scalatest/test`, run in the build's workspace root, the folder holding its `build.mill`, unless a scenario says otherwise.
+  The console is what the `mill` command writes to its stdout and stderr. The human-readable output is the consolidated human-readable output the test command writes there.
   `<report>` is an absolute path, in a folder that exists, at which nothing exists unless a scenario says otherwise.
 
   Background:
     Given a build whose JVM test module `core.test`, the module, tests with `com.edc::scalatest` at the release of this fork under test
-    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, without changing the module's definition
+    And the build adds the Mill plugin at that release as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`, and the module's definition names nothing of the plugin
     And every JVM test module of the build has test parallelism off, one fork group and `testBatchFrameworkTasks` unset
     And suite `CalculatorSuite`, class `samples.CalculatorSuite`, an `AnyFunSuite` whose one test, `adds two numbers`, labelled `- adds two numbers`, writes the line `dividing now` to stdout and succeeds
 
@@ -151,10 +158,26 @@ Feature: Deleting and writing the `-fJ` file
       When the test command is invoked as `mill scalatest/test core.test -fJ <blocker>/report.json`
       Then the console holds the human-readable output, whose lines include `- adds two numbers`
       And the test command fails, and its failure names `<blocker>/report.json`
+
+  Rule: A relative path resolves against the workspace root, wherever `mill` is run from
+    Scenario: AC-041 A relative path, with `mill` run from a folder below the workspace root
+      Given the folder `core` below the workspace root
+      When the test command is invoked from the folder `core` as `mill scalatest/test core.test -fJ report.json`
+      Then the file `report.json` in the workspace root holds a JSON object whose `kind` is `root`
+      And nothing exists at `report.json` in the folder `core`
+      And the test command succeeds
+
+  Rule: The test command creates the file's missing parent folders
+    Scenario: AC-042 A path whose parent folders do not exist
+      Given nothing exists at the absolute path `<missing>`
+      When the test command is invoked as `mill scalatest/test core.test -fJ <missing>/nested/report.json`
+      Then the file at `<missing>/nested/report.json` holds a JSON object whose `kind` is `root`
+      And the test command succeeds
 ```
 
 | Requirement                   | Criteria               |
 |-------------------------------|------------------------|
 | R-077                         | AC-008                 |
 | R-059                         | AC-008                 |
-| `../SPECIFICATION.md` § Scope | AC-008, AC-009, AC-010 |
+| R-049a                        | AC-041, AC-042         |
+| `../SPECIFICATION.md` § Scope | AC-008, AC-009, AC-010, AC-041, AC-042 |
