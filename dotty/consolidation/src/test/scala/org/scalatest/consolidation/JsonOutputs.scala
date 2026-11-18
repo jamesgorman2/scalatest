@@ -31,6 +31,20 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     def module: JsonValue = root("contents").only
 
     def runNode: JsonValue = module("contents").only
+
+    /** The one suite, scope or test of the kind and name anywhere in the JSON output. */
+    def node(kind: String, name: String): JsonValue =
+      nodes(kind, name) match {
+        case Vector(only) => only
+        case other => fail(s"expected one $kind named $name, but found ${other.size}")
+      }
+
+    /** Every suite, scope or test of the kind and name, in the order the JSON output holds them. */
+    def nodes(kind: String, name: String): Vector[JsonValue] =
+      allNodesUnder(root).filter(found => found.get("kind").contains(JsonValue.Text(kind)) && found.get("name").contains(JsonValue.Text(name)))
+
+    private def allNodesUnder(parent: JsonValue): Vector[JsonValue] =
+      parent.get("contents").fold(Vector.empty[JsonValue])(_.items.flatMap(child => child +: allNodesUnder(child)))
   }
 
   /** A consolidation started without Mill: module selector `core.test` resolving to module `core.test`, and no build tool or root time. */

@@ -2,6 +2,22 @@
 
 Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
+## Modules and top-level suites are ordered by name, compared as `String.compareTo` compares them, and those sharing a name by start order (`SPECIFICATION.md` R-105).
+
+**Alternatives**
+
+- Ordering top-level suites as their run started or discovered them changes between runs of the same build, since discovery order and parallel scheduling are not declared anywhere.
+- Ordering modules as the module selectors gave them makes one build's output depend on how the test command was invoked, and leaves no order for a module two selectors share.
+- Ordering by a locale's collation gives a different order on machines with different locales.
+
+**Reasoning** R-105 orders the tree by declared order where it is known, otherwise by label, then by execution order where siblings share a label. Nothing declares the order of a build's modules or of a run's top-level suites, and neither has a label, so each sorts by its name, which stands where a label would: a module's Mill module path, a suite's suite name. `String.compareTo` gives the same order on every machine and in every reader. Top-level suites that share a name fall back to the order they started, as R-105 gives for siblings with identical labels, with those that never started last.
+
+**Costs** The order differs from the order the human reading the build's source would list the modules or suites in, and from the order the suites ran.
+
+**Settled by** [Consolidated JSON output - Suites, scopes and tests in the JSON output](https://github.com/jamesgorman2/scalatest/issues/143).
+
+---
+
 ## The root's failures are a `failures` array of `{ "message" }` objects, beside `outcome`.
 
 **Alternatives**

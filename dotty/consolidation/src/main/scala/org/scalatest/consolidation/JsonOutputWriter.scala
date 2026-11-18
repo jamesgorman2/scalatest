@@ -1,13 +1,20 @@
 package org.scalatest.consolidation
 
 import org.scalatest.ScalaTestVersions
+import org.scalatest.events.DecodedEvent
 import org.scalatest.events.JsonValue
 import org.scalatest.events.JsonWriter
+import org.scalatest.events.LineInFile
+import org.scalatest.events.Location
 import org.scalatest.events.RunOutcome
+import org.scalatest.events.SeeStackDepthException
+import org.scalatest.events.StructureNode
 import org.scalatest.events.Summary
+import org.scalatest.events.TopOfClass
+import org.scalatest.events.TopOfMethod
 
 /**
- * Writes the JSON output: the root, its modules and their run nodes. Each node's keys are written in a fixed order,
+ * Writes the JSON output: the root, its modules, their run nodes, and each run's suites, scopes and tests. Each node's keys are written in a fixed order,
  * and a key whose value is absent is left out, so no `null` is written.
  */
 private[consolidation] object JsonOutputWriter {
@@ -74,11 +81,133 @@ private[consolidation] object JsonOutputWriter {
         "endedAt" -> closing.map(closed => JsonValue.Integer(closed.timeStamp)),
         "duration" -> closing.flatMap(_.duration).map(JsonValue.Integer(_)),
         "summary" -> closing.flatMap(_.summary).map(summaryObject),
-        "contents" -> Some(JsonValue.Array(Vector.empty)),
+        "contents" -> Some(JsonValue.Array(run.topLevelSuites.map(assembledNode))),
         "output" -> nonEmptyArray(run.output.collect { case RunOutput.Captured(line) => capturedOutputItem(line) })
       )
     )
   }
+
+  private def assembledNode(assembled: AssembledNode): JsonValue = {
+    val node = assembled.node
+    val execution = assembled.execution
+    val startedAt = execution.opening.map(_.timeStamp)
+    val endedAt = execution.closing.map(_.timeStamp).orElse(execution.abortedAt)
+    objectOf(
+      Vector[Field](
+        "kind" -> Some(JsonValue.Text(kindOf(node))),
+        "name" -> Some(JsonValue.Text(assembled.name)),
+        "label" -> labelOf(node).map(JsonValue.Text(_)),
+        "suiteId" -> suiteIdOf(node).map(JsonValue.Text(_)),
+        "location" -> locationOf(node, execution),
+        "outcome" -> execution.outcome.map(outcome => JsonValue.Text(outcomeText(outcome))),
+        "reason" -> execution.outcome.filter(_ == NodeOutcome.NotRun).map(_ => JsonValue.Text("notRun")),
+        "message" -> execution.ending.map(ending => JsonValue.Text(messageOf(ending))),
+        "startedAt" -> startedAt.map(JsonValue.Integer(_)),
+        "endedAt" -> endedAt.map(JsonValue.Integer(_)),
+        "duration" -> durationOf(node, execution, startedAt, endedAt).map(JsonValue.Integer(_)),
+        "threadName" -> threadNameOf(node, execution).map(JsonValue.Text(_)),
+        "contents" -> Some(JsonValue.Array(execution.children.map(assembledNode)))
+      )
+    )
+  }
+
+  private def kindOf(node: StructureNode): String =
+    node match {
+      case _: StructureNode.Suite => "suite"
+      case _: StructureNode.Scope => "scope"
+      case _: StructureNode.Test => "test"
+    }
+
+  private def labelOf(node: StructureNode): Option[String] =
+    node match {
+      case _: StructureNode.Suite => None
+      case scope: StructureNode.Scope => Some(scope.label)
+      case test: StructureNode.Test => Some(test.label)
+    }
+
+  private def suiteIdOf(node: StructureNode): Option[String] =
+    node match {
+      case suite: StructureNode.Suite => Some(suite.suiteId)
+      case _ => None
+    }
+
+  private def locationOf(node: StructureNode, execution: AssembledExecution): Option[JsonValue] =
+    node match {
+      case suite: StructureNode.Suite => Some(suiteLocationObject(suite, execution))
+      case _ => scopeOrTestLocation(execution).flatMap(locationObject)
+    }
+
+  // A suite's or test's closing event measures its duration. A scope's closing event carries none, and a node aborted
+  // with no closing event of its own has none to carry it.
+  private def durationOf(node: StructureNode, execution: AssembledExecution, startedAt: Option[Long], endedAt: Option[Long]): Option[Long] = {
+    val measured = for (started <- startedAt; ended <- endedAt) yield ended - started
+    node match {
+      case _: StructureNode.Scope => measured
+      case _ => execution.closing.fold(measured)(_.duration)
+    }
+  }
+
+  private def threadNameOf(node: StructureNode, execution: AssembledExecution): Option[String] =
+    node match {
+      case _: StructureNode.Scope => None
+      case _ => execution.opening.orElse(execution.closing).map(_.threadName)
+    }
+
+  private def outcomeText(outcome: NodeOutcome): String =
+    outcome match {
+      case NodeOutcome.Succeeded => "succeeded"
+      case NodeOutcome.Failed => "failed"
+      case NodeOutcome.Ignored => "ignored"
+      case NodeOutcome.Pending => "pending"
+      case NodeOutcome.Canceled => "canceled"
+      case NodeOutcome.Aborted | NodeOutcome.NotRun => "aborted"
+    }
+
+  private def messageOf(ending: DecodedEvent): String =
+    ending match {
+      case failed: DecodedEvent.TestFailed => failed.message
+      case canceled: DecodedEvent.TestCanceled => canceled.message
+      case aborted: DecodedEvent.SuiteAborted => aborted.message
+      case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a message")
+    }
+
+  // A `SeeStackDepthException` leaves the location to the throwable, so the closing event's is taken in its place.
+  private def scopeOrTestLocation(execution: AssembledExecution): Option[Location] =
+    (execution.opening ++ execution.closing).flatMap(_.location).find(_ != SeeStackDepthException)
+
+  // A suite's events give no line of its own, so only the file its scopes' and tests' locations all name is written.
+  private def suiteLocationObject(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
+    val locations = ownScopesAndTestsOf(execution).flatMap(child => scopeOrTestLocation(child.execution))
+    val files = locations.map(fileFields).distinct
+    val sharedFile = files match {
+      case Vector(file) if file.nonEmpty => file
+      case _ => Vector.empty
+    }
+    objectOf(("className" -> Some(JsonValue.Text(suite.className))) +: sharedFile)
+  }
+
+  private def ownScopesAndTestsOf(execution: AssembledExecution): Vector[AssembledNode] =
+    execution.children.filterNot(_.node.isInstanceOf[StructureNode.Suite]).flatMap(child => child +: ownScopesAndTestsOf(child.execution))
+
+  private def locationObject(location: Location): Option[JsonValue] =
+    location match {
+      case TopOfClass(className) =>
+        Some(objectOf(Vector[Field]("className" -> Some(JsonValue.Text(className)))))
+      case TopOfMethod(className, methodId) =>
+        Some(objectOf(Vector[Field]("className" -> Some(JsonValue.Text(className)), "methodId" -> Some(JsonValue.Text(methodId)))))
+      case line: LineInFile =>
+        Some(objectOf(fileFields(line) :+ ("lineNumber" -> Some(JsonValue.Integer(line.lineNumber.toLong)))))
+      case SeeStackDepthException =>
+        None
+    }
+
+  private def fileFields(location: Location): Vector[Field] =
+    location match {
+      case line: LineInFile =>
+        Vector(line.filePathname.fold[Field]("fileName" -> Some(JsonValue.Text(line.fileName)))(path => "filePath" -> Some(JsonValue.Text(path))))
+      case _ =>
+        Vector.empty
+    }
 
   private def configMapObject(configMap: Map[String, String]): JsonValue =
     JsonValue.Object(configMap.toVector.sortBy(_._1).map((key, value) => key -> JsonValue.Text(value)))

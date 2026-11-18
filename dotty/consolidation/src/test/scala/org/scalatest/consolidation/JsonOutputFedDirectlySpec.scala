@@ -35,6 +35,64 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
       }
     }
 
+    Scenario("A test open when its suite aborts is aborted, ended by the suite's abort, with no message of its own") {
+      Given("a run fed directly to the library in which suite S aborts with message `boom` while its test t is running")
+      val eventLog =
+        """
+        run started
+        run: RunStarting
+        structure
+          suite "S", class "samples.S"
+            test "t", label "- t"
+        suite "S": SuiteStarting(timeStamp: 100)
+        test "t": TestStarting(timeStamp: 110)
+        suite "S": SuiteAborted(message: "boom", timeStamp: 150)
+        run: RunCompleted
+        run ended completed
+        """
+
+      When("the library writes the JSON output")
+      val json = jsonOutputOfRun(TestRunPart.Events(eventLog))
+
+      Then("suite S holds the outcome aborted and the message boom")
+      val suite = json.node("suite", "S")
+      suite("outcome") shouldBe text("aborted")
+      suite("message") shouldBe text("boom")
+
+      And("test t is aborted, started, ended at the SuiteAborted's time, with a duration of its endedAt less its startedAt and no message")
+      val test = json.node("test", "t")
+      test("outcome") shouldBe text("aborted")
+      test("startedAt") shouldBe integer(110L)
+      test("endedAt") shouldBe integer(150L)
+      test("duration") shouldBe integer(40L)
+      test.keys should not contain "message"
+    }
+
+    Scenario("A scope open when its suite aborts is aborted") {
+      Given("a run fed directly to the library in which suite S aborts with message `boom` while its scope A is open")
+      val eventLog =
+        """
+        run started
+        run: RunStarting
+        structure
+          suite "S", class "samples.S"
+            scope "A", label "A"
+              test "t", label "- t"
+        suite "S": SuiteStarting
+        scope "A": ScopeOpened
+        suite "S": SuiteAborted(message: "boom")
+        run: RunCompleted
+        run ended completed
+        """
+
+      When("the library writes the JSON output")
+      val scope = jsonOutputOfRun(TestRunPart.Events(eventLog)).node("scope", "A")
+
+      Then("scope A holds the outcome aborted, with no message")
+      scope("outcome") shouldBe text("aborted")
+      scope.keys should not contain "message"
+    }
+
     Scenario("Output and failures attached to the root are written on the root: discovery fails") {
       Given("the library is fed no run")
       val json = new JsonSink

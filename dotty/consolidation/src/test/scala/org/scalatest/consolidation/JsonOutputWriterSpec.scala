@@ -321,4 +321,250 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       }
     }
   }
+
+  // A run of suite RowSuite, class samples.RowSuite, holding the structure lines, with each event one line of the event log.
+  private def jsonOutputOfRowSuite(structure: Seq[String], events: String*): JsonSink =
+    jsonOutputOfRun(
+      TestRunPart.Events(
+        s"""
+        run started
+        run: RunStarting
+        structure
+          suite "RowSuite", class "samples.RowSuite"
+            ${structure.mkString("\n            ")}
+        ${events.mkString("\n        ")}
+        run: RunCompleted
+        run ended completed
+        """
+      )
+    )
+
+  private val testAdds = Seq("""test "adds", label "- adds"""")
+
+  private val testsAddsAndSubtracts = Seq("""test "adds", label "- adds"""", """test "subtracts", label "- subtracts"""")
+
+  "A test of the JSON output" when {
+
+    "it started and succeeded" should {
+      "hold each value in the layout's key order" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", Some("/build/RowSuite.scala")), threadName: "pool-1", timeStamp: 100)""",
+          """test "adds": TestSucceeded(duration: 8, threadName: "pool-2", timeStamp: 110)""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds") shouldBe objectOf(
+          "kind" -> text("test"),
+          "name" -> text("adds"),
+          "label" -> text("- adds"),
+          "location" -> objectOf("filePath" -> text("/build/RowSuite.scala"), "lineNumber" -> integer(7L)),
+          "outcome" -> text("succeeded"),
+          "startedAt" -> integer(100L),
+          "endedAt" -> integer(110L),
+          "duration" -> integer(8L),
+          "threadName" -> text("pool-1"),
+          "contents" -> arrayOf()
+        )
+      }
+    }
+
+    "its closing event carries no duration" should {
+      "have no duration, though it has both times" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting(timeStamp: 100)""",
+          """test "adds": TestSucceeded(timeStamp: 110)""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds").keys should contain allOf ("startedAt", "endedAt")
+        json.node("test", "adds").keys should not contain "duration"
+      }
+    }
+
+    "its TestStarting's location is SeeStackDepthException" should {
+      "take its location from its closing event" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting(location: SeeStackDepthException)""",
+          """test "adds": TestFailed(location: TopOfMethod("samples.RowSuite", "def adds(): Unit"))""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds")("location") shouldBe objectOf("className" -> text("samples.RowSuite"), "methodId" -> text("def adds(): Unit"))
+      }
+    }
+
+    "neither its opening nor its closing event gives a location other than SeeStackDepthException" should {
+      "have no location" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting""",
+          """test "adds": TestFailed(location: SeeStackDepthException)""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds").keys should not contain "location"
+      }
+    }
+
+    "its location is a line in a file whose path is not known" should {
+      "give the file's name" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", None))""",
+          """test "adds": TestSucceeded""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds")("location") shouldBe objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
+      }
+    }
+
+    "it is canceled" should {
+      "hold the outcome canceled and its TestCanceled's message" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting""",
+          """test "adds": TestCanceled(message: "no database")""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds")("outcome") shouldBe text("canceled")
+        json.node("test", "adds")("message") shouldBe text("no database")
+      }
+    }
+
+    "it is open when its run aborts" should {
+      "be aborted, ended at the RunAborted's time, as its open suite is" in {
+        val json = jsonOutputOfRun(
+          TestRunPart.Events(
+            """
+            run started
+            run: RunStarting
+            structure
+              suite "RowSuite", class "samples.RowSuite"
+                test "adds", label "- adds"
+            suite "RowSuite": SuiteStarting(timeStamp: 90)
+            test "adds": TestStarting(timeStamp: 100)
+            run: RunAborted(message: "out of memory", timeStamp: 175)
+            run ended aborted
+            """
+          )
+        )
+        val adds = json.node("test", "adds")
+        adds("outcome") shouldBe text("aborted")
+        adds("endedAt") shouldBe integer(175L)
+        adds("duration") shouldBe integer(75L)
+        adds.keys should not contain "message"
+        json.node("suite", "RowSuite")("endedAt") shouldBe integer(175L)
+      }
+    }
+  }
+
+  "A scope of the JSON output" when {
+
+    "it is pending" should {
+      "take its end time from its ScopePending and its duration from its times" in {
+        val json = jsonOutputOfRowSuite(
+          Seq("""scope "A Queue", label "A Queue""""),
+          """suite "RowSuite": SuiteStarting""",
+          """scope "A Queue": ScopeOpened(timeStamp: 100)""",
+          """scope "A Queue": ScopePending(timeStamp: 104)""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        val scope = json.node("scope", "A Queue")
+        scope("endedAt") shouldBe integer(104L)
+        scope("duration") shouldBe integer(4L)
+      }
+    }
+  }
+
+  "A suite of the JSON output" when {
+
+    "it completed, and its tests' locations share one file" should {
+      "hold each value in the layout's key order, with that file in its location" in {
+        val json = jsonOutputOfRowSuite(
+          testsAddsAndSubtracts,
+          """suite "RowSuite": SuiteStarting(location: TopOfClass("samples.RowSuite"), threadName: "pool-1", timeStamp: 100)""",
+          """test "adds": TestStarting(location: LineInFile(5, "RowSuite.scala", Some("/build/RowSuite.scala")))""",
+          """test "adds": TestSucceeded""",
+          """test "subtracts": TestStarting(location: LineInFile(9, "RowSuite.scala", Some("/build/RowSuite.scala")))""",
+          """test "subtracts": TestSucceeded""",
+          """suite "RowSuite": SuiteCompleted(duration: 30, threadName: "pool-2", timeStamp: 140)"""
+        )
+        val suite = json.node("suite", "RowSuite")
+        suite.keys shouldBe Vector("kind", "name", "suiteId", "location", "startedAt", "endedAt", "duration", "threadName", "contents")
+        suite("kind") shouldBe text("suite")
+        suite("suiteId") shouldBe text("samples.RowSuite")
+        suite("location") shouldBe objectOf("className" -> text("samples.RowSuite"), "filePath" -> text("/build/RowSuite.scala"))
+        suite("startedAt") shouldBe integer(100L)
+        suite("endedAt") shouldBe integer(140L)
+        suite("duration") shouldBe integer(30L)
+        suite("threadName") shouldBe text("pool-1")
+      }
+    }
+
+    "its tests' locations name different files" should {
+      "give only its class name as its location" in {
+        val json = jsonOutputOfRowSuite(
+          testsAddsAndSubtracts,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting(location: LineInFile(5, "RowSuite.scala", None))""",
+          """test "adds": TestSucceeded""",
+          """test "subtracts": TestStarting(location: LineInFile(9, "Helpers.scala", None))""",
+          """test "subtracts": TestSucceeded""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("suite", "RowSuite")("location") shouldBe objectOf("className" -> text("samples.RowSuite"))
+      }
+    }
+
+    "it never started" should {
+      "be aborted with reason notRun, with no times or thread" in {
+        val suite = jsonOutputOfRowSuite(testAdds).node("suite", "RowSuite")
+        suite("outcome") shouldBe text("aborted")
+        suite("reason") shouldBe text("notRun")
+        suite.keys should contain noneOf ("startedAt", "endedAt", "duration", "threadName")
+      }
+    }
+
+    "it started and its run completed with neither its SuiteCompleted nor a RunAborted" should {
+      "be aborted with no end time, duration or message" in {
+        val suite = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting(timeStamp: 100)""").node("suite", "RowSuite")
+        suite("outcome") shouldBe text("aborted")
+        suite.keys should contain noneOf ("endedAt", "duration", "message")
+      }
+    }
+  }
+
+  "A run node's top-level suites" when {
+
+    "two of one name started and a third of that name never started" should {
+      "hold those that started in the order they started, then the one that never started" in {
+        val json = jsonOutputOfRun(
+          TestRunPart.Events(
+            """
+            run started
+            run: RunStarting
+            structure
+              suite "Same", class "samples.First"
+            structure
+              suite "Same", class "samples.Second"
+            structure
+              suite "Same", class "samples.Third"
+            suite "Same" #3: SuiteStarting
+            suite "Same" #3: SuiteCompleted
+            suite "Same" #1: SuiteStarting
+            suite "Same" #1: SuiteCompleted
+            run: RunCompleted
+            run ended completed
+            """
+          )
+        )
+        json.runNode("contents").items.map(_("suiteId")) shouldBe Vector(text("samples.Third"), text("samples.First"), text("samples.Second"))
+      }
+    }
+  }
 }
