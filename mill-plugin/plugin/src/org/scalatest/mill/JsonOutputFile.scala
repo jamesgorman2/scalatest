@@ -49,7 +49,7 @@ private[mill] final class JsonOutputFile(val path: Path) {
   private def cannotWrite(throwable: Throwable): String =
     s"The test command cannot write its JSON output to $path, the file -fJ names: $throwable"
 
-  /** Nothing where the partly written file is deleted, else why it could not be. */
+  /** Deletes the partly written file, returning an empty string, or, where the delete fails, the text to append to the failure message. */
   private def partlyWrittenFileDeletion(): String =
     Try(Files.deleteIfExists(path)).fold(throwable => s"; it cannot delete the partly written file either: $throwable", _ => "")
 }

@@ -64,7 +64,7 @@ final class JsonEncodingSpec extends AnyWordSpec with Matchers {
     }
 
     "writing to a writer" should {
-      "write the text it returns as a string" in {
+      "write the same text as writing to a string" in {
         val value = JsonValue.Object(
           Vector(
             "text" -> JsonValue.Text(textJsonMustEscape),

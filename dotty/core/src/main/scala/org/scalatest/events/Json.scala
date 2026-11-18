@@ -28,7 +28,7 @@ private[scalatest] object JsonWriter {
   }
 
   /**
-   * Appends the value's text to `out` as it goes, so the whole text is never held in memory. Throws what `out` throws.
+   * Appends the value's text to `out` piece by piece, without building the whole text itself. Throws what `out` throws.
    */
   // Keeps what is still to write in a list, not on the call stack, so that deep nesting cannot overflow the stack.
   def write(value: JsonValue, out: Appendable): Unit = {
