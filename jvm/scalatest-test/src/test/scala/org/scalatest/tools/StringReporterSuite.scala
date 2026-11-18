@@ -67,6 +67,14 @@ class StringReporterSuite extends AnyFunSuite with Matchers {
     countReset(aResult) should equal (2)
   }
 
+  test("toPossiblyColoredText should colour each line of a string split by the platform line separator and keep the separator between them") {
+    val lineSeparator = org.scalactic.Prettifier.lineSeparator
+    val coloured = Fragment("a" + lineSeparator + "b", AnsiCyan).toPossiblyColoredText(true)
+    coloured.replace(ansiCyan, "<cyan>").replace(ansiReset, "<reset>") should equal (
+      "<cyan>a<reset>" + lineSeparator + "<cyan>b<reset>"
+    )
+  }
+
   test("countTrailingEOLs should return the number of EOLs at the end of the passed string") {
     countTrailingEOLs("") should be (0)
     countTrailingEOLs("\n") should be (1)
@@ -101,7 +109,7 @@ class StringReporterSuite extends AnyFunSuite with Matchers {
     val aResult = Fragment("a\nb\n", AnsiCyan).toPossiblyColoredText(true)
     aResult should startWith (ansiCyan)
     aResult should not endWith (ansiReset)
-    aResult should endWith (ansiReset + "\n")
+    aResult should endWith (ansiReset + org.scalactic.Prettifier.lineSeparator)
     countCyan(aResult) should equal (2)
     countReset(aResult) should equal (2)
   }
@@ -112,7 +120,7 @@ class StringReporterSuite extends AnyFunSuite with Matchers {
     val aResult = Fragment("a\nb\n\n", AnsiCyan).toPossiblyColoredText(true)
     aResult should startWith (ansiCyan)
     aResult should not endWith (ansiReset)
-    aResult should endWith (ansiReset + "\n\n")
+    aResult should endWith (ansiReset + org.scalactic.Prettifier.lineSeparator * 2)
     countCyan(aResult) should equal (2)
     countReset(aResult) should equal (2)
   }
@@ -123,7 +131,7 @@ class StringReporterSuite extends AnyFunSuite with Matchers {
     val aResult = Fragment("\na\nb", AnsiCyan).toPossiblyColoredText(true)
     aResult should not startWith (ansiCyan)
     aResult should endWith (ansiReset)
-    aResult should startWith ("\n" + ansiCyan)
+    aResult should startWith (org.scalactic.Prettifier.lineSeparator + ansiCyan)
     withClue("\"" + aResult.toList.mkString(" ").replaceAll("\n", "EOL") + "\"") {
       countCyan(aResult) should equal (2)
       countReset(aResult) should equal (2)
@@ -385,15 +393,15 @@ class StringReporterSuite extends AnyFunSuite with Matchers {
   test("withPossibleLineNumber returns simple file name on same line if presentFilePathname is false") {
     import org.scalactic.source
 import StringReporter.withPossibleLineNumber
-    val result = withPossibleLineNumber("oops", Some(new TestFailedException((_: StackDepthException) => Some("also oops"), None, Left(source.Position.here), None, Vector.empty)), false)
+    val result = withPossibleLineNumber("oops", Some(ThrowableView.of(new TestFailedException((_: StackDepthException) => Some("also oops"), None, Left(source.Position.here), None, Vector.empty))), false)
     assert(result === "oops (StringReporterSuite.scala:" + (thisLineNumber - 1) + ")")
   }
 
   test("withPossibleLineNumber returns full file pathname on next line if presentFilePathname is true and it is available") {
     import StringReporter.withPossibleLineNumber
     import org.scalactic.source
-    val result = withPossibleLineNumber("oops", Some(new TestFailedException((_: StackDepthException) => Some("also oops"), None, Left(source.Position.here), None, Vector.empty)), true)
-    assert(result startsWith "oops\n** ")
+    val result = withPossibleLineNumber("oops", Some(ThrowableView.of(new TestFailedException((_: StackDepthException) => Some("also oops"), None, Left(source.Position.here), None, Vector.empty))), true)
+    assert(result startsWith "oops" + org.scalactic.Prettifier.lineSeparator + "** ")
     if (System.getenv("SCALACTIC_FILL_FILE_PATHNAMES") != null && System.getenv("SCALACTIC_FILL_FILE_PATHNAMES") == "yes")
       assert(result endsWith "org/scalatest/tools/StringReporterSuite.scala:" + (thisLineNumber - 3) + " **")
     else

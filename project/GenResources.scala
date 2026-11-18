@@ -20,7 +20,7 @@ import scala.util.parsing.combinator.JavaTokenParsers
 
 trait GenResources {
 
-  val generatorSource = new File("GenResources.scala")
+  val generatorSource = new File("project/GenResources.scala")
 
   def packageName: String
 
@@ -126,8 +126,11 @@ trait GenResourcesJVM extends GenResources {
        |
        |lazy val resourceBundle = ResourceBundle.getBundle("org.scalactic.ScalacticBundle")
        |
+       |private def bundleString(resourceName: String): String =
+       |  resourceBundle.getString(resourceName).replace("\\n", org.scalactic.Prettifier.lineSeparator)
+       |
        |private def makeString(resourceName: String, args: Array[Any]): String = {
-       |  val raw = resourceBundle.getString(resourceName)
+       |  val raw = bundleString(resourceName)
        |  formatString(raw, args)
        |}
        |
@@ -158,9 +161,9 @@ trait GenResourcesJVM extends GenResources {
       if (paramCount > 0)
         "def " + kv.key + "(" + (for (i <- 0 until paramCount) yield s"param$i: Any").mkString(", ") + "): String = makeString(\"" + kv.key + "\", Array(" + (for (i <- 0 until paramCount) yield s"param$i").mkString(", ") + "))"
       else
-        "def " + kv.key + ": String = resourceBundle.getString(\"" + kv.key + "\")"
+        "def " + kv.key + ": String = bundleString(\"" + kv.key + "\")"
     ) + "\n\n" +
-    "def raw" + kv.key.capitalize + ": String = resourceBundle.getString(\"" + kv.key + "\")"
+    "def raw" + kv.key.capitalize + ": String = bundleString(\"" + kv.key + "\")"
 
   def failureMessagesKeyValueTemplate(kv: KeyValue, paramCount: Int): String = {
     if (paramCount == 0)
@@ -191,8 +194,11 @@ object ScalaTestGenResourcesJVM extends GenResourcesJVM {
         |
         |lazy val resourceBundle = ResourceBundle.getBundle("org.scalatest.ScalaTestBundle")
         |
+        |private def bundleString(resourceName: String): String =
+        |  resourceBundle.getString(resourceName).replace("\\n", org.scalactic.Prettifier.lineSeparator)
+        |
         |def makeString(resourceName: String, args: Array[Any]): String = {
-        |  val raw = resourceBundle.getString(resourceName)
+        |  val raw = bundleString(resourceName)
         |  formatString(raw, args)
         |}
         |
@@ -245,8 +251,12 @@ trait GenResourcesJSVM extends GenResources {
         |}
     """.stripMargin
 
+  private def messageExpression(value: String): String =
+    value.replaceAllLiterally("\"", "\\\"").replaceAllLiterally("''", "'")
+      .split("\\\\n", -1).map("\"" + _ + "\"").mkString(" + org.scalactic.Prettifier.lineSeparator + ")
+
   def resourcesKeyValueTemplate(kv: KeyValue, paramCount: Int): String =
-    "final val raw" + kv.key.capitalize + " = \"" + kv.value.replaceAllLiterally("\"", "\\\"").replaceAllLiterally("''", "'") + "\"\n\n" +
+    "final val raw" + kv.key.capitalize + " = " + messageExpression(kv.value) + "\n\n" +
     (
       if (paramCount == 0 )
         "final val " + kv.key + " = raw" + kv.key.capitalize

@@ -438,8 +438,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
 
         val e3 = intercept[TestFailedException] {
@@ -448,8 +448,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e3.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine2 = thisLineNumber - 3
         e3.failedCodeLineNumber.get should be (offendingLine2)
-        e3.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine2 + ") \n" +
+        e3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine2 + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -510,8 +510,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Many(1, 2, 3)) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Many(1, 2, 3)) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, Many(Many(3, 2, 1), Many(3, 2, 1), Many(4, 3, 2)))))
       }
     }
@@ -530,8 +530,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
 
         val e4 = intercept[TestFailedException] {
@@ -540,8 +540,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e4.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine2 = thisLineNumber - 3
         e4.failedCodeLineNumber.get should be (offendingLine2)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine2 + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (EveryShouldContainOnlySpec.scala:" + offendingLine2 + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -602,8 +602,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Many(1, 2, 3)) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Many(1, 2, 3)) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, Many(Many(3, 2, 1), Many(3, 2, 1), Many(4, 3, 2)))))
       }
     }
@@ -618,8 +618,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -662,8 +662,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, One(Many("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Many("you", "to")) + "), did you forget to say : _*" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, One(Many("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Many("you", "to")) + "), did you forget to say : _*" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, One(One(Many("you", "to"))))))
       }
     }
@@ -678,8 +678,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (EveryShouldContainOnlySpec.scala:" + (offendingLine) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (EveryShouldContainOnlySpec.scala:" + (offendingLine) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -722,8 +722,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, One(Many("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Many("you", "to")) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, One(Many("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Many("you", "to")) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, One(One(Many("you", "to"))))))
       }
     }
@@ -738,8 +738,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -791,8 +791,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, One(Many("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Many("to", "you")) + "), did you forget to say : _*" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, One(Many("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Many("to", "you")) + "), did you forget to say : _*" +  " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, One(One(Many("to", "you"))))))
       }
     }
@@ -807,8 +807,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -860,8 +860,8 @@ class EveryShouldContainOnlySpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOnlySpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, One(Many("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Many("to", "you")) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, One(Many("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Many("to", "you")) + "), did you forget to say : _*" + " (EveryShouldContainOnlySpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, One(One(Many("to", "you"))))))
       }
     }

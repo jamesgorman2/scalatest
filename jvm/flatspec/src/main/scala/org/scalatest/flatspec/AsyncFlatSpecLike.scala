@@ -66,6 +66,9 @@ trait AsyncFlatSpecLike extends AsyncTestSuite with AsyncTestRegistration with S
 
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(true))
+
   /**
    * Returns an <code>Informer</code> that during test execution will forward strings passed to its
    * <code>apply</code> method to the current reporter. If invoked in a constructor, it
@@ -161,6 +164,7 @@ trait AsyncFlatSpecLike extends AsyncTestSuite with AsyncTestRegistration with S
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerAsyncTest(specText, transformToOutcome(transformToOutcomeParam), testRegistrationClosedMessageFun, None, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   private def registerPendingTestToRun(specText: String, methodName: String, testTags: List[Tag], testFun: () => PendingStatement, pos: source.Position): Unit = {
@@ -171,6 +175,7 @@ trait AsyncFlatSpecLike extends AsyncTestSuite with AsyncTestRegistration with S
         case "is" => Resources.isCannotAppearInsideAnotherInOrIs
       }
     engine.registerAsyncTest(specText, transformPendingToOutcome(testFun), testRegistrationClosedMessageFun, None, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**
@@ -1793,6 +1798,7 @@ import resultOfStringPassedToVerb.verb
     //SCALATESTJS,NATIVE-ONLY val stackDepthAdjustment = -5
     def transformToOutcomeParam: Future[compatible.Assertion] = testFun()
     engine.registerIgnoredAsyncTest(specText, transformToOutcome(transformToOutcomeParam), Resources.ignoreCannotAppearInsideAnInOrAnIs, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   private def registerPendingTestToIgnore(specText: String, testTags: List[Tag], methodName: String, testFun: () => PendingStatement, pos: source.Position): Unit = {
@@ -1803,6 +1809,7 @@ import resultOfStringPassedToVerb.verb
     //SCALATESTJS,NATIVE-ONLY val stackDepth = 6
     //SCALATESTJS,NATIVE-ONLY val stackDepthAdjustment = -5
     engine.registerIgnoredAsyncTest(specText, transformPendingToOutcome(testFun), Resources.ignoreCannotAppearInsideAnInOrAnIs, None, pos, testTags: _*)
+    engine.nameLastRegisteredTest(org.scalatest.RegisteredNode.flatSpecTestName(specText))
   }
 
   /**

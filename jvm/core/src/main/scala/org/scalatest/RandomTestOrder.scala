@@ -180,15 +180,18 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
    * @return a <code>Status</code> object that indicates when all tests and nested suites started by this method have completed, and whether or not a failure occurred.
    */
   abstract override def run(testName: Option[String], args: Args): Status = {
+    SuiteRegistration.registeredRun(this, args) { (registration, args) =>
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
-        super.run(testName, args.copy(reporter = createTestSpecificReporter(sorter, name)))
+        super.run(testName, args.copy(reporter = registration.reporterOfTest(name, createTestSpecificReporter(sorter, name))))
       case _ =>
-        val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-        val newArgs = args.copy(reporter = testSortingReporter, distributedTestSorter = Some(testSortingReporter))
+        val theSuiteId = suiteId
+        registration.suiteIdRead(theSuiteId)
+        val testSortingReporter = new TestSortingReporter(theSuiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
+        val newArgs = args.copy(reporter = registration.reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
         val status = super.run(testName, newArgs)
         // Random shuffle the deferred suite list, before executing them.
-        Random.shuffle(suiteRunQueue.asScala.toList).map { case DeferredSuiteRun(suite, testName, statefulStatus) =>
+        Random.shuffle(suiteRunQueue.asScala.toList).foreach { case DeferredSuiteRun(suite, testName, statefulStatus) =>
           val status = suite.run(Some(testName), newArgs.copy(runTestInNewInstance = true))
           status.whenCompleted { tri => 
             tri match {
@@ -203,6 +206,7 @@ trait RandomTestOrder extends OneInstancePerTest { this: Suite =>
         }
         status
     }
+  }
   }
 
   private[scalatest] def createTestSpecificReporter(testSorter: DistributedTestSorter, testName: String): Reporter = {

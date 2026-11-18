@@ -293,8 +293,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, lists(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, lists(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
 
         val e2 = intercept[TestFailedException] {
@@ -302,8 +302,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e2.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e2.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e2.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.didNotContainOneElementOf(prettifier, nils(0), Seq("ho", "hey", "howdy")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.didNotContainOneElementOf(prettifier, nils(0), Seq("ho", "hey", "howdy")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, nils)))
 
         val e4 = intercept[TestFailedException] {
@@ -311,8 +311,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e4.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, listsNil(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, listsNil(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, listsNil)))
       }
 
@@ -361,8 +361,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, lists(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, lists(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
 
         val e2 = intercept[TestFailedException] {
@@ -370,8 +370,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e2.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e2.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e2.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.didNotContainOneElementOf(prettifier, nils(0), Seq("ho", "hey", "howdy")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.didNotContainOneElementOf(prettifier, nils(0), Seq("ho", "hey", "howdy")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, nils)))
 
         val e4 = intercept[TestFailedException] {
@@ -379,8 +379,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e4.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, listsNil(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.didNotContainOneElementOf(prettifier, listsNil(2), Seq(1, 3, 4)) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, listsNil)))
       }
 
@@ -438,8 +438,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -490,8 +490,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -525,8 +525,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -560,8 +560,8 @@ class ListShouldContainOneElementOfSpec extends AnyFunSpec with Matchers {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneElementOf(prettifier, toLists(0), Seq("happy", "birthday", "to", "you")) + " (ListShouldContainOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

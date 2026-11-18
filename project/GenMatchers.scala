@@ -20,7 +20,7 @@ import java.io.{File, FileWriter, BufferedWriter}
 
 object GenMatchers {
 
-  val generatorSource = new File("GenMatchers.scala")
+  val generatorSource = new File("project/GenMatchers.scala")
 
   def translateShouldToMust(shouldLine: String): String = {
     shouldLine
@@ -188,7 +188,7 @@ object GenMatchers {
     outputFile
   }
 
-  def translateFileDottyJS(targetDir: File, fileName: String, sourceFileName: String, scalaVersion: String, translateFun: String => String): File = {
+  def translateFileDottyJS(targetDir: File, fileName: String, sourceFileName: String, scalaVersion: String, translateFun: String => String, lineEnding: String): File = {
     val outputFile = new File(targetDir, fileName)
     if (!outputFile.exists || generatorSource.lastModified > outputFile.lastModified) {
       val outputWriter = new BufferedWriter(new FileWriter(outputFile))
@@ -226,7 +226,7 @@ object GenMatchers {
               ""
 
           outputWriter.write(mustLine)
-          outputWriter.newLine()
+          outputWriter.write(lineEnding)
         }
       }
       finally {
@@ -384,7 +384,7 @@ object GenMatchers {
     val mustDir = new File(matchersDir, "must")
     mustDir.mkdirs()
     Seq(
-      translateFileDottyJS(mustDir, "Matchers.scala", "jvm/shouldmatchers/src/main/scala/org/scalatest/matchers/should/Matchers.scala", scalaVersion, translateShouldToMust)
+      translateFileDottyJS(mustDir, "Matchers.scala", "jvm/shouldmatchers/src/main/scala/org/scalatest/matchers/should/Matchers.scala", scalaVersion, translateShouldToMust, GenScalaTestDotty.ScalaJsLineEnding)
       /*translateFile(targetDir, "WillMatchers.scala", "scalatest/src/main/scala/org/scalatest/Matchers.scala", scalaVersion, scalaJS, translateShouldToWill)
       translateFile(targetDir, "FactNoExceptionWord.scala", "scalatest/src/main/scala/org/scalatest/words/NoExceptionWord.scala", scalaVersion, scalaJS, translateShouldToWill)
       translateFile(targetDir, "FactResultOfATypeInvocation.scala", "scalatest/src/main/scala/org/scalatest/words/ResultOfATypeInvocation.scala", scalaVersion, scalaJS,

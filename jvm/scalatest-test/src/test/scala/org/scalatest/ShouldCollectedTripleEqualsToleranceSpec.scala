@@ -308,8 +308,8 @@ class ShouldCollectedTripleEqualsToleranceSpec extends AnyFunSpec /* with NonImp
 
       // Double +- Double
       val caught = intercept[TestFailedException] { all (List(sevenDotOh, sevenDotOh, sevenDotOh)) should === (7.5 +- 0.2) }
-      caught.message should be (Some("'all' inspection failed, because: \n" +
-                                "  at index 0, " + sevenDotOh + " did not equal 7.5 plus or minus 0.2 (ShouldCollectedTripleEqualsToleranceSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+      caught.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                "  at index 0, " + sevenDotOh + " did not equal 7.5 plus or minus 0.2 (ShouldCollectedTripleEqualsToleranceSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                 "in List(" + sevenDotOh + ", " + sevenDotOh + ", " + sevenDotOh + ")"))
       intercept[TestFailedException] { all (List(sevenDotOh, sevenDotOh, sevenDotOh)) should === (6.5 +- 0.2) }
       intercept[TestFailedException] { all (List(minusSevenDotOh, minusSevenDotOh, minusSevenDotOh)) should === (-7.5 +- 0.2) }
@@ -572,8 +572,8 @@ class ShouldCollectedTripleEqualsToleranceSpec extends AnyFunSpec /* with NonImp
 
       // Double +- Double
       val caught = intercept[TestFailedException] { all (List(sevenDotOh, sevenDotOh, sevenDotOh)) should !== (7.1 +- 0.2) }
-      caught.message should be (Some("'all' inspection failed, because: \n" +
-                                "  at index 0, " + sevenDotOh + " equaled 7.1 plus or minus 0.2 (ShouldCollectedTripleEqualsToleranceSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+      caught.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                "  at index 0, " + sevenDotOh + " equaled 7.1 plus or minus 0.2 (ShouldCollectedTripleEqualsToleranceSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                 "in List(" + sevenDotOh + ", " + sevenDotOh + ", " + sevenDotOh + ")"))
       intercept[TestFailedException] { all (List(sevenDotOh, sevenDotOh, sevenDotOh)) should !== (6.9 +- 0.2) }
       intercept[TestFailedException] { all (List(sevenDotOh, sevenDotOh, sevenDotOh)) should !== (7.0 +- 0.2) }

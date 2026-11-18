@@ -29,7 +29,7 @@ object GenCommonTestDotty {
     uncommentJsExport(line)
 
 
-  private def copyFile(sourceFile: File, destFile: File): File = {
+  private def copyFile(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -41,7 +41,7 @@ object GenCommonTestDotty {
           skipMode = false
         else if (!skipMode) {
           destWriter.write(transformLine(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -53,20 +53,20 @@ object GenCommonTestDotty {
     }
   }
 
-  def copyDir(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDir(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String = GenScalaTestDotty.PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFile(sourceFile, destFile)
+        copyFile(sourceFile, destFile, lineEnding)
 
       destFile
     }
   }
 
-  def copyFiles(sourceDirName: String, packageDirName: String, targetDir: File, files: List[String]): Seq[File] = {
+  def copyFiles(sourceDirName: String, packageDirName: String, targetDir: File, files: List[String], lineEnding: String = GenScalaTestDotty.PlatformLineEnding): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
@@ -74,7 +74,7 @@ object GenCommonTestDotty {
       val sourceFile = new File(sourceDir, sourceFileName)
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFile(sourceFile, destFile)
+        copyFile(sourceFile, destFile, lineEnding)
 
       destFile
     }
@@ -95,7 +95,7 @@ object GenCommonTestDotty {
   private def transformLineJS(line: String): String =
     uncommentJsExportJS(line)
 
-  private def copyFileJS(sourceFile: File, destFile: File): File = {
+  private def copyFileJS(sourceFile: File, destFile: File, lineEnding: String): File = {
     val destWriter = new BufferedWriter(new FileWriter(destFile))
     try {
       val lines = Source.fromFile(sourceFile).getLines.toList
@@ -111,7 +111,7 @@ object GenCommonTestDotty {
           skipMode = false  
         else if (!skipMode) {
           destWriter.write(transformLineJS(line))
-          destWriter.newLine()
+          destWriter.write(lineEnding)
         }
       }
       destFile
@@ -123,14 +123,14 @@ object GenCommonTestDotty {
     }
   }
 
-  def copyDirJS(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String]): Seq[File] = {
+  def copyDirJS(sourceDirName: String, packageDirName: String, targetDir: File, skipList: List[String], lineEnding: String): Seq[File] = {
     val packageDir = new File(targetDir, packageDirName)
     packageDir.mkdirs()
     val sourceDir = new File(sourceDirName)
     sourceDir.listFiles.toList.filter(f => f.isFile && !skipList.contains(f.getName) && (f.getName.endsWith(".scala") || f.getName.endsWith(".java"))).map { sourceFile =>
       val destFile = new File(packageDir, sourceFile.getName)
       if (!destFile.exists || sourceFile.lastModified > destFile.lastModified)
-        copyFileJS(sourceFile, destFile)
+        copyFileJS(sourceFile, destFile, lineEnding)
 
       destFile
     }
@@ -154,13 +154,14 @@ object GenCommonTestDotty {
         "LineNumberHelper.scala", 
         "LineNumberMacro.scala", 
         "TestConcurrentDistributor.scala"
-      )
+      ),
+      GenScalaTestDotty.ScalaJsLineEnding
     ) ++
-    copyDirJS("dotty/common-test/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++
-    copyDirJS("jvm/common-test/src/main/scala/org/scalatest/path", "org/scalatest/path", targetDir, List.empty) ++ 
-    copyDirJS("js/common-test/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty) ++  
-    copyDirJS("jvm/common-test/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty) ++
-    copyDirJS("jvm/common-test/src/main/scala/org/scalatest/prop", "org/scalatest/prop", targetDir, List.empty)
+    copyDirJS("dotty/common-test/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDirJS("jvm/common-test/src/main/scala/org/scalatest/path", "org/scalatest/path", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDirJS("js/common-test/src/main/scala/org/scalatest", "org/scalatest", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDirJS("jvm/common-test/src/main/scala/org/scalatest/enablers", "org/scalatest/enablers", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding) ++
+    copyDirJS("jvm/common-test/src/main/scala/org/scalatest/prop", "org/scalatest/prop", targetDir, List.empty, GenScalaTestDotty.ScalaJsLineEnding)
   }
 
   /*copyFiles("jvm/common-test/src/main/scala/org/scalatest", "org/scalatest",

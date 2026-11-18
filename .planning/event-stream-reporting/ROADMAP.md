@@ -1,53 +1,63 @@
 # Roadmap - Event-stream test reporting for Mill
 
-Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then every worker, argument and module Mill runs, then supported Mill releases, then `--halt-on-failure`, then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
+Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then formatting, filtering and human-readable output to a file (feature 16), then filtering characters on JSON output (feature 18), then every worker, argument and module Mill runs, then supported Mill releases, then `--halt-on-failure`, then a module that presets a test command's arguments (feature 17), then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
+
+No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
 
 ## 2. Consolidated JSON output
 
-A test-command argument turns on JSON output, written once every event stream has ended to a file in the test command's task folder or at a path the argument gives. Builds on feature 1.
+`-fJ <path>` writes JSON output to the file at that path once every run has ended. Builds on feature 1.
 
-- The consolidation root records the ScalaTest version, the module selector with its module, and Mill's name and version; test run labels, run records and suites below it, each suite and node in the layout `JSON-LAYOUT.md` gives (R-028).
+- The JSON output encodes the entire node tree in the layout `JSON-LAYOUT.md` gives (R-028). Its root records the ScalaTest version, the module selector with its module, and Mill's name and version (`JSON-LAYOUT.md` § Not yet fixed).
 - The test command deletes or empties the file before any test starts.
-- The format is documented for third-party readers.
+- The format is documented for third-party readers (`JSON-LAYOUT.md` § Compatibility).
 
 Enables:
 
-- `SPECIFICATION.md` R-028, R-121, R-122, R-096–R-105 and R-112 (JSON output), R-108, R-109, R-055 (JSON on; JSON path), R-080, R-081 (ScalaTest version; module selectors; Mill name and version), R-084, R-085, R-049, R-077, R-020, R-021, R-012 and R-086 (in JSON), R-113 (JSON)
-- `ARCHITECTURE.md` § Modules § Consolidation library (Writers: JSON), § APIs § The Mill plugin and the consolidation library (Start: JSON sink; build tool name and version), § Data flow (JSON to the file the test command supplies)
+- `SPECIFICATION.md` R-028, R-084, R-096a, R-130a–R-130f, R-104, R-105, R-097a, R-097b, R-043, R-098a–R-098d, R-095a, R-095b and R-103 (in JSON), R-055 (a JSON file), R-049a (`-fJ`), R-077, R-020, R-011, R-063, R-074a, R-113 (JSON)
+- `JSON-LAYOUT.md` § Compatibility, § Tree, § Nodes, § Messages, § Captured output, § Not yet fixed (the root: ScalaTest version; module selectors; Mill name and version), § Run nodes
+- `ARCHITECTURE.md` § Modules § Consolidation library (Writers: JSON), § APIs § The Mill plugin and the consolidation library (Start: a JSON file's sink; build tool name and version), § Data flow (each output a `-f` names: JSON)
 
 Settles:
 
-- The JSON arguments' spelling and the default file name (R-055, R-049).
-- Key names above the suites: the root, test run labels, module selectors and build tool (R-028 fixes only the suites and below; R-080 fixes a run record's keys other than its identifier's).
-- The form and key of a run's identifier, unique within its label (R-080).
-- Where the JSON documentation lives (R-084).
+- Key names above the suites: the root, module nodes, module selectors and build tool (`JSON-LAYOUT.md` § Nodes fixes only the suites and below; `JSON-LAYOUT.md` § Run nodes fixes a run node's keys other than its identifier's).
+- The form and key of a run's identifier, unique within its module (`JSON-LAYOUT.md` § Run nodes).
+- How a module holds the state of a run that has no node, and tells that run's outcome from its own (R-135, R-098d, R-098e; `JSON-LAYOUT.md` § Tree).
+- How a node's children and messages are ordered among each other (`JSON-LAYOUT.md` § Nodes; R-105 and R-043 order each kind alone).
+- Whether a node that ran always has a `duration` (R-103 gives every node that ran one, falling back to the sum of its children's; `JSON-LAYOUT.md` § Nodes and § Run nodes leave `duration` absent where no event supplies it).
+- A module's outcome reasons, *not run* and *could not start*, under `--halt-on-failure` (R-098e gives a module an outcome only on an error).
+- The JSON output's compatibility promise (R-084 says only that the JSON output is versioned against this fork; the semantic-versioning promise is `JSON-LAYOUT.md` § Compatibility's alone).
+- The order of modules and of top-level suites (`JSON-LAYOUT.md` § Tree orders both by name; R-105 orders nodes by declaration order where it is known).
+- Whether a suite that has no events, and that a run was to execute, is written inside that run's node (R-101, R-136; `JSON-LAYOUT.md` § Tree writes every such suite as a child of its module).
+- Where the JSON documentation lives, beyond `JSON-LAYOUT.md`.
 
 Risks:
 
-- `decisions/runs-labels-and-selectors.md` "In consolidated output a run is not a node…" (Costs: two layouts)
 - `decisions/outputs.md` "Each JSON node holds its final state, with nothing per event." (Costs)
 - `research/emission-gap-analysis.md` § 9 (run-level facts needing new code)
 
 ## 3. Every worker of a JVM module
 
-The test command runs a JVM module in the processes Mill's fork grouping, test parallelism and test queue start, and consolidates every run under the module's label: one human-readable block per run that R-082 names, one run record per run, nothing of one run shown on another. A worker given no task is still a run. Builds on features 1 and 2.
+The test command runs a JVM module in the processes Mill's fork grouping, test parallelism and test queue start, and consolidates every run under the module's node: each forked run is a run node (R-096a), which the human-readable output shows only where the run failed or has output attached (R-082). Nothing of one run is shown on another. A worker given no task is still a run. Builds on features 1 and 2.
 
 Enables:
 
-- `SPECIFICATION.md` R-053 (fork grouping, test parallelism, test queue), R-071 (a run given no task), R-022, R-043, R-080 and R-082 (several runs on a label)
+- `SPECIFICATION.md` R-053a and R-053b (fork grouping, test parallelism, test queue), R-043, R-096a and R-082 (several runs in a module), R-046c and R-137 (for every worker)
+- `JSON-LAYOUT.md` § Run nodes (several runs in a module)
 - `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument: each worker given the absolute path of the file in its own `processFolder`; the event log file read in every `processFolder`; a JVM worker's stdout and stderr tied to its run by its `processFolder`), § Data flow (JVM bullet: drives Mill's test queue), § External systems (Mill: fork grouping, test parallelism, test queue)
 
 Settles:
 
-- The order of a label's run blocks and run records (R-079 orders labels and suites only).
+- The order of a module's run nodes (R-105 orders nodes with no declared order by label; whether a run has a label to order by is open: compared as text, `Run 10:` sorts before `Run 2:`).
 
 Risks:
 
 - `research/mill-parallel-worker-capture.md` § 5 and `research/mill-runner-progress-without-trait.md` § 6 (on Windows a class sometimes runs on two workers; worker counts vary, under Mill's own task too)
 - `research/emission-gap-analysis.md` § 11 (whether a JVM worker executes its tasks one at a time)
 - `research/jvm-file-channel.md` § 5 (a module with no test class spawns one worker)
+- `human-readable-one-jvm-module/research/mill-plugin-conventions.md` § 5 (at Mill 1.3.1 a module that sets `testBatchFrameworkTasks` runs one worker per fork group, each with its whole class list and no queue or claim files; a module that does not runs one worker per fork group with test parallelism off or one class selected)
 - `research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
-- `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after item 1; paths with spaces untried)
+- `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after the `runStarted` event; paths with spaces untried)
 
 ## 4. Class globs, framework arguments and JUnit XML
 
@@ -55,73 +65,75 @@ The test command takes class globs and framework arguments as Mill's `testOnly` 
 
 Enables:
 
-- `SPECIFICATION.md` R-055 (class globs, framework arguments), R-053 (`testOnly` or `testForked`; arguments), R-110, R-111, R-047
-- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument appended to the framework arguments)
+- `SPECIFICATION.md` R-055 (class globs, framework arguments), R-053a and R-053b (`testOnly` or `testForked`; class globs and framework arguments), R-110, R-047
+- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument among the arguments the test command adds to each run's), § Data flow (the ScalaTest arguments corresponding to the test command's class globs and framework arguments)
 
 Settles:
 
-- Where the folder the test command owns for each module sits (R-110 places it only outside the test command's task folder).
+- Where the folder the test command owns for each module sits (R-110 does not place it).
 
 Risks:
 
+- `decisions/test-command.md` "A test module's `testArgsDefault` arguments outside … are suppressed…" (whether the list should also govern the test command's own framework arguments)
 - `decisions/capture-and-console.md` "Under the test command, Mill's own console results for a module's tests are replaced by the consolidated output." (Costs: no report at Mill's usual path)
-- `ARCHITECTURE-DECISIONS.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible beside the user's framework arguments)
-- `research/mill-test-without-module-trait.md` § 4 (R-053 compared on the JVM only)
+- `decisions/architecture-test-event-log.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible among the ScalaTest arguments each run receives)
+- `research/mill-test-without-module-trait.md` § 4 (R-053a and R-053b compared on the JVM only)
 
 ## 5. Many modules in one test command
 
 The test command takes several module selectors, resolves each to its test modules (a module two module selectors name runs once), and runs every selected module's tests in one nested evaluation with fail-fast off: each starts on its own compile, whatever happens to the others. Builds on features 2 and 4.
 
-- One test run label per module, in label order; the JSON root records each module selector with its modules.
-- A module whose tests cannot start is aborted *could not start*, with its failure, and fails the test command.
+- One module node per module, in the order R-105 gives; the JSON root records each module selector with its modules.
+- A module whose tests cannot start, as when it fails to compile, has an outcome showing that error (R-098e), and fails the test command.
 - A module that does not test with this release of the fork fails the test command before any test starts. Until features 11–13, so does every Scala.js and Native module.
 
 Enables:
 
-- `SPECIFICATION.md` R-055 (several module selectors), R-056, R-061, R-062, R-059 (test framework and fork release), R-058, R-083, R-046 (third bullet), R-078 and R-079 (several labels), R-081 (each module selector with its modules), R-025
+- `SPECIFICATION.md` R-055 (several module selectors), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
+- `JSON-LAYOUT.md` § Not yet fixed (the root: each module selector with its modules)
 - `ARCHITECTURE.md` § Modules § Mill plugin (Test command: resolves the module selectors), § APIs § The Mill plugin and the consolidation library (Start: module selectors; Add a module whose tests did not start), § Data flow (one nested evaluation with fail-fast off)
 
 Settles:
 
 - How the test command tells that a module tests with this release of the fork (R-059).
 - What the test command does with a module selector that resolves to no test module.
-- How the failure that stopped a module is shown (R-058).
+- How the error that stopped a module is shown (R-098e gives the module an outcome, not its form).
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test command runs every selected module's tests in one nested evaluation of its own…" (Costs: reflection on a `private val`; a copy of `mill.exec.Execution`; its failure count on the prompt)
+- `decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…" (Costs: reflection on a `private val`; a copy of `mill.exec.Execution`; its failure count on the prompt)
 - `research/mill-nested-keep-going.md` § 2 (concurrent `execute` calls break Mill's pool), § 5
 - `research/mill-command-lifetime.md` § 2.2 (the body is skipped after an earlier failure without `--keep-going`), § 2.6 (one evaluation, not one Mill command)
 - `decisions/test-command.md` "A selected test module that does not test with the release of this fork…" (Costs: mixed builds narrow their module selectors)
 
 ## 6. Supported Mill releases
 
-Each release of the fork lists the Mill releases its integration tests passed on. On any other Mill release the test command warns before any test starts, naming the running Mill version; the human-readable output repeats the warning and the JSON root records that the release is unsupported. Where a Mill internal it needs is missing, it may instead fail before any test starts, naming the Mill version. Mill's test tasks and IDE launches behave as without the plugin on every Mill release it runs on. Builds on features 2 and 5. Every later feature holds on every supported release.
+Each release of the fork lists the Mill releases its integration tests passed on. On any other Mill release the test command warns on the console and in any file outputs before any test starts, naming the running Mill version (R-093), and any JSON root records that the release is unsupported (`JSON-LAYOUT.md` § Not yet fixed). Beyond that warning, its behaviour on such a release is undefined. Mill's test tasks and IDE launches behave as without the plugin on every Mill release it runs on. Builds on features 2 and 5. Every later feature delivers its behaviour on every supported release.
 
 Enables:
 
-- `SPECIFICATION.md` R-093, R-118, R-119, R-120, R-081 (support status), § Scope (supported Mill releases)
+- `SPECIFICATION.md` R-003 and R-060 (on unsupported Mill releases), R-093, § Scope (supported Mill releases)
+- `JSON-LAYOUT.md` § Not yet fixed (the root: support status)
 - `ARCHITECTURE.md` § Modules § Mill plugin (integration tests under Mill's testkit; API confined to classes the test command alone loads), § APIs § The Mill plugin and the consolidation library (Start: support status and warning)
 
 Settles:
 
 - Where a release records its supported Mill releases, and how CI runs the integration tests on each.
-- How the test command detects a missing Mill internal before any test starts (R-118).
 
 Risks:
 
-- `decisions/test-command.md` "A release of the Mill plugin supports exactly the Mill releases its integration tests passed on, not a range." (Costs) and "On an unsupported Mill release, the test command runs and warns." (Costs: a linkage error below the built-against release)
+- `decisions/test-command.md` "A release of the Mill plugin supports exactly the Mill releases its integration tests passed on, not a range." (Costs) and "On an unsupported Mill release, the test command warns on the console and in every file output…" (a linkage error below the built-against release)
 - `decisions/event-log-contract.md` "Every release of the Mill plugin is a release of the fork." (Costs)
 - `research/mill-command-lifetime.md` § 7
 
 ## 7. `--halt-on-failure`
 
-Under `--halt-on-failure`, once anything has failed the test command, it starts no further selected module's tests; each such module's label is aborted *not run*. Builds on feature 5.
+Under `--halt-on-failure`, once any node has failed (R-046a, R-046b, R-046c), the test command starts no further selected module's tests. Each such module's tests are shown as not run. Builds on feature 5.
 
 Enables:
 
-- `SPECIFICATION.md` R-055 (`--halt-on-failure`), R-057, R-114
-- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Add a module whose tests did not start: *not run*), § Data flow (`--halt-on-failure` withholds modules not yet started)
+- `SPECIFICATION.md` R-055 (`--halt-on-failure`), R-056a (its exception under `--halt-on-failure`)
+- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Add a module whose tests did not start: *not run*; Read the consolidation state: *open, failed* before each module starts), § Data flow (`--halt-on-failure` withholds modules not yet started)
 
 Risks:
 
@@ -129,29 +141,28 @@ Risks:
 
 ## 8. JVM runs that do not finish
 
-When a JVM worker dies, the consolidated output still holds everything the run handed to the operating system:
+When a JVM worker dies, the consolidated output still contains everything the run handed to the operating system:
 
 - the run, and each node it left open, aborted; every scope and test a constructed suite registered shown; the test that ended the process shown;
-- a worker that dies before its first task, or before any run exists in it, shown on its label, with the output captured from its streams;
+- the output captured from the streams of a worker that dies before its first task, or before any run exists in it, attached to the most specific node that can be identified (R-076);
 - the test command compiles each module's test manifest from Mill's queue and claim files, writing no file of its own; with each run, and each process in which no run existed, it gives the library the test classes its worker claimed, tied to the worker by its `processFolder`;
 - each test class claimed by a run that did not finish, or by a process in which no run existed, and reported as a suite by no run, shown once by class name;
-- test classes left in a fork group's queue when its last worker ended shown as not run;
-- each run that does not finish, and each process that ends before any run exists in it, fails the test command; classes left in a queue do not; an interrupted test command writes no human-readable or JSON output.
+- test classes left in a fork group's queue when its last worker ended shown as not run.
 
 Builds on features 2 and 3.
 
 Enables:
 
-- `SPECIFICATION.md` R-064, R-065, R-066, R-094, R-095, R-123, R-075, R-073, R-076, R-068, R-071 (a process that dies before its first task), R-082 (third bullet: did not finish), R-046 (does not finish; no run), R-115, R-069, R-116, R-117
-- `ARCHITECTURE.md` § Modules § Consolidation library (Runs that do not finish), § Modules § Mill plugin (Test command: compiles each module's test manifest; Test manifest, on the JVM), § APIs § The emitter and the Mill plugin (a `processFolder` with no event log file is a worker in which no run existed), § APIs § The Mill plugin and the consolidation library (Add a run and Add a process that ended before any run existed in it: the test classes the process took; Add a test class), § Data flow (the module's test classes, on the JVM; failure path)
+- `SPECIFICATION.md` R-095b, R-102, R-095a (suites, scopes and tests of a run that does not finish; test classes no run reported), R-130c and R-105 (test classes aborted with reason *not run*), R-136 (claim files), R-106c (on a run that does not finish), R-073, R-076, R-082 (a run that failed)
+- `ARCHITECTURE.md` § Modules § Consolidation library (Runs that do not finish), § Modules § Mill plugin (Test command: compiles each module's test manifest; Test manifest, on the JVM), § APIs § The emitter and the Mill plugin (a `processFolder` with no event log file is a worker in which no run existed), § APIs § The Mill plugin and the consolidation library (Add a run and Add a process that ended before any run existed in it: the test classes the process claimed; Add a test class), § Data flow (the module's test classes, on the JVM; failure path)
 
 Settles:
 
-- The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-064 aborts them and states no reason; R-102 gives the run *process failed*, and R-100 gives registered scopes and tests that never started *not run*).
+- The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-095b aborts them and states no reason; R-102 gives the run *process failed*, and R-095a gives registered suites, scopes and tests that have no events *not run*).
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: Mill's `@internal` queue and claim layout; on Windows one class in two workers' `claim.log`, `research/emitter-plugin-spike.md` § 2)
+- `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: Mill's `@internal` queue and claim layout; on Windows one class in two workers' `claim.log`, `research/emitter-plugin-spike.md` § 2)
 - `decisions/run-that-does-not-finish.md` "A suite's scopes and tests come from the run, one suite at a time…" (Costs) and "When a run's process dies, the consolidated output holds everything the run handed to the operating system before it died." (Costs)
 - `research/emitter-plugin-spike.md` § 4 (Mill reports `out.json does not exist` for a dead worker)
 - `research/jvm-file-channel.md` § 8 (a worker killed between tasks or with classes queued, not run)
@@ -159,21 +170,28 @@ Risks:
 
 ## 9. Progress output on Mill's console
 
-Progress output is on by default and written while the runs execute: whole lines through the test command's `Task.log`, showing every failure and every other cause of failure as it arrives (a run that aborts or does not finish as soon as its stream ends), and, where Mill redraws its prompt, a one-line summary on the test command's prompt line through `Task.log.ticker`. A test-command argument turns it off. Builds on features 5 and 8.
+Progress output is written while the runs execute, as new data reaches it. It reports a summary of the number of suites and tests expected to run and their current completion state, success and failure included, always with the most recent values. Progress output is written:
+
+- on stdout, with no `-o` or with `P` on `-o`: through the test command's Mill logging, redrawn in place where it can be;
+- in the file `-fP <path>` names.
+
+Builds on features 5, 8 and 16.
 
 Enables:
 
-- `SPECIFICATION.md` R-026, R-048 (progress), R-055 (progress off), R-090, R-089, R-091, R-067, R-020 (progress with JSON), R-050 (the nested tasks' prefix)
-- `ARCHITECTURE.md` § Modules § Consolidation library (Writers: progress), § APIs § The Mill plugin and the consolidation library (Start: line and summary sinks), § Data flow (progress output through the test command's Mill logging)
+- `SPECIFICATION.md` R-026, R-048 (`P`), R-049a (`-fP`), R-055 (progress output on stdout and in files), R-090a–R-090e, R-089, R-091, R-020 (progress with JSON; progress on stdout and in a file), R-077 (a progress file), R-050a (the nested tasks' prefix)
+- `ARCHITECTURE.md` § Modules § Consolidation library (Writers: progress), § APIs § The Mill plugin and the consolidation library (Start: the summary's sink on stdout; a progress file's sink), § Data flow (progress output on stdout through the test command's Mill logging; each output a `-f` names: progress)
 
 Settles:
 
-- The content of progress lines and of the summary (R-090 and R-089 fix what they show, not their form).
-- The spelling of the argument that turns progress output off (R-055 gives its effect only).
+- The form of the progress summary (R-090a fixes what it reports, not its form), and whether it is debounced (R-090d). This feature may redefine the format of the summary line that the feature `human-readable-one-jvm-module` prints (`human-readable-one-jvm-module/specification/layout-lines.md` § The summary line), and that summary line then follows this feature's (R-141).
+- How progress output counts before a run's event stream ends, where attribution and the suites its end aborts are not yet decided, so that its last summary equals the summary line (R-141; `human-readable-one-jvm-module/technical-design/consolidation-library.md` § The summary line).
+- What a progress file contains, where nothing can be redrawn in place (R-089).
+- Which formatting and filtering characters other than `w` apply to progress output (R-090e names `w`; R-106g, R-127a and R-127b name only the human-readable output).
 
 Risks:
 
-- `decisions/capture-and-console.md` "On the console, progress output is a one-line summary rewritten in place plus whole lines…" (Costs: summary cut to width and gone when the evaluation returns; lost `Task.log` lines under Windows pseudo-consoles; `mill.internal` prompt ordering; `1-<n>]` prefix)
+- `decisions/capture-and-console.md` "Progress output is a summary of the number of suites and tests expected to run…" (summary cut to width and gone when the evaluation returns; lost `Task.log` lines under Windows pseudo-consoles; `mill.internal` prompt ordering; `1-<n>]` prefix)
 - `research/nested-prompt-console.md` § 2.2, § 3.3 (at most rows/3 − 1 task lines), § 4, § 6 (`execute(tasks, logger = Task.log)`)
 - `research/mill-command-lifetime.md` § 4.2 (no prompt under `--ticker false`; plain lines where the width is unknown)
 
@@ -183,7 +201,8 @@ Inside each JVM run, output that capture can tie to a suite, scope or test is ca
 
 Enables:
 
-- `SPECIFICATION.md` R-010 and R-012 (output captured against a node), R-088, R-087, R-011 (captured output)
+- `SPECIFICATION.md` R-097a and R-097b (output captured against a node), R-043, R-087, R-011 (captured output)
+- `JSON-LAYOUT.md` § Captured output (each piece of output written at most once)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Test output capture, on the JVM)
 
 Settles:
@@ -198,58 +217,60 @@ Risks:
 
 The test command runs Scala.js modules whose JS environment is `NodeJs`, and fails before any test starts on any JS environment other than `NodeJs` and `JsDom` (`JsDom` until feature 12 too):
 
-- core's structure wrapper, emitter and encoder on Scala.js; item 1 carries the VM's PID; the test event log is the module's one event log file, named by the runner argument and written with Node's synchronous `fs`;
+- core's structure wrapper, emitter and encoder on Scala.js; the `runStarted` event carries the VM's PID; the test event log is the module's one event log file, named by the runner argument and written with Node's synchronous `fs`;
 - the plugin's Scala.js launcher (a C program in a job object on Windows, built by the plugin's Mill build and shipped in its jar; a `/bin/sh` script that `exec`s on Linux and macOS) swapped into `jsEnvConfig` in the plugin's own evaluation of the module's test task;
 - the launcher's header gives each VM's PID and start time, ending the run's stream on the VM's exit and tying its stdout and stderr files to the run; a VM that dies before any run exists in it is shown as R-076 states;
-- the module's test manifest: the test classes the test command learns before it evaluates the module's test task and holds in memory, all taken by the module's one process and shown as feature 8 shows a JVM worker's.
+- the module's test manifest: the test classes the test command learns before it evaluates the module's test task and keeps in memory, all claimed by the module's one process and shown as feature 8 shows a JVM worker's.
 
 Builds on features 5 and 8.
 
 Enables:
 
-- `SPECIFICATION.md` R-059 (JS environment), § Scope (Scala.js Scala versions), and on Scala.js under `NodeJs`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-066, R-076, R-094, R-022, R-040, R-041 (the default reporter off), R-042, R-043 (order in the launcher's files), R-044, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files; Test manifest, on Scala.js), § APIs § The emitter and the Mill plugin (the runner argument and item 1 under `NodeJs`; the module's one event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § APIs § The Mill plugin and the consolidation library (the test classes the process took, on Scala.js), § Data flow (Scala.js and Native bullet: `jsEnvConfig`; the module's test classes, on Scala.js), § External systems (Scala.js test adapter; `destroyForcibly()`)
+- `SPECIFICATION.md` R-059 (JS environment), § Scope (Scala 3 on Scala.js), and on Scala.js under `NodeJs`: R-001, R-002, R-051, R-063, R-011, R-074a, R-074b, R-073, R-095a, R-076, R-040, R-106f, R-125a, R-125b, R-097a, R-097b, R-087, R-043 (order in the launcher's files), R-044, R-053a, R-053b, R-110, R-047
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files; Test manifest, on Scala.js), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event under `NodeJs`; the module's one event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § APIs § The Mill plugin and the consolidation library (the test classes the process claimed, on Scala.js), § Data flow (Scala.js and Native bullet: `jsEnvConfig`; the module's test classes, on Scala.js), § External systems (Scala.js test adapter; `destroyForcibly()`)
 
 Settles:
 
-- How R-044 holds under Mill's own test task run with the plugin's `TaskCtx`, on Scala.js and, in feature 13, Native (`ARCHITECTURE.md` is silent; `research/native-stdio-wrapper.md` § 4 records Mill's own results line).
-- The C toolchain that cross-compiles the Windows launcher (`ARCHITECTURE-DECISIONS.md` "The Mill plugin is built by its own Mill build in this repo." Costs).
+- How the test command meets R-044 under Mill's own test task run with the plugin's `TaskCtx`, on Scala.js and, in feature 13, Native (`ARCHITECTURE.md` is silent; `research/native-stdio-wrapper.md` § 4 records Mill's own results line).
+- The C toolchain that cross-compiles the Windows launcher (`decisions/architecture-library-and-modules.md` "The Mill plugin is built by its own Mill build in this repo." Costs).
 - The names of each launcher's file pair in the launcher folder.
-- How the test command learns a Scala.js module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-066 and R-094 cannot hold on Scala.js, and `SPECIFICATION.md` § Scope needs that exception.
+- How the test command learns a Scala.js module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-095a cannot be met on Scala.js, and `SPECIFICATION.md` § Scope needs that exception.
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
-- `ARCHITECTURE-DECISIONS.md` "Every Scala.js VM starts through a launcher the plugin supplies…" (Costs: shipped Windows binary; ARM64 emulation; start-up cost; not run on macOS)
-- `ARCHITECTURE-DECISIONS.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time)
-- `ARCHITECTURE-DECISIONS.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: one process hosting several runs)
-- `ARCHITECTURE.md` § Modules § ScalaTest core, Emitter (Scala.js runners ignore `-C` and build no `RunStarting`; `research/node-native-file-channel.md` § 1)
+- `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
+- `decisions/architecture-running-tests.md` "Every Scala.js VM starts through a launcher the plugin supplies…" (Costs: shipped Windows binary; ARM64 emulation; start-up cost; not run on macOS)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time)
+- `decisions/architecture-test-event-log.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: one process hosting several runs)
+- `decisions/architecture-test-event-log.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Alternatives: Scala.js runners ignore `-C` and build no `RunStarting`)
 - `research/emission-gap-analysis.md` § Short answer (run-level events and a throwing constructor need new code on Scala.js and Native)
 - `research/js-stdout-launcher.md` § 3.3 (without a job object the VM outlives a killed launcher), § 12 (not run: macOS, `--no-daemon`, a compiled launcher on Linux)
+- Mill 1.3.1, which the plugin is built against, corrects a loss of data on stream close in Scala.js and Native test reporting. The launcher research ran on Mill 1.1.10 (`research/jsdom-channel.md` § 4: output Mill had not read is discarded); what the launcher is still needed for on 1.3.1 is unchecked.
+- `jvm/core/src/main/scala/org/scalatest/tools/ArgsParser.scala`, `ArgsParser.parseArgs` (its `SKIP-SCALATESTJS,NATIVE` markers): on Scala.js and Native it appears to reject `-D`, `-P`, `-F`, `-T` and `-W`, which R-125a passes. Not checked against those builds.
 
 ## 12. Scala.js under `JsDom`
 
-The test command also runs Scala.js modules whose JS environment is `JsDom`. Each run writes its test event log's items as framed lines with the window's `console.log`, each carrying the framing prefix, the test command's nonce from the runner argument and the run's own ID from item 1; event log reading takes them from the launcher's stdout file, and every other line is the process's ordinary output, captured against the run whose items the file holds. Builds on feature 11.
+The test command also runs Scala.js modules whose JS environment is `JsDom`. Each run writes its test event log's events as framed lines with the window's `console.log`, each carrying the framing prefix, the test command's nonce from the runner argument and the run's own ID from the `runStarted` event; event log reading takes them from the launcher's stdout file, and every other line is the process's ordinary output, captured against the run whose events the file contains. Builds on feature 11.
 
 Enables:
 
-- `SPECIFICATION.md` R-059 (`JsDom` accepted), and under `JsDom`: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-076, R-022, R-040, R-041 (the default reporter off), R-042, R-043 (order in the launcher's files), R-044, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; item 1 under `JsDom`; framed lines; a pair tied to its run by its items), § External systems (`JsDom` window code has no `require` or `process`)
+- `SPECIFICATION.md` R-059 (`JsDom` accepted), and under `JsDom`: R-001, R-002, R-051, R-063, R-011, R-074a, R-074b, R-073, R-076, R-040, R-106f, R-125a, R-125b, R-097a, R-097b, R-087, R-043 (order in the launcher's files), R-044, R-053a, R-053b, R-110, R-047
+- `ARCHITECTURE.md` § Modules § Mill plugin (Event log reading of launchers' stdout files), § APIs § The emitter and the Mill plugin (runner argument's prefix and nonce; the `runStarted` event under `JsDom`; framed lines; a pair tied to its run by its events), § APIs § The Mill plugin and the consolidation library (Build the runner argument: prefix and nonce), § External systems (`JsDom` window code has no `require` or `process`)
 
 Settles:
 
-- The framing prefix, how the nonce is made, the ID a `JsDom` run gives itself in item 1, and how the codec keeps each item to one line.
+- The framing prefix, how the nonce is made, and the ID a `JsDom` run gives itself in the `runStarted` event.
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: holds only while every item is one whole line)
-- `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted items), § 11 (jsdom other than `27.4.0` not run)
+- `decisions/architecture-test-event-log.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: readable only while every event is one whole line)
+- `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted events), § 11 (jsdom other than `27.4.0` not run)
 
 ## 13. Scala Native
 
 The test command runs Native modules:
 
-- core's structure wrapper, emitter and encoder on Native; item 1 carries the binary's PID and start time; the test event log is the module's one event log file, named by the runner argument and written through `FileOutputStream`;
+- core's structure wrapper, emitter and encoder on Native; the `runStarted` event carries the binary's PID and start time; the test event log is the module's one event log file, named by the runner argument and written through `FileOutputStream`;
 - a Native launcher per module, compiled with the module's `nativeClang` with the launcher folder and real binary's path compiled in, swapped into `nativeLink`; it starts `<CROSSCOMPILING_EMULATOR words> <binary> <port>` and writes the binary's stdout and stderr to its own files, headed with the binary's PID and start time;
 - the module's test manifest, as feature 11;
 - a binary that crashes fails the test command, though Mill's own task passes it.
@@ -258,21 +279,23 @@ Builds on features 8 and 11.
 
 Enables:
 
-- `SPECIFICATION.md` § Scope (Native Scala versions), and on Native: R-001, R-002, R-051 and R-063 (with the emitter on), R-010, R-011, R-074, R-071, R-073, R-066, R-076, R-094, R-022, R-040, R-041 (the default reporter off), R-042, R-043 (order in the launcher's files), R-044, R-046, R-053, R-110, R-111, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in; Test manifest, on Native), § APIs § The emitter and the Mill plugin (the runner argument and item 1 on Native; the module's one event log file on Native; header and item 1 carrying the same PID and start time), § APIs § The Mill plugin and the consolidation library (the test classes the process took, on Native), § Data flow (Scala.js and Native bullet: `nativeLink`; the module's test classes, on Native), § External systems (Native test adapter; `inheritIO()`)
+- `SPECIFICATION.md` § Scope (Scala 3 on Native), and on Native: R-001, R-002, R-051, R-063, R-011, R-074a, R-074b, R-073, R-095a, R-076, R-040, R-106f, R-125a, R-125b, R-097a, R-097b, R-087, R-043 (order in the launcher's files), R-044, R-046c, R-137, R-053a, R-053b, R-110, R-047
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in; Test manifest, on Native), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event on Native; the module's one event log file on Native; header and the `runStarted` event carrying the same PID and start time), § APIs § The Mill plugin and the consolidation library (the test classes the process claimed, on Native), § Data flow (Scala.js and Native bullet: `nativeLink`; the module's test classes, on Native), § External systems (Native test adapter; `inheritIO()`)
 
 Settles:
 
-- Whether a module's compiled launcher is reused across test commands (`ARCHITECTURE-DECISIONS.md` "Every Native test binary starts through a launcher…" Costs). Any reuse still writes the launcher into the module's launcher folder, which the test command creates afresh for each test command (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
-- How the test command learns a Native module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-066 and R-094 cannot hold on Native, and `SPECIFICATION.md` § Scope needs that exception.
+- Whether a module's compiled launcher is reused across test commands (`decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher…" Costs). Any reuse still writes the launcher into the module's launcher folder, which the test command creates afresh for each test command (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
+- How the test command learns a Native module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-095a cannot be met on Native, and `SPECIFICATION.md` § Scope needs that exception.
 
 Risks:
 
-- `ARCHITECTURE-DECISIONS.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
-- `ARCHITECTURE-DECISIONS.md` "Every Native test binary starts through a launcher compiled with the module's toolchain…" (Costs: compiled per module; run only on Linux, `--no-daemon`, host architecture)
+- `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
+- `decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher compiled with the module's toolchain…" (Costs: compiled per module; run only on Linux, `--no-daemon`, host architecture)
 - `decisions/test-command.md` "A run that did not complete fails the test command, even where Mill's test task passes it." (Costs)
 - `research/native-stdio-wrapper.md` § 4 (Mill's results line; exit status after a crash), § 7 (another architecture under its emulator; Windows crash exit status)
 - `research/mill-test-without-module-trait.md` § 8 (Native on Linux not run)
+- Mill 1.3.1 corrects a loss of data on stream close in Scala.js and Native test reporting, as feature 11's risks note; the Native launcher research ran on Mill 1.1.10 and is unchecked on 1.3.1.
+- `ArgsParser.parseArgs` on Native may reject `-D`, `-P`, `-F`, `-T` and `-W`, which R-125a passes, as feature 11's risks note.
 
 ## 14. Test output captured against nodes on Scala.js
 
@@ -280,7 +303,7 @@ As feature 10, on Scala.js under `NodeJs` and `JsDom`: writes through `console` 
 
 Enables:
 
-- `SPECIFICATION.md` R-010, R-012, R-088, R-087, on Scala.js
+- `SPECIFICATION.md` R-011, R-097a, R-097b, R-043, R-087, and `JSON-LAYOUT.md` § Captured output, on Scala.js
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Test output capture, on Scala.js)
 
 Risks:
@@ -293,9 +316,75 @@ As feature 10, on Native: writes through `System.out` and `System.err` are captu
 
 Enables:
 
-- `SPECIFICATION.md` R-010, R-012, R-088, R-087, on Native
+- `SPECIFICATION.md` R-011, R-097a, R-097b, R-043, R-087, and `JSON-LAYOUT.md` § Captured output, on Native
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Test output capture, on Native)
 
 Risks:
 
 - `decisions/capture-and-console.md` "Test output and worker output are told apart by their source…" (Costs: a C `printf` lands on a broader node; `research/js-native-structure-and-capture.md` § 4.2)
+
+## 16. Formatting, filtering and human-readable output to a file
+
+The test command takes the formatting and filtering characters on `-o` and `-f` and applies them to human-readable output (R-138, R-139, R-106f, R-106g, R-127a, R-127b), and `-fH <path>` writes human-readable output to the file at that path. Feature 18 applies the filtering characters to JSON output. Builds on features 1 and 2.
+
+Enables:
+
+- `SPECIFICATION.md` R-138 and R-139 (parsing on every `-o` and `-f`; effect on human-readable output), R-127a, R-127b, R-106c (nodes a filtering character removes), R-106f (`w`), R-106g (`d`), R-049a (`-fH`), R-049b (more than one `-f`), R-055 (human-readable files; formatting and filtering), R-020 (human-readable on stdout and in a file), R-077 and R-059 (a human-readable file), § Scope (the test command's output arguments)
+- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Start: a sink for each output in a file; each human-readable output's characters), § Data flow (each output a `-f` names: human-readable)
+
+Settles:
+
+- Whether one `-f` may name output letters in a combination other than those R-049a lists, such as `J` with `H`.
+- What the test command does with a lowercase character outside the set R-106f, R-106g and R-127a name.
+- What the test command does with an `-o` output letter other than `H` and `P`, such as `J` (R-048 names only those two).
+
+Risks:
+
+- `decisions/outputs.md` "Each `-o` and `-f` argument takes the formatting characters `w` and `d` for human-readable output, and the filtering characters…"
+
+## 17. A module that presets a test command's arguments
+
+A build defines a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module, such as `mill performanceTests` or `mill integrationTests`, runs that test command (R-126). The build, not the user, then knows which modules and tags make up a kind of test run. Builds on features 4 and 5.
+
+Enables:
+
+- `SPECIFICATION.md` R-126, R-055 (from a module that presets them), R-092 (modules a preset module selects), § Scope (a module that presets a test command's arguments)
+
+Settles:
+
+- How a build defines such a module (R-126 gives its effect only).
+- How arguments given on its `mill` command combine with its presets.
+
+Risks:
+
+- `decisions/test-command.md` "Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged." (Costs: built on evaluator commands that Mill documents as experimental), which a preset module's command must reach
+
+## 18. Filtering characters on JSON output
+
+The filtering characters on a `-fJ` argument omit nodes and messages from the JSON output that argument names. Builds on features 2 and 16.
+
+- `c` omits succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes (R-127c).
+- A scope whose children have all been omitted is omitted, recursively (R-127d).
+- The characters apply only to the `-fJ` they are attached to: another `-f` or the `-o` of the same test command is unaffected, and a `-fJ` with no filtering character writes every node (R-139, R-028).
+
+Enables:
+
+- `SPECIFICATION.md` R-127c, R-127d, R-138 and R-139 (filtering characters on a `-fJ`), R-028 (the tree less what filtering characters omit), R-055 (filtering of JSON output)
+- `JSON-LAYOUT.md` § Tree (every node except what the `-f` argument's filtering characters omit)
+
+Settles:
+
+- How the JSON writer is given its `-f` argument's filtering characters (`ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, Start, gives characters for each human-readable output only).
+- Whether the JSON output records which filtering characters were applied, or that a node's `contents` had nodes or messages omitted (`JSON-LAYOUT.md` § Nodes, § Messages and § Not yet fixed are silent).
+- Where the output captured against an omitted test or scope goes (R-127c and R-127d are silent; `JSON-LAYOUT.md` § Captured output).
+- Whether a scope is omitted when its tests and scopes are all omitted but a message remains in its `contents`, or output is captured against it (R-127d speaks of its children).
+- Whether a suite, run node or module is omitted when everything beneath it is omitted (R-127d names scopes only).
+- What a formatting character, `w` or `d`, does on a `-fJ` (R-138 allows formatting characters on each `-f`; R-106f and R-106g name the human-readable output only).
+
+Risks:
+
+- `JSON-LAYOUT.md` § Nodes ("No node's outcome is rolled up from its children; readers of the output roll up outcomes themselves"): a reader rolling up a filtered tree counts only the nodes left.
+
+## Deferred
+
+- Showing a test that ran more than once, such as one a retry wrapper reruns, as one line in the human-readable output. Each time it ran is shown as its own line.

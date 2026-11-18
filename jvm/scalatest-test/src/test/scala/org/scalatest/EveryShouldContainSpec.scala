@@ -532,8 +532,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine1 = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine1)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) did not contain element 1 (EveryShouldContainSpec.scala:" + offendingLine1 + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) did not contain element 1 (EveryShouldContainSpec.scala:" + offendingLine1 + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -542,8 +542,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e2.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine2 = thisLineNumber - 3
         e2.failedCodeLineNumber.get should be (offendingLine2)
-        e2.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) contained element 4 (EveryShouldContainSpec.scala:" + offendingLine2 + ") \n" +
+        e2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) contained element 4 (EveryShouldContainSpec.scala:" + offendingLine2 + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
 
         val e3 = intercept[TestFailedException] {
@@ -552,8 +552,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e3.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine3 = thisLineNumber - 3
         e3.failedCodeLineNumber.get should be (offendingLine3)
-        e3.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) did not contain element 1 (EveryShouldContainSpec.scala:" + offendingLine3 + ") \n" +
+        e3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) did not contain element 1 (EveryShouldContainSpec.scala:" + offendingLine3 + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -614,8 +614,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiLists(0)) + " did not contain null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiLists(0)) + " did not contain null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiLists)))
       }
     }
@@ -634,8 +634,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -673,8 +673,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -693,8 +693,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -732,8 +732,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -752,8 +752,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -791,8 +791,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -812,8 +812,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -851,8 +851,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -871,8 +871,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, Many(4, 5, 6) contained element 6 (EveryShouldContainSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in Many(Many(1, 2, 3), Many(1, 2, 3), Many(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -910,8 +910,8 @@ class EveryShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("EveryShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (EveryShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }

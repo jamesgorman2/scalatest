@@ -1004,6 +1004,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, args) =>
     import args._
 
     val theTestNames = testNames
@@ -1013,7 +1014,14 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     // into error messages on the standard error stream.
     val report = wrapReporterIfNecessary(thisSuite, reporter)
     val newArgs = args.copy(reporter = report)
-    
+
+    // Read in the order 3.2.20 passes them to the filter.
+    def tagsAndSuiteId: (Map[String, Set[String]], String) = {
+      val theTags = tags
+      val theSuiteId = suiteId
+      (theTags, theSuiteId)
+    }
+
     val statusBuffer = new ListBuffer[Status]()
 
     // If a testName is passed to run, just run that, else run the tests returned
@@ -1021,25 +1029,33 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     testName match {
 
       case Some(tn) =>
-        val (filterTest, ignoreTest) = filter(tn, tags, suiteId)
+        val (theTags, theSuiteId) = tagsAndSuiteId
+        registration.suiteIdRead(theSuiteId)
+        val (filterTest, ignoreTest) = filter(tn, theTags, theSuiteId)
         if (!filterTest) {
           if (ignoreTest)
-            reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)))
+            reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
           else
-            statusBuffer += runTest(tn, newArgs)
+            statusBuffer += runTest(tn, registration.argsOfTest(tn, newArgs))
         }
 
       case None =>
-        for ((tn, ignoreTest) <- filter(theTestNames, tags, suiteId)) {
+        val (theTags, theSuiteId) = tagsAndSuiteId
+        val keptTests = filter(theTestNames, theTags, theSuiteId)
+        // Kept before the suite ID is, so that a suite no structure holds has its tests in its first structure.
+        registration.updateStructureFromTestNames(keptTests)
+        registration.suiteIdRead(theSuiteId)
+        for ((tn, ignoreTest) <- keptTests) {
           if (!stopper.stopRequested) {
             if (ignoreTest)
-              reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)))
+              reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
             else
-              statusBuffer += runTest(tn, newArgs)
+              statusBuffer += runTest(tn, registration.argsOfTest(tn, newArgs))
           }
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)
+    }
   }
 
   /**
@@ -1097,11 +1113,14 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
     requireNonNull(testName, args)
 
+    SuiteRegistration.registeredRun(thisSuite, args) { (registration, args) =>
     import args._
 
     val originalThreadName = Thread.currentThread.getName
     try {
-      Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, suiteName))
+      val theSuiteName = suiteName
+      registration.suiteNameRead(theSuiteName)
+      Thread.currentThread.setName(SuiteHelpers.augmentedThreadName(originalThreadName, theSuiteName))
 
       val report = wrapReporterIfNecessary(thisSuite, reporter)
       val newArgs = args.copy(reporter = report)
@@ -1120,6 +1139,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       new CompositeStatus(Set(nestedSuitesStatus, testsStatus))
     }
     finally Thread.currentThread.setName(originalThreadName)
+    }
   }
 
   /**
@@ -1168,14 +1188,21 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
+        val start = startOfNestedSuite(nestedSuite, filter, report)
+        val nestedReport = start.reporter
 
         val suiteStartTime = System.currentTimeMillis
 
-        report(SuiteStarting(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
+        val ordinal = tracker.nextOrdinal()
+        val nestedSuiteName = nestedSuite.suiteName
+        val nestedSuiteId = nestedSuite.suiteId
+        start.namesRead(nestedSuiteName, nestedSuiteId)
+        start.report(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status = nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty))
+          val status = start.run(nestedSuite.run(None, Args(nestedReport, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
@@ -1184,11 +1211,11 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
           status.unreportedException match {
             case Some(ue) =>
-              report(SuiteAborted(tracker.nextOrdinal(), ue.getMessage, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+              start.report(SuiteAborted(tracker.nextOrdinal(), ue.getMessage, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
               FailedStatus
 
             case None =>
-              report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+              start.report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
               SucceededStatus
           }
         }
@@ -1203,7 +1230,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
             val formatter = formatterForSuiteAborted(nestedSuite, rawString)
 
             val duration = System.currentTimeMillis - suiteStartTime
-            report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+            start.report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
             if (NonFatal(e.getCause))
               FailedStatus
             else
@@ -1221,12 +1248,16 @@ trait Suite extends Assertions with Serializable { thisSuite =>
       distributor match {
         case None =>
           for (nestedSuite <- nestedSuitesArray) {
-            if (!stopper.stopRequested) 
+            if (!stopper.stopRequested)
               statusBuffer += callExecuteOnSuite(nestedSuite)
           }
         case Some(distribute) =>
-          for (nestedSuite <- nestedSuitesArray) 
-            statusBuffer += distribute(nestedSuite, args.copy(tracker = tracker.nextTracker()))
+          for (nestedSuite <- nestedSuitesArray) {
+            // The distributor runs the nested suite in the context it is handed the suite in.
+            val start = SuiteStart.ofNestedSuite(nestedSuite, reporter)
+            val nestedArgs = args.copy(reporter = start.reporter, tracker = tracker.nextTracker())
+            statusBuffer += start.run(distributeNestedSuite(distribute, nestedSuite, nestedArgs))
+          }
       }
     }
     new CompositeStatus(Set.empty ++ statusBuffer)
@@ -1305,6 +1336,20 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
   // MOVE IT
   private[scalatest] def createCatchReporter(reporter: Reporter): Reporter = new WrapperCatchReporter(reporter)
+
+  // A style trait that keeps a registration tree overrides this.
+  private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
+
+  /**
+   * `reporter` is the one this suite would give the nested suite. A suite whose nested suites are top-level suites of a
+   * run that writes a test event log overrides this.
+   */
+  private[scalatest] def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): SuiteStart =
+    SuiteStart.ofNestedSuite(nestedSuite, reporter)
+
+  // A suite whose nested suites are top-level suites of a run that writes a test event log overrides this.
+  private[scalatest] def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status =
+    distribute(nestedSuite, args)
   
   /**
    * The fully qualified class name of the rerunner to rerun this suite.  This implementation will look at this.getClass and see if it is
@@ -1613,7 +1658,7 @@ used for test events like succeeded/failed, etc.
   def indentation(level: Int) = "  " * level
   
   def indentLines(level: Int, lines: GenTraversable[String]) = 
-    lines.map(line => line.split("\n").map(indentation(level) + _).mkString("\n"))
+    lines.map(line => line.split("\r?\n").map(indentation(level) + _).mkString(Prettifier.lineSeparator))
     
   def substituteHtmlSpace(value: String) = value.replaceAll(" ", "&nbsp;")
 
@@ -1629,8 +1674,17 @@ used for test events like succeeded/failed, etc.
       case _ => Vector.empty
     }
 
+  private def reportFrom(origin: EventOrigin, report: Reporter, event: org.scalatest.events.Event): Unit = {
+    origin.handOff(event)
+    report(event)
+  }
+
   def reportTestFailed(theSuite: Suite, report: Reporter, throwable: Throwable, testName: String, testText: String,
-                       recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], rerunnable: Option[String], tracker: Tracker, duration: Long, formatter: Formatter, location: Option[Location]): Unit = {
+                       recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], rerunnable: Option[String], tracker: Tracker, duration: Long, formatter: Formatter, location: Option[Location]): Unit =
+    reportTestFailed(theSuite, report, throwable, testName, testText, recordedEvents, rerunnable, tracker, duration, formatter, location, EventOrigin.none)
+
+  def reportTestFailed(theSuite: Suite, report: Reporter, throwable: Throwable, testName: String, testText: String,
+                       recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], rerunnable: Option[String], tracker: Tracker, duration: Long, formatter: Formatter, location: Option[Location], origin: EventOrigin): Unit = {
 
     val message = getMessageForException(throwable)
     //val formatter = getEscapedIndentedTextForTest(testText, level, includeIcon)
@@ -1641,18 +1695,24 @@ used for test events like succeeded/failed, etc.
         case _ => 
           None
       }
-    report(TestFailed(tracker.nextOrdinal(), message, theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, analysisFromThrowable(throwable), Some(throwable), Some(duration), Some(formatter), location, theSuite.rerunner, payload))
+    reportFrom(origin, report, TestFailed(tracker.nextOrdinal(), message, theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, analysisFromThrowable(throwable), Some(throwable), Some(duration), Some(formatter), location, theSuite.rerunner, payload))
   }
 
   // TODO: Possibly separate these out from method tests and function tests, because locations are different
   // Update: Doesn't seems to need separation, to be confirmed with Bill.
-  def reportTestStarting(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, rerunnable: Option[String], location: Option[Location]): Unit = {
-    report(TestStarting(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, Some(MotionToSuppress),
+  def reportTestStarting(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, rerunnable: Option[String], location: Option[Location]): Unit =
+    reportTestStarting(theSuite, report, tracker, testName, testText, rerunnable, location, EventOrigin.none)
+
+  def reportTestStarting(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, rerunnable: Option[String], location: Option[Location], origin: EventOrigin): Unit = {
+    reportFrom(origin, report, TestStarting(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, Some(MotionToSuppress),
       location, rerunnable))
   }
 
-  def reportTestPending(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], duration: Long, formatter: Formatter, location: Option[Location]): Unit = {
-    report(TestPending(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, Some(duration), Some(formatter),
+  def reportTestPending(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], duration: Long, formatter: Formatter, location: Option[Location]): Unit =
+    reportTestPending(theSuite, report, tracker, testName, testText, recordedEvents, duration, formatter, location, EventOrigin.none)
+
+  def reportTestPending(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], duration: Long, formatter: Formatter, location: Option[Location], origin: EventOrigin): Unit = {
+    reportFrom(origin, report, TestPending(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, Some(duration), Some(formatter),
       location))
   }
 
@@ -1665,7 +1725,11 @@ used for test events like succeeded/failed, etc.
 */
 
   def reportTestCanceled(theSuite: Suite, report: Reporter, throwable: Throwable, testName: String, testText: String,
-      recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], rerunnable: Option[String], tracker: Tracker, duration: Long, formatter: Formatter, location: Option[Location]): Unit = {
+      recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], rerunnable: Option[String], tracker: Tracker, duration: Long, formatter: Formatter, location: Option[Location]): Unit =
+    reportTestCanceled(theSuite, report, throwable, testName, testText, recordedEvents, rerunnable, tracker, duration, formatter, location, EventOrigin.none)
+
+  def reportTestCanceled(theSuite: Suite, report: Reporter, throwable: Throwable, testName: String, testText: String,
+      recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], rerunnable: Option[String], tracker: Tracker, duration: Long, formatter: Formatter, location: Option[Location], origin: EventOrigin): Unit = {
 
     val message = getMessageForException(throwable)
     val payload = 
@@ -1676,17 +1740,23 @@ used for test events like succeeded/failed, etc.
           None
       }
     //val formatter = getEscapedIndentedTextForTest(testText, level, includeIcon)
-    report(TestCanceled(tracker.nextOrdinal(), message, theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, Some(throwable), Some(duration), Some(formatter), location, rerunnable, payload))
+    reportFrom(origin, report, TestCanceled(tracker.nextOrdinal(), message, theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, Some(throwable), Some(duration), Some(formatter), location, rerunnable, payload))
   }
 
-  def reportTestSucceeded(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], duration: Long, formatter: Formatter, rerunnable: Option[String], location: Option[Location]): Unit = {
-    report(TestSucceeded(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, Some(duration), Some(formatter),
+  def reportTestSucceeded(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], duration: Long, formatter: Formatter, rerunnable: Option[String], location: Option[Location]): Unit =
+    reportTestSucceeded(theSuite, report, tracker, testName, testText, recordedEvents, duration, formatter, rerunnable, location, EventOrigin.none)
+
+  def reportTestSucceeded(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, recordedEvents: collection.immutable.IndexedSeq[RecordableEvent], duration: Long, formatter: Formatter, rerunnable: Option[String], location: Option[Location], origin: EventOrigin): Unit = {
+    reportFrom(origin, report, TestSucceeded(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, recordedEvents, Some(duration), Some(formatter),
       location, rerunnable))
   }
 
-  def reportTestIgnored(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, formatter: Formatter, location: Option[Location]): Unit = {
+  def reportTestIgnored(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, formatter: Formatter, location: Option[Location]): Unit =
+    reportTestIgnored(theSuite, report, tracker, testName, testText, formatter, location, EventOrigin.none)
+
+  def reportTestIgnored(theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, testText: String, formatter: Formatter, location: Option[Location], origin: EventOrigin): Unit = {
     val testSucceededIcon = Resources.testSucceededIconChar
-    report(TestIgnored(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, Some(formatter),
+    reportFrom(origin, report, TestIgnored(tracker.nextOrdinal(), theSuite.suiteName, theSuite.suiteId, Some(theSuite.getClass.getName), testName, testText, Some(formatter),
       location))
   }
   
@@ -1774,8 +1844,25 @@ used for test events like succeeded/failed, etc.
     location: Option[Location],
     includeNameInfo: Boolean,
     includeIcon: Boolean = true
+  ): Unit =
+    reportInfoProvided(theSuite, report, tracker, testName, message, payload, level, location, includeNameInfo, includeIcon, EventOrigin.none)
+
+  def reportInfoProvided(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    testName: Option[String],
+    message: String,
+    payload: Option[Any],
+    level: Int,
+    location: Option[Location],
+    includeNameInfo: Boolean,
+    includeIcon: Boolean,
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       createInfoProvided(
         theSuite,
         report,
@@ -1802,8 +1889,25 @@ used for test events like succeeded/failed, etc.
     location: Option[Location],
     includeNameInfo: Boolean,
     includeIcon: Boolean = true
+  ): Unit =
+    reportNoteProvided(theSuite, report, tracker, testName, message, payload, level, location, includeNameInfo, includeIcon, EventOrigin.none)
+
+  def reportNoteProvided(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    testName: Option[String],
+    message: String,
+    payload: Option[Any],
+    level: Int,
+    location: Option[Location],
+    includeNameInfo: Boolean,
+    includeIcon: Boolean,
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       createNoteProvided(
         theSuite,
         report,
@@ -1830,8 +1934,25 @@ used for test events like succeeded/failed, etc.
     location: Option[Location],
     includeNameInfo: Boolean,
     includeIcon: Boolean = true
+  ): Unit =
+    reportAlertProvided(theSuite, report, tracker, testName, message, payload, level, location, includeNameInfo, includeIcon, EventOrigin.none)
+
+  def reportAlertProvided(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    testName: Option[String],
+    message: String,
+    payload: Option[Any],
+    level: Int,
+    location: Option[Location],
+    includeNameInfo: Boolean,
+    includeIcon: Boolean,
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       createAlertProvided(
         theSuite,
         report,
@@ -1882,8 +2003,24 @@ used for test events like succeeded/failed, etc.
     location: Option[Location],
     includeNameInfo: Boolean,
     includeIcon: Boolean = true
+  ): Unit =
+    reportMarkupProvided(theSuite, report, tracker, testName, message, level, location, includeNameInfo, includeIcon, EventOrigin.none)
+
+  def reportMarkupProvided(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    testName: Option[String],
+    message: String,
+    level: Int,
+    location: Option[Location],
+    includeNameInfo: Boolean,
+    includeIcon: Boolean,
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       createMarkupProvided(
         theSuite,
         report,
@@ -1906,8 +2043,22 @@ used for test events like succeeded/failed, etc.
     level: Int,
     includeIcon: Boolean = true,
     location: Option[Location]
+  ): Unit =
+    reportScopeOpened(theSuite, report, tracker, message, level, includeIcon, location, EventOrigin.none)
+
+  def reportScopeOpened(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    message: String,
+    level: Int,
+    includeIcon: Boolean,
+    location: Option[Location],
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       ScopeOpened(
         tracker.nextOrdinal(),
         message,
@@ -1927,8 +2078,22 @@ used for test events like succeeded/failed, etc.
     level: Int,
     includeIcon: Boolean = true,
     location: Option[Location]
+  ): Unit =
+    reportScopeClosed(theSuite, report, tracker, message, level, includeIcon, location, EventOrigin.none)
+
+  def reportScopeClosed(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    message: String,
+    level: Int,
+    includeIcon: Boolean,
+    location: Option[Location],
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       ScopeClosed(
         tracker.nextOrdinal(),
         message,
@@ -1947,8 +2112,22 @@ used for test events like succeeded/failed, etc.
     level: Int,
     includeIcon: Boolean = true,
     location: Option[Location]
+  ): Unit =
+    reportScopePending(theSuite, report, tracker, message, level, includeIcon, location, EventOrigin.none)
+
+  def reportScopePending(
+    theSuite: Suite,
+    report: Reporter,
+    tracker: Tracker,
+    message: String,
+    level: Int,
+    includeIcon: Boolean,
+    location: Option[Location],
+    origin: EventOrigin
   ): Unit = {
-    report(
+    reportFrom(
+      origin,
+      report,
       ScopePending(
         tracker.nextOrdinal(),
         message,
@@ -1980,7 +2159,11 @@ used for test events like succeeded/failed, etc.
       None
   }
 
-  def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite) = {
+  def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite): Map[String, Set[String]] =
+    autoTagClassAnnotations(tags, theSuite, theSuite.testNames)
+
+  /** Applies the suite class's tag annotations to `testNames`, which are read only where the class has such an annotation. */
+  def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite, testNames: => Iterable[String]): Map[String, Set[String]] = {
     // SKIP-SCALATESTJS,NATIVE-START
     val suiteTags = for {
       a <- theSuite.getClass.getAnnotations
@@ -1990,7 +2173,7 @@ used for test events like succeeded/failed, etc.
 
     val autoTestTags =
       if (suiteTags.size > 0)
-        Map() ++ theSuite.testNames.map(tn => (tn, suiteTags.toSet))
+        Map() ++ testNames.map(tn => (tn, suiteTags.toSet))
       else
         Map.empty[String, Set[String]]
 

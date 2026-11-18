@@ -459,8 +459,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
 
         val e3 = intercept[TestFailedException] {
@@ -468,8 +468,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e3.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e3.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e3.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -529,8 +529,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, Vector(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Vector(1, 2, 3)) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, Vector(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Vector(1, 2, 3)) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, Vector(Vector(3, 2, 1), Vector(3, 2, 1), Vector(4, 3, 2)))))
       }
     }
@@ -548,8 +548,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
 
         val e4 = intercept[TestFailedException] {
@@ -557,8 +557,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e4.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, List(4, 3, 2)) + " did not contain only " + "(1, 2, 3)" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -618,8 +618,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, Vector(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Vector(1, 2, 3)) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, Vector(3, 2, 1)) + " did not contain only (" + decorateToStringValue(prettifier, Vector(1, 2, 3)) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, Vector(Vector(3, 2, 1), Vector(3, 2, 1), Vector(4, 3, 2)))))
       }
     }
@@ -633,8 +633,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -676,8 +676,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Vector("you", "to")) + "), did you forget to say : _*" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Vector("you", "to")) + "), did you forget to say : _*" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, Vector(Vector(Vector("you", "to"))))))
       }
     }
@@ -691,8 +691,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -734,8 +734,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Vector("you", "to")) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("you", "to"))) + " contained only (" + decorateToStringValue(prettifier, Vector("you", "to")) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, Vector(Vector(Vector("you", "to"))))))
       }
     }
@@ -749,8 +749,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -801,8 +801,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Vector("to", "you")) + "), did you forget to say : _*" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Vector("to", "you")) + "), did you forget to say : _*" +  " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, Vector(Vector(Vector("to", "you"))))))
       }
     }
@@ -816,8 +816,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, List("to", "you")) + " contained only " + "(\"you\", \"to\")" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -868,8 +868,8 @@ class ListShouldContainOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Vector("to", "you")) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Vector(Vector("to", "you"))) + " contained only (" + decorateToStringValue(prettifier, Vector("to", "you")) + "), did you forget to say : _*" + " (ListShouldContainOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, Vector(Vector(Vector("to", "you"))))))
       }
     }

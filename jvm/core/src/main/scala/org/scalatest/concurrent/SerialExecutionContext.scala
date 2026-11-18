@@ -19,6 +19,7 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.scalatest.InvocationContext
 import org.scalatest.Outcome
 
 /*
@@ -38,7 +39,7 @@ private[scalatest] class SerialExecutionContext extends ExecutionContext {
   private final val queue = new org.scalatest.LinkedBlockingQueue[Runnable]
 
   def execute(runnable: Runnable): Unit = {
-    queue.put(runnable)
+    queue.put(InvocationContext.carriedTo(runnable))
     // If this is a thread different than the main test thread, we'll
     // notify the main test thread in case it is sitting in the wait
     // in runNow.
@@ -108,7 +109,9 @@ private[scalatest] class SerialExecutionContext extends ExecutionContext {
   }*/
 
 
-  def runNow(future: Future[Outcome]): Unit = recRunNow(future)
+  // A task given in no invocation context runs in none, not in the context of the thread that runs it.
+  def runNow(future: Future[Outcome]): Unit =
+    if (InvocationContext.get.isEmpty) recRunNow(future) else InvocationContext.cleared(recRunNow(future))
 
   @tailrec
   private def recRunNow(future: Future[Outcome]): Unit = // Could take a scala.concurrent.duration.Deadline to be used for poll(timeout, timeUnit)

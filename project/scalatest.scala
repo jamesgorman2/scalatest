@@ -545,7 +545,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
     .settings(
       projectTitle := "ScalaTest Compatible",
       name := "scalatest-compatible",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       javaSourceManaged := target.value / "java",
       autoScalaLibrary := false, 
       crossPaths := false, // disable using the Scala version in output paths and artifacts
@@ -557,8 +557,7 @@ object ScalatestBuild extends BuildCommons with DottyBuild with NativeBuild with
         }.taskValue
       },
       scalatestDocSettings,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
+      bundleCheckedAgainstUpstream(upstreamScalatestOrganization)
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
         "org.scalatest.compatible"

@@ -185,20 +185,20 @@ println("##### " + indexedList)
       Doc.stripMargin(" \t \tHowdy") should equal ("Howdy")
     }
     "when passed a string with leading space and two lines, should return the string with the leading space omitted from the first line, and the same amound omitted from the second line, with tabs converted to one space" in {
-      Doc.stripMargin(" Howdy\n123456789") should equal ("Howdy\n23456789")
-      Doc.stripMargin("  Howdy\n123456789") should equal ("Howdy\n3456789")
-      Doc.stripMargin("   Howdy\n123456789") should equal ("Howdy\n456789")
-      Doc.stripMargin("\tHowdy\n123456789") should equal ("Howdy\n23456789")
-      Doc.stripMargin("\t\tHowdy\n123456789") should equal ("Howdy\n3456789")
-      Doc.stripMargin(" \t \tHowdy\n123456789") should equal ("Howdy\n56789")
+      Doc.stripMargin(" Howdy\n123456789") should equal ("Howdy" + org.scalactic.Prettifier.lineSeparator + "23456789")
+      Doc.stripMargin("  Howdy\n123456789") should equal ("Howdy" + org.scalactic.Prettifier.lineSeparator + "3456789")
+      Doc.stripMargin("   Howdy\n123456789") should equal ("Howdy" + org.scalactic.Prettifier.lineSeparator + "456789")
+      Doc.stripMargin("\tHowdy\n123456789") should equal ("Howdy" + org.scalactic.Prettifier.lineSeparator + "23456789")
+      Doc.stripMargin("\t\tHowdy\n123456789") should equal ("Howdy" + org.scalactic.Prettifier.lineSeparator + "3456789")
+      Doc.stripMargin(" \t \tHowdy\n123456789") should equal ("Howdy" + org.scalactic.Prettifier.lineSeparator + "56789")
     }
     "when passed a string with one or more blank lines, a line with leading space and two lines, should return the string with the leading space omitted from the first line, and the same amound omitted from the second line, with tabs converted to one space" in {
-      Doc.stripMargin("\n Howdy\n123456789") should equal ("\nHowdy\n23456789")
-      Doc.stripMargin("\n  \n\n  Howdy\n123456789") should equal ("\n\n\nHowdy\n3456789")
-      Doc.stripMargin("\n  \t\t\n   Howdy\n123456789") should equal ("\n\t\nHowdy\n456789")
-      Doc.stripMargin("\n\n\n\n\tHowdy\n123456789") should equal ("\n\n\n\nHowdy\n23456789")
-      Doc.stripMargin("\n\t\tHowdy\n123456789") should equal ("\nHowdy\n3456789")
-      Doc.stripMargin("\n      \n \t \tHowdy\n123456789") should equal ("\n  \nHowdy\n56789")
+      Doc.stripMargin("\n Howdy\n123456789") should equal (org.scalactic.Prettifier.lineSeparator + "Howdy" + org.scalactic.Prettifier.lineSeparator + "23456789")
+      Doc.stripMargin("\n  \n\n  Howdy\n123456789") should equal (org.scalactic.Prettifier.lineSeparator * 3 + "Howdy" + org.scalactic.Prettifier.lineSeparator + "3456789")
+      Doc.stripMargin("\n  \t\t\n   Howdy\n123456789") should equal (org.scalactic.Prettifier.lineSeparator + "\t" + org.scalactic.Prettifier.lineSeparator + "Howdy" + org.scalactic.Prettifier.lineSeparator + "456789")
+      Doc.stripMargin("\n\n\n\n\tHowdy\n123456789") should equal (org.scalactic.Prettifier.lineSeparator * 4 + "Howdy" + org.scalactic.Prettifier.lineSeparator + "23456789")
+      Doc.stripMargin("\n\t\tHowdy\n123456789") should equal (org.scalactic.Prettifier.lineSeparator + "Howdy" + org.scalactic.Prettifier.lineSeparator + "3456789")
+      Doc.stripMargin("\n      \n \t \tHowdy\n123456789") should equal (org.scalactic.Prettifier.lineSeparator + "  " + org.scalactic.Prettifier.lineSeparator + "Howdy" + org.scalactic.Prettifier.lineSeparator + "56789")
     }
   }
 }

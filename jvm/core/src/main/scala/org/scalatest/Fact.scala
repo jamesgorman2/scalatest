@@ -123,7 +123,7 @@ private[scalatest] sealed abstract class Fact {
     val padding = "  " * level
     if (msg.contains("\n")) {
       val padding = "  " * (level)
-      padding + stringPrefix + "(" + NEWLINE + msg.split("\n").map(line => padding + "  " + line).mkString("\n") + NEWLINE + ")"
+      padding + stringPrefix + "(" + NEWLINE + msg.split("\r?\n").map(line => padding + "  " + line).mkString(NEWLINE) + NEWLINE + ")"
     }
     else
       padding + stringPrefix + "(" + msg + ")"
@@ -853,7 +853,7 @@ private[scalatest] object Fact {
       val msg = underlying.factDiagram(0)
       padding + (if (isYes) "Yes(" else "No(") + NEWLINE + {
         if (msg.contains("\n"))
-          ("!" + msg).split("\n").map(line => padding + "  " + line).mkString("\n") + NEWLINE
+          ("!" + msg).split("\r?\n").map(line => padding + "  " + line).mkString(NEWLINE) + NEWLINE
         else
           padding + "  !" + msg + NEWLINE
       } +

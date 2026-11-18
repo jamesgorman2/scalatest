@@ -55,6 +55,9 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
 
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] =
+    Some(engine.registeredNodes(true))
+
   /**
    * Returns an <code>Informer</code> that during test execution will forward strings passed to its
    * <code>apply</code> method to the current reporter. If invoked in a constructor, it
@@ -199,6 +202,9 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
         )
     }  
 
+  private def registerBranchNamed(nameInSource: String, description: String, childPrefix: Option[String], verb: String, pos: source.Position, fun: () => Unit): Unit =
+    registerBranch(description, childPrefix, verb, pos, () => { engine.nameCurrentScope(nameInSource); fun() })
+
   private def registerBranch(description: String, childPrefix: Option[String], verb: String, pos: source.Position, fun: () => Unit): Unit = {
     def registrationClosedMessageFun: String =
       verb match {
@@ -245,7 +251,8 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
                 }
 
               try {
-                registerNestedBranch(descriptionText, childPrefix, fun(), registrationClosedMessageFun, None, pos)
+                // The scope is registered with the previous scope's text, so it takes the name the suite's source gave that scope.
+                registerNestedBranch(descriptionText, childPrefix, { last.nameInSource.foreach(name => engine.nameCurrentScope(name)); fun() }, registrationClosedMessageFun, None, pos)
               }
               catch {
                 case e: TestFailedException => rethrowIfCauseIsNAEOrDTNE(e, pos)
@@ -684,11 +691,11 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
      */
     // SKIP-DOTTY-START
     def that(f: => Unit)(implicit pos: source.Position): Unit = {
-      registerBranch(string.trim + " that", None, "that", pos, () => f)
+      registerBranchNamed(string.trim, string.trim + " that", None, "that", pos, () => f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def that(f: => Unit): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " that", None, "that", pos, () => f) }) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " that", None, "that", pos, () => f) }) } 
     //DOTTY-ONLY }
 
     /**
@@ -711,11 +718,11 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
      */
     // SKIP-DOTTY-START
     def which(f: => Unit)(implicit pos: source.Position): Unit = {
-      registerBranch(string.trim + " which", None, "which", pos, () => f)
+      registerBranchNamed(string.trim, string.trim + " which", None, "which", pos, () => f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def which(f: => Unit): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " which", None, "which", pos, () => f) }) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " which", None, "which", pos, () => f) }) } 
     //DOTTY-ONLY }
 
     /**
@@ -738,11 +745,11 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
      */
     // SKIP-DOTTY-START
     def that(resultOfAfterWordApplication: ResultOfAfterWordApplication)(implicit pos: source.Position): Unit = {
-      registerBranch(string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", pos, resultOfAfterWordApplication.f)
+      registerBranchNamed(string.trim, string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", pos, resultOfAfterWordApplication.f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def that(resultOfAfterWordApplication: ResultOfAfterWordApplication): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", pos, resultOfAfterWordApplication.f) }) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " that " + resultOfAfterWordApplication.text.trim, None, "that", pos, resultOfAfterWordApplication.f) }) } 
     //DOTTY-ONLY }
 
     /**
@@ -765,11 +772,11 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
      */
     // SKIP-DOTTY-START
     def which(resultOfAfterWordApplication: ResultOfAfterWordApplication)(implicit pos: source.Position): Unit = {
-      registerBranch(string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", pos, resultOfAfterWordApplication.f)
+      registerBranchNamed(string.trim, string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", pos, resultOfAfterWordApplication.f)
     }
     // SKIP-DOTTY-END
     //DOTTY-ONLY inline infix def which(resultOfAfterWordApplication: ResultOfAfterWordApplication): Unit = {
-    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranch(string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", pos, resultOfAfterWordApplication.f) }) } 
+    //DOTTY-ONLY   ${ source.Position.withPosition[Unit]('{(pos: source.Position) => registerBranchNamed(string.trim, string.trim + " which " + resultOfAfterWordApplication.text.trim, None, "which", pos, resultOfAfterWordApplication.f) }) } 
     //DOTTY-ONLY }
   }
 

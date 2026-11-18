@@ -2,9 +2,7 @@ import dotty.tools.sbtplugin.DottyPlugin.autoImport._
 import scalanative.sbtplugin.ScalaNativePlugin.autoImport.nativeVersion
 import sbt._
 import Keys._
-import com.typesafe.tools.mima.plugin.MimaKeys.{mimaPreviousArtifacts, mimaCurrentClassfiles, mimaBinaryIssueFilters}
-import com.typesafe.tools.mima.core._
-import com.typesafe.tools.mima.core.ProblemFilters._
+import com.typesafe.tools.mima.plugin.MimaKeys.mimaFailOnNoPrevious
 import com.typesafe.sbt.osgi.OsgiKeys
 import com.typesafe.sbt.osgi.SbtOsgi
 import com.typesafe.sbt.osgi.SbtOsgi.autoImport._
@@ -19,15 +17,20 @@ trait DottyBuild { this: BuildCommons =>
 
   // List of available night build at https://repo1.maven.org/maven2/ch/epfl/lamp/dotty-compiler_0.27/
   // lazy val dottyVersion = dottyLatestNightlyBuild.get
-  lazy val dottyVersion = System.getProperty("scalatest.dottyVersion", "3.1.3")
+  lazy val dottyVersion = System.getProperty("scalatest.dottyVersion", "3.3.8")
   lazy val dottySettings = List(
+    organization := forkOrganization,
     scalaVersion := dottyVersion,
     scalacOptions ++= List("-language:implicitConversions", "-noindent", "-Xprint-suspension")
   )
-  lazy val nativeDottySettings = List(
-    scalaVersion := "3.3.3",
-    scalacOptions ++= List("-language:implicitConversions", "-noindent", "-Xprint-suspension")
-  )
+  lazy val nativeDottySettings = dottySettings
+
+  // Scaladoc 3 has no -doc-source-url. It reads the URL as a source path, which Windows rejects.
+  lazy val withoutDocSourceUrl =
+    Compile / doc / scalacOptions ~= { options =>
+      val index = options.indexOf("-doc-source-url")
+      if (index < 0) options else options.patch(index, Nil, 2)
+    }
 
   // https://github.com/sbt/sbt/issues/2205#issuecomment-144375501
   private lazy val packageManagedSources =
@@ -46,7 +49,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(scalacticDocSettings: _*)
     .settings(
       projectTitle := "Scalactic",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       moduleName := "scalactic",
       initialCommands in console := "import org.scalactic._",
       packageManagedSources,
@@ -70,8 +73,8 @@ trait DottyBuild { this: BuildCommons =>
       }.taskValue,
       //scalacticDocSourcesSetting,
       //docTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
+      bundleCheckedAgainstUpstream(upstreamScalacticOrganization),
+      withoutDocSourceUrl
     ).settings(osgiSettings: _*).settings(
     OsgiKeys.exportPackage := Seq(
       "org.scalactic",
@@ -102,14 +105,14 @@ trait DottyBuild { this: BuildCommons =>
     .settings(scalacticDocSettings: _*)
     .settings(
       projectTitle := "Scalactic",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       moduleName := "scalactic",
       initialCommands in console := "import org.scalactic._",
       packageManagedSources,
       sourceGenerators in Compile += {
         Def.task {
           // From scalactic-macro
-          GenScalacticDotty.genMacroScala((sourceManaged in Compile).value, version.value, scalaVersion.value) ++
+          GenScalacticDotty.genMacroScala((sourceManaged in Compile).value, version.value, scalaVersion.value, GenScalaTestDotty.ScalaJsLineEnding) ++
           ScalacticGenResourcesJSVM.genResources((sourceManaged in Compile).value / "org" / "scalactic", version.value, scalaVersion.value) ++
           GenAnyVals.genMain((sourceManaged in Compile).value / "org" / "scalactic" / "anyvals", version.value, scalaVersion.value, true) ++
           GenEvery.genMain((sourceManaged in Compile).value / "org" / "scalactic", version.value, scalaVersion.value) ++
@@ -126,8 +129,8 @@ trait DottyBuild { this: BuildCommons =>
       }.taskValue,
       //scalacticDocSourcesSetting,
       //docTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
+      bundleCheckedAgainstUpstream(upstreamScalacticOrganization),
+      withoutDocSourceUrl
     ).settings(osgiSettings: _*).settings(
     OsgiKeys.exportPackage := Seq(
       "org.scalactic",
@@ -158,7 +161,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(scalacticDocSettings: _*)
     .settings(
       projectTitle := "Scalactic",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       moduleName := "scalactic",
       initialCommands in console := "import org.scalactic._",
       packageManagedSources,
@@ -182,8 +185,8 @@ trait DottyBuild { this: BuildCommons =>
       }.taskValue,
       //scalacticDocSourcesSetting,
       //docTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
+      bundleCheckedAgainstUpstream(upstreamScalacticOrganization),
+      withoutDocSourceUrl
     ).settings(osgiSettings: _*).settings(
     OsgiKeys.exportPackage := Seq(
       "org.scalactic",
@@ -213,7 +216,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(dottySettings: _*)
     .settings(
       projectTitle := "ScalaTest Core Dotty",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-core",
       initialCommands in console := """|import org.scalatest._
                                        |import org.scalactic._
@@ -242,14 +245,7 @@ trait DottyBuild { this: BuildCommons =>
         //GenSafeStyles.genMain((sourceManaged in Compile).value / "org" / "scalatest", version.value, scalaVersion.value)
       }.taskValue,
       //scalatestJSDocTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"),
-      mimaBinaryIssueFilters ++= {
-        Seq(
-          exclude[MissingClassProblem]("org.scalatest.tools.SbtCommandParser$"),
-          exclude[MissingClassProblem]("org.scalatest.tools.SbtCommandParser")
-        )
-      }
+      bundleCheckedAgainstUpstream(upstreamScalatestOrganization)
     ).settings(osgiSettings: _*).settings(
     OsgiKeys.exportPackage := Seq(
       "org.scalatest", 
@@ -288,7 +284,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(dottySettings: _*)
     .settings(
       projectTitle := "ScalaTest Core Dotty",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-core",
       initialCommands in console := """|import org.scalatest._
                                        |import org.scalactic._
@@ -317,14 +313,7 @@ trait DottyBuild { this: BuildCommons =>
         //GenSafeStyles.genMain((sourceManaged in Compile).value / "org" / "scalatest", version.value, scalaVersion.value)
       }.taskValue,
       //scalatestJSDocTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"),
-      mimaBinaryIssueFilters ++= {
-        Seq(
-          exclude[MissingClassProblem]("org.scalatest.tools.SbtCommandParser$"),
-          exclude[MissingClassProblem]("org.scalatest.tools.SbtCommandParser")
-        )
-      }
+      bundleCheckedAgainstUpstream(upstreamScalatestOrganization)
     ).settings(osgiSettings: _*).settings(
     OsgiKeys.exportPackage := Seq(
       "org.scalatest", 
@@ -364,7 +353,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(nativeDottySettings: _*)
     .settings(
       projectTitle := "ScalaTest Core Dotty",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-core",
       initialCommands in console := """|import org.scalatest._
                                        |import org.scalactic._
@@ -393,14 +382,7 @@ trait DottyBuild { this: BuildCommons =>
         //GenSafeStyles.genMain((sourceManaged in Compile).value / "org" / "scalatest", version.value, scalaVersion.value)
       }.taskValue,
       //scalatestJSDocTaskSetting,
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar"),
-      mimaBinaryIssueFilters ++= {
-        Seq(
-          exclude[MissingClassProblem]("org.scalatest.tools.SbtCommandParser$"),
-          exclude[MissingClassProblem]("org.scalatest.tools.SbtCommandParser")
-        )
-      }
+      bundleCheckedAgainstUpstream(upstreamScalatestOrganization)
     ).settings(osgiSettings: _*).settings(
     OsgiKeys.exportPackage := Seq(
       "org.scalatest.*"
@@ -422,6 +404,55 @@ trait DottyBuild { this: BuildCommons =>
     )
   ).dependsOn(scalacticDottyNative).enablePlugins(ScalaNativePlugin)
 
+  lazy val millDependencies = taskKey[Seq[ModuleID]]("The Mill artifacts among the transitive dependencies of the published artifact")
+  lazy val checkNoMillDependency = taskKey[Unit]("Fails if the published artifact depends, transitively, on a Mill artifact")
+  lazy val checkMillPluginVersion = taskKey[Unit]("Fails if the Mill plugin's fork version differs from the release version")
+
+  def isMillArtifact(module: ModuleID): Boolean =
+    module.organization == "com.lihaoyi" && module.name.startsWith("mill-")
+
+  lazy val scalatestConsolidation = project.in(file("dotty/consolidation"))
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      organization := forkOrganization,
+      moduleName := "scalatest-consolidation",
+      mimaFailOnNoPrevious := false,
+      // Not a project dependency: the common test project is not published, so the POM must not name it.
+      Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
+      // Core's Framework implements sbt's test interface, which core declares optional.
+      libraryDependencies += "org.scala-sbt" % "test-interface" % "1.0" % Test,
+      // Published one at a time, dependencies first: on Windows, bundling a project
+      // holds its dependencies' jars open, so a dependency bundled later cannot replace its jar.
+      millDependencies := Def.sequential(
+        scalatestCompatible / publishLocal,
+        scalacticDotty / publishLocal,
+        scalatestCoreDotty / publishLocal,
+        publishLocal,
+        Def.task {
+          val resolution = lmcoursier.CoursierDependencyResolution(
+            lmcoursier.CoursierConfiguration().withResolvers(Vector(Resolver.defaultLocal, Resolver.DefaultMavenRepository))
+          )
+          val publishedArtifact = resolution.wrapDependencyInModule(organization.value %% moduleName.value % version.value, scalaModuleInfo.value)
+          resolution.update(publishedArtifact, updateConfiguration.value, sbt.librarymanagement.UnresolvedWarningConfiguration(), streams.value.log) match {
+            case Right(report) => report.allModules.filter(isMillArtifact)
+            case Left(unresolved) => throw unresolved.resolveException
+          }
+        }
+      ).value,
+      checkNoMillDependency := {
+        val found = millDependencies.value
+        if (found.nonEmpty)
+          sys.error(moduleName.value + " depends on Mill: " + found.map(module => module.organization + ":" + module.name + ":" + module.revision).mkString(", "))
+      },
+      checkMillPluginVersion := {
+        val buildFile = (ThisBuild / baseDirectory).value / "mill-plugin" / "build.mill"
+        val forkVersion = """val fork: String = "([^"]*)"""".r.findFirstMatchIn(IO.read(buildFile)).map(_.group(1))
+        if (!forkVersion.contains(releaseVersion))
+          sys.error(buildFile + " sets Versions.fork to " + forkVersion.getOrElse("(not found)") + ", but releaseVersion in project/BuildCommons.scala is " + releaseVersion)
+      }
+    ).dependsOn(scalatestCoreDotty)
+
   private implicit class DottyProjectEx(private val p: Project) {
     /** common settings for all scalatest modules */
     def scalatestModule(name: String, title: String, isNative: Boolean): Project =  {
@@ -431,8 +462,9 @@ trait DottyBuild { this: BuildCommons =>
        .settings(selectedDottySettings: _*)
        .settings(
          projectTitle := title,
-         organization := "org.scalatest",
+         organization := forkOrganization,
          moduleName := name,
+         bundleCheckedAgainstUpstream(upstreamScalatestOrganization),
          packageManagedSources,
          osgiSettings,
          OsgiKeys.additionalHeaders := Map(
@@ -706,6 +738,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestModulesDotty = project.in(file("modules/dotty/modules-aggregation"))
     .settings(sharedSettings: _*)
     .settings(
+      organization := forkOrganization,
       noPublishSettings,
       scalacOptions in (Compile, doc) := List.empty
     ).aggregate(
@@ -760,7 +793,8 @@ trait DottyBuild { this: BuildCommons =>
       scalatestDiagramsDotty, 
       scalatestMatchersCoreDotty, 
       scalatestShouldMatchersDotty, 
-      scalatestMustMatchersDotty
+      scalatestMustMatchersDotty, 
+      scalatestConsolidation
     )
 
   lazy val scalatestDottyJS = project.in(file("dotty/scalatest.js"))
@@ -849,7 +883,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(
       projectTitle := "ScalaTest App",
       name := "scalatest-app",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= scalatestLibraryDependencies,
       // include the scalactic classes and resources in the jar
       mappings in (Compile, packageBin) ++= mappings.in(scalacticDotty, Compile, packageBin).value,
@@ -916,8 +950,8 @@ trait DottyBuild { this: BuildCommons =>
       },
       scalatestDocSettings,
       unmanagedResourceDirectories in Compile += baseDirectory.value / "scalatest" / "src" / "main" / "resources",
-      mimaPreviousArtifacts := Set(organization.value %% name.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (name.value + "_" + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
+      bundleCheckedAgainstUpstream(upstreamScalatestOrganization),
+      withoutDocSourceUrl
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
         "images",
@@ -994,7 +1028,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(
       projectTitle := "ScalaTest App",
       name := "scalatest-app",
-      organization := "org.scalatest",
+      organization := forkOrganization,
       moduleName := "scalatest-app",
       //libraryDependencies ++= scalatestJSLibraryDependencies,
       libraryDependencies += ("org.scala-js" %% "scalajs-test-interface" % scalaJSVersion).withDottyCompat(dottyVersion), 
@@ -1057,8 +1091,7 @@ trait DottyBuild { this: BuildCommons =>
           Seq.empty[File]
         }.taskValue
       },
-      mimaPreviousArtifacts := Set(organization.value %%% moduleName.value % previousReleaseVersion),
-      mimaCurrentClassfiles := (classDirectory in Compile).value.getParentFile / (moduleName.value + sjsPrefix + scalaBinaryVersion.value + "-" + releaseVersion + ".jar")
+      bundleCheckedAgainstUpstream(upstreamScalatestOrganization)
     ).settings(osgiSettings: _*).settings(
       OsgiKeys.exportPackage := Seq(
         "org.scalatest",
@@ -1133,8 +1166,9 @@ trait DottyBuild { this: BuildCommons =>
       .settings(
         projectTitle := "ScalaTest App",
         name := "scalatest-app",
-        organization := "org.scalatest",
+        organization := forkOrganization,
         moduleName := "scalatest-app",
+        bundleCheckedAgainstUpstream(upstreamScalatestOrganization),
         //libraryDependencies ++= nativeCrossBuildLibraryDependencies.value,
         libraryDependencies += ("org.scala-native" %%% "test-interface" % nativeVersion),
         // include the scalacticDottyNative classes and resources in the jar
@@ -1316,7 +1350,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(dottySettings: _*)
     .settings(
       projectTitle := "Scalactic Test",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       testOptions in Test ++=
         Seq(Tests.Argument(TestFrameworks.ScalaTest,
           "-oDIF",
@@ -1334,7 +1368,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(dottySettings: _*)
     .settings(
       projectTitle := "Scalactic Test JS",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       scalaJSLinkerConfig ~= { _.withOptimizer(false) },
       testOptions in Test ++=
         Seq(Tests.Argument(TestFrameworks.ScalaTest, "-oDIF")),
@@ -1357,10 +1391,10 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalacticTestDottyNative = project.in(file("dotty/scalactic-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative: _*)
+    .settings(sharedTestSettingsDottyNative: _*)
     .settings(
       projectTitle := "Scalactic Test Native",
-      organization := "org.scalactic",
+      organization := forkOrganization,
       publishArtifact := false,
       publish := {},
       publishLocal := {}, 
@@ -1370,14 +1404,17 @@ trait DottyBuild { this: BuildCommons =>
       }.taskValue
     ).dependsOn(scalacticDottyNative, scalatestDottyNative % "test", commonTestDottyNative % "test").enablePlugins(ScalaNativePlugin)  
 
+  def sharedTestSettingsDottyNative: Seq[Setting[_]] =
+    sharedTestSettingsNative :+ (organization := forkOrganization)
+
   def sharedTestSettingsDotty: Seq[Setting[_]] = 
     Seq(
-      organization := "org.scalatest",
+      organization := forkOrganization,
       libraryDependencies ++= scalatestLibraryDependencies,
       libraryDependencies ++= 
         Seq(
-          "org.scalatestplus" %% "testng-6-7" % plusTestNGVersion % "test",
-          "org.scalatestplus" %% "junit-4-13" % plusJUnitVersion % "test"
+          withoutUpstreamScalatest("org.scalatestplus" %% "testng-6-7" % plusTestNGVersion % "test"),
+          withoutUpstreamScalatest("org.scalatestplus" %% "junit-4-13" % plusJUnitVersion % "test")
         ),
       testOptions in Test := scalatestTestOptions,
       logBuffered in Test := false,
@@ -1406,12 +1443,171 @@ trait DottyBuild { this: BuildCommons =>
       scalatestFunSpecTestDotty, 
       scalatestFunSuiteTestDotty, 
       scalatestPropSpecTestDotty, 
-      scalatestWordSpecTestDotty
+      scalatestWordSpecTestDotty,
+      scalatestCompatibilityTestDotty
     )
+
+  lazy val CompatibilityFixture = config("fixture").hide
+
+  lazy val scalatestCompatibilityTestDotty = project.in(file("dotty/compatibility-test"))
+    .configs(CompatibilityFixture)
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(inConfig(CompatibilityFixture)(Defaults.configSettings): _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Test",
+      libraryDependencies += upstreamScalatestOrganization %% "scalatest" % previousReleaseVersion % CompatibilityFixture,
+      // ScalaTest 3.2.20 asks for the Scala 3.1 library, which code compiled by Scala 3.3 cannot link against.
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      CompatibilityFixture / unmanagedSourceDirectories += (CompatibilityFixture / sourceDirectory).value / "scala-jvm",
+      Test / unmanagedSourceDirectories ++= Seq(sourceDirectory.value / "normalisation" / "scala", sourceDirectory.value / "comparison" / "scala"),
+      // ScalaTest leaves the test interface to the build tool, so the fixture configuration takes sbt's own.
+      CompatibilityFixture / unmanagedJars += Attributed.blank(testInterfaceJar),
+      Test / resourceGenerators += Def.task {
+        def pathList(files: Seq[File]): String = files.distinct.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator)
+        val classpaths = new java.util.Properties
+        classpaths.setProperty("fixture", pathList((CompatibilityFixture / products).value))
+        classpaths.setProperty("upstream", pathList((CompatibilityFixture / managedClasspath).value.files))
+        classpaths.setProperty("fork", pathList((scalatestDotty / Runtime / fullClasspath).value.files ++ (scalacticDotty / Runtime / fullClasspath).value.files))
+        classpaths.setProperty("testInterface", pathList(Seq(testInterfaceJar)))
+        classpaths.setProperty("runsDirectory", (target.value / "compatibility-runs").getAbsolutePath)
+        val resource = (Test / resourceManaged).value / "compatibility.properties"
+        IO.write(classpaths, "The classpaths of the comparison with ScalaTest " + previousReleaseVersion, resource)
+        Seq(resource)
+      }.taskValue,
+      Test / logBuffered := false,
+      noPublishSettings,
+    ).dependsOn(scalatestDotty % "test")
+
+  private def testInterfaceJar: File =
+    new File(classOf[sbt.testing.Framework].getProtectionDomain.getCodeSource.getLocation.toURI)
+
+  // The fixture for Scala.js and Native compiles once against 3.2.20's artefacts for the platform, in a project that
+  // links it with 3.2.20. A second project links the same compiled classes with the fork, and a JVM test project runs
+  // and compares the two programs.
+  private def compatibilityFixtureSettings(platformDirectory: String): Seq[Setting[_]] =
+    Seq(
+      libraryDependencies += upstreamScalatestOrganization %%% "scalatest" % previousReleaseVersion,
+      Compile / unmanagedSourceDirectories := {
+        val sources = (scalatestCompatibilityTestDotty / sourceDirectory).value
+        Seq(
+          sources / "fixture" / "scala",
+          sources / "fixture" / "scala-js-native",
+          sources / "fixture" / platformDirectory,
+          sources / "normalisation" / "scala"
+        )
+      },
+      Compile / mainClass := Some("compatibility.recorders.PlatformLauncher")
+    ) ++ noPublishSettings
+
+  private def compatibilityForkLinkSettings(fixture: Project): Seq[Setting[_]] =
+    Seq(
+      Compile / unmanagedClasspath ++= Attributed.blankSeq((fixture / Compile / products).value),
+      Compile / mainClass := Some("compatibility.recorders.PlatformLauncher")
+    ) ++ noPublishSettings
+
+  private def compatibilityPlatformTestSettings(
+    platform: String,
+    launcher: String,
+    upstreamProgram: Def.Initialize[Task[File]],
+    forkProgram: Def.Initialize[Task[File]]
+  ): Seq[Setting[_]] =
+    Seq(
+      Test / unmanagedSourceDirectories := {
+        val sources = (scalatestCompatibilityTestDotty / sourceDirectory).value
+        Seq(sources / "comparison" / "scala", sources / "platform-test" / "scala")
+      },
+      Test / resourceGenerators += Def.task {
+        val properties = new java.util.Properties
+        properties.setProperty("platform", platform)
+        properties.setProperty("launcher", launcher)
+        properties.setProperty("upstreamProgram", upstreamProgram.value.getAbsolutePath)
+        properties.setProperty("forkProgram", forkProgram.value.getAbsolutePath)
+        properties.setProperty("runsDirectory", (target.value / "compatibility-runs").getAbsolutePath)
+        val resource = (Test / resourceManaged).value / "compatibility-platform.properties"
+        IO.write(properties, "The programs of the comparison with ScalaTest " + previousReleaseVersion + " on " + platform, resource)
+        Seq(resource)
+      }.taskValue,
+      Test / logBuffered := false
+    ) ++ noPublishSettings
+
+  private def linkedJSProgram(linking: Project): Def.Initialize[Task[File]] =
+    Def.task {
+      val report = (linking / Compile / ScalaJSPlugin.autoImport.fastLinkJS).value.data
+      (linking / Compile / ScalaJSPlugin.autoImport.fastLinkJS / ScalaJSPlugin.autoImport.scalaJSLinkerOutputDirectory).value /
+        report.publicModules.head.jsFileName
+    }
+
+  private def linkedNativeProgram(linking: Project): Def.Initialize[Task[File]] =
+    Def.task((linking / Compile / ScalaNativePlugin.autoImport.nativeLink).value)
+
+  lazy val scalatestCompatibilityFixtureDottyJS = project.in(file("dotty/compatibility-fixture.js"))
+    .enablePlugins(ScalaJSPlugin)
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fixture JS",
+      ScalaJSPlugin.autoImport.scalaJSUseMainModuleInitializer := true,
+      compatibilityFixtureSettings("scala-js"),
+    )
+
+  lazy val scalatestCompatibilityForkLinkDottyJS = project.in(file("dotty/compatibility-fork-link.js"))
+    .enablePlugins(ScalaJSPlugin)
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fork Link JS",
+      ScalaJSPlugin.autoImport.scalaJSUseMainModuleInitializer := true,
+      compatibilityForkLinkSettings(scalatestCompatibilityFixtureDottyJS),
+    ).dependsOn(scalatestDottyJS)
+
+  lazy val scalatestCompatibilityTestDottyJS = project.in(file("dotty/compatibility-test.js"))
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Test JS",
+      compatibilityPlatformTestSettings(
+        "Scala.js",
+        "node",
+        linkedJSProgram(scalatestCompatibilityFixtureDottyJS),
+        linkedJSProgram(scalatestCompatibilityForkLinkDottyJS)
+      ),
+    ).dependsOn(scalatestDotty % "test")
+
+  lazy val scalatestCompatibilityFixtureDottyNative = project.in(file("dotty/compatibility-fixture.native"))
+    .enablePlugins(ScalaNativePlugin)
+    .settings(sharedSettings: _*)
+    .settings(nativeDottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fixture Native",
+      compatibilityFixtureSettings("scala-native"),
+    )
+
+  lazy val scalatestCompatibilityForkLinkDottyNative = project.in(file("dotty/compatibility-fork-link.native"))
+    .enablePlugins(ScalaNativePlugin)
+    .settings(sharedSettings: _*)
+    .settings(nativeDottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Fork Link Native",
+      compatibilityForkLinkSettings(scalatestCompatibilityFixtureDottyNative),
+    ).dependsOn(scalatestDottyNative)
+
+  lazy val scalatestCompatibilityTestDottyNative = project.in(file("dotty/compatibility-test.native"))
+    .settings(sharedSettings: _*)
+    .settings(dottySettings: _*)
+    .settings(
+      projectTitle := "ScalaTest Compatibility Test Native",
+      compatibilityPlatformTestSettings(
+        "Scala Native",
+        "",
+        linkedNativeProgram(scalatestCompatibilityFixtureDottyNative),
+        linkedNativeProgram(scalatestCompatibilityForkLinkDottyNative)
+      ),
+    ).dependsOn(scalatestDotty % "test")
 
   def sharedTestSettingsDottyJS: Seq[Setting[_]] = 
     Seq(
-      organization := "org.scalatest",
+      organization := forkOrganization,
       //jsDependencies += RuntimeDOM % "test",
       scalaJSLinkerConfig ~= { _.withOptimizer(false) },
       //jsEnv := NodeJSEnv(executable = "node").value,
@@ -1438,7 +1634,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(sharedTestSettingsDottyJS)
     .settings(
       projectTitle := "ScalaTest Test",
-      scalaJSLinkerConfig ~= { _.withOptimizer(false).withSemantics(_.withStrictFloats(true)) },
+      scalaJSLinkerConfig ~= { _.withOptimizer(false) },
       sourceGenerators in Test += Def.task {
         //GenRegularTests4.genJava((javaSourceManaged in Compile).value) ++
         GenScalaTestDotty.genTestJS((sourceManaged in Test).value, version.value, scalaVersion.value)
@@ -1452,13 +1648,14 @@ trait DottyBuild { this: BuildCommons =>
        scalatestFunSpecTestDottyJS, 
        scalatestFunSuiteTestDottyJS, 
        scalatestPropSpecTestDottyJS, 
-       scalatestWordSpecTestDottyJS
+       scalatestWordSpecTestDottyJS,
+       scalatestCompatibilityTestDottyJS
      ).enablePlugins(ScalaJSPlugin)
 
   lazy val scalatestTestDottyNative = project.in(file("dotty/scalatest-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative: _*)
+    .settings(sharedTestSettingsDottyNative: _*)
     .settings(
       projectTitle := "ScalaTest Test",
       sourceGenerators in Test += Def.task {
@@ -1474,7 +1671,8 @@ trait DottyBuild { this: BuildCommons =>
        scalatestFunSpecTestDottyNative, 
        scalatestFunSuiteTestDottyNative, 
        scalatestPropSpecTestDottyNative, 
-       scalatestWordSpecTestDottyNative
+       scalatestWordSpecTestDottyNative,
+       scalatestCompatibilityTestDottyNative
      ).enablePlugins(ScalaNativePlugin)   
 
 
@@ -1503,7 +1701,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestDiagramsTestDottyNative = project.in(file("dotty/diagrams-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest Diagrams Test",
       sourceGenerators in Test += Def.task {
@@ -1536,7 +1734,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestFeatureSpecTestDottyNative = project.in(file("dotty/featurespec-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest FeatureSpec Test",
       sourceGenerators in Test += Def.task {
@@ -1569,7 +1767,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestFlatSpecTestDottyNative = project.in(file("dotty/flatspec-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest FlatSpec Test",
       sourceGenerators in Test += Def.task {
@@ -1602,7 +1800,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestFreeSpecTestDottyNative = project.in(file("dotty/freespec-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest FreeSpec Test",
       sourceGenerators in Test += Def.task {
@@ -1635,7 +1833,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestFunSpecTestDottyNative = project.in(file("dotty/funspec-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest FunSpec Test",
       sourceGenerators in Test += Def.task {
@@ -1668,7 +1866,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestFunSuiteTestDottyNative = project.in(file("dotty/funsuite-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest FunSuite Test",
       sourceGenerators in Test += Def.task {
@@ -1701,7 +1899,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestPropSpecTestDottyNative = project.in(file("dotty/propspec-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest PropSpec Test",
       sourceGenerators in Test += Def.task {
@@ -1734,7 +1932,7 @@ trait DottyBuild { this: BuildCommons =>
   lazy val scalatestWordSpecTestDottyNative = project.in(file("dotty/wordspec-test.native"))
     .settings(sharedSettings: _*)
     .settings(nativeDottySettings: _*)
-    .settings(sharedTestSettingsNative)
+    .settings(sharedTestSettingsDottyNative)
     .settings(
       projectTitle := "ScalaTest WordSpec Test",
       sourceGenerators in Test += Def.task {

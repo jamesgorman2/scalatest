@@ -155,7 +155,7 @@ trait Checkpoints {
         val failMessages =
           for (failure <- failures.asScala)
           yield failure.getMessage + " " + Resources.atCheckpointAt + " " + getFailLine(failure)
-        throw new TestFailedException((sde: StackDepthException) => Some(failMessages.mkString("\n")), None, pos)
+        throw new TestFailedException((sde: StackDepthException) => Some(failMessages.mkString(org.scalactic.Prettifier.lineSeparator)), None, pos)
       }
     }
   }

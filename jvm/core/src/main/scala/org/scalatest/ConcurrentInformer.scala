@@ -19,12 +19,17 @@ import org.scalactic.Requirements._
 import java.util.concurrent.atomic.AtomicReference
 import org.scalactic.source
 import org.scalatest.events.AlertProvided
+import org.scalatest.events.Event
+import org.scalatest.events.InfoProvided
 import org.scalatest.events.LineInFile
 import org.scalatest.events.Location
+import org.scalatest.events.MarkupProvided
 import org.scalatest.events.NoteProvided
 import org.scalatest.events.NotificationEvent
 import org.scalatest.events.RecordableEvent
 import MessageRecorder.ConcurrentMessageFiringFun
+import MessageRecorder.MessageHandOff
+import MessageRecorder.PathMessageEventFun
 import MessageRecorder.RecordedMessageEventFun
 
 /*
@@ -133,15 +138,34 @@ private[scalatest] object ConcurrentDocumenter {
 private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAwareness {
 
   private var messages = List.empty[(String, Option[Any], RecordedMessageEventFun, Option[Location])]
+  private var recordedEventsTaken = false
 
   // Returns them in order recorded
   private def recordedMessages: List[(String, Option[Any], RecordedMessageEventFun, Option[Location])] =
-    synchronized { messages.reverse }
+    synchronized {
+      recordedEventsTaken = true
+      messages.reverse
+    }
 
-  def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location]): Unit = {
+  def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location]): Unit =
+    apply(message, payload, eventFun, location, MessageRecorder.noHandOff)
+
+  /**
+   * Records a message and, unless the test's recorded events have been taken for its closing event, hands it off.
+   * Recording and handing off under one lock means a message the closing event records has been handed off before
+   * that event is reported, and a message called after it is never handed off.
+   *
+   * The hand-off is prepared before the lock is taken: preparing builds the message's event, which calls the suite's
+   * own methods, and encodes it. Only the prepared hand-off runs under the lock.
+   */
+  def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location], handOff: MessageHandOff): Unit = {
     requireNonNull(message, payload)
+    val preparedHandOff = handOff(message, payload, location)
     synchronized {
       messages ::= (message, payload, eventFun, location)
+      if (!recordedEventsTaken) {
+        preparedHandOff()
+      }
     }
   }
 
@@ -152,28 +176,38 @@ private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAware
   }
 }
 
-private[scalatest] class MessageRecordingInformer(recorder: MessageRecorder, eventFun: RecordedMessageEventFun) extends Informer {
+private[scalatest] class MessageRecordingInformer(recorder: MessageRecorder, eventFun: RecordedMessageEventFun, handOff: MessageHandOff) extends Informer {
+  def this(recorder: MessageRecorder, eventFun: RecordedMessageEventFun) = this(recorder, eventFun, MessageRecorder.noHandOff)
+
   def apply(message: String, payload: Option[Any])(implicit pos: source.Position): Unit = {
     // SKIP-SCALATESTJS,NATIVE-START
     val stackDepth = 2
     // SKIP-SCALATESTJS,NATIVE-END
     //SCALATESTJS,NATIVE-ONLY val stackDepth = 4
-    recorder.apply(message, payload, eventFun, Some(LineInFile(pos.lineNumber, pos.fileName, Some(pos.filePathname))))
+    val location = Some(LineInFile(pos.lineNumber, pos.fileName, Some(pos.filePathname)))
+    recorder.apply(message, payload, eventFun, location, handOff)
   }
 }
 
 private[scalatest] object MessageRecordingInformer {
   def apply(recorder: MessageRecorder, eventFun: RecordedMessageEventFun) = new MessageRecordingInformer(recorder, eventFun)
+
+  def apply(recorder: MessageRecorder, eventFun: RecordedMessageEventFun, handOff: MessageHandOff) = new MessageRecordingInformer(recorder, eventFun, handOff)
 }
 
-private[scalatest] class MessageRecordingDocumenter(recorder: MessageRecorder, eventFun: RecordedMessageEventFun) extends Documenter {
+private[scalatest] class MessageRecordingDocumenter(recorder: MessageRecorder, eventFun: RecordedMessageEventFun, handOff: MessageHandOff) extends Documenter {
+  def this(recorder: MessageRecorder, eventFun: RecordedMessageEventFun) = this(recorder, eventFun, MessageRecorder.noHandOff)
+
   def apply(message: String)(implicit pos: source.Position): Unit = {
-    recorder.apply(message, None, eventFun, Some(LineInFile(pos.lineNumber, pos.fileName, Some(pos.filePathname))))
+    val location = Some(LineInFile(pos.lineNumber, pos.fileName, Some(pos.filePathname)))
+    recorder.apply(message, None, eventFun, location, handOff)
   }
 }
 
 private[scalatest] object MessageRecordingDocumenter {
   def apply(recorder: MessageRecorder, eventFun: RecordedMessageEventFun) = new MessageRecordingDocumenter(recorder, eventFun)
+
+  def apply(recorder: MessageRecorder, eventFun: RecordedMessageEventFun, handOff: MessageHandOff) = new MessageRecordingDocumenter(recorder, eventFun, handOff)
 }
 
 private[scalatest] object MessageRecorder {
@@ -185,11 +219,56 @@ private[scalatest] object MessageRecorder {
   // First two params of function are the string message and a boolean indicating this was from the current thread, 
   // and an optional location.
   type ConcurrentMessageFiringFun = (String, Option[Any], Boolean, Option[Location]) => Unit
+
+  // Prepares the hand-off of a message, with its payload and location, to the emitter of a run's test event log as a
+  // test records it. The recorder runs the returned hand-off under its lock.
+  type MessageHandOff = (String, Option[Any], Option[Location]) => PreparedHandOff
+
+  type PreparedHandOff = () => Unit
+
+  val noHandOff: MessageHandOff = (_, _, _) => EventOrigin.nothingToHandOff
+
+  // Builds the event of a message a path-style test recorded, from what the run that replays the test gives it: the
+  // suite, the reporter, the tracker, the test's name, the indentation and whether to include an icon.
+  type PathMessageEventFun = (Suite, Reporter, Tracker, String, Int, Boolean) => Event
+}
+
+/**
+ * The calls a path-style test makes of its four message recorders, in the order it makes them, each with the time of
+ * the call. No recorder's own queue gives that order across the four, or the time.
+ */
+private[scalatest] final class PathMessageCalls {
+
+  import org.scalatest.ConcurrentLinkedQueue
+  import scala.collection.JavaConverters._
+
+  private val calls = new ConcurrentLinkedQueue[(PathMessageEventFun, Long)]
+
+  def add(eventOfCall: PathMessageEventFun): Unit = calls.add((eventOfCall, System.currentTimeMillis))
+
+  // Each event is built with a tracker of its own, so that it takes no ordinal from the run's.
+  def handOffTo(origin: EventOrigin, theSuite: Suite, report: Reporter, testName: String, indentation: Int, includeIcon: Boolean): Unit = {
+    calls.asScala.foreach { case (eventOfCall, timeOfCall) =>
+      origin.handOffMessage(stamped(eventOfCall(theSuite, report, new Tracker, testName, indentation, includeIcon), timeOfCall))
+    }
+  }
+
+  private def stamped(event: Event, timeOfCall: Long): Event = {
+    event match {
+      case info: InfoProvided => info.copy(timeStamp = timeOfCall)
+      case note: NoteProvided => note.copy(timeStamp = timeOfCall)
+      case alert: AlertProvided => alert.copy(timeStamp = timeOfCall)
+      case markup: MarkupProvided => markup.copy(timeStamp = timeOfCall)
+      case other => other
+    }
+  }
 }
 
 // For path traits, need a message recording informer that only later gets 
 // (theSuite: Suite, report: Reporter, tracker: Tracker, testName: String, theTest: TestLeaf, includeIcon: Boolean. thread: Thread)
-private[scalatest] class PathMessageRecordingInformer(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent) extends ThreadAwareness with Informer {
+private[scalatest] class PathMessageRecordingInformer(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent, val calls: PathMessageCalls) extends ThreadAwareness with Informer {
+
+  def this(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent) = this(eventFun, new PathMessageCalls)
 
   import org.scalatest.ConcurrentLinkedQueue
   import scala.collection.JavaConverters._
@@ -202,7 +281,12 @@ private[scalatest] class PathMessageRecordingInformer(eventFun: (String, Option[
   // other threads whenever they come in. So only call record after first checking isConstructingThread
   // So now do have to worry about concurrency
   private def record(message: String, payload: Option[Any]): Unit = {
-    messages add ((message, payload, Thread.currentThread, isConstructingThread))
+    val thread = Thread.currentThread
+    val wasConstructingThread = isConstructingThread
+    messages add ((message, payload, thread, wasConstructingThread))
+    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
+      eventFun(message, payload, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    )
   }
 
   def apply(message: String, payload: Option[Any] = None)(implicit pos: source.Position): Unit = {
@@ -219,9 +303,13 @@ private[scalatest] class PathMessageRecordingInformer(eventFun: (String, Option[
 
 private[scalatest] object PathMessageRecordingInformer {
   def apply(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent) = new PathMessageRecordingInformer(eventFun)
+
+  def apply(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent, calls: PathMessageCalls) = new PathMessageRecordingInformer(eventFun, calls)
 }
 
-private[scalatest] class PathMessageRecordingNotifier(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => NoteProvided) extends ThreadAwareness with Notifier {
+private[scalatest] class PathMessageRecordingNotifier(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => NoteProvided, calls: PathMessageCalls) extends ThreadAwareness with Notifier {
+
+  def this(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => NoteProvided) = this(eventFun, new PathMessageCalls)
 
   import org.scalatest.ConcurrentLinkedQueue
   import scala.collection.JavaConverters._
@@ -233,7 +321,12 @@ private[scalatest] class PathMessageRecordingNotifier(eventFun: (String, Option[
   // other threads whenever they come in. So only call record after first checking isConstructingThread
   // So now do have to worry about concurrency
   private def record(message: String, payload: Option[Any]): Unit = {
-    messages add ((message, payload, Thread.currentThread, isConstructingThread))
+    val thread = Thread.currentThread
+    val wasConstructingThread = isConstructingThread
+    messages add ((message, payload, thread, wasConstructingThread))
+    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
+      eventFun(message, payload, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    )
   }
 
   def apply(message: String, payload: Option[Any] = None)(implicit pos: source.Position): Unit = {
@@ -250,9 +343,13 @@ private[scalatest] class PathMessageRecordingNotifier(eventFun: (String, Option[
 
 private[scalatest] object PathMessageRecordingNotifier {
   def apply(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => NoteProvided) = new PathMessageRecordingNotifier(eventFun)
+
+  def apply(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => NoteProvided, calls: PathMessageCalls) = new PathMessageRecordingNotifier(eventFun, calls)
 }
 
-private[scalatest] class PathMessageRecordingAlerter(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => AlertProvided) extends ThreadAwareness with Alerter {
+private[scalatest] class PathMessageRecordingAlerter(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => AlertProvided, calls: PathMessageCalls) extends ThreadAwareness with Alerter {
+
+  def this(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => AlertProvided) = this(eventFun, new PathMessageCalls)
 
   import org.scalatest.ConcurrentLinkedQueue
   import scala.collection.JavaConverters._
@@ -264,7 +361,12 @@ private[scalatest] class PathMessageRecordingAlerter(eventFun: (String, Option[A
   // other threads whenever they come in. So only call record after first checking isConstructingThread
   // So now do have to worry about concurrency
   private def record(message: String, payload: Option[Any]): Unit = {
-    messages add ((message, payload, Thread.currentThread, isConstructingThread))
+    val thread = Thread.currentThread
+    val wasConstructingThread = isConstructingThread
+    messages add ((message, payload, thread, wasConstructingThread))
+    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
+      eventFun(message, payload, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    )
   }
 
   def apply(message: String, payload: Option[Any] = None)(implicit pos: source.Position): Unit = {
@@ -281,9 +383,13 @@ private[scalatest] class PathMessageRecordingAlerter(eventFun: (String, Option[A
 
 private[scalatest] object PathMessageRecordingAlerter {
   def apply(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => AlertProvided) = new PathMessageRecordingAlerter(eventFun)
+
+  def apply(eventFun: (String, Option[Any], Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => AlertProvided, calls: PathMessageCalls) = new PathMessageRecordingAlerter(eventFun, calls)
 }
 
-private[scalatest] class PathMessageRecordingDocumenter(eventFun: (String, Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent) extends ThreadAwareness with Documenter {
+private[scalatest] class PathMessageRecordingDocumenter(eventFun: (String, Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent, calls: PathMessageCalls) extends ThreadAwareness with Documenter {
+
+  def this(eventFun: (String, Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent) = this(eventFun, new PathMessageCalls)
 
   import org.scalatest.ConcurrentLinkedQueue
   import scala.collection.JavaConverters._
@@ -295,7 +401,12 @@ private[scalatest] class PathMessageRecordingDocumenter(eventFun: (String, Boole
   // other threads whenever they come in. So only call record after first checking isConstructingThread
   // So now do have to worry about concurrency
   private def record(message: String): Unit = {
-    messages add ((message, Thread.currentThread, isConstructingThread))
+    val thread = Thread.currentThread
+    val wasConstructingThread = isConstructingThread
+    messages add ((message, thread, wasConstructingThread))
+    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
+      eventFun(message, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    )
   }
 
   def apply(message: String)(implicit pos: source.Position): Unit = {
@@ -312,4 +423,6 @@ private[scalatest] class PathMessageRecordingDocumenter(eventFun: (String, Boole
 
 private[scalatest] object PathMessageRecordingDocumenter {
   def apply(eventFun: (String, Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent) = new PathMessageRecordingDocumenter(eventFun)
+
+  def apply(eventFun: (String, Boolean, Boolean, Suite, Reporter, Tracker, String, Int, Boolean, Thread) => RecordableEvent, calls: PathMessageCalls) = new PathMessageRecordingDocumenter(eventFun, calls)
 }

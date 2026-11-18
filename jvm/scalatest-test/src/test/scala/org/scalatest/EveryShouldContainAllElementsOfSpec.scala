@@ -274,8 +274,8 @@ class EveryShouldContainAllElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainAllElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(8, 4, 3, 2)) + " did not contain all elements of " + decorateToStringValue(prettifier, List(1, 2, 3)) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(8, 4, 3, 2)) + " did not contain all elements of " + decorateToStringValue(prettifier, List(1, 2, 3)) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -323,8 +323,8 @@ class EveryShouldContainAllElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainAllElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, Many(8, 4, 3, 2)) + " did not contain all elements of " + decorateToStringValue(prettifier, List(1, 2, 3)) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, Many(8, 4, 3, 2)) + " did not contain all elements of " + decorateToStringValue(prettifier, List(1, 2, 3)) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -368,8 +368,8 @@ class EveryShouldContainAllElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainAllElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) +  " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) +  " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -404,8 +404,8 @@ class EveryShouldContainAllElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainAllElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -440,8 +440,8 @@ class EveryShouldContainAllElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainAllElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) +  " (EveryShouldContainAllElementsOfSpec.scala:" + (offendingLine) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) +  " (EveryShouldContainAllElementsOfSpec.scala:" + (offendingLine) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -476,8 +476,8 @@ class EveryShouldContainAllElementsOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainAllElementsOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, Many("happy", "to", "you")) + " contained all elements of " + decorateToStringValue(prettifier, List("you", "to")) + " (EveryShouldContainAllElementsOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

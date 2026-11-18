@@ -52,6 +52,11 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
   private final val engine = PathEngine.getEngine()
   import engine._
 
+  private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
+    registeredForStructure(ensureTestResultsRegistered(thisSuite))
+    Some(engine.registeredNodes(true))
+  }
+
   // SKIP-SCALATESTJS,NATIVE-START
   override def newInstance: org.scalatest.funspec.PathAnyFunSpecLike = this.getClass.newInstance.asInstanceOf[PathAnyFunSpecLike]
   // SKIP-SCALATESTJS,NATIVE-END
@@ -127,6 +132,10 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
    */
   protected class ItWord {
 
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
+    //DOTTY-ONLY def inline$applyImpl(testText: String, testTags: Tag*)(testFun: => Unit, pos: source.Position): Unit = applyImpl(testText, testTags: _*)(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testText: String, testTags: Tag*)(testFun: => Unit /* Assertion */, pos: source.Position): Unit = {
       // SKIP-SCALATESTJS,NATIVE-START
       val stackDepth = 3
@@ -256,6 +265,10 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
    */
   protected class TheyWord {
 
+    // SKIP-SCALATESTNATIVE-START
+    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
+    //DOTTY-ONLY def inline$applyImpl(testText: String, testTags: Tag*)(testFun: => Unit, pos: source.Position): Unit = applyImpl(testText, testTags: _*)(testFun, pos)
+    // SKIP-SCALATESTNATIVE-END
     private def applyImpl(testText: String, testTags: Tag*)(testFun: => Unit /* Assertion */, pos: source.Position): Unit = {
       handleTest(thisSuite, testText, Transformer(() => testFun), Resources.theyCannotAppearInsideAnotherItOrThey, "PathAnyFunSpecLike.scala", "apply", 3, -2, None, Some(pos), testTags: _*)
     }

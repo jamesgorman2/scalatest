@@ -551,8 +551,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) did not contain element 1 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) did not contain element 1 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -560,8 +560,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e2.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e2.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e2.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, List() did not contain element \"ho\" (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, List() did not contain element \"ho\" (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(), List(), List())"))
 
         val e3 = intercept[TestFailedException] {
@@ -569,8 +569,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e3.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e3.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e3.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) contained element 4 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) contained element 4 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e4 = intercept[TestFailedException] {
@@ -578,8 +578,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e4.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) did not contain element 1 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) did not contain element 1 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
       }
       it("should use the implicit Equality in scope") {
@@ -640,8 +640,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiLists(0)) + " did not contain null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiLists(0)) + " did not contain null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiLists)))
       }
     }
@@ -661,8 +661,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -707,8 +707,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -728,8 +728,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -774,8 +774,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -795,8 +795,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -841,8 +841,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -863,8 +863,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -909,8 +909,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }
@@ -930,8 +930,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, List(4, 5, 6) contained element 6 (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in List(List(1, 2, 3), List(1, 2, 3), List(4, 5, 6))"))
 
         val e2 = intercept[TestFailedException] {
@@ -976,8 +976,8 @@ class ListShouldContainSpec extends AnyFunSpec {
         }
         e.failedCodeFileName.get should be ("ListShouldContainSpec.scala")
         e.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, hiNullLists(0)) + " contained null (ListShouldContainSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, hiNullLists)))
       }
     }

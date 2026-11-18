@@ -21,6 +21,7 @@ import scala.collection.GenSet
 import scala.collection.GenIterable
 import scala.collection.GenTraversable
 import scala.collection.GenTraversableOnce
+import org.scalactic.Prettifier
 import org.scalactic.TripleEquals
 import org.scalactic.TypeCheckedTripleEquals
 import SharedHelpers._
@@ -70,19 +71,19 @@ class ShouldCollectedTripleEqualsSpec extends AnyFunSpec with NonImplicitAsserti
           all (List(sub1, sub1, sub1)) should === (super1)
 
           val caught1 = intercept[TestFailedException] { all (List(super1, super1, super1)) should === (null) }
-          caught1.message should be (Some("'all' inspection failed, because: \n" +
-                                    "  at index 0, Super(1) did not equal null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+          caught1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                    "  at index 0, Super(1) did not equal null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                     "in List(Super(1), Super(1), Super(1))"))
           all (List(super1, super1, super1)) should !== (null)
 
           all (List(nullSuper, nullSuper, nullSuper)) should === (null)
           val caught2 = intercept[TestFailedException] { all (List(nullSuper, nullSuper, nullSuper)) should !== (null) }
-          caught2.message should be (Some("'all' inspection failed, because: \n" +
-                                    "  at index 0, null equaled null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+          caught2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                    "  at index 0, null equaled null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                     "in List(null, null, null)"))
           val caught3 = intercept[TestFailedException] { all (List(nullSuper, nullSuper, nullSuper)) should === (super1) }
-          caught3.message should be (Some("'all' inspection failed, because: \n" +
-                                    "  at index 0, null did not equal Super(1) (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+          caught3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                    "  at index 0, null did not equal Super(1) (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                     "in List(null, null, null)"))
           all (List(nullSuper, nullSuper, nullSuper)) should !== (super1)
 
@@ -237,19 +238,19 @@ class ShouldCollectedTripleEqualsSpec extends AnyFunSpec with NonImplicitAsserti
           all (List(sub1, sub1, sub1)) should === (super1)
 
           val caught1 = intercept[TestFailedException] { all (List(super1, super1, super1)) should === (null) }
-          caught1.message should be (Some("'all' inspection failed, because: \n" +
-                                    "  at index 0, Super(1) did not equal null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+          caught1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                    "  at index 0, Super(1) did not equal null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                     "in List(Super(1), Super(1), Super(1))"))
           all (List(super1, super1, super1)) should !== (null)
 
           all (List(nullSuper, nullSuper, nullSuper)) should === (null)
           val caught2 = intercept[TestFailedException] { all (List(nullSuper, nullSuper, nullSuper)) should !== (null) }
-          caught2.message should be (Some("'all' inspection failed, because: \n" +
-                                    "  at index 0, null equaled null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+          caught2.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                    "  at index 0, null equaled null (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                     "in List(null, null, null)"))
           val caught3 = intercept[TestFailedException] { all (List(nullSuper, nullSuper, nullSuper)) should === (super1) }
-          caught3.message should be (Some("'all' inspection failed, because: \n" +
-                                    "  at index 0, null did not equal Super(1) (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") \n" +
+          caught3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                    "  at index 0, null did not equal Super(1) (ShouldCollectedTripleEqualsSpec.scala:" + (thisLineNumber - 2) + ") " + Prettifier.lineSeparator +
                                     "in List(null, null, null)"))
           all (List(nullSuper, nullSuper, nullSuper)) should !== (super1)
 

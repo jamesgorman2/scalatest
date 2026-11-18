@@ -13,9 +13,9 @@ Notes this one builds on and does not repeat:
 
 - **A framework argument per worker works, with no Mill API beyond what Route B already uses** (§ 1, § 2). A worker's framework arguments are the `args` constructor field of the `TestModuleUtil` on which `callTestRunnerSubprocess` is called. The test command already calls that method once per worker, so it can call it on a `TestModuleUtil` built for that worker, whose `args` end with the worker's own absolute path. *Ran:* on Windows and Linux, under the daemon and `--no-daemon`, every one of 95 worker JVMs wrote its file at the path its argument named, in its own `processFolder`, with sandboxing off and on, and no file appeared anywhere else.
 - **Nothing else must stay shared between those instances** (§ 1.2). `TestModuleUtil` holds no mutable state; the queue folder, claim folder, `processFolder` and result path are parameters of the call, and discovery, results and the JUnit XML report are the test command's own code under Route B.
-- **R-053 holds as far as it was checked** (§ 2.3). Between workers of one module, each worker's `testargs` differed only in `arguments` and in the three fields that differ per worker under Mill's own task. The comparison against `testForked` itself is `MPC` § 5's; it was not repeated with sandboxing off.
+- **R-053a and R-053b hold as far as they were checked** (§ 2.3). Between workers of one module, each worker's `testargs` differed only in `arguments` and in the three fields that differ per worker under Mill's own task. The comparison against `testForked` itself is `MPC` § 5's; it was not repeated with sandboxing off.
 - **Inside the worker, only the `testargs` path on the JVM command line names the worker** (§ 3). `sun.java.command` held it in all 95 JVMs, and its parent folder was the `processFolder`. It is a HotSpot property, space-joined, so a path holding a space cannot be split out of it for certain. `ProcessHandle` gave no arguments on either platform. No environment variable, system property or `TestArgs` field that names the worker reaches a test-interface `Runner`.
-- **A module-level folder with a name per run loses the worker tie** (§ 4). `callTestRunnerSubprocess` does not return the process, so the plugin has no PID to match item 1's against. *Source-read and inferred; not run.*
+- **A module-level folder with a name per run loses the worker tie** (§ 4). `callTestRunnerSubprocess` does not return the process, so the plugin has no PID to match the `runStarted` event's against. *Source-read and inferred; not run.*
 - **The same mechanism works with sandboxing on** (§ 2.2, § 5): the sandbox-on fixture ran under it with the same results.
 
 ## Sources
@@ -113,12 +113,12 @@ Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`; workers on Azul Zulu
 - **A class on two workers.** On Windows a class ran on two or three workers of one group in every run, as `MPC` § 5 records. Each such worker's file was in its own folder and held that class.
 - **`CREATE_NEW`.** No worker failed to create its file: no folder was given to two JVMs.
 
-### 2.3 Against R-053
+### 2.3 Against R-053a and R-053b
 
 - Within each module, the top-level keys of a worker's `testargs` that differed from the first started worker's were `arguments`, `outputPath`, `resultPath` and `globSelectors`, in every run, and no others. The last three hold the worker's own `processFolder`, queue and claim paths, and differ per worker under Mill's own task (`MILL` § 2.1). `arguments` differed only in the per-worker argument, by construction (§ 2.1).
 - *Inference:* the JVM arguments, environment, class path and working directory of the spawn come from instance fields that are equal across the instances (§ 1.2), so they are as under one instance.
 - Route B against Mill's own `testForked`: `MPC` § 5, with sandboxing on. It was not repeated here with sandboxing off (§ 6).
-- `SPECIFICATION.md` R-053 allows the arguments "plus only what is required to turn the emitter on, with its test event log, …". *Inference:* an argument that differs per worker only in the event log path is within that; the files land in the folder the test command owns for the module (R-110), not in the working directory.
+- `SPECIFICATION.md` R-053a and R-053b have the tests run as Mill's `testOnly` or `testForked` runs them. *Inference:* an argument that differs per worker only in the event log path is within that; the files land in the folder the test command owns for the module (R-110), not in the working directory.
 
 ## 3. What else differs per worker inside the worker JVM
 
@@ -138,8 +138,8 @@ With sandboxing off, the working directory, environment, JVM arguments and frame
 
 Not run. The earlier design, and `JFC`'s spike, gave every worker of a module one absolute folder, in which each run creates a file named by its run ID (`JFC` § 1). That needs no per-worker value, with sandboxing on or off. Against the `processFolder` design it changes:
 
-- **The worker tie.** The plugin holds, per worker it started, the `processFolder`, the claims and the captured stdout and stderr; it holds no PID (§ 3). *Inference:* a file's item 1 PID matches nothing the plugin holds, so a file is tied to its worker only by § 3's rows: `sun.java.command` written into item 1, or the classes run against `claim.log`.
-- **A worker that dies before item 1.** *Inference:* the plugin sees one file fewer than the workers it started. Which worker has none is known only if every other file is tied to its worker. `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin's "a `processFolder` with no event log file is … a worker in which no run existed" no longer follows from the folder alone.
+- **The worker tie.** The plugin holds, per worker it started, the `processFolder`, the claims and the captured stdout and stderr; it holds no PID (§ 3). *Inference:* the PID in a file's `runStarted` event matches nothing the plugin holds, so a file is tied to its worker only by § 3's rows: `sun.java.command` written into the `runStarted` event, or the classes run against `claim.log`.
+- **A worker that dies before the `runStarted` event.** *Inference:* the plugin sees one file fewer than the workers it started. Which worker has none is known only if every other file is tied to its worker. `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin's "a `processFolder` with no event log file is … a worker in which no run existed" no longer follows from the folder alone.
 - **Captured output.** `ARCHITECTURE.md`'s "a worker's stdout and stderr belong to the run whose event log file is in the worker's `processFolder`" needs the same tie.
 - **The file's name.** A fixed name guarded by Mill's one-JVM-per-`processFolder` (`MILL` § 2.3) becomes a name the run must make unique.
 - **Live reading.** The plugin lists a folder for new files (`JFC` § 1) instead of opening a path it knew before it started the worker.
@@ -155,7 +155,7 @@ Not run. The earlier design, and `JFC`'s spike, gave every worker of a module on
 
 - Route B with a per-worker argument against Mill's own `testForked` or `testOnly`, with sandboxing off: classes, worker count, JVM arguments, environment, working directory, results and JUnit XML (`MPC` § 5 compared them with sandboxing on and one instance).
 - Live reading of a file in a `processFolder`, where Mill and Route B's `poll` read `claim.log` and `result.log`; every file here was read after its worker ended. `JFC` § 2 read files live in a folder of the plugin's own.
-- A worker that dies or is killed, before or after item 1, under a per-worker argument.
+- A worker that dies or is killed, before or after the `runStarted` event, under a per-worker argument.
 - A workspace path holding a space, a non-ASCII character, or longer than the Windows path limit, in the argument or in `sun.java.command`; only the plain `java` check of § 3 was made.
 - How ScalaTest's argument parsing treats the form the real runner argument will take; the spike passed the path as a `-D` config value.
 - A per-worker `forkEnv`, `forkArgs` or `TaskCtx` environment (§ 1.2), and a module-level folder with PID or `sun.java.command` matching (§ 4).

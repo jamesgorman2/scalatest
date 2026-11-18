@@ -54,7 +54,7 @@ class SnapshotsSpec extends funspec.AnyFunSpec {
       val a = 3
       val b = 4
       val snapshots = Snapshots.snap(a, b, a + b)
-      assert(snapshots.lines == "a was 3\nb was 4\na.+(b) was 7")
+      assert(snapshots.lines == "a was 3" + Prettifier.lineSeparator + "b was 4" + Prettifier.lineSeparator + "a.+(b) was 7")
     }
   }
 

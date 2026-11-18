@@ -34,7 +34,7 @@ private[scalatest] class ReporterFactory {
 
         val msg1 = Resources.cantLoadReporterClass(reporterClassName)
         val msg2 = Resources.probarg(argString)
-        val msg = msg1 + "\n" + msg2
+        val msg = msg1 + org.scalactic.Prettifier.lineSeparator + msg2
     
         val iae = new IllegalArgumentException(msg)
         iae.initCause(e)
@@ -44,7 +44,7 @@ private[scalatest] class ReporterFactory {
 
         val msg1 = Resources.cantInstantiateReporter(reporterClassName)
         val msg2 = Resources.probarg(argString)
-        val msg = msg1 + "\n" + msg2
+        val msg = msg1 + org.scalactic.Prettifier.lineSeparator + msg2
     
         val iae = new IllegalArgumentException(msg)
         iae.initCause(e)
@@ -54,7 +54,7 @@ private[scalatest] class ReporterFactory {
 
         val msg1 = Resources.cantInstantiateReporter(reporterClassName)
         val msg2 = Resources.probarg(argString)
-        val msg = msg1 + "\n" + msg2
+        val msg = msg1 + org.scalactic.Prettifier.lineSeparator + msg2
     
         val iae = new IllegalArgumentException(msg)
         iae.initCause(e)

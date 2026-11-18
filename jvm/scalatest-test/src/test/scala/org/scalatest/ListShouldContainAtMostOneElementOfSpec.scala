@@ -279,8 +279,8 @@ class ListShouldContainAtMostOneElementOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one element of " + decorateToStringValue(prettifier, Seq(2, 3, 4)) + " (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one element of " + decorateToStringValue(prettifier, Seq(2, 3, 4)) + " (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -329,8 +329,8 @@ class ListShouldContainAtMostOneElementOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one element of List(2, 3, 4) (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain at most one element of List(2, 3, 4) (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -375,8 +375,8 @@ class ListShouldContainAtMostOneElementOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -412,8 +412,8 @@ class ListShouldContainAtMostOneElementOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -447,8 +447,8 @@ class ListShouldContainAtMostOneElementOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -484,8 +484,8 @@ class ListShouldContainAtMostOneElementOfSpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainAtMostOneElementOfSpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained at most one element of List(\"fee\", \"fie\", \"foe\", \"fum\") (ListShouldContainAtMostOneElementOfSpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

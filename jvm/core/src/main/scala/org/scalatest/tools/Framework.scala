@@ -255,11 +255,12 @@ class Framework extends SbtFramework {
     presentReminderWithShortStackTraces: Boolean,
     presentReminderWithFullStackTraces: Boolean,
     presentReminderWithoutCanceledTests: Boolean,
-    execService: ExecutorService
+    execService: ExecutorService,
+    startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ): Array[Task] = {
     val suiteStartTime = System.currentTimeMillis
     val suiteClass = suite.getClass
-    val report = new SbtReporter(rerunSuiteId, taskDefinition.fullyQualifiedName, taskDefinition.fingerprint, eventHandler, suiteSortingReporter, summaryCounter)
+    val sbtReporter = new SbtReporter(rerunSuiteId, taskDefinition.fullyQualifiedName, taskDefinition.fingerprint, eventHandler, suiteSortingReporter, summaryCounter)
     val formatter = formatterForSuiteStarting(suite)
     val suiteClassName = getSuiteClassName(suite)
 
@@ -305,6 +306,9 @@ class Framework extends SbtFramework {
         Filter(if (tagsToInclude.isEmpty) Some(Set(SELECTED_TAG)) else Some(tagsToInclude + SELECTED_TAG), tagsToExclude, false, new DynaTags(suiteTags.filter(s => !testTags.contains(s._1)).toMap, testTags.toMap))
       }
 
+    val start = startOfTopLevelSuite(suite, filter, sbtReporter)
+    val report = start.reporter
+
     if (!suite.isInstanceOf[DistributedTestRunnerSuite])
       report(SuiteStarting(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName))))
 
@@ -318,7 +322,7 @@ class Framework extends SbtFramework {
 
     try {
 
-      val status = suite.run(None, args.copy(distributor = distributor))
+      val status = start.run(suite.run(None, args.copy(distributor = distributor)))
       statusList.put(status)
       val formatter = formatterForSuiteCompleted(suite)
       val duration = System.currentTimeMillis - suiteStartTime
@@ -400,8 +404,66 @@ class Framework extends SbtFramework {
     presentFilePathname: Boolean,
     presentJson: Boolean,
     configSet: Set[ReporterConfigParam],
-    execService: ExecutorService
+    execService: ExecutorService,
+    startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ) extends Task {
+
+    // The constructor of 3.2.20, which the binary compatibility check requires.
+    def this(
+      taskDefinition: TaskDef,
+      loader: ClassLoader,
+      suiteSortingReporter: SuiteSortingReporter,
+      tracker: Tracker,
+      tagsToInclude: Set[String],
+      tagsToExclude: Set[String],
+      selectors: Array[Selector],
+      explicitlySpecified: Boolean,
+      configMap: ConfigMap,
+      summaryCounter: SummaryCounter,
+      statusList: LinkedBlockingQueue[Status],
+      useSbtLogInfoReporter: Boolean,
+      presentAllDurations: Boolean,
+      presentInColor: Boolean,
+      presentShortStackTraces: Boolean,
+      presentFullStackTraces: Boolean,
+      presentUnformatted: Boolean,
+      presentReminder: Boolean,
+      presentReminderWithShortStackTraces: Boolean,
+      presentReminderWithFullStackTraces: Boolean,
+      presentReminderWithoutCanceledTests: Boolean,
+      presentFilePathname: Boolean,
+      presentJson: Boolean,
+      configSet: Set[ReporterConfigParam],
+      execService: ExecutorService
+    ) =
+      this(
+        taskDefinition,
+        loader,
+        suiteSortingReporter,
+        tracker,
+        tagsToInclude,
+        tagsToExclude,
+        selectors,
+        explicitlySpecified,
+        configMap,
+        summaryCounter,
+        statusList,
+        useSbtLogInfoReporter,
+        presentAllDurations,
+        presentInColor,
+        presentShortStackTraces,
+        presentFullStackTraces,
+        presentUnformatted,
+        presentReminder,
+        presentReminderWithShortStackTraces,
+        presentReminderWithFullStackTraces,
+        presentReminderWithoutCanceledTests,
+        presentFilePathname,
+        presentJson,
+        configSet,
+        execService,
+        TestEventLogHandOff.startWithoutEventLog
+      )
 
     def loadSuiteClass = {
       try {
@@ -455,6 +517,20 @@ class Framework extends SbtFramework {
           } catch {
             case t: Throwable => new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, t)
           }
+
+        // A ConfigMapWrapperSuite constructs its wrapped class on first use. This forces that use before the suite can
+        // start, through an accessor no suite can override. What the constructor throws reaches the build tool, as in
+        // ScalaTest 3.2.20, and only the event log records the suite as aborted.
+        suite match {
+          case wrapper: ConfigMapWrapperSuite =>
+            try wrapper.instanceWithEmptyConfigMap
+            catch {
+              case thrown: Throwable =>
+                handOffAbortOfSuiteThatCannotStart(thrown)
+                throw thrown
+            }
+          case _ => ()
+        }
 
         if (useSbtLogInfoReporter) {
           val sbtLogInfoReporter =
@@ -514,11 +590,39 @@ class Framework extends SbtFramework {
           presentReminderWithShortStackTraces,
           presentReminderWithFullStackTraces,
           presentReminderWithoutCanceledTests,
-          execService
+          execService,
+          startOfTopLevelSuite
         )
       }
        else
          throw new IllegalArgumentException("Class " + taskDefinition.fullyQualifiedName + " is neither accessible org.scalatest.Suite nor runnable.")
+    }
+
+    /**
+     * Gives the test event log the structure of a suite that threw before it could start, and the `SuiteStarting`
+     * and `SuiteAborted` `runSuite` would send for it as a `DeferredAbortedSuite`. No reporter receives them, and
+     * they take no ordinal from the run's tracker, so the run's reporters receive what ScalaTest 3.2.20 sends them.
+     */
+    private def handOffAbortOfSuiteThatCannotStart(thrown: Throwable): Unit = {
+      val aborted = new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, thrown)
+      val passingNoEventOn: Reporter = (_: Event) => ()
+      val start = startOfTopLevelSuite(aborted, Filter.default, passingNoEventOn)
+      val report = start.reporter
+      if (report ne passingNoEventOn) {
+        val tracker = new Tracker
+        val suiteClassName = getSuiteClassName(aborted)
+        val message =
+          if (thrown.getMessage == null)
+            thrown.getClass.getName + " encountered when attempting to run suite " + aborted.suiteId
+          else
+            thrown.getMessage
+        // Run as the suite's own run, which ends once both events are handed off.
+        start.run {
+          report(SuiteStarting(tracker.nextOrdinal(), aborted.suiteName, aborted.suiteId, Some(suiteClassName), formatterForSuiteStarting(aborted), Some(TopOfClass(suiteClassName))))
+          report(SuiteAborted(tracker.nextOrdinal(), message, aborted.suiteName, aborted.suiteId, Some(aborted.suiteName), Some(thrown), Some(0L), formatterForSuiteAborted(aborted, message), Some(SeeStackDepthException)))
+          SucceededStatus
+        }
+      }
     }
 
     def taskDef = taskDefinition
@@ -662,8 +766,11 @@ class Framework extends SbtFramework {
     slowpokeDetectionDelay: Long,
     slowpokeDetectionPeriod: Long,
     concurrentConfig: ConcurrentConfig,
-    testSortingReporterTimeout: Span
+    testSortingReporterTimeout: Span,
+    testEventLogEmitter: Option[TestEventLogEmitter]
   ) extends sbt.testing.Runner {
+    private val handOffToTestEventLog = TestEventLogEmitter.handOffTo(testEventLogEmitter)
+    private val startOfTopLevelSuite = TestEventLogEmitter.startOfTopLevelSuiteFor(testEventLogEmitter)
     val isDone = new AtomicBoolean(false)
     val serverThread = new AtomicReference[Option[Thread]](None)
     val statusList = new LinkedBlockingQueue[Status]()
@@ -682,7 +789,18 @@ class Framework extends SbtFramework {
     if (detectSlowpokes)
       dispatchReporter.registerSlowpokeReporter(suiteSortingReporter)
 
-    dispatchReporter(RunStarting(tracker.nextOrdinal(), 0, configMap))
+    dispatchReporter.registerTestEventLogHandOff(handOffToTestEventLog)
+
+    private def sendRunEvent(event: Event): Unit = {
+      if (TestEventLogHandOff.isHandedOffByDispatchReporter(event))
+        dispatchReporter.reportAndHandOff(event)
+      else {
+        handOffToTestEventLog(event)
+        dispatchReporter(event)
+      }
+    }
+
+    sendRunEvent(RunStarting(tracker.nextOrdinal(), 0, configMap))
 
     private val atomicThreadCounter = new AtomicInteger
 
@@ -734,7 +852,8 @@ class Framework extends SbtFramework {
           presentFilePathname,
           presentJson,
           configSet,
-          execSvc
+          execSvc,
+          startOfTopLevelSuite
         )
 
     private def filterWildcard(paths: List[String], taskDefs: Array[TaskDef]): Array[TaskDef] =
@@ -753,7 +872,7 @@ class Framework extends SbtFramework {
       } yield task
 
     def done = {
-      if (!isDone.getAndSet(true)) {
+      if (!isDone.getAndSet(true)) try {
 
         // Wait until all status is completed
         statusList.asScala.foreach { s =>
@@ -775,12 +894,15 @@ class Framework extends SbtFramework {
         val duration = System.currentTimeMillis - runStartTime
         val summary = new Summary(summaryCounter.testsSucceededCount.get, summaryCounter.testsFailedCount.get, summaryCounter.testsIgnoredCount.get, summaryCounter.testsPendingCount.get,
                                   summaryCounter.testsCanceledCount.get, summaryCounter.suitesCompletedCount.get, summaryCounter.suitesAbortedCount.get, summaryCounter.scopesPendingCount.get)
-        dispatchReporter(RunCompleted(tracker.nextOrdinal(), Some(duration), Some(summary)))
+        sendRunEvent(RunCompleted(tracker.nextOrdinal(), Some(duration), Some(summary)))
         dispatchReporter.dispatchDisposeAndWaitUntilDone()
 
         execSvc.shutdown()
 
-        val fragments: Vector[Fragment] =
+        // Under the runner argument, done returns no summary: Mill's worker prints what done returns to its stdout,
+        // which the test command captures as the run's output.
+        if (testEventLogEmitter.isDefined) ""
+        else
           StringReporter.summaryFragments(
             true,
             Some(duration),
@@ -792,8 +914,11 @@ class Framework extends SbtFramework {
             presentReminderWithFullStackTraces,
             presentReminderWithoutCanceledTests,
             presentFilePathname
-          )
-        fragments.map(_.toPossiblyColoredText(presentInColor)).mkString("\n")
+          ).map(_.toPossiblyColoredText(presentInColor)).mkString(org.scalactic.Prettifier.lineSeparator)
+      }
+      finally {
+        // A done that throws before it sends RunCompleted must not leave the run's test event log open.
+        testEventLogEmitter.foreach(_.endWithoutRunEnded())
       }
       else
         throw new IllegalStateException("done method is called twice")
@@ -961,26 +1086,32 @@ class Framework extends SbtFramework {
    */
   def runner(args: Array[String], remoteArgs: Array[String], testClassLoader: ClassLoader): SbtRunner = {
 
-    val ParsedArgs(
-      runpathArgs,
-      reporterArgs,
-      suiteArgs,
-      againArgs,
-      junitArgs,
-      propertiesArgs,
-      tagsToIncludeArgs,
-      tagsToExcludeArgs,
-      concurrentArgs,
-      membersOnlyArgs,
-      wildcardArgs,
-      testNGArgs,
-      suffixes,
-      chosenStyles,
-      spanScaleFactors,
-      testSortingReporterTimeouts,
-      slowpokeArgs,
-      seedArgs
-    ) = parseArgs(args)
+    val (
+      ParsedArgs(
+        runpathArgs,
+        reporterArgs,
+        suiteArgs,
+        againArgs,
+        junitArgs,
+        propertiesArgs,
+        tagsToIncludeArgs,
+        tagsToExcludeArgs,
+        concurrentArgs,
+        membersOnlyArgs,
+        wildcardArgs,
+        testNGArgs,
+        suffixes,
+        chosenStyles,
+        spanScaleFactors,
+        testSortingReporterTimeouts,
+        slowpokeArgs,
+        seedArgs
+      ),
+      testEventLogFileArg
+    ) = parseArgsWithTestEventLog(args)
+
+    // The runner of a sub-process sbt forks is given the main runner's arguments, and must not write to the main runner's file.
+    val testEventLogFile = if (remoteArgs.isEmpty) testEventLogFileArg else None
 
     if (!runpathArgs.isEmpty)
       throw new IllegalArgumentException("Specifying a runpath (-R <runpath>) is not supported when running ScalaTest from sbt.")
@@ -1096,7 +1227,7 @@ class Framework extends SbtFramework {
           // the reason that sub-process must use stdout is that the Array[Logger] is passed in from SBT only when the
           // suite is run, in the fork mode case this happens only at the sub-process side, the main process will not be
           // able to get the Array[Logger] to create SbtInfoLoggerReporter.
-          (!remoteArgs.isEmpty || reporterArgs.isEmpty, false, !sbtNoFormat, false, false, false, false, false, false, false, false, false, Set.empty[ReporterConfigParam])
+          (!remoteArgs.isEmpty || (reporterArgs.isEmpty && testEventLogFile.isEmpty), false, !sbtNoFormat, false, false, false, false, false, false, false, false, false, Set.empty[ReporterConfigParam])
       }
 
     //val reporterConfigs = fullReporterConfigurations.copy(standardOutReporterConfiguration = None)
@@ -1120,35 +1251,45 @@ class Framework extends SbtFramework {
     if (!concurrentArgs.isEmpty && concurrentConfig.numThreads == 0)
       throw new IllegalArgumentException("-P without specifying <numthreads> is not supported when running ScalaTest from sbt, please use sbt parallel configuration instead.")
 
-    new ScalaTestRunner(
-      args,
-      testClassLoader,
-      tagsToInclude,
-      tagsToExclude,
-      membersOnly,
-      wildcard,
-      autoSelectors,
-      configMap,
-      reporterConfigs,
-      useStdout,
-      presentAllDurations,
-      presentInColor,
-      presentShortStackTraces,
-      presentFullStackTraces,
-      presentUnformatted,
-      presentReminder,
-      presentReminderWithShortStackTraces,
-      presentReminderWithFullStackTraces,
-      presentReminderWithoutCanceledTests,
-      presentFilePathname,
-      presentJson,
-      configSet,
-      detectSlowpokes,
-      slowpokeDetectionDelay,
-      slowpokeDetectionPeriod,
-      concurrentConfig,
-      testSortingReporterTimeout
-    )
+    val testEventLogEmitter = TestEventLogEmitter.startedIfGiven(testEventLogFile)
+    try {
+      new ScalaTestRunner(
+        args,
+        testClassLoader,
+        tagsToInclude,
+        tagsToExclude,
+        membersOnly,
+        wildcard,
+        autoSelectors,
+        configMap,
+        reporterConfigs,
+        useStdout,
+        presentAllDurations,
+        presentInColor,
+        presentShortStackTraces,
+        presentFullStackTraces,
+        presentUnformatted,
+        presentReminder,
+        presentReminderWithShortStackTraces,
+        presentReminderWithFullStackTraces,
+        presentReminderWithoutCanceledTests,
+        presentFilePathname,
+        presentJson,
+        configSet,
+        detectSlowpokes,
+        slowpokeDetectionDelay,
+        slowpokeDetectionPeriod,
+        concurrentConfig,
+        testSortingReporterTimeout,
+        testEventLogEmitter
+      )
+    }
+    catch {
+      // A runner that fails at construction ends no run, and must not leave its test event log open.
+      case e: Throwable =>
+        testEventLogEmitter.foreach(_.endWithoutRunEnded())
+        throw e
+    }
   }
 
   private case class ScalaTestSbtEvent(

@@ -87,7 +87,7 @@ object GenModulesDotty {
     GenScalaTestDotty.genScalaPackagesJS
       .filter { case (packagePath, _) => packagePaths.contains(packagePath) }
       .flatMap { case (packagePath, skipList) =>
-        GenScalaTestDotty.copyDirJS(s"jvm/$moduleDirName/src/main/scala/" + packagePath, packagePath, targetDir, skipList)
+        GenScalaTestDotty.copyDirJS(s"jvm/$moduleDirName/src/main/scala/" + packagePath, packagePath, targetDir, skipList, GenScalaTestDotty.ScalaJsLineEnding)
       }.toList
   }
   

@@ -48,8 +48,8 @@ class ShouldBeSortedLogicalOrSpec extends AnyFunSpec {
     decorateToStringValue(prettifier, left) + " was sorted"
     
   def allInspectionFailed(idx: Int, message: String, lineNumber:Int, left: Any) = 
-    "'all' inspection failed, because: \n" + 
-    "  at index " + idx + ", " + message + " (ShouldBeSortedLogicalOrSpec.scala:" + lineNumber + ") \n" + 
+    "'all' inspection failed, because: " + Prettifier.lineSeparator + 
+    "  at index " + idx + ", " + message + " (ShouldBeSortedLogicalOrSpec.scala:" + lineNumber + ") " + Prettifier.lineSeparator + 
     "in " + decorateToStringValue(prettifier, left)
     
   case class Student(name: String, scores: Int)

@@ -1,0 +1,447 @@
+package org.scalatest.consolidation
+
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should.Matchers
+
+final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+
+  private def eventLogOf(nodeLine: String, nodeEvents: String): String =
+    s"""
+    run started
+    structure
+      suite "OutcomeSpec", class "samples.OutcomeSpec"
+        $nodeLine
+    suite "OutcomeSpec": SuiteStarting
+    $nodeEvents
+    suite "OutcomeSpec": SuiteCompleted
+    run ended completed
+    """
+
+  private def outputWithNodeLine(nodeLine: String): String =
+    s"""{cyan}[core.test]{reset}
+       |  {green}OutcomeSpec:{reset}
+       |    $nodeLine""".stripExpectedMargin
+
+  Feature("A scope's or test's line: its label, then its outcome's suffix") {
+
+    Scenario("A test that succeeded shows its label alone, in green") {
+      Given("an event log of a test that succeeded")
+      val eventLog = eventLogOf(
+        """test "adds", label "- adds"""",
+        """test "adds": TestStarting
+          |    test "adds": TestSucceeded""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("the test's line is its label, in green")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{green}- adds{reset}")
+    }
+
+    Scenario("A test that failed shows `*** FAILED ***`, in red") {
+      Given("an event log of a test that failed")
+      val eventLog = eventLogOf(
+        """test "adds", label "- adds"""",
+        """test "adds": TestStarting
+          |    test "adds": TestFailed""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("the test's line is its label and `*** FAILED ***`, in red")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{red}- adds *** FAILED ***{reset}")
+    }
+
+    Scenario("A test that was ignored shows `!!! IGNORED !!!`, in yellow") {
+      Given("an event log of an ignored test whose label has no leading `- `")
+      val eventLog = eventLogOf(
+        """test "adds", label "Scenario: adds", ignored""",
+        """test "adds": TestIgnored"""
+      )
+
+      When("the library consolidates it")
+      Then("the test's line is its label and `!!! IGNORED !!!`, in yellow")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}Scenario: adds !!! IGNORED !!!{reset}")
+    }
+
+    Scenario("A test that is pending shows `(pending)`, in yellow") {
+      Given("an event log of a pending test")
+      val eventLog = eventLogOf(
+        """test "adds", label "- adds"""",
+        """test "adds": TestStarting
+          |    test "adds": TestPending""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("the test's line is its label and `(pending)`, in yellow")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}- adds (pending){reset}")
+    }
+
+    Scenario("A test that was cancelled shows `!!! CANCELED !!!`, in yellow") {
+      Given("an event log of a cancelled test")
+      val eventLog = eventLogOf(
+        """test "adds", label "- adds"""",
+        """test "adds": TestStarting
+          |    test "adds": TestCanceled""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("the test's line is its label and `!!! CANCELED !!!`, in yellow")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}- adds !!! CANCELED !!!{reset}")
+    }
+
+    Scenario("A scope with no outcome shows its label alone, in green") {
+      Given("an event log of a scope that opened and closed around a test")
+      val eventLog = eventLogOf(
+        """scope "A calculator", label "A calculator"
+          |          test "adds", label "- adds"""".stripMargin,
+        """scope "A calculator": ScopeOpened
+          |    test "adds": TestStarting
+          |    test "adds": TestSucceeded
+          |    scope "A calculator": ScopeClosed""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("the scope's line is its label, in green")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine(
+        """{green}A calculator{reset}
+          |      {green}- adds{reset}""".stripExpectedMargin
+      )
+    }
+
+    Scenario("A scope that is pending shows `(pending)`, in yellow") {
+      Given("an event log of a pending scope whose label begins `- `")
+      val eventLog = eventLogOf(
+        """scope "A calculator", label "- A calculator"""",
+        """scope "A calculator": ScopePending"""
+      )
+
+      When("the library consolidates it")
+      Then("the scope's line is its label and `(pending)`, in yellow")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}- A calculator (pending){reset}")
+    }
+  }
+
+  Feature("Nodes without an outcome of their own when their suite aborts") {
+
+    val abortedPartway =
+      """
+      run started
+      structure
+        suite "PartlyRunSpec", class "samples.PartlyRunSpec"
+          test "ran", label "- ran"
+          scope "Open", label "Open"
+            test "in progress", label "- in progress"
+          scope "Never opened", label "Never opened"
+            test "never started", label "- never started"
+          test "never reached", label "never reached"
+      suite "PartlyRunSpec": SuiteStarting
+      test "ran": TestStarting
+      test "ran": TestSucceeded
+      scope "Open": ScopeOpened
+      test "in progress": TestStarting
+      suite "PartlyRunSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+      run ended completed
+      """
+
+    val abortedPartwayOutput =
+      """{cyan}[core.test]{reset}
+        |  {green}PartlyRunSpec:{reset}
+        |    {green}- ran{reset}
+        |    {green}Open{reset}{red} *** ABORTED ***{reset}
+        |      {red}- in progress *** ABORTED ***{reset}
+        |    {green}Never opened{reset}{red} *** NOT RUN ***{reset}
+        |      {red}(1 test not run){reset}
+        |    {red}never reached *** NOT RUN ***{reset}
+        |    {red}samples.PartlyRunSpec *** ABORTED ***{reset}
+        |      {red}java.lang.RuntimeException: database unreachable{reset}
+        |        {red}...{reset}""".stripExpectedMargin
+
+    Scenario("A test that had not started when its suite aborted shows `*** NOT RUN ***`, in red") {
+      Given("an event log of a suite that aborted before a test whose label has no leading `- ` started")
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(abortedPartway)
+
+      Then("the test's line is its label and `*** NOT RUN ***`, in red")
+      output shouldBe abortedPartwayOutput
+    }
+
+    Scenario("A test open when its suite aborted shows `*** ABORTED ***`, in red") {
+      Given("an event log of a suite that aborted while a test was running")
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(abortedPartway)
+
+      Then("the test's line is its label and `*** ABORTED ***`, in red")
+      output shouldBe abortedPartwayOutput
+    }
+
+    Scenario("A scope that had not opened when its suite aborted shows its label in green and `*** NOT RUN ***` in red") {
+      Given("an event log of a suite that aborted before a scope opened")
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(abortedPartway)
+
+      Then("the scope's line is its label in green, then `*** NOT RUN ***` in red")
+      output shouldBe abortedPartwayOutput
+    }
+
+    Scenario("A scope open when its suite aborted shows its label in green and `*** ABORTED ***` in red") {
+      Given("an event log of a suite that aborted while a scope was open")
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(abortedPartway)
+
+      Then("the scope's line is its label in green, then `*** ABORTED ***` in red")
+      output shouldBe abortedPartwayOutput
+    }
+
+    Scenario("A test that completed before its suite aborted keeps its own outcome") {
+      Given("an event log of a suite that aborted after one test succeeded")
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(abortedPartway)
+
+      Then("the test's line is its label, in green")
+      output shouldBe abortedPartwayOutput
+    }
+  }
+
+  Feature("No line shows an outcome rolled up from the nodes below it") {
+
+    Scenario("A failed test leaves its scope, suite and label without a suffix") {
+      Given("an event log of a scope holding a test that failed and one that succeeded")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "FailingFunSpec", class "samples.FailingFunSpec"
+            scope "A Stack", label "A Stack"
+              test "is empty", label "- is empty"
+              test "pops", label "- pops"
+        suite "FailingFunSpec": SuiteStarting
+        scope "A Stack": ScopeOpened
+        test "is empty": TestStarting
+        test "is empty": TestFailed(throwable: java.lang.IllegalStateException "not empty")
+        test "pops": TestStarting
+        test "pops": TestSucceeded
+        scope "A Stack": ScopeClosed
+        suite "FailingFunSpec": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the label's, the suite's and the scope's lines carry no suffix, and only the test's line shows `*** FAILED ***`")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}FailingFunSpec:{reset}
+          |    {green}A Stack{reset}
+          |      {red}- is empty *** FAILED ***{reset}
+          |        {red}java.lang.IllegalStateException: not empty{reset}
+          |          {red}...{reset}
+          |      {green}- pops{reset}""".stripExpectedMargin
+    }
+  }
+
+  Feature("Each line of a multi-line label sits where its first line does") {
+
+    Scenario("A test that succeeded shows each line of its label at its depth, each in green") {
+      Given("an event log of a succeeding test whose label holds two lines")
+      val eventLog = eventLogOf(
+        """test "adds", label "- adds\nand carries"""",
+        """test "adds": TestStarting
+          |    test "adds": TestSucceeded""".stripMargin
+      )
+
+      When("the library consolidates it")
+      Then("each line of the test's label sits at the test's depth, coloured on its own")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine(
+        """{green}- adds{reset}
+          |    {green}and carries{reset}""".stripExpectedMargin
+      )
+    }
+
+    Scenario("A scope open when its suite aborted shows each line of its label in green, and `*** ABORTED ***` on the last") {
+      Given("an event log of a suite that aborted while a scope whose label holds two lines was open")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "AbortedSpec", class "samples.AbortedSpec"
+            scope "A calculator", label "A calculator\nin base 2"
+              test "adds", label "- adds"
+        suite "AbortedSpec": SuiteStarting
+        scope "A calculator": ScopeOpened
+        test "adds": TestStarting
+        test "adds": TestSucceeded
+        suite "AbortedSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("each line of the scope's label sits at the scope's depth in green, and the last carries `*** ABORTED ***` in red")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}AbortedSpec:{reset}
+          |    {green}A calculator{reset}
+          |    {green}in base 2{reset}{red} *** ABORTED ***{reset}
+          |      {green}- adds{reset}
+          |    {red}samples.AbortedSpec *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: database unreachable{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
+  }
+
+  Feature("A test marked ignored") {
+
+    Scenario("A marked test with no execution, in a suite that completed, shows as ignored rather than 'not run'") {
+      Given("an event log of a suite that completes without running a test it marks ignored or a test it does not mark")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+            test "peeks", label "- peeks", ignored
+            test "pops", label "- pops"
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedOutputFrom(eventLog)
+
+      Then("the marked test shows `!!! IGNORED !!!` in yellow, and the unmarked one `*** NOT RUN ***` in red")
+      output.tree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}
+          |    {yellow}- peeks !!! IGNORED !!!{reset}
+          |    {red}- pops *** NOT RUN ***{reset}""".stripExpectedMargin
+
+      And("the summary line counts the marked test as ignored, and the unmarked one as expected and not run")
+      output.plainSummaryLine shouldBe
+        "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 2 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
+    }
+
+    Scenario("The count line of a suite that did not start leaves its marked test out") {
+      Given("an event log of a suite that does not start, holding a test it marks ignored and one it does not")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+        structure
+          suite "HeapFunSuite", class "samples.HeapFunSuite"
+            test "sifts", label "- sifts"
+            test "merges", label "- merges", ignored
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedOutputFrom(eventLog)
+
+      Then("the suite is not run, and its count line counts only the unmarked test")
+      output.tree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}HeapFunSuite:{reset}
+          |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}
+          |    {red}(1 test not run){reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}""".stripExpectedMargin
+
+      And("the summary line counts the marked test as ignored, though its suite did not start")
+      output.plainSummaryLine shouldBe
+        "Suites: 1 of 2 completed, 0 aborted. Tests: 1 of 2 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
+    }
+
+    Scenario("A suite that did not start, whose only test is marked ignored, shows no count line") {
+      Given("an event log of a suite that does not start, holding only a test it marks ignored")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "HeapFunSuite", class "samples.HeapFunSuite"
+            test "merges", label "- merges", ignored
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the suite is not run, with nothing below it to count")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}HeapFunSuite:{reset}
+          |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A test that sends `TestIgnored` is ignored although no structure marks it ignored") {
+      Given("an event log of a suite that sends `TestIgnored` for a test it does not mark ignored")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "is empty", label "- is empty"
+            test "peeks", label "- peeks"
+        suite "StackFunSuite": SuiteStarting
+        test "is empty": TestStarting
+        test "is empty": TestSucceeded
+        test "peeks": TestIgnored
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedOutputFrom(eventLog)
+
+      Then("the test shows `!!! IGNORED !!!`, in yellow")
+      output.tree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- is empty{reset}
+          |    {yellow}- peeks !!! IGNORED !!!{reset}""".stripExpectedMargin
+
+      And("the summary line counts the test as ignored")
+      output.plainSummaryLine shouldBe
+        "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
+    }
+
+    Scenario("A marked test that succeeded shows its execution's outcome") {
+      Given("an event log of a suite running a test it marks ignored, which succeeds")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "StackFunSuite", class "samples.StackFunSuite"
+            test "peeks", label "- peeks", ignored
+        suite "StackFunSuite": SuiteStarting
+        test "peeks": TestStarting
+        test "peeks": TestSucceeded
+        suite "StackFunSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedOutputFrom(eventLog)
+
+      Then("the test's line is its label alone, in green")
+      output.tree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}StackFunSuite:{reset}
+          |    {green}- peeks{reset}""".stripExpectedMargin
+
+      And("the summary line counts the test as succeeded, not as ignored")
+      output.plainSummaryLine shouldBe
+        "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+    }
+  }
+}

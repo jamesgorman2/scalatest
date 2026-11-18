@@ -21,7 +21,7 @@ Decisions behind `../SPECIFICATION.md` on what a test event log carries, who may
 - A public API with a compatibility promise, checked by MiMa as `../SPECIFICATION.md` R-004 checks the fork, serves callers the goal does not name.
 - A documented API marked experimental invites outside callers but gives them no more to rely on.
 
-**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a test event log outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release. Any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, whose format is documented for them (`../SPECIFICATION.md` R-084).
+**Reasoning** sbt and command-line front ends are out of scope and this epic gives no supported way to produce a test event log outside Mill, so the only caller is this fork's own Mill plugin, shipped in the same release. Any later front end in this fork ships likewise. The epic then adds no public programmatic API; tools read only the JSON output, whose format is documented for them (`../JSON-LAYOUT.md` § Compatibility).
 
 **Costs** A third party that builds on the library, such as another build tool's plugin, may break on any release of the fork.
 
@@ -58,7 +58,7 @@ Decisions behind `../SPECIFICATION.md` on what a test event log carries, who may
 
 ## The test event log's format is private to this fork.
 
-**Alternatives** A documented format that third parties may read is a second public contract beside the JSON output (`../SPECIFICATION.md` R-028), needing its own specification and compatibility policy, and the goal names no reader for it.
+**Alternatives** A documented format that third parties may read is a second public contract beside the JSON output (`../SPECIFICATION.md` R-028), needing its own compatibility policy, and the goal names no reader for it.
 
 **Reasoning** Tools already have a documented account of every run in the JSON output, so the event log need serve only this fork's own reader.
 

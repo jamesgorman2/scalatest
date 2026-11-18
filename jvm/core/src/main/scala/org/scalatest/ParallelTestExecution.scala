@@ -83,8 +83,11 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
       else {
         args.distributor match {  // This is the initial instance
           case Some(distributor) =>
-            val testSortingReporter = new TestSortingReporter(suiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
-            args.copy(reporter = testSortingReporter, distributedTestSorter = Some(testSortingReporter))
+            val registration = SuiteRegistration.inContext(this)
+            val theSuiteId = suiteId
+            registration.suiteIdRead(theSuiteId)
+            val testSortingReporter = new TestSortingReporter(theSuiteId, args.reporter, sortingTimeout, expectedTestCount(args.filter), args.distributedSuiteSorter, System.err)
+            args.copy(reporter = registration.reporterAheadOf(testSortingReporter), distributedTestSorter = Some(testSortingReporter))
           case None =>
             args
         }
@@ -256,11 +259,13 @@ trait ParallelTestExecution extends OneInstancePerTest { this: Suite =>
    * @return a <code>Status</code> object that indicates when all tests and nested suites started by this method have completed, and whether or not a failure occurred.
    */
   abstract override def run(testName: Option[String], args: Args): Status = {
+    SuiteRegistration.registeredRun(this, args) { (registration, args) =>
     (testName, args.distributedTestSorter) match {
       case (Some(name), Some(sorter)) =>
-        super.run(testName, args.copy(reporter = createTestSpecificReporter(sorter, name)))
+        super.run(testName, args.copy(reporter = registration.reporterOfTest(name, createTestSpecificReporter(sorter, name))))
       case _ =>
         super.run(testName, args)
+    }
     }
   }
 

@@ -321,8 +321,8 @@ class EveryShouldContainOneOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOneOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.didNotContainOneOfElements(prettifier, lists(2), UnquotedString("1, 3, 4")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.didNotContainOneOfElements(prettifier, lists(2), UnquotedString("1, 3, 4")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -375,8 +375,8 @@ class EveryShouldContainOneOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOneOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 2, " + FailureMessages.didNotContainOneOfElements(prettifier, lists(2), UnquotedString("1, 3, 4")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 2, " + FailureMessages.didNotContainOneOfElements(prettifier, lists(2), UnquotedString("1, 3, 4")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, lists)))
       }
 
@@ -440,8 +440,8 @@ class EveryShouldContainOneOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOneOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -498,8 +498,8 @@ class EveryShouldContainOneOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOneOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -539,8 +539,8 @@ class EveryShouldContainOneOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOneOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -580,8 +580,8 @@ class EveryShouldContainOneOfSpec extends AnyFunSpec {
         e1.failedCodeFileName.get should be ("EveryShouldContainOneOfSpec.scala")
         val offendingLine = thisLineNumber - 3
         e1.failedCodeLineNumber.get should be (offendingLine)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+          "  at index 0, " + FailureMessages.containedOneOfElements(prettifier, toLists(0), UnquotedString("\"happy\", \"birthday\", \"to\", \"you\"")) + " (EveryShouldContainOneOfSpec.scala:" + offendingLine + ") " + Prettifier.lineSeparator +
           "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {

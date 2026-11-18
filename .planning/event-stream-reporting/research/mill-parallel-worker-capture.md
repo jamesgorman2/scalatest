@@ -165,7 +165,7 @@ Every difference between a route and `testForked` was one of these: the worker c
 
 - a pseudo-terminal or Mill's live prompt: what the ticker and Route A's per-worker prompt lines show there; all output was redirected to files;
 - the sequential path (`testParallelism` off, or one class in all), where `runTests()` spawns on the caller's thread (`MWC` § 2.2), under either route;
-- class globs, as `testOnly` passes them (R-053);
+- class globs, as `testOnly` passes them (R-053a);
 - either route inside an exclusive command executing several modules' tasks, as `EPS` runs `testForked`;
 - a worker that dies or is killed under either route;
 - whether Route B's pool of `jobs` threads schedules as Mill's shared pool does when other tasks compete for it;

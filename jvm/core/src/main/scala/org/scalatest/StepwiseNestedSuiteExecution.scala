@@ -49,7 +49,7 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
 
     import args._
 
-    val report = wrapReporterIfNecessary(thisSuite, reporter)
+    val suiteReport = wrapReporterIfNecessary(thisSuite, reporter)
 
     def callExecuteOnSuite(nestedSuite: Suite): Status = {
 
@@ -57,14 +57,21 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
         val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
+        val start = SuiteStart.ofNestedSuite(nestedSuite, suiteReport)
+        val report = start.reporter
 
         val suiteStartTime = System.currentTimeMillis
 
-        report(SuiteStarting(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
+        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
+        val ordinal = tracker.nextOrdinal()
+        val nestedSuiteName = nestedSuite.suiteName
+        val nestedSuiteId = nestedSuite.suiteId
+        start.namesRead(nestedSuiteName, nestedSuiteId)
+        start.report(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
-          val status = nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty))
+          val status = start.run(nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
           val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
@@ -73,12 +80,12 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
             case Some(_) => 
               status.withAfterEffect {
                 val duration = System.currentTimeMillis - suiteStartTime
-                report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
+                start.report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
               }
 
             case None => 
               val duration = System.currentTimeMillis - suiteStartTime
-              report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
+              start.report(SuiteCompleted(tracker.nextOrdinal(), nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
           }
           status
         }
@@ -93,7 +100,7 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
             val formatter = formatterForSuiteAborted(nestedSuite, rawString)
 
             val duration = System.currentTimeMillis - suiteStartTime
-            report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
+            start.report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
             FailedStatus
           }
         }

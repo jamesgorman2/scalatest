@@ -11,13 +11,13 @@ Notes this one builds on and does not repeat:
 
 ## Short answer
 
-- **Two of the three routes held R-044, R-040, R-042, R-053 with class globs, and R-092, on every terminal and in both modes** (§ 3, § 5, § 6). Neither drew a worker prompt line, a worker ticker or an `N/M completed` line in any of 1 755 snapshots of 54 runs, and none of those strings reached the terminal at all.
+- **Two of the three routes held R-044, R-040, R-097a, R-053a and R-053b, and R-092, on every terminal and in both modes** (§ 3, § 5, § 6). Neither drew a worker prompt line, a worker ticker or an `N/M completed` line in any of 1 755 snapshots of 54 runs, and none of those strings reached the terminal at all.
   - **Route B driven from outside the module** (`queue`, § 3). The plugin calls `callTestRunnerSubprocess` itself, so no Mill code that sets progress runs. It needs `@experimental` `TestModuleUtil`, `@internal` `internalWorker`, `TestRunnerUtils.globFilter` and `TestResult`, `mill.javalib.api.internal.ZincOp`, and reflection on the protected discovery member.
   - **A plugin `Logger` compiled in package `mill.ntp`**, passed as the `TaskCtx`'s `log` to the `command` route (`command-quiet`) and to Route A from outside the module (`member-quiet`) (§ 5). It implements the `private[mill]` `Logger.prompt` and drops the ticker and every prompt line and detail below its own key. It compiled as a meta-build source, `mill-build/src/mill/ntp/QuietLogger.scala`, with no annotation or flag.
-- **The `command` route with Mill's own logger did not hold R-044** (§ 4). In 18 of 18 runs its goal's line showed `N/M completed` and each worker had a line with its current test class, as under Mill's own `testForked`. It held R-040, R-042, R-053 and R-092.
-- **`Logger.DummyLogger`, public and unannotated, kept progress off the prompt but broke R-053** (§ 5.3). Its prompt is never coloured, so workers got `colored: false` where Mill's own task passed `true`: in 4 of 4 Linux runs and in a Windows run with `--color true`.
+- **The `command` route with Mill's own logger did not hold R-044** (§ 4). In 18 of 18 runs its goal's line showed `N/M completed` and each worker had a line with its current test class, as under Mill's own `testForked`. It held R-040, R-097a, R-053a, R-053b and R-092.
+- **`Logger.DummyLogger`, public and unannotated, kept progress off the prompt but broke R-053a and R-053b** (§ 5.3). Its prompt is never coloured, so workers got `colored: false` where Mill's own task passed `true`: in 4 of 4 Linux runs and in a Windows run with `--color true`.
 - **Mill's own task, under the same harness,** showed worker lines, tickers and the completion line in 18 of 18 runs, its failed-test list in 6 of 6 failing runs, and ScalaTest's summary and worker output in 18 of 18 (§ 2.2).
-- **R-053 variation** (§ 6). On Windows a class ran on two workers in 42 of 56 route runs and 9 of 12 runs of Mill's own task, and worker counts varied, as `MPC` § 5 records. On Linux no class ran twice; one `member-quiet` run started 3 workers in a group against 2.
+- **R-053a and R-053b variation** (§ 6). On Windows a class ran on two workers in 42 of 56 route runs and 9 of 12 runs of Mill's own task, and worker counts varied, as `MPC` § 5 records. On Linux no class ran twice; one `member-quiet` run started 3 workers in a group against 2.
 - **Not run:** macOS; a terminal height other than 40; several modules in one command; a killed worker; the logger in a jar; more than one round per case (§ 9).
 
 ## Sources
@@ -71,7 +71,7 @@ A statement marked *inference* follows from the cited source or runs and was not
   - In each snapshot, the prompt is the block from the last header row (`<n>/<m>] …`) to the foot of the screen. In it, a row whose key has three or more parts (`139-0-1]`, `1-139-0-1]`) is a worker prompt line; a row naming a test class is a worker ticker; a row holding `<n>/<m> completed` is a completion line.
   - The same patterns were counted over the whole stream with escapes removed, which catches a frame drawn between snapshots.
   - The final rendering, scrollback included, was searched for Mill's failed-test list (`tests failed`, `  gamma.G03 t2`), ScalaTest's summary (`Run completed in`, `Tests: succeeded`, …) and worker output (`SEQ-OUT`, `CHILD-ERR`, the JVM warning, `Running Test Class`, `- t1`, …).
-  - Capture (R-042) and the comparison with Mill's own task (R-053) are `MTW`'s `analyse.py` checks, extended to each worker's `testargs` file. A worker's captured PID must also equal the PID of the `worker-info` file in the folder its index line names.
+  - Capture (R-097a) and the comparison with Mill's own task (R-053a and R-053b) are `MTW`'s `analyse.py` checks, extended to each worker's `testargs` file. A worker's captured PID must also equal the PID of the `worker-info` file in the folder its index line names.
   - Output: `R/summary.txt`, `R/summary.tsv`, `R/tables.txt`, and one `R/timelines/<run>.timeline.tsv` per run.
 
 Versions: Mill `1.1.10`, Scala `3.3.6`, ScalaTest `3.2.19`, Azul Zulu `21.0.10` fetched by Mill. Windows 11 (`10.0.22631`), MinTTY `3.8.1`, Python `3.14.6`, `pywinpty` `3.1.2`, `pyte` `0.8.2`. Ubuntu 26.04 under WSL 2 (kernel `6.18.54.1`), util-linux `script` `2.41.3`.
@@ -108,8 +108,8 @@ The prompt read, for example, `139] jvm.test.testForked 3s 6/10 completed, 1 fai
   - The goal's key is `1-139`: the command's key `1` and the nested task count padded to three digits, as `NPC` § 6 describes.
   - *Inference:* Route B calls neither `fork.async` nor a ticker (`B` lines 265–284), so no line of § 2.1 is set.
 - **R-040, R-044's other items.** No failed-test list, ScalaTest summary or worker output line in any final rendering. The failing runs ended `1] [error] ntp.run ntp.run: a module failed`, the prototype's own failure.
-- **R-042.** In 18 of 18 runs every worker that started a JVM was captured, 68 in all, each stream's `SEQ` numbers ran 1 to N, and each PID matched its folder's `worker-info` file. Route B makes no capture key for a worker that claims nothing.
-- **R-053, with globs.** Classes per group, `testargs`, JVM working directory, arguments and environment, and the set of JUnit XML test cases matched Mill's own task in 18 of 18 runs. That includes the 6 glob runs, where both sides ran `G01`–`G05` and `G06`–`G09` in two groups. The differences were the variation of § 6.
+- **R-097a.** In 18 of 18 runs every worker that started a JVM was captured, 68 in all, each stream's `SEQ` numbers ran 1 to N, and each PID matched its folder's `worker-info` file. Route B makes no capture key for a worker that claims nothing.
+- **R-053a and R-053b.** Classes per group, `testargs`, JVM working directory, arguments and environment, and the set of JUnit XML test cases matched Mill's own task in 18 of 18 runs. That includes the 6 glob runs, where both sides ran `G01`–`G05` and `G06`–`G09` in two groups. The differences were the variation of § 6.
 - **Discovery.** On `jvm.test` the reflected member returns `None` (`MTW` § 3.2), so `NTP_DISC=none` (`B` line 160) would pass the same value; it was not run.
 
 ## 4. The `command` route with Mill's own logger
@@ -119,7 +119,7 @@ The prompt read, for example, `139] jvm.test.testForked 3s 6/10 completed, 1 fai
   - one line per worker: `1-139-0-0] 4s gamma.G05 1s`, `1-139-1-1] gamma.G09`.
   - Snapshots with a worker line, a ticker and a completion line: 402 of 581, each. The first appeared 0.5–3.5 s after recording began; under Mill's own task, also 0.5–3.5 s.
 - *Inference:* `fork.async` and both tickers run with the goal's own logger as `ctx.log` (§ 2.1). The `PluginCtx` changes only `dest`, `args` and `fork` (`MTW` § 1).
-- **R-040, R-042, R-053, R-092** held as for `queue`: no failed-test list, summary or worker output on the console; 68 workers captured in order; R-053's comparison the same apart from § 6's variation, in all 18 runs, globs included. `fork.async` ran a body for each group's worker `2`, which spawned nothing; the route recorded 40 such labels without bytes, as `MPC` § 4 found.
+- **R-040, R-097a, R-053a, R-053b, R-092** held as for `queue`: no failed-test list, summary or worker output on the console; 68 workers captured in order; the R-053a and R-053b comparison the same apart from § 6's variation, in all 18 runs, globs included. `fork.async` ran a body for each group's worker `2`, which spawned nothing; the route recorded 40 such labels without bytes, as `MPC` § 4 found.
 
 ## 5. A plugin-supplied logger
 
@@ -146,7 +146,7 @@ The prompt read, for example, `139] jvm.test.testForked 3s 6/10 completed, 1 fai
 | Prompt lines dropped per run | 6 in every run | 6 in every run |
 | Completion tickers / worker tickers dropped per run | 449–565 / 1 132–1 428 | 447–587 / 1 082–1 401 |
 | Workers captured in order, PID matched | 68 | 70 |
-| R-053, globs included | same in 11 runs; § 6's variation in 7 | same in 12; variation in 6 |
+| R-053a, R-053b | same in 11 runs; § 6's variation in 7 | same in 12; variation in 6 |
 
 - The task lines were the command's and the goal's, `1-139] Task.Anon@…(build_.package_#ntp.graphGoal) <n>s` or `…#ntp.utilGoal`, with no detail.
 - The six prompt lines dropped per run are one per `fork.async` body: two groups of up to three workers. `logLines=0`: no line was logged through the worker loggers, since `CaptureFork` sends each worker's process streams to the plugin (`B` lines 93–106).
@@ -157,9 +157,9 @@ The prompt read, for example, `139] jvm.test.testForked 3s 6/10 completed, 1 fai
 
 - `Logger.DummyLogger` is a public object with a `Prompt.NoOp`, which does nothing and is never coloured (`LOG` lines 106–126, 213–240). It needs no `mill` package.
 - No progress, failed-test list, summary or worker output was shown in 12 of 12 runs (393 snapshots), and every worker was captured in order.
-- **R-053 broke.** In 4 of 4 Linux runs each worker's `testargs` had `colored: false` where Mill's own task had `true`; with `--color true` on Windows, Mill's task and `command-quiet` passed `true` and `command-dummy` `false`. `callTestRunnerSubprocess` reads `colored` from `Task.log.prompt.colored` (`TMU` line 134). Under ConPTY and MinTTY both were `false`, so those 8 runs matched.
+- **R-053a and R-053b broke.** In 4 of 4 Linux runs each worker's `testargs` had `colored: false` where Mill's own task had `true`; with `--color true` on Windows, Mill's task and `command-quiet` passed `true` and `command-dummy` `false`. `callTestRunnerSubprocess` reads `colored` from `Task.log.prompt.colored` (`TMU` line 134). Under ConPTY and MinTTY both were `false`, so those 8 runs matched.
 
-## 6. Against R-053
+## 6. Against R-053a and R-053b
 
 Each route run was compared with Mill's own task of the same terminal, mode, outcome and kind.
 
@@ -205,11 +205,11 @@ All routes share the nested evaluation and the capture: `MNK` § 5's fail-fast-o
 | `command-quiet` | as `command`, plus `Logger` and `Logger.Prompt` implemented with their `private[mill]` members | `private[mill]` (`LOG` lines 21–98, 180–211); compiled in package `mill.ntp`, which nothing marks |
 | | relies on | worker keys below `ctx.log`'s (`EC` line 113, `PFX` line 37), in `mill.exec` and `mill.internal`, outside the policy |
 | `member-quiet` | `MPC` § 6 Route A's API from outside the module (`TestModuleUtil` `@experimental`, `internalWorker` and `TestResult` `@internal`), the reflected discovery member, and `command-quiet`'s logger | as listed above |
-| `command-dummy` | as `command`, plus `Logger.DummyLogger` | public object, unmarked (`LOG` line 106); breaks R-053 (§ 5.3) |
+| `command-dummy` | as `command`, plus `Logger.DummyLogger` | public object, unmarked (`LOG` line 106); breaks R-053a and R-053b (§ 5.3) |
 
 ## 8. Against the earlier notes
 
-- `.planning/event-stream-reporting/decisions/capture-and-console.md`, entry "R-040, R-042 and R-044 hold on every runtime…", finds no route that leaves the module unchanged meeting R-044 on the JVM. Here `queue`, `command-quiet` and `member-quiet` met it under ConPTY, MinTTY and Linux `script`.
+- `.planning/event-stream-reporting/decisions/capture-and-console.md`, entry "R-040, R-097a and R-044 hold on every runtime…", finds no route that leaves the module unchanged meeting R-044 on the JVM. Here `queue`, `command-quiet` and `member-quiet` met it under ConPTY, MinTTY and Linux `script`.
 - `MPC` § 2.2 found a plugin `log` cannot be built from build code. It can from a meta-build source in a `mill` package (§ 5.1). `.planning/event-stream-reporting/research/mill-command-lifetime.md` § 7's inference that a plugin outside package `mill` cannot implement `Logger` held: the class had to be inside it.
 - `MPC` § 6 ran Route B only from a trait mixed into the module. From outside it ran with the reflected discovery member and with class globs (§ 3).
 - `MTW` § 8 left a pseudo-terminal unrun. Under one, the `command` route showed the runner's progress (§ 4), as the decision entry above records.

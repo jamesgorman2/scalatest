@@ -16,6 +16,7 @@
 package org.scalatest
 
 import org.scalatest.events.Event
+import org.scalatest.tools.ThrowableView
 
 /**
  * Trait whose instances collect the results of a running
@@ -125,17 +126,17 @@ private[scalatest] object Reporter {
     val indentation = if (level > 0) "  " * level else ""
     val withTabsZapped = stackTrace.replaceAll("\t", "  ")
     val withInitialIndent = indentation + withTabsZapped
-    withInitialIndent.replaceAll("\n", "\n" + indentation) // I wonder if I need to worry about alternate line endings. Probably.
+    withInitialIndent.replaceAll("\r?\n", org.scalactic.Prettifier.lineSeparator + indentation)
   }
 
   // In the unlikely event that a message is blank, use the throwable's detail message
-  def messageOrThrowablesDetailMessage(message: String, throwable: Option[Throwable]): String = {
+  def messageOrThrowablesDetailMessage(message: String, throwable: Option[ThrowableView]): String = {
     val trimmedMessage = message.trim
     if (!trimmedMessage.isEmpty)
       trimmedMessage
     else
       throwable match {
-        case Some(t) => t.getMessage.trim
+        case Some(t) => t.message.orNull.trim // Throws a NullPointerException for a throwable without a message, as ScalaTest 3.2.20 does
         case None => ""
       }
   }

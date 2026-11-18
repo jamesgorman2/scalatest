@@ -1,0 +1,13 @@
+//| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
+package build
+
+import mill.*
+import mill.scalalib.*
+
+object core extends ScalaModule {
+  def scalaVersion = "3.3.8"
+
+  object test extends ScalaTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"org.scalatest::scalatest::3.2.20")
+  }
+}

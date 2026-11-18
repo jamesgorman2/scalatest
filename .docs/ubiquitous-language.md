@@ -21,18 +21,27 @@ How a run schedules its suites and tests: *sequential*, one after another on one
 _Avoid_: Parallelism level, run mode
 
 **Module**:
-A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM. It is not a unit of consolidation; the Mill plugin and the sbt recipe give each module one test run label.
+A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM.
 _Avoid_: Project, subproject, target
 
 ## Test structure
 
 **Test structure**:
-The tree of nodes a run reports: the run at its root, containing suites, which contain nested suites, scopes and tests.
+The tree of a run's nodes as its tests are written, however many times each ran: the run at its root, containing suites, which contain nested suites, scopes and tests. A test also contains the suites it ran.
 _Avoid_: Test tree, hierarchy, nesting
 
+**Execution**:
+One running of a suite, scope or test at its place, inside one execution of its parent.
+_Avoid_: Attempt, invocation, retry
+_Context_: A node of the test structure; unrelated to execution mode
+
 **Node**:
-A run, suite, nested suite, scope or test in the test structure; the run is the root of its own test structure. In consolidated output, the consolidation is the root, a test run label is also a node, and a run is not: its top-level suites sit directly under its test run label.
+An element in the test structure hierarchy as it is planned and/or executed. A single declaration (eg, suite, scope, test) may be referenced by multiple nodes when it is executed multiple times.
 _Avoid_: Element, item, entry, test case
+
+**Node path**:
+A node's ID in its run's test event log: its parent's node path followed by the node's place under that parent. Stable for the run, so the node's `structure` and events name it alike.
+_Avoid_: Invocation path, minted ID
 
 **Name**:
 A node's own text as written in the source file: a suite's suite name, or a scope's or test's text without the text of the scopes around it. ScalaTest's test name, which joins a test's scopes' text with its own, is not a node's name.
@@ -40,7 +49,7 @@ _Avoid_: Test name, full name, text
 _Context_: A node of the test structure
 
 **Label**:
-A scope's or test's name as ScalaTest's formatter renders it, such as `when b` or `- should c`, without its indentation. Suites and the run node have none. It is not a test run label.
+A scope's or test's name as ScalaTest's formatter renders it, such as `when b` or `- should c`, without its indentation. Suites and the run node have none.
 _Avoid_: Formatted name, display name
 _Context_: A node of the test structure
 
@@ -53,6 +62,14 @@ The order in which a sequential run reports a node's children, except that the t
 _Avoid_: Source order
 
 ## Output
+
+**Reporter**:
+Anything that reports on a run's events through ScalaTest's `Reporter`: a reporter a runner argument such as `-o`, `-f` or `-C` configures, a reporter ScalaTest adds itself, or the emitter. A `-C` reporter is one kind, not the meaning.
+_Avoid_: Listener
+
+**Emitter**:
+The reporter that writes a run's test event log when the run is given the runner argument. It receives each event as core sends it, before any other reporter reorders it.
+_Avoid_: Event log reporter, writer
 
 **`J` reporter**:
 An `-o`, `-e` or `-f` reporter whose configuration characters include `J`, so that it writes JSON in place of text.
@@ -82,6 +99,10 @@ How captured output relates to a process's stdout or stderr: output is captured 
 Bringing things together into a single place.
 _Avoid_: Aggregation, merging, report generation
 
+**Consolidation state**:
+Whether a consolidation has ended and whether anything has failed its test command: *open* or *open, failed* until the consolidation ends, then *ended* or *ended, failed*. Once failed, it stays failed.
+_Avoid_: Result, status, running, complete
+
 **Event stream**:
 One run's events, test structure and the output it captures, in the order the run produced them, independent of how they are carried.
 _Avoid_: Event log, event feed
@@ -94,23 +115,8 @@ _Avoid_: Channel, event stream, event file
 Said of a run whose event stream ends without recording how the run ended, completed, aborted or stopped, as when its process dies.
 
 **Test manifest**:
-The test classes one test command is to run for one module, each either taken by one or more of the module's test processes or not yet taken by any. It names classes only, not their nested suites, scopes or tests. Shortened to "manifest" where nothing else could be meant.
+The test classes one test command is to run for one module, each either claimed (picked up to run) by one or more of the module's test processes or not yet claimed by any. It names classes only, not their nested suites, scopes or tests. Shortened to "manifest" where nothing else could be meant.
 _Avoid_: Test plan, class list, expected tests
-
-**Take**:
-A process's claim on a test class of its module's test manifest. On the JVM, a process takes each class it picks up from those of its fork group still waiting to run; on Scala.js and Native, it takes every test class the test command was to run for its module.
-_Context_: A test process and a test class
-
-**Not-run test class**:
-A test class the test command was to run that the human-readable and JSON output show as not run, because no run reported it as a suite: a suite node named by its class name, aborted with reason *not run*, with no children, that names no run record.
-
-**Test run label**:
-A node in consolidated output that wraps the suites of the runs its caller names together, named by the caller and unique within one consolidation. It tells apart runs that are otherwise indistinguishable, such as the same suites run on the JVM, Scala.js and Native.
-_Avoid_: Module, module name, group, tag
-
-**Run record**:
-One run's own state in consolidated JSON output, such as its outcome, timings, summary counts and the output captured against the run, held in a list on the run's test run label. Each of the run's suites names its run record.
-_Avoid_: Run node, worker record
 
 **Test command**:
 One evaluation of the command the Mill plugin adds for consolidated testing, covering the runs of every test module its module selectors resolve to. Under `--watch`, each re-evaluation is a separate test command.

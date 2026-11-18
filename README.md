@@ -19,6 +19,10 @@ Please visit [Download and Setup](https://www.scala-sbt.org/1.x/docs/Setup.html)
 
 Please visit [Quick Start](http://www.scalatest.org/quick_start) for steps to get started quickly.
 
+### Mill plugin
+
+[mill-plugin/README.md](mill-plugin/README.md) describes how to publish this fork and its Mill plugin, run the plugin's tests, and use the plugin's test command in a Mill build.
+
 
 Building ScalaTest
 ------------------
@@ -110,6 +114,8 @@ The resulting JAR file will be produced in target/scala-2.11/.
 You can also publish it to your local Ivy repository using this command:
 
   `$ sbt publishLocal`
+
+This fork publishes no Scala 2 artifacts, and publishes each of the others under Maven group `com.edc` with the artifact name ScalaTest publishes it under.
 
 Or publish it to local maven repository using this command:
 

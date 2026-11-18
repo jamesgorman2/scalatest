@@ -27,8 +27,8 @@ class InspectorShorthandsRegexWithGroupsSpec extends AnyFunSpec with Matchers {
   private val prettifier = Prettifier.default
 
   def errorMessage(index: Int, message: String, lineNumber: Int, left: Any): String = 
-    "'all' inspection failed, because: \n" +
-    "  at index " + index + ", " + message + " (InspectorShorthandsRegexWithGroupsSpec.scala:" + lineNumber + ") \n" +
+    "'all' inspection failed, because: " + Prettifier.lineSeparator +
+    "  at index " + index + ", " + message + " (InspectorShorthandsRegexWithGroupsSpec.scala:" + lineNumber + ") " + Prettifier.lineSeparator +
     "in " + decorateToStringValue(prettifier, left)
   
   describe("Inspector shorthands") {

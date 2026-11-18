@@ -305,8 +305,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
 
         val e3 = intercept[TestFailedException] {
@@ -314,8 +314,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e3.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e3.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e3.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, listsNil(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e3.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, listsNil(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, listsNil)))
       }
 
@@ -368,8 +368,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, lists(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, lists)))
 
         val e4 = intercept[TestFailedException] {
@@ -377,8 +377,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e4.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e4.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e4.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 2, " + decorateToStringValue(prettifier, listsNil(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e4.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 2, " + decorateToStringValue(prettifier, listsNil(2)) + " did not contain only " + "(1, 2, 3)" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, listsNil)))
       }
 
@@ -426,8 +426,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" +  " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" +  " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -466,8 +466,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -506,8 +506,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" +  " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" +  " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
@@ -546,8 +546,8 @@ class ListShouldContainInOrderOnlySpec extends AnyFunSpec {
         }
         e1.failedCodeFileName.get should be ("ListShouldContainInOrderOnlySpec.scala")
         e1.failedCodeLineNumber.get should be (thisLineNumber - 3)
-        e1.message should be (Some("'all' inspection failed, because: \n" +
-                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") \n" +
+        e1.message should be (Some("'all' inspection failed, because: " + Prettifier.lineSeparator +
+                                   "  at index 0, " + decorateToStringValue(prettifier, toLists(0)) + " contained only " + "(\"to\", \"you\")" + " in order (ListShouldContainInOrderOnlySpec.scala:" + (thisLineNumber - 5) + ") " + Prettifier.lineSeparator +
                                    "in " + decorateToStringValue(prettifier, toLists)))
       }
       it("should use the implicit Equality in scope") {
