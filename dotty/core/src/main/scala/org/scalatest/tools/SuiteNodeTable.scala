@@ -362,9 +362,9 @@ private[scalatest] object SuiteNodeTable {
       structure.filteredTests
     )
     val nested = structure.nestedSuites.toVector
-    table.holdNestedSuites(nested.zipWithIndex.map { (nestedSuite, position) =>
-      val nestedId = nestedSuitePath(id, nestedSuite.suiteId, nested.take(position).map(_.suiteId))
-      suite(emitter, nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + position), nodes)
+    table.holdNestedSuites(nested.zipWithIndex.map { (nestedSuite, offset) =>
+      val nestedId = nestedSuitePath(id, nestedSuite.suiteId, nested.take(offset).map(_.suiteId))
+      suite(emitter, nestedSuite, nestedId, Some(table), Some(firstPositionOfNestedSuites + offset), nodes)
     })
     if (!structure.testsBeforeNestedSuites) {
       nodes ++= nodesOfScopesAndTests.result()
@@ -382,16 +382,16 @@ private[scalatest] object SuiteNodeTable {
     // Recurses once for each scope nested in another, as registering them does.
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
-        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), position)) =>
+        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), offset)) =>
           val id = NodeId(suite.places :+ NodePlace.Test(testName))
-          nodes += StructureNode.Test(id, parent, firstPosition + position, name, label, ignored)
+          nodes += StructureNode.Test(id, parent, firstPosition + offset, name, label, ignored)
           added = added.copy(testsByName = added.testsByName.updated(testName, id), parents = added.parents.updated(id, parent))
           scopesSoFarByText
-        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), position)) =>
+        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), offset)) =>
           val index = scopesSoFarByText.getOrElse(text, 0)
           val id = NodeId(parent.places :+ NodePlace.Scope(text, index))
           val path = pathOfParent :+ ScopePlace(text, index)
-          nodes += StructureNode.Scope(id, parent, firstPosition + position, name, label)
+          nodes += StructureNode.Scope(id, parent, firstPosition + offset, name, label)
           added = added.copy(scopesByPath = added.scopesByPath.updated(path, id), parents = added.parents.updated(id, parent))
           add(scopesAndTests, id, 0, path)
           scopesSoFarByText.updated(text, index + 1)
