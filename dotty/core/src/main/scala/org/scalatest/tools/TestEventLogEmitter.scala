@@ -342,8 +342,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   def handedOffEventCount: Int = synchronized(handedOff.size)
 
   /**
-   * Writes the event unless it has been handed off, at its send site or by another wrapper: an event reaches the wrapper of its test, of its suite and of each suite
-   * around that one, and only the first of them that finds it not handed off writes it.
+   * Writes the event unless it has already been handed off, at its send site or by another wrapper. An event reaches
+   * the wrapper of its test, of its suite and of each suite around that one; only the first wrapper that finds it not
+   * handed off writes it.
    *
    * The event is assigned as one with no origin, from its own data: to the suite its suite ID names (the wrapper's own
    * suite, or one at or below the wrapper's node), and to the test its test name names in that suite. A suite that no

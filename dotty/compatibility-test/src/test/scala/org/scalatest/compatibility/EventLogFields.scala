@@ -23,7 +23,7 @@ object EventLogFields {
     node(logged.execution) + " " + event.productPrefix + fields.mkString("(", ", ", ")")
   }
 
-  // Reads an event written by `of`, and gives `run` for one assigned to the run.
+  // Reads the quoted suite ID from an event `of` wrote, or `run` for an event assigned to the run.
   def quotedSuiteIdOf(written: String): String =
     if (written.startsWith("run ")) {
       "run"

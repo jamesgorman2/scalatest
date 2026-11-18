@@ -258,7 +258,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "add a suite after the siblings that share its suite ID where its ordinal names no suite an earlier structure holds" in {
+      "add a suite after its siblings with the same suite ID when its ordinal names no suite held by an earlier structure" in {
         structuresOf(
           """
           structure
@@ -269,7 +269,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ).last shouldBe Vector(suite(id(suiteAt("samples.StackSuite", 1)), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"))
       }
 
-      "reject an ordinal on a new suite other than the next among the suites that share its name" in {
+      "reject a new suite's ordinal when it is not the next one among suites sharing its name" in {
         rejection(
           """
           structure
@@ -659,7 +659,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "continue the first of the sibling suites that share the suite ID where the suite line gives no ordinal" in {
+      "continue the first sibling suite with that suite ID when the suite line gives no ordinal" in {
         val outer = id(suiteAt("samples.TwiceSuites"))
         val first = under(outer, suiteAt("samples.InnerSuite", 0))
 
@@ -705,7 +705,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "add a sibling suite of the same suite ID where the suite line's ordinal names no suite an earlier structure holds" in {
+      "add a sibling suite with the same suite ID when the suite line's ordinal names no suite held by an earlier structure" in {
         val outer = id(suiteAt("samples.OuterSuites"))
         val second = under(outer, suiteAt("samples.Inner1Suite", 1))
 
@@ -772,7 +772,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "assign the event to the node its ordinal picks among those sharing a name, in the order structures first hold them" in {
+      "assign the event to the node its ordinal picks among nodes sharing a name, ordered by when structures first hold them" in {
         val outer = id(suiteAt("samples.TwiceSuites"))
         val first = under(outer, suiteAt("samples.InnerSuite", 0))
         val second = under(outer, suiteAt("samples.InnerSuite", 1))
@@ -852,7 +852,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         rejection(dedentedAndJoined(stackSuite, """scope "pops": ScopeOpened""")) shouldBe Some("no structure so far holds scope \"pops\"")
       }
 
-      "reject a name that several nodes share where the event gives no ordinal" in {
+      "reject a name shared by several nodes when the event gives no ordinal" in {
         rejection(
           """
           structure
@@ -864,7 +864,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some("the structures so far hold 2 nodes named scope \"A Stack\": add #<n>")
       }
 
-      "reject an ordinal beyond the nodes that share the name" in {
+      "reject an ordinal beyond the number of nodes sharing the name" in {
         rejection(dedentedAndJoined(stackSuite, """test "pops" #2: TestStarting""")) shouldBe Some("no structure so far holds test \"pops\" #2: 1 share that name")
       }
 
@@ -988,7 +988,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(2)
       }
 
-      "take the ancestor's latest execution where none is open" in {
+      "take the ancestor's latest execution when none is open" in {
         lastParentExecutionOf(
           dedentedAndJoined(stackSuite, """
           scope "A Stack": ScopeOpened
@@ -1000,7 +1000,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some(2)
       }
 
-      "take the ancestor's first execution where the ancestor has none" in {
+      "take the ancestor's first execution when the ancestor has none" in {
         lastParentExecutionOf(dedentedAndJoined(stackSuite, """test "pops" execution 2: TestStarting""")) shouldBe Some(1)
       }
 
@@ -1228,7 +1228,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           Some("a string that is not closed at column 34 of 'run: InfoProvided(message: \"open)'")
       }
 
-      "reject a number where the field holds a string" in {
+      "reject a number when the field holds a string" in {
         rejection("run: InfoProvided(message: 3)") shouldBe Some("expected '\"' at column 28 of 'run: InfoProvided(message: 3)'")
       }
 
@@ -1271,14 +1271,14 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         }
       }
 
-      "leave it empty where its throwable's message is null" in {
+      "leave it empty when its throwable's message is null" in {
         lastDecodedEventOf("run: SuiteAborted(throwable: java.lang.IllegalStateException null)") match {
           case DecodedEvent.SuiteAborted(message, Some(_), None, None, "main", 0L) => message shouldBe ""
           case other => fail(s"not the SuiteAborted given: $other")
         }
       }
 
-      "leave it empty where its throwable writes no message" in {
+      "leave it empty when its throwable writes no message" in {
         lastDecodedEventOf("run: NoteProvided(throwable: java.lang.IllegalStateException)") match {
           case DecodedEvent.NoteProvided(message, Some(_), None, "main", 0L) => message shouldBe ""
           case other => fail(s"not the NoteProvided given: $other")
@@ -1456,7 +1456,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           WrittenParts(Set.empty, Set(aStackId), None)
       }
 
-      "record no ancestor where the event leaves each to the default" in {
+      "record no ancestor when the event leaves each to the default" in {
         built(TestRunPart.Events(dedentedAndJoined(stackSuite, """test "pops" execution 2: TestStarting"""))).events.last.written shouldBe WrittenParts.none
       }
 

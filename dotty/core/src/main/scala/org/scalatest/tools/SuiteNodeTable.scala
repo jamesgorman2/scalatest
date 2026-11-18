@@ -36,7 +36,7 @@ private[scalatest] final class NodeExecutions(emitter: TestEventLogEmitter) {
   private var open = List.empty[Execution]
   private var lastIndexedExecution = Option.empty[Execution]
 
-  /** An execution not yet indexed takes the next index, and is then the node's last indexed, and open. */
+  /** An execution not yet indexed takes the next index, becomes the node's last indexed execution and is marked open. */
   def indexOf(execution: Execution): Int = {
     emitter.assertLockHeld()
     Option(indexes.get(execution)) match {
@@ -67,7 +67,12 @@ private[scalatest] final class NodeExecutions(emitter: TestEventLogEmitter) {
 
   def newExecution(): Execution = new Execution(emitter)
 
-  /** The execution an event below this node ran in, where nothing names it, is the latest open, else the last indexed, else a new first one. */
+  /**
+   * The execution an event below this node ran in, where no execution is named, is the first of:
+   *  - the latest open execution;
+   *  - the last indexed execution;
+   *  - a new execution.
+   */
   def indexOfCurrent: Int = {
     emitter.assertLockHeld()
     indexOf(latestOpen.orElse(lastIndexed).getOrElse(newExecution()))

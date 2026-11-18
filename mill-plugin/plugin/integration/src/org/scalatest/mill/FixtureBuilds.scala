@@ -141,8 +141,8 @@ object TestCommandResult {
     )
 
   /**
-   * Mill, re-rendering a line it prefixes, drops a foreground reset that the next colour overrides, so the line's
-   * characters keep their colours.
+   * Removes each reset that the next colour overrides. Mill drops these when it re-renders a line to add its prefix,
+   * and the line's characters keep their colours.
    */
   def withoutResetsBeforeAColour(marked: String): String = marked.replaceAll("""\{reset\}(?=\{(?!reset\}))""", "")
 

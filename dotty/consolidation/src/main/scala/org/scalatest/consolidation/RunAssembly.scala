@@ -359,9 +359,11 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
     executions(node) = executions(node).updated(index, updated)
   }
 
-  // Reads the execution path against the latest structure. Its last index is the node's, and each index before it
-  // belongs to the next node up, counting each scope between a test and its suite. An execution keeps the parent
-  // execution it first had. Start order goes from the top down, so a parent's precedes its child's.
+  // Reads the execution path against the latest structure:
+  // - its last index is the node's own; each earlier index belongs to the parent, then the grandparent, and so on,
+  //   counting each scope between a test and its suite;
+  // - an execution keeps the parent execution it first had;
+  // - start order runs top down, so a parent's start precedes its child's.
   private def recordExecutionPath(nodeExecution: NodeExecution): Unit = {
     val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(_.parentId)))).toVector
     val executionsUp = nodesUp.zip(nodeExecution.executionPath.reverse).map((node, index) => ExecutionOfNode(node, index))

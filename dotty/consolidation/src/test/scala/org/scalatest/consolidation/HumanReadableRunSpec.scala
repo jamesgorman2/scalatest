@@ -480,7 +480,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.state shouldBe ConsolidationState.OpenFailed
     }
 
-    Scenario("A registered test with no event and no test to attribute it to shows as not run, and fails the state") {
+    Scenario("A test with no events and no test to attribute it to shows as not run, and fails the state") {
       Given("an event log of a run that ends completed, in which SkipSuite's test \"skipped\" has no event")
       val parts = TestRunPart.Events(skippedTestEventLog)
 
@@ -498,21 +498,21 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       stateAfterEnd(parts) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A test that only its suite's first registration holds, never starts and has no test to attribute it to fails the state") {
+    Scenario("A test that a later structure drops before it starts, with no test to attribute it to, fails the state") {
       Given("an event log of a run that ends completed, whose further structure drops the test \"local\" before it starts")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended, failed")
       stateAfterEnd(TestRunPart.Events(droppedTestEventLog)) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A suite registered at two places that runs at one, with every test of the other place attributed, leaves the state ended") {
+    Scenario("A suite at two places that runs at only one, with the other place's tests attributed to it, leaves the state ended") {
       Given("an event log of a run that ends completed, in which the second InnerSuite's test is attributed to the first's")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended")
       stateAfterEnd(TestRunPart.Events(twinSuitesEventLog)) shouldBe ConsolidationState.Ended
     }
 
-    Scenario("A suite, scope and test that start and never close, in a run that ends completed, are aborted and fail the state") {
+    Scenario("A suite, scope and test still open when a run completes show as aborted and fail the state") {
       Given("an event log of a run that ends completed while a suite, a scope in it and a test in that scope are open")
       val parts = TestRunPart.Events(openNodesEventLog)
 

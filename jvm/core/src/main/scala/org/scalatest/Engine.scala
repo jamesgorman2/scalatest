@@ -470,9 +470,9 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
   private val failureOfRegistrationForStructure = new AtomicReference[Option[Throwable]](None)
 
   /**
-   * For a suite that registers on first use. Such a suite registers once, so the call ScalaTest 3.2.20 would have made
-   * first finds the registration made. What `register` throws is therefore kept as well as thrown, and
-   * `throwFailureOfRegistrationForStructure` throws it from that call.
+   * For a suite that registers on first use. Such a suite registers only once, so the first call ScalaTest 3.2.20 would
+   * have made finds the registration already done. What `register` throws is therefore both kept and thrown, and
+   * `throwFailureOfRegistrationForStructure` rethrows it from that call.
    */
   def registeredForStructure(register: => Unit): Unit = {
     try register
