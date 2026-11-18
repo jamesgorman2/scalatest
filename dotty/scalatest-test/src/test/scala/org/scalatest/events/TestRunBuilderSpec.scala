@@ -3,7 +3,7 @@ package org.scalatest.events
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import EventNotationBlocks.joined
+import EventNotationBlocks.dedentedAndJoined
 
 final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
@@ -258,7 +258,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "add a suite after the siblings that share its suite ID where its number names no suite an earlier structure holds" in {
+      "add a suite after the siblings that share its suite ID where its ordinal names no suite an earlier structure holds" in {
         structuresOf(
           """
           structure
@@ -269,7 +269,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ).last shouldBe Vector(suite(id(suiteAt("samples.StackSuite", 1)), None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"))
       }
 
-      "reject a number on a new suite other than the next among the suites that share its name" in {
+      "reject an ordinal on a new suite other than the next among the suites that share its name" in {
         rejection(
           """
           structure
@@ -282,7 +282,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "reject a number that names a suite of another suite ID" in {
+      "reject an ordinal that names a suite of another suite ID" in {
         rejection(
           """
           structure
@@ -404,7 +404,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "put the suite under the suite a number picks among those sharing the name" in {
+      "put the suite under the suite an ordinal picks among those sharing the name" in {
         val userTwo = id(suiteAt("samples.UserSuites"), suiteAt("samples.two.UserSuite"))
 
         structuresOf(
@@ -466,7 +466,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject a structure under a scope" in {
-        rejection(joined(stackSuite, """
+        rejection(dedentedAndJoined(stackSuite, """
           structure under scope "A Stack"
             suite "HelperSuite", class "samples.HelperSuite"
           """)) shouldBe Some("a structure is under a suite or a test at column 32 of 'structure under scope \"A Stack\"'")
@@ -659,7 +659,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "continue the first of the sibling suites that share the suite ID where the suite line gives no number" in {
+      "continue the first of the sibling suites that share the suite ID where the suite line gives no ordinal" in {
         val outer = id(suiteAt("samples.TwiceSuites"))
         val first = under(outer, suiteAt("samples.InnerSuite", 0))
 
@@ -683,7 +683,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "continue the sibling suite that the suite line's number names" in {
+      "continue the sibling suite that the suite line's ordinal names" in {
         val outer = id(suiteAt("samples.TwiceSuites"))
         val second = under(outer, suiteAt("samples.InnerSuite", 1))
 
@@ -705,7 +705,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "add a sibling suite of the same suite ID where the suite line's number names no suite an earlier structure holds" in {
+      "add a sibling suite of the same suite ID where the suite line's ordinal names no suite an earlier structure holds" in {
         val outer = id(suiteAt("samples.OuterSuites"))
         val second = under(outer, suiteAt("samples.Inner1Suite", 1))
 
@@ -772,7 +772,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "assign the event to the node its number picks among those sharing a name, in the order structures first hold them" in {
+      "assign the event to the node its ordinal picks among those sharing a name, in the order structures first hold them" in {
         val outer = id(suiteAt("samples.TwiceSuites"))
         val first = under(outer, suiteAt("samples.InnerSuite", 0))
         val second = under(outer, suiteAt("samples.InnerSuite", 1))
@@ -845,14 +845,14 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject a node that only a later structure holds" in {
-        rejection(joined("""test "pops": TestStarting""", stackSuite)) shouldBe Some("no structure so far holds test \"pops\"")
+        rejection(dedentedAndJoined("""test "pops": TestStarting""", stackSuite)) shouldBe Some("no structure so far holds test \"pops\"")
       }
 
       "reject a node of another kind than the one that has the name" in {
-        rejection(joined(stackSuite, """scope "pops": ScopeOpened""")) shouldBe Some("no structure so far holds scope \"pops\"")
+        rejection(dedentedAndJoined(stackSuite, """scope "pops": ScopeOpened""")) shouldBe Some("no structure so far holds scope \"pops\"")
       }
 
-      "reject a name that several nodes share where the event gives no number" in {
+      "reject a name that several nodes share where the event gives no ordinal" in {
         rejection(
           """
           structure
@@ -864,8 +864,8 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         ) shouldBe Some("the structures so far hold 2 nodes named scope \"A Stack\": add #<n>")
       }
 
-      "reject a number beyond the nodes that share the name" in {
-        rejection(joined(stackSuite, """test "pops" #2: TestStarting""")) shouldBe Some("no structure so far holds test \"pops\" #2: 1 share that name")
+      "reject an ordinal beyond the nodes that share the name" in {
+        rejection(dedentedAndJoined(stackSuite, """test "pops" #2: TestStarting""")) shouldBe Some("no structure so far holds test \"pops\" #2: 1 share that name")
       }
 
       "reject an execution for an event of the run" in {
@@ -873,7 +873,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject an ancestor's execution for an event of the run" in {
-        rejection(joined(stackSuite, """run, in suite "StackSuite" execution 1: RunStopped""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """run, in suite "StackSuite" execution 1: RunStopped""")) shouldBe
           Some("an event assigned to the run has no execution: 'run, in suite \"StackSuite\" execution 1: RunStopped'")
       }
 
@@ -890,13 +890,13 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "numbering an event's executions" should {
+    "indexing an event's executions" should {
       "give the execution of each node from the top-level suite down to the event's node, the test's scopes included" in {
-        executionsOf(joined(stackSuite, """test "pops": TestStarting""")) shouldBe Vector(execution(popsId, 1, 1, 1))
+        executionsOf(dedentedAndJoined(stackSuite, """test "pops": TestStarting""")) shouldBe Vector(execution(popsId, 1, 1, 1))
       }
 
       "give the execution the event writes" in {
-        executionsOf(joined(stackSuite, """test "pops" execution 4: TestStarting""")) shouldBe Vector(execution(popsId, 1, 1, 4))
+        executionsOf(dedentedAndJoined(stackSuite, """test "pops" execution 4: TestStarting""")) shouldBe Vector(execution(popsId, 1, 1, 4))
       }
 
       "give a nested suite's event the execution of the suite above it" in {
@@ -933,7 +933,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "give the execution of each ancestor the event marks" in {
         executionsOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           scope "A Stack", in suite "StackSuite" execution 5: ScopeOpened
           test "pops" execution 2, in suite "StackSuite" execution 4, in scope "A Stack" execution 3: TestStarting
           """)
@@ -941,36 +941,36 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject a marked node that is not above the event's node" in {
-        rejection(joined(stackSuite, """suite "StackSuite", in scope "A Stack" execution 1: SuiteStarting""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """suite "StackSuite", in scope "A Stack" execution 1: SuiteStarting""")) shouldBe
           Some("scope \"A Stack\" is not above suite \"StackSuite\": 'suite \"StackSuite\", in scope \"A Stack\" execution 1: SuiteStarting'")
       }
 
       "reject ancestors marked other than from the top-level suite down" in {
-        rejection(joined(stackSuite, """test "pops", in scope "A Stack" execution 1, in suite "StackSuite" execution 1: TestStarting""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 1, in suite "StackSuite" execution 1: TestStarting""")) shouldBe
           Some(
             "an event marks each ancestor's execution once, from the top-level suite down: 'test \"pops\", in scope \"A Stack\" execution 1, in suite \"StackSuite\" execution 1: TestStarting'"
           )
       }
 
       "reject an ancestor marked twice" in {
-        rejection(joined(stackSuite, """test "pops", in scope "A Stack" execution 1, in scope "A Stack" execution 2: TestStarting""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 1, in scope "A Stack" execution 2: TestStarting""")) shouldBe
           Some(
             "an event marks each ancestor's execution once, from the top-level suite down: 'test \"pops\", in scope \"A Stack\" execution 1, in scope \"A Stack\" execution 2: TestStarting'"
           )
       }
 
       "reject an execution below 1" in {
-        rejection(joined(stackSuite, """test "pops" execution 0: TestStarting""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """test "pops" execution 0: TestStarting""")) shouldBe
           Some("expected a number from 1 at column 23 of 'test \"pops\" execution 0: TestStarting'")
       }
 
       "reject an ancestor's execution below 1" in {
-        rejection(joined(stackSuite, """test "pops", in scope "A Stack" execution 0: TestStarting""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 0: TestStarting""")) shouldBe
           Some("expected a number from 1 at column 43 of 'test \"pops\", in scope \"A Stack\" execution 0: TestStarting'")
       }
 
       "reject an execution that does not fit an Int" in {
-        rejection(joined(stackSuite, """test "pops" execution 2147483648: TestStarting""")) shouldBe
+        rejection(dedentedAndJoined(stackSuite, """test "pops" execution 2147483648: TestStarting""")) shouldBe
           Some("'2147483648' does not fit an Int at column 23 of 'test \"pops\" execution 2147483648: TestStarting'")
       }
     }
@@ -978,7 +978,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     "defaulting an ancestor's execution" should {
       "take the ancestor's latest execution that is open" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           scope "A Stack": ScopeOpened
           scope "A Stack" execution 2: ScopeOpened
           scope "A Stack" execution 3: ScopeOpened
@@ -990,7 +990,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "take the ancestor's latest execution where none is open" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           scope "A Stack": ScopeOpened
           scope "A Stack" execution 2: ScopeOpened
           scope "A Stack" execution 2: ScopeClosed
@@ -1001,12 +1001,12 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "take the ancestor's first execution where the ancestor has none" in {
-        lastParentExecutionOf(joined(stackSuite, """test "pops" execution 2: TestStarting""")) shouldBe Some(1)
+        lastParentExecutionOf(dedentedAndJoined(stackSuite, """test "pops" execution 2: TestStarting""")) shouldBe Some(1)
       }
 
       "count an execution as open from its first event, whatever that event is" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           scope "A Stack" execution 2: ScopeClosed
           scope "A Stack": InfoProvided(message: "checked")
           test "pops": TestStarting
@@ -1016,7 +1016,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "count an execution as open from the first event that marks it" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           scope "A Stack": ScopeOpened
           test "pops", in scope "A Stack" execution 2: TestStarting
           scope "A Stack" execution 3: ScopeOpened
@@ -1028,7 +1028,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "count a scope's execution as closed by ScopePending" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           scope "A Stack": ScopeOpened
           scope "A Stack" execution 2: ScopeOpened
           scope "A Stack" execution 2: ScopePending
@@ -1039,7 +1039,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "count a suite's execution as closed by SuiteCompleted" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           suite "StackSuite": SuiteStarting
           suite "StackSuite" execution 2: SuiteStarting
           suite "StackSuite" execution 2: SuiteCompleted
@@ -1050,7 +1050,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "count a suite's execution as closed by SuiteAborted" in {
         lastParentExecutionOf(
-          joined(stackSuite, """
+          dedentedAndJoined(stackSuite, """
           suite "StackSuite": SuiteStarting
           suite "StackSuite" execution 2: SuiteStarting
           suite "StackSuite" execution 2: SuiteAborted(throwable: java.lang.RuntimeException "boom")
@@ -1430,7 +1430,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       "record the fields and throwable parts a ScalaTest event writes" in {
         val event = built(
           TestRunPart.Events(
-            joined(stackSuite, """test "pops": TestFailed(throwable: java.lang.IllegalStateException null at StackSpec.scala:? property check frames [] suppressing [java.lang.Error] caused by java.io.IOException "inner", analysis: [])""")
+            dedentedAndJoined(stackSuite, """test "pops": TestFailed(throwable: java.lang.IllegalStateException null at StackSpec.scala:? property check frames [] suppressing [java.lang.Error] caused by java.io.IOException "inner", analysis: [])""")
           )
         ).events.last
 
@@ -1452,16 +1452,16 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "record each ancestor whose execution the event marks" in {
-        built(TestRunPart.Events(joined(stackSuite, """test "pops", in scope "A Stack" execution 1: TestStarting"""))).events.last.written shouldBe
+        built(TestRunPart.Events(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 1: TestStarting"""))).events.last.written shouldBe
           WrittenParts(Set.empty, Set(aStackId), None)
       }
 
       "record no ancestor where the event leaves each to the default" in {
-        built(TestRunPart.Events(joined(stackSuite, """test "pops" execution 2: TestStarting"""))).events.last.written shouldBe WrittenParts.none
+        built(TestRunPart.Events(dedentedAndJoined(stackSuite, """test "pops" execution 2: TestStarting"""))).events.last.written shouldBe WrittenParts.none
       }
 
       "keep each event's own notation" in {
-        built(TestRunPart.Events(joined(stackSuite, """test "pops": TestStarting"""))).events.map(_.notation) shouldBe Vector(
+        built(TestRunPart.Events(dedentedAndJoined(stackSuite, """test "pops": TestStarting"""))).events.map(_.notation) shouldBe Vector(
           "structure\n  suite \"StackSuite\", class \"samples.StackSuite\"\n    scope \"A Stack\", label \"A Stack\"\n      test \"pops\", label \"- pops\"",
           "test \"pops\": TestStarting"
         )

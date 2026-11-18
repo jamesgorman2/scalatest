@@ -61,8 +61,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
   private def boom: Option[DecodedThrowable] =
     Some(new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, Vector.empty))
 
-  // A DecodedThrowable has no structural equality, so an event is compared with each throwable replaced by its
-  // class name and message.
+  // A DecodedThrowable has no structural equality.
   private def comparable(event: TestEventLogEvent): Any = {
     event match {
       case TestEventLogEvent.ScalaTestEvent(execution, decoded) =>
@@ -650,7 +649,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           "executions is not an array of 32-bit integers from 1"
         ),
         (
-          "an execution number written as a string",
+          "an execution index written as a string",
           s"""{"item":"event","node":$aSuite,"executions":["1"],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
           "executions is not an array of 32-bit integers from 1"
         ),
@@ -705,7 +704,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           "index is not a 32-bit integer from 0"
         ),
         (
-          "an execution number above the greatest Int",
+          "an execution index above the greatest Int",
           s"""{"item":"event","node":$aSuite,"executions":[2147483648],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
           "executions is not an array of 32-bit integers from 1"
         ),
@@ -798,7 +797,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           "index is not a 32-bit integer from 0"
         ),
         (
-          "an execution number below 1",
+          "an execution index below 1",
           s"""{"item":"event","node":$aTest,"executions":[1,0],"event":"TestStarting","threadName":"main","timeStamp":1}""",
           "executions is not an array of 32-bit integers from 1"
         ),

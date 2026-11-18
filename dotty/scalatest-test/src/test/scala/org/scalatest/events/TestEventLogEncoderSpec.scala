@@ -145,7 +145,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
           """{"item":"event","event":"DiscoveryStarting","threadName":"main","timeStamp":1700000000000}""" + "\n"
       }
 
-      "write the suite's node path and its one execution number for an event assigned to a top-level suite" in {
+      "write the suite's node path and its one execution index for an event assigned to a top-level suite" in {
         val suiteStarting = SuiteStarting(
           ordinal = ordinal,
           suiteName = "StackSpec",

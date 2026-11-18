@@ -25,8 +25,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     def apply(event: Event): Unit = synchronized { received :+= event }
   }
 
-  // Records each suite it is asked to start, and starts each with the one reporter it holds.
-  private final class ReporterOfSuite {
+  private final class RecordingReporterOfSuite {
     private var asked = Vector.empty[(Suite, Filter, Reporter)]
     val handedOut = new RecordingReporter
     def askedFor: Vector[(Suite, Filter, Reporter)] = synchronized(asked)
@@ -68,7 +67,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
       "ask for the suite's reporter once, with the suite's filter and the reporter it was given, and report every event of the suite to the reporter it gets" in {
         val suite = new samples.Inner1Suite
         val reporter = new RecordingReporter
-        val reporterOfSuite = new ReporterOfSuite
+        val reporterOfSuite = new RecordingReporterOfSuite
         val args = Args(reporter, stopper(stopRequested = false))
         new SuiteRunner(suite, args, new ScalaTestStatefulStatus, TestEventLogHandOff.none, reporterOfSuite.function).run()
         reporterOfSuite.askedFor shouldBe Vector((suite, args.filter, reporter))
@@ -80,7 +79,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     "a stop was requested before its suite started" should {
       "not ask for the suite's reporter" in {
         val reporter = new RecordingReporter
-        val reporterOfSuite = new ReporterOfSuite
+        val reporterOfSuite = new RecordingReporterOfSuite
         val args = Args(reporter, stopper(stopRequested = true))
         new SuiteRunner(new samples.Inner1Suite, args, new ScalaTestStatefulStatus, TestEventLogHandOff.none, reporterOfSuite.function).run()
         reporterOfSuite.askedFor shouldBe Vector.empty
@@ -94,7 +93,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     "a stop was requested before the suite started" should {
       "not ask for the suite's reporter" in {
         withPoolOfOneThread { pool =>
-          val reporterOfSuite = new ReporterOfSuite
+          val reporterOfSuite = new RecordingReporterOfSuite
           val args = Args(new RecordingReporter, stopper(stopRequested = true))
           val distributor = new ConcurrentDistributor(args, pool)
           distributor.apply(new samples.Inner1Suite, args, TestEventLogHandOff.none, reporterOfSuite.function)
@@ -107,7 +106,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
 
   "A DiscoverySuite whose nested suite a ConcurrentDistributor runs" when {
 
-    def discoverySuiteRunBy(pool: ExecutorService, stopRequested: Boolean, reporter: Reporter, reporterOfSuite: ReporterOfSuite): DiscoverySuite = {
+    def discoverySuiteRunBy(pool: ExecutorService, stopRequested: Boolean, reporter: Reporter, reporterOfSuite: RecordingReporterOfSuite): DiscoverySuite = {
       val discoverySuite = new DiscoverySuite("", Set("samples.Inner1Suite"), true, getClass.getClassLoader, reporterOfSuite.function)
       val args = Args(reporter, stopper(stopRequested))
       val distributor = new ConcurrentDistributor(args, pool)
@@ -120,7 +119,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
       "ask for the nested suite's reporter once, and have every event of that suite reported to the reporter it gets" in {
         withPoolOfOneThread { pool =>
           val reporter = new RecordingReporter
-          val reporterOfSuite = new ReporterOfSuite
+          val reporterOfSuite = new RecordingReporterOfSuite
           val discoverySuite = discoverySuiteRunBy(pool, stopRequested = false, reporter, reporterOfSuite)
           reporterOfSuite.askedFor.map((suite, _, _) => suite) shouldBe discoverySuite.nestedSuites
           reporterOfSuite.handedOut.eventNames shouldBe eventsOfOneTestSuite
@@ -132,7 +131,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     "a stop was requested before the nested suite started" should {
       "not ask for the nested suite's reporter" in {
         withPoolOfOneThread { pool =>
-          val reporterOfSuite = new ReporterOfSuite
+          val reporterOfSuite = new RecordingReporterOfSuite
           discoverySuiteRunBy(pool, stopRequested = true, new RecordingReporter, reporterOfSuite)
           reporterOfSuite.askedFor shouldBe Vector.empty
         }
@@ -143,7 +142,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
   "A DiscoverySuite that runs its nested suite itself" when {
 
     def reporterAskedForWhenRunWith(stopper: Stopper): Vector[(Suite, Filter, Reporter)] = {
-      val reporterOfSuite = new ReporterOfSuite
+      val reporterOfSuite = new RecordingReporterOfSuite
       val discoverySuite = new DiscoverySuite("", Set("samples.Inner1Suite"), true, getClass.getClassLoader, reporterOfSuite.function)
       discoverySuite.run(None, Args(new RecordingReporter, stopper))
       reporterOfSuite.askedFor

@@ -20,16 +20,8 @@ import scala.jdk.CollectionConverters.*
 
 final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  /**
-   * A run as a criterion states it.
-   *
-   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
-   * @param eventLogInNotation the events the criterion states, in the event notation
-   * @param eventLogInFormat those events as the format writes them, one line for each
-   */
-  private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
+  private final case class StatedRun(reportedToReporters: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
 
-  /** What a run's reporters were told, in the order they were told it. */
   private def reported(events: Vector[Event]): Vector[String] = {
     events.collect {
       case starting: SuiteStarting => s"SuiteStarting ${starting.suiteName}"
@@ -89,7 +81,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       """,
       List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("ConfigSpec", className),
+          TestEventLogLine.topLevelSuite("ConfigSpec", className),
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(reads, aConfig, 0, "reads", "- reads")
         ),
@@ -105,12 +97,11 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
   private val configSpecDiscovered = {
     val stated = configSpecHolds("samples.discovered.ConfigSpec")
     stated.copy(
-      reported = Vector("DiscoveryStarting", "DiscoveryCompleted", "RunStarting", "SuiteStarting DiscoverySuite") ++
+      reportedToReporters = Vector("DiscoveryStarting", "DiscoveryCompleted", "RunStarting", "SuiteStarting DiscoverySuite") ++
         reportedOfConfigSpec ++ Vector("SuiteCompleted DiscoverySuite", "RunCompleted")
     )
   }
 
-  /** A run of a suite run through ConfigMapWrapperSuite that registers test remote where its config map holds db, and test local where it does not. */
   private def configDependent(suite: String): StatedRun = {
     val top = NodePath.topLevel(s"samples.$suite")
     val aConfig = top.scope("A config")
@@ -150,13 +141,13 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       frameworkRunOf(
         """"db":"on"""",
         TestEventLogLine.structure(
-          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.topLevelSuite(suite, s"samples.$suite"),
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(local, aConfig, 0, "local", "- local")
         ),
         nodeEvent(top, List(1), "SuiteStarting"),
         TestEventLogLine.structure(
-          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.topLevelSuite(suite, s"samples.$suite"),
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(remote, aConfig, 0, "remote", "- remote")
         ),
@@ -173,7 +164,6 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private val asyncConfigDependentSpec = configDependent("AsyncConfigDependentSpec")
 
-  /** A run of a suite wrapped by ConfigMapWrapperSuite. The suite registers test remote, marked ignored, where its config map holds db, and test local where it does not. */
   private val configDependentIgnoredSpec: StatedRun = {
     val suite = "ConfigDependentIgnoredSpec"
     val top = NodePath.topLevel(s"samples.$suite")
@@ -212,13 +202,13 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       frameworkRunOf(
         """"db":"on"""",
         TestEventLogLine.structure(
-          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.topLevelSuite(suite, s"samples.$suite"),
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.test(local, aConfig, 0, "local", "- local")
         ),
         nodeEvent(top, List(1), "SuiteStarting"),
         TestEventLogLine.structure(
-          TestEventLogLine.suite(suite, s"samples.$suite"),
+          TestEventLogLine.topLevelSuite(suite, s"samples.$suite"),
           TestEventLogLine.scope(aConfig, 0, "A config", "A config"),
           TestEventLogLine.ignoredTest(remote, aConfig, 0, "remote", "- remote")
         ),
@@ -270,7 +260,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     """,
     List(
       TestEventLogLine.structure(
-        TestEventLogLine.suite("NestsConfigDependentSpec", "samples.NestsConfigDependentSpec"),
+        TestEventLogLine.topLevelSuite("NestsConfigDependentSpec", "samples.NestsConfigDependentSpec"),
         TestEventLogLine.nestedSuite(nestedConfigDependentSpec, 0, "ConfigDependentSpec", "samples.ConfigDependentSpec"),
         TestEventLogLine.scope(nestedAConfig, 0, "A config", "A config"),
         TestEventLogLine.test(nestedConfigDependentSpec.test("A config local"), nestedAConfig, 0, "local", "- local")
@@ -318,7 +308,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     """,
     List(
       TestEventLogLine.structure(
-        TestEventLogLine.suite("OneInstancePerTestSuite", "samples.OneInstancePerTestSuite"),
+        TestEventLogLine.topLevelSuite("OneInstancePerTestSuite", "samples.OneInstancePerTestSuite"),
         TestEventLogLine.test(oneInstancePerTest.test("a"), oneInstancePerTest, 0, "a", "- a"),
         TestEventLogLine.test(oneInstancePerTest.test("b"), oneInstancePerTest, 1, "b", "- b")
       ),
@@ -346,7 +336,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     """,
     List(
       TestEventLogLine.structure(
-        TestEventLogLine.suite("TagsOverrideSuite", "samples.TagsOverrideSuite"),
+        TestEventLogLine.topLevelSuite("TagsOverrideSuite", "samples.TagsOverrideSuite"),
         TestEventLogLine.test(tagsOverride.test("a"), tagsOverride, 0, "a", "- a")
       ),
       nodeEvent(tagsOverride, List(1), "SuiteStarting"),
@@ -400,14 +390,14 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     frameworkRunOf(
       """"db":"on"""",
       TestEventLogLine.structure(
-        TestEventLogLine.suite("ConfigDependentWithSharedTestSpec", "samples.ConfigDependentWithSharedTestSpec"),
+        TestEventLogLine.topLevelSuite("ConfigDependentWithSharedTestSpec", "samples.ConfigDependentWithSharedTestSpec"),
         TestEventLogLine.scope(sharedTestAConfig, 0, "A config", "A config"),
         TestEventLogLine.test(sharedTest.test("A config reads"), sharedTestAConfig, 0, "reads", "- reads"),
         TestEventLogLine.test(sharedTest.test("A config local"), sharedTestAConfig, 1, "local", "- local")
       ),
       nodeEvent(sharedTest, List(1), "SuiteStarting"),
       TestEventLogLine.structure(
-        TestEventLogLine.suite("ConfigDependentWithSharedTestSpec", "samples.ConfigDependentWithSharedTestSpec"),
+        TestEventLogLine.topLevelSuite("ConfigDependentWithSharedTestSpec", "samples.ConfigDependentWithSharedTestSpec"),
         TestEventLogLine.scope(sharedTestAConfig, 0, "A config", "A config"),
         TestEventLogLine.test(sharedTest.test("A config reads"), sharedTestAConfig, 0, "reads", "- reads"),
         TestEventLogLine.test(sharedTest.test("A config remote"), sharedTestAConfig, 1, "remote", "- remote")
@@ -436,7 +426,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     """,
     frameworkRunOf(
       "",
-      TestEventLogLine.structure(TestEventLogLine.suite("ConfigWithoutDbFailsSpec", "samples.ConfigWithoutDbFailsSpec")),
+      TestEventLogLine.structure(TestEventLogLine.topLevelSuite("ConfigWithoutDbFailsSpec", "samples.ConfigWithoutDbFailsSpec")),
       nodeEvent(NodePath.topLevel("samples.ConfigWithoutDbFailsSpec"), List(1), "SuiteStarting"),
       suiteAborted(NodePath.topLevel("samples.ConfigWithoutDbFailsSpec"), invocationTargetEncountered("samples.ConfigWithoutDbFailsSpec"), invocationTargetCausedByNoDb)
     )
@@ -458,11 +448,10 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private val runAbortedByConstructor = "An exception or error caused a run to abort. "
 
-  /** The structure of a suite whose only scope, `A config`, holds its only test, `reads`. */
   private def structureOfAConfigReads(name: String, className: String): String = {
     val suite = NodePath.topLevel(className)
     TestEventLogLine.structure(
-      TestEventLogLine.suite(name, className),
+      TestEventLogLine.topLevelSuite(name, className),
       TestEventLogLine.scope(suite.scope("A config"), 0, "A config", "A config"),
       TestEventLogLine.test(suite.test("A config reads"), suite.scope("A config"), 0, "reads", "- reads")
     )
@@ -532,12 +521,12 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     frameworkRunOf(
       """"db":"on"""",
       TestEventLogLine.structure(
-        TestEventLogLine.suite("ConfigNamedTestSuite", "samples.ConfigNamedTestSuite"),
+        TestEventLogLine.topLevelSuite("ConfigNamedTestSuite", "samples.ConfigNamedTestSuite"),
         TestEventLogLine.test(configNamedTest.test("local"), configNamedTest, 0, "local", "- local")
       ),
       nodeEvent(configNamedTest, List(1), "SuiteStarting"),
       TestEventLogLine.structure(
-        TestEventLogLine.suite("ConfigNamedTestSuite", "samples.ConfigNamedTestSuite"),
+        TestEventLogLine.topLevelSuite("ConfigNamedTestSuite", "samples.ConfigNamedTestSuite"),
         TestEventLogLine.test(configNamedTest.test("remote"), configNamedTest, 0, "remote", "- remote")
       ),
       nodeEvent(configNamedTest, List(1), "SuiteCompleted")
@@ -579,14 +568,14 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     frameworkRunOf(
       "",
       TestEventLogLine.structure(
-        TestEventLogLine.suite("RunsADroppedTestSuite", "samples.RunsADroppedTestSuite"),
+        TestEventLogLine.topLevelSuite("RunsADroppedTestSuite", "samples.RunsADroppedTestSuite"),
         TestEventLogLine.test(runsADroppedTest.test("a"), runsADroppedTest, 0, "a", "- a")
       ),
       nodeEvent(runsADroppedTest, List(1), "SuiteStarting"),
       nodeEvent(runsADroppedTest.test("a"), List(1, 1), "TestStarting"),
       nodeEvent(runsADroppedTest.test("a"), List(1, 1), "TestSucceeded"),
       TestEventLogLine.structure(
-        TestEventLogLine.suite("RunsADroppedTestSuite", "samples.RunsADroppedTestSuite"),
+        TestEventLogLine.topLevelSuite("RunsADroppedTestSuite", "samples.RunsADroppedTestSuite"),
         TestEventLogLine.test(runsADroppedTest.test("a"), runsADroppedTest, 0, "a", "- a"),
         TestEventLogLine.test(runsADroppedTest.test("b"), runsADroppedTest, 1, "b", "- b")
       ),
@@ -598,14 +587,9 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   private def structuresIn(lines: Seq[String]): Int = lines.count(_.contains(""""item":"structure""""))
 
-  /** A suite's name, and the class name every `structure` that holds it must give it. */
-  private final case class SuiteClassName(suiteName: String, className: String)
+  private final case class SuiteNameAndClassName(suiteName: String, className: String)
 
-  /**
-   * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
-   * reads them. Where `isWhole`, the event log is the stated events; otherwise it holds them in order.
-   */
-  private def eventScenarios(
+  private def runAndDecoderScenarios(
     scenario: String,
     suite: String,
     suiteClassName: String,
@@ -613,9 +597,9 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     stated: StatedRun,
     launch: Launch = Launch.ByFramework,
     arguments: List[String] = Nil,
-    isWhole: Boolean = true,
+    eventLogIsOnlyTheStated: Boolean = true,
     structures: Option[Int] = None,
-    classNameOfEveryStructure: Option[SuiteClassName] = None
+    classNameOfEveryStructure: Option[SuiteNameAndClassName] = None
   ): Unit = {
     Scenario(scenario) {
       thisProcess
@@ -624,15 +608,15 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe stated.reported
+      reportedWithoutTheArgument shouldBe stated.reportedToReporters
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
         eventsReportedWhenLaunched(launch, suiteClassName, arguments ++ runnerArgument(eventLogFile))
         val lines = TemporaryEventLog.lines(eventLogFile)
 
-        Then(s"the event log ${if (isWhole) "is" else "holds, in order,"} $eventLogHolds")
-        if (isWhole) {
+        Then(s"the event log ${if (eventLogIsOnlyTheStated) "is" else "holds, in order,"} $eventLogHolds")
+        if (eventLogIsOnlyTheStated) {
           StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
           EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
         } else {
@@ -643,7 +627,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           And(s"the event log holds $count structure${if (count == 1) "" else "s"}")
           structuresIn(lines) shouldBe count
         }
-        classNameOfEveryStructure.foreach { case SuiteClassName(suiteName, className) =>
+        classNameOfEveryStructure.foreach { case SuiteNameAndClassName(suiteName, className) =>
           And(s"every structure holding $suiteName gives it class name $className")
           val classNames = classNamesGivenTo(suiteName, decodedOrFail(lines))
           classNames should not be empty
@@ -669,24 +653,24 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   Feature("A suite run through ConfigMapWrapperSuite") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite run through ConfigMapWrapperSuite, by Framework",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'reads'",
       "samples.ConfigSpec",
       "the structure of the wrapped class, then the suite's events, and no other structure",
       configSpec,
-      isWhole = false,
+      eventLogIsOnlyTheStated = false,
       structures = Some(1)
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite run through ConfigMapWrapperSuite, by Runner.run with -s",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'reads'",
       "samples.ConfigSpec",
       "the structure of the wrapped class, then the suite's events, and no other structure",
       configSpec,
       launch = Launch.ByRunner,
-      isWhole = false,
+      eventLogIsOnlyTheStated = false,
       structures = Some(1)
     )
 
@@ -702,7 +686,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          reportedWithoutTheArgument shouldBe configSpecDiscovered.reported
+          reportedWithoutTheArgument shouldBe configSpecDiscovered.reportedToReporters
 
           And("the event log holds, in order, the structure of the wrapped class, then the suite's events, and no other structure")
           StatedLines.mismatchWhenHoldsInOrder(lines, configSpecDiscovered.eventLogInFormat) shouldBe None
@@ -718,7 +702,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       configSpecDiscovered
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "What a suite run through ConfigMapWrapperSuite registers depends on its config map",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'remote' " +
         "where its config map holds db, and test 'local' where it does not",
@@ -729,7 +713,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       arguments = List("-Ddb=on")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A further structure marks an ignored test that only the suite instance that runs registers",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'remote', " +
         "declared with ignore, where its config map holds db, and test 'local' where it does not",
@@ -740,7 +724,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       arguments = List("-Ddb=on")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A scope and a test that both structures of a suite run through ConfigMapWrapperSuite contain",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'reads', " +
         "then test 'remote' where its config map holds db, and test 'local' where it does not",
@@ -770,7 +754,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       }
 
       When("Framework runs it without the runner argument")
-      thrownAndReported(Nil, _ => ()) shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reported))
+      thrownAndReported(Nil, _ => ()) shouldBe ((thrownByTheTask, configWithoutDbFailsSpec.reportedToReporters))
 
       TemporaryEventLog.in { eventLogFile =>
         When("Framework runs it with the runner argument")
@@ -803,7 +787,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(Launch.ByRunner, "samples.ConfigWithoutDbFailsSpec", Nil))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe configWithoutDbFailsBySuite.reported
+      reportedWithoutTheArgument shouldBe configWithoutDbFailsBySuite.reportedToReporters
 
       TemporaryEventLog.in { eventLogFile =>
         When("Runner.run runs it with the runner argument")
@@ -842,7 +826,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          reportedWithoutTheArgument shouldBe configWithoutDbFailsDiscovered.reported
+          reportedWithoutTheArgument shouldBe configWithoutDbFailsDiscovered.reportedToReporters
 
           And("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
           StatedLines.mismatchWhenHoldsInOrder(lines, configWithoutDbFailsDiscovered.eventLogInFormat) shouldBe None
@@ -862,31 +846,31 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
   Feature("A suite's class name, for a suite run through ConfigMapWrapperSuite") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A wrapped suite's beforeAll throws",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), mixing in BeforeAndAfterAll, whose beforeAll throws",
       "samples.ConfigSetupFailsSpec",
       "a structure holding the suite, every structure holding it giving it the wrapped class's name, and in this order after it the suite's SuiteAborted",
       configSetupFailsSpec,
-      isWhole = false,
-      classNameOfEveryStructure = Some(SuiteClassName("ConfigSetupFailsSpec", "samples.ConfigSetupFailsSpec"))
+      eventLogIsOnlyTheStated = false,
+      classNameOfEveryStructure = Some(SuiteNameAndClassName("ConfigSetupFailsSpec", "samples.ConfigSetupFailsSpec"))
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A wrapped suite's constructor throws given the run's config map",
       "a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), whose constructor throws where its config map holds db",
       "samples.ConfigWithDbFailsSpec",
       "a structure holding the suite, every structure holding it giving it the wrapped class's name, and in this order after it the suite's SuiteAborted",
       configWithDbFailsSpec,
       arguments = List("-Ddb=on"),
-      isWhole = false,
-      classNameOfEveryStructure = Some(SuiteClassName("ConfigWithDbFailsSpec", "samples.ConfigWithDbFailsSpec"))
+      eventLogIsOnlyTheStated = false,
+      classNameOfEveryStructure = Some(SuiteNameAndClassName("ConfigWithDbFailsSpec", "samples.ConfigWithDbFailsSpec"))
     )
   }
 
   Feature("Further structures") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite with no registration tree runs other tests than its first structure contains",
       "a Suite run through ConfigMapWrapperSuite whose one test is 'remote' where its config map holds db, and 'local' where it does not",
       "samples.ConfigNamedTestSuite",
@@ -895,7 +879,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       arguments = List("-Ddb=on")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A runTests override runs a test the filter drops",
       "an AnyFunSuite declaring tests a and b, b tagged samples.Slow, whose runTests also runs b",
       "samples.RunsADroppedTestSuite",
@@ -904,7 +888,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       arguments = List("-l", "samples.Slow")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A nested suite's instance that runs registers a different tree from its first structure",
       "a Suites nesting a ConfigMapWrapperSuite of a suite declaring scope 'A config' holding test 'remote' where its " +
         "config map holds db, and test 'local' where it does not",
@@ -915,11 +899,11 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       nestsConfigDependentSpec,
       launch = Launch.ByRunner,
       arguments = List("-Ddb=on"),
-      isWhole = false,
+      eventLogIsOnlyTheStated = false,
       structures = Some(2)
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "An async suite's instance that runs registers a different tree from its first structure",
       "an AsyncFunSpec run through ConfigMapWrapperSuite, declaring scope 'A config' holding test 'remote' where its " +
         "config map holds db, and test 'local' where it does not",
@@ -930,24 +914,24 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       arguments = List("-Ddb=on")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "Each test runs in an instance of its own, each registering the same tree",
       "an AnyFunSuite mixing in OneInstancePerTest, declaring tests a and b",
       "samples.OneInstancePerTestSuite",
       "the suite's one structure, then the events of a and b",
       oneInstancePerTestSuite,
-      isWhole = false,
+      eventLogIsOnlyTheStated = false,
       structures = Some(1)
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A tags override drops a test its registered tags keep",
       "an AnyFunSuite declaring tests a and b, whose tags override tags b with samples.Slow",
       "samples.TagsOverrideSuite",
       "the suite's one structure, holding a alone, then a's events",
       tagsOverrideSuite,
       arguments = List("-l", "samples.Slow"),
-      isWhole = false,
+      eventLogIsOnlyTheStated = false,
       structures = Some(1)
     )
   }

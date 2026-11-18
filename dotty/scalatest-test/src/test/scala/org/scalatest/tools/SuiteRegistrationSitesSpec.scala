@@ -49,7 +49,6 @@ import scala.concurrent.Promise
 
 final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with TestEventLogRuns with EventLogRecording {
 
-  // Records, as its run starts and as its test runs, the registration it finds and whether it is given a structure wrapper.
   private class Probe extends AnyFunSuite {
     @volatile var registrationInRun = Option.empty[SuiteRegistration]
     @volatile var registrationInTest = Option.empty[SuiteRegistration]
@@ -81,7 +80,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // Its one test completes only once the promise does, on another thread than the one that runs the suite.
   private final class AsyncProbe(mayComplete: Promise[Unit]) extends AsyncFunSpec {
     @volatile var registrationInRun = Option.empty[SuiteRegistration]
     @volatile var testIsGivenAStructureWrapper = false
@@ -105,7 +103,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   private def emitter: TestEventLogEmitter = TestEventLogEmitter.appendingTo(new ByteArrayOutputStream)
 
-  // Runs a top-level suite as Runner does, with the emitter's start for it where there is an emitter.
   private def runAsTopLevelSuite(
     suite: Suite,
     emitter: Option[TestEventLogEmitter],
@@ -118,7 +115,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     status
   }
 
-  // Runs each suite it is handed at once, on the thread that hands it over.
   private object RunningEachSuiteAtOnce extends Distributor {
     def apply(suite: Suite, args: Args): Status = {
       val status = new ScalaTestStatefulStatus
@@ -127,7 +123,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // Runs the suites it is handed only when asked to.
   private final class RunningEachSuiteWhenAsked extends Distributor {
     private var handedOver = Vector.empty[() => Unit]
 
@@ -144,22 +139,18 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // Passes no event on, so that an event that reaches it reaches no wrapper after it.
+  // So that an event that reaches it reaches no wrapper after it.
   private val sortingNoEventOn: DistributedTestSorter = new DistributedTestSorter {
     def distributingTest(testName: String): Unit = ()
     def apply(testName: String, event: Event): Unit = ()
     def completedTest(testName: String): Unit = ()
   }
 
-  /**
-   * Starts a suite as a top-level suite of an emitter writing to an event log of its own, has `run` run it in its
-   * context with its structure wrapper, and returns the lines the event log then holds.
-   */
-  private def linesWrittenRunning(suite: Suite)(run: Reporter => Unit): List[String] = {
+  private def eventLogLinesRunningAsTopLevelSuite(suite: Suite)(runWithItsStructureWrapper: Reporter => Unit): List[String] = {
     val eventLog = new RecordingEventLog
     val started = new StartedTopLevelSuite(TestEventLogEmitter.appendingTo(eventLog), suite)
     try {
-      started.runningInItsContext(run(started.wrapper))
+      started.runningInItsContext(runWithItsStructureWrapper(started.structureWrapper))
     } finally {
       started.complete()
     }
@@ -171,15 +162,14 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   private def hasBeenRemoved(registration: Option[SuiteRegistration]): Option[Boolean] =
     registration.collect { case registered: RegisteredSuite => registered.emitter.synchronized(registered.hasBeenRemoved) }
 
-  // Runs `body` in the context of another top-level suite's run, and returns what it returned, with whether that context
-  // is the one the thread is left in once `body` returns.
   private def inTheContextOfAnotherSuite[A](body: => A): (A, Boolean) = {
     val other = new StartedTopLevelSuite(emitter, new Probe)
     try {
       other.runningInItsContext {
         val contextGiven = InvocationContext.get
         val returned = body
-        (returned, contextGiven.isDefined && InvocationContext.get == contextGiven)
+        val contextRestored = contextGiven.isDefined && InvocationContext.get == contextGiven
+        (returned, contextRestored)
       }
     } finally {
       other.complete()
@@ -302,7 +292,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   "A suite whose nested suites Suite.runNestedSuites hands to a distributor" should {
     "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
       val suite = new samples.OuterSuites
-      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper, distributor = Some(RunningEachSuiteAtOnce))))
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite)(wrapper => suite.run(None, Args(wrapper, distributor = Some(RunningEachSuiteAtOnce))))
       val top = NodePath.topLevel("samples.OuterSuites")
       val inner1 = top.suite("samples.Inner1Suite")
       val inner2 = top.suite("samples.Inner2Suite")
@@ -310,7 +300,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val innerTwo = inner2.test("inner two")
       val stated = List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("OuterSuites", "samples.OuterSuites"),
+          TestEventLogLine.topLevelSuite("OuterSuites", "samples.OuterSuites"),
           TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
           TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
           TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
@@ -353,14 +343,14 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   "A suite mixing in OneInstancePerTest" should {
     "send each test's events from the instance it runs the test in to the test's node, in the execution of the run that created that instance" in {
       val suite = new StackPerTestFunSpec
-      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite)(wrapper => suite.run(None, Args(wrapper)))
       val top = NodePath.topLevel("org.scalatest.samples.StackPerTestFunSpec")
       val aStack = top.scope("A Stack")
       val isEmpty = top.test("A Stack is empty")
       val pops = top.test("A Stack pops")
       val stated = List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("StackPerTestFunSpec", "org.scalatest.samples.StackPerTestFunSpec"),
+          TestEventLogLine.topLevelSuite("StackPerTestFunSpec", "org.scalatest.samples.StackPerTestFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
           TestEventLogLine.test(pops, aStack, 1, "pops", "- pops")
@@ -384,7 +374,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val t = top.test("s t")
       val nodes = Map("s" -> (s, List(1, 1)), "t" -> (t, List(1, 1, 1)))
       TestEventLogLine.structure(
-        TestEventLogLine.suite(suite.suiteName, suite.getClass.getName),
+        TestEventLogLine.topLevelSuite(suite.suiteName, suite.getClass.getName),
         TestEventLogLine.scope(s, 0, "s", "s"),
         TestEventLogLine.test(t, s, 0, "t", "- t")
       ) :: eventsInOrderHandedOff.map { (node, eventName) =>
@@ -397,14 +387,14 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
     "hand the scope's events off as they are sent, where it mixes in RandomTestOrder" in {
       val suite = new ScopedRandomOrderFunSpec
-      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite)(wrapper => suite.run(None, Args(wrapper)))
       StatedLines.mismatchWhenIs(lines, scopeAndItsTest(suite, scopeClosedBeforeItsTest)) shouldBe None
     }
 
     "hand the scope's events off as they are sent, where it mixes in ParallelTestExecution and its test runs once its run has returned" in {
       val suite = new ScopedParallelFunSpec
       val distributor = new RunningEachSuiteWhenAsked
-      val lines = linesWrittenRunning(suite) { wrapper =>
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite) { wrapper =>
         suite.run(None, Args(wrapper, distributor = Some(distributor)))
         distributor.runHandedOver()
       }
@@ -413,7 +403,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
     "hand the scope's events off as they are sent, where it is of an async style and its test completes once its run has returned" in {
       val suite = new ScopedQueueingAsyncFunSpec
-      val lines = linesWrittenRunning(suite) { wrapper =>
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite) { wrapper =>
         suite.run(None, Args(wrapper))
         suite.queueing.runQueued()
       }
@@ -430,10 +420,10 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     ).foreach { (kind, sample) =>
       s"hand off, assigned to that test, a message sent through the reporter its runTests is given, where it $kind" in {
         val suite = sample()
-        val lines = linesWrittenRunning(suite)(wrapper => suite.run(Some("t"), Args(wrapper, distributedTestSorter = Some(sortingNoEventOn))))
+        val lines = eventLogLinesRunningAsTopLevelSuite(suite)(wrapper => suite.run(Some("t"), Args(wrapper, distributedTestSorter = Some(sortingNoEventOn))))
         val top = NodePath.topLevel(suite.getClass.getName)
         val stated = List(
-          TestEventLogLine.structure(TestEventLogLine.suite(suite.suiteName, suite.getClass.getName), TestEventLogLine.test(top.test("t"), top, 0, "t", "- t")),
+          TestEventLogLine.structure(TestEventLogLine.topLevelSuite(suite.suiteName, suite.getClass.getName), TestEventLogLine.test(top.test("t"), top, 0, "t", "- t")),
           TestEventLogLine.nodeEvent(top.test("t"), List(1, 1), "InfoProvided", """"message":"sent by runTests",""")
         )
         StatedLines.mismatchWhenIs(lines, stated) shouldBe None
@@ -444,7 +434,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   "A suite whose nested suites StepwiseNestedSuiteExecution.runNestedSuites runs" should {
     "send each nested suite's events, and those of its test, to that suite's and that test's own nodes" in {
       val suite = new samples.StepwiseOuterSuites
-      val lines = linesWrittenRunning(suite)(wrapper => suite.run(None, Args(wrapper)))
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite)(wrapper => suite.run(None, Args(wrapper)))
       val top = NodePath.topLevel("samples.StepwiseOuterSuites")
       val inner1 = top.suite("samples.Inner1Suite")
       val inner2 = top.suite("samples.Inner2Suite")
@@ -452,7 +442,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val innerTwo = inner2.test("inner two")
       val stated = List(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("StepwiseOuterSuites", "samples.StepwiseOuterSuites"),
+          TestEventLogLine.topLevelSuite("StepwiseOuterSuites", "samples.StepwiseOuterSuites"),
           TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
           TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
           TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
@@ -474,7 +464,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   "A path suite whose run is called twice" should {
     "send the events of its second run in a second execution of each of its scopes and tests" in {
       val suite = new samples.StackPathFunSpec
-      val lines = linesWrittenRunning(suite) { wrapper =>
+      val lines = eventLogLinesRunningAsTopLevelSuite(suite) { wrapper =>
         suite.run(None, Args(wrapper))
         suite.run(None, Args(wrapper))
       }
@@ -498,7 +488,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       }
       val structure =
         TestEventLogLine.structure(
-          TestEventLogLine.suite("StackPathFunSpec", "samples.StackPathFunSpec"),
+          TestEventLogLine.topLevelSuite("StackPathFunSpec", "samples.StackPathFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
           TestEventLogLine.scope(whenFull, 1, "when full", "when full"),
@@ -532,7 +522,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val contextAfterTheSuite = new AtomicReference(Option.empty[Option[InvocationContext]])
       try {
         val distributor = new ConcurrentDistributor(Args(passingNoEventOn), pool)
-        started.runningInItsContext(distributor(new DistributedProbe(suite), Args(passingNoEventOn)))
+        started.runningInItsContext(distributor(new RecordingRegistrationOf(suite), Args(passingNoEventOn)))
         distributor.waitUntilDone()
         pool.submit((() => contextAfterTheSuite.set(Some(InvocationContext.get))): Runnable).get(waitLimitSeconds, TimeUnit.SECONDS)
       } finally {
@@ -586,7 +576,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val contextOfTask = new AtomicReference(Option.empty[Option[InvocationContext]])
       try {
         val distributor = new ConcurrentDistributor(Args(passingNoEventOn), pool)
-        distributor(new DistributedProbe(suite), Args(passingNoEventOn))
+        distributor(new RecordingRegistrationOf(suite), Args(passingNoEventOn))
         distributor.waitUntilDone()
         executionContext.execute(() => contextOfTask.set(Some(InvocationContext.get)))
         executionContext.runNow(Future.successful(Succeeded))
@@ -726,7 +716,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // Counts the calls of its suite ID, each of which throws `thrown` where one is given.
   private final class CountingSuiteIdReads(thrown: Option[RuntimeException] = None) extends AnyFunSuite {
     val reads = new AtomicInteger
 
@@ -747,7 +736,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // Nests `nested`. Once `holdReads` is called, each call of its suite ID waits until `mayBeRead` is released.
   private final class HoldingSuiteIdReads(nested: Suite) extends Suite {
     val isBeingRead = new CountDownLatch(1)
     val mayBeRead = new CountDownLatch(1)
@@ -768,13 +756,11 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
   private def registrationOf(started: StartedTopLevelSuite): RegisteredSuite = started.registration.asInstanceOf[RegisteredSuite]
 
-  // Registers `suite` in `context`, as the first site of its run that finds the context would.
   private def registeredIn(context: ContextOfRegisteredSuite, suite: Suite): RegisteredSuite = context.register(suite).asInstanceOf[RegisteredSuite]
 
   private def anAlert: Event = AlertProvided(new Ordinal(1), "alert", None, threadName = "main", timeStamp = 0L)
 
-  // A suite that records, as it runs, the registration the probe finds in the context it runs in.
-  private final class DistributedProbe(probe: Probe) extends Suite {
+  private final class RecordingRegistrationOf(probe: Probe) extends Suite {
     override def run(testName: Option[String], args: Args): Status = {
       probe.registrationInRun = Some(SuiteRegistration.inContext(probe))
       org.scalatest.SucceededStatus

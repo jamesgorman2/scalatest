@@ -21,7 +21,6 @@ object RegistrationProbeSuite {
 
   private val ran = new ConcurrentLinkedQueue[(Suite, SuiteRegistration)]
 
-  /** Returns each instance that ran in the runs `launch` starts, with the registration it had as it ran. One caller records at a time. */
   def instancesRunIn(launch: => Unit): Vector[(Suite, SuiteRegistration)] = synchronized {
     ran.clear()
     try {

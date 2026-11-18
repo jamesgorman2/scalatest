@@ -19,7 +19,6 @@ import org.scalatest.funspec.PathAnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import scala.jdk.CollectionConverters.*
 
-/** When a sample's test called each of its messages: the time before the call and the time after it, by suite class. */
 object MessageCallTimes {
 
   private val bySuiteClass = new ConcurrentHashMap[String, ConcurrentLinkedQueue[(Long, Long)]]
@@ -40,7 +39,6 @@ object MessageCallTimes {
   }
 }
 
-/** A test that calls `info`, `note`, `alert` and `markup` in that order, timing each call. */
 trait CallsEachMessage extends Suite { this: Informing with Notifying with Alerting with Documenting =>
 
   protected def callEachMessage(): Unit = {
@@ -119,7 +117,6 @@ class FailingMessagesPathFreeSpec extends PathAnyFreeSpec with CallsEachMessage 
   }
 }
 
-/** A test that reports `text` as an info, then fails with it as the failure's message. */
 abstract class ReportsText(val text: String) extends AnyFunSuite {
 
   override def suiteName: String = "TextSuite"
@@ -145,7 +142,6 @@ class ControlCharactersTextSuite extends ReportsText("tab\tand carriage return\r
 @DoNotDiscover
 class EmptyTextSuite extends ReportsText("")
 
-/** The throwable `ThrowSuite`'s test threw in its latest run. */
 object ThrowSuite {
   val thrown = new AtomicReference[Throwable]
 }

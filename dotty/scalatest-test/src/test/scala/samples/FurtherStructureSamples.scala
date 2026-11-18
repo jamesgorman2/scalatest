@@ -26,7 +26,6 @@ class ConfigSpec(configMap: Map[String, Any]) extends AnyFunSpec {
   }
 }
 
-// Registers test remote where its config map holds db, and test local where it does not.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigDependentSpec(configMap: Map[String, Any]) extends AnyFunSpec {
@@ -44,7 +43,6 @@ class ConfigDependentSpec(configMap: Map[String, Any]) extends AnyFunSpec {
   }
 }
 
-// Registers test remote, declared with ignore, where its config map holds db, and test local where it does not.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigDependentIgnoredSpec(configMap: Map[String, Any]) extends AnyFunSpec {
@@ -62,7 +60,6 @@ class ConfigDependentIgnoredSpec(configMap: Map[String, Any]) extends AnyFunSpec
   }
 }
 
-// Registers test reads whatever its config map, then test remote where the map holds db, and test local where it does not.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigDependentWithSharedTestSpec(configMap: Map[String, Any]) extends AnyFunSpec {
@@ -126,7 +123,7 @@ class ConfigSetupFailsSpec(configMap: Map[String, Any]) extends AnyFunSpec with 
   }
 }
 
-// A suite with no registration tree whose one test is remote where its config map holds db, and local where it does not.
+// Has no registration tree.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigNamedTestSuite(configMap: Map[String, Any]) extends Suite {
@@ -136,7 +133,7 @@ class ConfigNamedTestSuite(configMap: Map[String, Any]) extends Suite {
   override protected def runTest(testName: String, args: Args): Status = SucceededStatus
 }
 
-// Its runTests also runs test b, which the filter drops where samples.Slow is excluded.
+// Runs test b even where the filter drops it, as it does where samples.Slow is excluded.
 @DoNotDiscover
 class RunsADroppedTestSuite extends AnyFunSuite {
 
@@ -155,11 +152,9 @@ class RunsADroppedTestSuite extends AnyFunSuite {
   }
 }
 
-// Nests ConfigDependentSpec, run through ConfigMapWrapperSuite.
 @DoNotDiscover
 class NestsConfigDependentSpec extends Suites(new ConfigMapWrapperSuite(classOf[ConfigDependentSpec]))
 
-// Registers test remote where its config map holds db, and test local where it does not.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class AsyncConfigDependentSpec(configMap: Map[String, Any]) extends AsyncFunSpec {
@@ -177,7 +172,6 @@ class AsyncConfigDependentSpec(configMap: Map[String, Any]) extends AsyncFunSpec
   }
 }
 
-// Runs each test in an instance of its own, each registering the same tests.
 @DoNotDiscover
 class OneInstancePerTestSuite extends AnyFunSuite with OneInstancePerTest {
 
@@ -190,7 +184,6 @@ class OneInstancePerTestSuite extends AnyFunSuite with OneInstancePerTest {
   }
 }
 
-// Its tags override tags test b with samples.Slow, which b is not registered with.
 @DoNotDiscover
 class TagsOverrideSuite extends AnyFunSuite {
 

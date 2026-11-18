@@ -10,7 +10,6 @@ import scala.jdk.CollectionConverters.*
 
 private[tools] object TemporaryEventLog {
 
-  /** Runs the body with the path of an event log file in a folder of its own, which it removes afterwards. */
   def in[A](body: Path => A): A = {
     val folder = Files.createTempDirectory("test-event-log")
     try {
@@ -21,7 +20,6 @@ private[tools] object TemporaryEventLog {
     }
   }
 
-  /** Returns the file's lines, each without its line feed. The last line must end in one. */
   def lines(eventLogFile: Path): Vector[String] = {
     val text = new String(Files.readAllBytes(eventLogFile), StandardCharsets.UTF_8)
     require(text.endsWith("\n"), s"the event log's last line is not ended: $text")

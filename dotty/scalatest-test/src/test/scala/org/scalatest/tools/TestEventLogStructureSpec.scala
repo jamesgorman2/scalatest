@@ -17,8 +17,6 @@ import org.scalatest.matchers.should.Matchers
 final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
   /**
-   * A suite's structure as a criterion states it, in the event notation, and as the event log's format writes it.
-   *
    * @param nodesInNotation the nodes below the suite, the outermost unindented
    * @param nodesInFormat the nodes below the suite, in the order the event holds them, given the suite's node path
    */
@@ -32,15 +30,14 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     def inNotation: String =
       ("structure" :: s"""  suite "$suiteName", class "$suiteClassName"""" :: nodesInNotation.linesIterator.map("    " + _).toList).mkString("\n")
 
-    def line: String = TestEventLogLine.structure((TestEventLogLine.suite(suiteName, suiteClassName) :: nodesInFormat(NodePath.topLevel(suiteClassName)))*)
+    def line: String = TestEventLogLine.structure((TestEventLogLine.topLevelSuite(suiteName, suiteClassName) :: nodesInFormat(NodePath.topLevel(suiteClassName)))*)
   }
 
   /**
    * The events a criterion states for a run, besides the suite's structure.
    *
-   * @param description the criterion's text, shown as an And step
-   * @param holdsInOrder the events the run holds after the structure, in order, in the event notation
-   * @param mustNotHold tests whether a log line is an event the run must not hold
+   * @param description shown as an And step
+   * @param holdsInOrder in the event notation
    */
   private final case class StatedEvents(description: String, holdsInOrder: List[String], mustNotHold: String => Boolean)
 
@@ -59,7 +56,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
   private def isEventOfTest(eventName: String, testName: String)(line: String): Boolean =
     isEvent(eventName)(line) && line.contains(s"""{"test":"$testName"}""")
 
-  /** Registers the scenario of the run that writes a suite's structure, and the scenario of the decoder that reads it. */
   private def structureScenarios(
     scenario: String,
     suite: String,
@@ -102,14 +98,12 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
   private val startedTest = """"node":\[[^\n]*\{"test":"([^"]*)"\}\],"executions":\[[0-9,]*\],"event":"TestStarting"""".r
 
-  /** The names of the tests that start, in the order the event log holds their `TestStarting`. */
   private def testsInTheOrderTheyStarted(lines: Seq[String]): Vector[String] =
     lines.toVector.flatMap(line => startedTest.findFirstMatchIn(line).map(_.group(1)))
 
   // A run starts the tests in declared order with a chance of 1 in 6, so all of these runs do with a chance below 1 in 10^23.
   private val runsToStartTheTestsOutOfDeclaredOrder = 30
 
-  /** The lines of the event log of the first of the suite's runs whose tests start in an order other than `declared`. */
   private def linesOfARunOutOfDeclaredOrder(structure: StatedStructure, declared: Vector[String]): Vector[String] = {
     Iterator
       .continually(TemporaryEventLog.in { eventLogFile =>
@@ -123,7 +117,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
   private def thrownBy(throwable: Option[Throwable]): String = throwable.fold("nothing")(thrown => s"${thrown.getClass.getName}: ${thrown.getMessage}")
 
-  /** How each suite and test of a run ended, and how the run did, as its reporters were told, in the order they were told. */
   private def reported(events: Vector[Event]): Vector[String] = {
     events.collect {
       case starting: SuiteStarting => s"SuiteStarting ${starting.suiteName}"
@@ -185,7 +178,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       }
     }
 
-  // Returns what the suite's task throws, and ends the run so that its event log is closed.
+  // Ends the run so that its event log is closed.
   private def thrownByFrameworkTask(suiteClassName: String, arguments: Seq[String]): String = {
     val runner = frameworkRunner(arguments)
     try thrownBy(scala.util.Try(execute(runner, suiteClassName, new RecordingLogger)).failed.toOption)

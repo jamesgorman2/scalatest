@@ -252,7 +252,6 @@ class StackPathFunSpec extends PathAnyFunSpec {
   }
 }
 
-// Runs each test with the reporter its run was given, in place of the one its test is given.
 @DoNotDiscover
 class KeepsItsRunsReporterSuite extends AnyFunSuite {
 
@@ -271,7 +270,6 @@ class KeepsItsRunsReporterSuite extends AnyFunSuite {
   }
 }
 
-// An async suite that runs each test with the reporter its run was given, in place of the one its test is given.
 @DoNotDiscover
 class KeepsItsRunsReporterAsyncSpec extends AsyncFunSpec {
 

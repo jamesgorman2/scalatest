@@ -119,7 +119,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     val className = classOf[OneTestSuite].getName
     val suite = NodePath.topLevel(className)
     TestEventLogLine.structure(
-      TestEventLogLine.suite("TestEventLogEmitterSpec$OneTestSuite", className),
+      TestEventLogLine.topLevelSuite("TestEventLogEmitterSpec$OneTestSuite", className),
       TestEventLogLine.test(suite.test("only"), suite, 0, "only", "- only")
     )
   }
@@ -426,7 +426,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val firstS = outerPath.scope("s")
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
-            TestEventLogLine.suite("Outer", "samples.Outer"),
+            TestEventLogLine.topLevelSuite("Outer", "samples.Outer"),
             TestEventLogLine.nestedSuite(innerPath, 0, "Inner", "samples.Inner"),
             TestEventLogLine.test(innerPath.test("i"), innerPath, 0, "i", "- i"),
             TestEventLogLine.scope(firstS, 1, "s", "s"),
@@ -444,7 +444,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           .addTopLevelSuite(structureOf(outer, "Outer", List(test("flat")), List(structureOf(inner, "Inner", Nil)), testsBeforeNestedSuites = true))
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
-            TestEventLogLine.suite("Outer", "samples.Outer"),
+            TestEventLogLine.topLevelSuite("Outer", "samples.Outer"),
             TestEventLogLine.test(outerPath.test("flat"), outerPath, 0, "flat", "- flat"),
             TestEventLogLine.nestedSuite(outerPath.suite("samples.Inner"), 1, "Inner", "samples.Inner")
           ) + "\n"
@@ -518,11 +518,11 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val laterPath = NodePath.topLevel("samples.Outer", 1)
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
-            TestEventLogLine.suite("Outer", "samples.Outer"),
+            TestEventLogLine.topLevelSuite("Outer", "samples.Outer"),
             TestEventLogLine.test(outerPath.test("flat"), outerPath, 0, "flat", "- flat")
           ) + "\n",
           TestEventLogLine.structure(
-            TestEventLogLine.suiteWithId(laterPath, "Outer", "samples.Outer", "samples.Outer"),
+            TestEventLogLine.topLevelSuiteWithId(laterPath, "Outer", "samples.Outer", "samples.Outer"),
             TestEventLogLine.test(laterPath.test("flat"), laterPath, 0, "flat", "- flat")
           ) + "\n"
         )

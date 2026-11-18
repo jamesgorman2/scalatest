@@ -29,16 +29,11 @@ import samples.ThrowSuite
 final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
   /**
-   * A run as a criterion states it.
-   *
-   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
-   * @param eventLogInNotation the run's whole event log, in the event notation
    * @param eventLogInFormat the lines the run writes, holding only the keys the criterion fixes
-   * @param linesTheDecoderReads that event log as the format writes it, one line for each event, where its lines
-   *                             need keys the criterion does not fix
+   * @param linesTheDecoderReads the same event log with the keys the decoder needs and the criterion does not fix
    */
   private final case class StatedRun(
-    reported: Vector[String],
+    reportedToReporters: Vector[String],
     eventLogInNotation: String,
     eventLogInFormat: List[String],
     linesTheDecoderReads: Option[List[String]] = None
@@ -52,7 +47,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     if (messages.isEmpty) "" else messages.mkString(", recording ", ", ", "")
   }
 
-  /** What a run's reporters were told, in the order they were told it. */
   private def reported(events: Vector[Event]): Vector[String] = {
     events.collect {
       case _: RunStarting => "RunStarting"
@@ -75,14 +69,13 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
   private val runCompleted = TestEventLogLine.runEvent("RunCompleted")
   private val runEndedCompleted = TestEventLogLine.runEnded("completed")
 
-  /** A Framework run of one top-level suite with one test, each of the test's events given the test's node path. */
   private def frameworkRunOfOneTest(suiteName: String, suiteClassName: String, testName: String, eventsOfTest: (NodePath => String)*): List[String] = {
     val suite = NodePath.topLevel(suiteClassName)
     val test = suite.test(testName)
     List(
       runStarted,
       runStartingOfFramework,
-      TestEventLogLine.structure(TestEventLogLine.suite(suiteName, suiteClassName), TestEventLogLine.test(test, suite, 0, testName, s"- $testName")),
+      TestEventLogLine.structure(TestEventLogLine.topLevelSuite(suiteName, suiteClassName), TestEventLogLine.test(test, suite, 0, testName, s"- $testName")),
       TestEventLogLine.nodeEvent(suite, List(1), "SuiteStarting")
     ) ++ eventsOfTest.map(_(test)) ++ List(TestEventLogLine.nodeEvent(suite, List(1), "SuiteCompleted"), runCompleted, runEndedCompleted)
   }
@@ -105,7 +98,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     """
   }
 
-  /** The text of a string as a JSON string and the event notation both write it: Java's escapes, and `\\uXXXX` beyond ASCII. */
+  /** As both a JSON string and the event notation write it. */
   private def escaped(text: String): String = {
     val backslash = 92.toChar.toString
     text.flatMap {
@@ -125,18 +118,14 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
   private def throwableOfTestFailed(log: Vector[TestEventLogEvent]): DecodedThrowable =
     decodedEventsIn(log).collectFirst { case failed: DecodedEvent.TestFailed => failed.throwable }.flatten.getOrElse(fail("no TestFailed holds a throwable"))
 
-  /**
-   * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
-   * reads them. `checkRun` makes the scenario's further checks of the run, given the events its reporters received
-   * and its event log.
-   */
+  /** Registers two scenarios: the run writing the event log, and the decoder reading it. */
   private def eventScenarios(
     scenario: String,
     suite: String,
     suiteClassName: String,
     eventLogHolds: String,
     stated: StatedRun,
-    checkRun: (Vector[Event], Vector[TestEventLogEvent]) => Unit = (_, _) => ()
+    furtherChecksOfRun: (Vector[Event], Vector[TestEventLogEvent]) => Unit = (_, _) => ()
   ): Unit = {
     Scenario(scenario) {
       thisProcess
@@ -145,7 +134,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
       val reportedWithoutTheArgument = eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, Nil)
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reported(reportedWithoutTheArgument) shouldBe stated.reported
+      reported(reportedWithoutTheArgument) shouldBe stated.reportedToReporters
 
       TemporaryEventLog.in { eventLogFile =>
         MessageCallTimes.clear(suiteClassName)
@@ -157,7 +146,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         val log = decodedOrFail(lines)
         StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenIs(log, built(stated.eventLogInNotation)) shouldBe None
-        checkRun(reportedWithTheArgument, log)
+        furtherChecksOfRun(reportedWithTheArgument, log)
       }
     }
 

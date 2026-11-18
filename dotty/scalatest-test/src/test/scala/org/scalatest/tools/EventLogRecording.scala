@@ -18,7 +18,6 @@ import org.scalatest.events.TestEventLogEvent
 import org.scalatest.matchers.should.Matchers
 import scala.jdk.CollectionConverters.*
 
-/** An event log that records each write made to it, a reporter that records its events, and threads that hand an emitter their events at once. */
 private[tools] trait EventLogRecording { this: Matchers =>
 
   protected val waitLimitSeconds = 30L
@@ -51,18 +50,13 @@ private[tools] trait EventLogRecording { this: Matchers =>
     override def close(): Unit = closed.set(true)
   }
 
-  /**
-   * A top-level suite an emitter has started, as a site that installs its wrapper starts it. Its run lasts until
-   * `complete` is called, which removes its registration.
-   */
+  /** Its run lasts until `complete` is called, which removes its registration. */
   protected final class StartedTopLevelSuite(emitter: TestEventLogEmitter, suite: Suite, reporter: Reporter = EventLogRecording.passingNoEventOn) {
     private val runOfSuite = new ScalaTestStatefulStatus
     private val start = emitter.startOfTopLevelSuite(suite, Filter.default, reporter)
 
-    /** The suite's structure wrapper. */
-    val wrapper: Reporter = start.reporter
+    val structureWrapper: Reporter = start.reporter
 
-    /** The registration of the suite's run. */
     val registration: SuiteRegistration = {
       var inItsRun = SuiteRegistration.none
       start.run {
@@ -72,10 +66,8 @@ private[tools] trait EventLogRecording { this: Matchers =>
       inItsRun
     }
 
-    /** Runs `body` in the invocation context of the suite's run, as the site that started the suite runs it. */
     def runningInItsContext[A](body: => A): A = registration.runningInItsContext(body)
 
-    /** Completes the suite's run. */
     def complete(): Unit = runOfSuite.setCompleted()
   }
 
@@ -90,10 +82,7 @@ private[tools] trait EventLogRecording { this: Matchers =>
     !thread.isAlive
   }
 
-  /**
-   * Has each of several threads hand an emitter its events from a common start, and returns the events the event
-   * log then holds. Each must have been written as one whole line, in one write that overlaps no other.
-   */
+  /** Fails unless each event was written as one whole line, in one write that overlaps no other. */
   protected def wholeLinesWrittenByThreadsAtOnce(threadCount: Int)(handOffOfThread: (TestEventLogEmitter, Int) => Unit): Vector[TestEventLogEvent] = {
     val eventLog = new RecordingEventLog
     val emitter = TestEventLogEmitter.appendingTo(eventLog)
@@ -119,7 +108,6 @@ private[tools] trait EventLogRecording { this: Matchers =>
 
 private[tools] object EventLogRecording {
 
-  /** A reporter that passes no event on. */
   val passingNoEventOn: Reporter = new Reporter {
     def apply(event: Event): Unit = ()
   }

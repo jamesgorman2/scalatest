@@ -16,8 +16,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
 
   private def alert(message: String): Event = AlertProvided(new Ordinal(1), message, None)
 
-  // Records, in one sequence, each event handed off and each event the wrapped reporter receives.
-  private final class Recording {
+  private final class HandOffAndPassOnRecording {
     private var recorded = Vector.empty[(String, AnyRef, Event)]
 
     def inOrder: Vector[(String, AnyRef, Event)] = recorded
@@ -34,14 +33,14 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
   }
 
   private def passedOnWhenHandOffThrows(thrown: Throwable, event: Event): Vector[Event] = {
-    val recording = new Recording
+    val recording = new HandOffAndPassOnRecording
     new StructureWrapper(recording.reporter, node, recording.handOffThrowing(thrown))(event)
     recording.passedOn
   }
 
   "A structure wrapper" should {
     "hand off each event, naming its node, before it passes that event on" in {
-      val recording = new Recording
+      val recording = new HandOffAndPassOnRecording
       val wrapper = new StructureWrapper(recording.reporter, node, recording.handOff)
       val first = alert("first")
       val second = alert("second")
@@ -79,7 +78,7 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
     }
 
     "throw a VirtualMachineError other than a StackOverflowError that its hand-off throws, and not pass the event on" in {
-      val recording = new Recording
+      val recording = new HandOffAndPassOnRecording
       val outOfMemory = new OutOfMemoryError("no heap")
       val wrapper = new StructureWrapper(recording.reporter, node, recording.handOffThrowing(outOfMemory))
       val thrown = the[OutOfMemoryError] thrownBy wrapper(alert("lost"))

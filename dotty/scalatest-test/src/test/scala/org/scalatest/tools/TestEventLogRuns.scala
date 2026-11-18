@@ -47,9 +47,7 @@ private[tools] final class RecordingLogger extends Logger {
 }
 
 /**
- * The reporter a run is given with `-C` so that a test can read the events the run's reporters receive.
- *
- * It records into the recording that is current when the run constructs it, so a run that outlives its recording,
+ * Records into the recording that is current when the run constructs it, so a run that outlives its recording,
  * having timed out, cannot write into a later one.
  */
 final class RunRecordingReporter extends Reporter {
@@ -62,9 +60,7 @@ object RunRecordingReporter {
   private val current = new AtomicReference(new ConcurrentLinkedQueue[Event])
 
   /**
-   * Returns the events the recording reporters of the runs `launch` starts receive. One caller records at a time.
-   *
-   * Every run given a recording reporter must be launched here: specs run in parallel, and a run launched elsewhere
+   * Every run given a `RunRecordingReporter` must be launched here: specs run in parallel, and a run launched elsewhere
    * would record into the recording of whichever caller holds the lock.
    */
   def eventsReportedIn(launch: => Unit): Vector[Event] = synchronized {
@@ -75,16 +71,13 @@ object RunRecordingReporter {
   }
 }
 
-/** What a JVM wrote to its stdout and to its stderr, as lines. */
 private[tools] final case class JvmOutput(stdout: Vector[String], stderr: Vector[String])
 
-/** The main class of a JVM that Framework runs one suite in: the suite's class name, then the run's arguments. */
 object FrameworkRunInItsOwnJvm extends Assertions with TestEventLogRuns {
 
   def main(arguments: Array[String]): Unit = launched(Launch.ByFramework, arguments.head, arguments.tail.toSeq)
 }
 
-/** Launches runs given the runner argument, and reads the event logs they write. */
 private[tools] trait TestEventLogRuns { this: Assertions =>
 
   protected val runTimeLimitSeconds = 120L
@@ -97,7 +90,6 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
 
   protected def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
 
-  /** The class name each `structure` of the events that holds a suite of the name gives it, in order. */
   protected def classNamesGivenTo(suiteName: String, events: Seq[TestEventLogEvent]): Vector[String] =
     events.toVector
       .collect { case TestEventLogEvent.Structure(nodes) => nodes }
@@ -151,8 +143,6 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     new Framework().runner(arguments.toArray, remoteArguments.toArray, getClass.getClassLoader)
 
   /**
-   * Executes the suite's task and the tasks it returns.
-   *
    * Framework, given a suite by name, runs none of the tests of the suites it nests, unless the task also selects
    * those suites by their suite IDs.
    */
@@ -165,14 +155,12 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     }
   }
 
-  /** Executes the suite's task and the tasks it returns, ignoring the test-interface events they send. */
   protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger, nestedSuiteIds: Seq[String]): Unit =
     execute(runner, suiteClassName, _ => (), logger, nestedSuiteIds)
 
-  /** Executes the suite's task and the tasks it returns, running no test of a suite it nests. */
   protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Unit = execute(runner, suiteClassName, logger, Nil)
 
-  /** Runs the suite to the run's end. Under Framework, `nestedSuiteIds` are the suites it nests whose tests are to run. */
+  /** `nestedSuiteIds` apply under Framework only. */
   protected def launched(launch: Launch, suiteClassName: String, arguments: Seq[String], nestedSuiteIds: Seq[String] = Nil): Unit = {
     launch match {
       case Launch.ByFramework =>
@@ -184,7 +172,6 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     }
   }
 
-  /** Runs the suite to the run's end, and returns the events the run's reporters received. */
   protected def eventsReportedWhenLaunched(
     launch: Launch,
     suiteClassName: String,
@@ -196,7 +183,6 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     )
   }
 
-  // Recurses once for each class loader between this class's and the JVM's own.
   private def classpathOf(loader: ClassLoader): List[URL] = {
     loader match {
       case null => Nil
@@ -205,14 +191,10 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     }
   }
 
-  /** Has Framework run the suite in a JVM of its own, and returns what that JVM wrote to its stdout and stderr. */
   protected def outputOfFrameworkRunInItsOwnJvm(suiteClassName: String, arguments: Seq[String], folder: Path): JvmOutput =
     outputOfItsOwnJvm(FrameworkRunInItsOwnJvm.getClass.getName.stripSuffix("$"), suiteClassName +: arguments, folder)
 
-  /**
-   * Runs a main class in a JVM of its own, which holds this JVM's classes, and returns what that JVM wrote to its
-   * stdout and stderr. The files that hold them are written to `folder`.
-   */
+  /** The JVM runs on this JVM's classpath, and writes its stdout and stderr to files in `folder`. */
   protected def outputOfItsOwnJvm(mainClassName: String, arguments: Seq[String], folder: Path): JvmOutput = {
     val classpath =
       (classpathOf(getClass.getClassLoader).map(url => Paths.get(url.toURI).toString) ++

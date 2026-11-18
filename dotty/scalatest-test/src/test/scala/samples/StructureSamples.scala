@@ -140,8 +140,6 @@ class BrokenCtorSpec extends AnyFunSuite {
   throw new IllegalStateException("no config")
 }
 
-// Its one test passes only where the event log, named by the config map's eventLog, held this suite's structure
-// when the suite started to run.
 @DoNotDiscover
 class ReadsItsStructureSuite extends AnyFunSuite {
 

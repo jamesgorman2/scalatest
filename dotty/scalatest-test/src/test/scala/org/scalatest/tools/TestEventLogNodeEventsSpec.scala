@@ -27,21 +27,13 @@ import org.scalatest.tools.TestEventLogLine.nodeEvent
 
 final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  /**
-   * A run as a criterion states it.
-   *
-   * @param reported what the run's reporters receive, in order, in a run not given the runner argument
-   * @param eventLogInNotation the run's whole event log, in the event notation
-   * @param eventLogInFormat that event log as the format writes it, one line for each event
-   */
-  private final case class StatedRun(reported: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
+  private final case class StatedRun(reportedToReporters: Vector[String], eventLogInNotation: String, eventLogInFormat: List[String])
 
   private def recordedIn(recorded: Seq[RecordableEvent]): String = {
     val messages = recorded.collect { case info: InfoProvided => s"InfoProvided ${info.message}" }
     if (messages.isEmpty) "" else messages.mkString(", recording ", ", ", "")
   }
 
-  /** What a run's reporters were told, in the order they were told it. */
   private def reported(events: Vector[Event]): Vector[String] = {
     events.collect {
       case _: RunStarting => "RunStarting"
@@ -80,13 +72,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private def thrown(className: String, message: String): String =
     s""""throwable":{"id":1,"className":"$className","message":"$message"},"""
 
-  /**
-   * Registers the scenario of the run that writes its events to the event log, and the scenario of the decoder that
-   * reads them.
-   *
-   * @param nestedSuiteIds the suites the suite nests, which Framework is told to run the tests of
-   */
-  private def eventScenarios(
+  private def runAndDecoderScenarios(
     scenario: String,
     suite: String,
     suiteClassName: String,
@@ -103,7 +89,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(launch, suiteClassName, arguments, nestedSuiteIds))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
-      reportedWithoutTheArgument shouldBe stated.reported
+      reportedWithoutTheArgument shouldBe stated.reportedToReporters
 
       TemporaryEventLog.in { eventLogFile =>
         When(s"${launch.named} runs it with ${("the runner argument" :: arguments).mkString(" and ")}")
@@ -170,7 +156,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("StackFunSpec", "samples.StackFunSpec"),
+          TestEventLogLine.topLevelSuite("StackFunSpec", "samples.StackFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.scope(whenEmpty, 0, "when empty", "when empty"),
           TestEventLogLine.test(isEmpty, whenEmpty, 0, "is empty", "- is empty"),
@@ -210,7 +196,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("SetupFailsSpec", "samples.SetupFailsSpec"),
+          TestEventLogLine.topLevelSuite("SetupFailsSpec", "samples.SetupFailsSpec"),
           TestEventLogLine.scope(aRepo, 0, "A repo", "A repo"),
           TestEventLogLine.test(top.test("A repo should read"), aRepo, 0, "read", "- should read"),
           TestEventLogLine.test(top.test("A repo should write"), aRepo, 1, "write", "- should write")
@@ -267,7 +253,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("OuterSuites", "samples.OuterSuites"),
+          TestEventLogLine.topLevelSuite("OuterSuites", "samples.OuterSuites"),
           TestEventLogLine.nestedSuite(inner1, 0, "Inner1Suite", "samples.Inner1Suite"),
           TestEventLogLine.test(innerOne, inner1, 0, "inner one", "- inner one"),
           TestEventLogLine.nestedSuite(inner2, 1, "Inner2Suite", "samples.Inner2Suite"),
@@ -312,7 +298,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("ForwardingSuite", "samples.ForwardingSuite"),
+          TestEventLogLine.topLevelSuite("ForwardingSuite", "samples.ForwardingSuite"),
           TestEventLogLine.test(a, top, 0, "a", "- a"),
           TestEventLogLine.test(b, top, 1, "b", "- b")
         ) :: suiteStarting(top) :: startingAndSucceeded(a, List(1, 1))) ::: startingAndSucceeded(b, List(1, 1)) ::: List(suiteCompleted(top))*
@@ -347,7 +333,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("KeepsItsRunsReporterSuite", "samples.KeepsItsRunsReporterSuite"),
+          TestEventLogLine.topLevelSuite("KeepsItsRunsReporterSuite", "samples.KeepsItsRunsReporterSuite"),
           TestEventLogLine.test(a, top, 0, "a", "- a")
         ) :: suiteStarting(top) :: startingAndSucceeded(a, List(1, 1))) ::: List(suiteCompleted(top))*
       )
@@ -387,7 +373,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("KeepsItsRunsReporterAsyncSpec", "samples.KeepsItsRunsReporterAsyncSpec"),
+          TestEventLogLine.topLevelSuite("KeepsItsRunsReporterAsyncSpec", "samples.KeepsItsRunsReporterAsyncSpec"),
           TestEventLogLine.test(t, top, 0, "t", "- t"),
           TestEventLogLine.test(u, top, 1, "u", "- u")
         ),
@@ -432,7 +418,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("FilteredSuite", "samples.FilteredSuite"),
+          TestEventLogLine.topLevelSuite("FilteredSuite", "samples.FilteredSuite"),
           TestEventLogLine.test(fast, top, 0, "fast", "- fast"),
           TestEventLogLine.ignoredTest(later, top, 1, "later", "- later")
         ) :: suiteStarting(top) :: startingAndSucceeded(fast, List(1, 1))) ::: List(nodeEvent(later, List(1, 1), "TestIgnored"), suiteCompleted(top))*
@@ -473,7 +459,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("SetupFailsSuites", "samples.SetupFailsSuites"),
+          TestEventLogLine.topLevelSuite("SetupFailsSuites", "samples.SetupFailsSuites"),
           TestEventLogLine.nestedSuite(spec, 0, "SetupFailsSpec", "samples.SetupFailsSpec"),
           TestEventLogLine.scope(aRepo, 0, "A repo", "A repo"),
           TestEventLogLine.test(spec.test("A repo should read"), aRepo, 0, "read", "- should read"),
@@ -511,7 +497,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.AddSuite"), TestEventLogLine.test(adds, top, 0, "adds", "- adds")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("AddSuite", "samples.AddSuite"), TestEventLogLine.test(adds, top, 0, "adds", "- adds")),
         suiteStarting(top),
         nodeEvent(adds, List(1, 1), "TestStarting"),
         nodeEvent(adds, List(1, 1), "TestSucceeded"),
@@ -535,7 +521,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("BrokenCtorSpec", "samples.BrokenCtorSpec")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("BrokenCtorSpec", "samples.BrokenCtorSpec")),
         suiteStarting(top),
         nodeEvent(top, List(1), "SuiteAborted", """"message":"no config",""" + thrown("java.lang.IllegalStateException", "no config"))
       )
@@ -564,7 +550,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         runStarted,
         TestEventLogLine.runEvent("RunStarting", """"testCount":1,"configMap":{},"""),
         TestEventLogLine.structure(
-          TestEventLogLine.suite("AbortSuite", "samples.AbortSuite"),
+          TestEventLogLine.topLevelSuite("AbortSuite", "samples.AbortSuite"),
           TestEventLogLine.test(throwsOnPop, top, 0, "throws on pop", "- throws on pop")
         ),
         suiteStarting(top),
@@ -618,7 +604,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("TwiceSuites", "samples.TwiceSuites"),
+          TestEventLogLine.topLevelSuite("TwiceSuites", "samples.TwiceSuites"),
           TestEventLogLine.nestedSuite(first, 0, "Inner1Suite", "samples.Inner1Suite"),
           TestEventLogLine.test(first.test("inner one"), first, 0, "inner one", "- inner one"),
           TestEventLogLine.nestedSuite(second, 1, "Inner1Suite", "samples.Inner1Suite"),
@@ -662,7 +648,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("RetrySuite", "samples.RetrySuite"), TestEventLogLine.test(flaky, top, 0, "flaky", "- flaky")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("RetrySuite", "samples.RetrySuite"), TestEventLogLine.test(flaky, top, 0, "flaky", "- flaky")),
         suiteStarting(top),
         nodeEvent(flaky, List(1, 1), "TestStarting"),
         nodeEvent(flaky, List(1, 1), "InfoProvided", """"message":"trying","""),
@@ -722,7 +708,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("ScopeInfoFunSpec", "samples.ScopeInfoFunSpec"),
+          TestEventLogLine.topLevelSuite("ScopeInfoFunSpec", "samples.ScopeInfoFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
           TestEventLogLine.scope(whenFull, 1, "when full", "when full"),
@@ -763,7 +749,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("BothStreamsSuite", "samples.BothStreamsSuite"),
+          TestEventLogLine.topLevelSuite("BothStreamsSuite", "samples.BothStreamsSuite"),
           TestEventLogLine.test(writes, top, 0, "writes", "- writes")
         ) :: suiteStarting(top) :: startingAndSucceeded(writes, List(1, 1))) ::: List(suiteCompleted(top))*
       )
@@ -801,7 +787,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("UnregisteredSuite", "samples.UnregisteredSuite"),
+          TestEventLogLine.topLevelSuite("UnregisteredSuite", "samples.UnregisteredSuite"),
           TestEventLogLine.test(b, top, 0, "b", "- b"),
           TestEventLogLine.ignoredTest(a, top, 1, "a", "- a")
         ) :: suiteStarting(top) :: startingAndSucceeded(b, List(1, 1))) ::: List(nodeEvent(a, List(1, 1), "TestIgnored"), suiteCompleted(top))*
@@ -839,7 +825,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("AnnouncingSuite", "samples.AnnouncingSuite"), TestEventLogLine.test(runs, top, 0, "runs", "- runs")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("AnnouncingSuite", "samples.AnnouncingSuite"), TestEventLogLine.test(runs, top, 0, "runs", "- runs")),
         suiteStarting(top),
         nodeEvent(top, List(1), "InfoProvided", """"message":"setting up","""),
         nodeEvent(runs, List(1, 1), "TestStarting"),
@@ -887,7 +873,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("StackAsyncFunSpec", "samples.StackAsyncFunSpec"),
+          TestEventLogLine.topLevelSuite("StackAsyncFunSpec", "samples.StackAsyncFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
           TestEventLogLine.ignoredTest(pops, aStack, 1, "pops", "- pops")
@@ -948,7 +934,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("TwinScopesFunSpec", "samples.TwinScopesFunSpec"),
+          TestEventLogLine.topLevelSuite("TwinScopesFunSpec", "samples.TwinScopesFunSpec"),
           TestEventLogLine.scope(first, 0, "s", "s"),
           TestEventLogLine.test(t, first, 0, "t", "- t"),
           TestEventLogLine.scope(second, 1, "s", "s"),
@@ -998,7 +984,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("RunsTwiceSuite", "samples.RunsTwiceSuite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("RunsTwiceSuite", "samples.RunsTwiceSuite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
         suiteStarting(top),
         nodeEvent(t, List(1, 1), "TestStarting"),
         nodeEvent(t, List(1, 1), "TestSucceeded"),
@@ -1054,7 +1040,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("TwinScopesAsyncFunSpec", "samples.TwinScopesAsyncFunSpec"),
+          TestEventLogLine.topLevelSuite("TwinScopesAsyncFunSpec", "samples.TwinScopesAsyncFunSpec"),
           TestEventLogLine.scope(first, 0, "s", "s"),
           TestEventLogLine.test(t, first, 0, "t", "- t"),
           TestEventLogLine.scope(second, 1, "s", "s"),
@@ -1104,7 +1090,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("RunsTwiceAsyncSpec", "samples.RunsTwiceAsyncSpec"), TestEventLogLine.test(t, top, 0, "t", "- t")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("RunsTwiceAsyncSpec", "samples.RunsTwiceAsyncSpec"), TestEventLogLine.test(t, top, 0, "t", "- t")),
         suiteStarting(top),
         nodeEvent(t, List(1, 1), "TestStarting"),
         nodeEvent(t, List(1, 1), "TestSucceeded"),
@@ -1161,7 +1147,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       frameworkRunOf(
         TestEventLogLine.structure(
-          TestEventLogLine.suite("StackPathFunSpec", "samples.StackPathFunSpec"),
+          TestEventLogLine.topLevelSuite("StackPathFunSpec", "samples.StackPathFunSpec"),
           TestEventLogLine.scope(aStack, 0, "A Stack", "A Stack"),
           TestEventLogLine.test(isEmpty, aStack, 0, "is empty", "- is empty"),
           TestEventLogLine.scope(whenFull, 1, "when full", "when full"),
@@ -1197,7 +1183,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       run ended completed
       """,
       frameworkRunOf(
-        TestEventLogLine.structure(TestEventLogLine.suite("MarkupDocSpec", "org.scalatest.samples.MarkupDocSpec")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("MarkupDocSpec", "org.scalatest.samples.MarkupDocSpec")),
         suiteStarting(top),
         nodeEvent(top, List(1), "MarkupProvided", """"text":"A stack pops","""),
         suiteCompleted(top)
@@ -1257,13 +1243,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       TestEventLogLine.runEvent("DiscoveryCompleted"),
       TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
       TestEventLogLine.runEvent("SuiteStarting"),
-      TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
+      TestEventLogLine.structure(TestEventLogLine.topLevelSuite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
       suiteStarting(addSuite),
       nodeEvent(adds, List(1, 1), "TestStarting"),
       nodeEvent(adds, List(1, 1), "TestSucceeded"),
       suiteCompleted(addSuite),
       TestEventLogLine.structure(
-        TestEventLogLine.suite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
+        TestEventLogLine.topLevelSuite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
         TestEventLogLine.test(sqrtOfASquare, sqrtPropSpec, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
       ),
       suiteStarting(sqrtPropSpec),
@@ -1324,14 +1310,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       TestEventLogLine.runEvent("RunStarting", """"testCount":2,"configMap":{},"""),
       TestEventLogLine.runEvent("SuiteStarting"),
       TestEventLogLine.structure(
-        TestEventLogLine.suite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
+        TestEventLogLine.topLevelSuite("SqrtPropSpec", "samples.discovered.SqrtPropSpec"),
         TestEventLogLine.test(sqrtOfASquare, sqrtPropSpec, 0, "sqrt of a square is the root", "- sqrt of a square is the root")
       ),
       suiteStarting(sqrtPropSpec),
       nodeEvent(sqrtOfASquare, List(1, 1), "TestStarting"),
       nodeEvent(sqrtOfASquare, List(1, 1), "TestSucceeded"),
       suiteCompleted(sqrtPropSpec),
-      TestEventLogLine.structure(TestEventLogLine.suite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
+      TestEventLogLine.structure(TestEventLogLine.topLevelSuite("AddSuite", "samples.discovered.AddSuite"), TestEventLogLine.test(adds, addSuite, 0, "adds", "- adds")),
       suiteStarting(addSuite),
       nodeEvent(adds, List(1, 1), "TestStarting"),
       nodeEvent(adds, List(1, 1), "TestSucceeded"),
@@ -1381,7 +1367,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         TestEventLogLine.runEvent("DiscoveryCompleted"),
         TestEventLogLine.runEvent("RunStarting", """"testCount":0,"configMap":{},"""),
         TestEventLogLine.runEvent("SuiteStarting"),
-        TestEventLogLine.structure(TestEventLogLine.suite("BrokenCtorSpec", "samples.discovered.BrokenCtorSpec")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("BrokenCtorSpec", "samples.discovered.BrokenCtorSpec")),
         suiteStarting(top),
         nodeEvent(
           top,
@@ -1401,11 +1387,10 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private def classFilesOf(simpleNames: String*): List[String] = simpleNames.toList.map(name => s"samples/discovered/$name.class")
 
   /**
-   * Each `SuiteStarting` and `SuiteCompleted` the event log assigns to the run, with the suite name the run's reporters
-   * were told it with. `Runner.run` without `-P` tells its reporters each event in the order the event log holds it, so
-   * the event log's ScalaTest events pair with the told events by position, and each pair shares its thread and time.
+   * `Runner.run` without `-P` tells its reporters each event in the order the event log holds it, so the event log's
+   * ScalaTest events pair with the told events by position, and each pair shares its thread and time.
    */
-  private def suiteEventsOfTheRunAsTold(events: Vector[TestEventLogEvent], told: Vector[Event]): Vector[String] = {
+  private def suiteEventsAssignedToTheRunWithToldSuiteNames(events: Vector[TestEventLogEvent], told: Vector[Event]): Vector[String] = {
     val logged = events.collect { case event: TestEventLogEvent.ScalaTestEvent => event }
     logged.size shouldBe told.size
     logged.zip(told).flatMap {
@@ -1449,16 +1434,12 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private def runnerRunOf(testCount: Int, lines: String*): List[String] =
     runStarted :: TestEventLogLine.runEvent("RunStarting", s""""testCount":$testCount,"configMap":{},""") :: lines.toList ::: List(runCompleted, runEndedCompleted)
 
-  /** One event, in the notation and as the format writes it. */
   private final case class StatedEvent(inNotation: String, inFormat: String)
 
-  /** The TestStarting and TestSucceeded of a test directly in a top-level suite, each in their first executions. */
-  private def startingAndSucceededOf(suite: NodePath, test: String): List[StatedEvent] = {
+  private def startingAndSucceededInFirstExecutions(suite: NodePath, test: String): List[StatedEvent] = {
     List("TestStarting", "TestSucceeded").map(eventName => StatedEvent(s"""test "$test": $eventName""", nodeEvent(suite.test(test), List(1, 1), eventName)))
   }
 
-  // Every order of the sequences' events that keeps each sequence's own events in order.
-  // Recurses once for each event.
   private def interleavings(sequences: List[List[StatedEvent]]): List[List[StatedEvent]] = {
     sequences.filter(_.nonEmpty) match {
       case Nil => List(Nil)
@@ -1473,7 +1454,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private val parFunSuite = NodePath.topLevel("samples.ParFunSuite")
 
-  private val parFunSuiteRuns = interleavings(List(startingAndSucceededOf(parFunSuite, "a"), startingAndSucceededOf(parFunSuite, "b"))).map { order =>
+  private val parFunSuiteRuns = interleavings(List(startingAndSucceededInFirstExecutions(parFunSuite, "a"), startingAndSucceededInFirstExecutions(parFunSuite, "b"))).map { order =>
     StatedRun(
       Vector(
         "RunStarting",
@@ -1501,7 +1482,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       runnerRunOf(
         2,
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("ParFunSuite", "samples.ParFunSuite"),
+          TestEventLogLine.topLevelSuite("ParFunSuite", "samples.ParFunSuite"),
           TestEventLogLine.test(parFunSuite.test("a"), parFunSuite, 0, "a", "- a"),
           TestEventLogLine.test(parFunSuite.test("b"), parFunSuite, 1, "b", "- b")
         ) :: suiteStarting(parFunSuite) :: order.map(_.inFormat)) ::: List(suiteCompleted(parFunSuite))*
@@ -1513,7 +1494,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   // Each test runs in an instance of its own, one after another, in any order.
   private val shuffledSuiteRuns = List("a", "b", "c").permutations.toList.map { tests =>
-    val order = tests.flatMap(test => startingAndSucceededOf(shuffledSuite, test))
+    val order = tests.flatMap(test => startingAndSucceededInFirstExecutions(shuffledSuite, test))
     StatedRun(
       Vector(
         "RunStarting",
@@ -1543,7 +1524,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       |""".stripMargin,
       frameworkRunOf(
         (TestEventLogLine.structure(
-          TestEventLogLine.suite("ShuffledSuite", "samples.ShuffledSuite"),
+          TestEventLogLine.topLevelSuite("ShuffledSuite", "samples.ShuffledSuite"),
           TestEventLogLine.test(shuffledSuite.test("a"), shuffledSuite, 0, "a", "- a"),
           TestEventLogLine.test(shuffledSuite.test("b"), shuffledSuite, 1, "b", "- b"),
           TestEventLogLine.test(shuffledSuite.test("c"), shuffledSuite, 2, "c", "- c")
@@ -1579,7 +1560,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       """,
       runnerRunOf(
         1,
-        TestEventLogLine.structure(TestEventLogLine.suite("ParAbortSuite", "samples.ParAbortSuite"), TestEventLogLine.test(a, top, 0, "a", "- a")),
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite("ParAbortSuite", "samples.ParAbortSuite"), TestEventLogLine.test(a, top, 0, "a", "- a")),
         suiteStarting(top),
         nodeEvent(a, List(1, 1), "SuiteAborted", s""""message":"$abortedRunningOneTest",""" + thrown("java.lang.RuntimeException", "no fixture")),
         suiteCompleted(top)
@@ -1587,22 +1568,16 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     )
   }
 
-  /**
-   * Registers two scenarios: a run whose tests hand off their events in no fixed order, and the decoder reading the
-   * event log of each order.
-   *
-   * @param runs the run in each order its tests may hand off their events. Every one tells its reporters the same.
-   */
-  private def eventScenariosInAnyOrder(
+  private def runAndDecoderScenariosInAnyOrder(
     scenario: String,
     suite: String,
     suiteClassName: String,
     eventLogHolds: String,
-    runs: List[StatedRun],
+    runInEachOrder: List[StatedRun],
     launch: Launch,
     arguments: List[String]
   ): Unit = {
-    val reportedInEveryOrder = runs.map(_.reported).distinct
+    val reportedInEveryOrder = runInEachOrder.map(_.reportedToReporters).distinct
     Scenario(scenario) {
       thisProcess
       reportedInEveryOrder should have size 1
@@ -1619,7 +1594,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         val lines = TemporaryEventLog.lines(eventLogFile)
 
         Then(s"the event log is $eventLogHolds, in one of the orders the tests may run in")
-        val runInOrderWritten = runs.filter(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat).isEmpty)
+        val runInOrderWritten = runInEachOrder.filter(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat).isEmpty)
         withClue(s"The event log is:\n${lines.mkString("\n")}\n") {
           runInOrderWritten should have size 1
         }
@@ -1629,7 +1604,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario(s"The decoder reads the event log of: $scenario") {
       When("the decoder is given the lines of that event log, in each order the tests may run in")
-      val mismatches = runs.flatMap(run => EventLogComparison.mismatchWhenIs(decodedOrFail(run.eventLogInFormat), built(run.eventLogInNotation)))
+      val mismatches = runInEachOrder.flatMap(run => EventLogComparison.mismatchWhenIs(decodedOrFail(run.eventLogInFormat), built(run.eventLogInNotation)))
 
       Then(s"it yields $eventLogHolds")
       mismatches shouldBe Nil
@@ -1641,7 +1616,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   private def slowSuiteAlertedBy(alert: String): List[String] = {
     val sleeps = slowSuite.test("sleeps")
     List(
-      TestEventLogLine.structure(TestEventLogLine.suite("SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(sleeps, slowSuite, 0, "sleeps", "- sleeps")),
+      TestEventLogLine.structure(TestEventLogLine.topLevelSuite("SlowSuite", "samples.SlowSuite"), TestEventLogLine.test(sleeps, slowSuite, 0, "sleeps", "- sleeps")),
       nodeEvent(sleeps, List(1, 1), "TestStarting"),
       alert,
       nodeEvent(sleeps, List(1, 1), "TestSucceeded")
@@ -1681,14 +1656,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          runsOfDiscoveredSuites.map(_.reported) should contain(reportedWithoutTheArgument)
+          runsOfDiscoveredSuites.map(_.reportedToReporters) should contain(reportedWithoutTheArgument)
 
           And("each suite has its own structure, whose root is that suite, before its events, which are assigned to it and its test")
           And("no structure holds the discovery suite, whose SuiteStarting and SuiteCompleted are assigned to the run")
-          val runInOrderDiscovered = runsOfDiscoveredSuites.filter(_.reported == reportedWithTheArgument)
+          val runInOrderDiscovered = runsOfDiscoveredSuites.filter(_.reportedToReporters == reportedWithTheArgument)
           runInOrderDiscovered.map(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat)) shouldBe List(None)
           runInOrderDiscovered.map(run => EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(run.eventLogInNotation))) shouldBe List(None)
-          suiteEventsOfTheRunAsTold(decodedOrFail(lines), toldWithTheArgument) shouldBe
+          suiteEventsAssignedToTheRunWithToldSuiteNames(decodedOrFail(lines), toldWithTheArgument) shouldBe
             Vector("SuiteStarting DiscoverySuite", "SuiteCompleted DiscoverySuite")
         }
       }
@@ -1702,7 +1677,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       EventLogComparison.mismatchWhenIs(events, built(discoveredWithAddSuiteFirst.eventLogInNotation)) shouldBe None
     }
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite whose tests run",
       "an AnyFunSpec declaring scope A Stack, holding scope when empty, holding tests is empty and pops, each succeeding",
       "samples.StackFunSpec",
@@ -1710,7 +1685,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       stackFunSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite whose beforeAll throws",
       "an AnyWordSpec declaring scope A repo, holding tests read and write, whose beforeAll throws",
       "samples.SetupFailsSpec",
@@ -1718,7 +1693,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       setupFailsSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "Nested suites sit under the suite that nests them",
       "a suite with no tests that nests two suites, each with one test that succeeds",
       "samples.OuterSuites",
@@ -1727,7 +1702,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       nestedSuiteIds = List("samples.Inner1Suite", "samples.Inner2Suite")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "Sibling scopes of one text",
       "an AnyFunSpec declaring scope s twice, the first holding test t and the second test u",
       "samples.TwinScopesFunSpec",
@@ -1735,7 +1710,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       twinScopesFunSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "Sibling scopes of one text in an async suite",
       "an AsyncFunSpec declaring scope s twice, the first holding test t and the second test u",
       "samples.TwinScopesAsyncFunSpec",
@@ -1743,7 +1718,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       twinScopesAsyncFunSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A path suite whose tests run",
       "a PathAnyFunSpec declaring scope A Stack, holding test is empty and scope when full, which holds test pops, each test succeeding",
       "samples.StackPathFunSpec",
@@ -1751,7 +1726,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       stackPathFunSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite with no registration tree",
       "a Suite that overrides testNames as b and a, tags a to be ignored, and overrides runTest to report TestStarting and TestSucceeded itself",
       "samples.UnregisteredSuite",
@@ -1759,7 +1734,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       unregisteredSuite
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "An async suite whose tests run one after another",
       "an AsyncFunSpec declaring scope A Stack, holding test is empty, which succeeds, and test pops, which is ignored",
       "samples.StackAsyncFunSpec",
@@ -1767,7 +1742,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       stackAsyncFunSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite wraps its reporter in its own",
       "an AnyFunSuite whose tests a and b succeed, and whose run passes on its reporter wrapped in one that forwards each event",
       "samples.ForwardingSuite",
@@ -1775,7 +1750,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       forwardingSuite
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite runs its tests with the reporter its run was given",
       "an AnyFunSuite whose runTest passes on, in place of the reporter it is given, the reporter the suite's run was given",
       "samples.KeepsItsRunsReporterSuite",
@@ -1783,7 +1758,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       keepsItsRunsReporterSuite
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "An async suite runs its tests with the reporter its run was given",
       "an AsyncFunSpec with tests t and u, whose runTest passes on, in place of the reporter it is given, the reporter the suite's run was given",
       "samples.KeepsItsRunsReporterAsyncSpec",
@@ -1791,7 +1766,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       keepsItsRunsReporterAsyncSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite with a tag excluded and a test ignored",
       "an AnyFunSuite declaring tests fast, slow and later, of which slow is tagged samples.Slow and later is ignored",
       "samples.FilteredSuite",
@@ -1800,7 +1775,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       arguments = List("-l", "samples.Slow")
     )
 
-    eventScenariosInAnyOrder(
+    runAndDecoderScenariosInAnyOrder(
       "Tests run in parallel by Runner",
       "an AnyFunSuite mixing in ParallelTestExecution, whose tests a and b succeed",
       "samples.ParFunSuite",
@@ -1811,7 +1786,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       List("-P2")
     )
 
-    eventScenariosInAnyOrder(
+    runAndDecoderScenariosInAnyOrder(
       "The events of tests in random order are assigned to their own nodes",
       "an AnyFunSuite mixing in RandomTestOrder, registering tests a, b and c in that order, each succeeding",
       "samples.ShuffledSuite",
@@ -1821,7 +1796,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       Nil
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "The suite running one test in parallel throws",
       "an AnyFunSuite mixing in ParallelTestExecution, whose one test is a, and whose run throws when given a test name",
       "samples.ParAbortSuite",
@@ -1834,7 +1809,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   Feature("A suite's class name") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite that completes",
       "an AnyFunSuite whose one test, 'adds', succeeds",
       "samples.AddSuite",
@@ -1842,7 +1817,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       completingAddSuite
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A nested suite's beforeAll throws",
       "a suite with no tests nesting an AnyWordSpec whose beforeAll throws",
       "samples.SetupFailsSuites",
@@ -1851,7 +1826,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       nestedSuiteIds = List("samples.SetupFailsSpec")
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite's constructor throws",
       "a suite class whose constructor throws",
       "samples.BrokenCtorSpec",
@@ -1876,7 +1851,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           val lines = TemporaryEventLog.lines(eventLogFile)
 
           Then("the run's reporters are told what ScalaTest 3.2.20 tells them, without the argument")
-          reportedWithoutTheArgument shouldBe brokenCtorSpecDiscovered.reported
+          reportedWithoutTheArgument shouldBe brokenCtorSpecDiscovered.reportedToReporters
 
           And("the event log holds a structure holding the suite, every structure holding it giving it the class that failed to construct, and in this order after it the suite's SuiteAborted")
           StatedLines.mismatchWhenIs(lines, brokenCtorSpecDiscovered.eventLogInFormat) shouldBe None
@@ -1941,7 +1916,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       EventLogComparison.mismatchWhenIs(events, built(slowSuiteAlerted.eventLogInNotation)) shouldBe None
     }
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "Runner.run aborts on an OutOfMemoryError",
       "an AnyFunSuite whose one test throws OutOfMemoryError",
       "samples.AbortSuite",
@@ -1954,7 +1929,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   Feature("Nested suites run in other ways") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A Suites nests one instance twice",
       "a suite with no tests whose two nested suites are one instance of an AnyFunSuite with one test",
       "samples.TwiceSuites",
@@ -1966,7 +1941,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   Feature("A test run more than once") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite runs a failed test again",
       "an AnyFunSuite whose runTest runs a test a second time where the first fails, and whose one test calls info, then fails the first time and succeeds the second",
       "samples.RetrySuite",
@@ -1977,7 +1952,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   Feature("A suite run more than once") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite's run runs its tests twice",
       "an AnyFunSuite with one test, whose run calls super.run twice",
       "samples.RunsTwiceSuite",
@@ -1985,7 +1960,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       runsTwiceSuite
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "An async suite's run runs its tests twice",
       "an AsyncFunSpec with one test, whose run calls super.run twice",
       "samples.RunsTwiceAsyncSpec",
@@ -1996,7 +1971,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
   Feature("Messages") {
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A DocSpec's markup",
       "a DocSpec, which is private to ScalaTest's package, whose document is one markup snippet",
       "org.scalatest.samples.MarkupDocSpec",
@@ -2004,7 +1979,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       markupDocSpec
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "A suite's own messages",
       "an AnyFunSuite that calls info before each test, and declares an info after its one test",
       "samples.AnnouncingSuite",
@@ -2012,7 +1987,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       announcingSuite
     )
 
-    eventScenarios(
+    runAndDecoderScenarios(
       "An info between two children of a scope",
       "an AnyFunSpec whose scope A Stack declares test is empty, then calls info, then declares scope when full",
       "samples.ScopeInfoFunSpec",

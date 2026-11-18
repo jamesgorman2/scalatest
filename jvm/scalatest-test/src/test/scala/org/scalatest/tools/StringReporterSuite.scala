@@ -67,7 +67,7 @@ class StringReporterSuite extends AnyFunSuite with Matchers {
     countReset(aResult) should equal (2)
   }
 
-  test("A string whose lines end in the platform line separator should come back with each line coloured and the separator kept between them") {
+  test("toPossiblyColoredText should colour each line of a string split by the platform line separator and keep the separator between them") {
     val lineSeparator = org.scalactic.Prettifier.lineSeparator
     val coloured = Fragment("a" + lineSeparator + "b", AnsiCyan).toPossiblyColoredText(true)
     coloured.replace(ansiCyan, "<cyan>").replace(ansiReset, "<reset>") should equal (

@@ -4,15 +4,14 @@ import org.scalatest.events.JsonReader
 import org.scalatest.events.JsonValue
 
 /**
- * Compares the lines a run wrote to its event log with the lines a criterion states, on the keys the stated lines
- * hold. A written line may hold keys its stated line lacks, such as a duration or a location.
+ * Compares on the keys the stated lines hold: a written line may hold keys its stated line lacks, such as a duration
+ * or a location.
  */
 private[tools] object StatedLines {
 
   // A stated line holds these only so that it decodes. No criterion fixes their values, so they are not compared.
   private val keysNoCriterionFixes = Set("threadName", "timeStamp", "pid", "startTime")
 
-  /** Returns why the written lines are not the stated ones, one for one, or none where they are. */
   def mismatchWhenIs(written: Seq[String], stated: Seq[String]): Option[String] = {
     if (written.size != stated.size) {
       Some(s"the event log has ${written.size} lines where ${stated.size} are stated:\n${written.mkString("\n")}")
@@ -23,10 +22,7 @@ private[tools] object StatedLines {
     }
   }
 
-  /**
-   * Matches each stated line, in order, against the written lines after the one the stated line before it matched.
-   * Returns why the first stated line with no match is missing, or none where every stated line matches.
-   */
+  /** Each stated line must match a written line after the one the stated line before it matched. */
   def mismatchWhenHoldsInOrder(written: Seq[String], stated: Seq[String]): Option[String] = {
     val (_, missing) = stated.foldLeft((written, Option.empty[String])) {
       case ((unmatched, None), statedLine) =>
@@ -42,8 +38,7 @@ private[tools] object StatedLines {
   private def parsed(line: String): JsonValue =
     JsonReader.read(line).fold(reason => throw new IllegalArgumentException(s"$reason, in $line"), identity)
 
-  // Recurses once for each nested object or array. In an event log line, those are only a node path's places and a
-  // throwable's parts.
+  // The recursion is shallow: in an event log line, only a node path's places and a throwable's parts nest.
   private def holds(written: JsonValue, stated: JsonValue): Boolean = {
     (written, stated) match {
       case (JsonValue.Object(writtenFields), JsonValue.Object(statedFields)) =>

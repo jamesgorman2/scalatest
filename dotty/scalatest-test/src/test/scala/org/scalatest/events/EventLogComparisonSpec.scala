@@ -3,7 +3,7 @@ package org.scalatest.events
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import EventNotationBlocks.joined
+import EventNotationBlocks.dedentedAndJoined
 
 final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
 
@@ -25,7 +25,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
   private def under(parent: NodeId, place: NodePlace): NodeId = NodeId(parent.places :+ place)
 
   private def expected(blocks: String*): Vector[BuiltEvent] = {
-    TestRunBuilder.build(TestRunPart.Events(joined(blocks*))) match {
+    TestRunBuilder.build(TestRunPart.Events(dedentedAndJoined(blocks*))) match {
       case Right(run) => run.events
       case Left(reason) => fail(s"the run was not built: $reason")
     }
@@ -33,7 +33,6 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
 
   private def log(blocks: String*): Vector[TestEventLogEvent] = expected(blocks*).map(_.event)
 
-  // Each of the log's node IDs starts with a place the expected IDs lack, so no node has its expected node's ID.
   private def logWithOtherNodeIds(blocks: String*): Vector[TestEventLogEvent] = {
     def otherId(id: NodeId): NodeId = NodeId(NodePlace.Suite("samples.OtherSuite", 0) +: id.places)
     log(blocks*).map {

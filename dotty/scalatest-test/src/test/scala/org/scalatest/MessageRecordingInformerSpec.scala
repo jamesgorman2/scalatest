@@ -21,8 +21,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
   private val markupOf: MessageRecorder.RecordedMessageEventFun =
     (message, _, _, _, _, _) => MarkupProvided(new Ordinal(1), message, None)
 
-  /** A hand-off that keeps each message handed to it. */
-  private final class KeptHandOff {
+  private final class MessageKeepingHandOff {
     @volatile var messages = Vector.empty[String]
     val handOff: MessageRecorder.MessageHandOff = (message, _, _) => () => messages :+= message
   }
@@ -30,7 +29,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
   "A test's informer and documenter" should {
     "hand each message off as the test calls it" in {
       val recorder = new MessageRecorder(noEventReporter)
-      val kept = new KeptHandOff
+      val kept = new MessageKeepingHandOff
       MessageRecordingInformer(recorder, infoOf, kept.handOff)("first")
       MessageRecordingDocumenter(recorder, markupOf, kept.handOff)("second")
       kept.messages shouldBe Vector("first", "second")
@@ -38,7 +37,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
 
     "hand off no message the test calls after its recorded events are taken for its closing event" in {
       val recorder = new MessageRecorder(noEventReporter)
-      val kept = new KeptHandOff
+      val kept = new MessageKeepingHandOff
       recorder.recordedEvents(false, false)
       MessageRecordingInformer(recorder, infoOf, kept.handOff)("after the close")
       MessageRecordingDocumenter(recorder, markupOf, kept.handOff)("after the close")

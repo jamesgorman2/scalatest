@@ -58,7 +58,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     it("flat") {}
   }
 
-  // Its run gives its scopes and tests a reporter that passes no event on.
   private final class PassesNoEventOnSpec extends AnyFunSpec {
     override def run(testName: Option[String], args: Args): Status = {
       super.run(testName, args.copy(reporter = passingNoEventOn))
@@ -69,7 +68,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  // Its runTests runs its scope and test twice in one run.
   private final class RunsItsTestsTwiceSpec extends AnyFunSpec {
     override protected def runTests(testName: Option[String], args: Args): Status = {
       super.runTests(testName, args)
@@ -81,7 +79,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  // Holds each task given it until `runAll`, which runs it in no invocation context.
   private final class QueuingExecutionContext extends ExecutionContext {
     private val tasks = new LinkedBlockingQueue[Runnable]
 
@@ -116,14 +113,12 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  // A nested suite that its outer suite runs from within one of the outer suite's scopes.
   private final class RunFromAScopeSpec extends AnyFunSpec {
     this.info("from the suite")
 
     it("o") {}
   }
 
-  // Its runTest runs the nested suite it declares, which its runNestedSuites does not run.
   private final class RunsItsNestedSuiteFromAScopeSpec extends AnyFunSpec {
     private val runFromAScope = new RunFromAScopeSpec
 
@@ -141,7 +136,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     }
   }
 
-  // A suite whose nested suite has its suite ID.
   private final class SharesItsIdWithItsNestedSuite extends org.scalatest.Suites(new SharesItsIdWithItsOuterSuite) {
     override def suiteName: String = SuiteEventHandOffSpec.this.suiteName
 
@@ -192,30 +186,26 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   private def line(node: NodePath, executions: Seq[Int], eventName: String, fields: String = ""): String =
     s"""{"item":"event","node":${node.json},"executions":${executions.mkString("[", ",", "]")},"event":"$eventName",$fields$threadAndTime"""
 
-  /** A top-level suite registered with an emitter, with what its events are sent through. */
-  private final class RegisteredRun(val eventLog: RecordingEventLog, val emitter: TestEventLogEmitter, val reporter: RecordingReporter, suite: Suite) {
+  private final class RegisteredTopLevelSuite(val eventLog: RecordingEventLog, val emitter: TestEventLogEmitter, val reporter: RecordingReporter, suite: Suite) {
     private val started = new StartedTopLevelSuite(emitter, suite, reporter)
-    val wrapperOfSuite: Reporter = started.wrapper
+    val wrapperOfSuite: Reporter = started.structureWrapper
     val registration: SuiteRegistration = started.registration
 
     def wrapperOfTest(testName: String): Reporter = registration.reporterOfTest(testName, wrapperOfSuite)
 
-    /** Completes the suite's run, which removes its registration. */
+    // Removes its registration.
     def complete(): Unit = started.complete()
 
-    /** The lines written after the suite's structure. */
-    def eventLines: Vector[String] = eventLog.writes.drop(1).map(_.stripSuffix("\n"))
+    def linesAfterItsStructure: Vector[String] = eventLog.writes.drop(1).map(_.stripSuffix("\n"))
   }
 
-  /** How the site that runs a nested suite starts it, in the context the site runs in, having read its names for its `SuiteStarting`. */
-  private def startOfNested(nested: Suite, reporter: Reporter): SuiteStart = {
+  private def startOfNestedWithNamesRead(nested: Suite, reporter: Reporter): SuiteStart = {
     val start = SuiteStart.ofNestedSuite(nested, reporter)
     start.namesRead(nested.suiteName, nested.suiteId)
     start
   }
 
-  // The lines the suite's run writes after its structure, by the time `afterItsRunReturns` has returned.
-  private def eventLinesOfRun(suite: Suite, afterItsRunReturns: () => Unit = () => ()): Vector[String] = {
+  private def linesAfterStructureRunning(suite: Suite, afterItsRunReturns: () => Unit = () => ()): Vector[String] = {
     val eventLog = new RecordingEventLog
     new SuiteRunner(
       suite,
@@ -228,28 +218,28 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     eventLog.writes.drop(1).map(_.stripSuffix("\n"))
   }
 
-  private def withRegisteredSuite[A](body: RegisteredRun => A): A = {
+  private def withRegisteredSuite[A](body: RegisteredTopLevelSuite => A): A = {
     val eventLog = new RecordingEventLog
-    val run = new RegisteredRun(eventLog, TestEventLogEmitter.appendingTo(eventLog), new RecordingReporter, new ScopedSuite)
+    val run = new RegisteredTopLevelSuite(eventLog, TestEventLogEmitter.appendingTo(eventLog), new RecordingReporter, new ScopedSuite)
     try body(run) finally run.complete()
   }
 
   "An emitter handed an event that has no origin" should {
     "assign the event to its wrapper's suite, in a first execution" in withRegisteredSuite { run =>
       run.wrapperOfSuite(suiteStarting)
-      run.eventLines shouldBe Vector(line(top, List(1), "SuiteStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(top, List(1), "SuiteStarting"))
     }
 
     "assign an event that reaches a test's wrapper to that test, in a first execution of the test and of its parent" in withRegisteredSuite { run =>
       run.wrapperOfTest("s t")(testStarting("s t"))
-      run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
     }
 
     "give a node's events its open execution, and open another for the first opening event after that one closes" in withRegisteredSuite { run =>
       val ofTest = run.wrapperOfTest("flat")
       List(testStarting("flat"), info("first"), testSucceeded("flat"), info("after it closed"), testStarting("flat"), testSucceeded("flat"))
         .foreach(ofTest(_))
-      run.eventLines shouldBe Vector(
+      run.linesAfterItsStructure shouldBe Vector(
         line(flat, List(1, 1), "TestStarting"),
         line(flat, List(1, 1), "InfoProvided", """"message":"first","""),
         line(flat, List(1, 1), "TestSucceeded"),
@@ -262,19 +252,19 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     "give a test's event the execution of its parent that is open" in withRegisteredSuite { run =>
       List(suiteStarting, suiteCompleted, suiteStarting).foreach(run.wrapperOfSuite(_))
       run.wrapperOfTest("flat")(testStarting("flat"))
-      run.eventLines.last shouldBe line(flat, List(2, 1), "TestStarting")
+      run.linesAfterItsStructure.last shouldBe line(flat, List(2, 1), "TestStarting")
     }
 
     "assign an event that reaches a test's wrapper to the other test of that test's suite that it names" in withRegisteredSuite { run =>
       run.wrapperOfTest("flat")(testStarting("s t"))
-      run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
     }
 
     "give a suite a node directly under a test, in a structure written before the event, where the event reaches the test's wrapper and no suite at or below the test has its suite ID" in
       withRegisteredSuite { run =>
         val other = flat.suite("samples.Other")
         run.wrapperOfTest("flat")(otherTestStarting)
-        run.eventLines shouldBe Vector(otherStructure(other), line(other.test("x"), List(1, 1, 1, 1), "TestStarting"))
+        run.linesAfterItsStructure shouldBe Vector(otherStructure(other), line(other.test("x"), List(1, 1, 1, 1), "TestStarting"))
       }
 
     "give a suite a node under a test's wrapper where only a suite outside the test has its suite ID" in withRegisteredSuite { run =>
@@ -282,7 +272,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val underTheTest = flat.suite("samples.Other")
       run.wrapperOfSuite(otherTestStarting)
       run.wrapperOfTest("flat")(otherTestStarting)
-      run.eventLines shouldBe Vector(
+      run.linesAfterItsStructure shouldBe Vector(
         otherStructure(besideTheTest),
         line(besideTheTest.test("x"), List(1, 1, 1), "TestStarting"),
         otherStructure(underTheTest),
@@ -297,7 +287,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         run.wrapperOfTest("s u")(otherTestStarting)
         run.wrapperOfTest("flat")(otherSuiteCompleted)
         run.wrapperOfSuite(otherInfo)
-        run.eventLines.last should startWith(nodeOf(underSu))
+        run.linesAfterItsStructure.last should startWith(startOfEventLineAt(underSu))
       }
 
     "assign an event naming a suite ID two suites at or below the wrapper's node share to the first of them where neither has ended" in
@@ -306,7 +296,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         run.wrapperOfTest("flat")(otherTestStarting)
         run.wrapperOfTest("s u")(otherTestStarting)
         run.wrapperOfSuite(otherInfo)
-        run.eventLines.last should startWith(nodeOf(underFlat))
+        run.linesAfterItsStructure.last should startWith(startOfEventLineAt(underFlat))
       }
 
     "assign an event naming the wrapper's own suite ID to the wrapper's own suite, not to a suite nested in it that shares the ID" in {
@@ -314,8 +304,8 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val outer = new SharesItsIdWithItsNestedSuite
       val ofOuter = new StartedTopLevelSuite(TestEventLogEmitter.appendingTo(eventLog), outer, new RecordingReporter)
       try {
-        ofOuter.wrapper(InfoProvided(ordinal, "of both", Some(NameInfo(suiteName, suiteId, Some(suiteId), None)), threadName = "main", timeStamp = timeStamp))
-        eventLog.writes.last should startWith(nodeOf(top))
+        ofOuter.structureWrapper(InfoProvided(ordinal, "of both", Some(NameInfo(suiteName, suiteId, Some(suiteId), None)), threadName = "main", timeStamp = timeStamp))
+        eventLog.writes.last should startWith(startOfEventLineAt(top))
       } finally {
         ofOuter.complete()
       }
@@ -329,62 +319,58 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         run.wrapperOfTest("flat")(otherSuiteCompleted)
         run.wrapperOfTest("s u")(otherSuiteCompleted)
         run.wrapperOfSuite(otherInfo)
-        run.eventLines.last should startWith(nodeOf(underFlat))
+        run.linesAfterItsStructure.last should startWith(startOfEventLineAt(underFlat))
       }
 
     "give a test that its suite's structure lacks a node directly under the suite, in a further structure written before the event" in
       withRegisteredSuite { run =>
         run.wrapperOfSuite(testStarting("lacked"))
-        run.eventLines.last shouldBe line(top.test("lacked"), List(1, 1), "TestStarting")
-        run.eventLines.init.last should include(TestEventLogLine.test(top.test("lacked"), top, 3, "lacked", "- lacked"))
+        run.linesAfterItsStructure.last shouldBe line(top.test("lacked"), List(1, 1), "TestStarting")
+        run.linesAfterItsStructure.init.last should include(TestEventLogLine.test(top.test("lacked"), top, 3, "lacked", "- lacked"))
       }
   }
 
-  // A test of a suite no structure of the run holds.
+  // Of a suite no structure of the run holds.
   private def otherTestStarting: Event =
     TestStarting(ordinal, "Other", "samples.Other", Some("samples.Other"), "x", "x", threadName = "main", timeStamp = timeStamp)
 
-  // The SuiteCompleted of that suite.
   private def otherSuiteCompleted: Event =
     SuiteCompleted(ordinal, "Other", "samples.Other", Some("samples.Other"), threadName = "main", timeStamp = timeStamp)
 
-  // A message of that suite, naming no test.
   private def otherInfo: Event =
     InfoProvided(ordinal, "of Other", Some(NameInfo("Other", "samples.Other", Some("samples.Other"), None)), threadName = "main", timeStamp = timeStamp)
 
-  // The start of an event line assigned to `node`.
-  private def nodeOf(node: NodePath): String = s"""{"item":"event","node":${node.json},"""
+  private def startOfEventLineAt(node: NodePath): String = s"""{"item":"event","node":${node.json},"""
 
-  // The structure of that suite, at `node`, holding its one test.
   private def otherStructure(node: NodePath): String =
-    TestEventLogLine.structure(TestEventLogLine.suiteUnder(node, "Other", "samples.Other"), TestEventLogLine.test(node.test("x"), node, 0, "x", "- x"))
+    TestEventLogLine.structure(TestEventLogLine.nestedSuiteWithoutPosition(node, "Other", "samples.Other"), TestEventLogLine.test(node.test("x"), node, 0, "x", "- x"))
 
   "An emitter handed an event at its send site" should {
     "write the event as it is handed off, assigned to the test its origin names, and not again when it reaches its suite's wrapper" in
       withRegisteredSuite { run =>
         val starting = testStarting("s t")
         run.registration.startTestExecution("s t").handOff(starting)
-        run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+        run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
         run.wrapperOfSuite(starting)
-        run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+        run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
       }
 
     "write the event once, assigned to the test its origin names, where it then reaches the wrapper of another test" in withRegisteredSuite { run =>
       val starting = testStarting("s t")
       run.registration.startTestExecution("s t").handOff(starting)
       run.wrapperOfTest("flat")(starting)
-      run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
     }
 
     "assign a scope's event to the scope at the origin's path, telling sibling scopes of one text apart by their place" in withRegisteredSuite { run =>
       run.registration.originAt(List(ScopePlace("s", 0))).handOff(scopeOpened)
       run.registration.originAt(List(ScopePlace("s", 1))).handOff(scopeOpened)
-      run.eventLines shouldBe Vector(line(firstS, List(1, 1), "ScopeOpened"), line(secondS, List(1, 1), "ScopeOpened"))
+      run.linesAfterItsStructure shouldBe Vector(line(firstS, List(1, 1), "ScopeOpened"), line(secondS, List(1, 1), "ScopeOpened"))
     }
 
     "assign an event whose origin names no scope to the suite" in withRegisteredSuite { run =>
       run.registration.originAt(Nil).handOff(info("from the suite"))
-      run.eventLines shouldBe Vector(line(top, List(1), "InfoProvided", """"message":"from the suite","""))
+      run.linesAfterItsStructure shouldBe Vector(line(top, List(1), "InfoProvided", """"message":"from the suite","""))
     }
 
     "number the executions of one test in the order their first events are written" in withRegisteredSuite { run =>
@@ -392,7 +378,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val second = run.registration.startTestExecution("flat")
       val events = List(first -> testStarting("flat"), first -> testSucceeded("flat"), second -> testStarting("flat"), second -> testSucceeded("flat"))
       events.foreach((origin, event) => origin.handOff(event))
-      run.eventLines shouldBe Vector(
+      run.linesAfterItsStructure shouldBe Vector(
         line(flat, List(1, 1), "TestStarting"),
         line(flat, List(1, 1), "TestSucceeded"),
         line(flat, List(1, 2), "TestStarting"),
@@ -409,7 +395,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           ofScope.runningInItsExecution(run.registration.startTestExecution("s t")).handOff(testStarting("s t"))
           ofScope.handOff(scopeClosed)
         }
-        run.eventLines shouldBe Vector(
+        run.linesAfterItsStructure shouldBe Vector(
           line(firstS, List(1, 1), "ScopeOpened"),
           line(st, List(1, 1, 1), "TestStarting"),
           line(firstS, List(1, 1), "ScopeClosed"),
@@ -427,7 +413,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         sendScopeOpened()
         run.registration.startRun()
         sendScopeOpened()
-        run.eventLines shouldBe Vector(line(top, List(1), "SuiteStarting"), line(firstS, List(1, 1), "ScopeOpened"), line(firstS, List(2, 2), "ScopeOpened"))
+        run.linesAfterItsStructure shouldBe Vector(line(top, List(1), "SuiteStarting"), line(firstS, List(1, 1), "ScopeOpened"), line(firstS, List(2, 2), "ScopeOpened"))
       }
 
     "give a run that follows a second SuiteStarting the execution that SuiteStarting opened" in withRegisteredSuite { run =>
@@ -437,7 +423,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         run.registration.originAt(Nil).handOff(info("from the suite"))
         run.wrapperOfSuite(suiteCompleted)
       }
-      run.eventLines shouldBe Vector(1, 2).flatMap { execution =>
+      run.linesAfterItsStructure shouldBe Vector(1, 2).flatMap { execution =>
         Vector(
           line(top, List(execution), "SuiteStarting"),
           line(top, List(execution), "InfoProvided", """"message":"from the suite","""),
@@ -452,12 +438,12 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       ofTest.handOff(testStarting("flat"))
       run.registration.startRun()
       ofTest.handOff(testSucceeded("flat"))
-      run.eventLines shouldBe Vector(line(flat, List(1, 1), "TestStarting"), line(flat, List(1, 1), "TestSucceeded"))
+      run.linesAfterItsStructure shouldBe Vector(line(flat, List(1, 1), "TestStarting"), line(flat, List(1, 1), "TestSucceeded"))
     }
 
     "assign an event whose origin names a test the suite's structure lacks to the suite, in the run's execution" in withRegisteredSuite { run =>
       run.registration.startTestExecution("no such test").handOff(testStarting("no such test"))
-      run.eventLines shouldBe Vector(line(top, List(1), "TestStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(top, List(1), "TestStarting"))
     }
 
     "write the event again, from its own data, where it is sent again after it reached its top-level suite's wrapper" in withRegisteredSuite { run =>
@@ -465,7 +451,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.registration.startTestExecution("s t").handOff(starting)
       run.wrapperOfSuite(starting)
       run.wrapperOfSuite(starting)
-      run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"), line(st, List(1, 1, 1), "TestStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"), line(st, List(1, 1, 1), "TestStarting"))
     }
   }
 
@@ -482,7 +468,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           TestEventLogLine.nodeEvent(s, List(1, opening), "ScopeClosed")
         )
       } ::: List(TestEventLogLine.nodeEvent(spec, List(1), "SuiteCompleted"))
-      StatedLines.mismatchWhenIs(eventLinesOfRun(new RunsItsTestsTwiceSpec), stated) shouldBe None
+      StatedLines.mismatchWhenIs(linesAfterStructureRunning(new RunsItsTestsTwiceSpec), stated) shouldBe None
     }
   }
 
@@ -491,7 +477,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OpensItsAsyncScopeTwiceSpec")
       val i = spec.test("s i")
       val queued = new QueuingExecutionContext
-      val written = eventLinesOfRun(new OpensItsAsyncScopeTwiceSpec(queued), () => queued.runAll())
+      val written = linesAfterStructureRunning(new OpensItsAsyncScopeTwiceSpec(queued), () => queued.runAll())
       val stated = List(
         TestEventLogLine.nodeEvent(i, List(1, 2, 1), "TestIgnored"),
         TestEventLogLine.nodeEvent(i, List(1, 1, 2), "TestIgnored")
@@ -509,7 +495,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         TestEventLogLine.nodeEvent(nested.test("o"), List(1, 1, 1), "TestStarting"),
         TestEventLogLine.nodeEvent(nested.test("o"), List(1, 1, 1), "TestSucceeded")
       )
-      StatedLines.mismatchWhenHoldsInOrder(eventLinesOfRun(new RunsItsNestedSuiteFromAScopeSpec), stated) shouldBe None
+      StatedLines.mismatchWhenHoldsInOrder(linesAfterStructureRunning(new RunsItsNestedSuiteFromAScopeSpec), stated) shouldBe None
     }
   }
 
@@ -518,7 +504,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       withRegisteredSuite { run =>
         val starting = testStarting("s t")
         run.wrapperOfTest("s t")(starting)
-        run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
+        run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"))
         run.reporter.events.size shouldBe 1
         run.reporter.events.head should be theSameInstanceAs starting
       }
@@ -528,7 +514,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val inner = new OneTestSuite
       val outer = new org.scalatest.Suites(inner)
       val ofOuter = new StartedTopLevelSuite(TestEventLogEmitter.appendingTo(eventLog), outer, new RecordingReporter)
-      val wrapperOfInner = ofOuter.runningInItsContext(startOfNested(inner, ofOuter.wrapper)).reporter
+      val wrapperOfInner = ofOuter.runningInItsContext(startOfNestedWithNamesRead(inner, ofOuter.structureWrapper)).reporter
       try {
         wrapperOfInner(SuiteStarting(ordinal, inner.suiteName, inner.suiteId, Some(inner.suiteId), threadName = "main", timeStamp = timeStamp))
         eventLog.writes.drop(1).map(_.stripSuffix("\n")) shouldBe
@@ -542,7 +528,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val starting = testStarting("s t")
       run.wrapperOfTest("s t")(starting)
       run.wrapperOfTest("s t")(starting)
-      run.eventLines shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"), line(st, List(1, 1, 1), "TestStarting"))
+      run.linesAfterItsStructure shouldBe Vector(line(st, List(1, 1, 1), "TestStarting"), line(st, List(1, 1, 1), "TestStarting"))
     }
   }
 
@@ -584,7 +570,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   "An emitter handed an event by a structure wrapper once its top-level suite's registration is removed" should {
     val structureOfScopedSuite =
       TestEventLogLine.structure(
-        TestEventLogLine.suiteWithId(top, suiteName, suiteId, "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),
+        TestEventLogLine.topLevelSuiteWithId(top, suiteName, suiteId, "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),
         TestEventLogLine.scope(firstS, 0, "s", "s"),
         TestEventLogLine.test(st, firstS, 0, "t", "- t"),
         TestEventLogLine.scope(secondS, 1, "s", "s"),
@@ -628,9 +614,9 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     "write an event once, where a top-level suite's test wrapper handed it off and another top-level suite's registration is removed before it reaches its own suite's wrapper" in {
       val eventLog = new RecordingEventLog
       val emitter = TestEventLogEmitter.appendingTo(eventLog)
-      val removed = new RegisteredRun(eventLog, emitter, new RecordingReporter, new ScopedSuite)
+      val removed = new RegisteredTopLevelSuite(eventLog, emitter, new RecordingReporter, new ScopedSuite)
       val oneTestSuite = new OneTestSuite
-      val kept = new RegisteredRun(eventLog, emitter, new RecordingReporter, oneTestSuite)
+      val kept = new RegisteredTopLevelSuite(eventLog, emitter, new RecordingReporter, oneTestSuite)
       val oneTestSuitePath = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite")
       val only = oneTestSuitePath.test("only")
       try {
@@ -643,7 +629,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
           List(
             structureOfScopedSuite,
             TestEventLogLine.structure(
-              TestEventLogLine.suite("SuiteEventHandOffSpec$OneTestSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite"),
+              TestEventLogLine.topLevelSuite("SuiteEventHandOffSpec$OneTestSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite"),
               TestEventLogLine.test(only, oneTestSuitePath, 0, "only", "- only")
             ),
             TestEventLogLine.nodeEvent(only, List(1, 1), "TestStarting")
@@ -661,19 +647,19 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val topLevel = new OneNestedSuite
       val ofTopLevel = new StartedTopLevelSuite(emitter, topLevel, new RecordingReporter)
       val nested = topLevel.nestedSuites.head
-      val wrapperOfNested = ofTopLevel.runningInItsContext(startOfNested(nested, passingNoEventOn)).reporter
+      val wrapperOfNested = ofTopLevel.runningInItsContext(startOfNestedWithNamesRead(nested, passingNoEventOn)).reporter
       val inFlight = SuiteStarting(ordinal, nested.suiteName, nested.suiteId, Some(nested.suiteId), threadName = "main", timeStamp = timeStamp)
       wrapperOfNested(inFlight)
       ofTopLevel.complete()
       emitter.handedOffEventCount shouldBe 0
-      ofTopLevel.wrapper(inFlight)
+      ofTopLevel.structureWrapper(inFlight)
       val topLevelPath = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OneNestedSuite")
       val nestedPath = topLevelPath.suite("org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite")
       StatedLines.mismatchWhenIs(
         eventLog.writes.map(_.stripSuffix("\n")),
         List(
           TestEventLogLine.structure(
-            TestEventLogLine.suite("SuiteEventHandOffSpec$OneNestedSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneNestedSuite"),
+            TestEventLogLine.topLevelSuite("SuiteEventHandOffSpec$OneNestedSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneNestedSuite"),
             TestEventLogLine.nestedSuite(nestedPath, 0, "SuiteEventHandOffSpec$OneTestSuite", "org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite"),
             TestEventLogLine.test(nestedPath.test("only"), nestedPath, 0, "only", "- only")
           ),
@@ -690,7 +676,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         val succeeded = testSucceeded("flat", Vector(info("first"), info("second")))
         ofTest.handOff(succeeded)
         run.wrapperOfSuite(succeeded)
-        run.eventLines shouldBe Vector(
+        run.linesAfterItsStructure shouldBe Vector(
           line(flat, List(1, 1), "InfoProvided", """"message":"first","""),
           line(flat, List(1, 1), "InfoProvided", """"message":"second","""),
           line(flat, List(1, 1), "TestSucceeded")
@@ -704,7 +690,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val starting = testStarting("s t")
       run.registration.startTestExecution("s t").handOff(starting)
       run.wrapperOfTest("s t")(starting)
-      run.eventLines shouldBe Vector.empty
+      run.linesAfterItsStructure shouldBe Vector.empty
       run.reporter.events.size shouldBe 1
     }
   }
@@ -731,7 +717,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
         )
       run.wrapperOfTest("flat")(failed)
       run.wrapperOfTest("flat")(testStarting("flat"))
-      run.eventLines shouldBe Vector.empty
+      run.linesAfterItsStructure shouldBe Vector.empty
       run.eventLog.isClosed shouldBe true
       run.reporter.events.size shouldBe 2
     }
@@ -748,7 +734,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
             val ofSuite = new StartedTopLevelSuite(emitter, new OneTestSuite, new RecordingReporter)
             started.add(ofSuite)
             val registration = ofSuite.registration
-            val wrapperOfTest = registration.reporterOfTest("only", ofSuite.wrapper)
+            val wrapperOfTest = registration.reporterOfTest("only", ofSuite.structureWrapper)
             (1 to executionsOfEachThread).foreach { _ =>
               val ofTest = registration.startTestExecution("only")
               List(testStarting("only"), testSucceeded("only")).foreach { event =>

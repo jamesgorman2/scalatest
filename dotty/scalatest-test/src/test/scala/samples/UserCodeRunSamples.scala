@@ -20,7 +20,6 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.funsuite.AsyncFunSuite
 import scala.concurrent.Future
 
-/** A suite that runs an instance of the class it wraps in its place, giving that instance's names and tests as its own. */
 @DoNotDiscover
 class DelegatingSuite(wrapped: Class[? <: Suite]) extends Suite {
 
@@ -56,7 +55,6 @@ class HelperSuite extends AnyFunSpec {
   }
 }
 
-/** A suite each of whose tests runs a `HelperSuite` with the `Args` its test is run with. */
 abstract class RunsHelpers extends AnyFunSuite {
 
   @volatile private var argsOfTest = Option.empty[Args]
@@ -78,7 +76,6 @@ class OuterSuite extends RunsHelpers {
   }
 }
 
-/** A suite whose test runs a `HelperSuite` on a thread it starts, and waits for that thread to end. */
 @DoNotDiscover
 class HelperOnAThreadSuite extends RunsHelpers {
 
@@ -125,7 +122,6 @@ class User2Suite extends RunsHelpers {
 @DoNotDiscover
 class UserSuites extends Suites(new User1Suite, new User2Suite)
 
-/** Runs its one test again where it fails. The test runs a helper, then fails the first time it runs. */
 @DoNotDiscover
 class RetryRunsAHelper extends RunsHelpers {
 
@@ -143,7 +139,6 @@ class RetryRunsAHelper extends RunsHelpers {
   }
 }
 
-/** An async suite whose test runs a `HelperSuite`, with the `Args` its test is run with, inside a `Future` on the suite's own `ExecutionContext`. */
 @DoNotDiscover
 class AsyncOuterSuite extends AsyncFunSuite {
 
@@ -159,7 +154,6 @@ class AsyncOuterSuite extends AsyncFunSuite {
   }
 }
 
-/** A suite whose `beforeAll` runs a `HelperSuite` with a reporter that drops every event. */
 @DoNotDiscover
 class SetupSuite extends AnyFunSuite with BeforeAndAfterAll {
 
@@ -181,7 +175,7 @@ class SetupSuite extends AnyFunSuite with BeforeAndAfterAll {
   }
 }
 
-/** Runs its first nested suite twice, and its second never, sending no event for them. */
+// Sends no event for the nested suite it runs.
 @DoNotDiscover
 class RunsItsFirstNestedSuiteTwice extends Suites(new Inner1Suite, new Inner2Suite) {
 
@@ -192,14 +186,13 @@ class RunsItsFirstNestedSuiteTwice extends Suites(new Inner1Suite, new Inner2Sui
   }
 }
 
-/** Runs each of its nested suites itself, sending no event for them. */
+// Sends no event for the nested suites it runs.
 @DoNotDiscover
 class RunsItsNestedSuites extends Suites(new Inner1Suite, new Inner2Suite) {
 
   override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.map(_.run(None, args)).toSet)
 }
 
-/** A suite whose one test is named by the mode it is constructed with. */
 @DoNotDiscover
 class ModeSuite(mode: String) extends AnyFunSuite {
 
@@ -208,14 +201,13 @@ class ModeSuite(mode: String) extends AnyFunSuite {
   }
 }
 
-/** Runs its two nested suites, which share a suite ID, itself and in reverse order, sending no event for them. */
+// Its nested suites share a suite ID. It sends no event for them.
 @DoNotDiscover
 class PairSuites extends Suites(new ModeSuite("fast"), new ModeSuite("slow")) {
 
   override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.reverse.map(_.run(None, args)).toSet)
 }
 
-/** Runs test `a` twice, and no other test. */
 @DoNotDiscover
 class TwiceRunPlainSuite extends PlainSuite {
 
@@ -226,21 +218,15 @@ class TwiceRunPlainSuite extends PlainSuite {
   }
 }
 
-/** The `Args` a suite's `run` was given, which a test sends a message to. */
 final class ArgsOfRun {
 
   @volatile private var kept = Option.empty[Args]
 
   def keep(args: Args): Unit = kept = Some(args)
 
-  /** Sends the reporter of the kept `Args` an `InfoProvided` with message `direct`. */
-  def sendDirect(nameInfo: Option[NameInfo]): Unit = kept.foreach(args => args.reporter(InfoProvided(args.tracker.nextOrdinal(), "direct", nameInfo)))
+  def sendToReporterOfRun(nameInfo: Option[NameInfo]): Unit = kept.foreach(args => args.reporter(InfoProvided(args.tracker.nextOrdinal(), "direct", nameInfo)))
 }
 
-/**
- * A suite whose `run` keeps its `Args`, and whose test `t` sends a message straight to a reporter: the one its own
- * `run` was given, or the one `sentTo` was given.
- */
 abstract class DirectSuite(sentTo: Option[ArgsOfRun], naming: DirectSuite.Naming) extends AnyFunSuite {
 
   protected val argsOfRun = new ArgsOfRun
@@ -258,12 +244,11 @@ abstract class DirectSuite(sentTo: Option[ArgsOfRun], naming: DirectSuite.Naming
     }
   }
 
-  protected def sendDirect(): Unit = sentTo.getOrElse(argsOfRun).sendDirect(nameInfo)
+  protected def sendToReporterOfRun(): Unit = sentTo.getOrElse(argsOfRun).sendToReporterOfRun(nameInfo)
 }
 
 object DirectSuite {
 
-  /** What the message's `nameInfo` names. */
   enum Naming {
     case Nothing
     case ItsSuite
@@ -271,11 +256,10 @@ object DirectSuite {
   }
 }
 
-/** A suite whose test `t` sends a message straight to a reporter, then succeeds. */
 abstract class SendsInItsTest(sentTo: Option[ArgsOfRun], naming: DirectSuite.Naming) extends DirectSuite(sentTo, naming) {
 
   test("t") {
-    sendDirect()
+    sendToReporterOfRun()
     succeed
   }
 }
@@ -289,7 +273,6 @@ class DirectNamingItsSuite extends SendsInItsTest(None, DirectSuite.Naming.ItsSu
 @DoNotDiscover
 class DirectNamingItsTest extends SendsInItsTest(None, DirectSuite.Naming.ItsTest)
 
-/** A suite nesting one whose test sends its message to the reporter this suite's `run` was given. */
 abstract class DirectSuites(argsOfRun: ArgsOfRun, nested: Suite) extends Suites(nested) {
 
   override def run(testName: Option[String], args: Args): Status = {
@@ -314,7 +297,6 @@ class DirectSuitesNamingTheTest(argsOfRun: ArgsOfRun) extends DirectSuites(argsO
   def this() = this(new ArgsOfRun)
 }
 
-/** Runs test `t` twice. The test sends its message, naming itself, only the second time it runs. */
 @DoNotDiscover
 class DirectNamingItsSecondRun extends DirectSuite(None, DirectSuite.Naming.ItsTest) {
 
@@ -332,19 +314,18 @@ class DirectNamingItsSecondRun extends DirectSuite(None, DirectSuite.Naming.ItsT
 
   test("t") {
     if (runs == 2) {
-      sendDirect()
+      sendToReporterOfRun()
     }
     succeed
   }
 }
 
-/** Sends a message naming test `t` after its tests have run. */
 @DoNotDiscover
 class DirectNamingItsTestAfterRun extends DirectSuite(None, DirectSuite.Naming.ItsTest) {
 
   override def run(testName: Option[String], args: Args): Status = {
     val status = super.run(testName, args)
-    sendDirect()
+    sendToReporterOfRun()
     status
   }
 
