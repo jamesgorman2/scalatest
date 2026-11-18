@@ -100,6 +100,7 @@ private[consolidation] object JsonOutputWriter {
     val startedAt = execution.opening.map(_.timeStamp)
     val endedAt = execution.closing.map(_.timeStamp).orElse(execution.abortedAt)
     val threadName = threadNameOf(node, execution)
+    val ending = execution.ending.map(EndingReport.of)
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text(kindOf(node))),
@@ -109,8 +110,8 @@ private[consolidation] object JsonOutputWriter {
         "location" -> locationOf(node, execution),
         "outcome" -> execution.outcome.map(outcome => JsonValue.Text(outcomeText(outcome))),
         "reason" -> execution.outcome.filter(_ == NodeOutcome.NotRun).map(_ => JsonValue.Text("notRun")),
-        "message" -> execution.ending.map(ending => JsonValue.Text(messageOf(ending))),
-        "throwable" -> execution.ending.flatMap(throwableOf).map(throwableRecord),
+        "message" -> ending.map(report => JsonValue.Text(report.message)),
+        "throwable" -> ending.flatMap(_.throwable).map(throwableRecord),
         "startedAt" -> startedAt.map(JsonValue.Integer(_)),
         "endedAt" -> endedAt.map(JsonValue.Integer(_)),
         "duration" -> durationOf(node, execution, startedAt, endedAt).map(JsonValue.Integer(_)),
@@ -173,21 +174,18 @@ private[consolidation] object JsonOutputWriter {
       case NodeOutcome.Aborted | NodeOutcome.NotRun => "aborted"
     }
 
-  private def messageOf(ending: DecodedEvent): String =
-    ending match {
-      case failed: DecodedEvent.TestFailed => failed.message
-      case canceled: DecodedEvent.TestCanceled => canceled.message
-      case aborted: DecodedEvent.SuiteAborted => aborted.message
-      case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a message")
-    }
+  private final case class EndingReport(message: String, throwable: Option[DecodedThrowable])
 
-  private def throwableOf(ending: DecodedEvent): Option[DecodedThrowable] =
-    ending match {
-      case failed: DecodedEvent.TestFailed => failed.throwable
-      case canceled: DecodedEvent.TestCanceled => canceled.throwable
-      case aborted: DecodedEvent.SuiteAborted => aborted.throwable
-      case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a throwable")
-    }
+  private object EndingReport {
+
+    def of(ending: DecodedEvent): EndingReport =
+      ending match {
+        case failed: DecodedEvent.TestFailed => EndingReport(failed.message, failed.throwable)
+        case canceled: DecodedEvent.TestCanceled => EndingReport(canceled.message, canceled.throwable)
+        case aborted: DecodedEvent.SuiteAborted => EndingReport(aborted.message, aborted.throwable)
+        case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a message")
+      }
+  }
 
   // Where an opening event's location is `SeeStackDepthException`, which defers to the throwable, the closing event's location is used.
   private def scopeOrTestLocation(node: StructureNode, execution: AssembledExecution): Option[Location] = {
@@ -312,13 +310,25 @@ private[consolidation] object JsonOutputWriter {
       }
   }
 
+  private enum ThrowableLink {
+    case Cause
+    case Suppressed
+  }
+
+  /** Where a throwable hangs in its record: the index of its parent's entry, and whether it is that throwable's cause or one of its suppressed throwables. */
+  private final case class ThrowableParent(entryIndex: Int, link: ThrowableLink)
+
+  private final case class ThrowableVisit(throwable: DecodedThrowable, parent: Option[ThrowableParent]) {
+
+    def isLinkedAs(link: ThrowableLink): Boolean = parent.exists(_.link == link)
+  }
+
   private enum ThrowableEntry {
-    case Recorded(id: Int, throwable: DecodedThrowable)
+    case Recorded(id: Int)
     case Ref(id: Int)
   }
 
-  /** A throwable reached while building a record, with the index of its parent entry and whether it is that entry's cause or one of its suppressed throwables. */
-  private final case class ThrowableVisit(throwable: DecodedThrowable, parent: Option[Int], isCause: Boolean)
+  private final case class VisitedThrowable(visit: ThrowableVisit, entry: ThrowableEntry)
 
   // Builds the record in two passes. Neither recurses, so a cause chain too long to recurse over is still written.
   //   1. Visit the throwables depth-first, cause before suppressed. A throwable seen for the first time, by identity, gets the
@@ -326,36 +336,35 @@ private[consolidation] object JsonOutputWriter {
   //   2. Build the record from the last entry back to the first.
   private def throwableRecord(throwable: DecodedThrowable): JsonValue = {
     val ids = new IdentityHashMap[DecodedThrowable, Int]
-    val entries = Vector.newBuilder[(ThrowableVisit, ThrowableEntry)]
+    val entries = Vector.newBuilder[VisitedThrowable]
     var entryCount = 0
-    var pending = List(ThrowableVisit(throwable, None, isCause = false))
+    var pending = List(ThrowableVisit(throwable, None))
     while (pending.nonEmpty) {
       val visit = pending.head
       pending = pending.tail
       if (ids.containsKey(visit.throwable)) {
-        entries += visit -> ThrowableEntry.Ref(ids.get(visit.throwable))
+        entries += VisitedThrowable(visit, ThrowableEntry.Ref(ids.get(visit.throwable)))
       } else {
         val id = ids.size + 1
         ids.put(visit.throwable, id)
-        entries += visit -> ThrowableEntry.Recorded(id, visit.throwable)
-        val linked = visit.throwable.cause.map(ThrowableVisit(_, Some(entryCount), isCause = true)).toList :::
-          visit.throwable.suppressed.toList.map(ThrowableVisit(_, Some(entryCount), isCause = false))
+        entries += VisitedThrowable(visit, ThrowableEntry.Recorded(id))
+        val linked = visit.throwable.cause.map(ThrowableVisit(_, Some(ThrowableParent(entryCount, ThrowableLink.Cause)))).toList :::
+          visit.throwable.suppressed.toList.map(ThrowableVisit(_, Some(ThrowableParent(entryCount, ThrowableLink.Suppressed))))
         pending = linked ::: pending
       }
       entryCount += 1
     }
     val visited = entries.result()
-    val linkedByParent = visited.indices.groupBy(index => visited(index)._1.parent)
+    val linkedByParent = visited.indices.groupBy(index => visited(index).visit.parent.map(_.entryIndex))
     val written = new Array[JsonValue](visited.size)
     visited.indices.reverse.foreach { index =>
-      val linked = linkedByParent.getOrElse(Some(index), Vector.empty).map(linkedIndex => (visited(linkedIndex)._1.isCause, written(linkedIndex)))
-      written(index) = visited(index)._2 match {
+      val linked = linkedByParent.getOrElse(Some(index), Vector.empty)
+      def recordsLinkedAs(link: ThrowableLink): Vector[JsonValue] = linked.filter(visited(_).visit.isLinkedAs(link)).map(written(_)).toVector
+      written(index) = visited(index).entry match {
         case ThrowableEntry.Ref(id) =>
           objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong))))
-        case ThrowableEntry.Recorded(id, recorded) =>
-          val cause = linked.collectFirst { case (true, causeRecord) => causeRecord }
-          val suppressed = linked.collect { case (false, suppressedRecord) => suppressedRecord }.toVector
-          throwableObject(id, recorded, cause, suppressed)
+        case ThrowableEntry.Recorded(id) =>
+          throwableObject(id, visited(index).visit.throwable, recordsLinkedAs(ThrowableLink.Cause).headOption, recordsLinkedAs(ThrowableLink.Suppressed))
       }
     }
     written(0)

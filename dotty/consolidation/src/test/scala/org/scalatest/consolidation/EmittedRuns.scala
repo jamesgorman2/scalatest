@@ -41,23 +41,11 @@ private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns &
   /** The human-readable output's lines, with colour on, less the summary line. */
   def colourMarkedTreeLinesFrom(eventLog: Vector[String]): Vector[String] = {
     val output = new OutputSink
-    val consolidation = Consolidation.start(output, coloured = true)
-    val feed = consolidation.addRun(moduleLabel)
-    eventLog.foreach(line => feed.add(decoded(line)))
-    feed.endEventStream()
-    consolidation.end()
+    consolidateRun(Consolidation.start(output, coloured = true), eventLog.map(decoded))
     output.linesWithoutSummaryLine.map(ConsolidatedRuns.withColoursMarked)
   }
 
-  def jsonOutputOfEventLog(eventLog: Vector[String]): JsonSink = {
-    val json = new JsonSink
-    val consolidation = startedWithoutMill(json)
-    val feed = consolidation.addRun(moduleLabel)
-    eventLog.foreach(line => feed.add(decoded(line)))
-    feed.endEventStream()
-    consolidation.end()
-    json
-  }
+  def jsonOutputOfEventLog(eventLog: Vector[String]): JsonSink = jsonOutputOfRunEvents(eventLog.map(decoded))
 
   private def decoded(line: String): RunEvent = RunEvent.decode(line).fold(reason => fail(s"$reason, in $line"), identity)
 }

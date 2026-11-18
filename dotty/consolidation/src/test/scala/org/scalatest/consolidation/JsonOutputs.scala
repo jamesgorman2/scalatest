@@ -71,13 +71,13 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     TestRunBuilder.build(TestRunPart.Events(eventLog)).fold(fail(_), _.events.map(_.event))
 
   /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the events. */
-  def jsonOutputOfEvents(events: Vector[TestEventLogEvent]): JsonSink = {
+  def jsonOutputOfEvents(events: Vector[TestEventLogEvent]): JsonSink =
+    jsonOutputOfRunEvents(events.map(event => RunEvent.of(event).fold(fail(_), identity)))
+
+  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the run events. */
+  def jsonOutputOfRunEvents(events: Vector[RunEvent]): JsonSink = {
     val json = new JsonSink
-    val consolidation = startedWithoutMill(json)
-    val feed = consolidation.addRun(moduleLabel)
-    events.foreach(event => feed.add(RunEvent.of(event).fold(fail(_), identity)))
-    feed.endEventStream()
-    consolidation.end()
+    consolidateRun(startedWithoutMill(json), events)
     json
   }
 

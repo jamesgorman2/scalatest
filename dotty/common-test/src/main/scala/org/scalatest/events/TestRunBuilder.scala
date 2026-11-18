@@ -179,7 +179,9 @@ private final class RunUnderConstruction {
   }
 
   /** The structure's suite, and whether an earlier structure held it. */
-  private def rootSuite(block: NotationLine.Structure): (HeldSuite, Boolean) = {
+  private final case class StructureRoot(suite: HeldSuite, isFurther: Boolean)
+
+  private def structureRootOf(block: NotationLine.Structure): StructureRoot = {
     val (written, text) = block.tree.headOption match {
       case Some(TreeLine(1, suite: WrittenNode.Suite, text)) => (suite, text)
       case _ => fail(s"a structure starts with its suite, indented 2 spaces:\n${block.text}")
@@ -205,19 +207,20 @@ private final class RunUnderConstruction {
           fail(s"a further structure holds its suite's scopes and tests only, not '$nested'")
         }
         hold(suite.id, NodeKind.Suite, written.name, suite.parent)
-        (suite, true)
-      case None => (newSuite(written, parent, None, text), false)
+        StructureRoot(suite, isFurther = true)
+      case None => StructureRoot(newSuite(written, parent, None, text), isFurther = false)
     }
   }
 
   private def structureNodes(block: NotationLine.Structure): Vector[StructureNode] = {
-    val (root, isFurther) = rootSuite(block)
+    val structureRoot = structureRootOf(block)
+    val root = structureRoot.suite
     val built = Vector.newBuilder[StructureNode]
     built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, root.className)
     val testNames = mutable.Set.empty[(NodeId, String)]
-    val openRoot = new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty, if (isFurther) root.firstPositionOfScopesAndTests else 0)
+    val openRoot = new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty, if (structureRoot.isFurther) root.firstPositionOfScopesAndTests else 0)
     val suitesFirstHeld = mutable.ArrayBuffer.empty[(HeldSuite, OpenTreeNode)]
-    if (!isFurther) {
+    if (!structureRoot.isFurther) {
       suitesFirstHeld += root -> openRoot
     }
     var open = List(openRoot)
