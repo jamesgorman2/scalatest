@@ -115,8 +115,8 @@ private[scalatest] object ScopeAndTestIds {
  * @param emitter the emitter under whose lock the table is read and written once it is shared
  * @param parent the node it sits under, if any: its parent suite's node, or one of that suite's tests
  * @param position its place among that node's children, if it has one: a nested suite node added after its parent's first structure has none
- * @param firstPositionOfScopesAndTests the position every structure of the suite gives its first scope or test: after the
- *        nested suites its first structure placed before them
+ * @param firstPositionOfScopesAndTests the position of the suite's first scope or test in every structure: 0 where the first
+ *        structure places them before the nested suites, otherwise after the nested suites
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
  */
@@ -235,8 +235,8 @@ private[scalatest] final class SuiteNodeTable(
 
   /**
    * Makes `scopesAndTests` the suite's latest structure. Returns the nodes of the further `structure` event that holds
-   * them: the suite, then its scopes and tests, positioned as the first structure positions them, so that a scope or
-   * test keeps one numbering beside the nested suites the further structure leaves out.
+   * them: the suite, then its scopes and tests, numbered from the first structure's first scope or test position, so that they
+   * keep their place beside the nested suites the further structure leaves out.
    */
   def replaceLatestStructure(scopesAndTests: List[ScopeOrTest]): Vector[StructureNode] = {
     emitter.assertLockHeld()

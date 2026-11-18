@@ -681,7 +681,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
-      "position a nested suite's further structure after the suites that nested suite nests" in {
+      "position the scopes and tests of a nested suite's further structure after the suites it nests" in {
         val outer = id(suiteAt("samples.OuterSuite"))
         val inner = under(outer, suiteAt("samples.InnerSuite"))
 

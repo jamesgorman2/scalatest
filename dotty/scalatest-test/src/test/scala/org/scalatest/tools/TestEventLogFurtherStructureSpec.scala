@@ -982,8 +982,8 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       "an AnyFunSuite mixing in OneInstancePerTest, nesting two suites, declaring tests a and b, and tests c and b in " +
         "each instance built after a has run",
       "samples.ReplacesARanTestNestingSuitesSuite",
-      "the structure placing the nested suites before a and b, a's events, then a further structure positioning c and b " +
-        "after the nested suites, as the first structure positions a and b, before b's events",
+      "the structure placing the nested suites before a and b, then a's events, then a further structure giving c and b " +
+        "the positions of a and b, then b's events",
       replacesARanTestNestingSuitesSuite,
       eventLogIsOnlyTheStated = false,
       structures = Some(2)

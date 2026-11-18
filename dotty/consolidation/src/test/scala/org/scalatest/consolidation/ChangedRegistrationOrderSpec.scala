@@ -15,7 +15,7 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
 
   Feature("A suite's scopes and tests keep one order whether or not the suite nests suites") {
 
-    Scenario("A test a later registration drops follows the test that registration holds in its place, in a suite nesting no suite") {
+    Scenario("A test a later registration drops follows the test registered in its place, in a suite that nests no suite") {
       Given("a suite mixing in OneInstancePerTest that registers tests a and b, and tests c and b in each instance built after a has run")
       And("the suite runs through `Framework`, writing the run's test event log")
       val eventLog = eventLogOfFrameworkRun(classOf[samples.ReplacesARanTestSuite].getName)
@@ -36,8 +36,8 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
       kindsAndNamesOf(json.node("suite", "ReplacesARanTestSuite")("contents")) shouldBe Vector(testNamed("c"), testNamed("a"), testNamed("b"))
     }
 
-    Scenario("A test a later registration drops follows the test that registration holds in its place, in a suite nesting two suites") {
-      Given("the same suite nesting suites FirstNestedSuite and SecondNestedSuite, which run before its tests")
+    Scenario("A test a later registration drops follows the test registered in its place, in a suite that nests two suites") {
+      Given("the same suite nesting suites FirstNestedSuite and SecondNestedSuite")
       And("the suite runs through `Framework`, writing the run's test event log")
       val eventLog = eventLogOfFrameworkRun(classOf[samples.ReplacesARanTestNestingSuitesSuite].getName)
 
@@ -45,7 +45,7 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
       val humanReadable = colourMarkedTreeLinesFrom(eventLog)
       val json = jsonOutputOfEventLog(eventLog)
 
-      Then("the human-readable output shows the nested suites where they were declared, then c, not run, then a, then b")
+      Then("the human-readable output shows the nested suites, then c, not run, then a, then b")
       humanReadable.mkString("\n") shouldBe
         """{cyan}[core.test]{reset}
           |  {green}ReplacesARanTestNestingSuitesSuite:{reset}

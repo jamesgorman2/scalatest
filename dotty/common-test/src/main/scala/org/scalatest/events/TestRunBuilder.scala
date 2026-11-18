@@ -106,7 +106,7 @@ private final class OpenTreeNode(
     position
   }
 
-  /** Where the node has no scope or test, the position one would take after its suites. */
+  /** The position of the node's first scope or test; where it has none, the position after its nested suites. */
   def firstPositionOfScopesAndTests: Int = positionOfFirstScopeOrTest.getOrElse(positionOfNextChild)
 
   def nextIndexOfScopeNamed(name: String): Int = {
