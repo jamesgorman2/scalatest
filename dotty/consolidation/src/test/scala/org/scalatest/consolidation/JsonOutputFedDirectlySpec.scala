@@ -40,7 +40,7 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
 
-      And("the library is given, as output and a failure of the root, the line `discovering\\n` captured from stderr and the failure `Discovery failed`")
+      And("the root is given the stderr line `discovering\\n` as output and `Discovery failed` as a failure")
       consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
       consolidation.addRootFailure("Discovery failed")
 

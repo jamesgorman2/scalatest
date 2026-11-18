@@ -2,7 +2,7 @@
 
 Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
-## The root holds each failure attached to it as an item `{ "message" }` of `failures`, in the order attached, beside `outcome` `aborted`.
+## The root's failures are a `failures` array of `{ "message" }` objects, beside `outcome`.
 
 **Alternatives**
 
@@ -18,7 +18,7 @@ Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
 ---
 
-## A run node is identified by `number`, its place from 1 among its module's runs in the order they were added, unique only within its module.
+## A run node is identified by `number`, its 1-based position among its module's runs, unique only within its module.
 
 **Alternatives**
 
@@ -33,7 +33,7 @@ Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
 ---
 
-## The root names the release as `scalaTestVersion`, the build tool as `buildTool` `{ "name", "version" }`, and each module selector as `moduleSelectors` `{ "selector", "modules" }`; a module is named by `name`.
+## The root names the release, build tool and module selectors `scalaTestVersion`, `buildTool` and `moduleSelectors`; a module is named by `name`.
 
 **Alternatives**
 

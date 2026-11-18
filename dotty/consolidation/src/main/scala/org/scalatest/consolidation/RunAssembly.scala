@@ -358,9 +358,10 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
 
   private def executionsOf(id: NodeId): Vector[RecordedExecution] = executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
 
-  // An event assigned to the run rather than to a node records the run's own state where it is a run or discovery
-  // event, and is the run's output where it is a message. Any other, such as a `DiscoverySuite`'s events, which the
-  // emitter assigns to the run, is dropped. The first of each kind of run or discovery event is kept.
+  // An event assigned to the run rather than to a node is handled by kind:
+  // - a run or discovery event records the run's own state; only the first of each kind is kept;
+  // - a message is added to the run's output;
+  // - any other event, such as a `DiscoverySuite`'s events (which the emitter assigns to the run), is dropped.
   private def addToRun(event: DecodedEvent): Unit =
     event match {
       case started: DecodedEvent.RunStarting =>
