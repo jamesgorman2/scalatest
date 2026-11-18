@@ -8,7 +8,10 @@ import java.nio.file.Path
 import scala.util.Try
 import scala.util.Using
 
-/** The file `-fJ` names, which holds either this test command's JSON output or nothing. */
+/**
+ * The file `-fJ` names, which holds either this test command's JSON output or nothing, unless the delete after a failed
+ * write also fails.
+ */
 private[mill] final class JsonOutputFile(val path: Path) {
 
   /** A folder at the path is never deleted, nor anything in it. A path whose parent is not a folder holds nothing to delete. */
