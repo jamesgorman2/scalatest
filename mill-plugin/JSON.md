@@ -7,6 +7,7 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Encoding
 
 - The file holds one JSON object, the root, as RFC 8259 defines it, encoded in UTF-8.
+- A key is always present unless this document states when it is absent.
 - A key whose value is absent is left out. `null` is never written. An empty string is written `""`.
 - Keys are written in the order this document lists them.
 - `startedAt`, `endedAt` and a message's `at` are in epoch milliseconds. `duration` is in milliseconds.
@@ -15,7 +16,7 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Tree
 
 - The root holds one module.
-- The module holds one run node: the run of its tests in a forked JVM.
+- The module holds at most one run node: the run of its tests in a forked JVM. It holds none where the worker wrote no test event log, as where its JVM failed to start or exited before its run began. The module's `contents` is then `[]`, the worker's captured output is not written, and the test command fails. The root has `failures` then only where starting the worker threw.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
 - Every node states its `kind`.
 - A suite, scope or test that ran more than once is one node for each time it ran.
@@ -23,8 +24,10 @@ The format carries no compatibility promise across releases of this fork: any re
 Children of a suite, scope or test appear in this order:
 
 1. Children whose place in the declaration is known, in declared order.
-2. The remaining children, which are suites, in ascending order by name.
-3. Children that share a declared place or a name appear in the order they started, followed by those that never started.
+   - Scopes and tests that share a declared place, as where a suite's declaration changed between its runs, appear in this order: those the suite's latest run declared, then those only earlier runs declared; within each, in the order the run first reported them.
+   - A suite with no declared place that shares a suite ID with a suite of this group appears directly after the last suite with that suite ID. Several such suites appear in the order the run first reported them.
+2. The remaining children, which are suites, in ascending order by name. Suites that share a name appear in the order they started, followed by those that never started.
+3. The nodes of one suite, scope or test that ran more than once appear in the order they started.
 
 A run node's top-level suites appear in ascending order by name; suites that share a name appear in the order they started, followed by those that never started. Names are compared as Java's `String.compareTo` compares them.
 
@@ -35,11 +38,11 @@ No node's outcome is rolled up from its children. Roll up outcomes yourself.
 Keys, in order:
 
 - `kind` — `root`.
-- `scalaTestVersion` — the release of this fork that wrote the output, such as `3.2.20`. Always present.
+- `scalaTestVersion` — the release of this fork that wrote the output, such as `3.2.20`.
 - `buildTool` — `{ "name", "version" }`: `Mill` and the version of Mill that ran the test command.
-- `moduleSelectors` — always present: the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
+- `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, present only where `failures` is.
-- `failures` — `[{ "message" }]`: each failure that is not a run's, in the order it occurred: the test worker failing to start, or its test event log failing to be read. Absent where there is none.
+- `failures` — `[{ "message" }]`: the failures that are not a run's, in this order: the test worker failing to start, and its test event log failing to be read. Absent where there is none.
 - `startedAt`, `endedAt`, `duration` — the test command's start, end and duration, measured by the test command.
 - `contents` — the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.
@@ -51,26 +54,28 @@ Keys, in order:
 - `kind` — `module`.
 - `name` — the module's Mill path, such as `core.test`.
 - `startedAt`, `endedAt`, `duration` — the module's start, end and duration, measured by the test command.
-- `contents` — the module's run node.
+- `contents` — the module's run node, or `[]` where it has none (§ Tree).
 
 ## Run node
 
 Keys, in order:
 
 - `kind` — `run`.
-- `number` — `1`, the run's number within its module. Always present.
+- `number` — `1`, the run's number within its module.
 - `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.
 - `configMap` — the run's config map, as an object of each value's `toString`, with keys in ascending order.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s time and `DiscoveryCompleted`'s duration. Absent unless the run reported both events. `duration` is absent where `DiscoveryCompleted` carries none.
-- `outcome` — `aborted` or `stopped`. Absent where the run completed.
+- `outcome` — `aborted` or `stopped`, from the run's end as its test event log records it. Absent where the run completed, or where the log does not record the run's end.
 - `message`, `throwable` — the `message` and `throwable` (§ Throwables) of the run's `RunAborted`. Absent where the run did not abort. `throwable` is also absent where `RunAborted` carries none.
 - `startedAt` — `RunStarting`'s time.
-- `endedAt`, `duration` — those of the run's `RunCompleted`, `RunStopped` or `RunAborted`.
-- `summary` — that event's summary: `testsSucceededCount`, `testsFailedCount`, `testsIgnoredCount`, `testsPendingCount`, `testsCanceledCount`, `suitesCompletedCount`, `suitesAbortedCount`, `scopesPendingCount`.
-- `contents` — the run's top-level suites (§ Tree).
-- `output` — the messages sent outside any suite (§ Messages) and the output captured from the run's process (§ Captured output), in one sequence, in the order they occurred. Absent where there is none.
+- `endedAt`, `duration` — those of the run's `RunCompleted`, `RunStopped` or `RunAborted`. `duration` is absent where that event carries none.
+- `summary` — that event's summary: `testsSucceededCount`, `testsFailedCount`, `testsIgnoredCount`, `testsPendingCount`, `testsCanceledCount`, `suitesCompletedCount`, `suitesAbortedCount`, `scopesPendingCount`. Absent where that event carries none.
+- `contents` — the run's top-level suites (§ Tree), `[]` when empty.
+- `output` — the messages sent outside any suite (§ Messages) and the output captured from the run's process (§ Captured output), in one sequence, in the order the test command received them. Lines captured before the run's test event log appeared come first. Absent where there is none.
 
 A key is absent where the run never reported the event that supplies it.
+
+A run's test event log can end before it records the run's end, as when the worker's JVM dies. The run node then has no `outcome`, though the run did not complete, and the suites, scopes and tests the run left open have no `outcome` either. The test command fails. Such a run node has no `endedAt` unless the log recorded the run's `RunCompleted`, `RunStopped` or `RunAborted`; every run node without `endedAt` is such a run.
 
 ## Suite, scope and test
 
@@ -80,15 +85,15 @@ Keys, in order:
 - `name` — the node's own name, never a joined name. In `"A" when { "b" should { "c" in { … } } }`, the names are `A`, `b` and `c`. A suite's name is its suite name. In a suite mixing in a ScalaTest style trait (one in `org.scalatest.funsuite`, `flatspec`, `funspec`, `wordspec`, `freespec`, `propspec`, `featurespec` or `refspec`, async and fixture variants included), a scope's or test's name is the name it was registered with. In any other suite, a test's name is its entry in the suite's `testNames`.
 - `label` — scopes and tests only: the line the human-readable output shows for the node, without indentation. In the example above, `A`, `when b` and `- should c`. In a suite mixing in no style trait, a test's label is `- ` followed by its name.
 - `suiteId` — suites only.
-- `location` — § Locations. A scope's comes from its `ScopeOpened`. A test's comes from its `TestStarting`, else from the event that closed it. A suite's holds its class name in `className`, plus `filePath` or `fileName` where every location of its own scopes and tests names the same file; it never holds a `lineNumber`.
-- `outcome` — a test's is `succeeded`, `failed`, `canceled`, `ignored`, `pending` or `aborted`; a scope's `pending` or `aborted`; a suite's `aborted`. Absent where the node has none, as on a suite that completed.
-- `reason` — `notRun`, only on a node aborted because its suite aborted before it started.
-- `message`, `throwable` — the `message` and `throwable` (§ Throwables) of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent on a node aborted without such an event of its own: a scope or test open when its suite aborted, or a node that never started.
-- `startedAt` — the time of the `SuiteStarting`, `ScopeOpened` or `TestStarting`. Absent on a node that never started, such as an ignored test.
-- `endedAt` — the time of the event that closed the node. For a node aborted without such an event of its own, the time of the `SuiteAborted` that aborted it. Absent on a node aborted with reason `notRun`.
-- `duration` — a suite's or test's comes from the event that closed it, and is absent where that event carries none, as on an ignored test. A scope's, and that of a node aborted without such an event of its own, is `endedAt` less `startedAt`, absent unless both are present.
-- `threadName` — suites and tests only: the thread of the event that opened the node, else of the event that closed it.
-- `contents` — the node's children (§ Tree). Always present, `[]` when empty.
+- `location` — § Locations. A scope's comes from its `ScopeOpened`. A test's comes from its `TestStarting`, else from the event that closed it. A scope's or test's is absent where none of those events gives a location other than `SeeStackDepthException`. A suite's holds its class name in `className`, plus `filePath` or `fileName` where every location of its own scopes and tests names the same file; it never holds a `lineNumber`.
+- `outcome` — a test's is `succeeded`, `failed`, `canceled`, `ignored`, `pending` or `aborted`; a scope's `pending` or `aborted`; a suite's `aborted`. Absent where the node has none, as on a suite that completed, or on a node left open by a run whose end its test event log does not record (§ Run node).
+- `reason` — `notRun`, on a node that never started, other than an ignored test: no event reports it or any node below it. Examples are a suite scheduled but never started, and a scope or test its suite or run never reached. Its `outcome` is `aborted`.
+- `message`, `throwable` — the `message` and `throwable` (§ Throwables) of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent where no such event closed the node, as on an aborted node with no closing event of its own. `throwable` is also absent where that event carries none.
+- `startedAt` — the time of the `SuiteStarting`, `ScopeOpened` or `TestStarting`. Absent where the node has none, as on a node that never started or an ignored test.
+- `endedAt` — the time of the event that closed the node. For an aborted node without such an event of its own, the time of the `SuiteAborted` of the nearest suite above it that aborted, else of the run's `RunAborted`. Absent where there is none of these, as on a node with reason `notRun`, or on a node left open by a run that stopped or whose end its test event log does not record.
+- `duration` — a suite's or test's comes from the event that closed it, and is absent where that event carries none, as on an ignored test. A scope's, and that of a node without such an event of its own, is `endedAt` less `startedAt`, absent unless both are present.
+- `threadName` — suites and tests only: the thread of the event that opened the node, else of the event that closed it. Absent where the node has neither.
+- `contents` — the node's children (§ Tree), `[]` when empty.
 - `output` — the node's messages (§ Messages), in the order they were sent. Absent where there are none.
 
 ## Messages
@@ -119,8 +124,8 @@ A throwable is one object. Keys, in order:
 - `id` — an integer, numbered depth-first from 1 within one `throwable`, a cause before suppressed throwables.
 - `className`.
 - `message` — `getMessage`. Absent where it is `null`.
-- `location` — for a `StackDepthException`, such as `TestFailedException` or `TestCanceledException`: the failed code's file and line (§ Locations), each where known. Absent where neither is known.
-- `stackTrace` — for any other throwable: every frame, as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`. `fileName` is absent where unknown, `lineNumber` where negative, and `isNative` unless it is `true`.
+- `location` — for a throwable mixing in `org.scalatest.exceptions.StackDepth`, such as `TestFailedException` or `TestCanceledException`: the failed code's file and line (§ Locations), each where known. Absent for any other throwable, and where neither is known.
+- `stackTrace` — for a throwable not mixing in `StackDepth`: every frame, as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`. `fileName` is absent where unknown, `lineNumber` where negative, and `isNative` unless it is `true`.
 - `cause` — the cause, written the same way. Absent where there is none.
 - `suppressed` — the suppressed throwables, in order, each written the same way. Absent where there are none.
 
