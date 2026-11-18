@@ -681,6 +681,46 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
+      "position a nested suite's further structure after the suites that nested suite nests" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+        val inner = under(outer, suiteAt("samples.InnerSuite"))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              suite "InnerSuite", class "samples.InnerSuite"
+                suite "DeepSuite", class "samples.DeepSuite"
+                test "a", label "- a"
+          structure under suite "OuterSuite"
+            suite "InnerSuite", class "samples.InnerSuite"
+              test "c", label "- c"
+          """
+        ).last shouldBe Vector(
+          suite(inner, Some(outer), Some(0), "InnerSuite", "samples.InnerSuite", "samples.InnerSuite"),
+          test(under(inner, testAt("c")), inner, 1, "c", "- c")
+        )
+      }
+
+      "position a further structure's scopes and tests after every nested suite where the first structure held no scope or test" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              suite "InnerSuite", class "samples.InnerSuite"
+              suite "OtherSuite", class "samples.OtherSuite"
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              test "c", label "- c"
+          """
+        ).last shouldBe Vector(
+          suite(outer, None, None, "OuterSuite", "samples.OuterSuite", "samples.OuterSuite"),
+          test(under(outer, testAt("c")), outer, 2, "c", "- c")
+        )
+      }
+
       "give a suite added by a structure under a suite its parent's node path and no position" in {
         val outer = id(suiteAt("samples.OuterSuite"))
         val helper = under(outer, suiteAt("samples.HelperSuite"))
