@@ -27,7 +27,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
 
     Scenario("A failed assertion") {
       jsonOutputOfRow("failed-assertion", "an AnyFunSuite whose test adds, at line 7, asserts that 2 equals 3") { json =>
-        Then("test adds is failed, with the assertion's message and the failed code's location as its throwable's")
+        Then("test adds is failed with message 2 did not equal 3, and its throwable is a TestFailedException with that message, located at line 7")
         shouldHold(
           node(json, "test", "adds"),
           """
@@ -47,7 +47,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
     }
 
     Scenario("A canceled test") {
-      jsonOutputOfRow("canceled-test", "an AnyFunSuite whose test adds cancels with no database") { json =>
+      jsonOutputOfRow("canceled-test", "an AnyFunSuite whose test adds cancels with the message no database") { json =>
         val test = node(json, "test", "adds")
         Then("test adds is canceled, with the cancel's message")
         shouldHold(test, """{ "outcome": "canceled", "message": "no database" }""")
@@ -100,7 +100,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
     }
 
     Scenario("A suite aborted before its tests run") {
-      jsonOutputOfRow("aborted-suite", "an AnyFunSuite with BeforeAndAfterAll, whose beforeAll throws no fixture, and whose one test is adds") { json =>
+      jsonOutputOfRow("aborted-suite", "an AnyFunSuite with BeforeAndAfterAll, whose beforeAll throws IllegalStateException(\"no fixture\"), and whose one test is adds") { json =>
         Then("suite RowSuite is aborted, with the thrown exception as its throwable")
         val suite = node(json, "suite", "RowSuite")
         shouldHold(suite, """{ "outcome": "aborted" }""")
@@ -113,7 +113,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
     }
 
     Scenario("A nested suite") {
-      jsonOutputOfRow("nested-suite", "a Suites nesting InnerSuite", Some("InnerSuite, an AnyFunSuite not discovered, whose one test adds succeeds")) { json =>
+      jsonOutputOfRow("nested-suite", "a Suites nesting InnerSuite", Some("InnerSuite, an AnyFunSuite annotated @DoNotDiscover, whose one test adds succeeds")) { json =>
         Then("the run's contents is RowSuite, whose contents is InnerSuite, whose contents is test adds")
         val run = node(json, "run")
         names(contents(run)) shouldBe Seq("suite" -> "RowSuite")
@@ -124,7 +124,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
 
     Scenario("A test run twice") {
       jsonOutputOfRow("test-run-twice", "an AnyFunSuite whose runTest runs each test twice, and whose one test adds succeeds") { json =>
-        Then("the suite's contents is two succeeded tests adds, the first started no later than the second")
+        Then("the suite's contents is two tests adds, both succeeded, the first started no later than the second")
         val tests = contents(node(json, "suite", "RowSuite"))
         tests should have size 2
         tests.foreach(test => shouldHold(test, """{ "name": "adds", "outcome": "succeeded" }"""))
@@ -146,7 +146,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
     }
 
     Scenario("A message from another thread") {
-      jsonOutputOfRow("message-from-another-thread", "an AnyFunSuite whose test talks sends info away from another thread and waits for it") { json =>
+      jsonOutputOfRow("message-from-another-thread", "an AnyFunSuite whose test talks calls info(\"away\") on another thread and waits for it") { json =>
         Then("test talks's output is the message, with a thread other than the test's")
         val test = node(json, "test", "talks")
         val output = test("output").arr.toSeq

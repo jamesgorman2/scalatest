@@ -11,7 +11,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
   Feature("The root, the module and the run in the JSON output") {
 
     Scenario("One run of one suite") {
-      Given("CalculatorSuite, whose one test adds two numbers, registered at line 5, prints dividing now and succeeds")
+      Given("CalculatorSuite, whose one test, `adds two numbers`, registered at line 5, prints dividing now and succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("CalculatorSuite") { tester =>
         val json = jsonOutputOfTestCommand(tester)

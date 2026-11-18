@@ -51,7 +51,8 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
   Feature("The JSON output and the human-readable output hold one node tree") {
 
     Scenario("Walking both outputs") {
-      Given("suites holding a nested suite, scopes nested in scopes, a pending scope, tests of every outcome but aborted, and a suite wrapped by ConfigMapWrapperSuite whose scope's tests two instances register")
+      Given("suites holding a nested suite, scopes nested in scopes, a pending scope, and tests of every outcome except aborted")
+      And("a suite wrapped with ConfigMapWrapperSuite, holding a scope whose tests two instances of the suite register")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputTree { tester =>
         val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)

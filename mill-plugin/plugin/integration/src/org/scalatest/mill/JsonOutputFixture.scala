@@ -16,7 +16,7 @@ trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
   protected def withJsonOutputRow[A](row: String)(test: IntegrationTester => A): A =
     withSuiteFiles(tester => os.list(tester.workspacePath / "rows" / row))(test)
 
-  /** The module holds the suites of the folder `tree`, which between them hold every kind of node and outcome but aborted. */
+  /** The module holds the suites of the folder `tree`, which together hold every kind of node and every outcome except aborted. */
   protected def withJsonOutputTree[A](test: IntegrationTester => A): A =
     withSuiteFiles(tester => os.list(tester.workspacePath / "tree"))(test)
 
@@ -32,7 +32,7 @@ trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
 
   protected def jsonOutput(path: os.Path): ujson.Value = ujson.read(os.read(path))
 
-  /** Invokes the test command as `mill scalatest/test core.test -fJ <report>`, and parses the JSON output. */
+  /** Deletes any earlier report, invokes the test command as `mill scalatest/test core.test -fJ <report>`, and parses the JSON output it writes. */
   protected def jsonOutputOfTestCommand(tester: IntegrationTester): ujson.Value = {
     os.remove(report(tester))
     val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
@@ -68,7 +68,7 @@ trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
       JsonPattern.parse(pattern).mismatches(actual) shouldBe empty
     }
 
-  /** `pattern` is an object whose keys `actual` holds, in that order, each with a value matching in full. */
+  /** `actual` holds each key of the object `pattern`, in the pattern's order, with a value matching the pattern's in full; it may hold other keys. */
   protected def shouldHold(actual: ujson.Value, pattern: String): Unit =
     withClue(s"in ${ujson.write(actual, indent = 2)}\n") {
       JsonPattern.parse(pattern).mismatchesHeldBy(actual) shouldBe empty
