@@ -12,7 +12,7 @@ final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   Feature("Encoding of the JSON output") {
 
-    Scenario("Text is written verbatim, as UTF-8 JSON, with a lone surrogate escaped: a message holding characters JSON must escape") {
+    Scenario("Text is written verbatim, with a lone surrogate escaped: a message holding characters JSON must escape") {
       Given("a run of suite EscapeSuite whose test escapes calls info with a string holding characters JSON must escape and a lone surrogate")
       val events = eventsOf(
         """

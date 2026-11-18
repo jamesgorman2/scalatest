@@ -373,7 +373,10 @@ private[consolidation] object JsonOutputWriter {
     )
 
   private def failedCodeLocation(stackDepth: DecodedStackDepth): Option[JsonValue] = {
-    val fields = Vector[Field](fileField(stackDepth.fileName, stackDepth.filePathname),"lineNumber" -> stackDepth.lineNumber.map(line => JsonValue.Integer(line.toLong)))
+    val fields = Vector[Field](
+      fileField(stackDepth.fileName, stackDepth.filePathname),
+      "lineNumber" -> stackDepth.lineNumber.map(line => JsonValue.Integer(line.toLong))
+    )
     Option.when(fields.exists(_._2.nonEmpty))(objectOf(fields))
   }
 
