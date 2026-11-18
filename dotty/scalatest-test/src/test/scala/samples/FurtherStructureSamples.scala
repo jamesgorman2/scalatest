@@ -1,5 +1,6 @@
 package samples
 
+import java.util.concurrent.atomic.AtomicBoolean
 import org.scalatest.Args
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.ConfigMapWrapperSuite
@@ -197,3 +198,43 @@ class TagsOverrideSuite extends AnyFunSuite {
 
   override def tags: Map[String, Set[String]] = super.tags.updated("b", Set("samples.Slow"))
 }
+
+object ReplacesARanTestNestingSuitesSuite {
+  val ranA: AtomicBoolean = new AtomicBoolean
+}
+
+// Each test runs in an instance of its own. An instance built after test a has run registers test c in a's place, so
+// the instance that runs b registers c and b. A run of the whole suite forgets that a ran once the run completes.
+@DoNotDiscover
+class ReplacesARanTestNestingSuitesSuite extends AnyFunSuite with OneInstancePerTest {
+
+  if (ReplacesARanTestNestingSuitesSuite.ranA.get) {
+    test("c") {
+      succeed
+    }
+  } else {
+    test("a") {
+      ReplacesARanTestNestingSuitesSuite.ranA.set(true)
+    }
+  }
+
+  test("b") {
+    succeed
+  }
+
+  override val nestedSuites: IndexedSeq[Suite] = Vector(new FirstNestedSuite, new SecondNestedSuite)
+
+  override def run(testName: Option[String], args: Args): Status = {
+    val status = super.run(testName, args)
+    if (testName.isEmpty) {
+      status.whenCompleted(_ => ReplacesARanTestNestingSuitesSuite.ranA.set(false))
+    }
+    status
+  }
+}
+
+@DoNotDiscover
+class FirstNestedSuite extends AnyFunSuite
+
+@DoNotDiscover
+class SecondNestedSuite extends AnyFunSuite

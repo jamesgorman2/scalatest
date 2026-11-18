@@ -115,6 +115,8 @@ private[scalatest] object ScopeAndTestIds {
  * @param emitter the emitter under whose lock the table is read and written once it is shared
  * @param parent the node it sits under, if any: its parent suite's node, or one of that suite's tests
  * @param position its place among that node's children, if it has one: a nested suite node added after its parent's first structure has none
+ * @param firstPositionOfScopesAndTests the position every structure of the suite gives its first scope or test: after the
+ *        nested suites its first structure placed before them
  * @param firstScopesAndTests the scopes and tests of the suite's first structure
  * @param firstFilteredTests what the filter said of each test of the tree the first structure was read from, as `SuiteStructure.filteredTests` holds it
  */
@@ -127,6 +129,7 @@ private[scalatest] final class SuiteNodeTable(
   val parentSuite: Option[SuiteNodeTable],
   val parent: Option[NodeId],
   val position: Option[Int],
+  firstPositionOfScopesAndTests: Int,
   firstScopesAndTests: List[ScopeOrTest],
   firstIds: ScopeAndTestIds,
   firstFilteredTests: Map[String, (Boolean, Boolean)]
@@ -186,7 +189,7 @@ private[scalatest] final class SuiteNodeTable(
    */
   def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
     emitter.assertLockHeld()
-    val added = new SuiteNodeTable(emitter, id, name, suiteId, className, Some(this), Some(parentNode), None, Nil, ScopeAndTestIds.none, Map.empty)
+    val added = new SuiteNodeTable(emitter, id, name, suiteId, className, Some(this), Some(parentNode), None, 0, Nil, ScopeAndTestIds.none, Map.empty)
     nestedSuitesAdded :+= added
     added
   }
@@ -232,14 +235,15 @@ private[scalatest] final class SuiteNodeTable(
 
   /**
    * Makes `scopesAndTests` the suite's latest structure. Returns the nodes of the further `structure` event that holds
-   * them: the suite, then its scopes and tests, positioned from 0 among themselves.
+   * them: the suite, then its scopes and tests, positioned as the first structure positions them, so that a scope or
+   * test keeps one numbering beside the nested suites the further structure leaves out.
    */
   def replaceLatestStructure(scopesAndTests: List[ScopeOrTest]): Vector[StructureNode] = {
     emitter.assertLockHeld()
     val nodes = Vector.newBuilder[StructureNode]
     nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
     val added = new SuiteNodeTable.ScopesAndTests(ids, node, nodes)
-    added.add(scopesAndTests, node, 0, Nil)
+    added.add(scopesAndTests, node, firstPositionOfScopesAndTests, Nil)
     ids = added.ids
     scopesAndTestsOfLatest = scopesAndTests
     testNamesOfLatest = SuiteNodeTable.testNamesIn(scopesAndTests)
@@ -362,6 +366,7 @@ private[scalatest] object SuiteNodeTable {
       parentSuite,
       parentSuite.map(_.node),
       position,
+      firstPositionOfScopesAndTests,
       structure.scopesAndTests,
       scopesAndTests.ids,
       structure.filteredTests

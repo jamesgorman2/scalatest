@@ -321,6 +321,59 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
     )
   )
 
+  private val replacesARanTest = NodePath.topLevel("samples.ReplacesARanTestNestingSuitesSuite")
+
+  private val replacesARanTestNestingSuitesSuite = StatedRun(
+    Vector(
+      "RunStarting",
+      "SuiteStarting ReplacesARanTestNestingSuitesSuite",
+      "TestStarting a",
+      "TestSucceeded a",
+      "TestStarting b",
+      "TestSucceeded b",
+      "SuiteCompleted ReplacesARanTestNestingSuitesSuite",
+      "SuiteStarting FirstNestedSuite",
+      "SuiteCompleted FirstNestedSuite",
+      "SuiteStarting SecondNestedSuite",
+      "SuiteCompleted SecondNestedSuite",
+      "RunCompleted"
+    ),
+    """
+    structure
+      suite "ReplacesARanTestNestingSuitesSuite", class "samples.ReplacesARanTestNestingSuitesSuite"
+        suite "FirstNestedSuite", class "samples.FirstNestedSuite"
+        suite "SecondNestedSuite", class "samples.SecondNestedSuite"
+        test "a", label "- a"
+        test "b", label "- b"
+    test "a": TestStarting
+    test "a": TestSucceeded
+    structure
+      suite "ReplacesARanTestNestingSuitesSuite", class "samples.ReplacesARanTestNestingSuitesSuite"
+        test "c", label "- c"
+        test "b", label "- b"
+    test "b": TestStarting
+    test "b": TestSucceeded
+    """,
+    List(
+      TestEventLogLine.structure(
+        TestEventLogLine.topLevelSuite("ReplacesARanTestNestingSuitesSuite", "samples.ReplacesARanTestNestingSuitesSuite"),
+        TestEventLogLine.nestedSuite(replacesARanTest.suite("samples.FirstNestedSuite"), 0, "FirstNestedSuite", "samples.FirstNestedSuite"),
+        TestEventLogLine.nestedSuite(replacesARanTest.suite("samples.SecondNestedSuite"), 1, "SecondNestedSuite", "samples.SecondNestedSuite"),
+        TestEventLogLine.test(replacesARanTest.test("a"), replacesARanTest, 2, "a", "- a"),
+        TestEventLogLine.test(replacesARanTest.test("b"), replacesARanTest, 3, "b", "- b")
+      ),
+      nodeEvent(replacesARanTest.test("a"), List(1, 1), "TestStarting"),
+      nodeEvent(replacesARanTest.test("a"), List(1, 1), "TestSucceeded"),
+      TestEventLogLine.structure(
+        TestEventLogLine.topLevelSuite("ReplacesARanTestNestingSuitesSuite", "samples.ReplacesARanTestNestingSuitesSuite"),
+        TestEventLogLine.test(replacesARanTest.test("c"), replacesARanTest, 2, "c", "- c"),
+        TestEventLogLine.test(replacesARanTest.test("b"), replacesARanTest, 3, "b", "- b")
+      ),
+      nodeEvent(replacesARanTest.test("b"), List(1, 1), "TestStarting"),
+      nodeEvent(replacesARanTest.test("b"), List(1, 1), "TestSucceeded")
+    )
+  )
+
   private val tagsOverride = NodePath.topLevel("samples.TagsOverrideSuite")
 
   private val tagsOverrideSuite = StatedRun(
@@ -922,6 +975,18 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       oneInstancePerTestSuite,
       eventLogIsOnlyTheStated = false,
       structures = Some(1)
+    )
+
+    runAndDecoderScenarios(
+      "A later instance of a suite nesting suites registers a different tree from its first structure",
+      "an AnyFunSuite mixing in OneInstancePerTest, nesting two suites, declaring tests a and b, and tests c and b in " +
+        "each instance built after a has run",
+      "samples.ReplacesARanTestNestingSuitesSuite",
+      "the structure placing the nested suites before a and b, a's events, then a further structure positioning c and b " +
+        "after the nested suites, as the first structure positions a and b, before b's events",
+      replacesARanTestNestingSuitesSuite,
+      eventLogIsOnlyTheStated = false,
+      structures = Some(2)
     )
 
     runAndDecoderScenarios(

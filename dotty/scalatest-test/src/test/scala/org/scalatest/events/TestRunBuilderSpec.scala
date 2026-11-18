@@ -639,6 +639,48 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         )
       }
 
+      "position a further structure's scopes and tests after the nested suites the suite's first structure placed before them" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              suite "InnerSuite", class "samples.InnerSuite"
+              suite "OtherSuite", class "samples.OtherSuite"
+              test "a", label "- a"
+              test "b", label "- b"
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              test "c", label "- c"
+              test "b", label "- b"
+          """
+        ).last shouldBe Vector(
+          suite(outer, None, None, "OuterSuite", "samples.OuterSuite", "samples.OuterSuite"),
+          test(under(outer, testAt("c")), outer, 2, "c", "- c"),
+          test(under(outer, testAt("b")), outer, 3, "b", "- b")
+        )
+      }
+
+      "position a further structure's scopes and tests from 0 where the suite's first structure placed its nested suites after them" in {
+        val outer = id(suiteAt("samples.OuterSuite"))
+
+        structuresOf(
+          """
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              test "a", label "- a"
+              suite "InnerSuite", class "samples.InnerSuite"
+          structure
+            suite "OuterSuite", class "samples.OuterSuite"
+              test "c", label "- c"
+          """
+        ).last shouldBe Vector(
+          suite(outer, None, None, "OuterSuite", "samples.OuterSuite", "samples.OuterSuite"),
+          test(under(outer, testAt("c")), outer, 0, "c", "- c")
+        )
+      }
+
       "give a suite added by a structure under a suite its parent's node path and no position" in {
         val outer = id(suiteAt("samples.OuterSuite"))
         val helper = under(outer, suiteAt("samples.HelperSuite"))
