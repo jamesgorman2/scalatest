@@ -275,7 +275,7 @@ private[consolidation] object JsonOutputWriter {
       case RunOutput.Captured(line) => capturedOutputItem(line)
     }
 
-  // A message's thread is written only where it tells the reader something its node's does not.
+  // A message's thread name is written only where its node has none or a different one.
   private def messageItem(event: DecodedEvent, nodeThreadName: Option[String]): JsonValue = {
     val message = ProvidedMessage.of(event)
     objectOf(
@@ -316,12 +316,13 @@ private[consolidation] object JsonOutputWriter {
     case Ref(id: Int)
   }
 
-  /** A throwable met in its record, and the index of the entry whose cause or suppressed throwable it is. */
+  /** A throwable reached while building a record, with the index of its parent entry and whether it is that entry's cause or one of its suppressed throwables. */
   private final case class ThrowableVisit(throwable: DecodedThrowable, parent: Option[Int], isCause: Boolean)
 
-  // Visits the throwables of one record depth-first, cause before suppressed, giving each first met, by identity, the next id
-  // and each met again a ref; then builds the record from its last entry back. Neither pass recurses, so a cause chain too
-  // long to recurse over is still written.
+  // Builds the record in two passes. Neither recurses, so a cause chain too long to recurse over is still written.
+  //   1. Visit the throwables depth-first, cause before suppressed. A throwable seen for the first time, by identity, gets the
+  //      next id; one seen again becomes a ref.
+  //   2. Build the record from the last entry back to the first.
   private def throwableRecord(throwable: DecodedThrowable): JsonValue = {
     val ids = new IdentityHashMap[DecodedThrowable, Int]
     val entries = Vector.newBuilder[(ThrowableVisit, ThrowableEntry)]

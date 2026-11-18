@@ -261,7 +261,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
     }
 
     Scenario("A throwable holds its cause and its suppressed throwables, numbered depth-first") {
-      Given("a run of suite RowSuite whose test throws throws a RuntimeException `outer`, caused by an IOException `inner`, suppressing an IllegalStateException `closing`")
+      Given("a run of suite RowSuite whose test `throws` throws a RuntimeException `outer`, caused by an IOException `inner`, suppressing an IllegalStateException `closing`")
       val eventLog = rowSuiteWithTest(
         "throws",
         """TestFailed(throwable: java.lang.RuntimeException "outer" frames ["samples.RowSuite.throws(RowSuite.scala:9)"] suppressing [java.lang.IllegalStateException "closing" frames ["samples.RowSuite.close(RowSuite.scala:12)"]] caused by java.io.IOException "inner" frames ["samples.RowSuite.read(RowSuite.scala:15)"])"""
@@ -285,7 +285,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
     }
 
     Scenario("A throwable whose cause chain loops back to it ends the loop with a ref") {
-      Given("a run of suite RowSuite whose test loops throws b, a RuntimeException caused by a, whose cause is b")
+      Given("a run of suite RowSuite whose test `loops` throws RuntimeException `b`, caused by RuntimeException `a`, whose cause is `b`")
       val events = eventsOf(
         rowSuiteWithTest(
           "loops",
@@ -315,8 +315,8 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
     }
 
-    Scenario("A throwable with no message has no message key, and its frames hold no isNative false") {
-      Given("a run of suite RowSuite whose test throws throws `new RuntimeException()`")
+    Scenario("A throwable with no message has no message key, and a frame that is not native has no isNative key") {
+      Given("a run of suite RowSuite whose test `throws` throws `new RuntimeException()`")
       val eventLog = rowSuiteWithTest(
         "throws",
         """TestFailed(message: "java.lang.RuntimeException was thrown.", throwable: java.lang.RuntimeException null frames ["samples.RowSuite.throws(RowSuite.scala:9)", "org.scalatest.Transformer.apply(Transformer.scala:22)"])"""

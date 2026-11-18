@@ -736,7 +736,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
   }
 
-  "A node with messages in the JSON output" when {
+  "A test node with messages or a throwable in the JSON output" when {
 
     "it has messages" should {
       "hold them as its output after its contents" in {

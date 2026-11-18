@@ -61,7 +61,7 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     json
   }
 
-  /** The events of the test event log the notation gives, in order, for a test to change before feeding them. */
+  /** The events of the test event log written in notation, in order, so a test can alter them before feeding them. */
   def eventsOf(eventLog: String): Vector[TestEventLogEvent] =
     TestRunBuilder.build(TestRunPart.Events(eventLog)).fold(fail(_), _.events.map(_.event))
 
