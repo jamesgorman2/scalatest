@@ -44,7 +44,7 @@ Keys, in order:
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's, in this order: the test worker failing to start, and its test event log failing to be read. Absent where there is none.
 - `startedAt`, `endedAt`, `duration` — the test command's start, end and duration, measured by the test command.
-- `contents` — the module.
+- `contents` — an array holding the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.
 
 ## Module
@@ -54,7 +54,7 @@ Keys, in order:
 - `kind` — `module`.
 - `name` — the module's Mill path, such as `core.test`.
 - `startedAt`, `endedAt`, `duration` — the module's start, end and duration, measured by the test command.
-- `contents` — the module's run node, or `[]` where it has none (§ Tree).
+- `contents` — an array holding the module's run node, or `[]` where it has none (§ Tree).
 
 ## Run node
 
@@ -125,7 +125,7 @@ A throwable is one object. Keys, in order:
 - `className`.
 - `message` — `getMessage`. Absent where it is `null`.
 - `location` — for a throwable mixing in `org.scalatest.exceptions.StackDepth`, such as `TestFailedException` or `TestCanceledException`: the failed code's file and line (§ Locations), each where known. Absent for any other throwable, and where neither is known.
-- `stackTrace` — for a throwable not mixing in `StackDepth`: every frame, as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`. `fileName` is absent where unknown, `lineNumber` where negative, and `isNative` unless it is `true`.
+- `stackTrace` — for a throwable not mixing in `StackDepth`: every frame, as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`. `fileName` is absent where unknown, `lineNumber` where negative, and `isNative` unless it is `true`. Absent for a throwable mixing in `StackDepth`.
 - `cause` — the cause, written the same way. Absent where there is none.
 - `suppressed` — the suppressed throwables, in order, each written the same way. Absent where there are none.
 
