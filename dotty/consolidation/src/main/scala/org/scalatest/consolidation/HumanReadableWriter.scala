@@ -231,9 +231,10 @@ private[consolidation] object HumanReadableWriter {
   ): Vector[String] =
     errorLines(note, errorMessage, message, throwable, analysis, formatterOf(text), suiteName, testName)
 
-  // `StringReporter` throws a NullPointerException for a blank message with a throwable that has no message, as
-  // ScalaTest 3.2.20 does, and core keeps that. Those lines are built from its parts instead, as it would build them
-  // were the throwable's message empty.
+  // `StringReporter.stringsToPrintOnError` throws a NullPointerException when the message is blank and the throwable
+  // has no message. ScalaTest 3.2.20 does the same, and core keeps that behaviour. For that case, this builds the lines
+  // without the throwable, then adds the throwable's line number and stack trace lines, as `StringReporter` prints them
+  // for a throwable whose message is empty.
   private def errorLines(
     note: String,
     errorMessage: Any => String,
