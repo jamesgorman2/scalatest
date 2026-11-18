@@ -6,6 +6,7 @@ import org.scalatest.events.DecodedEvent
 import org.scalatest.events.JsonReader
 import org.scalatest.events.JsonValue
 import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 
 private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =>
@@ -56,6 +57,21 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     val json = new JsonSink
     val consolidation = startedWithoutMill(json)
     addRun(consolidation, parts*).endEventStream()
+    consolidation.end()
+    json
+  }
+
+  /** The events of the test event log the notation gives, in order, for a test to change before feeding them. */
+  def eventsOf(eventLog: String): Vector[TestEventLogEvent] =
+    TestRunBuilder.build(TestRunPart.Events(eventLog)).fold(fail(_), _.events.map(_.event))
+
+  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the events. */
+  def jsonOutputOfEvents(events: Vector[TestEventLogEvent]): JsonSink = {
+    val json = new JsonSink
+    val consolidation = startedWithoutMill(json)
+    val feed = consolidation.addRun(moduleLabel)
+    events.foreach(event => feed.add(RunEvent.of(event).fold(fail(_), identity)))
+    feed.endEventStream()
     consolidation.end()
     json
   }

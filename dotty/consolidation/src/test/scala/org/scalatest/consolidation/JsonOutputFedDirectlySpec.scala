@@ -1,6 +1,7 @@
 package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
+import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
@@ -33,6 +34,38 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
           runNode.keys should not contain "outcome"
         }
       }
+    }
+
+    Scenario("A run node's output holds its messages and captured lines in the order the library received them: a message between two captured lines") {
+      Given("a run fed directly to the library whose events are runStarted, RunStarting, an InfoProvided `between` of no suite, RunCompleted and runEnded marking the run completed")
+      And("the line `before\\n` captured from stdout fed before the InfoProvided, and the line `after\\r\\n` captured from stderr after it")
+      val parts = Vector(
+        TestRunPart.Events(
+          """
+          run started
+          run: RunStarting
+          """
+        ),
+        TestRunPart.CapturedLine(CapturedStream.Stdout, "before\n"),
+        TestRunPart.Events("""run: InfoProvided(message: "between", threadName: "main", timeStamp: 120)"""),
+        TestRunPart.CapturedLine(CapturedStream.Stderr, "after\r\n"),
+        TestRunPart.Events(
+          """
+          run: RunCompleted
+          run ended completed
+          """
+        )
+      )
+
+      When("the library writes the JSON output")
+      val runNode = jsonOutputOfRun(parts*).runNode
+
+      Then("the run node's output is, in full, the stdout line, the info with its time and thread, and the stderr line")
+      runNode("output") shouldBe arrayOf(
+        objectOf("kind" -> text("stdio"), "stream" -> text("stdout"), "text" -> text("before\n")),
+        objectOf("kind" -> text("info"), "message" -> text("between"), "at" -> integer(120L), "threadName" -> text("main")),
+        objectOf("kind" -> text("stdio"), "stream" -> text("stderr"), "text" -> text("after\r\n"))
+      )
     }
 
     Scenario("A test open when its suite aborts is aborted, ended by the suite's abort, with no message of its own") {

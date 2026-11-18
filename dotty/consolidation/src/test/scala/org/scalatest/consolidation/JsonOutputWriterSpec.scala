@@ -4,7 +4,12 @@ import java.time.Instant
 import org.scalatest.ScalaTestVersions
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.DecodedEvent
+import org.scalatest.events.DecodedStackDepth
+import org.scalatest.events.DecodedStackFrame
+import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.JsonValue
+import org.scalatest.events.LineInFile
+import org.scalatest.events.SeeStackDepthException
 import org.scalatest.events.Summary
 import org.scalatest.events.TestRunPart
 import org.scalatest.matchers.should.Matchers
@@ -642,6 +647,240 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           )
         )
         json.runNode("contents").items.map(_("suiteId")) shouldBe Vector(text("samples.Third"), text("samples.First"), text("samples.Second"))
+      }
+    }
+  }
+
+  private def throwable(className: String, message: Option[String] = None, frames: Vector[DecodedStackFrame] = Vector.empty): DecodedThrowable =
+    new DecodedThrowable(className, message, None, false, frames)
+
+  private def linked(throwable: DecodedThrowable, cause: Option[DecodedThrowable] = None, suppressed: Vector[DecodedThrowable] = Vector.empty): DecodedThrowable = {
+    throwable.link(cause, suppressed)
+    throwable
+  }
+
+  private def stackDepthException(stackDepth: DecodedStackDepth): DecodedThrowable =
+    new DecodedThrowable("org.scalatest.exceptions.TestFailedException", Some("failed"), Some(stackDepth), false, Vector.empty)
+
+  private def runAbortedWith(thrown: DecodedThrowable): DecodedEvent.RunAborted =
+    DecodedEvent.RunAborted("boom", Some(thrown), None, None, None, "main", 500L)
+
+  private def recordOf(thrown: DecodedThrowable): JsonValue = runNodeFedWith(runAbortedWith(thrown))("throwable")
+
+  "A message in the JSON output" when {
+
+    "it carries a location and a throwable" should {
+      "hold each value in the layout's key order" in {
+        val info = DecodedEvent.InfoProvided("checked", Some(throwable("java.lang.IllegalStateException")), Some(LineInFile(9, "RowSuite.scala", None)), "pool-1", 120L)
+        runNodeFedWith(info)("output").only shouldBe objectOf(
+          "kind" -> text("info"),
+          "message" -> text("checked"),
+          "at" -> integer(120L),
+          "location" -> objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(9L)),
+          "throwable" -> objectOf("id" -> integer(1L), "className" -> text("java.lang.IllegalStateException"), "stackTrace" -> arrayOf()),
+          "threadName" -> text("pool-1")
+        )
+      }
+    }
+
+    "its message has leading and trailing white space" should {
+      "hold it as sent" in {
+        runNodeFedWith(DecodedEvent.NoteProvided("  spaced  ", None, None, "main", 120L))("output").only("message") shouldBe text("  spaced  ")
+      }
+    }
+
+    "its location is SeeStackDepthException" should {
+      "have no location" in {
+        runNodeFedWith(DecodedEvent.AlertProvided("look", None, Some(SeeStackDepthException), "main", 120L))("output").only.keys should not contain "location"
+      }
+    }
+
+    "it is sent in a scope" should {
+      "hold its thread's name, since a scope has none" in {
+        val json = jsonOutputOfRowSuite(
+          Seq("""scope "A Stack", label "A Stack""""),
+          """suite "RowSuite": SuiteStarting(threadName: "main")""",
+          """scope "A Stack": ScopeOpened(threadName: "main")""",
+          """scope "A Stack": InfoProvided(message: "in scope", threadName: "main")""",
+          """scope "A Stack": ScopeClosed(threadName: "main")""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("scope", "A Stack")("output").only("threadName") shouldBe text("main")
+      }
+    }
+
+    "it is sent in a suite on the suite's thread" should {
+      "have no thread name" in {
+        val json = jsonOutputOfRowSuite(
+          Seq.empty,
+          """suite "RowSuite": SuiteStarting(threadName: "main")""",
+          """suite "RowSuite": InfoProvided(message: "in suite", threadName: "main")""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("suite", "RowSuite")("output").only.keys should not contain "threadName"
+      }
+    }
+  }
+
+  "A node with messages in the JSON output" when {
+
+    "it has messages" should {
+      "hold them as its output after its contents" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting""",
+          """test "adds": InfoProvided(message: "adding")""",
+          """test "adds": TestSucceeded""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds").keys.takeRight(2) shouldBe Vector("contents", "output")
+      }
+    }
+
+    "it has no message" should {
+      "have no output" in {
+        val json = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting""", """test "adds": TestStarting""", """test "adds": TestSucceeded""", """suite "RowSuite": SuiteCompleted""")
+        json.node("test", "adds").keys should not contain "output"
+      }
+    }
+
+    "it failed with a throwable" should {
+      "hold the throwable after its message" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting""",
+          """test "adds": TestFailed(message: "failed", throwable: java.lang.IllegalStateException "failed")""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds").keys.dropWhile(_ != "message").take(2) shouldBe Vector("message", "throwable")
+      }
+    }
+
+    "it is a test aborted by its DistributedTestRunnerSuite" should {
+      "hold that SuiteAborted's throwable" in {
+        val json = jsonOutputOfRowSuite(
+          testAdds,
+          """suite "RowSuite": SuiteStarting""",
+          """test "adds": TestStarting""",
+          """test "adds": TestSucceeded""",
+          """test "adds": SuiteAborted(message: "no teardown", throwable: java.lang.IllegalStateException "no teardown")""",
+          """suite "RowSuite": SuiteCompleted"""
+        )
+        json.node("test", "adds")("throwable")("message") shouldBe text("no teardown")
+      }
+    }
+  }
+
+  "A run node of a run aborted with a throwable" should {
+    "hold the throwable after its message" in {
+      val runNode = runNodeFedWith(runAbortedWith(throwable("java.lang.IllegalStateException", Some("boom"))))
+      runNode.keys.dropWhile(_ != "message").take(2) shouldBe Vector("message", "throwable")
+      runNode("throwable") shouldBe objectOf("id" -> integer(1L), "className" -> text("java.lang.IllegalStateException"), "message" -> text("boom"), "stackTrace" -> arrayOf())
+    }
+  }
+
+  "A throwable record in the JSON output" when {
+
+    "it is a StackDepth exception whose failed code's path is known" should {
+      "give the path and line number as its location, with no stack trace" in {
+        recordOf(stackDepthException(DecodedStackDepth(Some("RowSuite.scala"), Some("/build/RowSuite.scala"), Some(7)))) shouldBe objectOf(
+          "id" -> integer(1L),
+          "className" -> text("org.scalatest.exceptions.TestFailedException"),
+          "message" -> text("failed"),
+          "location" -> objectOf("filePath" -> text("/build/RowSuite.scala"), "lineNumber" -> integer(7L))
+        )
+      }
+    }
+
+    "it is a StackDepth exception whose failed code's path is not known" should {
+      "give the file's name as its location" in {
+        recordOf(stackDepthException(DecodedStackDepth(Some("RowSuite.scala"), None, Some(7))))("location") shouldBe
+          objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
+      }
+    }
+
+    "it is a StackDepth exception whose failed code is not known" should {
+      "have neither a location nor a stack trace" in {
+        recordOf(stackDepthException(DecodedStackDepth(None, None, None))).keys shouldBe Vector("id", "className", "message")
+      }
+    }
+
+    "its frames have unknown files, unknown or negative line numbers and native methods" should {
+      "omit each unknown value, and mark only a native frame" in {
+        val frames = Vector(
+          DecodedStackFrame("samples.Row", "add", Some("Row.scala"), Some(3), false, "samples.Row.add(Row.scala:3)"),
+          DecodedStackFrame("samples.Row", "load", Some("Row.scala"), Some(-1), false, "samples.Row.load(Row.scala)"),
+          DecodedStackFrame("samples.Row", "find", None, None, false, "samples.Row.find(Unknown Source)"),
+          DecodedStackFrame("java.lang.Thread", "sleep", None, Some(-2), true, "java.lang.Thread.sleep(Native Method)")
+        )
+        recordOf(throwable("java.lang.IllegalStateException", frames = frames))("stackTrace") shouldBe arrayOf(
+          objectOf("className" -> text("samples.Row"), "methodName" -> text("add"), "fileName" -> text("Row.scala"), "lineNumber" -> integer(3L)),
+          objectOf("className" -> text("samples.Row"), "methodName" -> text("load"), "fileName" -> text("Row.scala")),
+          objectOf("className" -> text("samples.Row"), "methodName" -> text("find")),
+          objectOf("className" -> text("java.lang.Thread"), "methodName" -> text("sleep"), "isNative" -> JsonValue.Bool(true))
+        )
+      }
+    }
+
+    "its cause has a cause, and it has two suppressed throwables" should {
+      "number them depth-first, the whole cause chain before the suppressed throwables" in {
+        val record = recordOf(
+          linked(
+            throwable("Outer"),
+            cause = Some(linked(throwable("Cause"), cause = Some(throwable("RootCause")))),
+            suppressed = Vector(throwable("FirstSuppressed"), throwable("SecondSuppressed"))
+          )
+        )
+        record("id") shouldBe integer(1L)
+        record("cause")("id") shouldBe integer(2L)
+        record("cause")("cause")("id") shouldBe integer(3L)
+        record("suppressed").items.map(_("id")) shouldBe Vector(integer(4L), integer(5L))
+      }
+    }
+
+    "one throwable is both its cause and its suppressed throwable" should {
+      "record it as the cause and refer to it as the suppressed throwable" in {
+        val shared = throwable("Shared")
+        val record = recordOf(linked(throwable("Outer"), cause = Some(shared), suppressed = Vector(shared)))
+        record("cause")("id") shouldBe integer(2L)
+        record("suppressed") shouldBe arrayOf(objectOf("ref" -> integer(2L)))
+      }
+    }
+
+    "two throwables are equal but not the same object" should {
+      "record each in full" in {
+        val record = recordOf(linked(throwable("Outer"), cause = Some(throwable("Same", Some("same"))), suppressed = Vector(throwable("Same", Some("same")))))
+        record("suppressed").only("id") shouldBe integer(3L)
+      }
+    }
+
+    "it is its own cause" should {
+      "refer to itself as its cause" in {
+        val itself = throwable("Itself")
+        recordOf(linked(itself, cause = Some(itself)))("cause") shouldBe objectOf("ref" -> integer(1L))
+      }
+    }
+
+    "its cause chain is too long to recurse over" should {
+      "record every throwable of the chain" in {
+        val chainLength = 100000
+        val outermost = (1 until chainLength).foldLeft(throwable("Innermost"))((cause, _) => linked(throwable("Outer"), cause = Some(cause)))
+        val ids = Iterator.iterate(Option(recordOf(outermost)))(_.flatMap(_.get("cause"))).takeWhile(_.nonEmpty).flatten.map(_("id")).toVector
+        ids.size shouldBe chainLength
+        ids.last shouldBe integer(chainLength.toLong)
+      }
+    }
+
+    "the same throwable is carried by two messages" should {
+      "number each message's record from 1, referring to nothing in the other" in {
+        val shared = throwable("Shared")
+        val output = runNodeFedWith(
+          DecodedEvent.InfoProvided("first", Some(shared), None, "main", 110L),
+          DecodedEvent.InfoProvided("second", Some(shared), None, "main", 120L)
+        )("output")
+        output.items.map(_("throwable")("id")) shouldBe Vector(integer(1L), integer(1L))
       }
     }
   }
