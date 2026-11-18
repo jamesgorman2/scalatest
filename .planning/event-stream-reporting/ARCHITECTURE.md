@@ -56,6 +56,8 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - its JSON encoder;
 - the version of this fork it was built at.
 
+Its own components are:
+
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
   - It keeps each node's events against the node's ID, by execution, apart from the structure. The writers report each suite's latest structure, with those events.
   - Each node takes the parent its `structure` declares, which for a suite or scope the format requires to be its node path without the last place. A suite or scope takes its name from the `structure` that contains it. A test takes its parent scope, its name and its label from the latest `structure` that contains the test.
