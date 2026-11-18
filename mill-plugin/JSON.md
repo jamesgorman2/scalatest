@@ -23,11 +23,13 @@ The format carries no compatibility promise across releases of this fork: any re
 
 Children of a suite, scope or test appear in this order:
 
-1. Children whose place in the declaration is known, in declared order.
-   - Scopes and tests that share a declared place, as where a suite's declaration changed between its runs, appear in this order: those the suite's latest run declared, then those only earlier runs declared; within each, in the order the run first reported them.
+1. Children with a declared place, in declared order.
+   - A scope's or test's declared place is its index in the order its parent registered its scopes and tests, counting only those the run's filter keeps. It is numbered the same way each time the suite declares its tests. It is not a source line.
+   - A nested suite's declared place is its index in its parent's `nestedSuites`. A suite's nested suites come before all its scopes and tests, or after them where the suite mixes in `TestsBeforeNestedSuites`.
+   - Where a suite's declaration changed between its runs, a scope or test its latest declaration drops keeps the place it last had, and appears after the scope or test the latest declaration holds there. Several dropped at one place appear in the order they were first declared.
    - A suite with no declared place that shares a suite ID with a suite of this group appears directly after the last suite with that suite ID. Several such suites appear in the order the run first reported them.
-2. The remaining children, which are suites, in ascending order by name. Suites that share a name appear in the order they started, followed by those that never started.
-3. The nodes of one suite, scope or test that ran more than once appear in the order they started.
+2. The remaining children, which are suites, in ascending order by name. Suites that share a name appear in the order they started, followed by those that never started, in the order they were first declared.
+3. A suite, scope or test that ran more than once in one run of its parent is one node for each time it ran, in the order those runs started. The nodes of a child with a declared place are together. Those of the other suites are ordered as point 2 gives, so a suite of the same name that started between them separates them.
 
 A run node's top-level suites appear in ascending order by name; suites that share a name appear in the order they started, followed by those that never started. Names are compared as Java's `String.compareTo` compares them.
 
