@@ -67,7 +67,7 @@ private[consolidation] final case class PlacedMessage(event: DecodedEvent, child
  * @param index absent where the node has no execution
  * @param ending the `TestFailed`, `TestCanceled` or `SuiteAborted` whose lines sit under the execution's line
  * @param opening the execution's first `SuiteStarting`, `ScopeOpened` or `TestStarting`
- * @param closing the execution's first event that ends it
+ * @param closing the execution's `SuiteAborted`, else its first event that ends it
  * @param abortedAt for an execution aborted with no closing event of its own, the time of the `SuiteAborted` of the
  *                  nearest suite around it that aborted, else of the run's `RunAborted`
  * @param children the nodes shown under this execution, in order: a suite, scope or test once for each of its
@@ -330,7 +330,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
         runEndedAbnormally = runEndedAbnormally,
         started = executionStarted
       )
-      val closing = execution.flatMap(_.events.iterator.flatMap(NodeEvent.closingOf).nextOption())
+      val closing = execution.flatMap(RunAssembly.closingEventOf).flatMap(NodeEvent.closingOf)
       AssembledExecution(
         index,
         outcome,
@@ -503,7 +503,14 @@ private[consolidation] object RunAssembly {
     if (node.isInstanceOf[StructureNode.Suite]) execution.flatMap(_.events.collectFirst { case aborted: DecodedEvent.SuiteAborted => aborted })
     else None
 
-  private def endingOf(execution: RecordedExecution): Option[DecodedEvent] = execution.events.find(isFailureEnding)
+  // A `DistributedTestRunnerSuite`'s `SuiteAborted` ends the test it ran even where the test's own closing event came
+  // first, as when the suite's `afterEach` throws after the test succeeded.
+  private def closingEventOf(execution: RecordedExecution): Option[DecodedEvent] =
+    execution.events
+      .collectFirst { case aborted: DecodedEvent.SuiteAborted => aborted }
+      .orElse(execution.events.find(event => NodeEvent.closingOf(event).nonEmpty))
+
+  private def endingOf(execution: RecordedExecution): Option[DecodedEvent] = closingEventOf(execution).filter(isFailureEnding)
 
   private def isFailureEnding(event: DecodedEvent): Boolean =
     event match {
@@ -560,7 +567,7 @@ private[consolidation] object RunAssembly {
       abortedWhereOpen(openScopeOrTestAborted)
 
   private def testOutcome(execution: RecordedExecution, openScopeOrTestAborted: Boolean): Option[NodeOutcome] =
-    execution.events.collectFirst {
+    closingEventOf(execution).collect {
       case _: DecodedEvent.TestSucceeded => NodeOutcome.Succeeded
       case _: DecodedEvent.TestFailed => NodeOutcome.Failed
       case _: DecodedEvent.TestIgnored => NodeOutcome.Ignored

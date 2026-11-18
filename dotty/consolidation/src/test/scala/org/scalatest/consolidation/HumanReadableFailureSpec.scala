@@ -25,6 +25,20 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
     run ended completed
     """
 
+  private def eventLogOfTestEndingThenAbortedBy(ending: String, aborted: String): String =
+    s"""
+    run started
+    structure
+      suite "ParAbortSuite", class "samples.ParAbortSuite"
+        test "a", label "- a"
+    suite "ParAbortSuite": SuiteStarting
+    test "a": TestStarting
+    $ending
+    $aborted
+    suite "ParAbortSuite": SuiteCompleted
+    run ended completed
+    """
+
   private def eventLogOfSuiteAbortingWith(aborted: String): String =
     s"""
     run started
@@ -201,6 +215,44 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |  {green}ParAbortSuite:{reset}
           |    {red}- a *** ABORTED ***{reset}
           |      {red}java.lang.RuntimeException: no fixture{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A test that succeeded, then was aborted by its DistributedTestRunnerSuite, shows its abort line in place of its success") {
+      Given("an event log of a test that succeeds, then holds the SuiteAborted of the DistributedTestRunnerSuite running it")
+      val eventLog = eventLogOfTestEndingThenAbortedBy(
+        """test "a": TestSucceeded""",
+        """test "a": SuiteAborted(message: "no teardown", throwable: java.lang.RuntimeException "no teardown")"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the test's abort line, with the throwable's lines under it, replaces its success line")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}ParAbortSuite:{reset}
+          |    {red}- a *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: no teardown{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A test that failed, then was aborted by its DistributedTestRunnerSuite, shows its abort line in place of its failure") {
+      Given("an event log of a test that fails, then holds the SuiteAborted of the DistributedTestRunnerSuite running it")
+      val eventLog = eventLogOfTestEndingThenAbortedBy(
+        """test "a": TestFailed(message: "2 did not equal 3")""",
+        """test "a": SuiteAborted(message: "no teardown", throwable: java.lang.RuntimeException "no teardown")"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the test's abort line, with the throwable's lines under it, replaces its failure lines")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}ParAbortSuite:{reset}
+          |    {red}- a *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: no teardown{reset}
           |        {red}...{reset}""".stripExpectedMargin
     }
   }

@@ -373,5 +373,41 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       adds("startedAt") shouldBe integer(100L)
       adds("endedAt") shouldBe integer(140L)
     }
+
+    Scenario("A test that succeeded, then was aborted by its DistributedTestRunnerSuite, is aborted with that SuiteAborted's message, end time and duration") {
+      Given("a run of suite RowSuite whose test adds succeeds, then holds a SuiteAborted, as when a ParallelTestExecution suite's afterEach throws")
+      val eventLog = rowSuiteRunning(
+        """test "adds": TestStarting(timeStamp: 100)""",
+        """test "adds": TestSucceeded(duration: 8, timeStamp: 108)""",
+        """test "adds": SuiteAborted(message: "no teardown", duration: 45, timeStamp: 140)"""
+      )
+
+      When("the library writes the JSON output")
+      val adds = jsonOutputOf(eventLog).node("test", "adds")
+
+      Then("test adds holds the outcome aborted, and the SuiteAborted's message, end time and duration")
+      adds("outcome") shouldBe text("aborted")
+      adds("message") shouldBe text("no teardown")
+      adds("endedAt") shouldBe integer(140L)
+      adds("duration") shouldBe integer(45L)
+    }
+
+    Scenario("A test that failed, then was aborted by its DistributedTestRunnerSuite, is aborted with that SuiteAborted's message, end time and duration") {
+      Given("a run of suite RowSuite whose test adds fails, then holds a SuiteAborted")
+      val eventLog = rowSuiteRunning(
+        """test "adds": TestStarting(timeStamp: 100)""",
+        """test "adds": TestFailed(message: "2 did not equal 3", duration: 8, timeStamp: 108)""",
+        """test "adds": SuiteAborted(message: "no teardown", duration: 45, timeStamp: 140)"""
+      )
+
+      When("the library writes the JSON output")
+      val adds = jsonOutputOf(eventLog).node("test", "adds")
+
+      Then("test adds holds the outcome aborted, and the SuiteAborted's message, end time and duration")
+      adds("outcome") shouldBe text("aborted")
+      adds("message") shouldBe text("no teardown")
+      adds("endedAt") shouldBe integer(140L)
+      adds("duration") shouldBe integer(45L)
+    }
   }
 }
