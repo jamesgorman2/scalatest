@@ -91,7 +91,8 @@ Every other flag, including every reporter flag, is withheld.
 
 The test command fails before any test starts when:
 
-- it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`, or `-fJ` with no path;
+- it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`;
+- it is given `-fJ` with no path;
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector, or more than one;
 - the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;

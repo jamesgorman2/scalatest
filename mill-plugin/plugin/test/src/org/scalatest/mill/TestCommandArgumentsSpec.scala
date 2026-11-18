@@ -32,7 +32,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
     }
 
     "given -fJ followed by a path" should {
-      "take the path as the JSON output's, and not as a module selector, wherever the module selector stands" in {
+      "take the path as the JSON output file's path, not as a module selector, wherever the module selector stands" in {
         val expected = TestCommandArguments(Seq("core.test"), humanReadableOnStdout = true, jsonOutputPath = Some("report.json"))
         parsed("core.test", "-fJ", "report.json") shouldBe expected
         parsed("-fJ", "report.json", "core.test") shouldBe expected

@@ -158,7 +158,7 @@ Feature: Deleting and writing the `-fJ` file
       Then the console holds the human-readable output, whose lines include `- adds two numbers`
       And the test command fails, and its failure names `<blocker>/report.json`
 
-  Rule: A relative path resolves against the workspace root, wherever `mill` is run from
+  Rule: A relative path resolves against the workspace root
     Scenario: AC-041 A relative path with a folder in it
       When the test command is invoked as `mill scalatest/test core.test -fJ reports/report.json`
       Then the file `reports/report.json` below the workspace root holds a JSON object whose `kind` is `root`

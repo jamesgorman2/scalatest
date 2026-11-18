@@ -116,7 +116,7 @@ To test the prefix, pass `--ticker true` ahead of the task in the arguments to `
 <learning>
 date: 2026-11-18
 ---
-Mill 1.3.1, through its bootstrap scripts and its launcher (`mill.launcher.MillLauncherMain`), takes the current working directory as the workspace root and never searches upward for `build.mill`. Run from a folder below the workspace root, it creates an `out` folder there, finds no build, and fails to resolve any task or external module the build adds, such as `Cannot resolve external module <name>/`. `mill.testkit.IntegrationTester.eval(..., cwd = <subfolder>)` behaves the same.
+Mill 1.3.1, through its bootstrap scripts and its launcher (`mill.launcher.MillLauncherMain`), takes the current working directory as the workspace root and never searches upward for `build.mill`. Run from a folder below the workspace root, it creates an `out` folder there, finds no build, and fails to resolve any task or external module the build adds, with errors such as `Cannot resolve external module <name>/`. `mill.testkit.IntegrationTester.eval(..., cwd = <subfolder>)` behaves the same.
 
 A requirement or test that runs `mill` from a folder below the workspace root cannot pass under Mill 1.3.1. Inside a task, resolve a relative path argument against `mill.api.BuildCtx.workspaceRoot`, which under Mill 1.3.1 is always the folder `mill` was run from.
 </learning>
