@@ -28,7 +28,7 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
         stdout(capture, "dividing now\n")
         stderr(capture, " to divide\n")
         val lines = linesOfRunAddedTo(capture)
-        lines shouldBe Seq(CapturedLine.Stdout("dividing now"), CapturedLine.Stderr("warn: about to divide"))
+        lines shouldBe Seq(CapturedLine.Stdout("dividing now\n"), CapturedLine.Stderr("warn: about to divide\n"))
       }
     }
 
@@ -38,7 +38,7 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
         stdout(capture, "before\n")
         val lines = linesOfRunAddedTo(capture)
         stderr(capture, "after\n")
-        lines shouldBe Seq(CapturedLine.Stdout("before"), CapturedLine.Stderr("after"))
+        lines shouldBe Seq(CapturedLine.Stdout("before\n"), CapturedLine.Stderr("after\n"))
       }
     }
 
