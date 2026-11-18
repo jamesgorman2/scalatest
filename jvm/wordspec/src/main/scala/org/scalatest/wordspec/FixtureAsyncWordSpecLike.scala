@@ -202,7 +202,6 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
         )
     }  
 
-  // Registers a scope whose description holds more words than the name the suite's source gives it.
   private def registerBranchNamed(nameInSource: String, description: String, childPrefix: Option[String], verb: String, pos: source.Position, fun: () => Unit): Unit =
     registerBranch(description, childPrefix, verb, pos, () => { engine.nameCurrentScope(nameInSource); fun() })
 

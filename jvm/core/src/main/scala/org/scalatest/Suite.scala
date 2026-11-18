@@ -1337,25 +1337,17 @@ trait Suite extends Assertions with Serializable { thisSuite =>
   // MOVE IT
   private[scalatest] def createCatchReporter(reporter: Reporter): Reporter = new WrapperCatchReporter(reporter)
 
-  /**
-   * The scopes and tests of this suite's registration tree, for its structure in a test event log, or `None` for a
-   * suite that has no registration tree. A style trait that keeps one overrides this.
-   */
+  // A style trait that keeps a registration tree overrides this.
   private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
 
   /**
-   * How this suite starts a nested suite it runs itself: the reporter its `SuiteStarting`, `SuiteCompleted` and
-   * `SuiteAborted` are sent to and it is run with, and the invocation context it runs in. `reporter` is the one this
-   * suite would give it. A suite whose nested suites are top-level suites of a run that writes a test event log
-   * overrides this.
+   * `reporter` is the one this suite would give the nested suite. A suite whose nested suites are top-level suites of a
+   * run that writes a test event log overrides this.
    */
   private[scalatest] def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): SuiteStart =
     SuiteStart.ofNestedSuite(nestedSuite, reporter)
 
-  /**
-   * Hands a nested suite to the distributor that runs it. A suite whose nested suites are top-level suites of a run
-   * that writes a test event log overrides this.
-   */
+  // A suite whose nested suites are top-level suites of a run that writes a test event log overrides this.
   private[scalatest] def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status =
     distribute(nestedSuite, args)
   
@@ -1682,7 +1674,6 @@ used for test events like succeeded/failed, etc.
       case _ => Vector.empty
     }
 
-  // Hands the event off with its origin for a run that writes a test event log, then reports the event.
   private def reportFrom(origin: EventOrigin, report: Reporter, event: org.scalatest.events.Event): Unit = {
     origin.handOff(event)
     report(event)

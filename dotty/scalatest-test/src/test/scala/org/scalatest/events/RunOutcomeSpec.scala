@@ -10,16 +10,16 @@ final class RunOutcomeSpec extends AnyWordSpec with Matchers {
 
   "The outcome of a closing run event" should {
     "be completed for RunCompleted" in {
-      RunOutcome.ofClosing(RunCompleted(ordinal)) shouldBe Some(RunOutcome.Completed)
+      RunOutcome.reportedBy(RunCompleted(ordinal)) shouldBe Some(RunOutcome.Completed)
     }
     "be stopped for RunStopped" in {
-      RunOutcome.ofClosing(RunStopped(ordinal)) shouldBe Some(RunOutcome.Stopped)
+      RunOutcome.reportedBy(RunStopped(ordinal)) shouldBe Some(RunOutcome.Stopped)
     }
     "be aborted for RunAborted" in {
-      RunOutcome.ofClosing(RunAborted(ordinal, "aborted", None)) shouldBe Some(RunOutcome.Aborted)
+      RunOutcome.reportedBy(RunAborted(ordinal, "aborted", None)) shouldBe Some(RunOutcome.Aborted)
     }
     "be absent for an event that does not close the run" in {
-      RunOutcome.ofClosing(RunStarting(ordinal, 1, ConfigMap.empty)) shouldBe None
+      RunOutcome.reportedBy(RunStarting(ordinal, 1, ConfigMap.empty)) shouldBe None
     }
   }
 }

@@ -7,7 +7,6 @@ private[scalatest] final case class ProcessIdentity(pid: Long, startTime: Instan
 
 private[scalatest] object ProcessIdentity {
 
-  /** Returns this process's PID and start time as `ProcessHandle.current()` gives them, or why it gives none. */
   def current: Either[String, ProcessIdentity] = readThrough(Class.forName(_))
 
   // Reads through reflection because ProcessHandle is absent on Java 8, which core still compiles on. Each method is

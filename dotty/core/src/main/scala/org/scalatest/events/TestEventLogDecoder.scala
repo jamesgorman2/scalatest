@@ -94,7 +94,6 @@ private[scalatest] object TestEventLogDecoder {
     } yield build(parent, position, label)
   }
 
-  // A suite's or scope's parent is its node path without the last place, which a top-level suite's path lacks.
   private def parentOnNodePath(id: NodeId, parent: Option[NodeId]): Either[String, Unit] = {
     val pathParent = Option.when(id.places.size > 1)(NodeId(id.places.init))
     if (parent == pathParent) Right(())
@@ -325,8 +324,6 @@ private[scalatest] object TestEventLogDecoder {
       }
     }
 
-    // Yields the throwable a ref names, or a new throwable together with its cause and suppressed throwables,
-    // which are still to read.
     private def throwableOrRef(reader: JsonObjectReader): Either[String, (DecodedThrowable, Option[OpenThrowable])] = {
       reader.optionalLong("ref").flatMap {
         case Some(id) => decoded.get(id).toRight(s"ref $id names no throwable the event holds before it").map(_ -> None)
@@ -374,7 +371,6 @@ private[scalatest] object TestEventLogDecoder {
     }
   }
 
-  // A throwable whose own fields are read, taking its cause and then each suppressed throwable as they are read.
   private final class OpenThrowable(
     throwable: DecodedThrowable,
     cause: Option[JsonObjectReader],
@@ -447,7 +443,7 @@ private final class JsonObjectReader(fields: Vector[(String, JsonValue)]) {
     }
   }
 
-  /** Whether the key is present. A present key must be `true`, as the format never writes `false`. */
+  /** The format never writes `false`. */
   def trueOrAbsent(key: String): Either[String, Boolean] =
     optional(key, "true") { case JsonValue.Bool(true) => true }.map(_.isDefined)
 

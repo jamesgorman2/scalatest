@@ -85,7 +85,6 @@ final class ConfigMapWrapperSuite(clazz: Class[_ <: Suite]) extends Suite {
     constructor.newInstance(Map.empty)
   }
 
-  /** The instance of the wrapped class constructed with an empty config map, which this suite forwards its members to. */
   private[scalatest] def instanceWithEmptyConfigMap: Suite = wrappedSuite
 
   override def suiteId = wrappedSuite.suiteId

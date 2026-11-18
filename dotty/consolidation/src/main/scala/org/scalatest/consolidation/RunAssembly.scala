@@ -363,7 +363,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
     recordExecutionPath(nodeExecution)
     val node = nodeExecution.node
-    val number = nodeExecution.execution
+    val number = nodeExecution.executionIndex
     val execution = executions(node)(number)
     val updated =
       if (RunAssembly.isMessage(event)) execution.added(ReceivedMessage(event, childrenStarted(node, number)))
@@ -376,7 +376,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   // execution it first had. Start numbers go from the top down, so a parent's precedes its child's.
   private def recordExecutionPath(nodeExecution: NodeExecution): Unit = {
     val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(_.parentId)))).toVector
-    val executionsUp = nodesUp.zip(nodeExecution.executions.reverse).map((node, number) => ExecutionOfNode(node, number))
+    val executionsUp = nodesUp.zip(nodeExecution.executionPath.reverse).map((node, number) => ExecutionOfNode(node, number))
     executionsUp.indices.reverse.foreach { index =>
       val execution = executionsUp(index)
       val nodeExecutions = executions.getOrElse(execution.node, SortedMap.empty[Int, RecordedExecution])

@@ -182,7 +182,6 @@ private[tools] object ArgsParser {
 
   private[scalatest] def parseArgs(args: Array[String]): ParsedArgs = parse(args, false)._1
 
-  // Also accepts the test event log argument, and returns the file it names.
   private[scalatest] def parseArgsWithTestEventLog(args: Array[String]): (ParsedArgs, Option[String]) = parse(args, true)
 
   private def parse(args: Array[String], acceptsTestEventLog: Boolean): (ParsedArgs, Option[String]) = {

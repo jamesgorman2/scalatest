@@ -376,21 +376,21 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     }
   }
 
-  // The place of each scope from the suite down to a branch: the path by which a test event log names the branch's scope.
-  private def scopePlacesTo(branch: Branch): List[ScopePlace] =
+  // The path by which a test event log names the branch's scope.
+  private def scopePathTo(branch: Branch): List[ScopePlace] =
     branch match {
       case scope @ DescriptionBranch(parent, descriptionText, _, _) =>
         val declaredBefore = parent.subNodes.dropWhile(_ ne scope).drop(1)
-        val place = declaredBefore.count {
+        val indexAmongScopesOfItsText = declaredBefore.count {
           case DescriptionBranch(_, text, _, _) => text == descriptionText
           case _ => false
         }
-        scopePlacesTo(parent) :+ ScopePlace(descriptionText, place)
+        scopePathTo(parent) :+ ScopePlace(descriptionText, indexAmongScopesOfItsText)
       case _ => Nil
     }
 
   private def originOfBranch(registration: SuiteRegistration, branch: Branch): EventOrigin =
-    if (registration eq SuiteRegistration.none) EventOrigin.none else registration.originAt(scopePlacesTo(branch))
+    if (registration eq SuiteRegistration.none) EventOrigin.none else registration.originAt(scopePathTo(branch))
 
   private def runTestsInBranch(
     theSuite: Suite,
@@ -466,13 +466,12 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
       case _ => testText
     }
 
-  // What a registration made for a suite's structure threw, until the suite's next registration call throws it.
+  // Held until the suite's next registration call throws it.
   private val failureOfRegistrationForStructure = new AtomicReference[Option[Throwable]](None)
 
   /**
-   * Runs the registration of a suite that registers its scopes and tests on first use, for the suite's structure in
-   * a test event log. Such a suite registers once, so the call ScalaTest 3.2.20 would have made first finds the
-   * registration made. What `register` throws is therefore kept as well as thrown, and
+   * For a suite that registers on first use. Such a suite registers once, so the call ScalaTest 3.2.20 would have made
+   * first finds the registration made. What `register` throws is therefore kept as well as thrown, and
    * `throwFailureOfRegistrationForStructure` throws it from that call.
    */
   def registeredForStructure(register: => Unit): Unit = {
@@ -484,25 +483,22 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     }
   }
 
-  /** Throws, once, what a registration made for the suite's structure threw. A suite calls it where it registers on first use. */
+  // A suite that registers on first use calls it before registering.
   def throwFailureOfRegistrationForStructure(): Unit =
     failureOfRegistrationForStructure.getAndSet(None).foreach(thrown => throw thrown)
 
-  /** Names the scope being registered as the suite's source names it. Called from the scope's own registration function. */
+  // Called from the scope's own registration function.
   def nameCurrentScope(nameInSource: String): Unit = atomic.get.currentBranch.nameInSource = Some(nameInSource)
 
-  /** Names the test registered last as the suite's source names it. Called as that test's registration returns. */
+  // Called as that test's registration returns.
   def nameLastRegisteredTest(nameInSource: String): Unit =
     atomic.get.currentBranch.subNodes.headOption.foreach(test => test.nameInSource = Some(nameInSource))
 
   /**
-   * Returns the scopes and tests registered so far, in the order registered, each labelled as `runTestsInBranch` and
-   * `runTestImpl` label its events. `includeIcon` is the one the style's `runTest` passes `runTestImpl`. A scope or
-   * test whose registration recorded the name the suite's source gives it takes that name. For any other, the two
-   * functions give the name from the text it is registered with.
+   * Labels each scope and test as `runTestsInBranch` and `runTestImpl` label its events. `includeIcon` is the one the
+   * style's `runTest` passes `runTestImpl`. The name functions apply only where registration recorded no name in source.
    */
   def registeredNodes(includeIcon: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
-    // Recurses once for each scope nested in another, as registering and running them do.
     def nodesIn(branch: Branch): List[RegisteredNode] =
       branch.subNodes.reverse.collect {
         case test @ TestLeaf(_, testName, testText, _, _, _, _, _) =>
@@ -513,7 +509,6 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     nodesIn(Trunk)
   }
 
-  /** Returns the registered scopes and tests of a style that names each by the text it is registered with. */
   def registeredNodes(includeIcon: Boolean): List[RegisteredNode] =
     registeredNodes(includeIcon, (text: String) => text, (text: String) => text)
 

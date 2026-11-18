@@ -57,18 +57,15 @@ private[scalatest] class DispatchReporter(
 
   private val testEventLogHandOff: AtomicReference[Event => Unit] = new AtomicReference[Event => Unit](TestEventLogHandOff.none)
 
-  /**
-   * Registers the function that hands off to the test event log the events this reporter creates or completes: its
-   * slowpoke alerts, and the closing run events given to `reportAndHandOff`.
-   */
+  // The hand-off receives this reporter's slowpoke alerts and the closing run events given to `reportAndHandOff`.
   def registerTestEventLogHandOff(handOffToTestEventLog: Event => Unit): Unit =
     testEventLogHandOff.set(handOffToTestEventLog)
 
   /**
-   * Reports a closing run event of this reporter's own run. Once every reporter has it, hands off the event they
-   * received, which carries the run's summary. Returns once the event is handed off, and throws what the hand-off
-   * throws, so that the send site receives it rather than the dispatcher's thread. Closing run events relayed from
-   * another process are reported with `apply`, which hands nothing off.
+   * For a closing run event of this reporter's own run. Once every reporter has it, hands off the event they received,
+   * which carries the run's summary. Returns once the event is handed off, and throws what the hand-off throws, so that
+   * the send site receives it rather than the dispatcher's thread. Closing run events relayed from another process are
+   * reported with `apply`, which hands nothing off.
    */
   def reportAndHandOff(closingRunEvent: Event): Unit = {
     val handOff = testEventLogHandOff.get
@@ -227,7 +224,7 @@ private[scalatest] class DispatchReporter(
         }
       }
   
-      // Reports an event to the reporters and returns the event they received.
+      // Returns the event the reporters received, which can carry a summary the event sent lacked.
       def propagate(event: Event): Event = {
         val highestSoFar = highestOrdinalSeenSoFar.get
         if (event.ordinal > highestSoFar)

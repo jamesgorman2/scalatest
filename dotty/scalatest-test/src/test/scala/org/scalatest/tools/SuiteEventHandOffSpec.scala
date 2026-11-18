@@ -577,7 +577,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       }
 
     "keep none of the suite's events once the suite's run has completed" in afterTheSuiteRan { (_, emitter) =>
-      emitter.keptEventCount shouldBe 0
+      emitter.handedOffEventCount shouldBe 0
     }
   }
 
@@ -599,7 +599,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       run.registration.startTestExecution("s t").handOff(sentLate)
       wrapperOfTest(sentLate)
       StatedLines.mismatchWhenIs(run.eventLog.writes.map(_.stripSuffix("\n")), List(structureOfScopedSuite)) shouldBe None
-      run.emitter.keptEventCount shouldBe 0
+      run.emitter.handedOffEventCount shouldBe 0
     }
 
     "write an event sent after the removal once, assigned to the suite, where it reaches a test's wrapper and then its suite's" in withRegisteredSuite { run =>
@@ -665,7 +665,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       val inFlight = SuiteStarting(ordinal, nested.suiteName, nested.suiteId, Some(nested.suiteId), threadName = "main", timeStamp = timeStamp)
       wrapperOfNested(inFlight)
       ofTopLevel.complete()
-      emitter.keptEventCount shouldBe 0
+      emitter.handedOffEventCount shouldBe 0
       ofTopLevel.wrapper(inFlight)
       val topLevelPath = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OneNestedSuite")
       val nestedPath = topLevelPath.suite("org.scalatest.tools.SuiteEventHandOffSpec$OneTestSuite")
@@ -765,7 +765,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       }
       val executionsByTest =
         decoded.collect { case TestEventLogEvent.ScalaTestEvent(Some(assigned), event) =>
-          assigned.node -> (assigned.execution, assigned.executions.init.lastOption, event.isInstanceOf[DecodedEvent.TestStarting])
+          assigned.node -> (assigned.executionIndex, assigned.executionPath.init.lastOption, event.isInstanceOf[DecodedEvent.TestStarting])
         }.groupMap((node, _) => node)((_, execution) => execution)
       val executionsOfOneTest = (1 to executionsOfEachThread).toVector.flatMap(execution => Vector((execution, Some(1), true), (execution, Some(1), false)))
       testOfSuite.size shouldBe threadCount

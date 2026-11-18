@@ -5,11 +5,7 @@ import org.scalatest.exceptions.PropertyCheckFailedException
 import org.scalatest.exceptions.StackDepth
 import scala.collection.mutable
 
-/**
- * A ScalaTest event as the event log writes it, without the node and executions it is assigned to.
- *
- * @param fields the event's own fields, as the members of a JSON object without its braces
- */
+/** @param fields the event's own fields, as the members of a JSON object without its braces */
 private[scalatest] final class EncodedEvent private[events] (private[events] val name: String, private[events] val fields: String)
 
 private[scalatest] object TestEventLogEncoder {
@@ -24,24 +20,21 @@ private[scalatest] object TestEventLogEncoder {
 
   def event(event: Event, execution: Option[NodeExecution]): String = line(encoded(event), execution)
 
-  /**
-   * Encodes an event without the node and executions it is assigned to. This calls the methods of the event's
-   * throwables and config map values, which are the run's own code.
-   */
+  /** Calls the methods of the event's throwables and config map values, which are the run's own code. */
   def encoded(event: Event): EncodedEvent = {
     val (eventName, eventFields) = nameAndFields(event)
     val members = JsonWriter.write(record(eventFields: _*))
     new EncodedEvent(eventName, members.substring(1, members.length - 1))
   }
 
-  /** The line of an encoded event assigned to a node's execution, or to the run. It calls none of the run's own code. */
+  /** Calls none of the run's own code. */
   def line(encoded: EncodedEvent, execution: Option[NodeExecution]): String = {
     val assigned =
       JsonWriter.write(
         record(
           text("item", "event"),
           nested("node", execution.map(assigned => nodePath(assigned.node))),
-          array("executions", execution.toVector.flatMap(_.executions).map(number => JsonValue.Integer(number.toLong))),
+          array("executions", execution.toVector.flatMap(_.executionPath).map(index => JsonValue.Integer(index.toLong))),
           text("event", encoded.name)
         )
       )
@@ -282,7 +275,6 @@ private[scalatest] object TestEventLogEncoder {
       )
   }
 
-  // A throwable whose own fields are written, taking its cause and then each suppressed throwable as they are written.
   private final class OpenThrowable(ownFields: Seq[Field], cause: Option[Throwable], suppressed: Iterator[Throwable]) {
 
     private var causeIsNext = cause.nonEmpty

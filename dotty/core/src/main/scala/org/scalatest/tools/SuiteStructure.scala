@@ -8,23 +8,17 @@ import org.scalatest.RegisteredTest
 import org.scalatest.Suite
 import org.scalatest.TestsBeforeNestedSuites
 
-/**
- * A scope or test of a suite's structure. A scope's `text` is the text it is registered with, which may hold more
- * words than its name. A test's `ignored` is true where the filter ignores it, which marks it ignored in the structure.
- */
+/** A scope's `text` is the text it is registered with, which may hold more words than its name. */
 private[scalatest] enum ScopeOrTest {
   case Scope(name: String, text: String, label: String, scopesAndTests: List[ScopeOrTest])
   case Test(name: String, testName: String, label: String, ignored: Boolean = false)
 }
 
 /**
- * A suite's structure after filtering, before its nodes have IDs: the suite, its scopes and tests, and its nested
- * suites, each list in declared order.
+ * A suite's structure after filtering, before its nodes have IDs. Each list is in declared order.
  *
- * @param instance the suite instance the structure is for
- * @param testsBeforeNestedSuites whether the suite's scopes and tests come before its nested suites in declared order
- * @param filteredTests for a suite with a registration tree, what the filter said of each test of the tree, as
- *                      `Filter.apply` says it for one test: whether the test is dropped and whether it is ignored
+ * @param filteredTests for a suite with a registration tree, whether the filter drops and whether it ignores each test
+ *                      of the tree, as `Filter.apply` says it for one test
  */
 private[scalatest] final case class SuiteStructure(
   instance: Suite,
@@ -40,8 +34,6 @@ private[scalatest] final case class SuiteStructure(
 private[scalatest] object SuiteStructure {
 
   /**
-   * Reads a suite's structure from the constructed suite, its nested suites and the run's filter.
-   *
    * It calls the suite's own `suiteName`, `suiteId`, `testNames`, `tags` and `nestedSuites`, and those of each
    * nested suite, any of which may throw. It recurses once for each suite nested in another, as running them does.
    */
@@ -57,7 +49,7 @@ private[scalatest] object SuiteStructure {
       case Some(registered) =>
         val tags = readFrom.tags
         val filteredTests = testNamesIn(registered).map(testName => testName -> filter(testName, tags, suiteId)).toMap
-        (kept(registered, filteredTests), filteredTests)
+        (keptByFilter(registered, filteredTests), filteredTests)
       case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId)), Map.empty)
     }
     SuiteStructure(
@@ -73,8 +65,8 @@ private[scalatest] object SuiteStructure {
   }
 
   /**
-   * The tests of a suite with no registration tree, in the order given, each labelled as `Suite.runTests` labels a
-   * test it ignores. Each name is paired with whether the filter ignores it, as `Filter.apply` pairs the names it keeps.
+   * The tests of a suite with no registration tree, each labelled as `Suite.runTests` labels a test it ignores. Each
+   * name is paired with whether the filter ignores it, as `Filter.apply` pairs the names it keeps.
    */
   def ofTestNames(testNames: Seq[(String, Boolean)]): List[ScopeOrTest] =
     testNames.toList.map { (testName, isIgnored) =>
@@ -82,15 +74,12 @@ private[scalatest] object SuiteStructure {
       ScopeOrTest.Test(test.name, test.testName, test.label, isIgnored)
     }
 
-  /**
-   * Keeps every scope, as the engine opens a scope whose tests the filter all drops, and the tests the filter keeps.
-   * `filtered` returns, as `Filter.apply` does for one test, whether the test is dropped and whether it is ignored.
-   */
-  def kept(registered: List[RegisteredNode], filtered: String => (Boolean, Boolean)): List[ScopeOrTest] = {
+  /** Keeps every scope, as the engine opens a scope whose tests the filter all drops. */
+  def keptByFilter(registered: List[RegisteredNode], droppedAndIgnored: String => (Boolean, Boolean)): List[ScopeOrTest] = {
     registered.flatMap {
-      case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, kept(nodes, filtered)))
+      case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, keptByFilter(nodes, droppedAndIgnored)))
       case RegisteredTest(name, testName, label, labelWhenIgnored) =>
-        val (isDropped, isIgnored) = filtered(testName)
+        val (isDropped, isIgnored) = droppedAndIgnored(testName)
         if (isDropped) None else Some(ScopeOrTest.Test(name, testName, if (isIgnored) labelWhenIgnored else label, isIgnored))
     }
   }
@@ -111,14 +100,12 @@ private[scalatest] object SuiteStructure {
     Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
   }
 
-  /** The tests among the scopes and tests, and within each scope. It recurses once for each scope nested in another. */
   def testsIn(scopesAndTests: List[ScopeOrTest]): List[ScopeOrTest.Test] =
     scopesAndTests.flatMap {
       case test: ScopeOrTest.Test => List(test)
       case ScopeOrTest.Scope(_, _, _, nodes) => testsIn(nodes)
     }
 
-  /** The test names of a registration tree. */
   def testNamesIn(registered: List[RegisteredNode]): List[String] =
     registered.flatMap {
       case RegisteredScope(_, _, _, nodes) => testNamesIn(nodes)

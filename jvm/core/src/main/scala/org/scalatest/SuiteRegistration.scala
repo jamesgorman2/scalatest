@@ -2,8 +2,8 @@ package org.scalatest
 
 import org.scalatest.events.Event
 
-/** A scope among its parent's scopes: the text it is registered with, and its place, from 0, among those of that text. */
-private[scalatest] final case class ScopePlace(text: String, placeAmongScopesOfItsText: Int)
+/** A scope among its parent's scopes. `text` is the text it is registered with. */
+private[scalatest] final case class ScopePlace(text: String, indexAmongScopesOfItsText: Int)
 
 /**
  * What the site that sends an event knows of it, for a run that writes a test event log: the suite instance, the
@@ -11,28 +11,19 @@ private[scalatest] final case class ScopePlace(text: String, placeAmongScopesOfI
  */
 private[scalatest] abstract class EventOrigin {
 
-  /**
-   * Hands the event to the emitter of the run's test event log with this origin, leaving the event unchanged. The
-   * emitter writes it at once. Called before the event is reported.
-   */
+  /** The emitter writes the event at once. Called before the event is reported. */
   def handOff(event: Event): Unit
 
   /**
-   * Hands a message of a test's execution to the emitter as the test calls it, and to no reporter. The message is
-   * built only where the run writes a test event log. Called with the origin a test execution's start returned.
+   * Hands the message to no reporter. It is built only where the run writes a test event log. Called with the origin a
+   * test execution's start returned.
    */
   def handOffMessage(message: => Event): Unit = preparedHandOffOfMessage(message)()
 
-  /**
-   * Prepares `handOffMessage` without handing the message off: builds and encodes the message where the run writes a
-   * test event log, and returns the step that hands it to the emitter. Elsewhere it builds nothing.
-   */
+  /** Builds and encodes the message only where the run writes a test event log, and returns the step that hands it off. */
   def preparedHandOffOfMessage(message: => Event): () => Unit = EventOrigin.nothingToHandOff
 
-  /**
-   * The origin of a test's closing event, whose recorded messages the test has already handed off one by one, so the
-   * emitter writes the closing event without them.
-   */
+  // The emitter writes the closing event without the recorded messages.
   def ofClosingEventWithMessagesHandedOff: EventOrigin = this
 
   /**
@@ -46,10 +37,9 @@ private[scalatest] abstract class EventOrigin {
 
 private[scalatest] object EventOrigin {
 
-  /** The prepared hand-off of a message that is handed to no emitter. */
   val nothingToHandOff: () => Unit = () => ()
 
-  /** The origin of every event of a run that writes no test event log. It hands nothing off. */
+  /** The origin of every event of a run that writes no test event log. */
   val none: EventOrigin = new EventOrigin {
     def handOff(event: Event): Unit = ()
   }
@@ -62,10 +52,8 @@ private[scalatest] object EventOrigin {
  */
 private[scalatest] abstract class InvocationContext {
 
-  /** The registration of `suite` this context is the run of, where it is one. */
   def registrationOf(suite: Suite): Option[SuiteRegistration]
 
-  /** Registers `suite`, an instance whose run starts in this context. */
   def register(suite: Suite): SuiteRegistration
 }
 
@@ -74,16 +62,12 @@ private[scalatest] object InvocationContext {
   // Set only while a run's emitter is on, and cleared around a top-level suite of a run that writes no test event log.
   private val current = new ThreadLocal[InvocationContext]
 
-  /** The context the code on this thread runs in, where one is set. */
   def get: Option[InvocationContext] = Option(current.get)
 
-  /** Runs `body` in `context`, then restores the context this thread had. */
   def within[A](context: InvocationContext)(body: => A): A = replacedBy(context)(body)
 
-  /** Runs `body` in no context, then restores the context this thread had. */
   def cleared[A](body: => A): A = replacedBy(null)(body)
 
-  /** `runnable`, run on another thread in the context this thread runs in now. */
   def carriedTo(runnable: Runnable): Runnable = {
     val context = current.get
     if (context eq null) runnable else () => replacedBy(context)(runnable.run())
@@ -103,7 +87,7 @@ private[scalatest] object InvocationContext {
  */
 private[scalatest] abstract class SuiteRegistration {
 
-  /** Starts an execution for a run of the instance. Called by the first engine site the run reaches. */
+  // Called by the first engine site the run reaches.
   def startRun(): Unit
 
   /**
@@ -119,7 +103,6 @@ private[scalatest] abstract class SuiteRegistration {
    */
   def originOfStartAndEnd: EventOrigin
 
-  /** Starts an execution of a test, and returns the origin of that execution's events. */
   def startTestExecution(testName: String): EventOrigin
 
   /** The reporter a test is run with: the test's structure wrapper over `reporter`. */
@@ -140,7 +123,6 @@ private[scalatest] abstract class SuiteRegistration {
    */
   def startWith(reporter: Reporter): SuiteStart
 
-  /** Runs `body` in the invocation context of this registration's run. */
   def runningInItsContext[A](body: => A): A
 
   /**
@@ -159,16 +141,13 @@ private[scalatest] abstract class SuiteRegistration {
    */
   def updateStructureFromTestNames(keptTests: => Seq[(String, Boolean)]): Unit
 
-  /** Keeps the suite name a site read for the instance's run, where it is the first read of it. */
+  // Only the first read of the run counts.
   def suiteNameRead(suiteName: String): Unit
 
-  /** Keeps the suite ID a site read for the instance's run, where it is the first read of it, which fixes its node. */
+  // Only the first read of the run counts, and it fixes the suite's node.
   def suiteIdRead(suiteId: String): Unit
 
-  /**
-   * What `filter` says of one test of `suite`, the instance of this registration's run. It reads the suite's tags and
-   * suite ID in the order 3.2.20 passes them to the filter, and keeps the suite ID it read.
-   */
+  // Reads the suite's tags and suite ID in the order 3.2.20 passes them to the filter.
   final def filtered(filter: Filter, testName: String, suite: Suite): (Boolean, Boolean) = {
     val theTags = suite.tags
     val theSuiteId = suite.suiteId
@@ -176,7 +155,6 @@ private[scalatest] abstract class SuiteRegistration {
     filter(testName, theTags, theSuiteId)
   }
 
-  /** The `Args` a test is run with: `args`, reporting to the test's structure wrapper. */
   final def argsOfTest(testName: String, args: Args): Args = {
     val reporter = reporterOfTest(testName, args.reporter)
     if (reporter eq args.reporter) args else args.copy(reporter = reporter)
@@ -185,7 +163,7 @@ private[scalatest] abstract class SuiteRegistration {
 
 private[scalatest] object SuiteRegistration {
 
-  /** The registration of every suite instance whose run finds no invocation context. It registers and wraps nothing. */
+  /** The registration of every suite instance whose run finds no invocation context. */
   val none: SuiteRegistration = new SuiteRegistration {
     def startRun(): Unit = ()
     def originAt(scopes: List[ScopePlace]): EventOrigin = EventOrigin.none
@@ -202,7 +180,6 @@ private[scalatest] object SuiteRegistration {
     def suiteIdRead(suiteId: String): Unit = ()
   }
 
-  /** The registration of `suite` the invocation context this thread runs in is the run of, else `none`. */
   def inContext(suite: Suite): SuiteRegistration = InvocationContext.get.flatMap(_.registrationOf(suite)).getOrElse(none)
 
   /**
@@ -237,13 +214,8 @@ private[scalatest] abstract class SuiteStart {
   /** Takes the suite name and suite ID the site read as it built the suite's `SuiteStarting`. */
   def namesRead(suiteName: String, suiteId: String): Unit
 
-  /** The origin of the suite's `SuiteStarting`, `SuiteCompleted` and `SuiteAborted`, which hands nothing off unless overridden. */
   protected def originOfStartAndEnd: EventOrigin = EventOrigin.none
 
-  /**
-   * Reports the suite's `SuiteStarting`, `SuiteCompleted` or `SuiteAborted` to `reporter`, first handing it off with
-   * the suite's origin.
-   */
   final def report(event: Event): Unit = {
     originOfStartAndEnd.handOff(event)
     reporter(event)
@@ -255,7 +227,6 @@ private[scalatest] abstract class SuiteStart {
 
 private[scalatest] object SuiteStart {
 
-  /** The start of a top-level suite of a run that writes no test event log: it runs in no context. */
   def withoutEventLog(suiteReporter: Reporter): SuiteStart =
     new SuiteStart {
       def reporter: Reporter = suiteReporter
@@ -281,7 +252,6 @@ private[scalatest] object SuiteStart {
     }
   }
 
-  /** The start of a suite in the context the site finds, which keeps no names. */
   def inTheContextItFinds(suiteReporter: Reporter): SuiteStart =
     new SuiteStart {
       def reporter: Reporter = suiteReporter
@@ -289,7 +259,6 @@ private[scalatest] object SuiteStart {
       def run(run: => Status): Status = run
     }
 
-  /** The start of a nested suite: registered in the context the site runs in, where one is set. */
   def ofNestedSuite(nestedSuite: Suite, reporter: Reporter): SuiteStart =
     InvocationContext.get.fold(inTheContextItFinds(reporter))(_.register(nestedSuite).startWith(reporter))
 }

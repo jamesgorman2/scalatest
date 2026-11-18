@@ -24,7 +24,7 @@ final class ConsolidationTestSupportSpec extends AnyWordSpec with Matchers {
             BuiltEvent(
               "suite \"DivideSuite\": SuiteStarting",
               TestEventLogEvent.ScalaTestEvent(Some(NodeExecution(NodeId(Vector(NodePlace.Suite("samples.DivideSuite", 0))), Vector(1))), DecodedEvent.SuiteStarting(None, "main", 0L)),
-              FixedParts.none
+              WrittenParts.none
             )
           ),
           BuiltRunItem.CapturedLine(CapturedStream.Stdout, "dividing now")

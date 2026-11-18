@@ -246,10 +246,7 @@ private[scalatest] final class PathMessageCalls {
 
   def add(eventOfCall: PathMessageEventFun): Unit = calls.add((eventOfCall, System.currentTimeMillis))
 
-  /**
-   * Hands off the event of each call, in the order of the calls, each stamped with the time of its call. Each is built
-   * with a tracker of its own, so that it takes no ordinal from the run's.
-   */
+  // Each event is built with a tracker of its own, so that it takes no ordinal from the run's.
   def handOffTo(origin: EventOrigin, theSuite: Suite, report: Reporter, testName: String, indentation: Int, includeIcon: Boolean): Unit = {
     calls.asScala.foreach { case (eventOfCall, timeOfCall) =>
       origin.handOffMessage(stamped(eventOfCall(theSuite, report, new Tracker, testName, indentation, includeIcon), timeOfCall))

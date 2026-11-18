@@ -4,22 +4,13 @@ import scala.collection.mutable.ListBuffer
 
 private[scalatest] enum SplitArgument {
 
-  /**
-   * An argument whose flag `ArgsParser.parseArgs` recognises, with its values.
-   *
-   * @param flag the flag without what is written onto it: `-o` for `-oD`
-   * @param arguments the argument as written, then its values
-   */
-  case Flagged(flag: String, arguments: List[String])
+  /** @param flag the flag without what is written onto it: `-o` for `-oD` */
+  case Flagged(flag: String, argumentAndValues: List[String])
 
-  /** An argument whose flag `ArgsParser.parseArgs` does not recognise. */
   case Unrecognised(argument: String)
 }
 
-/**
- * Groups ScalaTest arguments by flag, giving each flag the values the JVM `ArgsParser.parseArgs` reads for it, so
- * that a value is never read as a flag.
- */
+/** Gives each flag the values the JVM `ArgsParser.parseArgs` reads for it, so that a value is never read as a flag. */
 private[scalatest] object ArgumentSplitter {
 
   private enum Values {

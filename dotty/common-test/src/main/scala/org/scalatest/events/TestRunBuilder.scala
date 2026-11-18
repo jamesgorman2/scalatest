@@ -12,18 +12,13 @@ private[scalatest] enum TestRunPart {
   case CapturedLine(stream: CapturedStream, line: String)
 }
 
-/**
- * The parts of an event that a `Then` fixes.
- *
- * @param ancestorExecutions the ancestors whose execution the event marks
- */
-private[scalatest] final case class FixedParts(fields: Set[String], ancestorExecutions: Set[NodeId], throwable: Option[WrittenThrowable])
+private[scalatest] final case class WrittenParts(fields: Set[String], markedAncestors: Set[NodeId], throwable: Option[WrittenThrowable])
 
-private[scalatest] object FixedParts {
-  val none: FixedParts = FixedParts(Set.empty, Set.empty, None)
+private[scalatest] object WrittenParts {
+  val none: WrittenParts = WrittenParts(Set.empty, Set.empty, None)
 }
 
-private[scalatest] final case class BuiltEvent(notation: String, event: TestEventLogEvent, fixed: FixedParts)
+private[scalatest] final case class BuiltEvent(notation: String, event: TestEventLogEvent, written: WrittenParts)
 
 private[scalatest] enum BuiltRunItem {
   case Event(built: BuiltEvent)
@@ -41,7 +36,7 @@ private[scalatest] final case class BuiltRun(items: Vector[BuiltRunItem]) {
  *
  * A run is given as its parts in order: blocks of events in the notation, and captured lines where they are fed.
  * Each event is built as a `Given` gives it, with a default for every field it does not write. It also carries the
- * parts a `Then` fixes, for `EventLogComparison`.
+ * parts the notation writes, which are all `EventLogComparison` compares.
  */
 private[scalatest] object TestRunBuilder {
 
@@ -50,7 +45,6 @@ private[scalatest] object TestRunBuilder {
   val defaultThreadName: String = "main"
   val defaultTimeStamp: Long = 0L
 
-  /** Returns the built run, or why a part is not in the notation. */
   def build(parts: TestRunPart*): Either[String, BuiltRun] = {
     val run = new RunUnderConstruction
     try {
@@ -80,7 +74,6 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, var name: Strin
     }
   }
 
-  /** The latest execution open at this point of the event log, else the latest, else the first. */
   def defaultExecution: Int = (executions -- endedExecutions).maxOption.orElse(executions.maxOption).getOrElse(1)
 }
 
@@ -112,11 +105,11 @@ private final class RunUnderConstruction {
   def built(line: NotationLine): BuiltEvent = {
     line match {
       case NotationLine.RunStarted(text) =>
-        BuiltEvent(text, TestEventLogEvent.RunStarted(TestRunBuilder.defaultPid, TestRunBuilder.defaultStartTime), FixedParts.none)
+        BuiltEvent(text, TestEventLogEvent.RunStarted(TestRunBuilder.defaultPid, TestRunBuilder.defaultStartTime), WrittenParts.none)
       case block: NotationLine.Structure =>
-        BuiltEvent(block.text, TestEventLogEvent.Structure(structureNodes(block)), FixedParts.none)
+        BuiltEvent(block.text, TestEventLogEvent.Structure(structureNodes(block)), WrittenParts.none)
       case event: NotationLine.Event => scalaTestEvent(event)
-      case NotationLine.RunEnded(outcome, text) => BuiltEvent(text, TestEventLogEvent.RunEnded(outcome), FixedParts.none)
+      case NotationLine.RunEnded(outcome, text) => BuiltEvent(text, TestEventLogEvent.RunEnded(outcome), WrittenParts.none)
     }
   }
 
@@ -154,7 +147,7 @@ private final class RunUnderConstruction {
   private def newSuite(written: WrittenNode.Suite, parent: Option[NodeId], position: Option[Int], text: String): HeldSuite = {
     val suiteId = written.suiteId.getOrElse(written.className)
     val ordinalItTakes = sharingName(NodeKind.Suite, written.name).size + 1
-    written.number.filter(_ != ordinalItTakes).foreach { ordinal =>
+    written.ordinalAmongSameName.filter(_ != ordinalItTakes).foreach { ordinal =>
       fail(s"a suite new to the event log is #$ordinalItTakes among the suites that share its name, not #$ordinal: '$text'")
     }
     val siblings = suitesUnderParent(parent)
@@ -173,7 +166,7 @@ private final class RunUnderConstruction {
     val suiteId = written.suiteId.getOrElse(written.className)
     val parent = block.under.map(reference => nodeNamed(reference).id)
     val siblings = suitesUnderParent(parent)
-    val earlier = written.number match {
+    val earlier = written.ordinalAmongSameName match {
       case Some(ordinal) =>
         sharingName(NodeKind.Suite, written.name).lift(ordinal - 1).map { named =>
           siblings.find(sibling => sibling.id == named.id && sibling.suiteId == suiteId).getOrElse {
@@ -233,8 +226,8 @@ private final class RunUnderConstruction {
     built.result()
   }
 
-  /** The nodes above the given one, from its top-level suite down. A test's scopes are those of the latest structure. */
-  private def ancestorsOf(node: HeldNode): Vector[HeldNode] =
+  // A test's scopes are those of the latest structure that holds it.
+  private def ancestorsTopDown(node: HeldNode): Vector[HeldNode] =
     Iterator.unfold(node.parent)(parent => parent.map(nodes).map(held => (held, held.parent))).toVector.reverse
 
   private def scalaTestEvent(line: NotationLine.Event): BuiltEvent = {
@@ -248,7 +241,7 @@ private final class RunUnderConstruction {
         (None, Set.empty[NodeId])
       case Some(reference) =>
         val node = nodeNamed(reference)
-        val ancestors = ancestorsOf(node)
+        val ancestors = ancestorsTopDown(node)
         val marked = line.ancestorExecutions.map { marker =>
           val ancestor = nodeNamed(marker.ancestor)
           if (!ancestors.contains(ancestor)) {
@@ -260,17 +253,17 @@ private final class RunUnderConstruction {
         if (depths != depths.distinct.sorted) {
           fail(s"an event marks each ancestor's execution once, from the top-level suite down: '${line.text}'")
         }
-        val markedExecutions = marked.map { case (ancestor, number) => ancestor.id -> number }.toMap
+        val markedExecutions = marked.map { case (ancestor, ancestorExecution) => ancestor.id -> ancestorExecution }.toMap
         val executionPath = ancestors.map(ancestor => markedExecutions.getOrElse(ancestor.id, ancestor.defaultExecution))
-        val number = line.execution.getOrElse(1)
-        marked.foreach { case (ancestor, ancestorNumber) => ancestor.record(ancestorNumber, endsIt = false) }
-        node.record(number, RunUnderConstruction.eventsEndingAnExecution.contains(line.className))
-        (Some(NodeExecution(node.id, executionPath :+ number)), markedExecutions.keySet)
+        val ownExecution = line.execution.getOrElse(1)
+        marked.foreach { case (ancestor, ancestorExecution) => ancestor.record(ancestorExecution, endsIt = false) }
+        node.record(ownExecution, RunUnderConstruction.eventsEndingAnExecution.contains(line.className))
+        (Some(NodeExecution(node.id, executionPath :+ ownExecution)), markedExecutions.keySet)
     }
     BuiltEvent(
       line.text,
       TestEventLogEvent.ScalaTestEvent(execution, decoded),
-      FixedParts(line.fields.map { case (name, _) => name }.toSet, markedAncestors, fields.writtenThrowable)
+      WrittenParts(line.fields.map { case (name, _) => name }.toSet, markedAncestors, fields.writtenThrowable)
     )
   }
 }
@@ -354,7 +347,6 @@ private final class WrittenFields(line: NotationLine.Event) {
 
 private object WrittenFields {
 
-  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   def decodedThrowable(written: WrittenThrowable): DecodedThrowable = {
     val message = written.message match {
       case WrittenMessage.Text(value) => Some(value)

@@ -58,8 +58,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
   private def linesAfterHandingOff(events: Event*): Vector[String] = {
     TemporaryEventLog.in { eventLogFile =>
       val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-      events.foreach(emitter.runEvent)
-      emitter.runEvent(runCompleted)
+      events.foreach(emitter.writeRunEvent)
+      emitter.writeRunEvent(runCompleted)
       TemporaryEventLog.lines(eventLogFile)
     }
   }
@@ -131,7 +131,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         try {
           TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine)
         } finally {
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runCompleted)
         }
       }
     }
@@ -142,7 +142,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         try {
           TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set("events.log")
         } finally {
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runCompleted)
         }
       }
     }
@@ -154,7 +154,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         try {
           TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine)
         } finally {
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runCompleted)
         }
       }
     }
@@ -166,7 +166,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         try {
           (TemporaryEventLog.namesIn(eventLogFile.getParent), TemporaryEventLog.lines(eventLogFile)) shouldBe ((Set("events.log"), Vector(runStartedLine)))
         } finally {
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runCompleted)
         }
       }
     }
@@ -228,10 +228,10 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         TemporaryEventLog.in { eventLogFile =>
           val emitter = TestEventLogEmitter.started(eventLogFile, identity)
           try {
-            emitter.runEvent(runStarting)
+            emitter.writeRunEvent(runStarting)
             TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
           } finally {
-            emitter.runEvent(runCompleted)
+            emitter.writeRunEvent(runCompleted)
           }
         }
       }
@@ -255,9 +255,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "write nothing handed to it afterwards" in {
         TemporaryEventLog.in { eventLogFile =>
           val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          emitter.runEvent(runCompleted)
-          emitter.runEvent(alert("late", "main"))
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runCompleted)
+          emitter.writeRunEvent(alert("late", "main"))
+          emitter.writeRunEvent(runCompleted)
           TemporaryEventLog.lines(eventLogFile) shouldBe
             Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
         }
@@ -268,9 +268,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "not throw, and end the event log before that event" in {
         TemporaryEventLog.in { eventLogFile =>
           val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          emitter.runEvent(runStarting)
-          emitter.runEvent(cannotBeEncodedFor(new IllegalStateException("no text")))
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runStarting)
+          emitter.writeRunEvent(cannotBeEncodedFor(new IllegalStateException("no text")))
+          emitter.writeRunEvent(runCompleted)
           TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
         }
       }
@@ -282,7 +282,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val wasLeftInterrupted =
           try {
-            emitter.runEvent(cannotBeEncodedFor(new InterruptedException("interrupted while blocked")))
+            emitter.writeRunEvent(cannotBeEncodedFor(new InterruptedException("interrupted while blocked")))
             Thread.currentThread.isInterrupted
           } finally {
             Thread.interrupted()
@@ -296,7 +296,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         emitter.endWithoutRunEnded()
         val wasLeftInterrupted =
           try {
-            emitter.runEvent(cannotBeEncodedFor(new InterruptedException("interrupted while blocked")))
+            emitter.writeRunEvent(cannotBeEncodedFor(new InterruptedException("interrupted while blocked")))
             Thread.currentThread.isInterrupted
           } finally {
             Thread.interrupted()
@@ -309,7 +309,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "not throw, and close the event log" in {
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
-        emitter.runEvent(RunStarting(ordinal, 3, ConfigMap("key" -> new RecursesWithoutEndFromToString), threadName = "main", timeStamp = timeStamp))
+        emitter.writeRunEvent(RunStarting(ordinal, 3, ConfigMap("key" -> new RecursesWithoutEndFromToString), threadName = "main", timeStamp = timeStamp))
         eventLog.writes shouldBe Vector.empty
         eventLog.isClosed shouldBe true
       }
@@ -320,7 +320,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val outOfMemory = new OutOfMemoryError("no heap")
-        val thrown = the[OutOfMemoryError] thrownBy emitter.runEvent(cannotBeEncodedFor(outOfMemory))
+        val thrown = the[OutOfMemoryError] thrownBy emitter.writeRunEvent(cannotBeEncodedFor(outOfMemory))
         thrown should be theSameInstanceAs outOfMemory
         eventLog.isClosed shouldBe true
       }
@@ -330,7 +330,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "not throw, and close the event log" in {
         val eventLog = new RejectsWrites
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
-        emitter.runEvent(runStarting)
+        emitter.writeRunEvent(runStarting)
         eventLog.isClosed shouldBe true
       }
     }
@@ -340,8 +340,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val heldBack = new MessageHeldBack
-        val waiting = new Thread(() => emitter.runEvent(AlertProvided(ordinal, "waiting", None, Some(heldBack), threadName = "main", timeStamp = timeStamp)))
-        val meanwhile = new Thread(() => emitter.runEvent(alert("meanwhile", "main")))
+        val waiting = new Thread(() => emitter.writeRunEvent(AlertProvided(ordinal, "waiting", None, Some(heldBack), threadName = "main", timeStamp = timeStamp)))
+        val meanwhile = new Thread(() => emitter.writeRunEvent(alert("meanwhile", "main")))
         waiting.start()
         try {
           heldBack.isBeingRead.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
@@ -359,9 +359,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "close the event log, and write nothing handed to it afterwards" in {
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
-        emitter.runEvent(runStarting)
+        emitter.writeRunEvent(runStarting)
         emitter.endWithoutRunEnded()
-        emitter.runEvent(runCompleted)
+        emitter.writeRunEvent(runCompleted)
         eventLog.writes shouldBe Vector(runStartingLine + "\n")
         eventLog.isClosed shouldBe true
       }
@@ -372,7 +372,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val threadCount = 4
         val eventsOfEachThread = 25
         val decoded = wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, thread) =>
-          (1 to eventsOfEachThread).foreach(event => emitter.runEvent(alert(s"alert $event", s"thread $thread")))
+          (1 to eventsOfEachThread).foreach(event => emitter.writeRunEvent(alert(s"alert $event", s"thread $thread")))
         }
         val messagesByThread =
           decoded.collect { case TestEventLogEvent.ScalaTestEvent(None, alert: org.scalatest.events.DecodedEvent.AlertProvided) =>
@@ -389,11 +389,11 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           val emitter = TestEventLogEmitter.started(eventLogFile, identity)
           val interrupted = new Thread(() => {
             Thread.currentThread.interrupt()
-            emitter.runEvent(alert("while interrupted", "main"))
+            emitter.writeRunEvent(alert("while interrupted", "main"))
           })
           interrupted.start()
           interrupted.join()
-          emitter.runEvent(runCompleted)
+          emitter.writeRunEvent(runCompleted)
           TemporaryEventLog.decoded(eventLogFile).collect { case Right(TestEventLogEvent.RunEnded(outcome)) => outcome } shouldBe
             Vector(RunOutcome.Completed)
           TemporaryEventLog.lines(eventLogFile).count(_.contains("while interrupted")) shouldBe 1
@@ -421,7 +421,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
       "write it as one line, the suite first and each node's children after it in declared order, nested suites before scopes and tests" in {
         val eventLog = new RecordingEventLog
-        TestEventLogEmitter.appendingTo(eventLog).topLevelSuite(nestedThenScopesAndTests)
+        TestEventLogEmitter.appendingTo(eventLog).addTopLevelSuite(nestedThenScopesAndTests)
         val innerPath = outerPath.suite("samples.Inner")
         val firstS = outerPath.scope("s")
         eventLog.writes shouldBe Vector(
@@ -441,7 +441,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         TestEventLogEmitter
           .appendingTo(eventLog)
-          .topLevelSuite(structureOf(outer, "Outer", List(test("flat")), List(structureOf(inner, "Inner", Nil)), testsBeforeNestedSuites = true))
+          .addTopLevelSuite(structureOf(outer, "Outer", List(test("flat")), List(structureOf(inner, "Inner", Nil)), testsBeforeNestedSuites = true))
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
             TestEventLogLine.suite("Outer", "samples.Outer"),
@@ -452,14 +452,14 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       }
 
       "return the suite's node table, holding the suite's node, suite ID and class name" in {
-        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).topLevelSuite(nestedThenScopesAndTests)
+        val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).addTopLevelSuite(nestedThenScopesAndTests)
         (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), "samples.Outer", "samples.Outer"))
       }
 
       "return a node table holding each test's node by its test name" in {
         val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
-        val table = emitter.topLevelSuite(nestedThenScopesAndTests)
-        emitter.synchronized(table.tests) shouldBe Map("s t" -> nodeId(outerPlace, NodePlace.Test("s t")), "flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
+        val table = emitter.addTopLevelSuite(nestedThenScopesAndTests)
+        emitter.synchronized(table.testsByName) shouldBe Map("s t" -> nodeId(outerPlace, NodePlace.Test("s t")), "flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
       }
 
       "return a node table holding each scope's node by its path of registered texts, telling sibling scopes of one text apart by their place" in {
@@ -473,8 +473,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
             )
           )
         val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
-        val table = emitter.topLevelSuite(structure)
-        emitter.synchronized(table.scopes) shouldBe Map(
+        val table = emitter.addTopLevelSuite(structure)
+        emitter.synchronized(table.scopesByPath) shouldBe Map(
           List(ScopePlace("s", 0)) -> nodeId(outerPlace, NodePlace.Scope("s", 0)),
           List(ScopePlace("s", 0), ScopePlace("u which", 0)) -> nodeId(outerPlace, NodePlace.Scope("s", 0), NodePlace.Scope("u which", 0)),
           List(ScopePlace("s", 1)) -> nodeId(outerPlace, NodePlace.Scope("s", 1))
@@ -483,7 +483,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
       "return a node table holding the parent of each scope and test" in {
         val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
-        val table = emitter.topLevelSuite(nestedThenScopesAndTests)
+        val table = emitter.addTopLevelSuite(nestedThenScopesAndTests)
         val outerId = nodeId(outerPlace)
         val firstS = nodeId(outerPlace, NodePlace.Scope("s", 0))
         emitter.synchronized(table.parents) shouldBe Map(
@@ -496,8 +496,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
       "return a node table holding each nested suite's table at its position" in {
         val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
-        val table = emitter.topLevelSuite(nestedThenScopesAndTests)
-        emitter.synchronized(table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.tests, nested.scopes, nested.nestedSuites))) shouldBe
+        val table = emitter.addTopLevelSuite(nestedThenScopesAndTests)
+        emitter.synchronized(table.nestedSuitesOfFirstStructure.map(nested => (nested.node, nested.suiteId, nested.className, nested.testsByName, nested.scopesByPath, nested.nestedSuitesOfFirstStructure))) shouldBe
           Vector(
             (
               nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0)),
@@ -513,8 +513,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       "give a later top-level suite of an earlier one's suite ID the next index, so that no two nodes share a path" in {
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
-        emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
-        emitter.topLevelSuite(structureOf(inner, "Outer", List(test("flat"))))
+        emitter.addTopLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
+        emitter.addTopLevelSuite(structureOf(inner, "Outer", List(test("flat"))))
         val laterPath = NodePath.topLevel("samples.Outer", 1)
         eventLog.writes shouldBe Vector(
           TestEventLogLine.structure(
@@ -532,14 +532,14 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         emitter.endWithoutRunEnded()
-        val table = emitter.topLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
+        val table = emitter.addTopLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
         eventLog.writes shouldBe Vector.empty
-        emitter.synchronized(table.tests) shouldBe Map("flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
+        emitter.synchronized(table.testsByName) shouldBe Map("flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
       }
 
       "not throw where its event log rejects the write, and close the event log" in {
         val eventLog = new RejectsWrites
-        TestEventLogEmitter.appendingTo(eventLog).topLevelSuite(structureOf(outer, "Outer", Nil))
+        TestEventLogEmitter.appendingTo(eventLog).addTopLevelSuite(structureOf(outer, "Outer", Nil))
         eventLog.isClosed shouldBe true
       }
     }
@@ -550,7 +550,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val suitesOfEachThread = 25
         val decoded = wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, thread) =>
           (1 to suitesOfEachThread).foreach { suite =>
-            emitter.topLevelSuite(structureOf(new Suite {}, s"Suite${suite}OfThread$thread", List(test("a"), test("b"))))
+            emitter.addTopLevelSuite(structureOf(new Suite {}, s"Suite${suite}OfThread$thread", List(test("a"), test("b"))))
           }
         }
         val nodeIds = decoded.collect { case TestEventLogEvent.Structure(nodes) =>
@@ -608,10 +608,10 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val eventLog = new RecordingEventLog
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val reporter = new RecordingReporter
-        emitter.runEvent(runStarting)
+        emitter.writeRunEvent(runStarting)
         val suite = new TestNamesThrow(new IllegalStateException("no names"))
         val start = emitter.startOfTopLevelSuite(suite, Filter.default, reporter)
-        emitter.runEvent(runCompleted)
+        emitter.writeRunEvent(runCompleted)
         var inItsRun = Option.empty[SuiteRegistration]
         start.run {
           inItsRun = Some(SuiteRegistration.inContext(suite))

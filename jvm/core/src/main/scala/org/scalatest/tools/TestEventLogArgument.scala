@@ -12,7 +12,6 @@ private[scalatest] object TestEventLogArgument {
 
   def isFlag(argument: String): Boolean = argument == flag
 
-  /** Takes the file's path from the arguments that follow the flag. */
   def fileAfterFlag(following: Iterator[String]): String =
     if (following.hasNext)
       following.next()

@@ -43,7 +43,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  private def lastParentExecutionOf(notation: String): Option[Int] = executionsOf(notation).last.flatMap(_.executions.init.lastOption)
+  private def lastParentExecutionOf(notation: String): Option[Int] = executionsOf(notation).last.flatMap(_.executionPath.init.lastOption)
 
   private def throwableOf(written: String): DecodedThrowable = {
     lastDecodedEventOf(s"run: RunAborted(throwable: $written)") match {
@@ -96,24 +96,24 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         val divideSuiteId = id(suiteAt("samples.DivideSuite"))
 
         run.items shouldBe Vector(
-          BuiltRunItem.Event(BuiltEvent("run started", TestEventLogEvent.RunStarted(1L, "1970-01-01T00:00:00Z"), FixedParts.none)),
+          BuiltRunItem.Event(BuiltEvent("run started", TestEventLogEvent.RunStarted(1L, "1970-01-01T00:00:00Z"), WrittenParts.none)),
           BuiltRunItem.CapturedLine(CapturedStream.Stderr, "warn: about to divide"),
           BuiltRunItem.Event(
             BuiltEvent(
               "structure\n  suite \"DivideSuite\", class \"samples.DivideSuite\"",
               TestEventLogEvent.Structure(Vector(suite(divideSuiteId, None, None, "DivideSuite", "samples.DivideSuite", "samples.DivideSuite"))),
-              FixedParts.none
+              WrittenParts.none
             )
           ),
           BuiltRunItem.Event(
             BuiltEvent(
               "suite \"DivideSuite\": SuiteStarting",
               TestEventLogEvent.ScalaTestEvent(execution(divideSuiteId, 1), DecodedEvent.SuiteStarting(None, "main", 0L)),
-              FixedParts.none
+              WrittenParts.none
             )
           ),
           BuiltRunItem.CapturedLine(CapturedStream.Stdout, "dividing now"),
-          BuiltRunItem.Event(BuiltEvent("run ended completed", TestEventLogEvent.RunEnded(RunOutcome.Completed), FixedParts.none))
+          BuiltRunItem.Event(BuiltEvent("run ended completed", TestEventLogEvent.RunEnded(RunOutcome.Completed), WrittenParts.none))
         )
       }
 
@@ -1426,7 +1426,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "recording what an event fixes" should {
+    "recording the parts an event writes" should {
       "record the fields and throwable parts a ScalaTest event writes" in {
         val event = built(
           TestRunPart.Events(
@@ -1434,7 +1434,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           )
         ).events.last
 
-        event.fixed shouldBe FixedParts(
+        event.written shouldBe WrittenParts(
           Set("throwable", "analysis"),
           Set.empty,
           Some(
@@ -1452,12 +1452,12 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "record each ancestor whose execution the event marks" in {
-        built(TestRunPart.Events(joined(stackSuite, """test "pops", in scope "A Stack" execution 1: TestStarting"""))).events.last.fixed shouldBe
-          FixedParts(Set.empty, Set(aStackId), None)
+        built(TestRunPart.Events(joined(stackSuite, """test "pops", in scope "A Stack" execution 1: TestStarting"""))).events.last.written shouldBe
+          WrittenParts(Set.empty, Set(aStackId), None)
       }
 
       "record no ancestor where the event leaves each to the default" in {
-        built(TestRunPart.Events(joined(stackSuite, """test "pops" execution 2: TestStarting"""))).events.last.fixed shouldBe FixedParts.none
+        built(TestRunPart.Events(joined(stackSuite, """test "pops" execution 2: TestStarting"""))).events.last.written shouldBe WrittenParts.none
       }
 
       "keep each event's own notation" in {

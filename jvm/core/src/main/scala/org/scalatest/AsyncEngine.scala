@@ -397,21 +397,21 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     asyncOutcome.toStatus
   }
 
-  // The place of each scope from the suite down to a branch: the path by which a test event log names the branch's scope.
-  private def scopePlacesTo(branch: Branch): List[ScopePlace] =
+  // The path by which a test event log names the branch's scope.
+  private def scopePathTo(branch: Branch): List[ScopePlace] =
     branch match {
       case scope @ DescriptionBranch(parent, descriptionText, _, _) =>
         val declaredBefore = parent.subNodes.dropWhile(_ ne scope).drop(1)
-        val place = declaredBefore.count {
+        val indexAmongScopesOfItsText = declaredBefore.count {
           case DescriptionBranch(_, text, _, _) => text == descriptionText
           case _ => false
         }
-        scopePlacesTo(parent) :+ ScopePlace(descriptionText, place)
+        scopePathTo(parent) :+ ScopePlace(descriptionText, indexAmongScopesOfItsText)
       case _ => Nil
     }
 
   private def originOfBranch(registration: SuiteRegistration, branch: Branch): EventOrigin =
-    if (registration eq SuiteRegistration.none) EventOrigin.none else registration.originAt(scopePlacesTo(branch))
+    if (registration eq SuiteRegistration.none) EventOrigin.none else registration.originAt(scopePathTo(branch))
 
   private def runTestsInBranch(
     theSuite: Suite,
@@ -521,21 +521,18 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
       case _ => testText
     }
 
-  /** Names the scope being registered as the suite's source names it. Called from the scope's own registration function. */
+  // Called from the scope's own registration function.
   def nameCurrentScope(nameInSource: String): Unit = atomic.get.currentBranch.nameInSource = Some(nameInSource)
 
-  /** Names the test registered last as the suite's source names it. Called as that test's registration returns. */
+  // Called as that test's registration returns.
   def nameLastRegisteredTest(nameInSource: String): Unit =
     atomic.get.currentBranch.subNodes.headOption.foreach(test => test.nameInSource = Some(nameInSource))
 
   /**
-   * Returns the scopes and tests registered so far, in the order registered, each labelled as `runTestsInBranch` and
-   * `runTestImpl` label its events. `includeIcon` is the one the style's `runTest` passes `runTestImpl`. A scope or
-   * test whose registration recorded the name the suite's source gives it takes that name. For any other, the two
-   * functions give the name from the text it is registered with.
+   * Labels each scope and test as `runTestsInBranch` and `runTestImpl` label its events. `includeIcon` is the one the
+   * style's `runTest` passes `runTestImpl`. The name functions apply only where registration recorded no name in source.
    */
   def registeredNodes(includeIcon: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
-    // Recurses once for each scope nested in another, as registering and running them do.
     def nodesIn(branch: Branch): List[RegisteredNode] =
       branch.subNodes.reverse.collect {
         case test @ TestLeaf(_, testName, testText, _, _, _, _) =>
@@ -546,7 +543,6 @@ private[scalatest] sealed abstract class AsyncSuperEngine[T](concurrentBundleMod
     nodesIn(Trunk)
   }
 
-  /** Returns the registered scopes and tests of a style that names each by the text it is registered with. */
   def registeredNodes(includeIcon: Boolean): List[RegisteredNode] =
     registeredNodes(includeIcon, (text: String) => text, (text: String) => text)
 

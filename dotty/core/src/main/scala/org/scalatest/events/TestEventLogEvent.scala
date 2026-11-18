@@ -3,20 +3,16 @@ package org.scalatest.events
 import org.scalatest.tools.StackDepthView
 import org.scalatest.tools.ThrowableView
 
-/**
- * A node's place under its parent. A suite's index is its order among the parent's suites of its `suiteId`; a
- * scope's is its order among the parent's scopes of its text.
- */
+/** A suite's index is its order among the parent's suites of its `suiteId`; a scope's, among the parent's scopes of its text. */
 private[scalatest] enum NodePlace {
   case Suite(suiteId: String, index: Int)
   case Scope(text: String, index: Int)
   case Test(name: String)
 }
 
-/** A node's ID: its node path, its places from its top-level suite down. */
+/** Places from the top-level suite down. */
 private[scalatest] final case class NodeId(places: Vector[NodePlace])
 
-/** A node of a `structure` event. A test's `ignored` says whether the structure marks it ignored. */
 private[scalatest] enum StructureNode {
   case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String)
   case Scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String)
@@ -34,15 +30,10 @@ private[scalatest] enum StructureNode {
     }
 }
 
-/**
- * The node an event is assigned to, and the event's execution path.
- *
- * @param executions an execution number for each node from the top-level suite down to `node`, each test's scopes included
- */
-private[scalatest] final case class NodeExecution(node: NodeId, executions: Vector[Int]) {
+/** @param executionPath an execution index for each node from the top-level suite down to `node`, each test's scopes included */
+private[scalatest] final case class NodeExecution(node: NodeId, executionPath: Vector[Int]) {
 
-  /** The number of the node's own execution. */
-  def execution: Int = executions.last
+  def executionIndex: Int = executionPath.last
 }
 
 private[scalatest] enum TestEventLogEvent {

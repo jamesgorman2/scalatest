@@ -14,7 +14,7 @@ private[events] final case class NodeReference(kind: NodeKind, name: String, ord
 }
 
 private[events] enum WrittenNode {
-  case Suite(name: String, number: Option[Int], className: String, suiteId: Option[String])
+  case Suite(name: String, ordinalAmongSameName: Option[Int], className: String, suiteId: Option[String])
   case Scope(name: String, label: String)
   case Test(name: String, label: String, testName: Option[String], ignored: Boolean)
 }
@@ -141,10 +141,10 @@ private[events] object EventNotation {
     val node = {
       if (cursor.accepts("suite ")) {
         val name = cursor.quoted()
-        val number = if (cursor.accepts(" #")) Some(cursor.count()) else None
+        val ordinal = if (cursor.accepts(" #")) Some(cursor.positiveInt()) else None
         cursor.expect(", class ")
         val className = cursor.quoted()
-        WrittenNode.Suite(name, number, className, if (cursor.accepts(", id ")) Some(cursor.quoted()) else None)
+        WrittenNode.Suite(name, ordinal, className, if (cursor.accepts(", id ")) Some(cursor.quoted()) else None)
       } else if (cursor.accepts("scope ")) {
         val name = cursor.quoted()
         cursor.expect(", label ")
@@ -185,12 +185,12 @@ private[events] object EventNotation {
   private def event(text: String): NotationLine = {
     val cursor = new LineCursor(text)
     val node = if (cursor.accepts("run")) None else Some(nodeReference(cursor))
-    val execution = if (cursor.accepts(" execution ")) Some(cursor.count()) else None
+    val execution = if (cursor.accepts(" execution ")) Some(cursor.positiveInt()) else None
     val ancestorExecutions = Vector.newBuilder[AncestorExecution]
     while (cursor.accepts(", in ")) {
       val ancestor = nodeReference(cursor)
       cursor.expect(" execution ")
-      ancestorExecutions += AncestorExecution(ancestor, cursor.count())
+      ancestorExecutions += AncestorExecution(ancestor, cursor.positiveInt())
     }
     cursor.expect(": ")
     val className = cursor.word("an event class")(_.isLetterOrDigit)
@@ -202,7 +202,7 @@ private[events] object EventNotation {
   private def nodeReference(cursor: LineCursor): NodeReference = {
     val kind = NodeKind.values.find(kind => cursor.accepts(kind.word + " ")).getOrElse(cursor.fail("expected run, suite, scope or test"))
     val name = cursor.quoted()
-    NodeReference(kind, name, if (cursor.accepts(" #")) Some(cursor.count()) else None)
+    NodeReference(kind, name, if (cursor.accepts(" #")) Some(cursor.positiveInt()) else None)
   }
 
   private def eventFields(cursor: LineCursor): Vector[(String, FieldValue)] = {
@@ -281,7 +281,6 @@ private[events] object EventNotation {
     }
   }
 
-  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   private def throwable(cursor: LineCursor): WrittenThrowable = {
     val className = cursor.word("a throwable's class name")(part => part.isLetterOrDigit || part == '.' || part == '$' || part == '_')
     val message = {
@@ -372,7 +371,7 @@ private final class LineCursor(line: String) {
     value.toInt
   }
 
-  def count(): Int = {
+  def positiveInt(): Int = {
     val start = position
     val value = int()
     if (value < 1) {

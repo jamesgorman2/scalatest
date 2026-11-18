@@ -3,7 +3,7 @@ package org.scalatest
 /** A scope or test of a suite's registration tree, named and labelled as a test event log's structure gives it. */
 private[scalatest] sealed abstract class RegisteredNode
 
-/** A scope, holding its scopes and tests in the order registered. Its `text` is the text it is registered with. */
+/** `nodes` are in the order registered. `text` is the text the scope is registered with. */
 private[scalatest] final case class RegisteredScope(name: String, text: String, label: String, nodes: List[RegisteredNode]) extends RegisteredNode
 
 /**
@@ -34,13 +34,11 @@ private[scalatest] object RegisteredNode {
   def flatSpecTestName(testText: String): String =
     flatSpecVerbs.find(verb => testText.startsWith(verb)).fold(testText)(verb => testText.substring(verb.length))
 
-  /** The name of a FeatureSpec scope: its text without what `Feature` puts before it. */
   def featureName(descriptionText: String): String = descriptionText.stripPrefix(Resources.feature(""))
 
-  /** The name of a FeatureSpec test: its text without what `Scenario` puts before it. */
   def scenarioName(testText: String): String = testText.stripPrefix(Resources.scenario(""))
 
-  /** The test of a suite with no registration tree, labelled as `Suite.runTests` labels a test it ignores. */
+  // Labelled as `Suite.runTests` labels a test it ignores.
   def unregisteredTest(testName: String): RegisteredTest = {
     val label = Suite.getEscapedIndentedTextForTest(testName, 1, true).formattedText
     RegisteredTest(testName, testName, label, label)

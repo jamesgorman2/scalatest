@@ -516,11 +516,11 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       try {
         // Sent to a reporter that is no structure wrapper, so the emitter keeps the handed-off markup until the registration is removed.
         started.runningInItsContext(suite.run(None, Args(passingNoEventOn)))
-        anEmitter.keptEventCount shouldBe 1
+        anEmitter.handedOffEventCount shouldBe 1
       } finally {
         started.complete()
       }
-      anEmitter.keptEventCount shouldBe 0
+      anEmitter.handedOffEventCount shouldBe 0
     }
   }
 

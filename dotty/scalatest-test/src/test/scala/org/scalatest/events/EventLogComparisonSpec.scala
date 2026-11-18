@@ -330,7 +330,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
             StructureNode.Test(test, scope, 0, "pops", "- pops")
           )
         ),
-        FixedParts.none
+        WrittenParts.none
       )
       val loggedTree = TestEventLogEvent.Structure(
         Vector(
@@ -543,7 +543,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       val expectedEvent = """test "pops", in scope "A Stack" execution 1: TestStarting"""
       val logged = log(stackSuite, expectedEvent).map {
         case TestEventLogEvent.ScalaTestEvent(Some(assigned), event) =>
-          TestEventLogEvent.ScalaTestEvent(Some(assigned.copy(executions = assigned.executions.takeRight(1))), event)
+          TestEventLogEvent.ScalaTestEvent(Some(assigned.copy(executionPath = assigned.executionPath.takeRight(1))), event)
         case other => other
       }
 

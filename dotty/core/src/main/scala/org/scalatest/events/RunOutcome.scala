@@ -8,8 +8,7 @@ private[scalatest] enum RunOutcome {
 
 private[scalatest] object RunOutcome {
 
-  /** The outcome a closing run event reports, or `None` where the event does not close the run. */
-  def ofClosing(event: Event): Option[RunOutcome] =
+  def reportedBy(event: Event): Option[RunOutcome] =
     event match {
       case _: RunCompleted => Some(Completed)
       case _: RunStopped => Some(Stopped)
