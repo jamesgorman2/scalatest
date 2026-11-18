@@ -23,8 +23,8 @@ object EventLogFields {
     node(logged.execution) + " " + event.productPrefix + fields.mkString("(", ", ", ")")
   }
 
-  /** The suite ID that an event written by `of` names, quoted, or `run` for an event assigned to the run. */
-  def suiteOf(written: String): String =
+  // Reads an event written by `of`, and gives `run` for one assigned to the run.
+  def quotedSuiteIdOf(written: String): String =
     if (written.startsWith("run ")) {
       "run"
     } else {
@@ -128,8 +128,7 @@ object EventLogCoverage {
   private val receivedPrefix = "received "
   private val recordedPrefix = "recorded "
 
-  /** Describes each event the recording holds that the event log does not, in the order the recording holds them. */
-  def missing(recording: Seq[String], eventLog: Seq[TestEventLogEvent.ScalaTestEvent], order: EmitterOrder): Seq[String] = {
+  def missingEvents(recording: Seq[String], eventLog: Seq[TestEventLogEvent.ScalaTestEvent], order: EmitterOrder): Seq[String] = {
     val logged = eventLog.toVector
     val withTimeStamps = logged.map(EventLogFields.of(_, withTimeStamp = true))
     val withoutTimeStamps = logged.map(EventLogFields.of(_, withTimeStamp = false))
@@ -139,7 +138,7 @@ object EventLogCoverage {
     def orderedWith(event: String): String =
       order match {
         case EmitterOrder.AcrossTheRun => ""
-        case EmitterOrder.WithinEachSuite => EventLogFields.suiteOf(event)
+        case EmitterOrder.WithinEachSuite => EventLogFields.quotedSuiteIdOf(event)
       }
 
     val missingReceived = recording.filter(_.startsWith(receivedPrefix)).map(_.stripPrefix(receivedPrefix)).flatMap { event =>
@@ -167,17 +166,15 @@ object EventLogCoverage {
     missingReceived ++ missingRecorded
   }
 
-  /** The quoted IDs of the suites whose `SuiteStarting` events the emitter received, in the order it received them. */
   def suitesStartedAsReceived(recording: Seq[String]): Seq[String] =
     recording
       .filter(_.startsWith(receivedPrefix))
       .map(_.stripPrefix(receivedPrefix))
-      .filter(event => event.startsWith(s"suite ${EventLogFields.suiteOf(event)} SuiteStarting("))
-      .map(EventLogFields.suiteOf)
+      .filter(event => event.startsWith(s"suite ${EventLogFields.quotedSuiteIdOf(event)} SuiteStarting("))
+      .map(EventLogFields.quotedSuiteIdOf)
 
-  /** The quoted IDs of the suites whose `SuiteStarting` events the event log holds, in its order. */
   def suitesStartedAsLogged(eventLog: Seq[TestEventLogEvent.ScalaTestEvent]): Seq[String] =
     eventLog
       .filter(_.event.isInstanceOf[DecodedEvent.SuiteStarting])
-      .map(logged => EventLogFields.suiteOf(EventLogFields.of(logged, withTimeStamp = false)))
+      .map(logged => EventLogFields.quotedSuiteIdOf(EventLogFields.of(logged, withTimeStamp = false)))
 }

@@ -33,7 +33,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each nested suite and its test sit under the suite that nests it, under the test run label")
       output shouldBe
@@ -71,7 +71,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the helper suite's name line sits under the line of the test that ran it, with its test under it")
       output shouldBe
@@ -115,7 +115,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each scope and test shows its label")
       output shouldBe
@@ -145,7 +145,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it as a run of the module `core.test`")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the first line is the module's line, with the suite under it")
       output shouldBe
@@ -187,7 +187,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suites appear in ascending lexicographic order by name")
       output shouldBe
@@ -228,7 +228,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the scopes and tests appear in declared order")
       output shouldBe
@@ -267,7 +267,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the helper suites appear under the test in ascending lexicographic order by name")
       output shouldBe
@@ -310,7 +310,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the undeclared suites follow the declared suite and test, in ascending lexicographic order by name")
       output shouldBe
@@ -353,7 +353,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each scope shows its own test")
       output shouldBe
@@ -388,7 +388,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite that started first comes first, each with its own test")
       output shouldBe
@@ -426,7 +426,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the executions appear in the order they started")
       output shouldBe
@@ -458,7 +458,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite that started comes first")
       output shouldBe
@@ -499,7 +499,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the second run of the first nested suite follows the first, with the tests that the extra suite registers")
       output shouldBe

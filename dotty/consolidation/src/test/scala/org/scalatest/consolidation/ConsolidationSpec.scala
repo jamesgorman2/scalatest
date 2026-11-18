@@ -163,7 +163,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
         val feed = consolidation.addRun(moduleLabel)
         feed.endEventStream()
-        an[IllegalArgumentException] should be thrownBy feed.add(runEvent("run ended completed"))
+        an[IllegalArgumentException] should be thrownBy feed.add("run ended completed".toRunEvent)
       }
     }
 

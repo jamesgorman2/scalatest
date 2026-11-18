@@ -31,7 +31,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("both executions of the test sit together at its declared position, in the order they started")
       output shouldBe
@@ -65,7 +65,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the info sits after the test's first execution and before its second")
       output shouldBe
@@ -107,7 +107,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("both executions of the scope come before the sibling scope, each holding the test's execution that ran in it")
       output shouldBe
@@ -146,7 +146,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each execution of the test sits under the scope execution it ran in")
       output shouldBe
@@ -187,7 +187,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the first execution of the scope holds only the test that ran in it, and the second the rest")
       output shouldBe
@@ -231,7 +231,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each execution of the test holds the helper suite's name line, with the helper's execution that ran in it")
       output shouldBe
@@ -278,7 +278,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the helper suite's name line sits under the test once for each execution, in the order they started, each with what it produced")
       output shouldBe
@@ -331,7 +331,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each test's line holds its own helper suite")
       output shouldBe
@@ -367,7 +367,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the first execution's name, test and abort lines come before the second execution's name and test lines")
       output shouldBe
@@ -419,7 +419,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each execution's tests appear in the last registration's order and with its labels, the moved test under the scope")
       output shouldBe
@@ -462,7 +462,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the dropped test follows the test now at its position, and the added test is not run")
       output shouldBe
@@ -503,7 +503,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the dropped scope and its test follow the scope now at its position")
       output shouldBe
@@ -538,7 +538,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the replaced test is not run, shown after the test the last registration holds")
       output shouldBe
@@ -579,7 +579,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each suite shows only the test it ran")
       output shouldBe
@@ -616,7 +616,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite that did not run, its scope and its test show no line")
       output shouldBe
@@ -649,7 +649,7 @@ final class HumanReadableExecutionSpec extends AnyFeatureSpec with GivenWhenThen
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the second suite is not run, and its count line counts `peeks` but not the `pops` that ran at the other place")
       output shouldBe

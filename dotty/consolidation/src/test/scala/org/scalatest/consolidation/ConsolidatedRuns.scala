@@ -7,18 +7,23 @@ import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 
-/** Feeds runs to the consolidation library and reads its human-readable output, with colours marked. */
 private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val moduleLabel: TestRunLabel = TestRunLabel("core.test")
 
   extension (literal: String) {
 
-    /** The literal with its margin stripped and its line endings made LF, as the output's are. A CRLF checkout gives it CRLF. */
+    // A CRLF checkout gives the literal CRLF line endings; the output's are LF.
     def stripExpectedMargin: String = literal.stripMargin.replace("\r\n", "\n")
+
+    def toRunEvent: RunEvent =
+      TestRunBuilder.build(TestRunPart.Events(literal)).map(_.items) match {
+        case Right(Vector(BuiltRunItem.Event(built))) => RunEvent.of(built.event).fold(fail(_), identity)
+        case Right(items) => fail(s"expected one event, but the notation built $items")
+        case Left(reason) => fail(reason)
+      }
   }
 
-  /** Collects each line of human-readable output it receives. */
   final class OutputSink extends (String => Unit) {
 
     private val received = mutable.ArrayBuffer.empty[String]
@@ -27,30 +32,22 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
     def lines: Vector[String] = synchronized(received.toVector)
 
-    /** Every line but the last, the summary line. */
-    def linesApartFromSummaryLine: Vector[String] = lines.dropRight(1)
+    def linesWithoutSummaryLine: Vector[String] = lines.dropRight(1)
 
-    /** The lines apart from the summary line, joined with LF, each ANSI SGR sequence replaced by a marker naming it. */
-    def markedTextApartFromSummaryLine: String = markedOutput.apartFromSummaryLine
+    def colourMarkedTree: String = colourMarkedOutput.tree
 
-    /** The lines, each ANSI SGR sequence replaced by a marker naming it. */
-    def markedOutput: MarkedOutput = MarkedOutput(lines.map(ConsolidatedRuns.withColoursMarked))
+    def colourMarkedOutput: ColourMarkedOutput = ColourMarkedOutput(lines.map(ConsolidatedRuns.withColoursMarked))
   }
 
-  /** The lines of human-readable output, each ANSI SGR sequence replaced by a marker naming it. */
-  final case class MarkedOutput(lines: Vector[String]) {
+  final case class ColourMarkedOutput(lines: Vector[String]) {
 
-    /** The lines apart from the summary line, joined with LF. */
-    def apartFromSummaryLine: String = lines.dropRight(1).mkString("\n")
+    def tree: String = lines.dropRight(1).mkString("\n")
 
-    /** The last line. */
     def summaryLine: String = lines.lastOption.getOrElse(fail("the human-readable output has no line"))
 
-    /** The last line, without its colour markers. */
-    def summaryLineText: String = summaryLine.replaceAll("\\{(reset|red|green|yellow|cyan)\\}", "")
+    def plainSummaryLine: String = summaryLine.replaceAll("\\{(reset|red|green|yellow|cyan)\\}", "")
   }
 
-  /** Adds the run to the consolidation, feeding each event and captured line in the order the parts give them. */
   def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = {
     val feed = consolidation.addRun(moduleLabel)
     TestRunBuilder.build(parts*) match {
@@ -65,40 +62,22 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     feed
   }
 
-  /**
-   * Each way of feeding the captured lines, in their order, among the event log's events: before the first, between
-   * any two, or after the last. An event is a line at the event log's least indentation with the lines indented below it.
-   */
-  def capturedLinesAtEveryPoint(eventLog: String, lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
+  // An event is a line at the event log's least indentation, with the lines indented below it.
+  def interleavingsOf(eventLog: String, lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
     ConsolidatedRuns.interleavings(ConsolidatedRuns.eventsOf(eventLog).map(TestRunPart.Events(_)), lines)
 
-  /** The single event the notation describes, built by the test-only builder. */
-  def runEvent(notation: String): RunEvent =
-    TestRunBuilder.build(TestRunPart.Events(notation)).map(_.items) match {
-      case Right(Vector(BuiltRunItem.Event(built))) => RunEvent.of(built.event).fold(fail(_), identity)
-      case Right(items) => fail(s"expected one event, but the notation built $items")
-      case Left(reason) => fail(reason)
-    }
+  def colourMarkedTreeFrom(eventLog: String): String = colourMarkedTreeFrom(TestRunPart.Events(eventLog))
 
-  /** The coloured human-readable output of one run whose event stream has ended, apart from its summary line, with colours marked. */
-  def consolidated(eventLog: String): String = consolidated(TestRunPart.Events(eventLog))
+  def colourMarkedTreeFrom(parts: TestRunPart*): String = colourMarkedOutputFrom(parts*).tree
 
-  /**
-   * The coloured human-readable output, apart from its summary line, with colours marked, of one run built from its
-   * parts whose event stream has ended.
-   */
-  def consolidated(parts: TestRunPart*): String = consolidatedOutput(parts*).apartFromSummaryLine
+  def colourMarkedOutputFrom(eventLog: String): ColourMarkedOutput = colourMarkedOutputFrom(TestRunPart.Events(eventLog))
 
-  /** The coloured human-readable output of one run whose event stream has ended, with colours marked. */
-  def consolidatedOutput(eventLog: String): MarkedOutput = consolidatedOutput(TestRunPart.Events(eventLog))
-
-  /** The coloured human-readable output, with colours marked, of one run built from its parts whose event stream has ended. */
-  def consolidatedOutput(parts: TestRunPart*): MarkedOutput = {
+  def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)
     addRun(consolidation, parts*).endEventStream()
     consolidation.end()
-    output.markedOutput
+    output.colourMarkedOutput
   }
 }
 

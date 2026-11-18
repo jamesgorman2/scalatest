@@ -6,7 +6,6 @@ import org.scalatest.matchers.should.Matchers
 
 final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  /** An event log of one suite holding the node `nodeLine`, whose events are `nodeEvents`. */
   private def eventLogOf(nodeLine: String, nodeEvents: String): String =
     s"""
     run started
@@ -36,7 +35,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the test's line is its label, in green")
-      consolidated(eventLog) shouldBe outputWithNodeLine("{green}- adds{reset}")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{green}- adds{reset}")
     }
 
     Scenario("A test that failed shows `*** FAILED ***`, in red") {
@@ -49,7 +48,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the test's line is its label and `*** FAILED ***`, in red")
-      consolidated(eventLog) shouldBe outputWithNodeLine("{red}- adds *** FAILED ***{reset}")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{red}- adds *** FAILED ***{reset}")
     }
 
     Scenario("A test that was ignored shows `!!! IGNORED !!!`, in yellow") {
@@ -61,7 +60,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the test's line is its label and `!!! IGNORED !!!`, in yellow")
-      consolidated(eventLog) shouldBe outputWithNodeLine("{yellow}Scenario: adds !!! IGNORED !!!{reset}")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}Scenario: adds !!! IGNORED !!!{reset}")
     }
 
     Scenario("A test that is pending shows `(pending)`, in yellow") {
@@ -74,7 +73,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the test's line is its label and `(pending)`, in yellow")
-      consolidated(eventLog) shouldBe outputWithNodeLine("{yellow}- adds (pending){reset}")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}- adds (pending){reset}")
     }
 
     Scenario("A test that was cancelled shows `!!! CANCELED !!!`, in yellow") {
@@ -87,7 +86,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the test's line is its label and `!!! CANCELED !!!`, in yellow")
-      consolidated(eventLog) shouldBe outputWithNodeLine("{yellow}- adds !!! CANCELED !!!{reset}")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}- adds !!! CANCELED !!!{reset}")
     }
 
     Scenario("A scope with no outcome shows its label alone, in green") {
@@ -103,7 +102,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the scope's line is its label, in green")
-      consolidated(eventLog) shouldBe outputWithNodeLine(
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine(
         """{green}A calculator{reset}
           |      {green}- adds{reset}""".stripExpectedMargin
       )
@@ -118,7 +117,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("the scope's line is its label and `(pending)`, in yellow")
-      consolidated(eventLog) shouldBe outputWithNodeLine("{yellow}- A calculator (pending){reset}")
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine("{yellow}- A calculator (pending){reset}")
     }
   }
 
@@ -160,7 +159,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A test that had not started when its suite aborted shows `*** NOT RUN ***`, in red") {
       Given("an event log of a suite that aborted before a test whose label has no leading `- ` started")
       When("the library consolidates it")
-      val output = consolidated(abortedPartway)
+      val output = colourMarkedTreeFrom(abortedPartway)
 
       Then("the test's line is its label and `*** NOT RUN ***`, in red")
       output shouldBe abortedPartwayOutput
@@ -169,7 +168,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A test open when its suite aborted shows `*** ABORTED ***`, in red") {
       Given("an event log of a suite that aborted while a test was running")
       When("the library consolidates it")
-      val output = consolidated(abortedPartway)
+      val output = colourMarkedTreeFrom(abortedPartway)
 
       Then("the test's line is its label and `*** ABORTED ***`, in red")
       output shouldBe abortedPartwayOutput
@@ -178,7 +177,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A scope that had not opened when its suite aborted shows its label in green and `*** NOT RUN ***` in red") {
       Given("an event log of a suite that aborted before a scope opened")
       When("the library consolidates it")
-      val output = consolidated(abortedPartway)
+      val output = colourMarkedTreeFrom(abortedPartway)
 
       Then("the scope's line is its label in green, then `*** NOT RUN ***` in red")
       output shouldBe abortedPartwayOutput
@@ -187,7 +186,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A scope open when its suite aborted shows its label in green and `*** ABORTED ***` in red") {
       Given("an event log of a suite that aborted while a scope was open")
       When("the library consolidates it")
-      val output = consolidated(abortedPartway)
+      val output = colourMarkedTreeFrom(abortedPartway)
 
       Then("the scope's line is its label in green, then `*** ABORTED ***` in red")
       output shouldBe abortedPartwayOutput
@@ -196,7 +195,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A test that completed before its suite aborted keeps its own outcome") {
       Given("an event log of a suite that aborted after one test succeeded")
       When("the library consolidates it")
-      val output = consolidated(abortedPartway)
+      val output = colourMarkedTreeFrom(abortedPartway)
 
       Then("the test's line is its label, in green")
       output shouldBe abortedPartwayOutput
@@ -227,7 +226,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the label's, the suite's and the scope's lines carry no suffix, and only the test's line shows `*** FAILED ***`")
       output shouldBe
@@ -253,7 +252,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
 
       When("the library consolidates it")
       Then("each line of the test's label sits at the test's depth, coloured on its own")
-      consolidated(eventLog) shouldBe outputWithNodeLine(
+      colourMarkedTreeFrom(eventLog) shouldBe outputWithNodeLine(
         """{green}- adds{reset}
           |    {green}and carries{reset}""".stripExpectedMargin
       )
@@ -277,7 +276,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each line of the scope's label sits at the scope's depth in green, and the last carries `*** ABORTED ***` in red")
       output shouldBe
@@ -312,10 +311,10 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidatedOutput(eventLog)
+      val output = colourMarkedOutputFrom(eventLog)
 
       Then("the marked test shows `!!! IGNORED !!!` in yellow, and the unmarked one `*** NOT RUN ***` in red")
-      output.apartFromSummaryLine shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- is empty{reset}
@@ -323,7 +322,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {red}- pops *** NOT RUN ***{reset}""".stripExpectedMargin
 
       And("the summary line counts the marked test as ignored, and the unmarked one as expected and not run")
-      output.summaryLineText shouldBe
+      output.plainSummaryLine shouldBe
         "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 2 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
     }
 
@@ -347,10 +346,10 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidatedOutput(eventLog)
+      val output = colourMarkedOutputFrom(eventLog)
 
       Then("the suite is not run, and its count line counts only the unmarked test")
-      output.apartFromSummaryLine shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}HeapFunSuite:{reset}
           |    {red}samples.HeapFunSuite *** NOT RUN ***{reset}
@@ -359,7 +358,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {green}- is empty{reset}""".stripExpectedMargin
 
       And("the summary line counts the marked test as ignored, though its suite did not start")
-      output.summaryLineText shouldBe
+      output.plainSummaryLine shouldBe
         "Suites: 1 of 2 completed, 0 aborted. Tests: 1 of 2 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
     }
 
@@ -375,7 +374,7 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite is not run, with nothing below it to count")
       output shouldBe
@@ -402,17 +401,17 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidatedOutput(eventLog)
+      val output = colourMarkedOutputFrom(eventLog)
 
       Then("the test shows `!!! IGNORED !!!`, in yellow")
-      output.apartFromSummaryLine shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- is empty{reset}
           |    {yellow}- peeks !!! IGNORED !!!{reset}""".stripExpectedMargin
 
       And("the summary line counts the test as ignored")
-      output.summaryLineText shouldBe
+      output.plainSummaryLine shouldBe
         "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 1, pending 0"
     }
 
@@ -432,16 +431,16 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidatedOutput(eventLog)
+      val output = colourMarkedOutputFrom(eventLog)
 
       Then("the test's line is its label alone, in green")
-      output.apartFromSummaryLine shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- peeks{reset}""".stripExpectedMargin
 
       And("the summary line counts the test as succeeded, not as ignored")
-      output.summaryLineText shouldBe
+      output.plainSummaryLine shouldBe
         "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
     }
   }

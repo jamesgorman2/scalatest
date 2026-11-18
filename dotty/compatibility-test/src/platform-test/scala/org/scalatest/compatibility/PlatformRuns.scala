@@ -9,7 +9,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import scala.jdk.CollectionConverters.*
 
-/** What a linked program printed, and the exit code it ended with. */
 final case class PlatformRunOutput(exitCode: Int, stdout: Seq[String], stderr: Seq[String])
 
 /**

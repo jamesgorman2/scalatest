@@ -45,7 +45,6 @@ object CompatibilityFixture {
 
   val suiteClassNamesOnEveryRuntime: Seq[String] = suiteClassNames.filterNot(jvmOnlySuiteClassNames)
 
-  /** Suites whose one test sends `timedMessage`, then `timedMessageCalled` naming when it called the first, then waits before closing. */
   val messageCallTimesSuiteClassNames: Seq[String] =
     List("AnyFunSuiteMessageCallTimesSpec", "PathAnyFunSpecMessageCallTimesSpec").map("compatibility.timing." + _)
 

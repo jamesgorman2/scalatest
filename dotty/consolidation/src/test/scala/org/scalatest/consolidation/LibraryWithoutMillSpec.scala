@@ -46,7 +46,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
       consolidation.end()
 
       Then("the library writes the human-readable output")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SqrtPropSpec:{reset}
           |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin

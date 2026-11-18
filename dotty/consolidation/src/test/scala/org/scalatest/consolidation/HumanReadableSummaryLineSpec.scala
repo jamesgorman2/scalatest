@@ -49,7 +49,7 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
         """
 
       When("the library consolidates it")
-      val output = consolidatedOutput(eventLog)
+      val output = colourMarkedOutputFrom(eventLog)
 
       Then("the summary line, unindented, follows the lines for `core.test`")
       output.lines.head shouldBe "{cyan}[core.test]{reset}"
@@ -79,7 +79,7 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
 
       When("the library consolidates it")
       Then("the summary line counts the open suite as aborted, and the open and unstarted tests as expected and not run")
-      consolidatedOutput(eventLog).summaryLine shouldBe
+      colourMarkedOutputFrom(eventLog).summaryLine shouldBe
         "{cyan}Suites: 0 of 1 completed, {reset}{red}1 aborted{reset}" +
           "{cyan}. Tests: 1 of 3 run: {reset}{green}succeeded 1{reset}{cyan}, {reset}{red}failed 0{reset}" +
           "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
@@ -104,7 +104,7 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
 
       When("the library consolidates it")
       Then("the summary line counts each execution of the test")
-      consolidatedOutput(eventLog).summaryLine shouldBe
+      colourMarkedOutputFrom(eventLog).summaryLine shouldBe
         "{cyan}Suites: 1 of 1 completed, {reset}{red}0 aborted{reset}" +
           "{cyan}. Tests: 2 of 2 run: {reset}{green}succeeded 1{reset}{cyan}, {reset}{red}failed 1{reset}" +
           "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
@@ -141,7 +141,7 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
 
       When("the library consolidates it")
       Then("the summary line counts the two tests that ran, and neither attributed test")
-      consolidatedOutput(eventLog).summaryLine shouldBe
+      colourMarkedOutputFrom(eventLog).summaryLine shouldBe
         "{cyan}Suites: 3 of 3 completed, {reset}{red}0 aborted{reset}" +
           "{cyan}. Tests: 2 of 2 run: {reset}{green}succeeded 2{reset}{cyan}, {reset}{red}failed 0{reset}" +
           "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
@@ -173,7 +173,7 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
 
       When("the library consolidates it")
       Then("the summary line counts the suites and the test that ran, and neither the attributed suite nor its test")
-      consolidatedOutput(eventLog).summaryLine shouldBe
+      colourMarkedOutputFrom(eventLog).summaryLine shouldBe
         "{cyan}Suites: 2 of 2 completed, {reset}{red}0 aborted{reset}" +
           "{cyan}. Tests: 1 of 1 run: {reset}{green}succeeded 1{reset}{cyan}, {reset}{red}failed 0{reset}" +
           "{cyan}, {reset}{yellow}canceled 0{reset}{cyan}, {reset}{yellow}ignored 0{reset}{cyan}, {reset}{yellow}pending 0{reset}"
@@ -206,10 +206,10 @@ final class HumanReadableSummaryLineSpec extends AnyFeatureSpec with GivenWhenTh
         """
 
       When("the library consolidates it")
-      val output = consolidatedOutput(eventLog)
+      val output = colourMarkedOutputFrom(eventLog)
 
       Then("the summary line, unindented, follows the lines for `core.test`, with `0 aborted` and `failed 0` still red")
-      output.apartFromSummaryLine shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}StackFunSuite:{reset}
           |    {green}- is empty{reset}

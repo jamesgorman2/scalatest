@@ -33,12 +33,12 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
 
     "all in the event log in the order received" should {
       "be covered" in {
-        EventLogCoverage.missing(received, List(suiteStarting, infoProvided, testStarting), EmitterOrder.AcrossTheRun) shouldBe Nil
+        EventLogCoverage.missingEvents(received, List(suiteStarting, infoProvided, testStarting), EmitterOrder.AcrossTheRun) shouldBe Nil
       }
     }
     "in the event log in another order" should {
       "be missing from the place received" in {
-        EventLogCoverage.missing(received, List(testStarting, suiteStarting), EmitterOrder.AcrossTheRun) shouldBe
+        EventLogCoverage.missingEvents(received, List(testStarting, suiteStarting), EmitterOrder.AcrossTheRun) shouldBe
           List("received, not in the event log in the emitter's order, though the log holds it earlier: " + EventLogFields.of(testStarting, withTimeStamp = true))
       }
     }
@@ -50,10 +50,10 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
       val receivedFromTwoSuites = received :+ ("received " + EventLogFields.of(otherSuiteStarting, withTimeStamp = true))
 
       "be covered where the emitter's order is only each suite's" in {
-        EventLogCoverage.missing(receivedFromTwoSuites, List(otherSuiteStarting, suiteStarting, testStarting), EmitterOrder.WithinEachSuite) shouldBe Nil
+        EventLogCoverage.missingEvents(receivedFromTwoSuites, List(otherSuiteStarting, suiteStarting, testStarting), EmitterOrder.WithinEachSuite) shouldBe Nil
       }
       "be missing where the emitter's order is the run's" in {
-        EventLogCoverage.missing(receivedFromTwoSuites, List(otherSuiteStarting, suiteStarting, testStarting), EmitterOrder.AcrossTheRun) shouldBe
+        EventLogCoverage.missingEvents(receivedFromTwoSuites, List(otherSuiteStarting, suiteStarting, testStarting), EmitterOrder.AcrossTheRun) shouldBe
           List("received, not in the event log in the emitter's order, though the log holds it earlier: " + EventLogFields.of(otherSuiteStarting, withTimeStamp = true))
       }
     }
@@ -84,12 +84,12 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
     "in the event log with another timestamp" should {
       "be covered" in {
         val calledEarlier = infoProvided.copy(event = DecodedEvent.InfoProvided("checked", None, None, "main", 0L))
-        EventLogCoverage.missing(recorded, List(calledEarlier), EmitterOrder.AcrossTheRun) shouldBe Nil
+        EventLogCoverage.missingEvents(recorded, List(calledEarlier), EmitterOrder.AcrossTheRun) shouldBe Nil
       }
     }
     "not in the event log" should {
       "be missing" in {
-        EventLogCoverage.missing(recorded, List(testStarting), EmitterOrder.AcrossTheRun) shouldBe
+        EventLogCoverage.missingEvents(recorded, List(testStarting), EmitterOrder.AcrossTheRun) shouldBe
           List("recorded, not in the event log: " + EventLogFields.of(infoProvided, withTimeStamp = false))
       }
     }

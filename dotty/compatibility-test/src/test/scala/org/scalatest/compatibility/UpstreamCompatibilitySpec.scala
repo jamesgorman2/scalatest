@@ -110,7 +110,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         And("the timestamp of each message recorded in a test's closing event is the time the test called the message")
         output.eventFields.count(_.startsWith("received ")) should be > 0
         output.eventFields.count(_.startsWith("recorded ")) should be > 0
-        EventLogCoverage.missing(output.eventFields, logged, emitterOrderIn(launch)) shouldBe Nil
+        EventLogCoverage.missingEvents(output.eventFields, logged, emitterOrderIn(launch)) shouldBe Nil
         timedMessagesNotStampedWithTheirCall(logged) shouldBe Nil
 
         And("the event log holds the suites' SuiteStarting events in the order the emitter received them")
@@ -333,12 +333,12 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
   private def isAccepted(outcome: ArgumentsOutcome): Boolean =
-    outcome.exitCode == 0 && outcome.outcome.exists(line => line == "accepted" || line.startsWith("returned "))
+    outcome.exitCode == 0 && outcome.launchResult.exists(line => line == "accepted" || line.startsWith("returned "))
 
   private def firstDifferenceOfOutcomes(outcome: Compared[ArgumentsOutcome]): Option[String] = {
     def described(run: ArgumentsOutcome): Seq[String] =
       List("exit code " + run.exitCode) ++
-        run.outcome ++
+        run.launchResult ++
         ReporterText.normalised(run.stdout.linesIterator.toList).map("stdout: " + _) ++
         ReporterText.normalised(run.stderr.linesIterator.toList).map("stderr: " + _)
     Compared.firstDifference(outcome.map(described))

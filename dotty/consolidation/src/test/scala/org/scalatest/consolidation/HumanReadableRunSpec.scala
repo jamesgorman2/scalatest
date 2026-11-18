@@ -23,7 +23,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       Given("an event log of a completed run with an alert attached to the run")
       And("a stdout line fed before the alert, and a stderr line fed after it")
       When("the library consolidates it")
-      val output = consolidated(runWithAlertBetweenCapturedLines*)
+      val output = colourMarkedTreeFrom(runWithAlertBetweenCapturedLines*)
 
       Then("the run's line holds the suite, then the stdout line, the alert and the stderr line, in the order fed")
       output shouldBe
@@ -39,7 +39,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("Captured stdout and stderr lines keep the order they were fed, wherever they are fed among the events") {
       Given("an event log holding `run started`, then `run ended completed`, consolidated as a run of the module `core.test`")
       And("stderr, stdout and stderr lines captured, fed in that order at each combination of points among the event log's events")
-      val runs = capturedLinesAtEveryPoint(
+      val runs = interleavingsOf(
         "run started\nrun ended completed",
         Vector(
           TestRunPart.CapturedLine(CapturedStream.Stderr, "SLF4J: No SLF4J providers were found."),
@@ -50,7 +50,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       runs should have size 10
 
       When("the library consolidates each")
-      val outputs = runs.map(parts => consolidated(parts*))
+      val outputs = runs.map(parts => colourMarkedTreeFrom(parts*))
 
       Then("each run's line holds each line's stream and text, in the order fed, with stderr lines yellow")
       all(outputs) shouldBe
@@ -64,7 +64,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("Captured lines sit after the lines for the run's suites, wherever they are fed among the events") {
       Given("an event log of a completed run of a suite with one test, consolidated as a run of the module `core.test`")
       And("a stdout line and a stderr line captured, fed in that order at each combination of points among the event log's events")
-      val runs = capturedLinesAtEveryPoint(
+      val runs = interleavingsOf(
         calculatorSuiteEventLog,
         Vector(
           TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
@@ -74,7 +74,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       runs should have size 36
 
       When("the library consolidates each")
-      val outputs = runs.map(parts => consolidated(parts*))
+      val outputs = runs.map(parts => colourMarkedTreeFrom(parts*))
 
       Then("each run's line holds the suite's lines, then the captured lines in the order fed")
       all(outputs) shouldBe
@@ -106,7 +106,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the run's line holds the suite's lines, then each message marked with its kind, in the order sent")
       output shouldBe
@@ -142,7 +142,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite sits directly under the module's line, and the output holds no run's line")
       output shouldBe
@@ -179,7 +179,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the module shows Run 1: with the first run's suite and line, then Run 2: with the second's")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 1:{reset}
           |    {green}ZetaSuite:{reset}
@@ -207,7 +207,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the second run's line is Run 2:")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 2:{reset}
           |    [stdout] dividing now""".stripExpectedMargin
@@ -216,11 +216,11 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   Feature("Runs that abort or stop") {
 
-    Scenario("A test's fatal error aborts the run") {
+    Scenario("A run aborted by a test's fatal error shows its open nodes aborted, and its abort last under the run's line") {
       Given("an event log of a run that aborts while a suite, two scopes and a test are open, consolidated as a run of the module `core.test`")
       And("a captured stderr line, fed after the alert attached to the run")
       When("the library consolidates it")
-      val output = consolidated(abortedRun*)
+      val output = colourMarkedTreeFrom(abortedRun*)
 
       Then("the open nodes are aborted, the nodes that never started are not run, and the run's abort comes last under the run's line")
       And("the abort's message keeps its trailing space")
@@ -244,10 +244,10 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |        {red}...{reset}""".stripExpectedMargin
     }
 
-    Scenario("A run stops between two nested suites") {
+    Scenario("A run that stops between two nested suites shows the second as not run, and its stop last under the run's line") {
       Given("an event log of a run that stops after the first of two nested suites")
       When("the library consolidates it")
-      val output = consolidated(stoppedRun*)
+      val output = colourMarkedTreeFrom(stoppedRun*)
 
       Then("the suite that never started is not run, and the run's stop comes last under the run's line")
       output shouldBe
@@ -265,7 +265,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("A run that ends aborted without a RunAborted shows only its abort line under the run's line") {
       Given("an event log of a run that starts and ends aborted")
       When("the library consolidates it")
-      val output = consolidated("run started\nrun ended aborted")
+      val output = colourMarkedTreeFrom("run started\nrun ended aborted")
 
       Then("the run's line holds only the run's abort line")
       output shouldBe
@@ -285,7 +285,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the run's abort line holds the first RunAborted's message and throwable, and nothing of the second")
       output shouldBe
@@ -307,7 +307,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the run shows no line")
       output shouldBe "{cyan}[core.test]{reset}"
@@ -322,7 +322,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation
     }
 
-    Scenario("A runner that is not a run writes a line") {
+    Scenario("A line captured from a runner that is not a run sits under the root's line, after the module's lines") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
       And("the root's captured output is the stdout line `discovering tests`")
       val output = new OutputSink
@@ -333,7 +333,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the root's line heads the module's lines, then the root's captured line")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -344,7 +344,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.state shouldBe ConsolidationState.Ended
     }
 
-    Scenario("A runner that is not a run fails") {
+    Scenario("A failure of a runner that is not a run fails the consolidation, and sits under the root's abort line") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
       val output = new OutputSink
       val consolidation = consolidationOfSqrtPropSpec(output)
@@ -359,7 +359,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the root's line heads the module's lines, then the root's abort with the failure's message under it")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -385,7 +385,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the root's captured lines come in the order attached, then its abort with each failure's message in the order attached")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -409,7 +409,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.end()
 
       Then("the run's line and its abort sit under the module's line, itself under the root's line")
-      output.markedTextApartFromSummaryLine shouldBe
+      output.colourMarkedTree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {cyan}Run 1:{reset}
@@ -420,7 +420,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("Nothing attached to the root leaves the output without the root's line") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`, with nothing attached to the root")
       When("the library consolidates it")
-      val output = consolidated(sqrtPropSpecEventLog)
+      val output = colourMarkedTreeFrom(sqrtPropSpecEventLog)
 
       Then("the module's line is unindented and the output holds no root's line")
       output shouldBe
@@ -432,21 +432,21 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   Feature("The consolidation state of a run that ends") {
 
-    Scenario("A run that ends completed") {
+    Scenario("A run that ends completed leaves the state ended") {
       Given("an event log of a run that ends completed, with an alert attached to the run between a stdout and a stderr line")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended")
       stateAfterEnd(runWithAlertBetweenCapturedLines*) shouldBe ConsolidationState.Ended
     }
 
-    Scenario("A run that ends aborted") {
+    Scenario("A run that ends aborted leaves the state ended and failed") {
       Given("an event log of a run that ends aborted, with a stderr line")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended, failed")
       stateAfterEnd(abortedRun*) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A run that ends stopped") {
+    Scenario("A run that ends stopped leaves the state ended and failed") {
       Given("an event log of a run that ends stopped")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended, failed")
@@ -474,18 +474,18 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.state shouldBe ConsolidationState.Open
 
       When("the run's runEnded event, ended aborted, is added")
-      feed.add(runEvent("run ended aborted"))
+      feed.add("run ended aborted".toRunEvent)
 
       Then("the consolidation state is failed before the operation returns")
       consolidation.state shouldBe ConsolidationState.OpenFailed
     }
 
-    Scenario("A registered test has no event and is not attributed") {
+    Scenario("A registered test with no event and no test to attribute it to shows as not run, and fails the state") {
       Given("an event log of a run that ends completed, in which SkipSuite's test \"skipped\" has no event")
       val parts = TestRunPart.Events(skippedTestEventLog)
 
       When("the library consolidates it")
-      val output = consolidated(parts)
+      val output = colourMarkedTreeFrom(parts)
 
       Then("the test shows as not run")
       output shouldBe
@@ -498,26 +498,26 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       stateAfterEnd(parts) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A test only the first registration of its suite contains never starts, and no test of its suite ID and test name runs") {
+    Scenario("A test only the first registration of its suite holds, that never starts and has no test to attribute it to, fails the state") {
       Given("an event log of a run that ends completed, whose further structure drops the test \"local\" before it starts")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended, failed")
       stateAfterEnd(TestRunPart.Events(droppedTestEventLog)) shouldBe ConsolidationState.EndedFailed
     }
 
-    Scenario("A suite registered at two places runs at one, and every test of the other place is attributed") {
+    Scenario("A suite registered at two places that runs at one, with every test of the other place attributed, leaves the state ended") {
       Given("an event log of a run that ends completed, in which the second InnerSuite's test is attributed to the first's")
       When("the library consolidates it")
       Then("the consolidation state the library gives is ended")
       stateAfterEnd(TestRunPart.Events(twinSuitesEventLog)) shouldBe ConsolidationState.Ended
     }
 
-    Scenario("A suite, scope and test that start and never close, in a run that ends completed, are aborted") {
+    Scenario("A suite, scope and test that start and never close, in a run that ends completed, are aborted and fail the state") {
       Given("an event log of a run that ends completed while a suite, a scope in it and a test in that scope are open")
       val parts = TestRunPart.Events(openNodesEventLog)
 
       When("the library consolidates it")
-      val output = consolidated(parts)
+      val output = colourMarkedTreeFrom(parts)
 
       Then("the suite, the scope and the test show as aborted")
       output shouldBe

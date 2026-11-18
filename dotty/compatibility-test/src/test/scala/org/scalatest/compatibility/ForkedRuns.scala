@@ -49,8 +49,7 @@ final case class RunOutput(
     ) ++ files.map((name, lines) => ("file " + name) -> lines)
 }
 
-/** What a JVM given an argument list did: its exit code, whether the launch accepted the list, and what it printed. */
-final case class ArgumentsOutcome(exitCode: Int, outcome: Seq[String], stdout: String, stderr: String)
+final case class ArgumentsOutcome(exitCode: Int, launchResult: Seq[String], stdout: String, stderr: String)
 
 object RunOutput {
 
@@ -134,7 +133,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
     def outcomeOn(library: Library): ArgumentsOutcome = {
       val directory = newRunDirectory("arguments", library)
       val outcome = directory.resolve("outcome.txt")
-      val exitCode = start(
+      val exitCode = runJvm(
         library,
         directory,
         List("-Dcompatibility.outcome=" + outcome, "-Dcompatibility.events=" + directory.resolve("events.txt")),
@@ -195,7 +194,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
   }
 
   private def run(library: Library, directory: Path, jvmOptions: Seq[String], mainClass: String, arguments: Seq[String]): Path = {
-    val exitCode = start(library, directory, jvmOptions, mainClass, arguments)
+    val exitCode = runJvm(library, directory, jvmOptions, mainClass, arguments)
     if (exitCode != 0) {
       throw new IllegalStateException(s"$mainClass on ${library.label} exited with $exitCode:\n${lines(directory.resolve("stderr.txt")).mkString("\n")}")
     }
@@ -204,8 +203,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
 
   private def workingDirectoryOf(directory: Path): Path = directory.resolve("working-directory")
 
-  /** Runs the main class in a JVM of its own, in the run directory's working directory, and returns its exit code. */
-  private def start(library: Library, directory: Path, jvmOptions: Seq[String], mainClass: String, arguments: Seq[String]): Int = {
+  private def runJvm(library: Library, directory: Path, jvmOptions: Seq[String], mainClass: String, arguments: Seq[String]): Int = {
     val workingDirectory = Files.createDirectories(workingDirectoryOf(directory))
     val java = Paths.get(System.getProperty("java.home"), "bin", "java").toString
     val encodings = List("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")

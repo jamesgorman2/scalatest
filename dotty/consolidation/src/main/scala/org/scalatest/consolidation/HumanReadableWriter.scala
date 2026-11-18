@@ -13,7 +13,6 @@ import org.scalatest.tools.AnsiYellow
 import org.scalatest.tools.StringReporter
 import org.scalatest.tools.ThrowableView
 
-/** A piece of a line in one colour, or uncoloured where `colour` is absent. */
 private[consolidation] final case class Segment(text: String, colour: Option[AnsiColor]) {
 
   def rendered(coloured: Boolean): String =
@@ -40,19 +39,15 @@ private[consolidation] object HumanReadableWriter {
 
   private val rootAbortedLine = "*** CONSOLIDATED TESTS ABORTED ***"
 
-  /** Every line of the human-readable output: the tree's lines, then the unindented summary line. */
   def lines(runs: Seq[RunAssembly], rootOutput: Seq[CapturedLine], rootFailures: Seq[String]): Vector[OutputLine] =
     treeLines(runs, rootOutput, rootFailures) :+ OutputLine(0, SummaryLine.of(runs))
 
-  // The root shows a line only where output or a failure is attached to it; otherwise each module's line is unindented.
-  // Under the root's line come the lines for each module, then the root's captured lines, then its failures.
   private def treeLines(runs: Seq[RunAssembly], rootOutput: Seq[CapturedLine], rootFailures: Seq[String]): Vector[OutputLine] =
     if (rootOutput.isEmpty && rootFailures.isEmpty) moduleLines(runs, 0)
     else
       linesOf(rootLine, 0, AnsiCyan) ++ moduleLines(runs, 1) ++ rootOutput.flatMap(capturedLineLines(_, 1)) ++
         rootFailureLines(rootFailures, 1)
 
-  // A run that completed with no output attached shows no line; its suites take the depth its line would have had.
   private def moduleLines(runs: Seq[RunAssembly], depth: Int): Vector[OutputLine] =
     runs.groupBy(_.label).toVector.sortBy(_._1.value).flatMap { (label, runsOfModule) =>
       linesOf("[" + label.value + "]", depth, AnsiCyan) ++ runsOfModule.toVector.sortBy(_.number).flatMap(runLines(_, depth + 1))
@@ -62,8 +57,6 @@ private[consolidation] object HumanReadableWriter {
     if (failures.isEmpty) Vector.empty
     else linesOf(rootAbortedLine, depth, AnsiRed) ++ failures.flatMap(linesOf(_, depth + 1, AnsiRed))
 
-  // Under a run's line come the lines for its suites, then its messages and captured lines in the order they were fed,
-  // then, if the run aborted or stopped, how it ended.
   private def runLines(run: RunAssembly, depth: Int): Vector[OutputLine] = {
     val outputAndEnd = run.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(run, depth + 1)
     if (outputAndEnd.isEmpty) run.topLevelSuites.flatMap(nodeLines(_, depth))
@@ -114,17 +107,16 @@ private[consolidation] object HumanReadableWriter {
     linesUnder(Vector(aborted.message).filter(_.nonEmpty) ++ lines.tail, aborted.throwable, depth, AnsiRed)
   }
 
-  // Under a test's line come its failure or cancel lines, then its messages and the suites it ran.
   private def nodeLines(node: AssembledNode, depth: Int): Vector[OutputLine] = {
     val execution = node.execution
     node.node match {
       case suite: StructureNode.Suite =>
         linesOf(suiteNameLine(suite.name), depth, AnsiGreen) ++ contentLines(execution, depth + 1) ++
-          suiteEndingLines(suite, execution, depth + 1) ++ countLines(execution, depth + 1)
+          suiteEndingLines(suite, execution, depth + 1) ++ notRunCountLines(execution, depth + 1)
       case scope: StructureNode.Scope =>
-        linesOf(scopeLine(scope, execution.outcome), depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
+        linesOf(scopeLine(scope, execution.outcome), depth) ++ contentLines(execution, depth + 1) ++ notRunCountLines(execution, depth + 1)
       case test: StructureNode.Test =>
-        testLines(test, execution, depth) ++ contentLines(execution, depth + 1) ++ countLines(execution, depth + 1)
+        testLines(test, execution, depth) ++ contentLines(execution, depth + 1) ++ notRunCountLines(execution, depth + 1)
     }
   }
 
@@ -140,17 +132,17 @@ private[consolidation] object HumanReadableWriter {
         messagesAfter(execution.children.size)
   }
 
-  private def countLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
+  private def notRunCountLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
     val notRun = if (execution.isCollapsed) execution.descendants.filter(_.execution.outcome.contains(NodeOutcome.NotRun)) else Vector.empty
     if (notRun.isEmpty) Vector.empty else linesOf(countLine(notRun), depth, AnsiRed)
   }
 
-  private def countLine(hidden: Vector[AssembledNode]): String = {
+  private def countLine(notRun: Vector[AssembledNode]): String = {
     def count(kind: String, n: Int): Option[String] = if (n == 0) None else Some(s"$n $kind" + (if (n == 1) "" else "s"))
     val counts = Vector(
-      count("suite", hidden.count(_.node.isInstanceOf[StructureNode.Suite])),
-      count("scope", hidden.count(_.node.isInstanceOf[StructureNode.Scope])),
-      count("test", hidden.count(_.node.isInstanceOf[StructureNode.Test]))
+      count("suite", notRun.count(_.node.isInstanceOf[StructureNode.Suite])),
+      count("scope", notRun.count(_.node.isInstanceOf[StructureNode.Scope])),
+      count("test", notRun.count(_.node.isInstanceOf[StructureNode.Test]))
     ).flatten
     "(" + counts.mkString(", ") + " not run)"
   }

@@ -14,11 +14,11 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
   private val rootOutput = mutable.ArrayBuffer.empty[CapturedLine]
   private val rootFailures = mutable.ArrayBuffer.empty[String]
 
-  /** The current state. A read made after an operation returns sees any failure that operation added. */
+  /** A read made after an operation returns sees any failure that operation added. */
   def state: ConsolidationState = currentState
 
   /**
-   * Adds a run. Its event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in
+   * The run's event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in
    * the order they are added, and a run's line in the human-readable output shows its number.
    *
    * @param label the run's module, which heads the module's line in the human-readable output
@@ -96,8 +96,6 @@ final class Consolidation private (humanReadableOutput: String => Unit, coloured
 object Consolidation {
 
   /**
-   * Starts a consolidation.
-   *
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
    * @param coloured whether that output is coloured with ANSI escape sequences
    */

@@ -18,7 +18,6 @@ import scala.jdk.CollectionConverters.*
 
 final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  /** Runs the suite through `Framework` with the runner argument, and returns the lines of its test event log. */
   private def eventLogOfFrameworkRun(suiteClassName: String): Vector[String] = {
     val folder = Files.createTempDirectory("emitted-run")
     try {
@@ -40,15 +39,14 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
     }
   }
 
-  /** The coloured human-readable output of one run, colours marked, each line of its event log decoded and fed in turn. */
-  private def consolidatedFrom(eventLog: Vector[String]): Vector[String] = {
+  private def colourMarkedTreeFrom(eventLog: Vector[String]): Vector[String] = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)
     val feed = consolidation.addRun(moduleLabel)
     eventLog.foreach(line => feed.add(RunEvent.decode(line).fold(reason => fail(s"$reason, in $line"), identity)))
     feed.endEventStream()
     consolidation.end()
-    output.linesApartFromSummaryLine.map(ConsolidatedRuns.withColoursMarked)
+    output.linesWithoutSummaryLine.map(ConsolidatedRuns.withColoursMarked)
   }
 
   Feature("A failure message reaches the human-readable output unchanged") {
@@ -60,7 +58,7 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matche
 
       And("the consolidation library is used directly, without Mill, with colour on")
       When("the library consolidates that test event log as a run under the test run label `core.test`")
-      val output = consolidatedFrom(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the output is under `core.test`, and the lines under the failed test begin with the message in red, ending with the failing code's file and line")
       val failedLine = output.indexOf("    {red}- reports *** FAILED ***{reset}")

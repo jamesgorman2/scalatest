@@ -6,8 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  /** An event log of a test that succeeds after sending an info, a note, an alert and a markup message. */
-  private def testWithMessages(info: String): String =
+  private def eventLogWithMessages(info: String): String =
     s"""
     run started
     structure
@@ -28,10 +27,10 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A test's messages sit under it in the order the run reported them: info, note and markup in green, alerts in yellow") {
       Given("an event log of a test that sends an info, a note, an alert and a markup message, then succeeds")
-      val eventLog = testWithMessages("""test "is empty": InfoProvided(message: "checked size")""")
+      val eventLog = eventLogWithMessages("""test "is empty": InfoProvided(message: "checked size")""")
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each message sits under the test's line, marked with its kind")
       output shouldBe
@@ -46,10 +45,10 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("Each line of a multi-line message sits where its first line does, whichever line break separates them") {
       Given("an event log of a test whose info holds three lines, separated by a CRLF and an LF")
-      val eventLog = testWithMessages("""test "is empty": InfoProvided(message: "checked size\r\nand order\nand contents")""")
+      val eventLog = eventLogWithMessages("""test "is empty": InfoProvided(message: "checked size\r\nand order\nand contents")""")
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each line of the info sits under the test's line, with no carriage return left in it")
       output shouldBe
@@ -66,12 +65,12 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A message's throwable sits under the message, with its cause") {
       Given("an event log of a test whose info carries a throwable with a cause")
-      val eventLog = testWithMessages(
+      val eventLog = eventLogWithMessages(
         """test "is empty": InfoProvided(message: "checked size", throwable: java.lang.IllegalStateException "size unknown" caused by java.io.IOException "closed")"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the throwable's first line and its `Cause:` line sit under the info, each with its frame lines under it")
       output shouldBe
@@ -110,7 +109,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the failure's lines sit under the test's line, then its messages")
       output shouldBe
@@ -154,7 +153,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the info sits under the scope's line, between its test and its nested scope")
       output shouldBe
@@ -196,7 +195,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("each message sits under the suite's name line, placed by the children that had started, in the order the run reported them")
       output shouldBe
@@ -235,7 +234,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the info sits after the second test and before the third")
       output shouldBe
@@ -273,7 +272,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the failure's lines come first, then the info sent before the helper suite, the suite, and the info sent after it")
       output shouldBe

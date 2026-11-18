@@ -2,7 +2,6 @@ package compatibility.recorders
 
 import sbt.testing.Task
 
-/** Runs the fixture through `Framework` with the program's arguments. */
 object PlatformLauncher {
 
   def main(arguments: Array[String]): Unit = {

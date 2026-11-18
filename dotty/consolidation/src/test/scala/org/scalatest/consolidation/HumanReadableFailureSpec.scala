@@ -6,8 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
 
-  /** An event log of a test that sends an info, a note and an alert, then ends with `ending`. */
-  private def testEndingWith(ending: String): String =
+  private def eventLogEndingWith(ending: String): String =
     s"""
     run started
     structure
@@ -26,8 +25,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
     run ended completed
     """
 
-  /** An event log of a suite that aborts with `aborted` before its scope opens. */
-  private def suiteAbortingWith(aborted: String): String =
+  private def eventLogAbortingWith(aborted: String): String =
     s"""
     run started
     structure
@@ -44,12 +42,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("Each frame line sits under its throwable's first line, and a `Cause:` line where that first line sits") {
       Given("an event log of a test that fails with a throwable and a cause, each with a frame")
-      val eventLog = testEndingWith(
+      val eventLog = eventLogEndingWith(
         """test "have size 0": TestFailed(throwable: java.lang.IllegalStateException "not empty" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"] caused by java.io.IOException "closed" frames ["samples.Stack.size(Stack.scala:3)"])"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the throwable's first line and its `Cause:` line sit under the test's line, each with its frames under it")
       output shouldBe
@@ -70,12 +68,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("Each line of a throwable's multi-line message sits where its first line does, even one that starts like a frame line") {
       Given("an event log of a test that fails with a throwable whose message's second line starts with `at `")
-      val eventLog = testEndingWith(
+      val eventLog = eventLogEndingWith(
         """test "have size 0": TestFailed(throwable: java.lang.RuntimeException "database unreachable\nat host db-1" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"])"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the message's second line sits under the test's line with the throwable's first line, and the frame lines under both")
       output shouldBe
@@ -94,12 +92,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A cancel whose throwable is a `StackDepth` shows its message with the failed code's file and line, and no throwable line") {
       Given("an event log of a test cancelled with a `TestCanceledException`")
-      val eventLog = testEndingWith(
+      val eventLog = eventLogEndingWith(
         """test "have size 0": TestCanceled(throwable: org.scalatest.exceptions.TestCanceledException "no stack" at StackFlatSpec.scala:7)"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the message and the failed code's file and line sit under the test's line, in yellow, before its messages")
       output shouldBe
@@ -115,12 +113,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A failure whose message differs from its `StackDepth` throwable's shows its own message with the failed code's file and line") {
       Given("an event log of a test that fails with a message of its own and a `TestFailedException` with another")
-      val eventLog = testEndingWith(
+      val eventLog = eventLogEndingWith(
         """test "have size 0": TestFailed(message: "Expected an empty stack, but it held 1 item", throwable: org.scalatest.exceptions.TestFailedException "1 did not equal 0" at StackFlatSpec.scala:9)"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the failure's own message and the failed code's file and line sit under the test's line, and the throwable's message shows nowhere")
       output shouldBe
@@ -136,12 +134,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A failure whose message differs from that of a throwable that is not a `StackDepth` shows the throwable's first line, as ScalaTest 3.2.20 does") {
       Given("an event log of a test that fails with a message of its own and an `IllegalStateException` with another")
-      val eventLog = testEndingWith(
+      val eventLog = eventLogEndingWith(
         """test "have size 0": TestFailed(message: "Expected an empty stack", throwable: java.lang.IllegalStateException "not empty" frames ["samples.StackFlatSpec.check(StackFlatSpec.scala:9)"])"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the throwable's first line and frames sit under the test's line, and the failure's own message shows nowhere")
       output shouldBe
@@ -159,12 +157,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A failure's analysis follows its message, after an `Analysis:` line") {
       Given("an event log of a test that fails with a `TestFailedException` and an analysis")
-      val eventLog = testEndingWith(
+      val eventLog = eventLogEndingWith(
         """test "have size 0": TestFailed(throwable: org.scalatest.exceptions.TestFailedException "Stack(1) did not equal Stack(0)" at StackFlatSpec.scala:9, analysis: ["Stack(size: 1 -> 0)"])"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the message, `Analysis:` and the analysis sit under the test's line, before its messages")
       output shouldBe
@@ -185,10 +183,10 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A suite aborted with a throwable shows its abort line, then the throwable's lines under it") {
       Given("an event log of a suite that aborts with a `RuntimeException` before its first test")
-      val eventLog = suiteAbortingWith("""suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")""")
+      val eventLog = eventLogAbortingWith("""suite "SetupFailsSpec": SuiteAborted(throwable: java.lang.RuntimeException "database unreachable")""")
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the abort line and the throwable's lines sit under the suite's name line, in red, then the count of what did not run")
       output shouldBe
@@ -202,12 +200,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A suite aborted with a `StackDepth` throwable shows its message with the failed code's file and line") {
       Given("an event log of a suite that aborts with a message and a `TestFailedException`")
-      val eventLog = suiteAbortingWith(
+      val eventLog = eventLogAbortingWith(
         """suite "SetupFailsSpec": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - database unreachable", throwable: org.scalatest.exceptions.TestFailedException "database unreachable" at SetupFailsSpec.scala:5)"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the message and the failed code's file and line sit under the abort line, with no throwable line")
       output shouldBe
@@ -220,12 +218,12 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A suite aborted with a message that differs from that of a throwable that is not a `StackDepth` shows the throwable's lines, as ScalaTest 3.2.20 does") {
       Given("an event log of a suite that aborts with a message of its own and a `RuntimeException` with another")
-      val eventLog = suiteAbortingWith(
+      val eventLog = eventLogAbortingWith(
         """suite "SetupFailsSpec": SuiteAborted(message: "Exception encountered when attempting to run a suite with class name: samples.SetupFailsSpec", throwable: java.lang.RuntimeException "database unreachable")"""
       )
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the abort line and the throwable's lines sit under the suite's name line, and the abort's own message shows nowhere")
       output shouldBe
@@ -255,7 +253,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the nested suite shows `*** NOT RUN ***` under its name line, and the outer suite's abort follows its children")
       output shouldBe

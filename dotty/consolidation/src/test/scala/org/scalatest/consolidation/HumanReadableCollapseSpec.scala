@@ -27,7 +27,7 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite shows its name and abort lines, then `(2 suites, 1 scope, 3 tests not run)`, and no line of a node below it")
       output shouldBe
@@ -56,7 +56,7 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite's count line is `(1 suite, 2 scopes, 1 test not run)`, in red, after the suite's abort lines")
       output shouldBe
@@ -81,7 +81,7 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the suite shows its name and abort lines alone")
       output shouldBe
@@ -112,7 +112,7 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the scope shows its line, its message, then its count line, and no line of its test")
       output shouldBe
@@ -145,7 +145,7 @@ final class HumanReadableCollapseSpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library consolidates it")
-      val output = consolidated(eventLog)
+      val output = colourMarkedTreeFrom(eventLog)
 
       Then("the scope and both tests show their own lines")
       output shouldBe
