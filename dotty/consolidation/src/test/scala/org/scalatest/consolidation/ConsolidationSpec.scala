@@ -5,7 +5,7 @@ import org.scalatest.events.TestRunPart
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-final class ConsolidationSpec extends AnyWordSpec with Matchers with ConsolidatedRuns {
+final class ConsolidationSpec extends AnyWordSpec with Matchers with ConsolidatedRuns with JsonOutputs {
 
   private def suiteWithTest(testEvents: String): TestRunPart =
     TestRunPart.Events(
@@ -155,6 +155,26 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
         consolidation.end()
         an[IllegalArgumentException] should be thrownBy consolidation.addRun(moduleLabel)
+      }
+    }
+
+    "given a module's times twice" should {
+      "hold only the later times" in {
+        val json = new JsonSink
+        val consolidation = startedWithoutMill(json)
+        consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(1000L)), Some(Instant.ofEpochMilli(2000L)))
+        consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(3000L)), None)
+        consolidation.end()
+        json.module.get("startedAt") shouldBe Some(integer(3000L))
+        json.module.get("endedAt") shouldBe None
+      }
+    }
+
+    "given a module's times after it has ended" should {
+      "be refused" in {
+        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        consolidation.end()
+        an[IllegalArgumentException] should be thrownBy consolidation.timeModule(moduleLabel, None, None)
       }
     }
 
