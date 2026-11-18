@@ -137,8 +137,8 @@ private[consolidation] object JsonOutputWriter {
       case _ => scopeOrTestLocation(node, execution).flatMap(locationObject)
     }
 
-  // A suite's or test's closing event measures its duration. A scope's closing event carries none, and a node aborted
-  // with no closing event of its own has none to carry it.
+  // A suite's or test's duration comes from its closing event. A scope's closing event carries none, and an aborted node
+  // may have no closing event of its own; either way the duration is endedAt less startedAt.
   private def durationOf(node: StructureNode, execution: AssembledExecution, startedAt: Option[Long], endedAt: Option[Long]): Option[Long] = {
     val measured = for (started <- startedAt; ended <- endedAt) yield ended - started
     node match {
@@ -171,7 +171,7 @@ private[consolidation] object JsonOutputWriter {
       case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a message")
     }
 
-  // A `SeeStackDepthException` leaves a test's location to the throwable, so its closing event's is taken in its place.
+  // Where an opening event's location is `SeeStackDepthException`, which defers to the throwable, the closing event's location is used.
   private def scopeOrTestLocation(node: StructureNode, execution: AssembledExecution): Option[Location] = {
     val events = node match {
       case _: StructureNode.Scope => execution.opening.toVector
@@ -180,7 +180,7 @@ private[consolidation] object JsonOutputWriter {
     events.flatMap(_.location).find(_ != SeeStackDepthException)
   }
 
-  // A suite's events give no line of its own, so only the file its scopes' and tests' locations all name is written.
+  // A suite's events give no line of their own. Its location has a file only when all its scopes' and tests' locations name the same one.
   private def suiteLocationObject(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
     val locations = ownScopesAndTestsOf(execution).flatMap(child => scopeOrTestLocation(child.node, child.execution))
     val files = locations.map(fileFields).distinct

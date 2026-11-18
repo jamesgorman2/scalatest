@@ -68,8 +68,8 @@ private[consolidation] final case class PlacedMessage(event: DecodedEvent, child
  * @param ending the `TestFailed`, `TestCanceled` or `SuiteAborted` whose lines sit under the execution's line
  * @param opening the execution's first `SuiteStarting`, `ScopeOpened` or `TestStarting`
  * @param closing the execution's `SuiteAborted`, else its first event that ends it
- * @param abortedAt for an execution aborted with no closing event of its own, the time of the `SuiteAborted` of the
- *                  nearest suite around it that aborted, else of the run's `RunAborted`
+ * @param abortedAt for an aborted execution with no closing event of its own, the time of the nearest enclosing aborted
+ *                  suite's `SuiteAborted`, else of the run's `RunAborted`
  * @param children the nodes shown under this execution, in order: a suite, scope or test once for each of its
  *                 executions that ran in this one
  */
@@ -519,7 +519,7 @@ private[consolidation] object RunAssembly {
     }
 
   // Marks as aborted:
-  // - a test whose own execution holds a `SuiteAborted`, that of the `DistributedTestRunnerSuite` that ran it;
+  // - a test whose own execution holds the `SuiteAborted` of the `DistributedTestRunnerSuite` that ran it;
   // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
   // - a suite still open when its run aborted or stopped;
   // - a suite, scope or test with a start event and no closing event, in a run that ended.

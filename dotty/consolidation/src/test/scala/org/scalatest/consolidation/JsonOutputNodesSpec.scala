@@ -106,7 +106,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       When("the library writes the JSON output")
       val rowSuite = jsonOutputOf(eventLog).node("suite", "RowSuite")
 
-      Then("suite RowSuite's contents is one scope with the scope's values and a duration of its endedAt less its startedAt")
+      Then("suite RowSuite's contents is scope A Stack, with its label, location and times, a duration of endedAt less startedAt, and no outcome or thread")
       val scope = rowSuite("contents").only
       scope("kind") shouldBe text("scope")
       scope("name") shouldBe text("A Stack")

@@ -59,7 +59,7 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
       suite("outcome") shouldBe text("aborted")
       suite("message") shouldBe text("boom")
 
-      And("test t is aborted, started, ended at the SuiteAborted's time, with a duration of its endedAt less its startedAt and no message")
+      And("test t is aborted with no message, has a startedAt, ends at the SuiteAborted's time, and has a duration of endedAt less startedAt")
       val test = json.node("test", "t")
       test("outcome") shouldBe text("aborted")
       test("startedAt") shouldBe integer(110L)
