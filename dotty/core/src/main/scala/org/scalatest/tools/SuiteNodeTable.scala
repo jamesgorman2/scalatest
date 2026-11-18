@@ -138,7 +138,6 @@ private[scalatest] final class SuiteNodeTable(
   private var nestedSuitesAdded = Vector.empty[SuiteNodeTable]
   private var hasEndedOnce = false
 
-  /** Each at its position among the suite's nested suites. */
   def nestedSuites: Vector[SuiteNodeTable] = heldNestedSuites
 
   // Set once, by the companion, after this table is built, so that each nested table's parent is a whole table. Set
@@ -383,19 +382,19 @@ private[scalatest] object SuiteNodeTable {
     // Recurses once for each scope nested in another, as registering them does.
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
-        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), index)) =>
+        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), position)) =>
           val id = NodeId(suite.places :+ NodePlace.Test(testName))
-          nodes += StructureNode.Test(id, parent, firstPosition + index, name, label, ignored)
+          nodes += StructureNode.Test(id, parent, firstPosition + position, name, label, ignored)
           added = added.copy(testsByName = added.testsByName.updated(testName, id), parents = added.parents.updated(id, parent))
           scopesSoFarByText
-        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), index)) =>
-          val place = scopesSoFarByText.getOrElse(text, 0)
-          val id = NodeId(parent.places :+ NodePlace.Scope(text, place))
-          val path = pathOfParent :+ ScopePlace(text, place)
-          nodes += StructureNode.Scope(id, parent, firstPosition + index, name, label)
+        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), position)) =>
+          val index = scopesSoFarByText.getOrElse(text, 0)
+          val id = NodeId(parent.places :+ NodePlace.Scope(text, index))
+          val path = pathOfParent :+ ScopePlace(text, index)
+          nodes += StructureNode.Scope(id, parent, firstPosition + position, name, label)
           added = added.copy(scopesByPath = added.scopesByPath.updated(path, id), parents = added.parents.updated(id, parent))
           add(scopesAndTests, id, 0, path)
-          scopesSoFarByText.updated(text, place + 1)
+          scopesSoFarByText.updated(text, index + 1)
       }
     }
   }
