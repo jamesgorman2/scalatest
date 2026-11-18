@@ -38,12 +38,15 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
         shouldWalkInOrder(rest, lines.drop(index + 1))
     }
 
-  private def withoutTimingKeys(value: ujson.Value): ujson.Value =
+  private def withTimingValuesMasked(value: ujson.Value): ujson.Value =
     value match {
-      case ujson.Obj(fields) => ujson.Obj.from(fields.toSeq.filterNot { case (key, _) => timingKeys.contains(key) }.map { case (key, field) => key -> withoutTimingKeys(field) })
-      case ujson.Arr(items) => ujson.Arr.from(items.map(withoutTimingKeys))
+      case ujson.Obj(fields) =>
+        ujson.Obj.from(fields.toSeq.map { case (key, field) => key -> (if (timingKeys.contains(key)) ujson.Str("<masked>") else withTimingValuesMasked(field)) })
+      case ujson.Arr(items) => ujson.Arr.from(items.map(withTimingValuesMasked))
       case other => other
     }
+
+  private def contentNames(node: ujson.Value): Seq[(String, String)] = contents(node).map(found => (found("kind").str, found("name").str))
 
   Feature("The JSON output and the human-readable output hold one node tree") {
 
@@ -56,7 +59,10 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
         val treeNodes = suitesScopesAndTests(json)
         withClue(s"in ${ujson.write(json, indent = 2)}\n") {
           treeNodes.flatMap(_.obj.get("outcome")).map(_.str).toSet should contain allOf ("succeeded", "failed", "canceled", "ignored", "pending")
-          treeNodes.count(_("kind").str == "scope") should be > 3
+          contentNames(node(json, "suite", "NestingSuite")) shouldBe Seq("suite" -> "NestedSuite")
+          contentNames(node(json, "scope", "A calculator")) shouldBe Seq("scope" -> "when adding")
+          node(json, "scope", "A queue")("outcome").str shouldBe "pending"
+          contentNames(node(json, "scope", "A wrapped scope")) shouldBe Seq("test" -> "succeeds", "test" -> "also succeeds")
         }
 
         Then("the human-readable output holds a line for each suite, scope and test of the JSON output, in the order of a depth-first walk")
@@ -75,8 +81,8 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
         setModuleArguments(tester, Seq("-oDW"))
         val withReporterArguments = jsonOutputOfTestCommand(tester)
 
-        Then("the JSON output is the same, apart from its times and thread names")
-        withoutTimingKeys(withReporterArguments) shouldBe withoutTimingKeys(withoutReporterArguments)
+        Then("the JSON output is the same, key for key and in the same order, apart from the values of its times and thread names")
+        ujson.write(withTimingValuesMasked(withReporterArguments), indent = 2) shouldBe ujson.write(withTimingValuesMasked(withoutReporterArguments), indent = 2)
       }
     }
   }

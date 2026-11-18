@@ -101,7 +101,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
   private def time(node: ujson.Value, key: String): Option[Instant] = node.obj.get(key).map(value => Instant.ofEpochMilli(value.num.toLong))
 
   /** The library is given the JSON output's build tool, and its root's and module's times. */
-  private def jsonOutputReplaying(eventLogLines: Seq[String], json: ujson.Value): ujson.Value = {
+  private def jsonOutputReplaying(eventLogLines: Seq[String], json: ujson.Value): String = {
     var written = Option.empty[String]
     val buildTool = json("buildTool")
     val consolidation = Consolidation.start(
@@ -119,7 +119,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
     val moduleNode = node(json, "module")
     consolidation.timeModule(module, time(moduleNode, "startedAt"), time(moduleNode, "endedAt"))
     consolidation.end(time(json, "endedAt"))
-    ujson.read(written.getOrElse(fail("the library wrote no JSON output")))
+    written.getOrElse(fail("the library wrote no JSON output"))
   }
 
   Feature("The library writes the same human-readable output without Mill as under the test command") {
@@ -160,8 +160,8 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
         And("the library is given the root's and the module's start and end times as the JSON output gives them")
         val replayed = jsonOutputReplaying(eventLogOfTestCommand(tester), json)
 
-        Then("the JSON value the library writes is the JSON output")
-        replayed shouldBe json
+        Then("the JSON value the library writes is the JSON output, written as the same text")
+        replayed shouldBe os.read(report(tester))
       }
     }
   }

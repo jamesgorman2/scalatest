@@ -6,8 +6,11 @@ import org.scalatest.matchers.should
 
 final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
-  private def jsonOutputOfRow(row: String, rowSuite: String)(assertions: ujson.Value => Unit): Unit = {
-    Given(s"the module holds the one suite RowSuite, $rowSuite")
+  private def jsonOutputOfRow(row: String, rowSuite: String, otherSuite: Option[String] = None)(assertions: ujson.Value => Unit): Unit = {
+    otherSuite match {
+      case None => Given(s"the module holds the one suite RowSuite, $rowSuite")
+      case Some(other) => Given(s"the module holds two suites: RowSuite, $rowSuite, and $other")
+    }
     When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
     withJsonOutputRow(row) { tester =>
       assertions(jsonOutputOfTestCommand(tester))
@@ -110,7 +113,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
     }
 
     Scenario("A nested suite") {
-      jsonOutputOfRow("nested-suite", "a Suites nesting InnerSuite, not discovered, whose one test adds succeeds") { json =>
+      jsonOutputOfRow("nested-suite", "a Suites nesting InnerSuite", Some("InnerSuite, an AnyFunSuite not discovered, whose one test adds succeeds")) { json =>
         Then("the run's contents is RowSuite, whose contents is InnerSuite, whose contents is test adds")
         val run = node(json, "run")
         names(contents(run)) shouldBe Seq("suite" -> "RowSuite")
@@ -203,7 +206,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
     }
 
     Scenario("Top-level suites ordered by name") {
-      jsonOutputOfRow("suites-ordered-by-name", "an AnyFunSuite named ZebraSuite, beside AlphaSuite, of class samples.ZSuite") { json =>
+      jsonOutputOfRow("suites-ordered-by-name", "an AnyFunSuite named ZebraSuite", Some("ZSuite, an AnyFunSuite named AlphaSuite")) { json =>
         Then("the run's contents is AlphaSuite then ZebraSuite")
         names(contents(node(json, "run"))) shouldBe Seq("suite" -> "AlphaSuite", "suite" -> "ZebraSuite")
       }

@@ -32,7 +32,11 @@ trait FixtureBuilds { this: should.Matchers =>
     val buildFile = tester.workspacePath / "build.mill"
     val mvnDeps = """    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")"""
     val testArgsDefault = moduleArguments.map(argument => s"\"$argument\"").mkString("    def testArgsDefault = Seq(", ", ", ")")
-    os.write.over(buildFile, os.read(buildFile).replace(mvnDeps, s"$mvnDeps\n$testArgsDefault"))
+    val build = os.read(buildFile)
+    withClue(s"the build file holds no line $mvnDeps to follow with $testArgsDefault:\n$build\n") {
+      build should include(mvnDeps)
+    }
+    os.write.over(buildFile, build.replace(mvnDeps, s"$mvnDeps\n$testArgsDefault"))
   }
 
   protected def runTestCommand(tester: IntegrationTester, arguments: String*): TestCommandResult =
