@@ -83,4 +83,39 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
         Vector(suiteNamed("FirstNestedSuite"), suiteNamed("SecondNestedSuite"), testNamed("a"), testNamed("b"))
     }
   }
+
+  Feature("A suite's nested suites come before the scopes and tests a later registration adds") {
+
+    def eventLogOfSuiteWhoseFirstRegistrationHeldNoTest(): Vector[String] = {
+      Given("a suite nesting suites FirstNestedSuite and SecondNestedSuite, whose one test a the filter drops, and whose runTests also runs a")
+      And("the suite runs through `Framework` excluding a's tag, writing the run's test event log")
+      eventLogOfFrameworkRun(classOf[samples.RunsADroppedTestNestingSuitesSuite].getName, Seq("-l", "samples.Dropped"))
+    }
+
+    Scenario("The human-readable output shows a test a later registration adds after the nested suites, where the first registration held no test") {
+      val eventLog = eventLogOfSuiteWhoseFirstRegistrationHeldNoTest()
+
+      When("the library consolidates that test event log")
+      val humanReadable = colourMarkedTreeLinesFrom(eventLog)
+
+      Then("the human-readable output shows the nested suites, then a")
+      humanReadable.mkString("\n") shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}RunsADroppedTestNestingSuitesSuite:{reset}
+          |    {green}FirstNestedSuite:{reset}
+          |    {green}SecondNestedSuite:{reset}
+          |    {green}- a{reset}""".stripExpectedMargin
+    }
+
+    Scenario("The JSON output holds a test a later registration adds after the nested suites, where the first registration held no test") {
+      val eventLog = eventLogOfSuiteWhoseFirstRegistrationHeldNoTest()
+
+      When("the library consolidates that test event log")
+      val json = jsonOutputOfEventLog(eventLog)
+
+      Then("the JSON output's contents of the suite are the nested suites, then a")
+      kindsAndNamesOf(json.node("suite", "RunsADroppedTestNestingSuitesSuite")("contents")) shouldBe
+        Vector(suiteNamed("FirstNestedSuite"), suiteNamed("SecondNestedSuite"), testNamed("a"))
+    }
+  }
 }

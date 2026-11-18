@@ -17,12 +17,12 @@ import scala.jdk.CollectionConverters.*
 /** Runs a suite through `Framework`, outside Mill, writing the run's test event log, and consolidates that log. */
 private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns & JsonOutputs =>
 
-  def eventLogOfFrameworkRun(suiteClassName: String): Vector[String] = {
+  def eventLogOfFrameworkRun(suiteClassName: String, runnerArguments: Seq[String] = Nil): Vector[String] = {
     val folder = Files.createTempDirectory("emitted-run")
     try {
       val eventLogFile = folder.resolve("events.log")
       val framework = new Framework
-      val runner = framework.runner(RunnerArgument.forEventLogFile(eventLogFile).toArray, Array.empty, getClass.getClassLoader)
+      val runner = framework.runner((RunnerArgument.forEventLogFile(eventLogFile) ++ runnerArguments).toArray, Array.empty, getClass.getClassLoader)
       try {
         val fingerprint = framework.fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
         val ignoringEvents: EventHandler = _ => ()

@@ -125,7 +125,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
   private val childIds = mutable.Map.empty[NodeId, mutable.Set[NodeId]]
   private val latestScopesAndTests = mutable.Map.empty[NodeId, Set[NodeId]]
-  private val firstScopeOrTestPosition = mutable.Map.empty[NodeId, Option[Int]]
+  private val firstScopeOrTestPosition = mutable.Map.empty[NodeId, Int]
   private val executions = mutable.Map.empty[NodeId, SortedMap[Int, RecordedExecution]]
   private var executionsStarted = 0
   private var received = Vector.empty[RunOutput]
@@ -247,7 +247,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
       shownChildrenById.getOrElseUpdate(id, orderedChildren(id, childrenOf(id).filterNot(isAttributed)))
 
     // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
-    // one it holds. A suite's nested suites sit before or after them, as its first structure placed them. A suite a
+    // one it holds. A suite's nested suites sit before or after them, as the emitter's numbering placed them. A suite a
     // later structure added that shares a suite ID with a placed sibling sits directly after the last sibling with that
     // suite ID, in the order such suites arrived.
     private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): OrderedChildren = {
@@ -255,7 +255,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
       val suites = children.collect { case suite: StructureNode.Suite => suite }
       val (placedSuites, suitesWithoutPosition) = suites.partition(_.position.nonEmpty)
       val (furtherRunsOfPlacedSuites, otherSuites) = suitesWithoutPosition.partition(suite => placedSuites.exists(_.suiteId == suite.suiteId))
-      val firstScopeOrTest = firstScopeOrTestPosition.get(parent).flatten
+      val firstScopeOrTest = firstScopeOrTestPosition.get(parent)
       val (suitesBefore, suitesAfter) =
         placedSuites.sortBy(_.position).partition(suite => firstScopeOrTest.exists(first => suite.position.exists(_ < first)))
       OrderedChildren(furtherRunsOfPlacedSuites.foldLeft(suitesBefore ++ scopesAndTests ++ suitesAfter)(RunAssembly.withAddedSuite), otherSuites)
@@ -348,10 +348,10 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   }
 
   // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
-  // and label it last had.
+  // and label it last had. The emitter numbers a suite's scopes and tests from one origin in every structure, so the
+  // first structure holding any of them gives that origin.
   private def addStructure(nodes: IndexedSeq[StructureNode]): Unit = {
     val suites = nodes.collect { case suite: StructureNode.Suite => suite.id }
-    val firstSeenSuites = suites.filterNot(structure.contains)
     nodes.foreach(addToStructure)
     val suiteOfNode = nodes.foldLeft(Map.empty[NodeId, NodeId]) { (suites, node) =>
       node match {
@@ -362,8 +362,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
     val scopesAndTests = nodes.filter(RunAssembly.isScopeOrTest)
     val positionsByParent = scopesAndTests.groupMap(_.parentId)(RunAssembly.declaredPositionOf)
     val scopesAndTestsBySuite = scopesAndTests.groupMap(node => suiteOfNode.get(node.id))(_.id)
-    firstSeenSuites.foreach { suite =>
-      firstScopeOrTestPosition(suite) = positionsByParent.getOrElse(Some(suite), Vector.empty).minOption
+    suites.filterNot(firstScopeOrTestPosition.contains).foreach { suite =>
+      positionsByParent.get(Some(suite)).flatMap(_.minOption).foreach(firstScopeOrTestPosition(suite) = _)
     }
     suites.foreach { suite =>
       latestScopesAndTests(suite) = scopesAndTestsBySuite.getOrElse(Some(suite), Vector.empty).toSet

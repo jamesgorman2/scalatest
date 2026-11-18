@@ -6,6 +6,7 @@ import org.scalatest.DoNotDiscover
 import org.scalatest.OneInstancePerTest
 import org.scalatest.Status
 import org.scalatest.Suite
+import org.scalatest.Tag
 import org.scalatest.funsuite.AnyFunSuite
 
 // Each test runs in an instance of its own. An instance built after test a has run registers test c in a's place, so
@@ -69,6 +70,26 @@ class KeepsItsTestsNestingSuitesSuite extends AnyFunSuite with OneInstancePerTes
   }
 
   override val nestedSuites: IndexedSeq[Suite] = Vector(new FirstNestedSuite, new SecondNestedSuite)
+}
+
+object Dropped extends Tag("samples.Dropped")
+
+// Runs test a even where the filter drops it, as it does where samples.Dropped is excluded. The suite's first structure
+// then holds its nested suites alone, and a further structure adds a.
+@DoNotDiscover
+class RunsADroppedTestNestingSuitesSuite extends AnyFunSuite {
+
+  test("a", Dropped) {
+    succeed
+  }
+
+  override val nestedSuites: IndexedSeq[Suite] = Vector(new FirstNestedSuite, new SecondNestedSuite)
+
+  override protected def runTests(testName: Option[String], args: Args): Status = {
+    val status = super.runTests(testName, args)
+    status.succeeds()
+    runTest("a", args)
+  }
 }
 
 @DoNotDiscover
