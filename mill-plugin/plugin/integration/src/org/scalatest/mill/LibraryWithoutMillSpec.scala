@@ -1,6 +1,7 @@
 package org.scalatest.mill
 
 import compatibility.recorders.FrameworkLauncher
+import java.io.StringWriter
 import java.time.Instant
 import mill.api.PathRef
 import mill.testkit.IntegrationTester
@@ -100,14 +101,18 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   private def time(node: ujson.Value, key: String): Option[Instant] = node.obj.get(key).map(value => Instant.ofEpochMilli(value.num.toLong))
 
-  /** The JSON text the library writes when fed the event log and the run's captured lines, and given the JSON output's build tool and its root's and module's times. */
+  /** The JSON text the library writes to a [[StringWriter]] when fed the event log and the run's captured lines, and given the JSON output's build tool and its root's and module's times. */
   private def jsonOutputReplaying(eventLogLines: Seq[String], json: ujson.Value): String = {
     var written = Option.empty[String]
     val buildTool = json("buildTool")
     val consolidation = Consolidation.start(
       _ => (),
       coloured = false,
-      jsonOutput = Some(text => written = Some(text)),
+      jsonOutput = Some { output =>
+        val writer = new StringWriter
+        output.writeTo(writer)
+        written = Some(writer.toString)
+      },
       moduleSelectors = Vector(ModuleSelector("core.test", Vector(module))),
       buildTool = Some(BuildTool(buildTool("name").str, buildTool("version").str)),
       startedAt = time(json, "startedAt")

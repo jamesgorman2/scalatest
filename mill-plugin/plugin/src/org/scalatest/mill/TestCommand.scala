@@ -27,7 +27,7 @@ private[mill] object TestCommand {
     val consolidation = Consolidation.start(
       humanReadableOutput,
       coloured = true,
-      jsonOutput = jsonOutputFile.map(file => json => jsonOutputWritten = BuildCtx.withFilesystemCheckerDisabled(file.write(json))),
+      jsonOutput = jsonOutputFile.map(file => json => jsonOutputWritten = BuildCtx.withFilesystemCheckerDisabled(file.write(json.writeTo))),
       moduleSelectors = commandArguments.moduleSelectors.map(selector => ModuleSelector(selector, Vector(label))),
       buildTool = Some(BuildTool("Mill", BuildInfo.millVersion)),
       startedAt = Some(Instant.now())

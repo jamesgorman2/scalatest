@@ -1,5 +1,6 @@
 package org.scalatest.mill
 
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -65,7 +66,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
       "hold the JSON output in UTF-8, replacing what it held" in {
         withFolder { folder =>
           val path = Files.writeString(folder.resolve("report.json"), "left over, and longer than the output")
-          new JsonOutputFile(path).write("""{"name":"café"}""") shouldBe Right(())
+          new JsonOutputFile(path).write(_.write("""{"name":"café"}""")) shouldBe Right(())
           read(path) shouldBe """{"name":"café"}"""
         }
       }
@@ -73,7 +74,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
       "create its missing parent folders" in {
         withFolder { folder =>
           val path = folder.resolve("missing").resolve("nested").resolve("report.json")
-          new JsonOutputFile(path).write("{}") shouldBe Right(())
+          new JsonOutputFile(path).write(_.write("{}")) shouldBe Right(())
           read(path) shouldBe "{}"
         }
       }
@@ -82,7 +83,20 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         withFolder { folder =>
           val blocker = Files.writeString(folder.resolve("blocker"), "a file")
           val path = blocker.resolve("report.json")
-          new JsonOutputFile(path).write("{}").left.map(_.contains(path.toString)) shouldBe Left(true)
+          new JsonOutputFile(path).write(_.write("{}")).left.map(_.contains(path.toString)) shouldBe Left(true)
+        }
+      }
+
+      "fail, naming its path, and leave nothing at its path, where the JSON output fails part way through" in {
+        withFolder { folder =>
+          val path = folder.resolve("report.json")
+          val written = new JsonOutputFile(path).write { writer =>
+            writer.write("""{"kind":"root",""")
+            writer.flush()
+            throw new IOException("no space left")
+          }
+          written.left.map(failure => failure.contains(path.toString) && failure.contains("no space left")) shouldBe Left(true)
+          Files.exists(path) shouldBe false
         }
       }
     }

@@ -69,6 +69,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
         endedWithOneRun(startedWithoutMill(json))
         json.texts should have size 1
       }
+
+      "give it the JSON output after writing the whole human-readable output" in {
+        val humanReadable = new OutputSink
+        var humanReadableLinesBeforeJson = Option.empty[Vector[String]]
+        endedWithOneRun(Consolidation.start(humanReadable, coloured = false, jsonOutput = Some(_ => humanReadableLinesBeforeJson = Some(humanReadable.lines))))
+        humanReadableLinesBeforeJson shouldBe Some(humanReadable.lines)
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 package org.scalatest.consolidation
 
+import java.io.StringWriter
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
@@ -59,6 +60,22 @@ final class JsonEncodingSpec extends AnyWordSpec with Matchers {
       "write text that decodes to the string it was given" in {
         val decoded = strictlyDecodedUtf8(strictlyEncodedUtf8(encoded(textJsonMustEscape)))
         JsonReader.read(decoded) shouldBe Right(JsonValue.Text(textJsonMustEscape))
+      }
+    }
+
+    "writing to a writer" should {
+      "write the text it returns as a string" in {
+        val value = JsonValue.Object(
+          Vector(
+            "text" -> JsonValue.Text(textJsonMustEscape),
+            "integer" -> JsonValue.Integer(-42L),
+            "flag" -> JsonValue.Bool(true),
+            "items" -> JsonValue.Array(Vector(JsonValue.Bool(false), JsonValue.Object(Vector.empty), JsonValue.Array(Vector.empty)))
+          )
+        )
+        val writer = new StringWriter
+        JsonWriter.write(value, writer)
+        writer.toString shouldBe JsonWriter.write(value)
       }
     }
   }

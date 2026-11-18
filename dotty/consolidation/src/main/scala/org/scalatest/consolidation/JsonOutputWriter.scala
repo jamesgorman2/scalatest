@@ -1,5 +1,6 @@
 package org.scalatest.consolidation
 
+import java.io.Writer
 import java.util.IdentityHashMap
 import org.scalactic.source.Position
 import org.scalatest.ScalaTestVersions
@@ -26,7 +27,7 @@ private[consolidation] object JsonOutputWriter {
 
   private type Field = (String, Option[JsonValue])
 
-  def text(root: ConsolidatedRoot): String = JsonWriter.write(rootNode(root))
+  def write(root: ConsolidatedRoot, out: Writer): Unit = JsonWriter.write(rootNode(root), out)
 
   private def rootNode(root: ConsolidatedRoot): JsonValue =
     objectOf(

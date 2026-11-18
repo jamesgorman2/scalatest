@@ -175,6 +175,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 - **Start** a consolidation, given:
   - a sink for each output on stdout and in each file (`SPECIFICATION.md` R-048, R-049a, R-049b):
     - progress output on stdout: one sink for the summary of counts, which the caller redraws in place on Mill's prompt where it can (R-089, R-090a–R-090e, R-091);
+    - the JSON output: one streaming sink, which **End** hands the JSON output once, after the human-readable output. The sink writes it to a `java.io.Writer` of its choosing, so the output's text is never held whole in memory. The Mill plugin's sink writes through a buffered UTF-8 writer to the file `-fJ` names, deleting the file where the write fails part way, so the file holds the whole JSON output or nothing. **End** holds the consolidation's lock while the sink writes;
     - every other output: one text sink;
   - for each human-readable output, the formatting and filtering characters of the `-o` or `-f` that names it (R-138, R-139);
   - each module selector, with the test modules it resolved to;

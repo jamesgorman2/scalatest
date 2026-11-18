@@ -12,7 +12,7 @@ import scala.collection.mutable
 final class Consolidation private (
   humanReadableOutput: String => Unit,
   coloured: Boolean,
-  jsonOutput: Option[String => Unit],
+  jsonOutput: Option[JsonOutput => Unit],
   moduleSelectors: Seq[ModuleSelector],
   buildTool: Option[BuildTool],
   startedAt: Option[Instant]
@@ -106,7 +106,7 @@ final class Consolidation private (
       require(runs.forall(!_.isEventStreamOpen), "every run's event stream must have ended")
       val consolidated = root(endedAt)
       HumanReadableWriter.lines(consolidated).foreach(line => humanReadableOutput(line.rendered(coloured)))
-      jsonOutput.foreach(sink => sink(JsonOutputWriter.text(consolidated)))
+      jsonOutput.foreach(sink => sink(new JsonOutput(consolidated)))
       currentState = currentState.withEnd
     }
 
@@ -134,8 +134,9 @@ object Consolidation {
   /**
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
    * @param coloured whether that output is coloured with ANSI escape sequences
-   * @param jsonOutput the sink the JSON output is written to, as one text, once the consolidation ends; with none, no
-   *                   JSON output is made
+   * @param jsonOutput the sink given the JSON output once, when the consolidation ends, to write where it chooses; every
+   *                   other operation on the consolidation waits until the sink returns. With none, no JSON output is
+   *                   made
    * @param moduleSelectors each module selector, in the order given, with the test modules it resolved to
    * @param buildTool the build tool that started the runs, where the caller gives one
    * @param startedAt the root's start time by the caller's clock: when the consolidation started
@@ -143,7 +144,7 @@ object Consolidation {
   def start(
     humanReadableOutput: String => Unit,
     coloured: Boolean,
-    jsonOutput: Option[String => Unit] = None,
+    jsonOutput: Option[JsonOutput => Unit] = None,
     moduleSelectors: Seq[ModuleSelector] = Vector.empty,
     buildTool: Option[BuildTool] = None,
     startedAt: Option[Instant] = None
