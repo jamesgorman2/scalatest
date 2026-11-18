@@ -2,13 +2,13 @@
 
 Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
-## A node's children are ordered by declared place, a dropped scope or test following the current node at its place, then by name and start order (`SPECIFICATION.md` R-105).
+## A node's children are ordered by declared place, then by name and start order; a dropped scope or test follows the current node at its place (`SPECIFICATION.md` R-105).
 
 The order is [JSON-LAYOUT.md](JSON-LAYOUT.md) § Nodes, `contents`. A scope's or test's declared place is its registration index among its parent's scopes and tests after filtering, numbered the same way in every structure of its suite; it is not a source line.
 
 **Alternatives** Ordering scopes and tests that share a declared place by start order puts a node a later structure dropped before the node that now holds its place whenever the dropped one ran first, and makes their order depend on timing in a concurrent run.
 
-**Reasoning** R-105 orders by declaration order where it is known. Registration order is the declaration order every structure carries, so numbering it from one origin in every structure of a suite gives each scope and test one place across structures. Where a later structure drops a node, the latest structure states the suite's current declaration, so its node comes first and the dropped node follows. A suite that runs again beside its declared self has no declared place of its own; placing it after the last sibling with its `suiteId` keeps a suite's runs together. Suites with no declared place have only a name, so they follow § Tree's order by name and start order.
+**Reasoning** R-105 orders by declaration order where it is known. Registration order is the declaration order every structure carries, so numbering it from the same first position in every structure of a suite gives each scope and test one place across structures. Where a later structure drops a node, the latest structure states the suite's current declaration, so its node comes first and the dropped node follows. A suite that runs again beside its declared self has no declared place of its own; placing it after the last sibling with its `suiteId` keeps a suite's runs together. Suites with no declared place have only a name, so they follow § Tree's order by name and start order.
 
 **Costs** Where the declaration changed between structures, a dropped node sits at a place the current declaration gives another node. The executions of distinct suites that share a name and have no declared place interleave by start order.
 

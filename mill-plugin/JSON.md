@@ -16,7 +16,7 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Tree
 
 - The root holds one module.
-- The module holds at most one run node: the run of its tests in a forked JVM. It holds none where the worker wrote no test event log, as where its JVM failed to start or exited before its run began. The module's `contents` is then `[]`, the worker's captured output is not written, and the test command fails. The root has `failures` then only where starting the worker threw.
+- The module holds at most one run node: the run of its tests in a forked JVM. The forked JVM writes the run's events to a file, its test event log, which the test command reads. The module holds no run node where the worker wrote no test event log, as where its JVM failed to start or exited before its run began. The module's `contents` is then `[]`, the worker's captured output is not written, and the test command fails. The root has `failures` then only where starting the worker threw.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
 - Every node states its `kind`.
 - A suite, scope or test that ran more than once is one node for each time it ran.
@@ -26,10 +26,11 @@ Children of a suite, scope or test appear in this order:
 1. Children with a declared place, in declared order.
    - A scope's or test's declared place is its index in the order its parent registered its scopes and tests, counting only those the run's filter keeps. It is numbered the same way each time the suite declares its tests. It is not a source line.
    - A nested suite's declared place is its index in its parent's `nestedSuites`. A suite's nested suites come before all its scopes and tests, or after them where the suite mixes in `TestsBeforeNestedSuites`.
-   - Where a suite's declaration changed between its runs, a scope or test its latest declaration drops keeps the place it last had, and appears after the scope or test the latest declaration holds there. Several dropped at one place appear in the order they were first declared.
-   - A suite with no declared place that shares a suite ID with a suite of this group appears directly after the last suite with that suite ID. Several such suites appear in the order the run first reported them.
-2. The remaining children, which are suites, in ascending order by name. Suites that share a name appear in the order they started, followed by those that never started, in the order they were first declared.
-3. A suite, scope or test that ran more than once in one run of its parent is one node for each time it ran, in the order those runs started. The nodes of a child with a declared place are together. Those of the other suites are ordered as point 2 gives, so a suite of the same name that started between them separates them.
+   - Where a suite's declaration changes during the run, as when a suite mixing in `OneInstancePerTest` registers different tests in a later instance, a scope or test its latest declaration drops keeps the place it last had, and appears after the scope or test the latest declaration holds there. Several dropped at one place appear in the order they were first declared.
+   - A suite with no declared place that shares a `suiteId` with a sibling that has one appears directly after the last such sibling. Several such suites appear in the order the run first reported them.
+2. The remaining children, which are suites, in ascending order by name. Suites that share a name appear in the order they started, followed by those that never started, in the order the run first reported them.
+
+A child that ran more than once while its parent ran once has its nodes in the order they started. The nodes of a child with a declared place are together. The nodes of a remaining suite are ordered as point 2 gives, so a suite of the same name that started between them separates them.
 
 A run node's top-level suites appear in ascending order by name; suites that share a name appear in the order they started, followed by those that never started. Names are compared as Java's `String.compareTo` compares them.
 

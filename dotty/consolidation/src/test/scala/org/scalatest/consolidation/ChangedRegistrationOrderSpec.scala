@@ -84,16 +84,16 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
     }
   }
 
-  Feature("A suite's nested suites come before the scopes and tests a later registration adds") {
+  Feature("A suite's nested suites come before the scopes and tests a further structure adds") {
 
-    def eventLogOfSuiteWhoseFirstRegistrationHeldNoTest(): Vector[String] = {
-      Given("a suite nesting suites FirstNestedSuite and SecondNestedSuite, whose one test a the filter drops, and whose runTests also runs a")
+    def eventLogOfSuiteWhoseFirstStructureHeldNoTest(): Vector[String] = {
+      Given("a suite nesting suites FirstNestedSuite and SecondNestedSuite, with one test, a, which the filter drops and the suite's runTests runs anyway")
       And("the suite runs through `Framework` excluding a's tag, writing the run's test event log")
       eventLogOfFrameworkRun(classOf[samples.RunsADroppedTestNestingSuitesSuite].getName, Seq("-l", "samples.Dropped"))
     }
 
-    Scenario("The human-readable output shows a test a later registration adds after the nested suites, where the first registration held no test") {
-      val eventLog = eventLogOfSuiteWhoseFirstRegistrationHeldNoTest()
+    Scenario("The human-readable output shows the nested suites before a test that only a further structure holds") {
+      val eventLog = eventLogOfSuiteWhoseFirstStructureHeldNoTest()
 
       When("the library consolidates that test event log")
       val humanReadable = colourMarkedTreeLinesFrom(eventLog)
@@ -107,8 +107,8 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
           |    {green}- a{reset}""".stripExpectedMargin
     }
 
-    Scenario("The JSON output holds a test a later registration adds after the nested suites, where the first registration held no test") {
-      val eventLog = eventLogOfSuiteWhoseFirstRegistrationHeldNoTest()
+    Scenario("The JSON output holds the nested suites before a test that only a further structure holds") {
+      val eventLog = eventLogOfSuiteWhoseFirstStructureHeldNoTest()
 
       When("the library consolidates that test event log")
       val json = jsonOutputOfEventLog(eventLog)

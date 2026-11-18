@@ -84,7 +84,8 @@ A suite's, scope's or test's keys, in order: `kind`, `name`, `label`, `suiteId`,
   - A scope or test that a later structure of its suite drops keeps the place it last had, and follows the node the latest structure holds there. Several dropped at one place follow in the order a structure first held them.
   - A suite with no declared place that shares a `suiteId` with a sibling that has one sits directly after the last sibling with that `suiteId`. Several such suites follow in the order a structure first held them.
   - The remaining children are suites, in ascending order by name, compared as § Tree compares names. Suites that share a name appear in the order they started, followed by those that never started, in the order a structure first held them.
-  - A node that ran more than once in one execution of its parent appears once per execution, in the order its executions started. The nodes of a child with a declared place are together. Those of the remaining suites are ordered as the previous point gives, so they are separated where another suite of the same name started between them.
+
+  A child that ran more than once in one execution of its parent has one node per execution, in the order its executions started. The nodes of a child with a declared place are together. The nodes of a remaining suite are ordered as the previous point gives, so a suite of the same name that started between them separates them.
 - `output` — the node's messages (§ Messages) and the output captured against it (§ Captured output), in one sequence. Absent where the node has neither.
 
 A suite scheduled to run that has no events (R-095a) has `kind` `suite`, `outcome` `aborted`, `reason` `notRun` and `contents` `[]`. For class `p.B`, the suite's `suiteId` and `location.className` are `p.B`. The suite has no times, `threadName`, `message`, `throwable` or `output`.

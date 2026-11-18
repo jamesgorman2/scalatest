@@ -348,8 +348,8 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val numb
   }
 
   // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
-  // and label it last had. The emitter numbers a suite's scopes and tests from one origin in every structure, so the
-  // first structure holding any of them gives that origin.
+  // and label it last had. The emitter numbers a suite's scopes and tests from the same first position in every
+  // structure, so the first structure holding any of them gives that position.
   private def addStructure(nodes: IndexedSeq[StructureNode]): Unit = {
     val suites = nodes.collect { case suite: StructureNode.Suite => suite.id }
     nodes.foreach(addToStructure)
