@@ -10,7 +10,7 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Success
 import scala.util.Try
 
-/** Runs the module's tests through Mill's test queue, in one worker for each fork group, one worker after another. */
+/** Runs the module's tests through Mill's test queue, in one worker for each fork group holding a test class, one worker after another. */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
     inputs: JvmTestModuleInputs,
