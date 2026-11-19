@@ -33,6 +33,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
               "contents": [{
                 "kind": "run",
                 "number": 1,
+                "forkGroup": 0,
                 "configMap": {},
                 "startedAt": <time>, "endedAt": <time>, "duration": <ms>,
                 "summary": {

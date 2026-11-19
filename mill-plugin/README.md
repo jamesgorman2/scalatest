@@ -8,6 +8,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
+- The module's tests run through Mill's test queue in one worker for each of its fork groups that holds a test class, one worker after another, as Mill's `testForked` runs them with `testParallelism` off, whatever the module's own `testParallelism`. A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
 
@@ -96,13 +97,12 @@ The test command fails before any test starts when:
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector, or more than one;
 - the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;
-- the module has more than one fork group;
 - the module's own ScalaTest arguments hold a flag ScalaTest's runner does not recognise.
 
 It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
-- the test worker dies;
+- a test worker dies;
 - the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 

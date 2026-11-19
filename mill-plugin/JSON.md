@@ -16,7 +16,8 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Tree
 
 - The root holds one module.
-- The module holds at most one run node: the run of its tests in a forked JVM. The forked JVM writes the run's events to a file, its test event log, which the test command reads. The module holds no run node where the worker wrote no test event log, as where its JVM failed to start or exited before its run began. The module's `contents` is then `[]`, the worker's captured output is not written, and the test command fails. The root has `failures` then only where starting the worker threw.
+- The module holds one run node for each worker the test command started: the run of its tests in that worker's forked JVM (README.md § What it supports). Each forked JVM writes its run's events to a file of its own, its test event log, which the test command reads. The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has `failures` then only where starting the worker threw.
+- The module's run nodes appear in ascending order of `number`.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
 - Every node states its `kind`.
 - A suite, scope or test that ran more than once is one node for each time it ran.
@@ -45,7 +46,7 @@ Keys, in order:
 - `buildTool` — `{ "name", "version" }`: `Mill` and the version of Mill that ran the test command.
 - `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, present only where `failures` is.
-- `failures` — `[{ "message" }]`: the failures that are not a run's, in this order: the test worker failing to start, and its test event log failing to be read. Absent where there is none.
+- `failures` — `[{ "message" }]`: the failures that are not a run's: for each worker in the order the test command started them, the worker failing to start, then its test event log failing to be read. Each message names the worker, its fork group and the module, as in `Starting worker 0 of fork group 1 of core.test failed: …`. Absent where there is none.
 - `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's tests are discovered until every run has ended.
 - `contents` — an array holding the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.
@@ -56,15 +57,16 @@ Keys, in order:
 
 - `kind` — `module`.
 - `name` — the module's Mill path, such as `core.test`.
-- `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's worker starts until the worker has ended and its test event log is read.
-- `contents` — an array holding the module's run node, or `[]` where it has none (§ Tree).
+- `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's first worker starts until its last worker has ended and that worker's test event log is read.
+- `contents` — an array holding the module's run nodes, or `[]` where it has none (§ Tree).
 
 ## Run node
 
 Keys, in order:
 
 - `kind` — `run`.
-- `number` — `1`, the run's number within its module.
+- `number` — the run's number within its module, from 1, in ascending order of `forkGroup`.
+- `forkGroup` — the 0-based position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives, including a group that holds no test class and so has no worker. A module that does not set `testForkGrouping`, or holds no test class, has one run, in fork group `0`.
 - `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.
 - `configMap` — the run's config map, as an object of each value's `toString`, with keys in ascending order.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s time and `DiscoveryCompleted`'s duration. Absent unless the run reported both events. `duration` is absent where `DiscoveryCompleted` carries none.

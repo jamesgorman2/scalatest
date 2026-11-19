@@ -21,9 +21,20 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
   private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
 
-  private final class WorkerRun(eventLogFile: Path, open: Path => InputStream) {
+  private final class ConsolidationUnderTest {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
+
+    def outputWithoutSummaryLine: Seq[String] = output.toSeq.dropRight(1)
+  }
+
+  private final class WorkerRun(
+      eventLogFile: Path,
+      open: Path => InputStream,
+      workerName: String = "worker 0 of fork group 1 of core.test",
+      consolidated: ConsolidationUnderTest = new ConsolidationUnderTest
+  ) {
+    val consolidation: Consolidation = consolidated.consolidation
     val capture: WorkerOutputCapture = new WorkerOutputCapture(StandardCharsets.UTF_8)
     val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
     private val reader = new EventLogReader(
@@ -48,9 +59,9 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     def runWorker(startWorker: => Unit): Unit =
-      JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker)
+      JvmTestModuleRun.runWorker(consolidation, workerName, reader, capture)(startWorker)
 
-    def outputWithoutSummaryLine: Seq[String] = output.toSeq.dropRight(1)
+    def outputWithoutSummaryLine: Seq[String] = consolidated.outputWithoutSummaryLine
   }
 
   private def withEventLogFile[A](test: Path => A): A = {
@@ -79,7 +90,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
             "Consolidated tests:",
             "  [core.test]",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            s"    Reading the event log of core.test failed: java.io.FileNotFoundException: $file (The process cannot access the file because it is being used by another process)"
+            s"    Reading the event log of worker 0 of fork group 1 of core.test failed: java.io.FileNotFoundException: $file (The process cannot access the file because it is being used by another process)"
           )
           workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
@@ -102,7 +113,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
             "    Run 1:",
             "      [stdout] partial",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: testargs already exists"
           )
           workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
@@ -117,9 +128,37 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
           workerRun.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: testargs already exists"
           )
           workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
+    "starting the first of two workers throws before its event log exists" should {
+      "attach what starting threw to the root, naming the first worker, and still give the second worker's run to the consolidation" in {
+        withEventLogFile { firstFile =>
+          withEventLogFile { secondFile =>
+            writeCompletedRun(secondFile)
+            val consolidated = new ConsolidationUnderTest
+            val opening: Path => InputStream = path => new FileInputStream(path.toFile)
+            val first = new WorkerRun(firstFile, opening, "worker 0 of fork group 0 of core.test", consolidated)
+            val second = new WorkerRun(secondFile, opening, "worker 0 of fork group 1 of core.test", consolidated)
+            first.runWorker(throw new IllegalStateException("testargs already exists"))
+            second.runWorker {
+              val bytes = "second\n".getBytes(StandardCharsets.UTF_8)
+              second.capture.stdout(bytes, bytes.length)
+            }
+            consolidated.consolidation.end()
+            consolidated.outputWithoutSummaryLine shouldBe Seq(
+              "Consolidated tests:",
+              "  [core.test]",
+              "    Run 1:",
+              "      [stdout] second",
+              "  *** CONSOLIDATED TESTS ABORTED ***",
+              "    Starting worker 0 of fork group 0 of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            )
+          }
         }
       }
     }
