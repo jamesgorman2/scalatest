@@ -7,7 +7,7 @@ import scala.util.Failure
 import scala.util.Try
 
 /**
- * One worker of Mill's test queue, from its start to its end, with the reader of its event log and the capture of its
+ * One worker of a JVM test module, from its start to its end, with the reader of its event log and the capture of its
  * output. What starting or running the worker, or reading its event log, threw is attached to the consolidation's
  * root as a failure naming the worker, so the module's other workers still run and the consolidation can still end and
  * write its output.
