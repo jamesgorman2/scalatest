@@ -209,7 +209,9 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-106g Human-readable output prints durations only when the `d` formatting character is given
 - R-127a Human-readable output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
 - R-127b Human-readable output omits a scope when all its children have been omitted by filtering characters. This is recursive.
-- R-082 Human-readable output omits the root and run nodes unless the node failed or there is output attached to the node
+- R-082 Human-readable output omits the root and run nodes, except:
+  - the root, where the root failed or has output attached;
+  - a run, where the run has output attached, the run aborted or stopped, or the run was assigned test classes and ran none of them.
 - R-140 Human-readable output starts after the last progress output, if they are enabled together
 - R-141 Human-readable output ends with a summary line that is identical to the last progress output, regardless of whether progress output was enabled.
 
