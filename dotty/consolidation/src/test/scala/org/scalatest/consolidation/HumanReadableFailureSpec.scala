@@ -391,7 +391,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |      {green}[info] still checked{reset}""".stripExpectedMargin
     }
 
-    Scenario("A test failed by `fail()` shows the failed code's file and line, as ScalaTest 3.2.20 prints a `StackDepth` throwable whose message is empty") {
+    Scenario("A failure with an empty message and a message-less `StackDepth` throwable shows the failing code's file and line, as ScalaTest 3.2.20 does for an empty message") {
       Given("an event log of a test that fails with an empty message and a `TestFailedException` with no message, then a test that succeeds")
       val eventLog = eventLogOfTwoTestsWhoseFirstEndsWith(
         """test "first": TestFailed(message: "", throwable: org.scalatest.exceptions.TestFailedException null at SilentSpec.scala:9)"""

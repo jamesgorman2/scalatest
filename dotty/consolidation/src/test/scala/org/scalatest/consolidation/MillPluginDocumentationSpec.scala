@@ -26,7 +26,17 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
 
   private def millPluginDocument(name: String): String = Files.readString(millPluginDirectory.resolve(name), StandardCharsets.UTF_8)
 
-  private def namedIn(document: String)(key: String): Boolean = document.contains(s"`$key`") || document.contains(s"\"$key\"")
+  private def keysDefinedIn(document: String): Set[String] = {
+    val bulletLeads = """(?m)^\s*- ((?:`\w+`(?:, | or | and )?)+)""".r
+    val objectShapes = """\{[^{}]*\}""".r
+    val listsAfterColon = """: ((?:`\w+`, )+`\w+`)\.""".r
+    val backticked = """`(\w+)`""".r
+    val quoted = """"(\w+)"""".r
+    val fromBullets = bulletLeads.findAllMatchIn(document).flatMap(lead => backticked.findAllMatchIn(lead.group(1)))
+    val fromLists = listsAfterColon.findAllMatchIn(document).flatMap(list => backticked.findAllMatchIn(list.group(1)))
+    val fromShapes = objectShapes.findAllMatchIn(document).flatMap(shape => quoted.findAllMatchIn(shape.matched))
+    (fromBullets ++ fromLists ++ fromShapes).map(_.group(1)).toSet
+  }
 
   // A config map's keys are the run's own, not the format's.
   private def keysOf(value: JsonValue): Set[String] =
@@ -36,7 +46,6 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       case _ => Set.empty
     }
 
-  /** JSON output holding every kind of node and record, each with every key the JSON output can give it. */
   private def jsonOutputWithEveryKey: JsonValue = {
     val json = new JsonSink
     val consolidation = Consolidation.start(
@@ -103,7 +112,7 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
 
   Feature("The Mill plugin's documents describe the JSON output") {
 
-    Scenario("The README links the document giving the JSON output's format") {
+    Scenario("The README links JSON.md") {
       Given("the Mill plugin's README")
       val readme = millPluginDocument("README.md")
 
@@ -111,15 +120,15 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       readme should include("](JSON.md)")
     }
 
-    Scenario("The format's document names every key the JSON output holds") {
+    Scenario("JSON.md defines every key the JSON output holds") {
       Given("JSON output holding every kind of node and record, each with every key the JSON output can give it")
       val keys = keysOf(jsonOutputWithEveryKey)
 
-      When("the keys are looked up in JSON.md")
-      val format = millPluginDocument("JSON.md")
+      When("the keys JSON.md defines are read")
+      val defined = keysDefinedIn(millPluginDocument("JSON.md"))
 
-      Then("JSON.md names each of them")
-      keys.filterNot(namedIn(format)) shouldBe empty
+      Then("JSON.md defines each of them")
+      keys.diff(defined) shouldBe empty
     }
   }
 }
