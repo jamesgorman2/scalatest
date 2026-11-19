@@ -11,7 +11,8 @@ import org.scalatest.consolidation.RunProcess
 import scala.concurrent.duration.FiniteDuration
 
 /**
- * Reads one worker's test event log on a thread of its own, while the worker runs.
+ * Reads one worker's test event log on a thread of its own, while the worker runs. It may
+ * also start once the worker has ended, and then reads the finished event log.
  *
  * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
  * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
