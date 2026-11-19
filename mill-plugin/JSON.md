@@ -140,7 +140,7 @@ A location is one object. Keys, in order, each present only where known:
 
 - `className`.
 - `methodId`.
-- `filePath` or `fileName`, never both. `filePath` is the source file's path as recorded, usually absolute. `fileName` is the file's name, written only where the path is not recorded, as where the code was compiled without the environment variable `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`.
+- `filePath` or `fileName` — never both. `filePath` is the source file's path as recorded, usually absolute. `fileName` is the file's name, written only where the path is not recorded, as where the code was compiled without the environment variable `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`.
 - `lineNumber`.
 
 ScalaTest's locations become:

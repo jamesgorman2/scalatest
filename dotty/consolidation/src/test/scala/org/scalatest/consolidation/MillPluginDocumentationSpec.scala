@@ -27,7 +27,7 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
   private def millPluginDocument(name: String): String = Files.readString(millPluginDirectory.resolve(name), StandardCharsets.UTF_8)
 
   private def keysDefinedIn(document: String): Set[String] = {
-    val bulletLeads = """(?m)^\s*- ((?:`\w+`(?:, | or | and )?)+)""".r
+    val bulletLeads = """(?m)^\s*- ((?:`\w+`(?:, | or | and )?)+)(?: — |\.$)""".r
     val objectShapes = """\{[^{}]*\}""".r
     val listsAfterColon = """: ((?:`\w+`, )+`\w+`)\.""".r
     val backticked = """`(\w+)`""".r
