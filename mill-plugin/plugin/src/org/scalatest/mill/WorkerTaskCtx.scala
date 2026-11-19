@@ -7,11 +7,10 @@ import mill.api.daemon.internal.TestReporter
 import scala.concurrent.Future
 
 /**
- * The test command's `TaskCtx` for one worker, except in the bodies that start the worker. Each async body forked
- * through it, and each body given to [[runOnThisThread]], first calls `workerStarting`, then runs with `os.Inherit`
- * set to `capture`, so a worker spawned in that body sends its stdout and stderr to `capture` rather than to Mill's
- * logging. Mill sets `os.Inherit` around each async body it runs, so only a value set inside the body reaches the
- * worker.
+ * The test command's `TaskCtx` for one worker, except that each async body forked through it, and each body given to
+ * [[runOnThisThread]], first calls `workerStarting`, then runs with `os.Inherit` set to `capture`. A worker spawned in
+ * that body sends its stdout and stderr to `capture` rather than to Mill's logging. Mill sets `os.Inherit` around
+ * each async body it runs, so only a value set inside the body reaches the worker.
  *
  * @param workerStarting called as the worker starts, on the thread that runs it
  */

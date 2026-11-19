@@ -10,11 +10,14 @@ import scala.util.Try
 
 /**
  * One worker of a JVM test module, from its start to its end, with the reader of its event log and the capture of its
- * output. The reader polls from the worker's start until the worker ends, so a worker Mill has not yet scheduled holds no
- * polling reader thread. A worker that started a process without its reader has the reader started once it has ended,
- * to read the finished event log.
+ * output.
+ *
+ * The reader polls from the worker's start until the worker ends, so a worker Mill has not yet scheduled holds no
+ * reader thread. A worker that started a process without its reader has the reader started once it has ended, to read
+ * the finished event log.
+ *
  * What starting or running the worker, or reading its event log, threw is attached to the consolidation's root as a
- * failure naming the worker, so the module's other workers still run and the consolidation can still end and write its
+ * failure naming the worker. The module's other workers still run, and the consolidation can still end and write its
  * output.
  *
  * @param workerName the worker and its module, as the failures name them

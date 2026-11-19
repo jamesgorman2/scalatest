@@ -11,8 +11,8 @@ import org.scalatest.consolidation.RunProcess
 import scala.concurrent.duration.FiniteDuration
 
 /**
- * Reads one worker's test event log on a thread of its own, while the worker runs. It may
- * also start once the worker has ended, and then reads the finished event log.
+ * Reads one worker's test event log on a thread of its own, while the worker runs. It may also start after the worker
+ * has ended, and then reads the finished event log.
  *
  * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
  * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
@@ -37,8 +37,8 @@ private[mill] final class EventLogReader(
   def start(): Unit = thread.start()
 
   /**
-   * Tells the reader the worker has ended, so a missing event log file will not appear: the reader then ends at once
-   * where the file has not appeared, else once the run's process has exited. Only the first call counts.
+   * Tells the reader the worker has ended, so a missing event log file will not appear. The reader then ends at once if
+   * the file has not appeared, else once the run's process has exited. Only the first call counts.
    *
    * @param startedAProcess whether the worker started a process, as Mill's test queue starts none for a worker that
    *                        finds its queue empty

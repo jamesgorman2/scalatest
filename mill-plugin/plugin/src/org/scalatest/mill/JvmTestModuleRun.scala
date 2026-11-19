@@ -145,8 +145,8 @@ private[mill] final class JvmTestModuleRun(
   // Mill's own test queue starts the worker. Where it runs the fork group's workers one after another, the worker runs
   // on this thread and ends before this returns; otherwise it runs on a future forked through the given `TaskCtx`. Mill
   // forks exactly the workers it gives a folder of their own. Only whether the worker started a process is kept. The
-  // `Result` Mill gives for that process is ignored, even a failure, because the consolidation decides the test
-  // command's result.
+  // `Result` Mill gives for that process is ignored, even a failure: the consolidation decides the test command's
+  // result.
   private def runOnQueue(layout: WorkerLayout)(forkGroup: PlannedForkGroup, queue: os.Path, worker: PlannedWorker)(
       workerCtx: WorkerTaskCtx,
       util: TestModuleUtil
