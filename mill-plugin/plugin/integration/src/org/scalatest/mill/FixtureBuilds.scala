@@ -1,9 +1,10 @@
 package org.scalatest.mill
 
 import mill.testkit.IntegrationTester
+import org.scalatest.matchers.should
 import scala.util.matching.Regex
 
-trait FixtureBuilds {
+trait FixtureBuilds { this: should.Matchers =>
 
   protected val pluginVersion: String = sys.env("SCALATEST_MILL_VERSION")
   protected val fixtures: os.Path = os.Path(sys.env("MILL_TEST_RESOURCE_DIR"))
@@ -31,7 +32,11 @@ trait FixtureBuilds {
     val buildFile = tester.workspacePath / "build.mill"
     val mvnDeps = """    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")"""
     val testArgsDefault = moduleArguments.map(argument => s"\"$argument\"").mkString("    def testArgsDefault = Seq(", ", ", ")")
-    os.write.over(buildFile, os.read(buildFile).replace(mvnDeps, s"$mvnDeps\n$testArgsDefault"))
+    val build = os.read(buildFile)
+    withClue(s"the build file holds no line $mvnDeps to follow with $testArgsDefault:\n$build\n") {
+      build should include(mvnDeps)
+    }
+    os.write.over(buildFile, build.replace(mvnDeps, s"$mvnDeps\n$testArgsDefault"))
   }
 
   protected def runTestCommand(tester: IntegrationTester, arguments: String*): TestCommandResult =
@@ -50,6 +55,17 @@ trait FixtureBuilds {
   // Mill writes a `testargs` file for each worker it starts.
   protected def anyTestWorkerStarted(tester: IntegrationTester): Boolean =
     os.exists(tester.workspacePath / "out") && os.walk(tester.workspacePath / "out").exists(_.last == "testargs")
+
+  protected def shouldSucceed(result: TestCommandResult): Unit =
+    withClue(result.debugString) {
+      result.succeeded shouldBe true
+    }
+
+  protected def shouldFailBeforeAnyTestStarts(tester: IntegrationTester, result: TestCommandResult): Unit =
+    withClue(result.debugString) {
+      result.succeeded shouldBe false
+      anyTestWorkerStarted(tester) shouldBe false
+    }
 }
 
 final case class TestCommandResult(eval: IntegrationTester.EvalResult) {

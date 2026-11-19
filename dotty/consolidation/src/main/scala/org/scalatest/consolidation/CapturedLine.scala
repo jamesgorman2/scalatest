@@ -1,6 +1,6 @@
 package org.scalatest.consolidation
 
-/** One line a run's process wrote to stdout or stderr, decoded and without its line end. */
+/** One line a process wrote to stdout or stderr, decoded, with its line terminator where it has one. */
 enum CapturedLine {
   case Stdout(text: String)
   case Stderr(text: String)

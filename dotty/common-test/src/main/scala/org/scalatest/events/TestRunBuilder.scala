@@ -77,17 +77,37 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, var name: Strin
   def defaultExecution: Int = (executions -- endedExecutions).maxOption.orElse(executions.maxOption).getOrElse(1)
 }
 
-private final class HeldSuite(val id: NodeId, val suiteId: String, val className: String, val parent: Option[NodeId], val position: Option[Int])
+// A further structure positions the suite's scopes and tests from where its first structure positioned them.
+private final class HeldSuite(val id: NodeId, val suiteId: String, val className: String, val parent: Option[NodeId], val position: Option[Int]) {
+  var firstPositionOfScopesAndTests: Int = 0
+}
 
-private final class OpenTreeNode(val depth: Int, val id: NodeId, val kind: NodeKind, val suite: NodeId, val scopeNames: Vector[String]) {
+private final class OpenTreeNode(
+  val depth: Int,
+  val id: NodeId,
+  val kind: NodeKind,
+  val suite: NodeId,
+  val scopeNames: Vector[String],
+  firstPosition: Int = 0
+) {
 
-  private var children = 0
+  private var positionOfNextChild = firstPosition
+  private var positionOfFirstScopeOrTest = Option.empty[Int]
   private val scopesNamed = mutable.Map.empty[String, Int]
 
   def nextPosition(): Int = {
-    children += 1
-    children - 1
+    positionOfNextChild += 1
+    positionOfNextChild - 1
   }
+
+  def nextScopeOrTestPosition(): Int = {
+    val position = nextPosition()
+    positionOfFirstScopeOrTest = positionOfFirstScopeOrTest.orElse(Some(position))
+    position
+  }
+
+  /** The position of the node's first scope or test; where it has none, the position after its nested suites. */
+  def firstPositionOfScopesAndTests: Int = positionOfFirstScopeOrTest.getOrElse(positionOfNextChild)
 
   def nextIndexOfScopeNamed(name: String): Int = {
     val index = scopesNamed.getOrElse(name, 0)
@@ -158,7 +178,10 @@ private final class RunUnderConstruction {
     added
   }
 
-  private def rootSuite(block: NotationLine.Structure): HeldSuite = {
+  /** The structure's suite, and whether an earlier structure held it. */
+  private final case class StructureRoot(suite: HeldSuite, isFurther: Boolean)
+
+  private def structureRootOf(block: NotationLine.Structure): StructureRoot = {
     val (written, text) = block.tree.headOption match {
       case Some(TreeLine(1, suite: WrittenNode.Suite, text)) => (suite, text)
       case _ => fail(s"a structure starts with its suite, indented 2 spaces:\n${block.text}")
@@ -184,17 +207,23 @@ private final class RunUnderConstruction {
           fail(s"a further structure holds its suite's scopes and tests only, not '$nested'")
         }
         hold(suite.id, NodeKind.Suite, written.name, suite.parent)
-        suite
-      case None => newSuite(written, parent, None, text)
+        StructureRoot(suite, isFurther = true)
+      case None => StructureRoot(newSuite(written, parent, None, text), isFurther = false)
     }
   }
 
   private def structureNodes(block: NotationLine.Structure): Vector[StructureNode] = {
-    val root = rootSuite(block)
+    val structureRoot = structureRootOf(block)
+    val root = structureRoot.suite
     val built = Vector.newBuilder[StructureNode]
     built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, root.className)
     val testNames = mutable.Set.empty[(NodeId, String)]
-    var open = List(new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty))
+    val openRoot = new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty, if (structureRoot.isFurther) root.firstPositionOfScopesAndTests else 0)
+    val suitesFirstHeld = mutable.ArrayBuffer.empty[(HeldSuite, OpenTreeNode)]
+    if (!structureRoot.isFurther) {
+      suitesFirstHeld += root -> openRoot
+    }
+    var open = List(openRoot)
     block.tree.tail.foreach { line =>
       open = open.dropWhile(_.depth >= line.depth)
       val above = open.headOption.filter(_.depth == line.depth - 1).getOrElse {
@@ -207,11 +236,13 @@ private final class RunUnderConstruction {
           }
           val nested = newSuite(written, Some(above.id), Some(above.nextPosition()), line.text)
           built += StructureNode.Suite(nested.id, nested.parent, nested.position, written.name, nested.suiteId, nested.className)
-          open = new OpenTreeNode(line.depth, nested.id, NodeKind.Suite, nested.id, Vector.empty) :: open
+          val openNested = new OpenTreeNode(line.depth, nested.id, NodeKind.Suite, nested.id, Vector.empty)
+          suitesFirstHeld += nested -> openNested
+          open = openNested :: open
         case WrittenNode.Scope(name, label) =>
           val id = NodeId(above.id.places :+ NodePlace.Scope(name, above.nextIndexOfScopeNamed(name)))
           hold(id, NodeKind.Scope, name, Some(above.id))
-          built += StructureNode.Scope(id, above.id, above.nextPosition(), name, label)
+          built += StructureNode.Scope(id, above.id, above.nextScopeOrTestPosition(), name, label)
           open = new OpenTreeNode(line.depth, id, NodeKind.Scope, above.suite, above.scopeNames :+ name) :: open
         case WrittenNode.Test(name, label, writtenTestName, ignored) =>
           val testName = writtenTestName.getOrElse((above.scopeNames :+ name).mkString(" "))
@@ -220,9 +251,10 @@ private final class RunUnderConstruction {
           }
           val id = NodeId(above.suite.places :+ NodePlace.Test(testName))
           hold(id, NodeKind.Test, name, Some(above.id))
-          built += StructureNode.Test(id, above.id, above.nextPosition(), name, label, ignored)
+          built += StructureNode.Test(id, above.id, above.nextScopeOrTestPosition(), name, label, ignored)
       }
     }
+    suitesFirstHeld.foreach { (suite, openSuite) => suite.firstPositionOfScopesAndTests = openSuite.firstPositionOfScopesAndTests }
     built.result()
   }
 

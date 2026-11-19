@@ -2,6 +2,18 @@
 
 Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, builds on and decides, and how the fork's artifacts are built and published, newest first.
 
+## The library's caller gives the root's and each module's start and end times, and no test event log holds them.
+
+**Alternatives** Writing the root's and a module's times into a run's test event log ties them to one run, though a module can have several runs or none, and the root belongs to no run.
+
+**Reasoning** Only the test command sees when the consolidation and each module's tests start and end, and the test command is the library's caller. Passing the times through **Start**, **End** and **Time a module** keeps the test event log a record of one run alone.
+
+**Costs** A caller that gives no times, such as one replaying test event logs, gets a root and modules with no times.
+
+**Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
+
+---
+
 ## The fork's sbt build compiles with Scala 3.3.8 on every runtime.
 
 **Alternatives**

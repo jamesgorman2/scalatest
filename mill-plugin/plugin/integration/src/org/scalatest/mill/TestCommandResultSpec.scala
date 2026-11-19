@@ -21,11 +21,6 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
   private def resultSuite(source: String): TestCommandResult = runResultFixture(source -> "ResultSuite")()
 
-  private def shouldSucceed(result: TestCommandResult): Unit =
-    withClue(result.debugString) {
-      result.succeeded shouldBe true
-    }
-
   private def shouldFail(result: TestCommandResult): Unit =
     withClue(result.debugString) {
       result.succeeded shouldBe false

@@ -1,19 +1,34 @@
 package org.scalatest.mill
 
-private[mill] final case class TestCommandArguments(moduleSelectors: Seq[String], humanReadableOnStdout: Boolean)
+/** @param jsonOutputPath the path `-fJ` names, as given */
+private[mill] final case class TestCommandArguments(
+    moduleSelectors: Seq[String],
+    humanReadableOnStdout: Boolean,
+    jsonOutputPath: Option[String]
+)
 
 private[mill] object TestCommandArguments {
 
-  private val outputArguments: Map[String, Boolean] = Map("-oH" -> true, "-o" -> false)
+  private val stdoutArguments: Map[String, Boolean] = Map("-oH" -> true, "-o" -> false)
 
-  def parse(arguments: Seq[String]): Either[String, TestCommandArguments] = {
-    val (options, moduleSelectors) = arguments.partition(_.startsWith("-"))
-    options match {
-      case Seq() => Right(TestCommandArguments(moduleSelectors, humanReadableOnStdout = true))
-      case Seq(option) if outputArguments.contains(option) => Right(TestCommandArguments(moduleSelectors, outputArguments(option)))
-      case _ =>
-        val rejected = options.find(!outputArguments.contains(_)).getOrElse(options(1))
-        Left(s"The test command takes one output argument, -oH or -o, but was given: $rejected")
+  private val jsonOutputArgument: String = "-fJ"
+
+  def parse(arguments: Seq[String]): Either[String, TestCommandArguments] =
+    parseFrom(arguments.toList, TestCommandArguments(Vector.empty, humanReadableOnStdout = true, jsonOutputPath = None), stdoutGiven = false)
+
+  private def parseFrom(arguments: List[String], parsed: TestCommandArguments, stdoutGiven: Boolean): Either[String, TestCommandArguments] =
+    arguments match {
+      case Nil =>
+        Right(parsed)
+      case `jsonOutputArgument` :: path :: rest if parsed.jsonOutputPath.isEmpty =>
+        parseFrom(rest, parsed.copy(jsonOutputPath = Some(path)), stdoutGiven)
+      case `jsonOutputArgument` :: Nil if parsed.jsonOutputPath.isEmpty =>
+        Left(s"The test command's $jsonOutputArgument takes a path, but none follows it: $jsonOutputArgument")
+      case argument :: rest if stdoutArguments.contains(argument) && !stdoutGiven =>
+        parseFrom(rest, parsed.copy(humanReadableOnStdout = stdoutArguments(argument)), stdoutGiven = true)
+      case argument :: _ if argument.startsWith("-") =>
+        Left(s"The test command takes at most one of -oH or a bare -o, and at most one $jsonOutputArgument followed by a path, but was given: $argument")
+      case moduleSelector :: rest =>
+        parseFrom(rest, parsed.copy(moduleSelectors = parsed.moduleSelectors :+ moduleSelector), stdoutGiven)
     }
-  }
 }

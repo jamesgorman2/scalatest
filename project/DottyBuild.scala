@@ -422,6 +422,14 @@ trait DottyBuild { this: BuildCommons =>
       Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
       // Core's Framework implements sbt's test interface, which core declares optional.
       libraryDependencies += "org.scala-sbt" % "test-interface" % "1.0" % Test,
+      // The tests check the Mill plugin's documents against the JSON output, wherever sbt runs them from.
+      Test / resourceGenerators += Def.task {
+        val directories = new java.util.Properties
+        directories.setProperty("millPlugin", ((ThisBuild / baseDirectory).value / "mill-plugin").getAbsolutePath)
+        val resource = (Test / resourceManaged).value / "repository.properties"
+        IO.write(directories, "The repository's directories the tests read", resource)
+        Seq(resource)
+      }.taskValue,
       // Published one at a time, dependencies first: on Windows, bundling a project
       // holds its dependencies' jars open, so a dependency bundled later cannot replace its jar.
       millDependencies := Def.sequential(

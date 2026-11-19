@@ -1,6 +1,6 @@
 # ScalaTest's Mill plugin
 
-The plugin `com.edc:scalatest-mill_mill1_3` adds the test command `mill scalatest/test`. It runs one JVM test module's tests and writes their consolidated human-readable output to stdout.
+The plugin `com.edc:scalatest-mill_mill1_3` adds the test command `mill scalatest/test`. It runs one JVM test module's tests and writes their consolidated human-readable output to stdout and, on request, their consolidated JSON output to a file.
 
 Each plugin release is a release of this fork. The plugin, the fork's ScalaTest artifacts and the consolidation library share one version, `3.2.20`.
 
@@ -9,7 +9,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
-- Human-readable output on stdout. The only output arguments are `-oH` and a bare `-o`.
+- Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
 
 ## Publishing
 
@@ -76,7 +76,7 @@ Nothing else in the build names the plugin. Mill's own test tasks, such as `mill
 ## Running the test command
 
 ```
-mill scalatest/test <module selector> [-oH | -o]
+mill scalatest/test <module selector> [-oH | -o] [-fJ <path>]
 ```
 
 For example, `mill scalatest/test core.test`.
@@ -84,13 +84,16 @@ For example, `mill scalatest/test core.test`.
 - **Module selector**: exactly one, resolving to one JVM test module.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
+- **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
 
 The module's own ScalaTest arguments (`testArgsDefault`) reach the run only if they are one of these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`.
 Every other flag, including every reporter flag, is withheld.
 
 The test command fails before any test starts when:
 
-- it is given any other output argument, such as `-oP`, `-oHd` or an `-f`;
+- it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`;
+- it is given `-fJ` with no path;
+- a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector, or more than one;
 - the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;
 - the module has more than one fork group;
@@ -100,6 +103,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - the test worker dies;
-- the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`.
+- the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
+- the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
 Under the test command, ScalaTest prints no end-of-run summary. Mill's own test tasks still print it.

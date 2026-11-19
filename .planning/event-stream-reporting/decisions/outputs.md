@@ -1,6 +1,54 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output holds, newest first.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output records, newest first. The JSON output's layout has its own decisions, in `../JSON-LAYOUT-DECISIONS.md`.
+
+## The JSON output's format carries no compatibility promise across releases of this fork (`../SPECIFICATION.md` § Scope).
+
+**Alternatives** Semantic versioning of the format, under which a patch release never changes it and a minor release only adds to it, binds every later release to additive change for third-party readers the goal does not name.
+
+**Reasoning** The JSON output's readers are agents that started the test command. Each agent reads the output against the documentation of the release that wrote it, so a change between releases costs it nothing.
+
+**Costs** A tool that parses the JSON output across releases may break on any release.
+
+**Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
+
+---
+
+## The JSON output records the release of this fork that wrote it, and has no format version of its own (`../SPECIFICATION.md` R-084).
+
+**Alternatives** A format version of its own beside the release version records nothing the release version does not, since only a release changes the format.
+
+**Reasoning** The release version tells a reader which release's documentation describes the layout, so a second version adds nothing a reader can act on.
+
+**Costs** A reader that wants to know whether the layout changed between two releases must compare those releases' documentation.
+
+**Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
+
+---
+
+## The test command times the root and each module.
+
+**Alternatives** Leaving the root and modules untimed gives a reader no time for the test command or for a module, though only the test command can observe either.
+
+**Reasoning** No run's events record when the test command or a module's tests start and end. Only the test command observes those times, so only it can give the root and each module a measured time.
+
+**Costs** The root and modules have no times when the consolidation library is called by a caller that gives none.
+
+**Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
+
+---
+
+## A node's duration is measured from that node's own start and end, never derived from its children's (`../SPECIFICATION.md` R-103).
+
+**Alternatives** Falling back to the sum of a node's children's durations overstates the time of a node whose children ran concurrently, such as a module with parallel runs, and gives the node a value nothing measured.
+
+**Reasoning** A duration that nothing measured is a guess a reader cannot tell from a measurement.
+
+**Costs** A node whose start or end was not measured, such as an ignored test, has no duration.
+
+**Settled by** [Plan: consolidated JSON output](https://github.com/jamesgorman2/scalatest/issues/140).
+
+---
 
 ## A suite, scope or test that was executed more than once appears as many times as it was executed, in the structure of its execution (`../SPECIFICATION.md` R-130e).
 
@@ -77,17 +125,5 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 **Costs** CI tools that read only JUnit XML get nothing from the consolidation.
 
 **Settled by** [Is consolidated JUnit XML in scope?](https://github.com/jamesgorman2/scalatest/issues/34).
-
----
-
-## Each JSON node holds its final state, with nothing per event.
-
-**Alternatives** Writing each node's events with every field, as ScalaTest 3.2.20's JSON lines do, repeats each event's suite name, suite ID and suite class name, and carries ordinals, formatters and rerunners, which only restate the order the tree already gives or have no meaning outside the run that wrote them.
-
-**Reasoning** Every reader of the JSON output needs a node's state and its place, and the tree gives the place. One record per node, with one key per value, is what the format's documentation can describe and keep stable under semantic versioning (`../JSON-LAYOUT.md` § Compatibility).
-
-**Costs** The JSON output does not hold every field of every event, and a tool that reads only the JSON cannot recover the order of events across nodes.
-
-**Settled by** [How is a run's test structure laid out as JSON?](https://github.com/jamesgorman2/scalatest/issues/19).
 
 ---

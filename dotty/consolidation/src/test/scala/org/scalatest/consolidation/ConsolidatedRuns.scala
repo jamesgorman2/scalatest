@@ -62,9 +62,17 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     feed
   }
 
+  /** Feeds the events to one run of module `core.test`, then ends the consolidation. */
+  def consolidateRun(consolidation: Consolidation, events: Vector[RunEvent]): Unit = {
+    val feed = consolidation.addRun(moduleLabel)
+    events.foreach(event => feed.add(event))
+    feed.endEventStream()
+    consolidation.end()
+  }
+
   // An event is a line at the event log's least indentation, with the lines indented below it.
   def interleavingsOf(eventLog: String, lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
-    ConsolidatedRuns.interleavings(ConsolidatedRuns.eventsOf(eventLog).map(TestRunPart.Events(_)), lines)
+    ConsolidatedRuns.interleavings(ConsolidatedRuns.eventNotationsOf(eventLog).map(TestRunPart.Events(_)), lines)
 
   def colourMarkedTreeFrom(eventLog: String): String = colourMarkedTreeFrom(TestRunPart.Events(eventLog))
 
@@ -94,7 +102,7 @@ private[consolidation] object ConsolidatedRuns {
   def withColoursMarked(line: String): String =
     markers.foldLeft(line) { case (marked, (sequence, marker)) => marked.replace(sequence, marker) }
 
-  private def eventsOf(eventLog: String): Vector[String] = {
+  private def eventNotationsOf(eventLog: String): Vector[String] = {
     val lines = eventLog.linesIterator.filter(_.trim.nonEmpty).toVector
     val leastIndentation = lines.map(_.takeWhile(_ == ' ').length).min
     lines.foldLeft(Vector.empty[String]) { (events, line) =>

@@ -1,5 +1,6 @@
 package org.scalatest.mill
 
+import java.time.Instant
 import mill.api.TaskCtx
 import mill.javalib.api.internal.ZincOp
 import org.scalatest.consolidation.Consolidation
@@ -20,6 +21,7 @@ private[mill] final class JvmTestModuleRun(
 
   private val eventLogFile: os.Path = moduleFolder / JvmTestModuleRun.eventLogFileName
 
+  /** Times the module from just before its worker starts until the worker has ended and its event log is read. */
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
@@ -36,7 +38,9 @@ private[mill] final class JvmTestModuleRun(
       ProcessExit.hasExited,
       10.millis
     )
+    val startedAt = Instant.now()
     JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker(testClasses, capture))
+    consolidation.timeModule(label, Some(startedAt), Some(Instant.now()))
   }
 
   private def discoveredTestClasses(): Seq[String] = {

@@ -21,32 +21,39 @@ private[scalatest] object JsonWriter {
     case Punctuation(char: Char)
   }
 
-  // Keeps what is still to write in a list, not on the call stack, so that deep nesting cannot overflow the stack.
   def write(value: JsonValue): String = {
-    val builder = new StringBuilder
+    val builder = new java.lang.StringBuilder
+    write(value, builder)
+    builder.toString
+  }
+
+  /**
+   * Appends the value's text to `out` piece by piece, without building the whole text itself. Throws what `out` throws.
+   */
+  // Keeps what is still to write in a list, not on the call stack, so that deep nesting cannot overflow the stack.
+  def write(value: JsonValue, out: Appendable): Unit = {
     var pending = List[Pending](Pending.Value(value))
     while (pending.nonEmpty) {
       val next = pending.head
       pending = pending.tail
       next match {
-        case Pending.Punctuation(char) => builder.append(char)
+        case Pending.Punctuation(char) => out.append(char)
         case Pending.Key(key) =>
-          appendString(builder, key)
-          builder.append(':')
-        case Pending.Value(JsonValue.Text(text)) => appendString(builder, text)
-        case Pending.Value(JsonValue.Integer(number)) => builder.append(number)
-        case Pending.Value(JsonValue.Bool(flag)) => builder.append(flag)
+          appendString(out, key)
+          out.append(':')
+        case Pending.Value(JsonValue.Text(text)) => appendString(out, text)
+        case Pending.Value(JsonValue.Integer(number)) => out.append(number.toString)
+        case Pending.Value(JsonValue.Bool(flag)) => out.append(flag.toString)
         case Pending.Value(JsonValue.Array(items)) =>
-          builder.append('[')
+          out.append('[')
           val members = items.map(item => List[Pending](Pending.Value(item)))
           pending = separated(members) ::: Pending.Punctuation(']') :: pending
         case Pending.Value(JsonValue.Object(fields)) =>
-          builder.append('{')
+          out.append('{')
           val members = fields.map { case (key, fieldValue) => List[Pending](Pending.Key(key), Pending.Value(fieldValue)) }
           pending = separated(members) ::: Pending.Punctuation('}') :: pending
       }
     }
-    builder.toString
   }
 
   private def separated(members: Vector[List[Pending]]): List[Pending] = {
@@ -55,45 +62,45 @@ private[scalatest] object JsonWriter {
     }
   }
 
-  private def appendString(builder: StringBuilder, text: String): Unit = {
-    builder.append('"')
+  private def appendString(out: Appendable, text: String): Unit = {
+    out.append('"')
     var index = 0
     while (index < text.length) {
       val char = text.charAt(index)
       val pairedHighSurrogate =
         Character.isHighSurrogate(char) && index + 1 < text.length && Character.isLowSurrogate(text.charAt(index + 1))
       if (pairedHighSurrogate) {
-        builder.append(char).append(text.charAt(index + 1))
+        out.append(char).append(text.charAt(index + 1))
         index += 2
       } else {
-        appendChar(builder, char)
+        appendChar(out, char)
         index += 1
       }
     }
-    builder.append('"')
+    out.append('"')
   }
 
-  private def appendChar(builder: StringBuilder, char: Char): Unit = {
+  private def appendChar(out: Appendable, char: Char): Unit = {
     char match {
-      case '"' => builder.append("\\\"")
-      case '\\' => builder.append("\\\\")
-      case '\b' => builder.append("\\b")
-      case '\f' => builder.append("\\f")
-      case '\n' => builder.append("\\n")
-      case '\r' => builder.append("\\r")
-      case '\t' => builder.append("\\t")
+      case '"' => out.append("\\\"")
+      case '\\' => out.append("\\\\")
+      case '\b' => out.append("\\b")
+      case '\f' => out.append("\\f")
+      case '\n' => out.append("\\n")
+      case '\r' => out.append("\\r")
+      case '\t' => out.append("\\t")
       case _ =>
         if (char < ' ' || Character.isSurrogate(char)) {
-          appendUnicodeEscape(builder, char)
+          appendUnicodeEscape(out, char)
         } else {
-          builder.append(char)
+          out.append(char)
         }
     }
   }
 
-  private def appendUnicodeEscape(builder: StringBuilder, char: Char): Unit = {
-    builder.append("\\u")
-    List(12, 8, 4, 0).foreach(shift => builder.append(hexDigits.charAt((char >> shift) & 0xF)))
+  private def appendUnicodeEscape(out: Appendable, char: Char): Unit = {
+    out.append("\\u")
+    List(12, 8, 4, 0).foreach(shift => out.append(hexDigits.charAt((char >> shift) & 0xF)))
   }
 }
 

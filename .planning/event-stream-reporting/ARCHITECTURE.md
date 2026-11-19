@@ -47,7 +47,16 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 
 ### Consolidation library
 
-`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it. It sits in core's package because it reuses four `private[scalatest]` parts of core: its formatting of human-readable output, its decoder, its argument splitter and its definition of the runner argument.
+`scalatest-consolidation`, published as `scalatest-consolidation_3`: JVM and Scala 3 only, as its one caller, the Mill plugin, runs on Scala 3. It is in package `org.scalatest`, depends on scalatest-core and meets `SPECIFICATION.md` R-023. It takes each event stream in the form core's decoder yields it. It sits in core's package because it reuses `private[scalatest]` parts of core:
+
+- its formatting of human-readable output;
+- its decoder;
+- its argument splitter;
+- its definition of the runner argument;
+- its JSON encoder;
+- the version of this fork it was built at.
+
+Its own components are:
 
 - **Assembly** — builds each run's test structure from its event stream as it arrives.
   - It keeps each node's events against the node's ID, by execution, apart from the structure. The writers report each suite's latest structure, with those events.
@@ -166,21 +175,27 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 - **Start** a consolidation, given:
   - a sink for each output on stdout and in each file (`SPECIFICATION.md` R-048, R-049a, R-049b):
     - progress output on stdout: one sink for the summary of counts, which the caller redraws in place on Mill's prompt where it can (R-089, R-090a–R-090e, R-091);
+    - the JSON output: one streaming sink, to which **End** hands the JSON output once, after the human-readable output. The sink writes it to a `java.io.Writer` of its choosing, so the consolidation never holds the output's text whole in memory. **End** holds the consolidation's lock while the sink writes. The Mill plugin's sink writes through a buffered UTF-8 writer to the file `-fJ` names. If the write fails part way, the sink deletes the file, so the file holds the whole JSON output or nothing. If that delete also fails, the failure message says so;
     - every other output: one text sink;
   - for each human-readable output, the formatting and filtering characters of the `-o` or `-f` that names it (R-138, R-139);
   - each module selector, with the test modules it resolved to;
-  - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show.
-- **Add a run** under the module the caller names for it (§ Modules § Consolidation library, Consolidation): its event stream, fed live as the test event log is decoded, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-097a), as one sequence of lines in the order the caller read them, each line tagged with its stream.
+  - where the caller gives them, the name and version of the build tool that started the runs, whether that version is supported, and a warning to show;
+  - where the caller gives it, the root's start time: the time, by the caller's clock, at which the consolidation starts.
+- **Add a run** under the module the caller names for it (§ Modules § Consolidation library, Consolidation): its event stream, fed live as the test event log is decoded, and the output captured from the stdout and stderr of the run's processes (`SPECIFICATION.md` R-097a). The caller adds that output as one sequence of lines in the order the caller read them. Each line is tagged with its stream and keeps its line terminator where it has one.
   - The caller splits each stream into lines and decodes them to text before adding them, since a stream reaches it in chunks that can split a line or a character (`research/mill-worker-channels.md` § 1.3).
   - The caller adds a stream's unterminated last line once that stream ends, so a process that dies keeps its last line (R-097a).
   - The caller tells the library when the run's event stream has ended (§ APIs § The emitter and the Mill plugin, "Each event" and "The end of a run's event stream").
 
   Once the run's process has ended, the caller adds the test classes that process claimed, from the module's test manifest (§ Modules § Mill plugin).
+- **Time a module**: the caller gives a start time and an end time for each module whose tests it starts, each by the caller's own clock.
+  - A module's start time is the time at which the caller starts the module's tests.
+  - A module's end time is the time at which the last of the module's test processes has ended.
+  - These times, with the root's start and end times, supply the times of the root and the modules in the JSON output (`JSON-LAYOUT.md` § Root and modules). No test event log holds these times.
 - **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its module, the test classes it claimed, and the output captured from its stdout and stderr, in the form **Add a run** takes it. The library attaches that output to the module, the most specific node the process identifies.
 - **Add a module whose tests did not start** (R-098e), naming the module and, where a failure stopped them, that failure.
 - **Add a test class** left in a fork group's queue when the group's last worker ended, with its module. The library adds the class as a suite node aborted with reason *not run* (R-095a).
 - **Attach output or a failure to the root**: the output and the failure of a runner that is not a run, such as Mill's discovery runner, which adds no node (R-072), and a failure of the test command itself (R-098f). Output is in the form **Add a run** takes it.
-- **End**, which the caller calls once every run's event stream has ended: the library writes the human-readable and JSON output. The consolidation state is ended once **End** returns, after that output is written.
+- **End**, which the caller calls once every run's event stream has ended. Where the caller gives it, **End** takes the root's end time: the time, by the caller's clock, at which every run has ended. The library writes the human-readable and JSON output. The consolidation state is ended once **End** returns, after that output is written.
 - **Read the consolidation state**: returns, at once and at any time from **Start**, one of *open*, *open, failed*, *ended* and *ended, failed* (`decisions/architecture-library-and-modules.md` "The consolidation library, not the Mill plugin, decides whether the test command has failed." and "The library gives the consolidation state as a synchronous read of four states…").
   - The state becomes failed, and stays failed, when (`SPECIFICATION.md` R-046a, R-046b, R-046c, R-137):
     - an event reporting a failure is added to a run's event stream;
@@ -244,7 +259,7 @@ flowchart LR
   PROC -- "stdout and stderr (JVM), less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
-  CMD -- "each run's module, selectors, test classes each process claimed, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version" --> LIB
+  CMD -- "each run's module, selectors, test classes each process claimed, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version, start and end times of the root and each module" --> LIB
   LIB -- "runner argument; consolidation state" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]

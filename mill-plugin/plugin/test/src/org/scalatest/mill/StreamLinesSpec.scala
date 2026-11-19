@@ -19,28 +19,28 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
 
   "Stream lines" when {
     "given bytes holding whole lines" should {
-      "pass on each line without its line end" in {
+      "pass on each line with its line end" in {
         val splitting = new Splitting
         splitting.append("first\nsecond\n")
-        splitting.lines shouldBe Seq("first", "second")
+        splitting.lines shouldBe Seq("first\n", "second\n")
       }
 
-      "drop one carriage return before a line end" in {
+      "keep each carriage return before a line end" in {
         val splitting = new Splitting
         splitting.append("first\r\nsecond\r\r\n")
-        splitting.lines shouldBe Seq("first", "second\r")
+        splitting.lines shouldBe Seq("first\r\n", "second\r\r\n")
       }
 
       "keep a lone carriage return in the line" in {
         val splitting = new Splitting
         splitting.append("50%\r100%\n")
-        splitting.lines shouldBe Seq("50%\r100%")
+        splitting.lines shouldBe Seq("50%\r100%\n")
       }
 
       "pass on an empty line" in {
         val splitting = new Splitting
         splitting.append("\n\r\n")
-        splitting.lines shouldBe Seq("", "")
+        splitting.lines shouldBe Seq("\n", "\r\n")
       }
     }
 
@@ -50,7 +50,7 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
         splitting.append("fir")
         splitting.lines shouldBe empty
         splitting.append("st\nsec")
-        splitting.lines shouldBe Seq("first")
+        splitting.lines shouldBe Seq("first\n")
       }
 
       "decode a character whose bytes the chunks split" in {
@@ -58,14 +58,14 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
         val bytes = "café\n".getBytes(StandardCharsets.UTF_8)
         splitting.append(bytes.take(4))
         splitting.append(bytes.drop(4))
-        splitting.lines shouldBe Seq("café")
+        splitting.lines shouldBe Seq("café\n")
       }
 
       "keep a carriage return and line end split across chunks as one line end" in {
         val splitting = new Splitting
         splitting.append("first\r")
         splitting.append("\n")
-        splitting.lines shouldBe Seq("first")
+        splitting.lines shouldBe Seq("first\r\n")
       }
     }
 
@@ -74,7 +74,7 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
         val splitting = new Splitting
         val buffer = "one\ntwo\n".getBytes(StandardCharsets.UTF_8)
         splitting.splitter.append(buffer, 4)
-        splitting.lines shouldBe Seq("one")
+        splitting.lines shouldBe Seq("one\n")
       }
     }
 
@@ -83,7 +83,7 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
         val windows1252 = Charset.forName("windows-1252")
         val splitting = new Splitting(windows1252)
         splitting.append("naïve € line\n")
-        splitting.lines shouldBe Seq("naïve € line")
+        splitting.lines shouldBe Seq("naïve € line\n")
       }
 
       "split a multi-byte charset's lines without cutting a character" in {
@@ -92,7 +92,7 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
         val bytes = "表示\n".getBytes(shiftJis)
         splitting.append(bytes.take(1))
         splitting.append(bytes.drop(1))
-        splitting.lines shouldBe Seq("表示")
+        splitting.lines shouldBe Seq("表示\n")
       }
     }
 
@@ -100,23 +100,23 @@ final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
       "decode them to the replacement character" in {
         val splitting = new Splitting
         splitting.append(Array[Byte]('a', 0xff.toByte, 'b', '\n'))
-        splitting.lines shouldBe Seq("a�b")
+        splitting.lines shouldBe Seq("a�b\n")
       }
     }
 
     "ended" should {
-      "pass on the line it still holds" in {
+      "pass on the line it still holds, with no line end" in {
         val splitting = new Splitting
         splitting.append("first\nlast")
         splitting.splitter.end()
-        splitting.lines shouldBe Seq("first", "last")
+        splitting.lines shouldBe Seq("first\n", "last")
       }
 
       "pass on nothing when it holds no byte" in {
         val splitting = new Splitting
         splitting.append("first\n")
         splitting.splitter.end()
-        splitting.lines shouldBe Seq("first")
+        splitting.lines shouldBe Seq("first\n")
       }
 
       "keep a carriage return ending the line it still holds" in {

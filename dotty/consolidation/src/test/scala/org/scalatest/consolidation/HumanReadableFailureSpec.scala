@@ -1,6 +1,10 @@
 package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
+import org.scalatest.events.DecodedEvent
+import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.TestRunBuilder
+import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -22,6 +26,20 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
     $ending
     scope "A Stack": ScopeClosed
     suite "StackFlatSpec": SuiteCompleted
+    run ended completed
+    """
+
+  private def eventLogOfTestEndingThenAbortedBy(ending: String, aborted: String): String =
+    s"""
+    run started
+    structure
+      suite "ParAbortSuite", class "samples.ParAbortSuite"
+        test "a", label "- a"
+    suite "ParAbortSuite": SuiteStarting
+    test "a": TestStarting
+    $ending
+    $aborted
+    suite "ParAbortSuite": SuiteCompleted
     run ended completed
     """
 
@@ -177,6 +195,70 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |        {green}[note] a note{reset}
           |        {yellow}[alert] an alert{reset}""".stripExpectedMargin
     }
+
+    Scenario("A test aborted by its DistributedTestRunnerSuite shows its abort line, then the throwable's lines under it") {
+      Given("an event log of a test that holds only the SuiteAborted of the DistributedTestRunnerSuite running it")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "ParAbortSuite", class "samples.ParAbortSuite"
+            test "a", label "- a"
+        suite "ParAbortSuite": SuiteStarting
+        test "a": SuiteAborted(message: "Exception encountered when invoking run on a nested suite - no fixture", throwable: java.lang.RuntimeException "no fixture")
+        suite "ParAbortSuite": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the test's abort line sits under the suite's name line, with the throwable's lines under it, in red")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}ParAbortSuite:{reset}
+          |    {red}- a *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: no fixture{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A test that succeeded, then was aborted by its DistributedTestRunnerSuite, shows its abort line in place of its success") {
+      Given("an event log of a test that succeeds, then holds the SuiteAborted of the DistributedTestRunnerSuite running it")
+      val eventLog = eventLogOfTestEndingThenAbortedBy(
+        """test "a": TestSucceeded""",
+        """test "a": SuiteAborted(message: "no teardown", throwable: java.lang.RuntimeException "no teardown")"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the test's abort line, with the throwable's lines under it, replaces its success line")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}ParAbortSuite:{reset}
+          |    {red}- a *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: no teardown{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A test that failed, then was aborted by its DistributedTestRunnerSuite, shows its abort line in place of its failure") {
+      Given("an event log of a test that fails, then holds the SuiteAborted of the DistributedTestRunnerSuite running it")
+      val eventLog = eventLogOfTestEndingThenAbortedBy(
+        """test "a": TestFailed(message: "2 did not equal 3")""",
+        """test "a": SuiteAborted(message: "no teardown", throwable: java.lang.RuntimeException "no teardown")"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the test's abort line, with the throwable's lines under it, replaces its failure lines")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}ParAbortSuite:{reset}
+          |    {red}- a *** ABORTED ***{reset}
+          |      {red}java.lang.RuntimeException: no teardown{reset}
+          |        {red}...{reset}""".stripExpectedMargin
+    }
   }
 
   Feature("A suite's abort sits under its name line") {
@@ -266,6 +348,193 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
           |    {red}samples.PartlyRunSpec *** ABORTED ***{reset}
           |      {red}java.lang.RuntimeException: database unreachable{reset}
           |        {red}...{reset}""".stripExpectedMargin
+    }
+  }
+
+  Feature("An event with an empty message and a throwable with no message") {
+
+    def eventLogOfTwoTestsWhoseFirstEndsWith(ending: String): String =
+      s"""
+      run started
+      structure
+        suite "SilentSpec", class "samples.SilentSpec"
+          test "first", label "- first"
+          test "second", label "- second"
+      suite "SilentSpec": SuiteStarting
+      test "first": TestStarting
+      $ending
+      test "second": TestStarting
+      test "second": InfoProvided(message: "still checked")
+      test "second": TestSucceeded
+      suite "SilentSpec": SuiteCompleted
+      run ended completed
+      """
+
+    Scenario("A failed test shows its throwable's class and frames, and every other test's output still shows") {
+      Given("an event log of a test that fails with an empty message and a throwable with no message, then a test that succeeds")
+      val eventLog = eventLogOfTwoTestsWhoseFirstEndsWith(
+        """test "first": TestFailed(message: "", throwable: java.lang.IllegalStateException frames ["samples.SilentSpec.check(SilentSpec.scala:9)"])"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the failure shows the throwable's class and frames, and the second test and its message follow")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SilentSpec:{reset}
+          |    {red}- first *** FAILED ***{reset}
+          |      {red}java.lang.IllegalStateException:{reset}
+          |        {red}at samples.SilentSpec.check(SilentSpec.scala:9){reset}
+          |        {red}...{reset}
+          |    {green}- second{reset}
+          |      {green}[info] still checked{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A failure with an empty message and a message-less `StackDepth` throwable shows the failing code's file and line, as ScalaTest 3.2.20 does for an empty message") {
+      Given("an event log of a test that fails with an empty message and a `TestFailedException` with no message, then a test that succeeds")
+      val eventLog = eventLogOfTwoTestsWhoseFirstEndsWith(
+        """test "first": TestFailed(message: "", throwable: org.scalatest.exceptions.TestFailedException null at SilentSpec.scala:9)"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the failure shows the failed code's file and line after an empty message, with no throwable line, and the second test follows")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SilentSpec:{reset}
+          |    {red}- first *** FAILED ***{reset}
+          |      {red} (SilentSpec.scala:9){reset}
+          |    {green}- second{reset}
+          |      {green}[info] still checked{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A failed test whose throwable is its own cause shows the throwable once") {
+      Given("an event log of a test that fails with an empty message and a throwable with no message that is its own cause")
+      val events = TestRunBuilder.build(TestRunPart.Events(eventLogOfTwoTestsWhoseFirstEndsWith(
+        """test "first": TestFailed(message: "", throwable: java.lang.IllegalStateException frames ["samples.SilentSpec.check(SilentSpec.scala:9)"])"""
+      ))).fold(fail(_), _.events.map(_.event))
+      events.collect { case TestEventLogEvent.ScalaTestEvent(_, failed: DecodedEvent.TestFailed) => failed.throwable }.flatten
+        .foreach(throwable => throwable.link(Some(throwable), Vector.empty))
+
+      When("the library consolidates it")
+      val output = new OutputSink
+      val consolidation = Consolidation.start(output, coloured = true)
+      val feed = consolidation.addRun(moduleLabel)
+      events.foreach(event => feed.add(RunEvent.of(event).fold(fail(_), identity)))
+      feed.endEventStream()
+      consolidation.end()
+
+      Then("the failure shows the throwable's class and frames once, with no `Cause:` line, and the second test follows")
+      output.colourMarkedTree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SilentSpec:{reset}
+          |    {red}- first *** FAILED ***{reset}
+          |      {red}java.lang.IllegalStateException:{reset}
+          |        {red}at samples.SilentSpec.check(SilentSpec.scala:9){reset}
+          |        {red}...{reset}
+          |    {green}- second{reset}
+          |      {green}[info] still checked{reset}""".stripExpectedMargin
+    }
+
+    Scenario("A canceled test shows its throwable's class and frames, and every other test's output still shows") {
+      Given("an event log of a test canceled with an empty message and a throwable with no message, then a test that succeeds")
+      val eventLog = eventLogOfTwoTestsWhoseFirstEndsWith(
+        """test "first": TestCanceled(message: "", throwable: java.lang.IllegalStateException frames ["samples.SilentSpec.check(SilentSpec.scala:9)"])"""
+      )
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the cancel shows the throwable's class and frames, and the second test and its message follow")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}SilentSpec:{reset}
+          |    {yellow}- first !!! CANCELED !!!{reset}
+          |      {yellow}java.lang.IllegalStateException:{reset}
+          |        {yellow}at samples.SilentSpec.check(SilentSpec.scala:9){reset}
+          |        {yellow}...{reset}
+          |    {green}- second{reset}
+          |      {green}[info] still checked{reset}""".stripExpectedMargin
+    }
+
+    Scenario("An aborted suite shows its throwable's class, and every other suite's output still shows") {
+      Given("an event log of a suite that aborts with an empty message and a throwable with no message, then a suite whose test succeeds")
+      val eventLog =
+        """
+        run started
+        structure
+          suite "SilentSpec", class "samples.SilentSpec"
+            test "first", label "- first"
+        suite "SilentSpec": SuiteStarting
+        suite "SilentSpec": SuiteAborted(message: "", throwable: java.lang.IllegalStateException)
+        structure
+          suite "LaterSpec", class "samples.LaterSpec"
+            test "later", label "- later"
+        suite "LaterSpec": SuiteStarting
+        test "later": TestStarting
+        test "later": InfoProvided(message: "still checked")
+        test "later": TestSucceeded
+        suite "LaterSpec": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates it")
+      val output = colourMarkedTreeFrom(eventLog)
+
+      Then("the abort shows the throwable's class, and the other suite, its test and its message show too")
+      output shouldBe
+        """{cyan}[core.test]{reset}
+          |  {green}LaterSpec:{reset}
+          |    {green}- later{reset}
+          |      {green}[info] still checked{reset}
+          |  {green}SilentSpec:{reset}
+          |    {red}samples.SilentSpec *** ABORTED ***{reset}
+          |      {red}java.lang.IllegalStateException:{reset}
+          |        {red}...{reset}
+          |    {red}(1 test not run){reset}""".stripExpectedMargin
+    }
+
+    Scenario("An aborted run shows its throwable's class, and every other run's output still shows") {
+      Given("an event log of a run that aborts with an empty message and a throwable with no message, and another run whose test succeeds")
+      val abortedRun =
+        """
+        run started
+        run: RunAborted(message: "", throwable: java.lang.OutOfMemoryError)
+        run ended aborted
+        """
+      val laterRun =
+        """
+        run started
+        structure
+          suite "LaterSpec", class "samples.LaterSpec"
+            test "later", label "- later"
+        suite "LaterSpec": SuiteStarting
+        test "later": TestStarting
+        test "later": InfoProvided(message: "still checked")
+        test "later": TestSucceeded
+        suite "LaterSpec": SuiteCompleted
+        run ended completed
+        """
+
+      When("the library consolidates both runs")
+      val output = new OutputSink
+      val consolidation = Consolidation.start(output, coloured = true)
+      addRun(consolidation, TestRunPart.Events(abortedRun)).endEventStream()
+      addRun(consolidation, TestRunPart.Events(laterRun)).endEventStream()
+      consolidation.end()
+
+      Then("the run's abort shows the throwable's class, and the later run's suite, test and message follow")
+      output.colourMarkedTree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 1:{reset}
+          |    {red}*** RUN ABORTED ***{reset}
+          |      {red}java.lang.OutOfMemoryError:{reset}
+          |        {red}...{reset}
+          |  {green}LaterSpec:{reset}
+          |    {green}- later{reset}
+          |      {green}[info] still checked{reset}""".stripExpectedMargin
     }
   }
 }
