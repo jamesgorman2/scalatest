@@ -24,7 +24,7 @@ import scala.util.Try
  */
 private[mill] final class WorkerRun(consolidation: Consolidation, workerName: String, reader: EventLogReader, capture: WorkerOutputCapture) {
 
-  private var started: Try[Future[Boolean]] = Failure(new IllegalStateException(s"$workerName was never started"))
+  private var started: Try[Future[WorkerProcess]] = Failure(new IllegalStateException(s"$workerName was never started"))
   private var readerStarted: Boolean = false
   private var readerClosed: Boolean = false
 
@@ -35,7 +35,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    * @param startWorker starts the worker, giving once it has ended whether it started a process. It is given what to
    *                    call as the worker starts, on whichever thread runs it.
    */
-  def start(startWorker: (() => Unit) => Future[Boolean]): Unit = {
+  def start(startWorker: (() => Unit) => Future[WorkerProcess]): Unit = {
     started =
       try {
         Try(startWorker(() => startReading()))
@@ -45,9 +45,9 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
           throw fatal
       }
     started match {
-      case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(startedAProcess = ended.getOrElse(true)))(using ExecutionContext.parasitic)
+      case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started)))(using ExecutionContext.parasitic)
       // A worker whose start threw may have started a process, as `end` assumes.
-      case Failure(_) => reader.workerHasEnded(startedAProcess = true)
+      case Failure(_) => reader.workerHasEnded(WorkerProcess.Started)
     }
   }
 
@@ -58,7 +58,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    *
    * @param awaitWorker returns once the worker has ended
    */
-  def end(awaitWorker: Future[Boolean] => Unit): Unit = {
+  def end(awaitWorker: Future[WorkerProcess] => Unit): Unit = {
     val ended =
       try {
         started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
@@ -72,8 +72,8 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     // `WorkerRun.endEach` stops capturing them.
     ended.foreach(_ => capture.endStreams())
     // A worker whose end is unknown may have started a process, unless it never started.
-    reader.workerHasEnded(startedAProcess = ended.getOrElse(true))
-    val startedUncaptured = ended.getOrElse(false) && startReadingLate()
+    reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started))
+    val startedUncaptured = ended.toOption.contains(WorkerProcess.Started) && startReadingLate()
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
     ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
     if (startedUncaptured) {
@@ -88,7 +88,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    */
   def abandon(): Unit = {
     closeReader()
-    reader.workerHasEnded(startedAProcess = true)
+    reader.workerHasEnded(WorkerProcess.Started)
     stopCapturing()
   }
 
@@ -119,7 +119,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
   private def stopCapturing(): Unit = capture.stopCapturing()
 
-  private def endOf(workerEnd: Future[Boolean]): Try[Boolean] =
+  private def endOf(workerEnd: Future[WorkerProcess]): Try[WorkerProcess] =
     workerEnd.value.getOrElse(Failure(new IllegalStateException(s"$workerName had not ended once awaited")))
 }
 
@@ -129,7 +129,7 @@ private[mill] object WorkerRun {
    * Starts each worker in turn. A fatal throwable from starting one is rethrown, once the workers already started are
    * abandoned.
    */
-  def startEach[Worker](workers: Seq[Worker])(start: Worker => WorkerRun): Seq[WorkerRun] =
+  def startEach[A](workers: Seq[A])(start: A => WorkerRun): Seq[WorkerRun] =
     workers.foldLeft(Vector.empty[WorkerRun]) { (started, worker) =>
       try {
         started :+ start(worker)
@@ -146,7 +146,7 @@ private[mill] object WorkerRun {
    *
    * @param awaitWorker returns once the worker has ended
    */
-  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[Boolean] => Unit): Unit =
+  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[WorkerProcess] => Unit): Unit =
     try {
       workerRuns.tails.foreach {
         case workerRun +: notYetEnded =>

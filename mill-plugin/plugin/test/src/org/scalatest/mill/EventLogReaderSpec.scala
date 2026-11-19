@@ -49,8 +49,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       processExited.get
     }
 
-    def stateAfterEnd(workerStartedAProcess: Boolean = true): ConsolidationState = {
-      reader.workerHasEnded(workerStartedAProcess)
+    def stateAfterEnd(workerProcess: WorkerProcess = WorkerProcess.Started): ConsolidationState = {
+      reader.workerHasEnded(workerProcess)
       reader.awaitStreamEnd()
       consolidation.end()
       consolidation.state
@@ -98,7 +98,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
         withEventLogFile { file =>
           val reading = new Reading(file)
           reading.reader.start()
-          reading.stateAfterEnd(workerStartedAProcess = false) shouldBe ConsolidationState.Ended
+          reading.stateAfterEnd(WorkerProcess.NotStarted) shouldBe ConsolidationState.Ended
           reading.runsAdded.get shouldBe 0
           reading.processesEndedBeforeAnyRun.get shouldBe 0
         }
@@ -140,7 +140,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           val reading = new Reading(file, openingAfterFailures(Int.MaxValue))
           reading.processExited.set(true)
           reading.reader.start()
-          reading.reader.workerHasEnded(startedAProcess = true)
+          reading.reader.workerHasEnded(WorkerProcess.Started)
           a[FileNotFoundException] should be thrownBy reading.reader.awaitStreamEnd()
         }
       }

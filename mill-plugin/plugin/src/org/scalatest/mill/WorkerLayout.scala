@@ -73,16 +73,56 @@ private[mill] object WorkerLayout {
       jobs: Int,
       filesystemIgnoresCase: () => Either[String, Boolean]
   ): Either[String, WorkerLayout] = {
-    val groupsToRun = forkGroups.map(_.filter(discovered)).zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
+    val discoveredForkGroups = forkGroups.map(_.filter(discovered))
+    val workersPerGroup =
+      if (testParallelism && discoveredForkGroups.map(_.size).sum != 1)
+        WorkersPerGroup.UpToJobsInOwnFolders(jobs)
+      else
+        WorkersPerGroup.OneInGroupFolder
+    of(discoveredForkGroups, workersPerGroup, filesystemIgnoresCase)
+  }
+
+  /**
+   * The layout for a module that sets `testBatchFrameworkTasks`: one fork group for each group holding a class, or fork
+   * group 0 with no class where none does, as [[ofQueue]] gives them. Each group gets one worker, a batch worker,
+   * with index 0 in the group's folder. The worker is given the group's whole class list, whatever the module's test
+   * parallelism.
+   *
+   * @return the layout, or why it cannot run, as [[ofQueue]] gives them
+   */
+  def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Either[String, Boolean]): Either[String, WorkerLayout] =
+    of(forkGroups, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
+
+  private enum WorkersPerGroup {
+    case OneInGroupFolder
+    case UpToJobsInOwnFolders(jobs: Int)
+
+    def count(classes: Seq[String]): Int =
+      this match {
+        case OneInGroupFolder => 1
+        case UpToJobsInOwnFolders(jobs) => Math.max(Math.min(jobs, classes.size), 1)
+      }
+
+    def processFolder(groupFolder: Seq[String], index: Int, indexLength: Int): Seq[String] =
+      this match {
+        case OneInGroupFolder => groupFolder
+        case UpToJobsInOwnFolders(_) => groupFolder :+ s"worker-${padded(index, indexLength)}"
+      }
+  }
+
+  private def of(
+      forkGroups: Seq[Seq[String]],
+      workersPerGroup: WorkersPerGroup,
+      filesystemIgnoresCase: () => Either[String, Boolean]
+  ): Either[String, WorkerLayout] = {
+    val groupsToRun = forkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     val testClassCount = groupsToRun.map { case (classes, _) => classes.size }.sum
-    val workersInFolders = testParallelism && testClassCount != 1
     def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): PlannedForkGroup = {
       val forkGroup = valid(ForkGroup.from(position))
-      val workerCount = if (workersInFolders) Math.max(Math.min(jobs, classes.size), 1) else 1
+      val workerCount = workersPerGroup.count(classes)
       val workerIndexLength = workerCount.toString.length
       val workers = (0 until workerCount).map { index =>
-        val processFolder = if (workersInFolders) folder :+ s"worker-${padded(index, workerIndexLength)}" else folder
-        PlannedWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), processFolder)
+        PlannedWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), workersPerGroup.processFolder(folder, index, workerIndexLength))
       }
       PlannedForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
     }
@@ -98,17 +138,6 @@ private[mill] object WorkerLayout {
         filesystemIgnoresCase().flatMap(ignoresCase => sharedFolders(queued, ignoresCase).toLeft(WorkerLayout(testClassCount, queued)))
     }
   }
-
-  /**
-   * The layout for a module that sets `testBatchFrameworkTasks`: one fork group for each group holding a class, or fork
-   * group 0 with no class where none does, as [[ofQueue]] gives them. Each group gets one worker, a batch worker,
-   * with index 0 in the group's folder. The worker is given the group's whole class list, whatever the module's test
-   * parallelism.
-   *
-   * @return the layout, or why it cannot run, as [[ofQueue]] gives them
-   */
-  def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Either[String, Boolean]): Either[String, WorkerLayout] =
-    ofQueue(forkGroups, forkGroups.flatten.toSet, testParallelism = false, jobs = 1, filesystemIgnoresCase)
 
   private def padded(index: Int, length: Int): String = s"%0${length}d".format(index)
 

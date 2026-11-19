@@ -38,35 +38,31 @@ private[mill] final class JvmTestModuleRun(
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
-    layout().fold(
+    launcher().fold(
       reason => {
         consolidation.addRootFailure(s"Laying out the workers of ${label.value} failed: $reason")
         consolidation.timeModule(label, None, None)
       },
-      layout =>
-        if (inputs.testBatchFrameworkTasks)
-          runWorkers(consolidation, layout)(layOutBatch)((forkGroup, selector, _) => runBatch(layout)(forkGroup, selector))
-        else
-          runWorkers(consolidation, layout)(layOutQueue)(runOnQueue(layout))
+      launcher => runWorkers(consolidation, launcher)
     )
   }
 
   // Like Mill 1.3.1, the test command runs no discovery for a module that sets `testBatchFrameworkTasks`: each fork
   // group's worker is given the group's classes as `testForkGrouping` gives them.
-  private def layout(): Either[String, WorkerLayout] =
+  private def launcher(): Either[String, WorkerLauncher] =
     if (inputs.testBatchFrameworkTasks)
-      WorkerLayout.ofBatches(inputs.forkGroups, () => filesystemIgnoresCase())
+      WorkerLayout.ofBatches(inputs.forkGroups, () => filesystemIgnoresCase()).map(new BatchLauncher(_))
     else
-      WorkerLayout.ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, () => filesystemIgnoresCase())
+      WorkerLayout
+        .ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, () => filesystemIgnoresCase())
+        .map(new QueueLauncher(_))
 
-  private def runWorkers[LaidOut](consolidation: Consolidation, layout: WorkerLayout)(layOut: PlannedForkGroup => LaidOut)(
-      runWorker: (PlannedForkGroup, LaidOut, PlannedWorker) => (WorkerTaskCtx, TestModuleUtil) => Future[Boolean]
-  ): Unit = {
-    val laidOutForkGroups = JvmTestModuleRun.layOutForkGroups(consolidation, label, layout.forkGroups)(layOut)
+  private def runWorkers(consolidation: Consolidation, launcher: WorkerLauncher): Unit = {
+    val laidOutForkGroups = JvmTestModuleRun.layOutForkGroups(consolidation, label, launcher.layout.forkGroups)(launcher.layOut)
     val startedAt = Instant.now()
     val workers = laidOutForkGroups.flatMap { case (forkGroup, laidOut) => forkGroup.workers.map(worker => (forkGroup, laidOut, worker)) }
     val workerRuns = WorkerRun.startEach(workers) { case (forkGroup, laidOut, worker) =>
-      startWorker(consolidation, worker)(runWorker(forkGroup, laidOut, worker))
+      startWorker(consolidation, worker)((workerCtx, util) => launcher.launch(forkGroup, laidOut, worker, workerCtx, util))
     }
     WorkerRun.endEach(workerRuns)(workerEnd => ctx.fork.blocking(Await.ready(workerEnd, Duration.Inf)))
     consolidation.timeModule(label, Some(startedAt), Some(Instant.now()))
@@ -98,28 +94,10 @@ private[mill] final class JvmTestModuleRun(
       }
     }.toEither.left.map(throwable => s"checking whether the filesystem ignores case failed: $throwable")
 
-  private def layOutQueue(forkGroup: PlannedForkGroup): os.Path =
-    inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(forkGroup.testClasses, moduleFolder / forkGroup.folder)
-
-  // As Mill 1.3.1 does, a fork group with no class is given an empty queue, not an empty class list, so the framework's
-  // setup and teardown still run without every class being selected.
-  private def layOutBatch(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
-    val groupFolder = moduleFolder / forkGroup.folder
-    os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
-    if (forkGroup.testClasses.isEmpty) {
-      val queue = inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(Nil, groupFolder)
-      val claimFolder = groupFolder / "claim"
-      os.makeDir.all(claimFolder)
-      Right((None, queue, claimFolder))
-    } else {
-      Left(forkGroup.testClasses)
-    }
-  }
-
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
   private def startWorker(consolidation: Consolidation, worker: PlannedWorker)(
-      runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[Boolean]
+      runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[WorkerProcess]
   ): WorkerRun = {
     val eventLogFile = moduleFolder / worker.processFolder / JvmTestModuleRun.eventLogFileName
     val capture = new WorkerOutputCapture(WorkerOutputCapture.workerCharset)
@@ -142,47 +120,105 @@ private[mill] final class JvmTestModuleRun(
     workerRun
   }
 
+  /**
+   * Lays out and launches the workers of a [[WorkerLayout]]. Each fork group is laid out before any worker starts.
+   */
+  private sealed trait WorkerLauncher {
+
+    def layout: WorkerLayout
+
+    /** What laying out a fork group gives each of its workers. */
+    type LaidOut
+
+    def layOut(forkGroup: PlannedForkGroup): LaidOut
+
+    /** @return a future that completes once the worker has ended, giving whether it started a process */
+    def launch(
+        forkGroup: PlannedForkGroup,
+        laidOut: LaidOut,
+        worker: PlannedWorker,
+        workerCtx: WorkerTaskCtx,
+        util: TestModuleUtil
+    ): Future[WorkerProcess]
+  }
+
   // Mill's own test queue starts the worker. Where it runs the fork group's workers one after another, the worker runs
-  // on this thread and ends before this returns; otherwise it runs on a future forked through the given `TaskCtx`. Mill
-  // forks exactly the workers it gives a folder of their own. Only whether the worker started a process is kept. The
-  // `Result` Mill gives for that process is ignored, even a failure: the consolidation decides the test command's
+  // on this thread and ends before `launch` returns; otherwise it runs on a future forked through the given `TaskCtx`.
+  // Mill forks exactly the workers it gives a folder of their own. Only whether the worker started a process is kept.
+  // The `Result` Mill gives for that process is ignored, even a failure: the consolidation decides the test command's
   // result.
-  private def runOnQueue(layout: WorkerLayout)(forkGroup: PlannedForkGroup, queue: os.Path, worker: PlannedWorker)(
-      workerCtx: WorkerTaskCtx,
-      util: TestModuleUtil
-  ): Future[Boolean] = {
-    val groupFolder = moduleFolder / forkGroup.folder
-    def joinQueue() =
-      util.runTestFuture(
-        layout.testClassCount,
-        layout.forkGroups.size,
-        groupFolder,
-        queue,
-        groupFolder.last,
-        forkGroup.workerIndexLength,
-        forkGroup.label,
-        worker.forkGroupAndIndex.index.value
-      )
-    val (_, workerEnd) = if (worker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
-    workerEnd.map { case (_, _, processResult) => processResult.isDefined }(using ExecutionContext.parasitic)
+  private final class QueueLauncher(val layout: WorkerLayout) extends WorkerLauncher {
+
+    type LaidOut = os.Path
+
+    def layOut(forkGroup: PlannedForkGroup): os.Path =
+      inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(forkGroup.testClasses, moduleFolder / forkGroup.folder)
+
+    def launch(
+        forkGroup: PlannedForkGroup,
+        queue: os.Path,
+        worker: PlannedWorker,
+        workerCtx: WorkerTaskCtx,
+        util: TestModuleUtil
+    ): Future[WorkerProcess] = {
+      val groupFolder = moduleFolder / forkGroup.folder
+      def joinQueue() =
+        util.runTestFuture(
+          layout.testClassCount,
+          layout.forkGroups.size,
+          groupFolder,
+          queue,
+          groupFolder.last,
+          forkGroup.workerIndexLength,
+          forkGroup.label,
+          worker.forkGroupAndIndex.index.value
+        )
+      val (_, workerEnd) = if (worker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
+      workerEnd.map { case (_, _, processResult) =>
+        if (processResult.isDefined) WorkerProcess.Started else WorkerProcess.NotStarted
+      }(using ExecutionContext.parasitic)
+    }
   }
 
   // As Mill 1.3.1 does, the fork group's one worker is forked through the given `TaskCtx` where the module has more than
   // one fork group holding a class, and otherwise runs on this thread. A batch worker always starts a process. The
-  // `Result` Mill gives for that process is ignored, as in [[runOnQueue]].
-  private def runBatch(layout: WorkerLayout)(forkGroup: PlannedForkGroup, selector: JvmTestModuleRun.BatchSelector)(
-      workerCtx: WorkerTaskCtx,
-      util: TestModuleUtil
-  ): Future[Boolean] = {
-    val groupFolder = moduleFolder / forkGroup.folder
-    def runProcess(): Boolean = {
-      util.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
-      true
+  // `Result` Mill gives for that process is ignored, as in [[QueueLauncher]].
+  private final class BatchLauncher(val layout: WorkerLayout) extends WorkerLauncher {
+
+    type LaidOut = JvmTestModuleRun.BatchSelector
+
+    // As Mill 1.3.1 does, a fork group with no class is given an empty queue, not an empty class list, so the
+    // framework's setup and teardown still run without every class being selected.
+    def layOut(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
+      val groupFolder = moduleFolder / forkGroup.folder
+      os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
+      if (forkGroup.testClasses.isEmpty) {
+        val queue = inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(Nil, groupFolder)
+        val claimFolder = groupFolder / "claim"
+        os.makeDir.all(claimFolder)
+        Right((None, queue, claimFolder))
+      } else {
+        Left(forkGroup.testClasses)
+      }
     }
-    if (layout.forkGroups.size > 1)
-      workerCtx.fork.async(groupFolder, forkGroup.label, "", priority = -1)(_ => runProcess())(using workerCtx)
-    else
-      workerCtx.runOnThisThread(Future.successful(runProcess()))
+
+    def launch(
+        forkGroup: PlannedForkGroup,
+        selector: JvmTestModuleRun.BatchSelector,
+        worker: PlannedWorker,
+        workerCtx: WorkerTaskCtx,
+        util: TestModuleUtil
+    ): Future[WorkerProcess] = {
+      val groupFolder = moduleFolder / forkGroup.folder
+      def runProcess(): WorkerProcess = {
+        util.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
+        WorkerProcess.Started
+      }
+      if (layout.forkGroups.size > 1)
+        workerCtx.fork.async(groupFolder, forkGroup.label, "", priority = -1)(_ => runProcess())(using workerCtx)
+      else
+        workerCtx.runOnThisThread(Future.successful(runProcess()))
+    }
   }
 }
 

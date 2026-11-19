@@ -70,17 +70,17 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     )
     val workerRun: WorkerRun = new WorkerRun(consolidation, workerName, reader, capture)
 
-    def runAndEndConsolidation(startWorker: => Future[Boolean]): Unit = {
+    def runAndEndConsolidation(startWorker: => Future[WorkerProcess]): Unit = {
       run(startWorker)
       consolidation.end()
     }
 
-    def run(startWorker: => Future[Boolean]): Unit = {
+    def run(startWorker: => Future[WorkerProcess]): Unit = {
       start(startWorker)
       endWorker()
     }
 
-    def start(startWorker: => Future[Boolean]): Unit =
+    def start(startWorker: => Future[WorkerProcess]): Unit =
       workerRun.start { workerStarting =>
         workerStarting()
         startWorker
@@ -113,7 +113,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   private val sharingViolation: Path => InputStream =
     path => throw new FileNotFoundException(s"$path (The process cannot access the file because it is being used by another process)")
 
-  private val startedAProcess: Future[Boolean] = Future.successful(true)
+  private val startedAProcess: Future[WorkerProcess] = Future.successful(WorkerProcess.Started)
 
   private def writeStdout(capture: WorkerOutputCapture, text: String): Unit = {
     val bytes = text.getBytes(StandardCharsets.UTF_8)
@@ -236,7 +236,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "add neither a run nor a process that ended before any run, and leave the consolidation unfailed" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          fixture.runAndEndConsolidation(Future.successful(false))
+          fixture.runAndEndConsolidation(Future.successful(WorkerProcess.NotStarted))
           fixture.runsAdded.get shouldBe 0
           fixture.processesEndedBeforeAnyRun.get shouldBe 0
           fixture.consolidation.state shouldBe ConsolidationState.Ended
@@ -259,10 +259,10 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "read the event log the worker writes after it started, and add its run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          val workerEnd = Promise[Boolean]()
+          val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
           writeCompletedRun(file)
-          workerEnd.success(true)
+          workerEnd.success(WorkerProcess.Started)
           fixture.endWorker()
           fixture.consolidation.end()
           fixture.outputWithoutSummaryLine shouldBe Seq("[core.test]")
@@ -351,7 +351,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "start no event log reader" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          fixture.workerRun.start(_ => Promise[Boolean]().future)
+          fixture.workerRun.start(_ => Promise[WorkerProcess]().future)
           readerThreadsOf(file) shouldBe 0
           fixture.workerRun.abandon()
         }
@@ -362,7 +362,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "start its event log reader then, which adds the worker's run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          val workerEnd = Promise[Boolean]()
+          val workerEnd = Promise[WorkerProcess]()
           var workerStarting: () => Unit = () => ()
           fixture.workerRun.start { starting =>
             workerStarting = starting
@@ -371,7 +371,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           workerStarting()
           readerThreadsOf(file) shouldBe 1
           writeCompletedRun(file)
-          workerEnd.success(true)
+          workerEnd.success(WorkerProcess.Started)
           fixture.endWorker()
           fixture.runsAdded.get shouldBe 1
         }
@@ -382,10 +382,10 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "end its event log reader then, adding neither a run nor a process that ended before any run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          val workerEnd = Promise[Boolean]()
+          val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
           readerThreadsOf(file) shouldBe 1
-          workerEnd.success(false)
+          workerEnd.success(WorkerProcess.NotStarted)
           eventually(readerThreadsOf(file) shouldBe 0)
           fixture.runsAdded.get shouldBe 0
           fixture.processesEndedBeforeAnyRun.get shouldBe 0
@@ -398,9 +398,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "end its event log reader then, adding the process as one that ended before any run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          val workerEnd = Promise[Boolean]()
+          val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
-          workerEnd.success(true)
+          workerEnd.success(WorkerProcess.Started)
           eventually(readerThreadsOf(file) shouldBe 0)
           fixture.processesEndedBeforeAnyRun.get shouldBe 1
           fixture.endWorker()
@@ -457,7 +457,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             val first = new WorkerRunFixture(firstFile, opening)
             val second = new WorkerRunFixture(secondFile, opening)
             val workerRuns = WorkerRun.startEach(Seq(first, second)) { fixture =>
-              if (fixture eq first) fixture.start(Promise[Boolean]().future) else fixture.workerRun.start(_ => Promise[Boolean]().future)
+              if (fixture eq first) fixture.start(Promise[WorkerProcess]().future) else fixture.workerRun.start(_ => Promise[WorkerProcess]().future)
               fixture.workerRun
             }
             Seq(readerThreadsOf(firstFile), readerThreadsOf(secondFile)) shouldBe Seq(1, 0)
@@ -475,7 +475,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             val first = new WorkerRunFixture(firstFile, opening)
             val second = new WorkerRunFixture(secondFile, opening)
             a[StackOverflowError] should be thrownBy WorkerRun.startEach(Seq(first, second)) { fixture =>
-              fixture.start(if (fixture eq first) Promise[Boolean]().future else throw new StackOverflowError("worker"))
+              fixture.start(if (fixture eq first) Promise[WorkerProcess]().future else throw new StackOverflowError("worker"))
               fixture.workerRun
             }
             eventually(first.processesEndedBeforeAnyRun.get shouldBe 1)
@@ -507,7 +507,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           withEventLogFile { secondFile =>
             val first = new WorkerRunFixture(firstFile, opening)
             val second = new WorkerRunFixture(secondFile, opening)
-            Seq(first, second).foreach(_.start(Promise[Boolean]().future))
+            Seq(first, second).foreach(_.start(Promise[WorkerProcess]().future))
             an[InterruptedException] should be thrownBy WorkerRun.endEach(Seq(first.workerRun, second.workerRun)) { _ =>
               throw new InterruptedException("cancelled")
             }

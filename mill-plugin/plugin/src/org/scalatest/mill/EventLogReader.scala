@@ -29,7 +29,7 @@ private[mill] final class EventLogReader(
     open: Path => InputStream = path => new FileInputStream(path.toFile)
 ) {
 
-  @volatile private var endedWorkerStartedAProcess: Option[Boolean] = None
+  @volatile private var endedWorkerProcess: Option[WorkerProcess] = None
   @volatile private var failure: Option[Throwable] = None
   private val thread: Thread = new Thread(() => readCapturingFailure(), EventLogReader.threadName(eventLogFile))
   thread.setDaemon(true)
@@ -40,13 +40,12 @@ private[mill] final class EventLogReader(
    * Tells the reader the worker has ended, so a missing event log file will not appear. The reader then ends at once if
    * the file has not appeared, else once the run's process has exited. Only the first call counts.
    *
-   * @param startedAProcess whether the worker started a process, as Mill's test queue starts none for a worker that
-   *                        finds its queue empty
+   * @param process whether the worker started a process
    */
-  def workerHasEnded(startedAProcess: Boolean): Unit =
+  def workerHasEnded(process: WorkerProcess): Unit =
     synchronized {
-      if (endedWorkerStartedAProcess.isEmpty) {
-        endedWorkerStartedAProcess = Some(startedAProcess)
+      if (endedWorkerProcess.isEmpty) {
+        endedWorkerProcess = Some(process)
       }
     }
 
@@ -69,7 +68,7 @@ private[mill] final class EventLogReader(
         } finally {
           feed.endEventStream()
         }
-      } else if (endedWorkerStartedAProcess.contains(true)) {
+      } else if (endedWorkerProcess.contains(WorkerProcess.Started)) {
         addProcessEndedBeforeAnyRun()
       }
     } catch {
@@ -80,7 +79,7 @@ private[mill] final class EventLogReader(
     var appeared = false
     var noRun = false
     while (!appeared && !noRun) {
-      val ended = endedWorkerStartedAProcess.isDefined
+      val ended = endedWorkerProcess.isDefined
       appeared = Files.exists(eventLogFile)
       noRun = !appeared && ended
       if (!appeared && !noRun) {
