@@ -56,14 +56,15 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   private def runTestCommandAsAtTheConsole(tester: IntegrationTester): TestCommandResult =
     runTestCommandWithJobs(tester, 2, "--ticker", "true")
 
-  private def holdOnlySuites(tester: IntegrationTester, forkGrouping: Seq[String], testBodies: (String, String)*): Unit = {
+  /** The module holds only the given suites, each in its own fork group, in the order given. */
+  private def holdOnlySuitesEachInItsOwnForkGroup(tester: IntegrationTester, testBodies: (String, String)*): Unit = {
     os.remove.all(samples(tester))
     os.makeDir.all(samples(tester))
     testBodies.foreach { case (suite, testBody) => writeSuite(tester, suite, testBody) }
     editBuild(
       tester,
       """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))""",
-      forkGrouping.map(suite => s"""Seq("samples.$suite")""").mkString("Seq(", ", ", ")")
+      testBodies.map { case (suite, _) => s"""Seq("samples.$suite")""" }.mkString("Seq(", ", ", ")")
     )
   }
 
@@ -377,9 +378,8 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         Given("the build, whose module holds suites A1 and B1")
         And("""the module's testForkGrouping is Seq(Seq("samples.B1"), Seq("samples.A1")) and its testParallelism is false""")
         And("B1's test t writes the lines B 1 to B 500 to stdout, and A1's test t writes the lines A 1 to A 500 to stdout, each pausing 1 millisecond between lines")
-        holdOnlySuites(
+        holdOnlySuitesEachInItsOwnForkGroup(
           tester,
-          Seq("B1", "A1"),
           "B1" -> """(1 to 500).foreach { i => println("B " + i); Thread.sleep(1) }""",
           "A1" -> """(1 to 500).foreach { i => println("A " + i); Thread.sleep(1) }"""
         )
@@ -458,7 +458,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("""the module's testForkGrouping is Seq(Seq("samples.Zeta"), Seq("samples.Alpha")) and its testParallelism is false""")
         And("Zeta's test t writes the line hello to stdout")
         And("nothing else in either run writes to stdout or stderr")
-        holdOnlySuites(tester, Seq("Zeta", "Alpha"), "Zeta" -> """println("hello")""", "Alpha" -> "()")
+        holdOnlySuitesEachInItsOwnForkGroup(tester, "Zeta" -> """println("hello")""", "Alpha" -> "()")
         When("the test command is invoked, with Mill's ticker on")
         val result = runTestCommandAsAtTheConsole(tester)
 
@@ -483,7 +483,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("""the module's testForkGrouping is Seq(Seq("samples.Zeta"), Seq("samples.Alpha")) and its testParallelism is false""")
         And("Zeta's test t fails")
         And("nothing in either run writes to stdout or stderr")
-        holdOnlySuites(tester, Seq("Zeta", "Alpha"), "Zeta" -> """fail("Zeta fails")""", "Alpha" -> "()")
+        holdOnlySuitesEachInItsOwnForkGroup(tester, "Zeta" -> """fail("Zeta fails")""", "Alpha" -> "()")
         When("the test command is invoked, with Mill's ticker on")
         val result = runTestCommandAsAtTheConsole(tester)
 
