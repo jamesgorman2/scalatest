@@ -142,3 +142,17 @@ In Mill 1.3.1, `mill.javalib.TestModuleUtil.runTestFuture(filteredClassCount, gr
 
 A plugin that needs per-worker framework arguments or a per-worker `TaskCtx` can build one `TestModuleUtil` per worker and call `runTestFuture` on each, rather than copying Mill's scheduler. Lay out each group's queue with `prepareTestClassesFolder` first. `waitForFutures` and result handling are `private[mill]`: await every future yourself, and do not treat a worker that started no JVM as a process that died.
 </learning>
+
+<learning>
+date: 2026-11-19
+---
+In Mill 1.3.1, a test module that sets `testBatchFrameworkTasks` runs through `TestModuleUtil.runTestBatchScheduler`, which is `private`, and differs from the queue scheduler in ways its name does not suggest:
+
+- it runs no `ZincOp.GetTestTasks` discovery: each fork group's worker is given the group's classes exactly as `testForkGrouping` gives them, including classes that do not exist;
+- each fork group holding a class gets one worker, in the group's folder (no `worker-<i>` folder), with `Left(classList)` as the selector;
+- the workers are forked through `Task.fork.async(groupFolder, groupLabel, "", priority = -1)` whenever more than one group holds a class, whatever `testParallelism` says; a single group runs on the calling thread;
+- where no group holds a class, fork group 0 runs with an empty `test-classes` queue and `claim` folder (`Right((None, queue, claimFolder))`), because `Left(Nil)` would select every class;
+- it writes `result.log` as `(0L, 0L)` before starting each worker.
+
+A plugin that must start the same processes calls the public `callTestRunnerSubprocess` itself and reproduces these rules; it cannot reuse `runTestFuture`, which always drives the queue.
+</learning>

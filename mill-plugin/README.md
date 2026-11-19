@@ -8,9 +8,11 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
-- The module's tests run through Mill's test queue, in the workers Mill's `testForked` starts for each fork group that holds a test class. The module's `testBatchFrameworkTasks` is ignored.
-  - With `testParallelism` on (the default), a fork group gets as many workers as Mill's `--jobs`, but no more than it has test classes, and its workers run in parallel. A module with exactly one test class runs it in one worker.
-  - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
+- The module's tests run in the workers Mill's `testForked` starts for each fork group that holds a test class.
+  - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
+    - With `testParallelism` on (the default), a fork group gets as many workers as Mill's `--jobs`, but no more than it has test classes, and its workers run in parallel. A module with exactly one test class runs it in one worker.
+    - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
+  - A module that sets `testBatchFrameworkTasks` has no queue. Each fork group gets one worker, given the group's whole class list as `testForkGrouping` gives it, whatever its `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
   - A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.

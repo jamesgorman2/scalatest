@@ -224,16 +224,18 @@ The test command runs each selected module's tests under a task context it suppl
 
 It runs the tests:
 
-- on the JVM, it runs the module's test discovery itself without the runner argument (`decisions/architecture-running-tests.md` "The plugin runs a module's test discovery itself…").
-  - For a module that does not set `testBatchFrameworkTasks`, it lays out Mill's test queue, then starts each worker Mill 1.3.1's `testForked` would start through `TestModuleUtil.runTestFuture`, and waits for every worker.
+- on the JVM:
+  - For a module that does not set `testBatchFrameworkTasks`, it runs the module's test discovery itself without the runner argument (`decisions/architecture-running-tests.md` "The plugin runs a module's test discovery itself…"). It lays out Mill's test queue, then starts each worker Mill 1.3.1's `testForked` would start through `TestModuleUtil.runTestFuture`, and waits for every worker.
     - Where `testParallelism` is on, unless exactly one test class is queued, each worker is forked through its own task context, as `testForked` does, and the workers run in parallel on Mill's pool.
     - Otherwise each worker runs on the command's thread, one after another.
-  - For a module that sets `testBatchFrameworkTasks`, it starts one worker for each fork group, given the group's class list, as Mill 1.3.1 does (`SPECIFICATION.md` R-053b; `research/mill-plugin-conventions.md` § 5);
+  - For a module that sets `testBatchFrameworkTasks`, it runs no discovery, as Mill 1.3.1 does not. It starts one worker for each fork group that holds a class, through `TestModuleUtil.callTestRunnerSubprocess`, given the group's class list as `testForkGrouping` gives it, and waits for every worker. A module whose fork groups hold no class runs fork group 0's worker on an empty queue (`SPECIFICATION.md` R-053b; `research/mill-plugin-conventions.md` § 5).
+    - Where more than one fork group holds a class, each worker is forked through its own task context, as `testForked` does, whatever the module's `testParallelism`.
+    - Otherwise the one worker runs on the command's thread;
 - on Scala.js and Native, it evaluates the module's own Mill test task. In that evaluation only, it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher (`decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…").
 
 Before it starts any of a module's test processes, the test command knows the module's test classes, from which it later compiles the test manifest (§ Modules § Mill plugin):
 
-- on the JVM, as the queue it lays out for each fork group from its own discovery, which starts no test;
+- on the JVM, as the queue it lays out for each fork group from its own discovery, which starts no test, or, for a module that sets `testBatchFrameworkTasks`, as each fork group's class list;
 - on Scala.js and Native, from test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
 
 All of this runs in one nested evaluation of the test command's own, with fail-fast off (`decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…").

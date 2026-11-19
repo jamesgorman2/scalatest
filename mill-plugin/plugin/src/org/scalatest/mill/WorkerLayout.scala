@@ -7,30 +7,31 @@ import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 
 /**
- * The fork groups and workers the test command runs through Mill's test queue: those Mill 1.3.1's `testForked` runs.
+ * The fork groups and workers of a JVM test module that the test command starts: those Mill 1.3.1's `testForked` starts.
  *
- * @param testClassCount the number of classes queued over every fork group
+ * @param testClassCount the number of classes given over every fork group
  */
-private[mill] final case class QueueLayout(testClassCount: Int, forkGroups: Seq[QueueForkGroup])
+private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq[LaidOutForkGroup])
 
 /**
- * A fork group holding a queued class, or the one fork group of a module holding none.
+ * A fork group holding a class to run, or the one fork group of a module holding none.
  *
  * @param label the group's index among the groups Mill runs, as Mill pads it, which keys the group's workers in Mill's
  *              logging
- * @param folder the group's folder, which holds its queue, as path segments under the module's folder: the folder
- *               Mill's `testForked` would give the group, under its own `Task.dest`
- * @param testClasses the classes of the group's queue
+ * @param folder the group's folder, as path segments under the module's folder: the folder Mill's `testForked` would
+ *               give the group, under its own `Task.dest`
+ * @param testClasses the classes the group's workers are given: the classes of its queue, or its batch worker's class
+ *                    list
  * @param workerIndexLength the number of digits each worker's index is padded to in its folder's name
  * @param workers the workers Mill starts for the group, in order of index
  */
-private[mill] final case class QueueForkGroup(
+private[mill] final case class LaidOutForkGroup(
     forkGroup: ForkGroup,
     label: String,
     folder: Seq[String],
     testClasses: Seq[String],
     workerIndexLength: Int,
-    workers: Seq[QueueWorker]
+    workers: Seq[LaidOutWorker]
 ) {
 
   def describedIn(module: TestRunLabel): String = s"fork group ${forkGroup.position} of ${module.value}"
@@ -42,15 +43,17 @@ private[mill] final case class QueueForkGroup(
  *                      folder, or its own folder `worker-<i>` in that folder where Mill runs the group's workers in
  *                      parallel
  */
-private[mill] final case class QueueWorker(forkGroupAndIndex: Worker, processFolder: Seq[String]) {
+private[mill] final case class LaidOutWorker(forkGroupAndIndex: Worker, processFolder: Seq[String]) {
 
   def describedIn(module: TestRunLabel): String =
     s"worker ${forkGroupAndIndex.index.value} of fork group ${forkGroupAndIndex.forkGroup.position} of ${module.value}"
 }
 
-private[mill] object QueueLayout {
+private[mill] object WorkerLayout {
 
   /**
+   * The layout Mill's test queue runs, for a module that does not set `testBatchFrameworkTasks`.
+   *
    * One fork group for each group holding a discovered class. A fork group keeps its position among every group
    * `forkGroups` gives, so a group with no discovered class is not run but still counts. Where no group holds a
    * discovered class, fork group 0 is run with no class, as Mill runs it to run the framework's setup and teardown.
@@ -63,38 +66,48 @@ private[mill] object QueueLayout {
    * @return the layout, or why it cannot run: two fork groups would share a folder (Mill's `testForked` fails there too,
    *         as a `processFolder`'s second worker cannot start), or `filesystemIgnoresCase` gave no answer.
    */
-  def of(
+  def ofQueue(
       forkGroups: Seq[Seq[String]],
       discovered: Set[String],
       testParallelism: Boolean,
       jobs: Int,
       filesystemIgnoresCase: () => Either[String, Boolean]
-  ): Either[String, QueueLayout] = {
+  ): Either[String, WorkerLayout] = {
     val groupsToRun = forkGroups.map(_.filter(discovered)).zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     val testClassCount = groupsToRun.map { case (classes, _) => classes.size }.sum
     val workersInFolders = testParallelism && testClassCount != 1
-    def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): QueueForkGroup = {
+    def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): LaidOutForkGroup = {
       val forkGroup = valid(ForkGroup.from(position))
       val workerCount = if (workersInFolders) Math.max(Math.min(jobs, classes.size), 1) else 1
       val workerIndexLength = workerCount.toString.length
       val workers = (0 until workerCount).map { index =>
         val processFolder = if (workersInFolders) folder :+ s"worker-${padded(index, workerIndexLength)}" else folder
-        QueueWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), processFolder)
+        LaidOutWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), processFolder)
       }
-      QueueForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
+      LaidOutForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
     }
     groupsToRun match {
-      case Seq() => Right(QueueLayout(testClassCount, Seq(forkGroupOf(Nil, 0, "0", Nil))))
-      case Seq((classes, position)) => Right(QueueLayout(testClassCount, Seq(forkGroupOf(classes, position, "0", Nil))))
+      case Seq() => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(Nil, 0, "0", Nil))))
+      case Seq((classes, position)) => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(classes, position, "0", Nil))))
       case groups =>
         val labelLength = groups.size.toString.length
         val queued = groups.zipWithIndex.map { case ((classes, position), runIndex) =>
           val label = padded(runIndex, labelLength)
           forkGroupOf(classes, position, label, Seq(groupFolderName(classes, label)))
         }
-        filesystemIgnoresCase().flatMap(ignoresCase => sharedFolders(queued, ignoresCase).toLeft(QueueLayout(testClassCount, queued)))
+        filesystemIgnoresCase().flatMap(ignoresCase => sharedFolders(queued, ignoresCase).toLeft(WorkerLayout(testClassCount, queued)))
     }
   }
+
+  /**
+   * The layout for a module that sets `testBatchFrameworkTasks`: one fork group for each group holding a class, or fork
+   * group 0 with no class where none does, as [[ofQueue]] gives them. Each group gets one worker, index 0, in the
+   * group's folder, which is given the group's whole class list, whatever the module's test parallelism.
+   *
+   * @return the layout, or why it cannot run, as [[ofQueue]] gives them
+   */
+  def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Either[String, Boolean]): Either[String, WorkerLayout] =
+    ofQueue(forkGroups, forkGroups.flatten.toSet, testParallelism = false, jobs = 1, filesystemIgnoresCase)
 
   private def padded(index: Int, length: Int): String = s"%0${length}d".format(index)
 
@@ -104,7 +117,7 @@ private[mill] object QueueLayout {
       case multiple => s"group-$label-${multiple.head}"
     }
 
-  private def sharedFolders(forkGroups: Seq[QueueForkGroup], filesystemIgnoresCase: Boolean): Option[String] = {
+  private def sharedFolders(forkGroups: Seq[LaidOutForkGroup], filesystemIgnoresCase: Boolean): Option[String] = {
     val folderOnDisk: String => String = if (filesystemIgnoresCase) _.toLowerCase(Locale.ROOT) else identity
     val shared = forkGroups
       .groupBy(_.folder.map(folderOnDisk))
@@ -116,7 +129,7 @@ private[mill] object QueueLayout {
     Option.when(shared.nonEmpty)(shared.mkString("; "))
   }
 
-  private def describeSharing(sharing: Seq[QueueForkGroup]): String = {
+  private def describeSharing(sharing: Seq[LaidOutForkGroup]): String = {
     val positions = sharing.map(_.forkGroup.position)
     val processFolder = sharing.head.workers.head.processFolder.mkString("/")
     s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder $processFolder"

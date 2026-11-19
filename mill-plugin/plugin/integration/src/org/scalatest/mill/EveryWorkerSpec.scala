@@ -64,6 +64,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   private def turnOffTestSandboxing(tester: IntegrationTester): Unit =
     editBuild(tester, "def testForkGrouping", "def testSandboxWorkingDir = false\n    def testForkGrouping")
 
+  private def turnOnBatchFrameworkTasks(tester: IntegrationTester): Unit =
+    editBuild(tester, "def testForkGrouping", "def testBatchFrameworkTasks = true\n    def testForkGrouping")
+
   private val suites: Seq[String] = Seq("A1", "A2", "B1", "B2")
 
   private def infoMessages(node: ujson.Value): Seq[String] =
@@ -73,6 +76,16 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   private def eventLogFolders(tester: IntegrationTester): Seq[os.Path] =
     os.walk(tester.workspacePath / "out").filter(_.last == "scalatest-event-log.jsonl").map(_ / os.up)
+
+  private def shouldRunEachForkGroupInExactlyOneWorker(json: ujson.Value): Unit = {
+    Then("each of B1 and B2 is in the contents of a run whose forkGroup is 0, and in no run whose forkGroup is 1")
+    runsOfForkGroup(json, 0).flatMap(suiteNames) should contain theSameElementsAs Seq("B1", "B2")
+    And("each of A1 and A2 is in the contents of a run whose forkGroup is 1, and in no run whose forkGroup is 0")
+    runsOfForkGroup(json, 1).flatMap(suiteNames) should contain theSameElementsAs Seq("A1", "A2")
+
+    And("for each forkGroup, the module has exactly 1 run with that forkGroup")
+    runs(json).map(_("forkGroup").num.toInt) shouldBe Seq(0, 1)
+  }
 
   private def shouldRunEachForkGroupInItsOwnWorkers(json: ujson.Value): Unit = {
     Then("each of B1 and B2 is in the contents of at least one of the module's runs whose forkGroup is 0, and in no run whose forkGroup is 1")
@@ -94,13 +107,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command is invoked")
         val (result, json) = jsonOutputOf(tester)
 
-        Then("each of B1 and B2 is in the contents of a run whose forkGroup is 0, and in no run whose forkGroup is 1")
-        runsOfForkGroup(json, 0).flatMap(suiteNames) should contain theSameElementsAs Seq("B1", "B2")
-        And("each of A1 and A2 is in the contents of a run whose forkGroup is 1, and in no run whose forkGroup is 0")
-        runsOfForkGroup(json, 1).flatMap(suiteNames) should contain theSameElementsAs Seq("A1", "A2")
-
-        And("for each forkGroup, the module has exactly 1 run with that forkGroup")
-        runs(json).map(_("forkGroup").num.toInt) shouldBe Seq(0, 1)
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInExactlyOneWorker(json)
+        }
 
         And("the test command succeeds")
         shouldSucceed(result)
@@ -135,6 +144,41 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         withClue(result.debugString) {
           shouldRunEachForkGroupInItsOwnWorkers(json)
+        }
+
+        And("the test command succeeds")
+        shouldSucceed(result)
+      }
+    }
+
+    Scenario("testParallelism false, testBatchFrameworkTasks true, testSandboxWorkingDir true") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is false and its testBatchFrameworkTasks is true")
+        turnOnBatchFrameworkTasks(tester)
+        When("the test command is invoked")
+        val (result, json) = jsonOutputWithJobs(tester, 2)
+
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInExactlyOneWorker(json)
+        }
+
+        And("the test command succeeds")
+        shouldSucceed(result)
+      }
+    }
+
+    Scenario("testParallelism true, testBatchFrameworkTasks true, testSandboxWorkingDir true") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true and its testBatchFrameworkTasks is true")
+        turnOnTestParallelism(tester)
+        turnOnBatchFrameworkTasks(tester)
+        When("the test command is invoked")
+        val (result, json) = jsonOutputWithJobs(tester, 2)
+
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInExactlyOneWorker(json)
         }
 
         And("the test command succeeds")
@@ -264,6 +308,52 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
+    Scenario("Under testBatchFrameworkTasks, each fork group's one worker writes its event log in the group's processFolder, given no queue") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true and its testBatchFrameworkTasks is true")
+        turnOnTestParallelism(tester)
+        turnOnBatchFrameworkTasks(tester)
+        When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
+        val (result, _) = jsonOutputWithJobs(tester, 4)
+
+        Then("an event log file is in each of the two processFolders Mill's testForked lays out for the fork groups, and nowhere else")
+        withClue(result.debugString) {
+          eventLogFolders(tester).map(_.last) should contain theSameElementsAs Seq("group-0-samples.B1", "group-1-samples.A1")
+        }
+
+        And("Mill started a worker in each of those processFolders")
+        eventLogFolders(tester).filterNot(folder => os.exists(folder / "testargs")) shouldBe empty
+
+        And("neither processFolder holds a test queue or a claim folder")
+        eventLogFolders(tester).flatMap(folder => Seq(folder / "test-classes", folder / "claim")).filter(os.exists(_)) shouldBe empty
+      }
+    }
+
+    Scenario("Under testBatchFrameworkTasks, each worker's stdout is on that worker's run alone, and none reaches the console") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is false and its testBatchFrameworkTasks is true")
+        turnOnBatchFrameworkTasks(tester)
+        And("B1's test t writes the line from B1 to stdout, and A1's test t writes the line from A1 to stdout")
+        writeSuite(tester, "B1", """println("from B1")""")
+        writeSuite(tester, "A1", """println("from A1")""")
+        When("the test command is invoked")
+        val (result, json) = jsonOutputOf(tester)
+
+        Then("the stdout of the run whose forkGroup is 0 holds from B1 and not from A1")
+        withClue(result.debugString) {
+          runsOfForkGroup(json, 0).flatMap(stdoutLines) should (contain("from B1") and not contain "from A1")
+        }
+
+        And("the stdout of the run whose forkGroup is 1 holds from A1 and not from B1")
+        runsOfForkGroup(json, 1).flatMap(stdoutLines) should (contain("from A1") and not contain "from B1")
+
+        And("no console line outside the human-readable output holds either line")
+        result.consoleLinesOutsideHumanReadableOutput.filter(line => line.contains("from B1") || line.contains("from A1")) shouldBe empty
+      }
+    }
+
     Scenario("Each worker's stdout is on that worker's run alone") {
       withTester("every-worker") { tester =>
         Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
@@ -345,6 +435,28 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("the human-readable output, apart from its summary line, is [core.test]")
         result.treeLines shouldBe Seq("[core.test]")
+
+        And("the test command succeeds")
+        shouldSucceed(result)
+      }
+    }
+
+    Scenario("Under testBatchFrameworkTasks, a module with no fork group") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds no test class, and whose testForkGrouping is Seq()")
+        os.remove.all(samples(tester))
+        editBuild(tester, """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))""", "Seq()")
+        And("the module's testBatchFrameworkTasks is true")
+        turnOnBatchFrameworkTasks(tester)
+        When("the test command is invoked")
+        val (result, json) = jsonOutputOf(tester)
+
+        Then("the module's runs are exactly one run, whose number is 1 and forkGroup is 0, whose contents is [] and which has no outcome")
+        withClue(result.debugString) {
+          runs(json).map(run => (run("number").num.toInt, run("forkGroup").num.toInt, contents(run), run.obj.contains("outcome"))) shouldBe Seq(
+            (1, 0, Nil, false)
+          )
+        }
 
         And("the test command succeeds")
         shouldSucceed(result)

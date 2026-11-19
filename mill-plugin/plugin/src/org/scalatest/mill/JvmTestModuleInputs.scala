@@ -35,7 +35,8 @@ private[mill] final case class JvmTestModuleInputs(
     testLogLevel: TestReporter.LogLevel,
     propagateEnv: Boolean,
     jvmWorker: InternalJvmWorkerApi,
-    discoveredClasses: Option[Seq[(String, Int)]]
+    discoveredClasses: Option[Seq[(String, Int)]],
+    testBatchFrameworkTasks: Boolean
 ) {
 
   /**
@@ -64,7 +65,8 @@ private[mill] final case class JvmTestModuleInputs(
       if (testLogLevel.level < TestReporter.LogLevel.Info.level) TestReporter.LogLevel.Info else testLogLevel,
       propagateEnv,
       jvmWorker,
-      discoveredClasses
+      discoveredClasses,
+      testBatchFrameworkTasks
     )(using ctx)
 }
 
@@ -100,7 +102,8 @@ private[mill] object JvmTestModuleInputs {
         module.testLogLevel(),
         module.propagateEnv(),
         module.jvmWorker().internalWorker(),
-        discoveredClasses()
+        discoveredClasses(),
+        module.testBatchFrameworkTasks()
       )
     }
   }

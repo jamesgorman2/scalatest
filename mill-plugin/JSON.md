@@ -48,7 +48,7 @@ Keys, in order:
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
   - failures of single workers, each naming the worker, its fork group and the module, in this order:
-    1. for each fork group in order, laying out its queue failing, as in `Laying out the queue of fork group 1 of core.test failed: …`. None of that group's workers starts;
+    1. for each fork group in order, laying out its files failing, as in `Laying out fork group 1 of core.test failed: …`: its queue or, for a module that sets `testBatchFrameworkTasks`, the files Mill writes before its worker starts. None of that group's workers starts;
     2. for each worker in the order it started, starting or running it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`, then reading its test event log failing;
   - or one failure laying out the module's workers, naming the module. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
     - two of the module's fork groups would share a `processFolder`, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
