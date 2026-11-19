@@ -19,6 +19,7 @@ import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.Promise
@@ -75,9 +76,15 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     def run(startWorker: => Future[Boolean]): Unit = {
-      workerRun.start(startWorker)
+      start(startWorker)
       endWorker()
     }
+
+    def start(startWorker: => Future[Boolean]): Unit =
+      workerRun.start { workerStarting =>
+        workerStarting()
+        startWorker
+      }
 
     def endWorker(): Unit = workerRun.end(workerEnd => Await.ready(workerEnd, Duration.Inf))
 
@@ -85,6 +92,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
   }
+
+  private def readerThreadsOf(eventLogFile: Path): Int =
+    Thread.getAllStackTraces.keySet.asScala.count(thread => thread.getName == EventLogReader.threadName(eventLogFile) && thread.isAlive)
 
   private def withEventLogFile[A](test: Path => A): A = {
     val folder = Files.createTempDirectory("worker-run")
@@ -250,7 +260,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
           val workerEnd = Promise[Boolean]()
-          fixture.workerRun.start(workerEnd.future)
+          fixture.start(workerEnd.future)
           writeCompletedRun(file)
           workerEnd.success(true)
           fixture.endWorker()
@@ -293,7 +303,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "rethrow it once the reader is abandoned, so the reader adds the worker as a process that ended before any run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
-          a[StackOverflowError] should be thrownBy fixture.workerRun.start(throw new StackOverflowError("worker"))
+          a[StackOverflowError] should be thrownBy fixture.start(throw new StackOverflowError("worker"))
           eventually(fixture.processesEndedBeforeAnyRun.get shouldBe 1)
         }
       }
@@ -307,7 +317,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           fixture.processExited = false
           implicit val signaler: Signaler = ThreadSignaler
           failAfter(patienceConfig.timeout) {
-            a[StackOverflowError] should be thrownBy fixture.workerRun.start(throw new StackOverflowError("worker"))
+            a[StackOverflowError] should be thrownBy fixture.start(throw new StackOverflowError("worker"))
           }
           fixture.processExited = true
           fixture.awaitReaderEnd()
@@ -317,7 +327,86 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
   }
 
+  "Starting a worker" when {
+    "Mill has not yet started it, as where the worker waits for a free job" should {
+      "start no event log reader" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.workerRun.start(_ => Promise[Boolean]().future)
+          readerThreadsOf(file) shouldBe 0
+          fixture.workerRun.abandon()
+        }
+      }
+    }
+
+    "Mill goes on to start it" should {
+      "start its event log reader then, which adds the worker's run" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          val workerEnd = Promise[Boolean]()
+          var workerStarting: () => Unit = () => ()
+          fixture.workerRun.start { starting =>
+            workerStarting = starting
+            workerEnd.future
+          }
+          workerStarting()
+          readerThreadsOf(file) shouldBe 1
+          writeCompletedRun(file)
+          workerEnd.success(true)
+          fixture.endWorker()
+          fixture.runsAdded.get shouldBe 1
+        }
+      }
+    }
+
+    "Mill starts it only once it has been ended, as where Mill runs a cancelled task's body" should {
+      "start no event log reader" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          var workerStarting: () => Unit = () => ()
+          fixture.workerRun.start { starting =>
+            workerStarting = starting
+            Future.failed(new InterruptedException("cancelled"))
+          }
+          fixture.endWorker()
+          workerStarting()
+          readerThreadsOf(file) shouldBe 0
+        }
+      }
+    }
+
+    "the worker ends without Mill having started it, as where Mill cancels the task first" should {
+      "add neither a run nor a process that ended before any run" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.workerRun.start(_ => Future.failed(new InterruptedException("cancelled")))
+          fixture.endWorker()
+          fixture.runsAdded.get shouldBe 0
+          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+        }
+      }
+    }
+  }
+
   "Starting each of two workers" when {
+    "Mill starts the first but not yet the second" should {
+      "start the first worker's event log reader only" in {
+        withEventLogFile { firstFile =>
+          withEventLogFile { secondFile =>
+            val first = new WorkerRunFixture(firstFile, opening)
+            val second = new WorkerRunFixture(secondFile, opening)
+            val workerRuns = WorkerRun.startEach(Seq(first, second)) { fixture =>
+              if (fixture eq first) fixture.start(Promise[Boolean]().future) else fixture.workerRun.start(_ => Promise[Boolean]().future)
+              fixture.workerRun
+            }
+            Seq(readerThreadsOf(firstFile), readerThreadsOf(secondFile)) shouldBe Seq(1, 0)
+            workerRuns.foreach(_.abandon())
+            eventually(readerThreadsOf(firstFile) shouldBe 0)
+          }
+        }
+      }
+    }
+
     "starting the second throws a fatal error" should {
       "rethrow it once the first worker's reader is abandoned, so that reader ends" in {
         withEventLogFile { firstFile =>
@@ -325,7 +414,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             val first = new WorkerRunFixture(firstFile, opening)
             val second = new WorkerRunFixture(secondFile, opening)
             a[StackOverflowError] should be thrownBy WorkerRun.startEach(Seq(first, second)) { fixture =>
-              fixture.workerRun.start(if (fixture eq first) Promise[Boolean]().future else throw new StackOverflowError("worker"))
+              fixture.start(if (fixture eq first) Promise[Boolean]().future else throw new StackOverflowError("worker"))
               fixture.workerRun
             }
             eventually(first.processesEndedBeforeAnyRun.get shouldBe 1)
@@ -341,7 +430,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withEventLogFile { file =>
           writeCompletedRun(file)
           val fixture = new WorkerRunFixture(file, opening)
-          fixture.workerRun.start(Future.failed(new InterruptedException("sleep interrupted")))
+          fixture.start(Future.failed(new InterruptedException("sleep interrupted")))
           WorkerRun.endEach(Seq(fixture.workerRun))(workerEnd => Await.ready(workerEnd, Duration.Inf))
           fixture.consolidation.end()
           noException should be thrownBy writeStdout(fixture.capture, "late\n")
@@ -357,7 +446,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           withEventLogFile { secondFile =>
             val first = new WorkerRunFixture(firstFile, opening)
             val second = new WorkerRunFixture(secondFile, opening)
-            Seq(first, second).foreach(_.workerRun.start(Promise[Boolean]().future))
+            Seq(first, second).foreach(_.start(Promise[Boolean]().future))
             an[InterruptedException] should be thrownBy WorkerRun.endEach(Seq(first.workerRun, second.workerRun)) { _ =>
               throw new InterruptedException("cancelled")
             }

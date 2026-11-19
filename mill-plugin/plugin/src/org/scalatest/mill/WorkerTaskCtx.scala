@@ -7,19 +7,28 @@ import mill.api.daemon.internal.TestReporter
 import scala.concurrent.Future
 
 /**
- * The test command's `TaskCtx`, except that each async body forked through it runs inside [[capturing]], so a worker
- * spawned in that body sends its stdout and stderr to `capture` rather than to Mill's logging. Mill
- * sets `os.Inherit` around each async body it runs, so only a value set inside the body reaches the worker.
+ * The test command's `TaskCtx` for one worker, except in the bodies that start the worker. Each async body forked
+ * through it, and each body given to [[runOnThisThread]], first calls `workerStarting`, then runs with `os.Inherit`
+ * set to `capture`, so a worker spawned in that body sends its stdout and stderr to `capture` rather than to Mill's
+ * logging. Mill sets `os.Inherit` around each async body it runs, so only a value set inside the body reaches the
+ * worker.
+ *
+ * @param workerStarting called as the worker starts, on the thread that runs it
  */
-private[mill] final class WorkerOutputTaskCtx(ctx: TaskCtx, capture: WorkerOutputCapture) extends TaskCtx {
+private[mill] final class WorkerTaskCtx(ctx: TaskCtx, capture: WorkerOutputCapture, workerStarting: () => Unit) extends TaskCtx {
 
-  /** Runs `body` with the stdout and stderr of each process it spawns sent to `capture`. */
-  def capturing[T](body: => T): T =
+  private def capturing[T](body: => T): T =
     os.Inherit.out.withValue(os.ProcessOutput.ReadBytes(capture.stdout)) {
       os.Inherit.err.withValue(os.ProcessOutput.ReadBytes(capture.stderr)) {
         body
       }
     }
+
+  /** Runs `body`, which starts the worker on the calling thread, once `workerStarting` is called. */
+  def runOnThisThread[T](body: => T): T = {
+    workerStarting()
+    capturing(body)
+  }
 
   val fork: TaskCtx.Fork.Api = new TaskCtx.Fork.Api {
     def blocking[T](t: => T): T = ctx.fork.blocking(t)
@@ -31,7 +40,7 @@ private[mill] final class WorkerOutputTaskCtx(ctx: TaskCtx, capture: WorkerOutpu
     def async[T](dest: os.Path, key: String, message: String, priority: Int)(t: Logger => T)(using
         forkingCtx: TaskCtx
     ): Future[T] =
-      ctx.fork.async(dest, key, message, priority)(logger => capturing(t(logger)))(using forkingCtx)
+      ctx.fork.async(dest, key, message, priority)(logger => runOnThisThread(t(logger)))(using forkingCtx)
   }
 
   def args: IndexedSeq[?] = ctx.args

@@ -31,7 +31,7 @@ private[mill] final class EventLogReader(
   @volatile private var workerEnded: Boolean = false
   @volatile private var workerStartedAProcess: Boolean = true
   @volatile private var failure: Option[Throwable] = None
-  private val thread: Thread = new Thread(() => readCapturingFailure(), s"scalatest event log reader: $eventLogFile")
+  private val thread: Thread = new Thread(() => readCapturingFailure(), EventLogReader.threadName(eventLogFile))
   thread.setDaemon(true)
 
   def start(): Unit = thread.start()
@@ -151,6 +151,8 @@ private[mill] final class EventLogReader(
 }
 
 private[mill] object EventLogReader {
+
+  def threadName(eventLogFile: Path): String = s"scalatest event log reader: $eventLogFile"
 
   private val retriedOpens: Int = 500
 }

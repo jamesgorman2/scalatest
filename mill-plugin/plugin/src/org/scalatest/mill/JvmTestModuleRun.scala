@@ -60,7 +60,7 @@ private[mill] final class JvmTestModuleRun(
       WorkerLayout.ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, () => filesystemIgnoresCase())
 
   private def runWorkers[LaidOut](consolidation: Consolidation, layout: WorkerLayout)(layOut: PlannedForkGroup => LaidOut)(
-      runWorker: (PlannedForkGroup, LaidOut, PlannedWorker) => (WorkerOutputTaskCtx, TestModuleUtil) => Future[Boolean]
+      runWorker: (PlannedForkGroup, LaidOut, PlannedWorker) => (WorkerTaskCtx, TestModuleUtil) => Future[Boolean]
   ): Unit = {
     val laidOutForkGroups = JvmTestModuleRun.layOutForkGroups(consolidation, label, layout.forkGroups)(layOut)
     val startedAt = Instant.now()
@@ -119,7 +119,7 @@ private[mill] final class JvmTestModuleRun(
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
   private def startWorker(consolidation: Consolidation, worker: PlannedWorker)(
-      runWorker: (WorkerOutputTaskCtx, TestModuleUtil) => Future[Boolean]
+      runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[Boolean]
   ): WorkerRun = {
     val eventLogFile = moduleFolder / worker.processFolder / JvmTestModuleRun.eventLogFileName
     val capture = new WorkerOutputCapture(WorkerOutputCapture.workerCharset)
@@ -135,23 +135,24 @@ private[mill] final class JvmTestModuleRun(
       10.millis
     )
     val workerRun = new WorkerRun(consolidation, worker.describedIn(label), reader, capture)
-    workerRun.start {
-      val workerCtx = new WorkerOutputTaskCtx(ctx, capture)
+    workerRun.start { workerStarting =>
+      val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
       runWorker(workerCtx, inputs.testModuleUtil(scalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun
   }
 
   // Mill's own test queue starts the worker. Where it runs the fork group's workers one after another, the worker runs
-  // on this thread and ends before this returns; otherwise it runs on a future forked through the given `TaskCtx`. Only
-  // whether the worker started a process is kept. The `Result` Mill gives for that process is ignored, even a failure,
-  // because the consolidation decides the test command's result.
+  // on this thread and ends before this returns; otherwise it runs on a future forked through the given `TaskCtx`. Mill
+  // forks exactly the workers it gives a folder of their own. Only whether the worker started a process is kept. The
+  // `Result` Mill gives for that process is ignored, even a failure, because the consolidation decides the test
+  // command's result.
   private def runOnQueue(layout: WorkerLayout)(forkGroup: PlannedForkGroup, queue: os.Path, worker: PlannedWorker)(
-      workerCtx: WorkerOutputTaskCtx,
+      workerCtx: WorkerTaskCtx,
       util: TestModuleUtil
   ): Future[Boolean] = {
     val groupFolder = moduleFolder / forkGroup.folder
-    val (_, workerEnd) = workerCtx.capturing {
+    def joinQueue() =
       util.runTestFuture(
         layout.testClassCount,
         layout.forkGroups.size,
@@ -162,7 +163,7 @@ private[mill] final class JvmTestModuleRun(
         forkGroup.label,
         worker.forkGroupAndIndex.index.value
       )
-    }
+    val (_, workerEnd) = if (worker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
     workerEnd.map { case (_, _, processResult) => processResult.isDefined }(using ExecutionContext.parasitic)
   }
 
@@ -170,7 +171,7 @@ private[mill] final class JvmTestModuleRun(
   // one fork group holding a class, and otherwise runs on this thread. A batch worker always starts a process. The
   // `Result` Mill gives for that process is ignored, as in [[runOnQueue]].
   private def runBatch(layout: WorkerLayout)(forkGroup: PlannedForkGroup, selector: JvmTestModuleRun.BatchSelector)(
-      workerCtx: WorkerOutputTaskCtx,
+      workerCtx: WorkerTaskCtx,
       util: TestModuleUtil
   ): Future[Boolean] = {
     val groupFolder = moduleFolder / forkGroup.folder
@@ -178,12 +179,10 @@ private[mill] final class JvmTestModuleRun(
       util.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
       true
     }
-    workerCtx.capturing {
-      if (layout.forkGroups.size > 1)
-        workerCtx.fork.async(groupFolder, forkGroup.label, "", priority = -1)(_ => runProcess())(using workerCtx)
-      else
-        Future.successful(runProcess())
-    }
+    if (layout.forkGroups.size > 1)
+      workerCtx.fork.async(groupFolder, forkGroup.label, "", priority = -1)(_ => runProcess())(using workerCtx)
+    else
+      workerCtx.runOnThisThread(Future.successful(runProcess()))
   }
 }
 
