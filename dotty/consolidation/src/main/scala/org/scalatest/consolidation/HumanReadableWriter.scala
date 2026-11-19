@@ -48,8 +48,19 @@ private[consolidation] object HumanReadableWriter {
       linesOf(rootLine, 0, AnsiCyan) ++ root.modules.flatMap(moduleLines(_, 1)) ++ root.output.flatMap(capturedLineLines(_, 1)) ++
         rootFailureLines(root.failures, 1)
 
-  private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] =
-    linesOf("[" + module.label.value + "]", depth, AnsiCyan) ++ module.runs.flatMap(runLines(_, depth + 1))
+  // The suites of the runs whose lines are not shown form one list by name. A stable sort keeps suites that share a name
+  // in order of their runs' numbers, then in the order each run lists them.
+  private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] = {
+    val (shownRuns, hiddenRuns) = module.runs.partition(showsItsLine)
+    val hiddenRunsSuites = hiddenRuns.flatMap(_.assembly.topLevelSuites).sortBy(_.name)
+    linesOf("[" + module.label.value + "]", depth, AnsiCyan) ++ hiddenRunsSuites.flatMap(nodeLines(_, depth + 1)) ++
+      shownRuns.flatMap(runLines(_, depth + 1))
+  }
+
+  private def showsItsLine(run: ConsolidatedRun): Boolean = {
+    val assembly = run.assembly
+    assembly.output.nonEmpty || assembly.endedAbnormally || assembly.ranNoneOfItsAssignedTestClasses
+  }
 
   private def rootFailureLines(failures: Seq[String], depth: Int): Vector[OutputLine] =
     if (failures.isEmpty) Vector.empty
@@ -57,9 +68,8 @@ private[consolidation] object HumanReadableWriter {
 
   private def runLines(run: ConsolidatedRun, depth: Int): Vector[OutputLine] = {
     val assembly = run.assembly
-    val outputAndEnd = assembly.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(assembly, depth + 1)
-    if (outputAndEnd.isEmpty) assembly.topLevelSuites.flatMap(nodeLines(_, depth))
-    else linesOf(s"Run ${run.number}:", depth, AnsiCyan) ++ assembly.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++ outputAndEnd
+    linesOf(s"Run ${run.number}:", depth, AnsiCyan) ++ assembly.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++
+      assembly.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(assembly, depth + 1)
   }
 
   private def outputLines(output: RunOutput, depth: Int): Vector[OutputLine] =

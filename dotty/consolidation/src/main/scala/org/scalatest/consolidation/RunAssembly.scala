@@ -139,6 +139,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val work
   private var abort = Option.empty[DecodedEvent.RunAborted]
   private var ending = Option.empty[RunOutcome]
   private var eventStreamOpen = true
+  private var assignedTestClasses = Vector.empty[TestClassName]
   private var assembledTree = Vector.empty[AssembledNode]
 
   def isEventStreamOpen: Boolean = eventStreamOpen
@@ -178,6 +179,17 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val work
 
   def add(line: CapturedLine): Unit = received :+= RunOutput.Captured(line)
 
+  def addAssigned(classes: Iterable[TestClassName]): Unit = assignedTestClasses ++= classes
+
+  /** Whether the run was assigned test classes and reported a suite of none of them. */
+  def ranNoneOfItsAssignedTestClasses: Boolean = {
+    val reportedClasses = structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet
+    assignedTestClasses.nonEmpty && !assignedTestClasses.exists(assigned => reportedClasses.contains(assigned.value))
+  }
+
+  /** Whether the run ended aborted or stopped. */
+  def endedAbnormally: Boolean = RunAssembly.isAbnormal(ending)
+
   /** Ends the event stream and assembles the run's tree, which every later reader of the tree shares. */
   def endEventStream(): Unit =
     if (eventStreamOpen) {
@@ -208,7 +220,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val work
   private final class TreeAssembler {
 
     private val runFinished = ending.nonEmpty
-    private val runEndedAbnormally = RunAssembly.isAbnormal(ending)
+    private val runEndedAbnormally = endedAbnormally
     private val childrenByParent = structure.values.toVector.groupBy(_.parentId)
     private val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
     private val keysOfTestsThatRan = executions.keysIterator.flatMap(RunAssembly.attributionKeyOf).toSet

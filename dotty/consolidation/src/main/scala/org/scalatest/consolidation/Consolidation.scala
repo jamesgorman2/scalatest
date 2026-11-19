@@ -178,6 +178,14 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
   def add(line: CapturedLine): Unit = consolidation.feed(run.add(line))
 
   /**
+   * Adds test classes the run's process was assigned, once that process has ended. A run that was assigned test classes
+   * and reported a suite of none of them shows its line in the human-readable output.
+   *
+   * @throws IllegalArgumentException if the consolidation has ended
+   */
+  def addAssignedTestClasses(classes: Iterable[TestClassName]): Unit = consolidation.feed(run.addAssigned(classes))
+
+  /**
    * Ends the run's event stream. No further event of the run may be added. A run whose stream ends without its
    * `runEnded` event does not finish, which fails the test command. Ending the stream also fails the state where the
    * run's tree holds a suite, scope or test that aborted or did not run: a node that did not run is known only once the

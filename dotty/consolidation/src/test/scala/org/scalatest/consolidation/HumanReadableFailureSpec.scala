@@ -525,16 +525,16 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
       addRun(consolidation, TestRunPart.Events(laterRun)).endEventStream()
       consolidation.end()
 
-      Then("the run's abort shows the throwable's class, and the later run's suite, test and message follow")
+      Then("the later run's suite, test and message come first, then the aborted run's line, whose abort shows the throwable's class")
       output.colourMarkedTree shouldBe
         """{cyan}[core.test]{reset}
+          |  {green}LaterSpec:{reset}
+          |    {green}- later{reset}
+          |      {green}[info] still checked{reset}
           |  {cyan}Run 1:{reset}
           |    {red}*** RUN ABORTED ***{reset}
           |      {red}java.lang.OutOfMemoryError:{reset}
-          |        {red}...{reset}
-          |  {green}LaterSpec:{reset}
-          |    {green}- later{reset}
-          |      {green}[info] still checked{reset}""".stripExpectedMargin
+          |        {red}...{reset}""".stripExpectedMargin
     }
   }
 }

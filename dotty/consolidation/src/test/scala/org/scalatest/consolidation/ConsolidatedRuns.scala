@@ -48,6 +48,32 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     def plainSummaryLine: String = summaryLine.replaceAll("\\{(reset|red|green|yellow|cyan)\\}", "")
   }
 
+  val runStarts: TestRunPart = TestRunPart.Events("run started\nrun: RunStarting")
+
+  val runEndsCompleted: TestRunPart = TestRunPart.Events("run: RunCompleted\nrun ended completed")
+
+  /**
+   * Suite `samples.<suite>` with one test, which succeeds.
+   *
+   * @param occurrenceAmongTestsOfItsName where the test falls among the run's tests of the same name, counted from 1
+   */
+  def suiteRuns(suite: String, test: String = "t", occurrenceAmongTestsOfItsName: Int = 1): TestRunPart =
+    TestRunPart.Events(
+      s"""
+      structure
+        suite "$suite", class "samples.$suite"
+          test "$test", label "- $test"
+      suite "$suite": SuiteStarting
+      test "$test" #$occurrenceAmongTestsOfItsName: TestStarting
+      test "$test" #$occurrenceAmongTestsOfItsName: TestSucceeded
+      suite "$suite": SuiteCompleted
+      """
+    )
+
+  /** A completed run of the suites, in order, each with one test `t`, which succeeds. */
+  def runOfSuites(suites: String*): Vector[TestRunPart] =
+    runStarts +: suites.zipWithIndex.map((suite, index) => suiteRuns(suite, occurrenceAmongTestsOfItsName = index + 1)).toVector :+ runEndsCompleted
+
   def workerAt(forkGroup: Int, workerIndex: Int): Worker =
     ForkGroup.from(forkGroup).flatMap(group => WorkerIndex.from(workerIndex).map(Worker(group, _))).fold(fail(_), identity)
 

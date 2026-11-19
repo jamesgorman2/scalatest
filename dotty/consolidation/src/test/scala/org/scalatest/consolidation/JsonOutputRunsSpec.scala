@@ -9,24 +9,6 @@ import org.scalatest.matchers.should.Matchers
 
 final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
 
-  private def suiteRuns(suite: String, occurrenceAmongTestsNamedT: Int = 1): String =
-    s"""
-    structure
-      suite "$suite", class "samples.$suite"
-        test "t", label "- t"
-    suite "$suite": SuiteStarting
-    test "t" #$occurrenceAmongTestsNamedT: TestStarting
-    test "t" #$occurrenceAmongTestsNamedT: TestSucceeded
-    suite "$suite": SuiteCompleted
-    """
-
-  private val runStarts = TestRunPart.Events("run started\nrun: RunStarting")
-
-  private val runEndsCompleted = TestRunPart.Events("run: RunCompleted\nrun ended completed")
-
-  private def runOfSuites(suites: String*): Vector[TestRunPart] =
-    runStarts +: suites.zipWithIndex.map((suite, index) => TestRunPart.Events(suiteRuns(suite, index + 1))).toVector :+ runEndsCompleted
-
   private def namesIn(runNode: JsonValue): Vector[JsonValue] = runNode("contents").items.map(_("name"))
 
   Feature("Runs in the JSON output") {
@@ -35,7 +17,7 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
       Given("run 1, fork group 0, worker index 0, running suites Zeta then Alpha")
       val runOne = runOfSuites("Zeta", "Alpha")
       And("run 2, fork group 0, worker index 1, running suite Mid and writing `two` to stdout")
-      val runTwo = runStarts +: TestRunPart.Events(suiteRuns("Mid")) +: TestRunPart.CapturedLine(CapturedStream.Stdout, "two\n") +: Vector(runEndsCompleted)
+      val runTwo = runStarts +: suiteRuns("Mid") +: TestRunPart.CapturedLine(CapturedStream.Stdout, "two\n") +: Vector(runEndsCompleted)
       And("run 3, fork group 1, worker index 0, running suites Alpha then Beta")
       val runThree = runOfSuites("Alpha", "Beta")
 
