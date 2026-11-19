@@ -105,10 +105,11 @@ Feature: Every worker of a JVM module
 
   Rule: A module's runs are numbered by fork group, then by worker index, whatever order they start and end in
     Scenario: AC-003 The first fork group's run ends last
-      Given the module's `testParallelism` is `false`
+      Given the module's `testParallelism` is `false` and its `testBatchFrameworkTasks` is `true`, so its two fork groups' workers run at the same time
       And `B1`'s test `t` sleeps for 3 seconds before it succeeds
       When the test command is invoked
-      Then the module's runs are, in order, a run whose `number` is 1 and `forkGroup` is 0, then a run whose `number` is 2 and `forkGroup` is 1
+      Then the `endedAt` of the run whose `forkGroup` is 0 is later than the `endedAt` of the run whose `forkGroup` is 1
+      And the module's runs are, in order, a run whose `number` is 1 and `forkGroup` is 0, then a run whose `number` is 2 and `forkGroup` is 1
       And the run whose `number` is 1 holds suites `B1` and `B2`, and the run whose `number` is 2 holds suites `A1` and `A2`
 
     Scenario: AC-004 Two workers in each fork group
