@@ -9,7 +9,10 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
+import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.consolidation.Worker
+import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
@@ -170,6 +173,37 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
           a[StackOverflowError] should be thrownBy workerRun.runWorker(throw new StackOverflowError("worker"))
           workerRun.processesEndedBeforeAnyRun.get shouldBe 1
         }
+      }
+    }
+  }
+
+  "Laying out the queues of a module's workers" when {
+    def workerOf(position: Int): QueueWorker =
+      (for {
+        forkGroup <- ForkGroup.from(position)
+        index <- WorkerIndex.from(0)
+      } yield QueueWorker(Worker(forkGroup, index), Seq(s"group-$position"), Nil)).fold(fail(_), identity)
+
+    "laying out the first of two workers' queues throws" should {
+      "attach what it threw to the root, naming the first worker, and fail the consolidation" in {
+        val consolidated = new ConsolidationUnderTest
+        JvmTestModuleRun.layOutQueues(consolidated.consolidation, label, Seq(workerOf(0), workerOf(1))) { worker =>
+          if (worker == workerOf(0)) throw new IllegalStateException("disk full") else "queue"
+        }
+        consolidated.consolidation.end()
+        consolidated.outputWithoutSummaryLine shouldBe Seq(
+          "Consolidated tests:",
+          "  *** CONSOLIDATED TESTS ABORTED ***",
+          "    Laying out the queue of worker 0 of fork group 0 of core.test failed: java.lang.IllegalStateException: disk full"
+        )
+        consolidated.consolidation.state shouldBe ConsolidationState.EndedFailed
+      }
+
+      "give the second worker its queue, and the first none" in {
+        val consolidated = new ConsolidationUnderTest
+        JvmTestModuleRun.layOutQueues(consolidated.consolidation, label, Seq(workerOf(0), workerOf(1))) { worker =>
+          if (worker == workerOf(0)) throw new IllegalStateException("disk full") else s"queue of ${worker.processFolder.mkString}"
+        } shouldBe Seq(workerOf(1) -> "queue of group-1")
       }
     }
   }

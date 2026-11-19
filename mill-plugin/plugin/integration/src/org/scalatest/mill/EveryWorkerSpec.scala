@@ -152,4 +152,36 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
   }
+
+  Feature("Fork groups that would share a processFolder") {
+
+    Scenario("Two fork groups each hold only the same class") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2")
+        And("""the module's testForkGrouping is Seq(Seq("samples.A1"), Seq("samples.A1")) and its testParallelism is false""")
+        val buildFile = tester.workspacePath / "build.mill"
+        os.write.over(
+          buildFile,
+          os.read(buildFile).replace(
+            """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))""",
+            """Seq(Seq("samples.A1"), Seq("samples.A1"))"""
+          )
+        )
+        When("the test command is invoked")
+        val (result, json) = jsonOutputOf(tester)
+
+        Then("the root's failures are exactly Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1")
+        json("failures").arr.map(_("message").str) shouldBe Seq(
+          "Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
+        )
+
+        And("the module has no run, and no startedAt, endedAt or duration")
+        runs(json) shouldBe empty
+        shouldHaveNoKeys(node(json, "module", "core.test"), "startedAt", "endedAt", "duration")
+
+        And("the test command fails before any worker starts")
+        shouldFailBeforeAnyTestStarts(tester, result)
+      }
+    }
+  }
 }

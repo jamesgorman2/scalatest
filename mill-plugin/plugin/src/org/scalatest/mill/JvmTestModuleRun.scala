@@ -28,7 +28,7 @@ private[mill] final class JvmTestModuleRun(
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     QueueWorker
-      .forEachForkGroup(inputs.forkGroups, discoveredTestClasses())
+      .forEachForkGroup(inputs.forkGroups, discoveredTestClasses(), filesystemIgnoresCase())
       .fold(
         reason => {
           consolidation.addRootFailure(s"Laying out the workers of ${label.value} failed: $reason")
@@ -39,7 +39,7 @@ private[mill] final class JvmTestModuleRun(
   }
 
   private def runWorkers(consolidation: Consolidation, workers: Seq[QueueWorker]): Unit = {
-    val queues = workers.map(worker => worker -> layOutQueue(worker))
+    val queues = JvmTestModuleRun.layOutQueues(consolidation, label, workers)(layOutQueue)
     val startedAt = Instant.now()
     queues.foreach { case (worker, queue) => runWorker(consolidation, worker, queue) }
     consolidation.timeModule(label, Some(startedAt), Some(Instant.now()))
@@ -59,6 +59,16 @@ private[mill] final class JvmTestModuleRun(
         javaHome = inputs.javaHome
       )(using ctx)
       .toSet
+
+  private def filesystemIgnoresCase(): Boolean = {
+    val probe = moduleFolder / "case-probe"
+    os.write(probe, "")
+    try {
+      os.exists(moduleFolder / "CASE-PROBE")
+    } finally {
+      os.remove(probe)
+    }
+  }
 
   private def processFolder(worker: QueueWorker): os.Path = moduleFolder / worker.processFolder
 
@@ -101,6 +111,26 @@ private[mill] object JvmTestModuleRun {
 
   /** Mill writes no file of this name in a worker's `processFolder`. */
   val eventLogFileName: String = "scalatest-event-log.jsonl"
+
+  /**
+   * Lays out each worker's queue, in order, before any worker starts. What laying out a worker's queue throws is attached
+   * to the consolidation's root as a failure naming the worker, and that worker is left out, so the module's other workers
+   * still run.
+   *
+   * @return each worker whose queue was laid out, with its queue
+   */
+  def layOutQueues[Queue](consolidation: Consolidation, module: TestRunLabel, workers: Seq[QueueWorker])(
+      layOutQueue: QueueWorker => Queue
+  ): Seq[(QueueWorker, Queue)] =
+    workers.flatMap { worker =>
+      Try(layOutQueue(worker)).fold(
+        throwable => {
+          consolidation.addRootFailure(s"Laying out the queue of ${worker.describedIn(module)} failed: $throwable")
+          None
+        },
+        queue => Some(worker -> queue)
+      )
+    }
 
   /**
    * What starting the worker or reading its event log threw is attached to the consolidation's root as a failure naming

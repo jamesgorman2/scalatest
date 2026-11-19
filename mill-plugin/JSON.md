@@ -47,7 +47,7 @@ Keys, in order:
 - `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
-  - for each worker in the order the test command started them, the worker failing to start, then its test event log failing to be read. Each message names the worker, its fork group and the module, as in `Starting worker 0 of fork group 1 of core.test failed: …`;
+  - for each worker in fork group order, its queue failing to be laid out, as in `Laying out the queue of worker 0 of fork group 1 of core.test failed: …`. That worker does not start. Then, for each worker in the order the test command started them, the worker failing to start, then its test event log failing to be read, as in `Starting worker 0 of fork group 1 of core.test failed: …`. Each message names the worker, its fork group and the module;
   - or, where two of the module's fork groups would run in one folder, one failure naming the module, the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`.
 - `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's tests are discovered until every run has ended.
 - `contents` — an array holding the module.

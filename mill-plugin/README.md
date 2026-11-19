@@ -103,7 +103,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- two of the module's fork groups would run in one folder, as where each holds only the same test class, or only classes whose names differ only in case. No test runs;
+- two of the module's fork groups would run in one folder, as where each holds only the same test class, or, on a filesystem that ignores case, only classes whose names differ only in case. No test runs;
 - the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
