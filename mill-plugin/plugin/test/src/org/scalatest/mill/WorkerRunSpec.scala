@@ -105,6 +105,11 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   private val startedAProcess: Future[Boolean] = Future.successful(true)
 
+  private def writeStdout(capture: WorkerOutputCapture, text: String): Unit = {
+    val bytes = text.getBytes(StandardCharsets.UTF_8)
+    capture.stdout(bytes, bytes.length)
+  }
+
   "Running a worker" when {
     "its event log file never becomes readable" should {
       "attach what reading threw to the root, end the run's event stream and fail the consolidation" in {
@@ -124,24 +129,65 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "starting the worker throws after the worker wrote an unterminated line" should {
-      "end the capture streams, attach what starting threw to the root and fail the consolidation" in {
+      "leave the capture streams unended, so the line the worker's output pump goes on to finish is captured whole" in {
         withEventLogFile { file =>
           writeCompletedRun(file)
           val fixture = new WorkerRunFixture(file, opening)
-          fixture.runAndEndConsolidation {
-            val bytes = "partial".getBytes(StandardCharsets.UTF_8)
-            fixture.capture.stdout(bytes, bytes.length)
-            throw new IllegalStateException("testargs already exists")
+          fixture.run {
+            writeStdout(fixture.capture, "partial")
+            throw new IllegalStateException("claim log unreadable")
           }
+          writeStdout(fixture.capture, " rest\n")
+          fixture.consolidation.end()
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  [core.test]",
             "    Run 1:",
-            "      [stdout] partial",
+            "      [stdout] partial rest",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: claim log unreadable"
           )
-          fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
+    "the worker started on a future fails after it wrote an unterminated line, as where Mill cancels the task" should {
+      "leave the capture streams unended, so the line the worker's output pump goes on to finish is captured whole" in {
+        withEventLogFile { file =>
+          writeCompletedRun(file)
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.run {
+            writeStdout(fixture.capture, "partial")
+            Future.failed(new InterruptedException("sleep interrupted"))
+          }
+          writeStdout(fixture.capture, " rest\n")
+          fixture.consolidation.end()
+          fixture.outputWithoutSummaryLine shouldBe Seq(
+            "Consolidated tests:",
+            "  [core.test]",
+            "    Run 1:",
+            "      [stdout] partial rest",
+            "  *** CONSOLIDATED TESTS ABORTED ***",
+            "    Starting worker 0 of fork group 1 of core.test failed: java.util.concurrent.ExecutionException: Boxed Exception"
+          )
+        }
+      }
+    }
+
+    "the worker ends normally after it wrote an unterminated line" should {
+      "end the capture streams, capturing that line" in {
+        withEventLogFile { file =>
+          writeCompletedRun(file)
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.runAndEndConsolidation {
+            writeStdout(fixture.capture, "partial")
+            startedAProcess
+          }
+          fixture.outputWithoutSummaryLine shouldBe Seq(
+            "[core.test]",
+            "  Run 1:",
+            "    [stdout] partial"
+          )
         }
       }
     }
@@ -226,8 +272,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             val second = new WorkerRunFixture(secondFile, opening, "worker 0 of fork group 1 of core.test", consolidationUnderTest)
             first.run(throw new IllegalStateException("testargs already exists"))
             second.run {
-              val bytes = "second\n".getBytes(StandardCharsets.UTF_8)
-              second.capture.stdout(bytes, bytes.length)
+              writeStdout(second.capture, "second\n")
               startedAProcess
             }
             consolidationUnderTest.consolidation.end()

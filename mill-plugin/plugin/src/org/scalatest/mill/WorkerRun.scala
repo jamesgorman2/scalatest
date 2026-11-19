@@ -42,7 +42,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    * @param awaitWorker returns once the worker has ended
    */
   def end(awaitWorker: Future[Boolean] => Unit): Unit = {
-    val startedAProcess =
+    val ended =
       try {
         started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
       } catch {
@@ -50,9 +50,12 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
           abandon()
           throw fatal
       }
+    // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as where Mill
+    // cancels the task, can leave its process and those threads running, so its streams are left unended.
+    ended.foreach(_ => capture.endStreams())
     // A worker whose end is unknown may have started a process.
-    val reading = endReading(startedAProcess = startedAProcess.getOrElse(true))
-    startedAProcess.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: $throwable"))
+    val reading = Try(reader.awaitStreamEnd(startedAProcess = ended.getOrElse(true)))
+    ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: $throwable"))
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
   }
 
@@ -61,11 +64,6 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
   private def endOf(workerEnd: Future[Boolean]): Try[Boolean] =
     workerEnd.value.getOrElse(Failure(new IllegalStateException(s"$workerName had not ended once awaited")))
-
-  private def endReading(startedAProcess: Boolean): Try[Unit] = {
-    capture.endStreams()
-    Try(reader.awaitStreamEnd(startedAProcess))
-  }
 }
 
 private[mill] object WorkerRun {
