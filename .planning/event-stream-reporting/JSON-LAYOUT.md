@@ -149,8 +149,10 @@ A run node records one run's own state, including how the run ended (R-074a). Ev
 No suite names its run. A suite in a run node belongs to that node's run. A top-level suite that has events and is a child of a module belongs to that module's run that has no node.
 
 - `kind` — `run`.
-- `number` — the run's identifier, unique within its module. Always present. The module's runs are numbered from 1, ordered by `forkGroup`, then by the index, counted from 0, that Mill's test queue gives the run's worker within its fork group, as in the worker's folder name `worker-<i>`. A fork group that Mill runs in one worker has only index 0. The order in which runs start or end plays no part. Where the consolidation library's caller gives a module's runs no fork group, they are numbered in the order the caller adds them.
-- `forkGroup` — the 0-based position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives. Absent where the consolidation library's caller gives none, as where the library is called without Mill.
+- `number` — the run's identifier, unique within its module. Always present. The module's runs are numbered from 1.
+  - Where the consolidation library's caller gives each run a fork group and a worker index, the runs are numbered in ascending order of `forkGroup`, then of worker index. The worker index is the index of the run's worker within its fork group, which the caller gives and the JSON output does not record.
+  - Where the caller gives the module's runs no fork group, the runs are numbered in the order the caller adds them.
+- `forkGroup` — the 0-based position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives. Absent where the consolidation library's caller gives the run no fork group.
 - `testCount` — the expected test count of the run's `RunStarting`; absent where that count is 0, as it is under a build tool's `Framework`.
 - `configMap` — `RunStarting`'s config map, as an object of each value's `toString`.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s `timeStamp` and `DiscoveryCompleted`'s `duration`; absent unless the run reported them.

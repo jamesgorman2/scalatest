@@ -1,10 +1,10 @@
 # Decisions: runs and modules in the output
 
-Decisions behind `../SPECIFICATION.md` on how runs and modules appear in the consolidated output, newest first.
+Decisions behind `../SPECIFICATION.md` on when the human-readable output shows a run, newest first.
 
 ---
 
-## Human-readable output shows a run only where the run has output attached, aborted or stopped, or was assigned test classes and ran none of them (`../SPECIFICATION.md` R-082).
+## Human-readable output shows a run only where the run has output attached, aborted or stopped, or was assigned test classes and ran none of them (`../SPECIFICATION.md` R-144).
 
 **Alternatives**
 
@@ -17,29 +17,5 @@ Decisions behind `../SPECIFICATION.md` on how runs and modules appear in the con
 **Costs** The human-readable output does not show which suites shared a worker unless the run is shown; a reader who needs that reads the JSON output.
 
 **Settled by** [Plan: every worker of a JVM module](https://github.com/jamesgorman2/scalatest/issues/159).
-
----
-
-## A forked JVM run is a node, and a non-forked run is reported as part of its module (`../SPECIFICATION.md` R-096a, R-135).
-
-**Alternatives**
-
-**Reasoning**
-
-**Costs**
-
-**Settled by**
-
----
-
-## A module has an outcome only when the module has an error (`../SPECIFICATION.md` R-098e).
-
-**Alternatives**
-
-**Reasoning**
-
-**Costs**
-
-**Settled by**
 
 ---

@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-The test command runs a JVM test module in one worker and fails where the module has more than one fork group with test classes, so a module that Mill runs in parallel, or splits with `testForkGrouping`, cannot be tested with it. This feature runs one JVM test module in every worker that Mill 1.3.1's own `testForked` starts for it, and consolidates each worker's run as a run node under the module. The human-readable output shows a run only where the run itself matters; the JSON output keeps every run, so that a reader can see which suites may have run in parallel.
+The test command runs a JVM test module in one worker, whatever the module's `testParallelism`, and fails where the module has more than one fork group with test classes. This feature runs one JVM test module in every worker that Mill 1.3.1's own `testForked` starts for it, and consolidates each worker's run as a run node under the module. The human-readable output shows a run only where the run has output attached, aborted or stopped, or was assigned test classes and ran none of them; the JSON output keeps every run.
 
 ## Plan
 
@@ -18,16 +18,15 @@ The test command runs a JVM test module in one worker and fails where the module
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the epic's architecture, including how the test command starts each worker and gives each worker's run to the consolidation library.
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 
-Terms are defined in `.docs/ubiquitous-language.md`, among them *worker* and *fork group*.
+Terms are defined in `.docs/ubiquitous-language.md`, among them *worker*, *fork group* and *assigned test classes*.
 
 ## Scope
 
 - Running one JVM test module, named by one module selector, in every worker that Mill 1.3.1's `testForked` starts for that module, as the module's `testForkGrouping`, `testParallelism` and `testBatchFrameworkTasks` and Mill's test queue decide. The test command no longer fails on a module with more than one fork group.
 - One run node for each worker's run, including the run of a worker given no task.
-- A run's number. A *worker index* is the index, counted from 0, that Mill's test queue gives a worker within its fork group, as in the worker's folder name `worker-<i>`; a fork group that Mill runs in one worker has only worker index 0. A module's runs are numbered from 1, ordered first by the position of the run's fork group among the groups the module's `testForkGrouping` gives, then by the run's worker index. The number does not depend on the order in which the runs start or end. Numbers are compared as numbers, so run 2 comes before run 10.
-- The `forkGroup` key of a run node in the JSON output: the 0-based position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives. The consolidation library writes it only where its caller gives it, so a run node has no `forkGroup` where the library is called without Mill.
-- Which runs the human-readable output shows, and where it shows the suites of the runs it does not show. A run's *assigned classes* are the test classes its worker claimed from Mill's test queue or, for a module that sets `testBatchFrameworkTasks`, the whole class list the test command gave the worker for its fork group. A run *ran* an assigned class where the run reported a suite of that class.
-- The order of a module's run nodes in the JSON output: in number order, before any other child of the module.
+- Each run node's `number` and `forkGroup`, and the order of a module's run nodes, in the JSON output, as `../JSON-LAYOUT.md` § Tree and § Run nodes define them.
+- The fork group and worker index the test command gives each run. The fork group is the position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives. The *worker index* is the index, counted from 0, under which Mill's test queue starts the worker within its fork group, as in the worker's folder name `worker-<i>`. A fork group that Mill runs in one worker has only worker index 0.
+- Which runs the human-readable output shows, and where it shows the suites of the runs it does not show.
 
 ### Out of scope
 
@@ -37,7 +36,11 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - More than one module selector or module (§ 5).
 - Mill releases other than 1.3.1 (§ 6).
 - `--halt-on-failure` (§ 7).
-- A worker that dies, a run that completes and whose process then exits with a failure, and showing a test class that a worker claimed or was given and that no run reported, or that was left in a fork group's queue (§ 8).
+- A worker that dies (§ 8).
+- A run whose process exits with a failure after the run completes (§ 8).
+- The test command giving the consolidation library each run's assigned test classes (§ 8).
+- Showing a test class that was assigned to a worker and that no run reported (§ 8).
+- Showing a test class left in a fork group's queue (§ 8).
 - Progress output (§ 9).
 - Output captured against a suite, scope or test (§ 10).
 
@@ -46,7 +49,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 This feature meets each requirement below for one module selector and one JVM test module run in every worker Mill 1.3.1's `testForked` starts for it, and with the consolidation library called directly. Where a requirement is followed by a parenthesis, this feature meets only the part the parenthesis names.
 
 - R-053b (fork grouping, test parallelism, the test queue and `testBatchFrameworkTasks`), R-096a (several runs in a module), R-105 (a module's runs and the suites of the runs the human-readable output does not show).
-- R-082, R-074a (each of a module's runs), R-074b (each of a module's runs).
+- R-144, R-074a (each of a module's runs), R-074b (each of a module's runs).
 - R-043, R-087 (the output of each worker, on that worker's run only).
 - R-046c, R-137 (a failure in any worker).
 - R-028 (`forkGroup`, and several run nodes in a module), R-113 (runs given with no fork group).
@@ -59,7 +62,7 @@ Terms the criteria share:
 - *Suite `<S>`* is class `samples.<S>`, an `AnyFunSuite` with one test, `t`, labelled `- t`, which succeeds, unless a scenario says otherwise.
 - The test command is invoked as `mill -j 2 scalatest/test core.test -fJ <report>`, where `<report>` is an absolute path at which nothing exists, unless a scenario says otherwise. *The JSON output* is the JSON value parsed from the file at `<report>`. *The module's runs* are the run nodes in the `contents` of the JSON output's module node.
 - *The human-readable output* is what the test command writes to its stdout, compared without colour codes and without the prefix, such as `1] `, that Mill puts on each line, and *apart from its summary line* means every line but its last. A line is shown with its leading spaces.
-- Where a scenario uses *the library directly*, the consolidation library is called without Mill, with colour off, and is given runs of the module `core.test`. A run is given as its fork group and worker index, where the scenario gives them, and its events in the order fed:
+- Where a scenario uses *the library directly*, the consolidation library is called without Mill, with colour off, and is given runs of the module `core.test`. Each run is given its fork group and worker index where the scenario states them. Each run is given its events in the order the scenario lists them:
   - `suite <S> runs` is a structure for suite `<S>` with one test, `t`, labelled `- t`, followed by `SuiteStarting`, `TestStarting`, `TestSucceeded` and `SuiteCompleted`; `suite <S> runs test <u>` is the same with a test `<u>`, labelled `- <u>`, in place of `t`;
   - `stdout "<line>"` is a line captured from the run's process's stdout;
   - `run ended <how>` is the run's `runEnded` event, where `<how>` is `completed`, `aborted` or `stopped`, after `RunCompleted`, `RunAborted` or `RunStopped` respectively.
@@ -108,12 +111,13 @@ Feature: Every worker of a JVM module
       Then the module's runs are, in order, a run whose `number` is 1 and `forkGroup` is 0, then a run whose `number` is 2 and `forkGroup` is 1
       And the run whose `number` is 1 holds suites `B1` and `B2`, and the run whose `number` is 2 holds suites `A1` and `A2`
 
-    Scenario: AC-004 Workers of one fork group
+    Scenario: AC-004 Two workers in each fork group
       Given the module's `testParallelism` is `true`
-      And each suite's test `t` sleeps for 1 second, then sends an `info` message holding the system property `user.dir`
-      When the test command is invoked
-      Then within each of the module's runs, every `info` message is a path holding one and the same folder `worker-<i>`
-      And of two runs with the same `forkGroup`, the one with the lower `number` has the lower `<i>`
+      And each suite's test `t` sleeps for 3 seconds, then sends an `info` message holding the system property `user.dir`
+      When the test command is invoked as `mill -j 4 scalatest/test core.test -fJ <report>`
+      Then for each `forkGroup`, the module has exactly two runs with that `forkGroup`
+      And within each of the module's runs, every `info` message is a path holding one and the same folder `worker-<i>`
+      And of the two runs with each `forkGroup`, the one with the lower `number` has the lower `<i>`
 ```
 
 ```gherkin
@@ -134,8 +138,8 @@ Feature: A worker given no task
 
 ```gherkin
 Feature: Runs in the human-readable output
-  A run's line, `Run <n>:`, is shown only where the run has output attached, aborted or stopped, or was assigned test classes and ran none of them.
-  The suites of every run whose line is not shown form one list directly under the module's line, ordered by name; a suite that ran more than once appears once for each time it ran, in order of its runs' numbers.
+  A run's line, `Run <n>:`, is shown only where the run aborted or stopped, was assigned test classes and ran none of them, or has output attached to the run itself, such as its worker's stdout.
+  The suites of every run whose line is not shown form one list directly under the module's line, ordered by name. A suite that ran more than once appears once for each time it ran, in order of its runs' numbers.
   Each run whose line is shown follows that list, in order of number, holding its own suites.
 
   Rule: A run that has output attached shows its line; a run that only ran suites does not
@@ -199,13 +203,13 @@ Feature: Runs in the human-readable output
       Then the human-readable output holds the line `  Run 2:` and no line `  Run 1:` or `  Run 3:`
       And the line `  Beta:` sits directly under `[core.test]`
 
-  Rule: The suites of runs that are not shown merge by name; a suite that ran in two runs appears in order of those runs' numbers; shown runs follow in order of number
+  Rule: The suites of runs that are not shown form one list by name, which lists a suite once for each run it ran in; shown runs follow that list in order of number
     Scenario: AC-010 Three hidden runs and two shown
       Given the library directly
       And run 1, fork group 0, worker index 0: `suite Zeta runs`, `suite Alpha runs`, `run ended completed`
       And run 2, fork group 0, worker index 1: `suite Mid runs`, `stdout "two"`, `run ended completed`
       And run 3, fork group 1, worker index 0: `suite Alpha runs test u`, `suite Beta runs`, `run ended completed`
-      And run 10, fork group 1, worker index 7: `suite Last runs`, `stdout "ten"`, `run ended completed`
+      And run 10, fork group 1, worker index 7: `suite Last runs`, `suite Kilo runs`, `stdout "ten"`, `run ended completed`
       And runs 4 to 9, fork group 1, worker indexes 1 to 6: each `run ended completed`, with no assigned class
       And run 3's `Alpha` starts before run 1's `Alpha`
       And the runs are given to the library in the order 10, 3, 9, 8, 7, 6, 5, 4, 2, 1
@@ -226,6 +230,8 @@ Feature: Runs in the human-readable output
               - t
             [stdout] two
           Run 10:
+            Kilo:
+              - t
             Last:
               - t
             [stdout] ten
@@ -245,10 +251,10 @@ Feature: Runs in the JSON output
       And the runs are given to the library in the order 3, 2, 1
       When the library consolidates them
       Then the module's `contents` is, in order:
-        | number | forkGroup | contents      | output       |
-        | 1      | 0         | Alpha, Zeta   | absent       |
-        | 2      | 0         | Mid           | stdout `two` |
-        | 3      | 1         | Alpha, Beta   | absent       |
+        | number | forkGroup | contents, in order | output       |
+        | 1      | 0         | Alpha, Zeta        | absent       |
+        | 2      | 0         | Mid                | stdout `two` |
+        | 3      | 1         | Alpha, Beta        | absent       |
       And each run node writes `number` then `forkGroup` as its second and third keys
 
   Rule: A run given no fork group has no `forkGroup`, and a module's runs given none are numbered in the order they are given
@@ -275,7 +281,7 @@ Feature: Runs in the JSON output
 | R-053b      | AC-001, AC-004, AC-005                         |
 | R-096a      | AC-001, AC-005, AC-011                         |
 | R-105       | AC-003, AC-004, AC-006, AC-007, AC-010, AC-011 |
-| R-082       | AC-005, AC-006, AC-007, AC-008, AC-009, AC-010 |
+| R-144       | AC-005, AC-006, AC-007, AC-008, AC-009, AC-010 |
 | R-074a      | AC-005, AC-011                                 |
 | R-074b      | AC-008                                         |
 | R-043       | AC-013                                         |

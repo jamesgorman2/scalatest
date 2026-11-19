@@ -107,7 +107,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-043 All captured output keeps its order within a node, whatever its source.
 - R-076 Output captured from a forked execution, before any Runner is constructed, is associated with the most specific node that can be identified.
 - R-072 The execution of a runner that is not intended to produce test output, such as Mill's discovery runner, does not create nodes. Its failure state and output is attached to the root node.
-- R-136 The node tree is constructed from the consolidated test commands execution, claim files, and the events emitted by all Runners
+- R-136 The node tree is constructed from the consolidated test command's execution, each process's assigned test classes, and the events emitted by all Runners
 
 ### Outcomes and durations
 
@@ -200,7 +200,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 - R-106a Human-readable output prints each node's label as either the ScalaTest formatted name, or the name of the node.
 - R-106b Human-readable output prints the node tree as with each child indented from its parent
-- R-106c Human-readable output prints the entire tree except:
+- R-106c Human-readable output prints every module, suite, scope and test of the node tree, except:
   - where a filter character removes nodes
   - where a subtree contains identical aborted messages, only the root is printed
 - R-106d Human-readable output prints each nodes outcome and outcome message
@@ -209,9 +209,8 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-106g Human-readable output prints durations only when the `d` formatting character is given
 - R-127a Human-readable output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
 - R-127b Human-readable output omits a scope when all its children have been omitted by filtering characters. This is recursive.
-- R-082 Human-readable output omits the root and run nodes, except:
-  - the root, where the root failed or has output attached;
-  - a run, where the run has output attached, the run aborted or stopped, or the run was assigned test classes and ran none of them.
+- R-143 Human-readable output shows the root only where the root failed or has output attached.
+- R-144 Human-readable output shows a run only where the run has output attached, the run aborted or stopped, or the run was assigned test classes and ran none of them.
 - R-140 Human-readable output starts after the last progress output, if they are enabled together
 - R-141 Human-readable output ends with a summary line that is identical to the last progress output, regardless of whether progress output was enabled.
 

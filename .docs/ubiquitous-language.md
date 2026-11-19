@@ -32,6 +32,10 @@ _Avoid_: Fork, test JVM, subprocess
 One of the sets of test classes a Mill module's `testForkGrouping` divides its tests into. Only the workers of a fork group run that group's classes.
 _Avoid_: Test group, partition
 
+**Assigned test classes**:
+The test classes a process running tests was to run: on the JVM, those its worker claimed from its fork group's queue or, where the module sets `testBatchFrameworkTasks`, the whole class list its worker was given; on Scala.js and Native, every test class of the module. A run *ran* an assigned test class where it reported a suite of that class.
+_Avoid_: Claimed classes, scheduled classes
+
 ## Test structure
 
 **Test structure**:

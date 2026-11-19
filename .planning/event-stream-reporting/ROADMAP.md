@@ -95,16 +95,16 @@ When a JVM worker dies, the consolidated output still contains everything the ru
 
 - the run, and each node it left open, aborted; every scope and test a constructed suite registered shown; the test that ended the process shown;
 - the output captured from the streams of a worker that dies before its first task, or before any run exists in it, attached to the most specific node that can be identified (R-076);
-- the test command compiles each module's test manifest from Mill's queue and claim files, writing no file of its own; with each run, and each process in which no run existed, it gives the library the test classes its worker claimed, tied to the worker by its `processFolder`;
-- each test class claimed by a run that did not finish, or by a process in which no run existed, and reported as a suite by no run, shown once by class name;
+- the test command compiles each module's test manifest from Mill's queue and claim files, writing no file of its own; with each run, and each process in which no run existed, it gives the library its worker's assigned test classes, tied to the worker by its `processFolder`: those the worker's `claim.log` records or, where the module sets `testBatchFrameworkTasks`, the class list the test command gave the worker;
+- each test class assigned to a run that did not finish, or to a process in which no run existed, and reported as a suite by no run, shown once by class name;
 - test classes left in a fork group's queue when its last worker ended shown as not run.
 
 Builds on features 2 and 3.
 
 Enables:
 
-- `SPECIFICATION.md` R-095b, R-102, R-095a (suites, scopes and tests of a run that does not finish; test classes no run reported), R-130c and R-105 (test classes aborted with reason *not run*), R-136 (claim files), R-106c (on a run that does not finish), R-073, R-076, R-082 (a run that failed)
-- `ARCHITECTURE.md` § Modules § Consolidation library (Runs that do not finish), § Modules § Mill plugin (Test command: compiles each module's test manifest; Test manifest, on the JVM), § APIs § The emitter and the Mill plugin (a `processFolder` with no event log file is a worker in which no run existed), § APIs § The Mill plugin and the consolidation library (Add a run and Add a process that ended before any run existed in it: the test classes the process claimed; Add a test class), § Data flow (the module's test classes, on the JVM; failure path)
+- `SPECIFICATION.md` R-095b, R-102, R-095a (suites, scopes and tests of a run that does not finish; test classes no run reported), R-130c and R-105 (test classes aborted with reason *not run*), R-136 (assigned test classes), R-106c (on a run that does not finish), R-073, R-076, R-144 (a run whose worker died)
+- `ARCHITECTURE.md` § Modules § Consolidation library (Runs that do not finish), § Modules § Mill plugin (Test command: compiles each module's test manifest; Test manifest, on the JVM), § APIs § The emitter and the Mill plugin (a `processFolder` with no event log file is a worker in which no run existed), § APIs § The Mill plugin and the consolidation library (Add a run and Add a process that ended before any run existed in it: the test classes the process was assigned; Add a test class), § Data flow (the module's test classes, on the JVM; failure path)
 
 Settles:
 

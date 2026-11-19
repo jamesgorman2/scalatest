@@ -2,6 +2,21 @@
 
 Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
+## A module's runs are numbered by their fork group's position in the module's `testForkGrouping`, then by their worker's index within the fork group.
+
+**Alternatives**
+
+- Numbering runs in the order they start or end makes a run's number depend on scheduling between workers, which differs between runs of the same build.
+- Numbering runs in the order the consolidation library's caller adds them ties the number to how the caller happens to iterate its workers.
+
+**Reasoning** A fork group's position and a worker's index are fixed by the build and by Mill's scheduling rule, not by timing. A suite run in the same worker of the same build therefore sits under the same run number every time, in both outputs.
+
+**Costs** A run's number says nothing of when the run ran. A worker that Mill does not start, as where its fork group's queue is already drained, changes the number of every later run in the module.
+
+**Settled by** [Plan: every worker of a JVM module](https://github.com/jamesgorman2/scalatest/issues/159).
+
+---
+
 ## A run node records its fork group as `forkGroup`, the group's 0-based position in the module's `testForkGrouping`, which the consolidation library's caller gives.
 
 **Alternatives**
@@ -77,7 +92,7 @@ Top-level suites that share a name follow their start order, as R-105 gives for 
 - A run's process ID is not known for a run whose `runStarted` event never arrived, and is not unique where the operating system reuses it.
 - An identifier unique across the whole JSON output, such as a module name joined to a number, repeats the module the tree already gives.
 
-**Reasoning** The human-readable output shows a run as `Run <n>:` under its module, numbered by fork group and then by worker index. Writing that number gives a reader the same name for a run in both outputs, and the tree gives its module.
+**Reasoning** The human-readable output shows a run as `Run <n>:` under its module. Writing that number gives a reader the same name for a run in both outputs, and the tree gives its module.
 
 **Costs** A reader that collects runs across modules must pair each `number` with its module's `name`.
 
