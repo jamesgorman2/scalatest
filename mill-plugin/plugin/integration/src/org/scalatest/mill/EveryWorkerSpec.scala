@@ -153,6 +153,38 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
   }
 
+  Feature("A worker that cannot start") {
+
+    Scenario("The second fork group's worker cannot start") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
+        And("B1's test t writes a testargs file into the second fork group's processFolder, so Mill cannot start a worker there")
+        writeSuite(
+          tester,
+          "B1",
+          """java.nio.file.Files.write(java.nio.file.Paths.get("..", "..", "group-1-samples.A1", "testargs"), Array.emptyByteArray)"""
+        )
+        When("the test command is invoked")
+        val (result, json) = jsonOutputOf(tester)
+
+        Then("the root's failures are exactly one, naming the module and its worker that could not start")
+        val failures = json("failures").arr.map(_("message").str)
+        withClue(result.debugString) {
+          failures should have size 1
+          failures.head should startWith("Starting worker 0 of fork group 1 of core.test failed: ")
+        }
+
+        And("the module's runs are exactly one run, whose forkGroup is 0 and which holds suites B1 and B2")
+        runs(json).map(run => (run("forkGroup").num.toInt, suiteNames(run))) shouldBe Seq((0, Seq("B1", "B2")))
+
+        And("the test command fails")
+        withClue(result.debugString) {
+          result.succeeded shouldBe false
+        }
+      }
+    }
+  }
+
   Feature("Fork groups that would share a processFolder") {
 
     Scenario("Two fork groups each hold only the same class") {

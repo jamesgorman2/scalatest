@@ -21,14 +21,14 @@ private[mill] final class JvmTestModuleRun(
 
   /**
    * Times the module from just before its first worker starts until its last worker has ended and its event log is read.
-   * Where two workers would share a `processFolder`, none starts: the failure is attached to the root naming the module,
-   * and the module stays in the output with no times and no run.
+   * Where two workers would share a `processFolder`, or checking whether the filesystem ignores case fails, none starts:
+   * the failure is attached to the root naming the module, and the module stays in the output with no times and no run.
    */
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     QueueWorker
-      .forEachForkGroup(inputs.forkGroups, discoveredTestClasses(), filesystemIgnoresCase())
+      .forEachForkGroup(inputs.forkGroups, discoveredTestClasses(), () => filesystemIgnoresCase())
       .fold(
         reason => {
           consolidation.addRootFailure(s"Laying out the workers of ${label.value} failed: $reason")
@@ -60,15 +60,16 @@ private[mill] final class JvmTestModuleRun(
       )(using ctx)
       .toSet
 
-  private def filesystemIgnoresCase(): Boolean = {
-    val probe = moduleFolder / "case-probe"
-    os.write(probe, "")
-    try {
-      os.exists(moduleFolder / "CASE-PROBE")
-    } finally {
-      os.remove(probe)
-    }
-  }
+  private def filesystemIgnoresCase(): Either[String, Boolean] =
+    Try {
+      val probe = moduleFolder / "case-probe"
+      os.write(probe, "")
+      try {
+        os.exists(moduleFolder / "CASE-PROBE")
+      } finally {
+        os.remove(probe)
+      }
+    }.toEither.left.map(throwable => s"checking whether the filesystem ignores case failed: $throwable")
 
   private def processFolder(worker: QueueWorker): os.Path = moduleFolder / worker.processFolder
 

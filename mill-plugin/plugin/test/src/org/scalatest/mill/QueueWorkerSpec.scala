@@ -22,7 +22,7 @@ final class QueueWorkerSpec extends AnyWordSpec with should.Matchers {
       discovered: Set[String],
       filesystemIgnoresCase: Boolean = false
   ): Either[String, Seq[QueueWorker]] =
-    QueueWorker.forEachForkGroup(forkGroups, discovered, filesystemIgnoresCase)
+    QueueWorker.forEachForkGroup(forkGroups, discovered, () => Right(filesystemIgnoresCase))
 
   "Laying out the workers of a module's fork groups" when {
     "the module has one fork group" should {
@@ -111,6 +111,34 @@ final class QueueWorkerSpec extends AnyWordSpec with should.Matchers {
         "give each group's worker a folder of its own" in {
           workersOf(Seq(Seq("samples.A1"), Seq("samples.a1")), Set("samples.A1", "samples.a1")).map(_.map(_.processFolder)) shouldBe Right(
             Seq(Seq("samples.A1"), Seq("samples.a1"))
+          )
+        }
+      }
+    }
+
+    "checking whether the filesystem ignores case fails" when {
+      val failingCheck: () => Either[String, Boolean] = () => Left("checking whether the filesystem ignores case failed: disk full")
+
+      "two fork groups hold a discovered class" should {
+        "give no worker, giving why the check failed" in {
+          QueueWorker.forEachForkGroup(Seq(Seq("samples.B1"), Seq("samples.A1")), discovered, failingCheck) shouldBe Left(
+            "checking whether the filesystem ignores case failed: disk full"
+          )
+        }
+      }
+
+      "one fork group holds a discovered class" should {
+        "give that group's worker, without checking" in {
+          QueueWorker.forEachForkGroup(Seq(Seq("samples.Gone"), Seq("samples.A1")), discovered, failingCheck) shouldBe Right(
+            Seq(QueueWorker(firstWorkerOf(1), Nil, Seq("samples.A1")))
+          )
+        }
+      }
+
+      "no fork group holds a discovered class" should {
+        "give one worker of fork group 0 no class, without checking" in {
+          QueueWorker.forEachForkGroup(Seq(Seq("samples.Gone")), discovered, failingCheck) shouldBe Right(
+            Seq(QueueWorker(firstWorkerOf(0), Nil, Nil))
           )
         }
       }

@@ -30,14 +30,15 @@ private[mill] object QueueWorker {
    * teardown.
    *
    * @param filesystemIgnoresCase whether the filesystem holding the `processFolder`s ignores case, so that folder names
-   *                              differing only in case name one folder
-   * @return why the workers cannot run, where two of them would share a `processFolder`; Mill's `testForked` fails there
-   *         too, since a folder's second worker cannot start
+   *                              differing only in case name one folder, or why that is unknown; asked only where two or
+   *                              more groups hold a discovered class
+   * @return why the workers cannot run: where two of them would share a `processFolder`, which Mill's `testForked` fails
+   *         on too, since a folder's second worker cannot start; or where `filesystemIgnoresCase` gives no answer
    */
   def forEachForkGroup(
       forkGroups: Seq[Seq[String]],
       discovered: Set[String],
-      filesystemIgnoresCase: Boolean
+      filesystemIgnoresCase: () => Either[String, Boolean]
   ): Either[String, Seq[QueueWorker]] = {
     val groupsToRun = forkGroups.map(_.filter(discovered)).zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     groupsToRun match {
@@ -48,7 +49,7 @@ private[mill] object QueueWorker {
         val workers = groups.zipWithIndex.map { case ((classes, position), folderIndex) =>
           QueueWorker(firstWorkerOf(position), Seq(groupFolderName(classes, folderIndex, folderIndexLength)), classes)
         }
-        sharedProcessFolders(workers, filesystemIgnoresCase).toLeft(workers)
+        filesystemIgnoresCase().flatMap(ignoresCase => sharedProcessFolders(workers, ignoresCase).toLeft(workers))
     }
   }
 
