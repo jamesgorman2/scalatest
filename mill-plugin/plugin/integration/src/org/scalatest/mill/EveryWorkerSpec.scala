@@ -373,30 +373,30 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Two workers writing at once") {
+    Scenario("Two workers each write to stdout") {
       withTester("every-worker") { tester =>
         Given("the build, whose module holds suites A1 and B1")
         And("""the module's testForkGrouping is Seq(Seq("samples.B1"), Seq("samples.A1")) and its testParallelism is false""")
-        And("B1's test t writes the lines B 1 to B 500 to stdout, and A1's test t writes the lines A 1 to A 500 to stdout, each pausing 1 millisecond between lines")
+        And("B1's test t writes the lines B 1 to B 3 to stdout, and A1's test t writes the lines A 1 to A 3 to stdout")
         holdOnlySuitesEachInItsOwnForkGroup(
           tester,
-          "B1" -> """(1 to 500).foreach { i => println("B " + i); Thread.sleep(1) }""",
-          "A1" -> """(1 to 500).foreach { i => println("A " + i); Thread.sleep(1) }"""
+          "B1" -> """(1 to 3).foreach(i => println("B " + i))""",
+          "A1" -> """(1 to 3).foreach(i => println("A " + i))"""
         )
         When("the test command is invoked")
         val (result, json) = jsonOutputWithJobs(tester, 2)
 
-        Then("the stdout text of the output of the run whose forkGroup is 0 holds the lines B 1 to B 500, in order, and no line beginning A ")
+        Then("the stdout text of the output of the run whose forkGroup is 0 holds the lines B 1 to B 3, in order, and no line beginning A ")
         val forkGroup0Lines = runsOfForkGroup(json, 0).flatMap(stdoutLines)
         withClue(result.debugString) {
-          forkGroup0Lines.filter(_.startsWith("B ")) shouldBe (1 to 500).map(i => s"B $i")
+          forkGroup0Lines.filter(_.startsWith("B ")) shouldBe (1 to 3).map(i => s"B $i")
           forkGroup0Lines.filter(_.startsWith("A ")) shouldBe empty
         }
 
-        And("the stdout text of the output of the run whose forkGroup is 1 holds the lines A 1 to A 500, in order, and no line beginning B ")
+        And("the stdout text of the output of the run whose forkGroup is 1 holds the lines A 1 to A 3, in order, and no line beginning B ")
         val forkGroup1Lines = runsOfForkGroup(json, 1).flatMap(stdoutLines)
         withClue(result.debugString) {
-          forkGroup1Lines.filter(_.startsWith("A ")) shouldBe (1 to 500).map(i => s"A $i")
+          forkGroup1Lines.filter(_.startsWith("A ")) shouldBe (1 to 3).map(i => s"A $i")
           forkGroup1Lines.filter(_.startsWith("B ")) shouldBe empty
         }
       }

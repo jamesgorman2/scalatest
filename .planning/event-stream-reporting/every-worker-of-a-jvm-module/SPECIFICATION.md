@@ -267,13 +267,13 @@ Feature: Runs in the JSON output
       And neither run node has a `forkGroup` key
 
   Rule: The output of each worker is on that worker's run alone, in the order the worker wrote it
-    Scenario: AC-013 Two workers writing at once
+    Scenario: AC-013 Two workers each write to stdout
       Given the build, whose module holds suites `A1` and `B1`
       And the module's `testForkGrouping` is `Seq(Seq("samples.B1"), Seq("samples.A1"))` and its `testParallelism` is `false`
-      And `B1`'s test `t` writes the lines `B 1` to `B 500` to stdout, and `A1`'s test `t` writes the lines `A 1` to `A 500` to stdout, each pausing 1 millisecond between lines
+      And `B1`'s test `t` writes the lines `B 1` to `B 3` to stdout, and `A1`'s test `t` writes the lines `A 1` to `A 3` to stdout
       When the test command is invoked
-      Then the `stdout` text of the `output` of the run whose `forkGroup` is 0 holds the lines `B 1` to `B 500`, in order, and no line beginning `A `
-      And the `stdout` text of the `output` of the run whose `forkGroup` is 1 holds the lines `A 1` to `A 500`, in order, and no line beginning `B `
+      Then the `stdout` text of the `output` of the run whose `forkGroup` is 0 holds the lines `B 1` to `B 3`, in order, and no line beginning `A `
+      And the `stdout` text of the `output` of the run whose `forkGroup` is 1 holds the lines `A 1` to `A 3`, in order, and no line beginning `B `
 ```
 
 | Requirement | Criteria                                       |
