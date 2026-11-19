@@ -41,7 +41,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("Every worker of a JVM module") {
 
-    Scenario("AC-001 testParallelism false, testBatchFrameworkTasks false, testSandboxWorkingDir true") {
+    Scenario("testParallelism false, testBatchFrameworkTasks false, testSandboxWorkingDir true") {
       withTester("every-worker") { tester =>
         Given("the build, whose module holds suites A1, A2, B1 and B2")
         And("""the module's testForkGrouping is Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2")) and its testParallelism is false""")
@@ -61,7 +61,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("AC-003 The first fork group's run ends last") {
+    Scenario("The first fork group's run ends last") {
       withTester("every-worker") { tester =>
         Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
         And("B1's test t sleeps for 3 seconds before it succeeds")
@@ -128,9 +128,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
   }
 
-  Feature("A worker given no task") {
+  Feature("A module with no test class") {
 
-    Scenario("AC-005 No test class") {
+    Scenario("No test class") {
       withTester("every-worker") { tester =>
         Given("the build, whose module holds no test class")
         os.remove.all(samples(tester))

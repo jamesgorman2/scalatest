@@ -7,10 +7,10 @@ import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 
 /**
- * A worker the test command starts through Mill's test queue, one for each fork group, as Mill 1.3.1's `testForked`
- * starts with test parallelism off.
+ * A worker the test command starts through Mill's test queue, one for each fork group holding a test class, as Mill
+ * 1.3.1's `testForked` starts with test parallelism off.
  *
- * @param forkGroupAndIndex the worker's fork group and its index within that group, as the run it runs is added with
+ * @param forkGroupAndIndex the worker's fork group and its index within that group, which label the worker's run
  * @param processFolder the worker's `processFolder`, as path segments under the module's folder: the folder Mill's
  *                      `testForked` would give the worker, under its own `Task.dest`
  * @param testClasses the classes of its fork group's queue
@@ -29,11 +29,10 @@ private[mill] object QueueWorker {
    * discovered class, one worker of fork group 0 is given no class, as Mill starts one to run the framework's setup and
    * teardown.
    *
-   * @param filesystemIgnoresCase whether the filesystem holding the `processFolder`s ignores case, so that folder names
-   *                              differing only in case name one folder, or why that is unknown; asked only where two or
-   *                              more groups hold a discovered class
-   * @return why the workers cannot run: where two of them would share a `processFolder`, which Mill's `testForked` fails
-   *         on too, since a folder's second worker cannot start; or where `filesystemIgnoresCase` gives no answer
+   * @param filesystemIgnoresCase whether the filesystem holding the `processFolder`s is case-insensitive, or why that is
+   *                              unknown. Asked only where two or more groups hold a discovered class.
+   * @return the workers, or why they cannot run: two would share a `processFolder` (Mill's `testForked` fails there too,
+   *         as a folder's second worker cannot start), or `filesystemIgnoresCase` gave no answer.
    */
   def forEachForkGroup(
       forkGroups: Seq[Seq[String]],

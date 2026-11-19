@@ -21,8 +21,8 @@ private[mill] final class JvmTestModuleRun(
 
   /**
    * Times the module from just before its first worker starts until its last worker has ended and its event log is read.
-   * Where two workers would share a `processFolder`, or checking whether the filesystem ignores case fails, none starts:
-   * the failure is attached to the root naming the module, and the module stays in the output with no times and no run.
+   * Where two workers would share a `processFolder`, or checking whether the filesystem ignores case fails, none starts.
+   * A failure naming the module is attached to the root, and the module stays in the output with no times and no run.
    */
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)

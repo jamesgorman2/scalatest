@@ -8,7 +8,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
-- The module's tests run through Mill's test queue in one worker for each of its fork groups that holds a test class, one worker after another, as Mill's `testForked` runs them with `testParallelism` off, whatever the module's own `testParallelism`. A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
+- The module's tests run through Mill's test queue, in one worker for each fork group that holds a test class. The workers run one after another, as Mill's `testForked` runs them with `testParallelism` off, whatever the module's own `testParallelism`. A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
 
@@ -103,8 +103,8 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- two of the module's fork groups would run in one folder, as where each holds only the same test class, or, on a filesystem that ignores case, only classes whose names differ only in case. No test runs;
-- two or more of the module's fork groups hold a test class, and checking whether the filesystem ignores case fails. No test runs;
+- two of the module's fork groups would share a `processFolder`, as where each holds only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test runs;
+- two or more of the module's fork groups hold a test class, and the test command cannot tell whether the filesystem is case-insensitive. No test runs;
 - the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
