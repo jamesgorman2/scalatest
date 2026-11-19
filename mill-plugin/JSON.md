@@ -126,7 +126,7 @@ A piece of captured output is an item of an `output`: a line captured from a pro
 - `stream` — `stdout` or `stderr`.
 - `text` — the line as written, with its line terminator if it has one.
 
-Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream. Where starting or running the run's worker failed (§ Root), its output can lack an unterminated last line of each stream. No `output` holds Mill's list of failed tests or ScalaTest's end-of-run summary.
+Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream. Where starting or running the run's worker failed (§ Root), its output can lack an unterminated last line of each stream, and anything its process wrote after the module's last worker ended. No `output` holds Mill's list of failed tests or ScalaTest's end-of-run summary.
 
 ## Throwables
 

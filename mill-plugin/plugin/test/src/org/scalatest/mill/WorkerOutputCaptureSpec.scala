@@ -53,5 +53,24 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
         lines shouldBe Seq(CapturedLine.Stdout("last out"), CapturedLine.Stderr("last err"))
       }
     }
+
+    "capturing has stopped" should {
+      "drop each line completed after, passing none to the run" in {
+        val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
+        val lines = linesOfRunAddedTo(capture)
+        stdout(capture, "before\n")
+        capture.stopCapturing()
+        stdout(capture, "after\n")
+        stderr(capture, "after\n")
+        lines shouldBe Seq(CapturedLine.Stdout("before\n"))
+      }
+      "drop the lines it held before the run is named" in {
+        val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
+        stdout(capture, "held\n")
+        capture.stopCapturing()
+        stdout(capture, "after\n")
+        linesOfRunAddedTo(capture) shouldBe empty
+      }
+    }
   }
 }

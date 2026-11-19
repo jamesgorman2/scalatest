@@ -1,5 +1,6 @@
 package org.scalatest.mill
 
+import java.util.concurrent.ExecutionException
 import org.scalatest.consolidation.Consolidation
 import scala.concurrent.Future
 import scala.util.Failure
@@ -51,16 +52,25 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
           throw fatal
       }
     // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as where Mill
-    // cancels the task, can leave its process and those threads running, so its streams are left unended.
+    // cancels the task, can leave its process and those threads running, so its streams are left unended until
+    // `WorkerRun.endEach` stops capturing them.
     ended.foreach(_ => capture.endStreams())
     // A worker whose end is unknown may have started a process.
     val reading = Try(reader.awaitStreamEnd(startedAProcess = ended.getOrElse(true)))
-    ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: $throwable"))
+    ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
   }
 
-  /** Lets the reader end without waiting for the worker or the reader, as where another worker threw a fatal throwable. */
-  def abandon(): Unit = reader.abandon()
+  /**
+   * Lets the reader end without waiting for the worker or the reader, and stops capturing the worker's output, as where
+   * another worker threw a fatal throwable.
+   */
+  def abandon(): Unit = {
+    reader.abandon()
+    stopCapturing()
+  }
+
+  private def stopCapturing(): Unit = capture.stopCapturing()
 
   private def endOf(workerEnd: Future[Boolean]): Try[Boolean] =
     workerEnd.value.getOrElse(Failure(new IllegalStateException(s"$workerName had not ended once awaited")))
@@ -84,21 +94,33 @@ private[mill] object WorkerRun {
     }
 
   /**
-   * Ends each worker in turn. A fatal throwable from ending one is rethrown, once the workers not yet ended are
-   * abandoned.
+   * Ends each worker in turn, then stops capturing every worker's output, so output a failed worker goes on writing
+   * reaches no ended run. A fatal throwable from ending one is rethrown, once the workers not yet ended are abandoned.
    *
    * @param awaitWorker returns once the worker has ended
    */
   def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[Boolean] => Unit): Unit =
-    workerRuns.tails.foreach {
-      case workerRun +: notYetEnded =>
-        try {
-          workerRun.end(awaitWorker)
-        } catch {
-          case fatal: Throwable =>
-            notYetEnded.foreach(_.abandon())
-            throw fatal
-        }
-      case _ => ()
+    try {
+      workerRuns.tails.foreach {
+        case workerRun +: notYetEnded =>
+          try {
+            workerRun.end(awaitWorker)
+          } catch {
+            case fatal: Throwable =>
+              notYetEnded.foreach(_.abandon())
+              throw fatal
+          }
+        case _ => ()
+      }
+    } finally {
+      workerRuns.foreach(_.stopCapturing())
+    }
+
+  // A Scala Promise fails with an InterruptedException or an Error boxed in an ExecutionException with this message,
+  // which names neither.
+  private def unboxed(throwable: Throwable): Throwable =
+    throwable match {
+      case boxed: ExecutionException if boxed.getMessage == "Boxed Exception" && boxed.getCause != null => boxed.getCause
+      case other => other
     }
 }

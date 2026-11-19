@@ -168,7 +168,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             "    Run 1:",
             "      [stdout] partial rest",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 1 of core.test failed: java.util.concurrent.ExecutionException: Boxed Exception"
+            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.InterruptedException: sleep interrupted"
           )
         }
       }
@@ -330,6 +330,21 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             }
             eventually(first.processesEndedBeforeAnyRun.get shouldBe 1)
           }
+        }
+      }
+    }
+  }
+
+  "Ending each worker" when {
+    "a worker started on a future failed, and its process goes on writing after the consolidation has ended" should {
+      "drop that output, throwing nothing" in {
+        withEventLogFile { file =>
+          writeCompletedRun(file)
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.workerRun.start(Future.failed(new InterruptedException("sleep interrupted")))
+          WorkerRun.endEach(Seq(fixture.workerRun))(workerEnd => Await.ready(workerEnd, Duration.Inf))
+          fixture.consolidation.end()
+          noException should be thrownBy writeStdout(fixture.capture, "late\n")
         }
       }
     }
