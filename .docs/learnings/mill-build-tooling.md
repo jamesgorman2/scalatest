@@ -160,7 +160,7 @@ A plugin that must start the same processes calls the public `callTestRunnerSubp
 <learning>
 date: 2026-11-19
 ---
-In Mill 1.3.1, a test worker's process folder is `<task>.dest` with one fork group or `<task>.dest/<group folder>` with several, plus `worker-<i>` where `testParallelism` is on and the module selects more than one test class in total; under `testBatchFrameworkTasks`, never `worker-<i>`. Where `testSandboxWorkingDir` is true (the default), the worker JVM starts in `<process folder>/sandbox`.
+In Mill 1.3.1, a test worker's process folder is `<task>.dest` with one fork group or `<task>.dest/<group folder>` with several, plus `worker-<i>` where `testParallelism` is on and the module selects anything other than exactly one test class in total (zero classes included); under `testBatchFrameworkTasks`, never `worker-<i>`. Where `testSandboxWorkingDir` is true (the default), the worker JVM starts in `<process folder>/sandbox`.
 
 A testkit `IntegrationTester` defaults `baseWorkspacePath` to `os.pwd` and, unless `MILL_TEST_SHARED_OUTPUT_DIR` is set, puts each test build's workspace in a new `baseWorkspacePath/run-<n>` folder. With both defaults, an integration test run by an outer build's `testForked` puts the test build's workspace at `<outer process folder>/sandbox/run-<n>`, and the test build's own workers run under that workspace's `out` folder by the same rules.
 
