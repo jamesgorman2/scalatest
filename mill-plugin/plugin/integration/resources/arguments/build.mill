@@ -9,5 +9,6 @@ object core extends ScalaModule {
 
   object test extends ScalaTests, TestModule.ScalaTest {
     def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+    def testParallelism = false
   }
 }

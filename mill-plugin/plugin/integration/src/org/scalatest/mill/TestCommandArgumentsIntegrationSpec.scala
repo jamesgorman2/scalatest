@@ -37,18 +37,6 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       test(tester)
     }
 
-  // On Windows, Mill's test queue can run one class in two workers, so the module's suites run in one worker to give
-  // the same human-readable output on every invocation.
-  private def turnOffTestParallelism(tester: IntegrationTester): Unit = {
-    val buildFile = tester.workspacePath / "build.mill"
-    val testModule = "object test extends ScalaTests, TestModule.ScalaTest {"
-    val build = os.read(buildFile)
-    withClue(s"the build file holds no line $testModule:\n$build\n") {
-      build should include(testModule)
-    }
-    os.write.over(buildFile, build.replace(testModule, s"$testModule\n    def testParallelism = false"))
-  }
-
   Feature("The test command's output arguments") {
 
     for ((what, outputArguments) <- Seq("no -o" -> Nil, "-oH" -> Seq("-oH"))) {
@@ -189,7 +177,6 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         And("the module's testParallelism is false")
         When("the test command runs core.test, and runs it again with the module's own arguments removed")
         val (result, withoutArguments) = withSuites(moduleArguments*)("CalculatorSuite", "OtherSuite") { tester =>
-          turnOffTestParallelism(tester)
           val result = runTestCommand(tester, "core.test")
           val buildFile = tester.workspacePath / "build.mill"
           os.write.over(buildFile, os.read(buildFile).linesIterator.filterNot(_.contains("testArgsDefault")).mkString("\n"))

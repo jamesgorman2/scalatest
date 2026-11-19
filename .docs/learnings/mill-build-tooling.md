@@ -160,15 +160,17 @@ A plugin that must start the same processes calls the public `callTestRunnerSubp
 <learning>
 date: 2026-11-19
 ---
-An integration test run by an outer Mill build's `testForked` (Mill 1.3.1) runs inside that build's own worker folder, `<task>.dest/worker-<NN>/sandbox/...`. A path taken from the test build's processes, such as `user.dir`, therefore holds two `worker-<i>` segments: the outer build's first, the test build's last.
+An integration test run by an outer Mill build's `testForked` (Mill 1.3.1) runs inside that build's own worker folder, `<task>.dest/worker-<NN>/sandbox/...`. A path taken from the test build's processes, such as `user.dir`, therefore holds the outer build's `worker-<i>` segment.
 
-Reading the first `worker-<i>` segment silently reports the outer worker for every run. Take the innermost (last) segment.
+The test build adds a `worker-<i>` folder of its own only on Mill's parallel queue path: `testParallelism` on, more than one class in the fork group, and no `testBatchFrameworkTasks`. Otherwise its worker runs in the group folder, and the only `worker-<i>` segment in the path is the outer build's.
+
+Reading the first or the last `worker-<i>` segment of the whole path can silently report the outer worker. Read the segment from the part of the path after the test build's workspace path; where there is none, the worker ran in its group folder.
 </learning>
 
 <learning>
 date: 2026-11-19
 ---
-On Windows, Mill 1.3.1's test queue sometimes runs one test class in two workers: both workers write a `CLAIM` for it in their `claim.log`. Which worker also runs the other classes varies between runs, and the race rarely shows when a scenario runs alone.
+Under `testParallelism`, Mill 1.3.1's test queue varies between runs on every platform: whether a fork group's classes run in one worker or are split across two, and so which run holds which class. On Windows, the queue also sometimes runs one test class in two workers: both workers write a `CLAIM` for it in their `claim.log`. That race rarely shows when a scenario runs alone.
 
 An integration test that compares output across runs, or expects a fixed number of runs, must not depend on the queue under `testParallelism` (Mill's default is true). Set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
 </learning>
