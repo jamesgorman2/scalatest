@@ -118,9 +118,10 @@ private[consolidation] enum RunOutput {
  * Builds one run's test structure from its event stream as the stream arrives. It keeps each node's structure by
  * node path, and the node's executions separately, by execution index.
  *
- * @param number the run's place, from 1, among its module's runs in the order they were added
+ * @param forkGroup the run's fork group, where the caller gave one
+ * @param workerIndex the index of the run's worker within its fork group, where the caller gave one
  */
-private[consolidation] final class RunAssembly(val label: TestRunLabel, val number: Int) {
+private[consolidation] final class RunAssembly(val label: TestRunLabel, val forkGroup: Option[ForkGroup], val workerIndex: Option[WorkerIndex]) {
 
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
   private val childIds = mutable.Map.empty[NodeId, mutable.Set[NodeId]]

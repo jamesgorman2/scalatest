@@ -1,0 +1,60 @@
+package org.scalatest.consolidation
+
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+
+final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
+
+  private val module = TestRunLabel("core.test")
+
+  private def runIn(forkGroup: Int, workerIndex: Int): RunAssembly =
+    new RunAssembly(module, Some(ForkGroup(forkGroup)), Some(WorkerIndex(workerIndex)))
+
+  private def runInNoWorker(): RunAssembly = new RunAssembly(module, None, None)
+
+  private def numbersOf(runs: Vector[RunAssembly]): Vector[(Int, RunAssembly)] =
+    ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))
+
+  "A module's runs" when {
+    "each given a fork group and a worker index" should {
+      "be numbered from 1 by fork group, then by worker index, whatever order they were added in" in {
+        val first = runIn(0, 0)
+        val second = runIn(0, 1)
+        val third = runIn(1, 0)
+        numbersOf(Vector(third, second, first)) shouldBe Vector(1 -> first, 2 -> second, 3 -> third)
+      }
+      "compare worker indexes as numbers" in {
+        val second = runIn(0, 10)
+        val first = runIn(0, 2)
+        numbersOf(Vector(second, first)) shouldBe Vector(1 -> first, 2 -> second)
+      }
+      "compare fork groups as numbers" in {
+        val second = runIn(10, 0)
+        val first = runIn(2, 0)
+        numbersOf(Vector(second, first)) shouldBe Vector(1 -> first, 2 -> second)
+      }
+      "keep the order they were added in where two share a fork group and worker index" in {
+        val first = runIn(0, 0)
+        val second = runIn(0, 0)
+        numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
+      }
+    }
+    "given no fork group" should {
+      "be numbered in the order they were added" in {
+        val first = runInNoWorker()
+        val second = runInNoWorker()
+        numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
+      }
+      "be numbered in the order they were added, whatever worker index they were given" in {
+        val first = new RunAssembly(module, None, Some(WorkerIndex(1)))
+        val second = new RunAssembly(module, None, Some(WorkerIndex(0)))
+        numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
+      }
+      "come before the runs given one" in {
+        val withForkGroup = runIn(0, 0)
+        val withoutForkGroup = runInNoWorker()
+        numbersOf(Vector(withForkGroup, withoutForkGroup)) shouldBe Vector(1 -> withoutForkGroup, 2 -> withForkGroup)
+      }
+    }
+  }
+}

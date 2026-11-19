@@ -55,10 +55,11 @@ private[consolidation] object HumanReadableWriter {
     if (failures.isEmpty) Vector.empty
     else linesOf(rootAbortedLine, depth, AnsiRed) ++ failures.flatMap(linesOf(_, depth + 1, AnsiRed))
 
-  private def runLines(run: RunAssembly, depth: Int): Vector[OutputLine] = {
+  private def runLines(numbered: ConsolidatedRun, depth: Int): Vector[OutputLine] = {
+    val run = numbered.assembly
     val outputAndEnd = run.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(run, depth + 1)
     if (outputAndEnd.isEmpty) run.topLevelSuites.flatMap(nodeLines(_, depth))
-    else linesOf(s"Run ${run.number}:", depth, AnsiCyan) ++ run.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++ outputAndEnd
+    else linesOf(s"Run ${numbered.number}:", depth, AnsiCyan) ++ run.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++ outputAndEnd
   }
 
   private def outputLines(output: RunOutput, depth: Int): Vector[OutputLine] =

@@ -172,29 +172,30 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    {green}- sqrt of a square is the root{reset}""".stripExpectedMargin
     }
 
-    Scenario("Each run of a module shows its own suites and output under its own line, numbered in the order the runs were added") {
-      Given("two runs of one module, each with a suite and a stdout line, the first run's suite sorting after the second's")
-      def run(suite: String, line: String): Vector[TestRunPart] =
-        Vector(
-          TestRunPart.Events(
-            s"""
-            run started
-            structure
-              suite "$suite", class "samples.$suite"
-                test "runs", label "- runs"
-            suite "$suite": SuiteStarting
-            test "runs": TestStarting
-            test "runs": TestSucceeded
-            suite "$suite": SuiteCompleted
-            """
-          ),
-          TestRunPart.CapturedLine(CapturedStream.Stdout, line),
-          TestRunPart.Events("run ended completed")
-        )
+    def runWithLine(suite: String, line: String): Vector[TestRunPart] =
+      Vector(
+        TestRunPart.Events(
+          s"""
+          run started
+          structure
+            suite "$suite", class "samples.$suite"
+              test "runs", label "- runs"
+          suite "$suite": SuiteStarting
+          test "runs": TestStarting
+          test "runs": TestSucceeded
+          suite "$suite": SuiteCompleted
+          """
+        ),
+        TestRunPart.CapturedLine(CapturedStream.Stdout, line),
+        TestRunPart.Events("run ended completed")
+      )
+
+    Scenario("Each run of a module given no fork group shows its own suites and output under its own line, numbered in the order the runs were added") {
+      Given("two runs of one module given no fork group, each with a suite and a stdout line, the first run's suite sorting after the second's")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, run("ZetaSuite", "from the first run")*).endEventStream()
-      addRun(consolidation, run("AlphaSuite", "from the second run")*).endEventStream()
+      addRun(consolidation, runWithLine("ZetaSuite", "from the first run")*).endEventStream()
+      addRun(consolidation, runWithLine("AlphaSuite", "from the second run")*).endEventStream()
 
       When("the library consolidates them")
       consolidation.end()
@@ -210,6 +211,34 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    {green}AlphaSuite:{reset}
           |      {green}- runs{reset}
           |    [stdout] from the second run""".stripExpectedMargin
+    }
+
+    Scenario("A run's line shows its number by fork group, then worker index, whatever order the runs were added in") {
+      Given("a run in fork group 1, worker index 0, then a run in fork group 0, worker index 1, then a run in fork group 0, worker index 0, each with a suite and a stdout line")
+      val output = new OutputSink
+      val consolidation = Consolidation.start(output, coloured = true)
+      addRunInWorker(consolidation, 1, 0, runWithLine("FirstAdded", "from fork group 1, worker 0")*).endEventStream()
+      addRunInWorker(consolidation, 0, 1, runWithLine("SecondAdded", "from fork group 0, worker 1")*).endEventStream()
+      addRunInWorker(consolidation, 0, 0, runWithLine("ThirdAdded", "from fork group 0, worker 0")*).endEventStream()
+
+      When("the library consolidates them")
+      consolidation.end()
+
+      Then("the module shows Run 1: for the last run added, Run 2: for the second and Run 3: for the first")
+      output.colourMarkedTree shouldBe
+        """{cyan}[core.test]{reset}
+          |  {cyan}Run 1:{reset}
+          |    {green}ThirdAdded:{reset}
+          |      {green}- runs{reset}
+          |    [stdout] from fork group 0, worker 0
+          |  {cyan}Run 2:{reset}
+          |    {green}SecondAdded:{reset}
+          |      {green}- runs{reset}
+          |    [stdout] from fork group 0, worker 1
+          |  {cyan}Run 3:{reset}
+          |    {green}FirstAdded:{reset}
+          |      {green}- runs{reset}
+          |    [stdout] from fork group 1, worker 0""".stripExpectedMargin
     }
 
     Scenario("A run keeps its number when an earlier run of its module shows no line") {

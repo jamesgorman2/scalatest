@@ -71,13 +71,15 @@ private[consolidation] object JsonOutputWriter {
       "duration" -> times.duration.map(JsonValue.Integer(_))
     )
 
-  private def runNode(run: RunAssembly): JsonValue = {
+  private def runNode(numbered: ConsolidatedRun): JsonValue = {
+    val run = numbered.assembly
     val starting = run.runStarting
     val closing = run.closing
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text("run")),
-        "number" -> Some(JsonValue.Integer(run.number.toLong)),
+        "number" -> Some(JsonValue.Integer(numbered.number.toLong)),
+        "forkGroup" -> run.forkGroup.map(forkGroup => JsonValue.Integer(forkGroup.position.toLong)),
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
         "configMap" -> starting.map(started => configMapObject(started.configMap)),
         "discovery" -> run.discovery.map(discoveryObject),

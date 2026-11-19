@@ -28,16 +28,20 @@ final class Consolidation private (
   def state: ConsolidationState = currentState
 
   /**
-   * The run's event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in
-   * the order they are added, and a run's line in the human-readable output shows its number.
+   * The run's event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in ascending
+   * order of fork group, then of worker index; runs given no fork group come first, in the order they are added. Numbers are
+   * fixed when the consolidation ends, so a run added later can renumber earlier ones. A run's line in the
+   * human-readable output, and its run node in the JSON output, show its number.
    *
    * @param label the run's module, which heads the module's line in the human-readable output
+   * @param forkGroup the position of the run's fork group, which the JSON output records on the run's node
+   * @param workerIndex the index of the run's worker within its fork group, which orders the run and is not recorded
    * @throws IllegalArgumentException if the consolidation has ended
    */
-  def addRun(label: TestRunLabel): RunFeed =
+  def addRun(label: TestRunLabel, forkGroup: Option[ForkGroup] = None, workerIndex: Option[WorkerIndex] = None): RunFeed =
     synchronized {
       requireOpen()
-      val run = new RunAssembly(label, runs.count(_.label == label) + 1)
+      val run = new RunAssembly(label, forkGroup, workerIndex)
       runs += run
       new RunFeed(this, run)
     }
@@ -113,7 +117,7 @@ final class Consolidation private (
   private def root(endedAt: Option[Instant]): ConsolidatedRoot = {
     val runsByModule = runs.toVector.groupBy(_.label)
     val modules = (runsByModule.keySet ++ moduleTimes.keySet).toVector.sortBy(_.value).map { module =>
-      ConsolidatedModule(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty).sortBy(_.number))
+      ConsolidatedModule.of(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty))
     }
     ConsolidatedRoot(buildTool, moduleSelectors, rootFailures.toVector, MeasuredTimes(startedAt, endedAt), modules, rootOutput.toVector)
   }

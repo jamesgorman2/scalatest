@@ -2,6 +2,21 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## Where a module's runs mix runs given a fork group with runs given none, the runs given none are numbered first, in the order they are added, whatever worker index they were given; runs that share a fork group and worker index are numbered in the order they are added.
+
+**Alternatives**
+
+- Rejecting a module whose runs mix the two, or whose runs share a fork group and worker index, fails a consolidation at its end over a numbering choice, after every run's output has been collected.
+- Numbering the runs given no fork group last makes their numbers change with how many runs were given one.
+
+**Reasoning** The Mill plugin gives every run of a module both values or neither, and no two of its runs share both, so neither case reaches the library from Mill. A caller that mixes them still gets every run, each with a number unique within its module, in an order fixed by what it gave.
+
+**Costs** A caller that mixes the two gets no warning that it did.
+
+**Settled by** [Every worker of a JVM module - Run numbers and fork groups in the library](https://github.com/jamesgorman2/scalatest/issues/161).
+
+---
+
 ## In the human-readable output's list of the suites of runs it does not show, suites that share a name are ordered by the numbers of the runs they ran in, as this feature's reading of `../SPECIFICATION.md` R-105's "execution order".
 
 **Alternatives**
