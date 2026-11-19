@@ -48,10 +48,9 @@ private[mill] final class JvmTestModuleRun(
   private def runWorkers(consolidation: Consolidation, layout: QueueLayout): Unit = {
     val queues = JvmTestModuleRun.layOutQueues(consolidation, label, layout.forkGroups)(layOutQueue)
     val startedAt = Instant.now()
-    val workerRuns = queues.flatMap { case (forkGroup, queue) =>
-      forkGroup.workers.map(worker => startWorker(consolidation, layout, forkGroup, queue, worker))
-    }
-    workerRuns.foreach(_.end(worker => ctx.fork.blocking(Await.ready(worker, Duration.Inf))))
+    val workers = queues.flatMap { case (forkGroup, queue) => forkGroup.workers.map(worker => (forkGroup, queue, worker)) }
+    val workerRuns = WorkerRun.startEach(workers) { case (forkGroup, queue, worker) => startWorker(consolidation, layout, forkGroup, queue, worker) }
+    WorkerRun.endEach(workerRuns)(workerEnd => ctx.fork.blocking(Await.ready(workerEnd, Duration.Inf)))
     consolidation.timeModule(label, Some(startedAt), Some(Instant.now()))
   }
 
@@ -99,14 +98,14 @@ private[mill] final class JvmTestModuleRun(
       10.millis
     )
     val workerRun = new WorkerRun(consolidation, worker.describedIn(label), reader, capture)
-    workerRun.start(queueWorker(layout, forkGroup, queue, worker, eventLogFile, capture))
+    workerRun.start(runOnQueue(layout, forkGroup, queue, worker, eventLogFile, capture))
     workerRun
   }
 
   // Mill's own test queue starts the worker: on this thread, ending before it returns, where it runs the fork group's
   // workers one after another, else on a future forked through the given `TaskCtx`. The worker's result is ignored,
   // even a failure: the consolidation decides the test command's result.
-  private def queueWorker(
+  private def runOnQueue(
       layout: QueueLayout,
       forkGroup: QueueForkGroup,
       queue: os.Path,

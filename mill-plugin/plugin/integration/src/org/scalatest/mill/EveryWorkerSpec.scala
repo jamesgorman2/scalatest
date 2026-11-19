@@ -44,7 +44,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     (result, withClue(result.debugString)(jsonOutput(report(tester))))
   }
 
-  /** Invokes the test command as `mill -j <jobs> scalatest/test core.test -fJ <report>`. */
   private def jsonOutputWithJobs(tester: IntegrationTester, jobs: Int): (TestCommandResult, ujson.Value) = {
     val result = TestCommandResult(tester.eval(Seq("-j", jobs.toString, "scalatest/test", "core.test", "-fJ", report(tester).toString)))
     (result, withClue(result.debugString)(jsonOutput(report(tester))))
@@ -301,9 +300,15 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
           runsOfForkGroup(json, 1).flatMap(stdoutLines) should not contain "out from B1"
         }
 
+        And("every run whose stdout holds out from B1 holds suite B1")
+        runs(json).filter(stdoutLines(_).contains("out from B1")).foreach(run => suiteNames(run) should contain("B1"))
+
         And("the stderr of a run whose forkGroup is 1 holds err from A1, and no run whose forkGroup is 0 holds it")
         runsOfForkGroup(json, 1).flatMap(stderrLines) should contain("err from A1")
         runsOfForkGroup(json, 0).flatMap(stderrLines) should not contain "err from A1"
+
+        And("every run whose stderr holds err from A1 holds suite A1")
+        runs(json).filter(stderrLines(_).contains("err from A1")).foreach(run => suiteNames(run) should contain("A1"))
 
         And("no console line outside the human-readable output holds either line")
         result.consoleLinesOutsideHumanReadableOutput.filter(line => line.contains("out from B1") || line.contains("err from A1")) shouldBe empty

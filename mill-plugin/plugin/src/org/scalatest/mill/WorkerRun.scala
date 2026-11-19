@@ -36,23 +36,71 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
   }
 
   /**
-   * Waits for the worker to end, then for the reader to end the worker's run.
+   * Waits for the worker to end, then for the reader to end the worker's run. A fatal throwable from waiting is
+   * rethrown, once the reader is abandoned.
    *
    * @param awaitWorker returns once the worker has ended
    */
   def end(awaitWorker: Future[Boolean] => Unit): Unit = {
-    val workerEnd = started.flatMap(worker => Try(awaitWorker(worker)).flatMap(_ => endOf(worker)))
+    val startedAProcess =
+      try {
+        started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
+      } catch {
+        case fatal: Throwable =>
+          abandon()
+          throw fatal
+      }
     // A worker whose end is unknown may have started a process.
-    val reading = endReading(startedAProcess = workerEnd.getOrElse(true))
-    workerEnd.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: $throwable"))
+    val reading = endReading(startedAProcess = startedAProcess.getOrElse(true))
+    startedAProcess.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: $throwable"))
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
   }
 
-  private def endOf(worker: Future[Boolean]): Try[Boolean] =
-    worker.value.getOrElse(Failure(new IllegalStateException(s"$workerName had not ended once awaited")))
+  /** Lets the reader end without waiting for the worker or the reader, as where another worker threw a fatal throwable. */
+  def abandon(): Unit = reader.abandon()
+
+  private def endOf(workerEnd: Future[Boolean]): Try[Boolean] =
+    workerEnd.value.getOrElse(Failure(new IllegalStateException(s"$workerName had not ended once awaited")))
 
   private def endReading(startedAProcess: Boolean): Try[Unit] = {
     capture.endStreams()
     Try(reader.awaitStreamEnd(startedAProcess))
   }
+}
+
+private[mill] object WorkerRun {
+
+  /**
+   * Starts each worker in turn. A fatal throwable from starting one is rethrown, once the workers already started are
+   * abandoned.
+   */
+  def startEach[Worker](workers: Seq[Worker])(start: Worker => WorkerRun): Seq[WorkerRun] =
+    workers.foldLeft(Vector.empty[WorkerRun]) { (started, worker) =>
+      try {
+        started :+ start(worker)
+      } catch {
+        case fatal: Throwable =>
+          started.foreach(_.abandon())
+          throw fatal
+      }
+    }
+
+  /**
+   * Ends each worker in turn. A fatal throwable from ending one is rethrown, once the workers not yet ended are
+   * abandoned.
+   *
+   * @param awaitWorker returns once the worker has ended
+   */
+  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[Boolean] => Unit): Unit =
+    workerRuns.tails.foreach {
+      case workerRun +: notYetEnded =>
+        try {
+          workerRun.end(awaitWorker)
+        } catch {
+          case fatal: Throwable =>
+            notYetEnded.foreach(_.abandon())
+            throw fatal
+        }
+      case _ => ()
+    }
 }
