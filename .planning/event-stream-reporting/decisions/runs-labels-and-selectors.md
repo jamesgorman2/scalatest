@@ -1,4 +1,4 @@
-# Decisions: runs and modules in the output
+# Decisions: when the output shows a run
 
 Decisions behind `../SPECIFICATION.md` on when the human-readable output shows a run, newest first.
 

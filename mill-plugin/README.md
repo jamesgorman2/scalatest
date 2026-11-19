@@ -122,6 +122,8 @@ A run's number is its `number` in [JSON.md](JSON.md) § Run node. The human-read
 - aborted or stopped;
 - has output of its own: its worker's stdout or stderr, or a message sent outside any suite.
 
+The output is laid out as:
+
 - The suites of every run whose line is not shown form one list directly under the module's line, ordered by name. A suite that ran in several runs appears once for each, in order of the runs' numbers.
 - Each run whose line is shown follows that list, in order of number, so `Run 10:` follows `Run 2:`. It holds its own suites, then its output, then `*** RUN ABORTED ***` or `*** RUN STOPPED ***` where the run aborted or stopped.
 
