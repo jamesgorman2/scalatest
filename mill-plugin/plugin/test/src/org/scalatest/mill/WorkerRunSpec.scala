@@ -88,7 +88,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     def endWorker(): Unit = workerRun.end(workerEnd => Await.ready(workerEnd, Duration.Inf))
 
-    def awaitReaderEnd(): Unit = reader.awaitStreamEnd(startedAProcess = true)
+    def awaitReaderEnd(): Unit = reader.awaitStreamEnd()
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
   }
@@ -272,6 +272,25 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
+    "the worker started a process without starting its event log reader, as where it ran on the calling thread uncaptured" should {
+      "read the worker's run once it has ended, and attach a failure naming the worker to the root" in {
+        withEventLogFile { file =>
+          writeCompletedRun(file)
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.workerRun.start(_ => startedAProcess)
+          fixture.endWorker()
+          fixture.consolidation.end()
+          fixture.runsAdded.get shouldBe 1
+          fixture.outputWithoutSummaryLine shouldBe Seq(
+            "Consolidated tests:",
+            "  [core.test]",
+            "  *** CONSOLIDATED TESTS ABORTED ***",
+            "    Capturing the output of worker 0 of fork group 1 of core.test failed: the worker started without its capture"
+          )
+        }
+      }
+    }
+
     "starting the first of two workers throws before its event log exists" should {
       "attach what starting threw to the root, naming the first worker, and still give the second worker's run to the consolidation" in {
         withEventLogFile { firstFile =>
@@ -355,6 +374,36 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           workerEnd.success(true)
           fixture.endWorker()
           fixture.runsAdded.get shouldBe 1
+        }
+      }
+    }
+
+    "it finds its fork group's queue empty and ends at once, before it has been ended" should {
+      "end its event log reader then, adding neither a run nor a process that ended before any run" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          val workerEnd = Promise[Boolean]()
+          fixture.start(workerEnd.future)
+          readerThreadsOf(file) shouldBe 1
+          workerEnd.success(false)
+          eventually(readerThreadsOf(file) shouldBe 0)
+          fixture.runsAdded.get shouldBe 0
+          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+          fixture.endWorker()
+        }
+      }
+    }
+
+    "its process dies before any run, before the worker has been ended" should {
+      "end its event log reader then, adding the process as one that ended before any run" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          val workerEnd = Promise[Boolean]()
+          fixture.start(workerEnd.future)
+          workerEnd.success(true)
+          eventually(readerThreadsOf(file) shouldBe 0)
+          fixture.processesEndedBeforeAnyRun.get shouldBe 1
+          fixture.endWorker()
         }
       }
     }

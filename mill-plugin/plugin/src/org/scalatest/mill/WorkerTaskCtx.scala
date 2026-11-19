@@ -24,7 +24,7 @@ private[mill] final class WorkerTaskCtx(ctx: TaskCtx, capture: WorkerOutputCaptu
       }
     }
 
-  /** Runs `body`, which starts the worker on the calling thread, once `workerStarting` is called. */
+  /** Calls `workerStarting`, then runs `body`, which starts the worker on the calling thread. */
   def runOnThisThread[T](body: => T): T = {
     workerStarting()
     capturing(body)

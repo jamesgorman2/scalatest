@@ -28,8 +28,7 @@ private[mill] final class EventLogReader(
     open: Path => InputStream = path => new FileInputStream(path.toFile)
 ) {
 
-  @volatile private var workerEnded: Boolean = false
-  @volatile private var workerStartedAProcess: Boolean = true
+  @volatile private var workerEnd: Option[Boolean] = None
   @volatile private var failure: Option[Throwable] = None
   private val thread: Thread = new Thread(() => readCapturingFailure(), EventLogReader.threadName(eventLogFile))
   thread.setDaemon(true)
@@ -37,24 +36,28 @@ private[mill] final class EventLogReader(
   def start(): Unit = thread.start()
 
   /**
-   * Call it once the worker has ended: until then, a missing event log file may yet appear.
+   * Tells the reader the worker has ended, so a missing event log file will not appear: the reader then ends at once
+   * where the file has not appeared, else once the run's process has exited. Only the first call counts.
    *
    * @param startedAProcess whether the worker started a process, as Mill's test queue starts none for a worker that
    *                        finds its queue empty
+   */
+  def workerHasEnded(startedAProcess: Boolean): Unit =
+    synchronized {
+      if (workerEnd.isEmpty) {
+        workerEnd = Some(startedAProcess)
+      }
+    }
+
+  /**
+   * Call it once the reader has been told the worker has ended: until then, the reader may wait on the event log file.
+   *
    * @throws Throwable what reading threw
    */
-  def awaitStreamEnd(startedAProcess: Boolean): Unit = {
-    workerStartedAProcess = startedAProcess
-    workerEnded = true
+  def awaitStreamEnd(): Unit = {
     thread.join()
     failure.foreach(throwable => throw throwable)
   }
-
-  /**
-   * Lets the reader end for a worker that will not be awaited: at once where the event log file has not appeared, else
-   * once the run's process has exited.
-   */
-  def abandon(): Unit = workerEnded = true
 
   private def readCapturingFailure(): Unit =
     try {
@@ -65,7 +68,7 @@ private[mill] final class EventLogReader(
         } finally {
           feed.endEventStream()
         }
-      } else if (workerStartedAProcess) {
+      } else if (workerEnd.contains(true)) {
         addProcessEndedBeforeAnyRun()
       }
     } catch {
@@ -76,7 +79,7 @@ private[mill] final class EventLogReader(
     var appeared = false
     var noRun = false
     while (!appeared && !noRun) {
-      val ended = workerEnded
+      val ended = workerEnd.isDefined
       appeared = Files.exists(eventLogFile)
       noRun = !appeared && ended
       if (!appeared && !noRun) {

@@ -2,6 +2,7 @@ package org.scalatest.mill
 
 import java.util.concurrent.ExecutionException
 import org.scalatest.consolidation.Consolidation
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
@@ -9,7 +10,8 @@ import scala.util.Try
 
 /**
  * One worker of a JVM test module, from its start to its end, with the reader of its event log and the capture of its
- * output. The reader starts only once the worker starts, so a worker Mill has not yet scheduled holds no reader thread.
+ * output. The reader polls only from the worker's start until the worker ends, so a worker Mill has not yet scheduled, or
+ * has finished, holds no polling reader thread.
  * What starting or running the worker, or reading its event log, threw is attached to the consolidation's root as a
  * failure naming the worker, so the module's other workers still run and the consolidation can still end and write its
  * output.
@@ -29,7 +31,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    * @param startWorker starts the worker, giving once it has ended whether it started a process. It is given what to
    *                    call as the worker starts, on whichever thread runs it.
    */
-  def start(startWorker: (() => Unit) => Future[Boolean]): Unit =
+  def start(startWorker: (() => Unit) => Future[Boolean]): Unit = {
     started =
       try {
         Try(startWorker(() => startReading()))
@@ -38,10 +40,13 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
           abandon()
           throw fatal
       }
+    started.foreach(_.onComplete(workerEnd => reader.workerHasEnded(startedAProcess = workerEnd.getOrElse(true)))(using ExecutionContext.parasitic))
+  }
 
   /**
-   * Waits for the worker to end, then for the reader to end the worker's run. A fatal throwable from waiting is
-   * rethrown, once the reader is abandoned.
+   * Waits for the worker to end, then for the reader to end the worker's run. A worker that started a process without
+   * starting its reader, so ran with its output uncaptured, has its event log read then, and a failure naming it is
+   * attached to the root. A fatal throwable from waiting is rethrown, once the reader is abandoned.
    *
    * @param awaitWorker returns once the worker has ended
    */
@@ -59,8 +64,13 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     // `WorkerRun.endEach` stops capturing them.
     ended.foreach(_ => capture.endStreams())
     // A worker whose end is unknown may have started a process, unless it never started.
-    val reading = if (closeReader()) Try(reader.awaitStreamEnd(startedAProcess = ended.getOrElse(true))) else Success(())
+    reader.workerHasEnded(startedAProcess = ended.getOrElse(true))
+    val startedUncaptured = ended.getOrElse(false) && startReadingLate()
+    val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
     ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
+    if (startedUncaptured) {
+      consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker started without its capture")
+    }
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
   }
 
@@ -70,7 +80,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    */
   def abandon(): Unit = {
     closeReader()
-    reader.abandon()
+    reader.workerHasEnded(startedAProcess = true)
     stopCapturing()
   }
 
@@ -80,6 +90,15 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
         reader.start()
         readerStarted = true
       }
+    }
+
+  // Gives whether the reader was started now. The event log file outlives the worker's process, so a reader started
+  // after the worker has ended still reads the whole run.
+  private def startReadingLate(): Boolean =
+    synchronized {
+      val late = !readerStarted && !readerClosed
+      startReading()
+      late
     }
 
   // Once closed, a worker starting late, as where Mill runs an async body after the task is cancelled, starts no reader.
