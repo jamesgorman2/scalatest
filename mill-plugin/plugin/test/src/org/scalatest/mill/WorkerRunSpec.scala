@@ -408,6 +408,17 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
+    "it starts its event log reader then throws, as where it runs on the calling thread, before the test command waits for it" should {
+      "end its event log reader then" in {
+        withEventLogFile { file =>
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.start(throw new IllegalStateException("claim log unreadable"))
+          eventually(readerThreadsOf(file) shouldBe 0)
+          fixture.endWorker()
+        }
+      }
+    }
+
     "Mill starts it only once the test command has waited for it, as where Mill runs a cancelled task's body" should {
       "start no event log reader" in {
         withEventLogFile { file =>

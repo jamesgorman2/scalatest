@@ -40,7 +40,11 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
           abandon()
           throw fatal
       }
-    started.foreach(_.onComplete(workerEnd => reader.workerHasEnded(startedAProcess = workerEnd.getOrElse(true)))(using ExecutionContext.parasitic))
+    started match {
+      case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(startedAProcess = ended.getOrElse(true)))(using ExecutionContext.parasitic)
+      // A worker whose start threw may have started a process, as `end` assumes.
+      case Failure(_) => reader.workerHasEnded(startedAProcess = true)
+    }
   }
 
   /**
