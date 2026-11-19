@@ -69,7 +69,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
     ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
     if (startedUncaptured) {
-      consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker started without its capture")
+      consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
     }
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
   }

@@ -19,12 +19,12 @@ import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.*
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.*
 
 final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventually with TimeLimits {
 
@@ -285,7 +285,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             "Consolidated tests:",
             "  [core.test]",
             "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Capturing the output of worker 0 of fork group 1 of core.test failed: the worker started without its capture"
+            "    Capturing the output of worker 0 of fork group 1 of core.test failed: the worker ran outside the test command's capture, so its output went to Mill's console"
           )
         }
       }
@@ -378,7 +378,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
-    "it finds its fork group's queue empty and ends at once, before it has been ended" should {
+    "it finds its fork group's queue empty and ends at once, before the test command waits for it" should {
       "end its event log reader then, adding neither a run nor a process that ended before any run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
@@ -394,7 +394,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
-    "its process dies before any run, before the worker has been ended" should {
+    "its process dies before any run, before the test command waits for it" should {
       "end its event log reader then, adding the process as one that ended before any run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
@@ -408,7 +408,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
-    "Mill starts it only once it has been ended, as where Mill runs a cancelled task's body" should {
+    "Mill starts it only once the test command has waited for it, as where Mill runs a cancelled task's body" should {
       "start no event log reader" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
@@ -419,7 +419,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           }
           fixture.endWorker()
           workerStarting()
-          readerThreadsOf(file) shouldBe 0
+          fixture.awaitReaderEnd()
+          fixture.processesEndedBeforeAnyRun.get shouldBe 0
         }
       }
     }

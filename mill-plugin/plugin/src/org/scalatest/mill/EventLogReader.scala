@@ -28,7 +28,7 @@ private[mill] final class EventLogReader(
     open: Path => InputStream = path => new FileInputStream(path.toFile)
 ) {
 
-  @volatile private var workerEnd: Option[Boolean] = None
+  @volatile private var endedWorkerStartedAProcess: Option[Boolean] = None
   @volatile private var failure: Option[Throwable] = None
   private val thread: Thread = new Thread(() => readCapturingFailure(), EventLogReader.threadName(eventLogFile))
   thread.setDaemon(true)
@@ -44,8 +44,8 @@ private[mill] final class EventLogReader(
    */
   def workerHasEnded(startedAProcess: Boolean): Unit =
     synchronized {
-      if (workerEnd.isEmpty) {
-        workerEnd = Some(startedAProcess)
+      if (endedWorkerStartedAProcess.isEmpty) {
+        endedWorkerStartedAProcess = Some(startedAProcess)
       }
     }
 
@@ -68,7 +68,7 @@ private[mill] final class EventLogReader(
         } finally {
           feed.endEventStream()
         }
-      } else if (workerEnd.contains(true)) {
+      } else if (endedWorkerStartedAProcess.contains(true)) {
         addProcessEndedBeforeAnyRun()
       }
     } catch {
@@ -79,7 +79,7 @@ private[mill] final class EventLogReader(
     var appeared = false
     var noRun = false
     while (!appeared && !noRun) {
-      val ended = workerEnd.isDefined
+      val ended = endedWorkerStartedAProcess.isDefined
       appeared = Files.exists(eventLogFile)
       noRun = !appeared && ended
       if (!appeared && !noRun) {
