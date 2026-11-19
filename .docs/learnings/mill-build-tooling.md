@@ -156,3 +156,19 @@ In Mill 1.3.1, a test module that sets `testBatchFrameworkTasks` runs through th
 
 A plugin that must start the same processes calls the public `callTestRunnerSubprocess` itself and reproduces these rules; it cannot reuse `runTestFuture`, which always drives the queue.
 </learning>
+
+<learning>
+date: 2026-11-19
+---
+An integration test run by an outer Mill build's `testForked` (Mill 1.3.1) runs inside that build's own worker folder, `<task>.dest/worker-<NN>/sandbox/...`. A path taken from the test build's processes, such as `user.dir`, therefore holds two `worker-<i>` segments: the outer build's first, the test build's last.
+
+Reading the first `worker-<i>` segment silently reports the outer worker for every run. Take the innermost (last) segment.
+</learning>
+
+<learning>
+date: 2026-11-19
+---
+On Windows, Mill 1.3.1's test queue sometimes runs one test class in two workers: both workers write a `CLAIM` for it in their `claim.log`. Which worker also runs the other classes varies between runs, and the race rarely shows when a scenario runs alone.
+
+An integration test that compares output across runs, or expects a fixed number of runs, must not depend on the queue under `testParallelism` (Mill's default is true). Set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
+</learning>
