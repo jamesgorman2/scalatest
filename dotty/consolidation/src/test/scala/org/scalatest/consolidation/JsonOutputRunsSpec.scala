@@ -9,15 +9,14 @@ import org.scalatest.matchers.should.Matchers
 
 final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
 
-  // The run's nth suite's test is the nth test named t its structures hold.
-  private def suiteRuns(suite: String, place: Int = 1): String =
+  private def suiteRuns(suite: String, occurrenceAmongTestsNamedT: Int = 1): String =
     s"""
     structure
       suite "$suite", class "samples.$suite"
         test "t", label "- t"
     suite "$suite": SuiteStarting
-    test "t" #$place: TestStarting
-    test "t" #$place: TestSucceeded
+    test "t" #$occurrenceAmongTestsNamedT: TestStarting
+    test "t" #$occurrenceAmongTestsNamedT: TestSucceeded
     suite "$suite": SuiteCompleted
     """
 
@@ -69,7 +68,7 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
       runNodes.map(_.keys.slice(1, 3)) shouldBe Vector.fill(3)(Vector("number", "forkGroup"))
     }
 
-    Scenario("A run given no fork group has no forkGroup, and a module's runs given none are numbered in the order they are given") {
+    Scenario("A run given no fork group has no forkGroup, and a module's runs given none are numbered in the order they are given: runs without a fork group") {
       Given("a run with no fork group and no worker index, running suite Beta")
       And("then a run with no fork group and no worker index, running suite Alpha")
       val json = new JsonSink
