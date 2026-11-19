@@ -48,8 +48,7 @@ private[consolidation] object HumanReadableWriter {
       linesOf(rootLine, 0, AnsiCyan) ++ root.modules.flatMap(moduleLines(_, 1)) ++ root.output.flatMap(capturedLineLines(_, 1)) ++
         rootFailureLines(root.failures, 1)
 
-  // The suites of the runs whose lines are not shown form one list by name. A stable sort keeps suites that share a name
-  // in order of their runs' numbers, then in the order each run lists them.
+  // A stable sort keeps suites that share a name in order of their runs' numbers, then in the order each run lists them.
   private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] = {
     val (shownRuns, hiddenRuns) = module.runs.partition(showsItsLine)
     val hiddenRunsSuites = hiddenRuns.flatMap(_.assembly.topLevelSuites).sortBy(_.name)

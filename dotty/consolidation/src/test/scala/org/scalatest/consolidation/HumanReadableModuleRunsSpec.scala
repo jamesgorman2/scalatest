@@ -39,9 +39,9 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         Given("the library directly")
         val library = new LibraryCalledDirectly
         And("run 1, fork group 0, worker index 0: suite Beta runs, run ended completed")
-        library.addRun(0, 0, runOfSuites("Beta")*)
+        library.addRun(0, 0, runOfSuites("Beta")*).addAssignedTestClasses(classes("samples.Beta"))
         And(s"run 2, fork group 0, worker index 1: suite Alpha runs, run ended $how")
-        library.addRun(0, 1, runStarts, suiteRuns("Alpha"), runEnds(how))
+        library.addRun(0, 1, runStarts, suiteRuns("Alpha"), runEnds(how)).addAssignedTestClasses(classes("samples.Alpha"))
 
         When("the library consolidates them")
         val lines = library.consolidated()
@@ -88,13 +88,13 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       val runTen = Vector(runStarts, suiteRuns("Last"), suiteRuns("Kilo", occurrenceAmongTestsOfItsName = 2), stdout("ten"), runEndsCompleted)
 
       And("the runs are given to the library in the order 10, 3, 9, 8, 7, 6, 5, 4, 2, 1, so run 3's Alpha starts before run 1's")
-      library.addRun(1, 7, runTen*)
-      library.addRun(1, 0, runThree*)
+      library.addRun(1, 7, runTen*).addAssignedTestClasses(classes("samples.Last", "samples.Kilo"))
+      library.addRun(1, 0, runThree*).addAssignedTestClasses(classes("samples.Alpha", "samples.Beta"))
       for (workerIndex <- 6 to 1 by -1) {
         library.addRun(1, workerIndex, runOfSuites()*).addAssignedTestClasses(classes())
       }
-      library.addRun(0, 1, runTwo*)
-      library.addRun(0, 0, runOne*)
+      library.addRun(0, 1, runTwo*).addAssignedTestClasses(classes("samples.Mid"))
+      library.addRun(0, 0, runOne*).addAssignedTestClasses(classes("samples.Zeta", "samples.Alpha"))
 
       When("the library consolidates them")
       val lines = library.consolidated()
