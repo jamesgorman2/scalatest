@@ -8,7 +8,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 - Ordering runs by label, as `../SPECIFICATION.md` R-105 orders nodes with no declared order, compares `Run 10:` before `Run 2:` as text.
 
-**Reasoning** A run has no label of its own: `Run <n>:` is a line the human-readable output writes, and a run node has no `label` key. A run's `number` is fixed by its fork group and worker index ([../JSON-LAYOUT-DECISIONS.md](../JSON-LAYOUT-DECISIONS.md) "A module's runs are numbered by their fork group's position…"), so ordering by it gives the same order on every run of the build. The JSON output's order is [../JSON-LAYOUT.md](../JSON-LAYOUT.md) § Tree's. `Run 10:` follows `Run 2:`.
+**Reasoning** A run has no label of its own: `Run <n>:` is a line the human-readable output writes, and a run node has no `label` key. A run's `number` is fixed by its fork group and worker index ([../JSON-LAYOUT-DECISIONS.md](../JSON-LAYOUT-DECISIONS.md) "A module's runs are numbered by their fork group's position…"), so ordering by it gives the same order each time the test command runs the module. The JSON output's order is [../JSON-LAYOUT.md](../JSON-LAYOUT.md) § Tree's. `Run 10:` follows `Run 2:`.
 
 **Costs** A module's runs follow a different rule from the other nodes R-105 orders.
 
@@ -37,7 +37,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 - Ordering suites that share a name by start time makes their order depend on scheduling between workers, which differs between runs of the same build.
 
-**Reasoning** R-105 does not say what "execution order" means for siblings that ran in different workers at once. Run numbers are fixed by fork group and worker index, so ordering by run number gives the same order on every run of the build.
+**Reasoning** R-105 does not say what "execution order" means for siblings that ran in different workers at once. Run numbers are fixed by fork group and worker index, so ordering by run number gives the same order each time the test command runs the module.
 
 **Costs** A suite that started later can be listed before one that started earlier.
 
