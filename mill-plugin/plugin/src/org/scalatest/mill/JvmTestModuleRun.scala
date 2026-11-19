@@ -142,11 +142,12 @@ private[mill] final class JvmTestModuleRun(
     ): Future[WorkerProcess]
   }
 
-  // Mill's own test queue starts the worker. Where it runs the fork group's workers one after another, the worker runs
-  // on this thread and ends before `launch` returns; otherwise it runs on a future forked through the given `TaskCtx`.
-  // Mill forks exactly the workers it gives a folder of their own. Only whether the worker started a process is kept.
-  // The `Result` Mill gives for that process is ignored, even a failure: the consolidation decides the test command's
-  // result.
+  // Mill's own test queue starts the worker. Where Mill runs the fork group's workers one after another, the worker runs
+  // on this thread and ends before `launch` returns. Otherwise it runs on a future forked through the given `TaskCtx`:
+  // Mill forks exactly the workers it gives a folder of their own.
+  //
+  // Only whether the worker started a process is kept. The `Result` Mill gives for that process is ignored, even a
+  // failure, as the consolidation decides the test command's result.
   private final class QueueLauncher(val layout: WorkerLayout) extends WorkerLauncher {
 
     type LaidOut = os.Path

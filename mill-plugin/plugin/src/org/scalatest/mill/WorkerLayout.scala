@@ -83,12 +83,11 @@ private[mill] object WorkerLayout {
   }
 
   /**
-   * The layout for a module that sets `testBatchFrameworkTasks`: one fork group for each group holding a class, or fork
-   * group 0 with no class where none does, as [[ofQueue]] gives them. Each group gets one worker, a batch worker,
-   * with index 0 in the group's folder. The worker is given the group's whole class list, whatever the module's test
-   * parallelism.
+   * The layout for a module that sets `testBatchFrameworkTasks`. As in [[ofQueue]], it has one fork group for each group
+   * holding a class, or fork group 0 with no class where none does. Each group gets one batch worker, with index 0 in
+   * the group's folder. The worker is given the group's whole class list, whatever the module's test parallelism.
    *
-   * @return the layout, or why it cannot run, as [[ofQueue]] gives them
+   * @return the layout, or why it cannot run, as [[ofQueue]] gives
    */
   def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Either[String, Boolean]): Either[String, WorkerLayout] =
     of(forkGroups, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
