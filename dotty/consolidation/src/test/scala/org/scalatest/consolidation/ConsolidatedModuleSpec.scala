@@ -3,17 +3,15 @@ package org.scalatest.consolidation
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
-
-  private val module = TestRunLabel("core.test")
+final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns {
 
   private def runIn(forkGroup: Int, workerIndex: Int): RunAssembly =
-    new RunAssembly(module, Some(Worker(ForkGroup(forkGroup), WorkerIndex(workerIndex))))
+    new RunAssembly(moduleLabel, Some(workerAt(forkGroup, workerIndex)))
 
-  private def runGivenNoForkGroup(): RunAssembly = new RunAssembly(module, None)
+  private def runGivenNoForkGroup(): RunAssembly = new RunAssembly(moduleLabel, None)
 
   private def numbersOf(runs: Vector[RunAssembly]): Vector[(Int, RunAssembly)] =
-    ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))
+    ConsolidatedModule.of(moduleLabel, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))
 
   "A module's runs" when {
     "each given a fork group and a worker index" should {

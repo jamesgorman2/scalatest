@@ -48,12 +48,15 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     def plainSummaryLine: String = summaryLine.replaceAll("\\{(reset|red|green|yellow|cyan)\\}", "")
   }
 
-  def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = fed(consolidation.addRun(moduleLabel), parts)
+  def workerAt(forkGroup: Int, workerIndex: Int): Worker =
+    ForkGroup.from(forkGroup).flatMap(group => WorkerIndex.from(workerIndex).map(Worker(group, _))).fold(fail(_), identity)
+
+  def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = feedParts(consolidation.addRun(moduleLabel), parts)
 
   def addRunInWorker(consolidation: Consolidation, forkGroup: Int, workerIndex: Int, parts: TestRunPart*): RunFeed =
-    fed(consolidation.addRun(moduleLabel, Some(Worker(ForkGroup(forkGroup), WorkerIndex(workerIndex)))), parts)
+    feedParts(consolidation.addRun(moduleLabel, Some(workerAt(forkGroup, workerIndex))), parts)
 
-  private def fed(feed: RunFeed, parts: Seq[TestRunPart]): RunFeed = {
+  private def feedParts(feed: RunFeed, parts: Seq[TestRunPart]): RunFeed = {
     TestRunBuilder.build(parts*) match {
       case Right(run) =>
         run.items.foreach {
