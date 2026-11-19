@@ -160,7 +160,9 @@ A plugin that must start the same processes calls the public `callTestRunnerSubp
 <learning>
 date: 2026-11-19
 ---
-An integration test run by an outer Mill build's `testForked` (Mill 1.3.1) runs inside the outer build's process folder: `<task>.dest` with one fork group, `<task>.dest/<group folder>` with several, plus `worker-<i>` where the outer build's `runTestFuture` takes its parallel case. The test build's own worker gets a `worker-<i>` folder only in that same case; under `testBatchFrameworkTasks`, never.
+In Mill 1.3.1, a test worker's process folder is `<task>.dest` with one fork group or `<task>.dest/<group folder>` with several, plus `worker-<i>` where `testParallelism` is on and the module selects more than one test class in total; under `testBatchFrameworkTasks`, never `worker-<i>`. Where `testSandboxWorkingDir` is true (the default), the worker JVM starts in `<process folder>/sandbox`.
+
+A testkit `IntegrationTester` defaults `baseWorkspacePath` to `os.pwd` and, unless `MILL_TEST_SHARED_OUTPUT_DIR` is set, puts each test build's workspace in a new `baseWorkspacePath/run-<n>` folder. With both defaults, an integration test run by an outer build's `testForked` puts the test build's workspace at `<outer process folder>/sandbox/run-<n>`, and the test build's own workers run under that workspace's `out` folder by the same rules.
 
 A path taken from the test build's processes, such as `user.dir`, can therefore hold a `worker-<i>` segment from either build, from both, or from neither. Reading the first or the last `worker-<i>` segment of the whole path can silently report the outer worker. Read the segment from the part of the path after the test build's workspace path; where there is none, the worker ran in its group folder.
 </learning>
@@ -168,7 +170,7 @@ A path taken from the test build's processes, such as `user.dir`, can therefore 
 <learning>
 date: 2026-11-19
 ---
-Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform: whether a fork group's classes run in one worker or are split across several workers, and so which run holds which class. On Windows, the queue also sometimes runs one test class in two workers: both workers write a `CLAIM` for it in their `claim.log`. That race rarely shows when a scenario runs alone.
+Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform: whether a fork group's classes run in one worker or are split across several workers, and so which worker runs which class. On Windows, the queue also sometimes runs one test class in two workers: both workers write a `CLAIM` for it in their `claim.log`. That race rarely shows when a scenario runs alone.
 
 An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue under `testParallelism` (Mill's default is true). Set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
 </learning>
