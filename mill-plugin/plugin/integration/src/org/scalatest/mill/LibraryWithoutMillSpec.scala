@@ -169,7 +169,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
         Given("the test command was invoked as mill scalatest/test core.test -fJ <report>, for a module holding CalculatorSuite, whose test prints dividing now")
         val json = jsonOutputOfTestCommand(tester)
 
-        When("the run's test event log is fed directly to the library under module core.test, as the run of worker 0 of fork group 0, with module selector core.test resolving to core.test, and build tool Mill at the version the JSON output gives")
+        When("the run's test event log is fed directly to the library as the run of worker 0 of fork group 0, under module core.test, with module selector core.test resolving to core.test and build tool Mill at the JSON output's version")
         And("the text of each stdio item of the run node's output is fed as a line captured from that item's stream")
         And("the library is given the root's and the module's start and end times as the JSON output gives them")
         val replayed = jsonOutputReplaying(eventLogOfTestCommand(tester), json)
