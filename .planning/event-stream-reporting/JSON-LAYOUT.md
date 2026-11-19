@@ -150,9 +150,9 @@ No suite names its run. A suite in a run node belongs to that node's run. A top-
 
 - `kind` — `run`.
 - `number` — the run's identifier, unique within its module. Always present. The module's runs are numbered from 1.
-  - Where the consolidation library's caller gives each run a fork group and a worker index, the runs are numbered in ascending order of `forkGroup`, then of worker index. The worker index is the index of the run's worker within its fork group, which the caller gives and the JSON output does not record.
+  - Runs given a worker are numbered in ascending order of `forkGroup`, then of worker index. The worker index is the index of the run's worker within its fork group, which the consolidation library's caller gives and the JSON output does not record.
   - A run given no worker is numbered before every run given one.
-  - Runs with the same fork group and worker index, including runs given no worker, are numbered in the order the caller adds them.
+  - Runs given the same fork group and worker index, and runs given no worker, are numbered in the order the caller adds them.
 - `forkGroup` — the 0-based position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives. Absent where the consolidation library's caller gives the run no fork group.
 - `testCount` — the expected test count of the run's `RunStarting`; absent where that count is 0, as it is under a build tool's `Framework`.
 - `configMap` — `RunStarting`'s config map, as an object of each value's `toString`.
