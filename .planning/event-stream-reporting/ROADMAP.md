@@ -4,29 +4,6 @@ Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), i
 
 No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
 
-## 3. Every worker of a JVM module
-
-The test command runs a JVM module in the processes Mill's fork grouping, test parallelism and test queue start, and consolidates every run under the module's node: each forked run is a run node (R-096a), which the human-readable output shows only where the run failed or has output attached (R-082). Nothing of one run is shown on another. A worker given no task is still a run. Builds on features 1 and 2.
-
-Enables:
-
-- `SPECIFICATION.md` R-053a and R-053b (fork grouping, test parallelism, test queue), R-043, R-096a and R-082 (several runs in a module), R-046c and R-137 (for every worker)
-- `JSON-LAYOUT.md` § Run nodes (several runs in a module)
-- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument: each worker given the absolute path of the file in its own `processFolder`; the event log file read in every `processFolder`; a JVM worker's stdout and stderr tied to its run by its `processFolder`), § Data flow (JVM bullet: drives Mill's test queue), § External systems (Mill: fork grouping, test parallelism, test queue)
-
-Settles:
-
-- The order of a module's run nodes (R-105 orders nodes with no declared order by label; whether a run has a label to order by is open: compared as text, `Run 10:` sorts before `Run 2:`).
-
-Risks:
-
-- `research/mill-parallel-worker-capture.md` § 5 and `research/mill-runner-progress-without-trait.md` § 6 (on Windows a class sometimes runs on two workers; worker counts vary, under Mill's own task too)
-- `research/emission-gap-analysis.md` § 11 (whether a JVM worker executes its tasks one at a time)
-- `research/jvm-file-channel.md` § 5 (a module with no test class spawns one worker)
-- `research/mill-plugin-conventions.md` § 5 (at Mill 1.3.1 a module that sets `testBatchFrameworkTasks` runs one worker per fork group, each with its whole class list and no queue or claim files; a module that does not runs one worker per fork group with test parallelism off or one class selected)
-- `research/mill-test-worker-args.md` § 5 I-1 (with test parallelism off, a second JVM in a used `processFolder` makes Mill throw)
-- `research/jvm-per-worker-event-log-path.md` § 6 (a per-worker argument with test sandboxing off not compared against Mill's own `testForked` and `testOnly`; no worker killed before or after the `runStarted` event; paths with spaces untried)
-
 ## 4. Class globs, framework arguments and JUnit XML
 
 The test command takes class globs and framework arguments as Mill's `testOnly` takes them, applied alike to every selected module, and runs as `testOnly` runs (or as `testForked` without globs). It writes each module's JUnit XML report as that task writes it, moved with every other `Task.dest` path to a folder the test command owns for the module, and sets launcher environment variables such as `MILL_PARAMS` from the `mill` command line that started it. Builds on feature 3.
