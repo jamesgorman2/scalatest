@@ -16,7 +16,7 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Tree
 
 - The root holds one module.
-- The module holds one run node for each worker whose forked JVM the test command started: the run of its tests in that JVM (README.md § What it supports). This includes a worker given no test class, as the one worker of a module with no test class. A worker that found its fork group's queue already empty starts no JVM and has no run node (§ Run node, `forkGroup`). Each forked JVM writes its run's events to a file of its own, its test event log, which the test command reads. The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only where laying out its fork group or starting it threw.
+- The module holds one run node for each of its workers: the run of its tests in that worker (README.md § What it supports). This includes a worker given no test class, as the one worker of a module with no test class. Where a fork group's queue is already empty, Mill starts no further worker for that group (§ Run node, `forkGroup`). Each worker writes its run's events to a file of its own, its test event log, which the test command reads. The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only where laying out its fork group or starting it threw.
 - The module's run nodes appear in ascending order of `number`, compared as numbers, whatever order the runs started and ended in.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
 - Every node states its `kind`.
@@ -73,7 +73,7 @@ Keys, in order:
 - `kind` — `run`.
 - `number` — the run's number within its module, from 1, in ascending order of `forkGroup`, then of the worker's index within its fork group: the `<i>` of the worker's folder `worker-<i>`, or 0 where the fork group has one worker.
 - `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that hold no test class and so have no worker. A module that does not set `testForkGrouping` has its runs in fork group `0`. A module that holds no test class has one run, in fork group `0`. A fork group's runs are:
-  - for a module that does not set `testBatchFrameworkTasks`, one for each of the group's workers that found a test class in the group's queue, and always one for its first worker. Without test parallelism, the group has one worker, and so one run;
+  - for a module that does not set `testBatchFrameworkTasks`, one for each worker Mill starts for the group. Mill always starts the group's first worker, and starts each further worker only where a test class remains in the group's queue. Without test parallelism, the group has one worker, and so one run;
   - for a module that sets `testBatchFrameworkTasks`, at most one, whatever the module's test parallelism.
 - `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.
 - `configMap` — the run's config map, as an object of each value's `toString`, with keys in ascending order.

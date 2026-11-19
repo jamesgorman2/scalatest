@@ -10,7 +10,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 - One JVM test module per command, testing with this fork at the plugin's release.
 - The module's tests run in the workers Mill's `testForked` starts for each fork group that holds a test class.
   - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
-    - With `testParallelism` on (the default), a fork group gets as many workers as Mill's `--jobs`, but no more than it has test classes, and its workers run in parallel. A module with exactly one test class runs it in one worker.
+    - With `testParallelism` on (the default), Mill starts up to as many workers for a fork group as Mill's `--jobs`, and no more than the group has test classes. It starts each worker after the first only where a test class remains in the group's queue. The group's workers run in parallel. A module with exactly one test class runs it in one worker.
     - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
   - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's whole class list as `testForkGrouping` gives it, whatever the module's `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
   - A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
@@ -120,9 +120,9 @@ Under the test command, ScalaTest prints no end-of-run summary. Mill's own test 
 Each worker's run is numbered as [JSON.md](JSON.md) § Run node gives `number`. The human-readable output shows a run's line, `Run <n>:`, only where the run aborted or stopped, or has output attached to the run itself: its worker's stdout or stderr, or a message sent outside any suite.
 
 - The suites of every run whose line is not shown form one list directly under the module's line, ordered by name. A suite that ran in several runs appears once for each, in order of the runs' numbers.
-- Each run whose line is shown follows that list, in order of number, so `Run 10:` follows `Run 2:`. It holds its own suites, then its output.
+- Each run whose line is shown follows that list, in order of number, so `Run 10:` follows `Run 2:`. It holds its own suites, then its output, then `*** RUN ABORTED ***` or `*** RUN STOPPED ***` where the run aborted or stopped.
 
-For example, where fork group 0 runs `Zeta`, whose test writes `hello` to stdout, and fork group 1 runs `Alpha`:
+For example, where fork group 0 runs `Zeta`, whose test writes `hello` to stdout, and fork group 1 runs `Alpha`, the output, apart from its closing summary line, is:
 
 ```
 [core.test]
