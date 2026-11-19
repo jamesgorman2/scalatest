@@ -160,11 +160,9 @@ A plugin that must start the same processes calls the public `callTestRunnerSubp
 <learning>
 date: 2026-11-19
 ---
-An integration test run by an outer Mill build's `testForked` (Mill 1.3.1) runs inside that build's own worker folder, `<task>.dest/worker-<NN>/sandbox/...`. A path taken from the test build's processes, such as `user.dir`, therefore holds the outer build's `worker-<i>` segment.
+An integration test run by an outer Mill build's `testForked` (Mill 1.3.1) runs inside the outer build's process folder: `<task>.dest` with one fork group, `<task>.dest/<group folder>` with several, plus `worker-<i>` where the outer build's `runTestFuture` takes its parallel case. The test build's own worker gets a `worker-<i>` folder only in that same case; under `testBatchFrameworkTasks`, never.
 
-The test build adds a `worker-<i>` folder of its own only on Mill's parallel queue path: `testParallelism` on, more than one class in the fork group, and no `testBatchFrameworkTasks`. Otherwise its worker runs in the group folder, and the only `worker-<i>` segment in the path is the outer build's.
-
-Reading the first or the last `worker-<i>` segment of the whole path can silently report the outer worker. Read the segment from the part of the path after the test build's workspace path; where there is none, the worker ran in its group folder.
+A path taken from the test build's processes, such as `user.dir`, can therefore hold a `worker-<i>` segment from either build, from both, or from neither. Reading the first or the last `worker-<i>` segment of the whole path can silently report the outer worker. Read the segment from the part of the path after the test build's workspace path; where there is none, the worker ran in its group folder.
 </learning>
 
 <learning>

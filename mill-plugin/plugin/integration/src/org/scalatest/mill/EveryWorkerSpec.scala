@@ -4,7 +4,6 @@ import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import scala.util.matching.Regex
 
 final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
@@ -91,11 +90,10 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   private def infoMessages(node: ujson.Value): Seq[String] =
     nodes(node).flatMap(_.obj.get("output").toSeq.flatMap(_.arr)).filter(_("kind").str == "info").map(_("message").str)
 
-  private val workerFolder: Regex = """[/\\](worker-\d+)(?:[/\\]|$)""".r
-
-  // The build's workspace can itself sit in a folder `worker-<i>`, as when Mill runs these tests in parallel workers, so
-  // the folder of the build's own worker is the last one in the path.
-  private def innermostWorkerFolder(path: String): Option[String] = workerFolder.findAllMatchIn(path).map(_.group(1)).toSeq.lastOption
+  // The build's workspace can itself sit in a folder `worker-<i>` of the build running these tests, so only the part of
+  // the path below the workspace names the build's own worker.
+  private def workerFolderOfTheBuild(tester: IntegrationTester, path: String): Option[String] =
+    Some(os.Path(path)).filter(_.startsWith(tester.workspacePath)).flatMap(_.relativeTo(tester.workspacePath).segments.find(_.matches("worker-\\d+")))
 
   private def eventLogFolders(tester: IntegrationTester): Seq[os.Path] =
     os.walk(tester.workspacePath / "out").filter(_.last == "scalatest-event-log.jsonl").map(_ / os.up)
@@ -252,7 +250,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("within each of the module's runs, every info message is a path holding one and the same folder worker-<i>")
         val workerFoldersOfRuns = runs(json).map { run =>
-          val folders = infoMessages(run).map(innermostWorkerFolder)
+          val folders = infoMessages(run).map(workerFolderOfTheBuild(tester, _))
           withClue(s"in the info messages ${infoMessages(run)}: ") {
             folders should not be empty
             folders.distinct should have size 1
