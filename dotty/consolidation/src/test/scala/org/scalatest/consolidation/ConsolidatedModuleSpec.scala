@@ -10,7 +10,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
   private def runIn(forkGroup: Int, workerIndex: Int): RunAssembly =
     new RunAssembly(module, Some(ForkGroup(forkGroup)), Some(WorkerIndex(workerIndex)))
 
-  private def runInNoWorker(): RunAssembly = new RunAssembly(module, None, None)
+  private def runGivenNoForkGroup(): RunAssembly = new RunAssembly(module, None, None)
 
   private def numbersOf(runs: Vector[RunAssembly]): Vector[(Int, RunAssembly)] =
     ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))
@@ -23,12 +23,12 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
         val third = runIn(1, 0)
         numbersOf(Vector(third, second, first)) shouldBe Vector(1 -> first, 2 -> second, 3 -> third)
       }
-      "compare worker indexes as numbers" in {
+      "be numbered by worker index as a number, 2 before 10" in {
         val second = runIn(0, 10)
         val first = runIn(0, 2)
         numbersOf(Vector(second, first)) shouldBe Vector(1 -> first, 2 -> second)
       }
-      "compare fork groups as numbers" in {
+      "be numbered by fork group as a number, 2 before 10" in {
         val second = runIn(10, 0)
         val first = runIn(2, 0)
         numbersOf(Vector(second, first)) shouldBe Vector(1 -> first, 2 -> second)
@@ -41,8 +41,8 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
     }
     "given no fork group" should {
       "be numbered in the order they were added" in {
-        val first = runInNoWorker()
-        val second = runInNoWorker()
+        val first = runGivenNoForkGroup()
+        val second = runGivenNoForkGroup()
         numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
       }
       "be numbered in the order they were added, whatever worker index they were given" in {
@@ -52,7 +52,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
       }
       "come before the runs given one" in {
         val withForkGroup = runIn(0, 0)
-        val withoutForkGroup = runInNoWorker()
+        val withoutForkGroup = runGivenNoForkGroup()
         numbersOf(Vector(withForkGroup, withoutForkGroup)) shouldBe Vector(1 -> withoutForkGroup, 2 -> withForkGroup)
       }
     }

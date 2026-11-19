@@ -6,7 +6,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Alternatives**
 
-- Rejecting a module whose runs mix the two, or whose runs share a fork group and worker index, fails a consolidation at its end over a numbering choice, after every run's output has been collected.
+- Having `addRun` reject a run that would mix runs given a fork group with runs given none in its module, or that shares a fork group and worker index with another run of its module, fails that run over a numbering choice.
 - Numbering the runs given no fork group last makes their numbers change with how many runs were given one.
 
 **Reasoning** The Mill plugin gives every run of a module both values or neither, and no two of its runs share both, so neither case reaches the library from Mill. A caller that mixes them still gets every run, each with a number unique within its module, in an order fixed by what it gave.
