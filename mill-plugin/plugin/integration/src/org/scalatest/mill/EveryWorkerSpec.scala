@@ -459,10 +459,10 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("Zeta's test t writes the line hello to stdout")
         And("nothing else in either run writes to stdout or stderr")
         holdOnlySuitesEachInItsOwnForkGroup(tester, "Zeta" -> """println("hello")""", "Alpha" -> "()")
-        When("the test command is invoked, with Mill's ticker on")
+        When("the test command is invoked")
         val result = runTestCommandAsAtTheConsole(tester)
 
-        Then("the human-readable output, apart from its summary line, is Alpha directly under the module, then Run 1: holding Zeta and the line hello")
+        Then("the human-readable output, apart from its summary line, is:")
         withClue(result.debugString) {
           result.treeLines shouldBe Seq(
             "[core.test]",
@@ -484,7 +484,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("Zeta's test t fails")
         And("nothing in either run writes to stdout or stderr")
         holdOnlySuitesEachInItsOwnForkGroup(tester, "Zeta" -> """fail("Zeta fails")""", "Alpha" -> "()")
-        When("the test command is invoked, with Mill's ticker on")
+        When("the test command is invoked")
         val result = runTestCommandAsAtTheConsole(tester)
 
         Then("the human-readable output holds no line beginning Run ")
@@ -492,7 +492,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
           result.treeLines.filter(_.trim.startsWith("Run ")) shouldBe empty
         }
 
-        And("the line   Alpha: comes before the line   Zeta:, each directly under [core.test]")
+        And("the line `  Alpha:` comes before the line `  Zeta:`, each directly under `[core.test]`")
         withClue(result.debugString) {
           result.treeLines.head shouldBe "[core.test]"
           result.treeLines.filter(line => line.startsWith("  ") && !line.startsWith("   ")) shouldBe Seq("  Alpha:", "  Zeta:")
