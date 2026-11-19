@@ -48,8 +48,8 @@ Keys, in order:
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
   - failures of single workers, each naming the worker, its fork group and the module, in this order:
-    1. for each worker in fork group order, laying out its queue failing, as in `Laying out the queue of worker 0 of fork group 1 of core.test failed: …`. That worker does not start;
-    2. for each worker in the order it started, starting it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`, then reading its test event log failing;
+    1. for each fork group in order, laying out its queue failing, as in `Laying out the queue of fork group 1 of core.test failed: …`. None of that group's workers starts;
+    2. for each worker in the order it started, starting or running it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`, then reading its test event log failing;
   - or one failure laying out the module's workers, naming the module. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
     - two of the module's fork groups would share a `processFolder`, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
     - or checking whether the filesystem ignores case failed, and the failure gives what the check threw, as in `Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: …`. The check runs only where two or more fork groups hold a test class.
@@ -71,8 +71,8 @@ Keys, in order:
 Keys, in order:
 
 - `kind` — `run`.
-- `number` — the run's number within its module, from 1, in ascending order of `forkGroup`.
-- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that hold no test class and so have no worker. A module that does not set `testForkGrouping`, or holds no test class, has one run, in fork group `0`.
+- `number` — the run's number within its module, from 1, in ascending order of `forkGroup`, then of the worker's index within its fork group: the `<i>` of the worker's folder `worker-<i>`, or 0 where the fork group has one worker.
+- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that hold no test class and so have no worker. A module that does not set `testForkGrouping` has its runs in fork group `0`. A module that holds no test class has one run, in fork group `0`. Under test parallelism a fork group can have several runs, one for each of its workers that found a test class in the group's queue, and always one for its first worker.
 - `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.
 - `configMap` — the run's config map, as an object of each value's `toString`, with keys in ascending order.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s time and `DiscoveryCompleted`'s duration. Absent unless the run reported both events. `duration` is absent where `DiscoveryCompleted` carries none.

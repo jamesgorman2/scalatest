@@ -16,7 +16,8 @@ import scala.concurrent.duration.FiniteDuration
  * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
  * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
  * end and ends the run's event stream. A line that cannot be decoded ends the stream there. If the worker ends before
- * the file appears, no run existed in it, and the reader adds the worker as a process that ended before any run.
+ * the file appears, no run existed in it: where the worker started a process, the reader adds that process as one that
+ * ended before any run.
  */
 private[mill] final class EventLogReader(
     eventLogFile: Path,
@@ -28,6 +29,7 @@ private[mill] final class EventLogReader(
 ) {
 
   @volatile private var workerEnded: Boolean = false
+  @volatile private var workerStartedAProcess: Boolean = true
   @volatile private var failure: Option[Throwable] = None
   private val thread: Thread = new Thread(() => readCapturingFailure(), s"scalatest event log reader: $eventLogFile")
   thread.setDaemon(true)
@@ -37,9 +39,12 @@ private[mill] final class EventLogReader(
   /**
    * Call it once the worker has ended: until then, a missing event log file may yet appear.
    *
+   * @param startedAProcess whether the worker started a process, as Mill's test queue starts none for a worker that
+   *                        finds its queue empty
    * @throws Throwable what reading threw
    */
-  def awaitStreamEnd(): Unit = {
+  def awaitStreamEnd(startedAProcess: Boolean): Unit = {
+    workerStartedAProcess = startedAProcess
     workerEnded = true
     thread.join()
     failure.foreach(throwable => throw throwable)
@@ -54,7 +59,7 @@ private[mill] final class EventLogReader(
         } finally {
           feed.endEventStream()
         }
-      } else {
+      } else if (workerStartedAProcess) {
         addProcessEndedBeforeAnyRun()
       }
     } catch {

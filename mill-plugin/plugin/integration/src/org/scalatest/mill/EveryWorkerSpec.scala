@@ -4,6 +4,7 @@ import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import scala.util.matching.Regex
 
 final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
@@ -31,12 +32,58 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   private def runsOfForkGroup(json: ujson.Value, forkGroup: Int): Seq[ujson.Value] =
     runs(json).filter(_.obj.get("forkGroup").contains(ujson.Num(forkGroup)))
 
-  private def stdoutLines(run: ujson.Value): Seq[String] =
-    run.obj.get("output").toSeq.flatMap(_.arr).filter(_("kind").str == "stdio").filter(_("stream").str == "stdout").map(_("text").str.trim)
+  private def stdoutLines(run: ujson.Value): Seq[String] = capturedLines(run, "stdout")
+
+  private def stderrLines(run: ujson.Value): Seq[String] = capturedLines(run, "stderr")
+
+  private def capturedLines(run: ujson.Value, stream: String): Seq[String] =
+    run.obj.get("output").toSeq.flatMap(_.arr).filter(_("kind").str == "stdio").filter(_("stream").str == stream).map(_("text").str.trim)
 
   private def jsonOutputOf(tester: IntegrationTester): (TestCommandResult, ujson.Value) = {
     val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
     (result, withClue(result.debugString)(jsonOutput(report(tester))))
+  }
+
+  /** Invokes the test command as `mill -j <jobs> scalatest/test core.test -fJ <report>`. */
+  private def jsonOutputWithJobs(tester: IntegrationTester, jobs: Int): (TestCommandResult, ujson.Value) = {
+    val result = TestCommandResult(tester.eval(Seq("-j", jobs.toString, "scalatest/test", "core.test", "-fJ", report(tester).toString)))
+    (result, withClue(result.debugString)(jsonOutput(report(tester))))
+  }
+
+  private def editBuild(tester: IntegrationTester, from: String, to: String): Unit = {
+    val buildFile = tester.workspacePath / "build.mill"
+    val build = os.read(buildFile)
+    withClue(s"the build file holds no $from:\n$build\n") {
+      build should include(from)
+    }
+    os.write.over(buildFile, build.replace(from, to))
+  }
+
+  private def turnOnTestParallelism(tester: IntegrationTester): Unit =
+    editBuild(tester, "def testParallelism = false", "def testParallelism = true")
+
+  private def turnOffTestSandboxing(tester: IntegrationTester): Unit =
+    editBuild(tester, "def testParallelism = true", "def testParallelism = true\n    def testSandboxWorkingDir = false")
+
+  private val suites: Seq[String] = Seq("A1", "A2", "B1", "B2")
+
+  private def infoMessages(node: ujson.Value): Seq[String] =
+    nodes(node).flatMap(_.obj.get("output").toSeq.flatMap(_.arr)).filter(_("kind").str == "info").map(_("message").str)
+
+  private val workerFolder: Regex = """[/\\](worker-\d+)(?:[/\\]|$)""".r
+
+  private def eventLogFolders(tester: IntegrationTester): Seq[os.Path] =
+    os.walk(tester.workspacePath / "out").filter(_.last == "scalatest-event-log.jsonl").map(_ / os.up)
+
+  private def shouldRunEachForkGroupInItsOwnWorkers(json: ujson.Value): Unit = {
+    Then("each of B1 and B2 is in the contents of at least one of the module's runs whose forkGroup is 0, and in no run whose forkGroup is 1")
+    runsOfForkGroup(json, 0).flatMap(suiteNames).distinct should contain theSameElementsAs Seq("B1", "B2")
+    And("each of A1 and A2 is in the contents of at least one of the module's runs whose forkGroup is 1, and in no run whose forkGroup is 0")
+    runsOfForkGroup(json, 1).flatMap(suiteNames).distinct should contain theSameElementsAs Seq("A1", "A2")
+
+    And("for each forkGroup, the module has either 1 or 2 runs with that forkGroup")
+    runs(json).map(_("forkGroup").num.toInt).toSet shouldBe Set(0, 1)
+    Seq(0, 1).foreach(forkGroup => runsOfForkGroup(json, forkGroup).size should (be >= 1 and be <= 2))
   }
 
   Feature("Every worker of a JVM module") {
@@ -58,6 +105,102 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("the test command succeeds")
         shouldSucceed(result)
+      }
+    }
+
+    Scenario("testParallelism true, testBatchFrameworkTasks false, testSandboxWorkingDir true") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true and its testSandboxWorkingDir is true")
+        turnOnTestParallelism(tester)
+        When("the test command is invoked")
+        val (result, json) = jsonOutputWithJobs(tester, 2)
+
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInItsOwnWorkers(json)
+        }
+
+        And("the test command succeeds")
+        shouldSucceed(result)
+      }
+    }
+
+    Scenario("testParallelism true, testBatchFrameworkTasks false, testSandboxWorkingDir false") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true and its testSandboxWorkingDir is false")
+        turnOnTestParallelism(tester)
+        turnOffTestSandboxing(tester)
+        When("the test command is invoked")
+        val (result, json) = jsonOutputWithJobs(tester, 2)
+
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInItsOwnWorkers(json)
+        }
+
+        And("the test command succeeds")
+        shouldSucceed(result)
+      }
+    }
+
+    Scenario("A failing test in the second fork group") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true")
+        turnOnTestParallelism(tester)
+        And("A2's test t fails")
+        writeSuite(tester, "A2", """fail("A2 fails")""")
+        When("the test command is invoked")
+        val (result, json) = jsonOutputWithJobs(tester, 2)
+
+        Then("the JSON output holds a test t in suite A2 whose outcome is failed")
+        val a2Tests = runs(json).flatMap(contents).filter(_("name").str == "A2").flatMap(contents)
+        withClue(result.debugString) {
+          a2Tests.map(test => (test("name").str, test.obj.get("outcome").map(_.str))) should contain(("t", Some("failed")))
+        }
+
+        And("each of A1, B1 and B2 is in the contents of one of the module's runs")
+        runs(json).flatMap(suiteNames) should contain allOf ("A1", "B1", "B2")
+
+        And("the test command fails")
+        withClue(result.debugString) {
+          result.succeeded shouldBe false
+        }
+      }
+    }
+
+    Scenario("Two workers in each fork group") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true")
+        turnOnTestParallelism(tester)
+        And("each suite's test t sleeps for 3 seconds, then sends an info message holding the system property user.dir")
+        suites.foreach(suite => writeSuite(tester, suite, "Thread.sleep(3000); info(System.getProperty(\"user.dir\"))"))
+        When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
+        val (result, json) = jsonOutputWithJobs(tester, 4)
+
+        Then("for each forkGroup, the module has exactly two runs with that forkGroup")
+        withClue(result.debugString) {
+          Seq(0, 1).map(forkGroup => runsOfForkGroup(json, forkGroup).size) shouldBe Seq(2, 2)
+        }
+
+        And("within each of the module's runs, every info message is a path holding one and the same folder worker-<i>")
+        val workerFoldersOfRuns = runs(json).map { run =>
+          val folders = infoMessages(run).map(message => workerFolder.findFirstMatchIn(message).map(_.group(1)))
+          withClue(s"in the info messages ${infoMessages(run)}: ") {
+            folders should not be empty
+            folders.distinct should have size 1
+            folders.head shouldBe defined
+          }
+          (run("forkGroup").num.toInt, run("number").num.toInt, folders.head.getOrElse(""))
+        }
+
+        And("of the two runs with each forkGroup, the one with the lower number has the lower <i>")
+        Seq(0, 1).foreach { forkGroup =>
+          val indexesInNumberOrder = workerFoldersOfRuns.collect { case (`forkGroup`, number, folder) => (number, folder.stripPrefix("worker-").toInt) }.sortBy(_._1).map(_._2)
+          indexesInNumberOrder.distinct should have size 2
+          indexesInNumberOrder shouldBe indexesInNumberOrder.sorted
+        }
       }
     }
 
@@ -87,13 +230,38 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         val (result, _) = jsonOutputOf(tester)
 
         Then("an event log file is in each of the two processFolders Mill's testForked lays out for the fork groups, and nowhere else")
-        val eventLogFolders = os.walk(tester.workspacePath / "out").filter(_.last == "scalatest-event-log.jsonl").map(_ / os.up)
         withClue(result.debugString) {
-          eventLogFolders.map(_.last) should contain theSameElementsAs Seq("group-0-samples.B1", "group-1-samples.A1")
+          eventLogFolders(tester).map(_.last) should contain theSameElementsAs Seq("group-0-samples.B1", "group-1-samples.A1")
         }
 
         And("Mill started a worker in each of those processFolders")
-        eventLogFolders.filterNot(folder => os.exists(folder / "testargs")) shouldBe empty
+        eventLogFolders(tester).filterNot(folder => os.exists(folder / "testargs")) shouldBe empty
+      }
+    }
+
+    Scenario("Under test parallelism, with test sandboxing off, each worker writes its event log in its own processFolder") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true and its testSandboxWorkingDir is false")
+        turnOnTestParallelism(tester)
+        turnOffTestSandboxing(tester)
+        And("each suite's test t sleeps for 3 seconds, so each fork group's two workers each claim a class")
+        suites.foreach(suite => writeSuite(tester, suite, "Thread.sleep(3000)"))
+        When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
+        val (result, _) = jsonOutputWithJobs(tester, 4)
+
+        Then("an event log file is in each worker's own processFolder, worker-0 and worker-1 of each fork group's folder, and nowhere else")
+        withClue(result.debugString) {
+          eventLogFolders(tester).map(folder => s"${(folder / os.up).last}/${folder.last}") should contain theSameElementsAs Seq(
+            "group-0-samples.B1/worker-0",
+            "group-0-samples.B1/worker-1",
+            "group-1-samples.A1/worker-0",
+            "group-1-samples.A1/worker-1"
+          )
+        }
+
+        And("Mill started a worker in each of those processFolders")
+        eventLogFolders(tester).filterNot(folder => os.exists(folder / "testargs")) shouldBe empty
       }
     }
 
@@ -111,6 +279,34 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("the stdout of the run whose forkGroup is 1 holds from A1 and not from B1")
         runsOfForkGroup(json, 1).flatMap(stdoutLines) should (contain("from A1") and not contain "from B1")
+      }
+    }
+
+    Scenario("Under test parallelism, each worker's stdout and stderr are on that worker's run alone, and none reaches the console") {
+      withTester("every-worker") { tester =>
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is true")
+        turnOnTestParallelism(tester)
+        And("each suite's test t sleeps for 3 seconds, so each fork group's two workers each claim a class")
+        And("B1's test t then writes the line out from B1 to stdout, and A1's test t writes the line err from A1 to stderr")
+        writeSuite(tester, "B1", """Thread.sleep(3000); println("out from B1")""")
+        writeSuite(tester, "A1", """Thread.sleep(3000); System.err.println("err from A1")""")
+        Seq("B2", "A2").foreach(suite => writeSuite(tester, suite, "Thread.sleep(3000)"))
+        When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
+        val (result, json) = jsonOutputWithJobs(tester, 4)
+
+        Then("the stdout of a run whose forkGroup is 0 holds out from B1, and no run whose forkGroup is 1 holds it")
+        withClue(result.debugString) {
+          runsOfForkGroup(json, 0).flatMap(stdoutLines) should contain("out from B1")
+          runsOfForkGroup(json, 1).flatMap(stdoutLines) should not contain "out from B1"
+        }
+
+        And("the stderr of a run whose forkGroup is 1 holds err from A1, and no run whose forkGroup is 0 holds it")
+        runsOfForkGroup(json, 1).flatMap(stderrLines) should contain("err from A1")
+        runsOfForkGroup(json, 0).flatMap(stderrLines) should not contain "err from A1"
+
+        And("no console line outside the human-readable output holds either line")
+        result.consoleLinesOutsideHumanReadableOutput.filter(line => line.contains("out from B1") || line.contains("err from A1")) shouldBe empty
       }
     }
 

@@ -49,8 +49,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       processExited.get
     }
 
-    def stateAfterEnd(): ConsolidationState = {
-      reader.awaitStreamEnd()
+    def stateAfterEnd(workerStartedAProcess: Boolean = true): ConsolidationState = {
+      reader.awaitStreamEnd(workerStartedAProcess)
       consolidation.end()
       consolidation.state
     }
@@ -80,14 +80,26 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     Files.write(file, text.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
 
   "An event log reader" when {
-    "its worker ends with no event log file" should {
-      "add no run, but add the worker as a process that ended before any run existed in it" in {
+    "its worker started a process and ends with no event log file" should {
+      "add no run, but add the worker's process as one that ended before any run existed in it" in {
         withEventLogFile { file =>
           val reading = new Reading(file)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
           reading.runsAdded.get shouldBe 0
           reading.processesEndedBeforeAnyRun.get shouldBe 1
+        }
+      }
+    }
+
+    "its worker started no process and ends with no event log file" should {
+      "add neither a run nor a process, and leave the consolidation unfailed" in {
+        withEventLogFile { file =>
+          val reading = new Reading(file)
+          reading.reader.start()
+          reading.stateAfterEnd(workerStartedAProcess = false) shouldBe ConsolidationState.Ended
+          reading.runsAdded.get shouldBe 0
+          reading.processesEndedBeforeAnyRun.get shouldBe 0
         }
       }
     }
@@ -127,7 +139,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           val reading = new Reading(file, openingAfterFailures(Int.MaxValue))
           reading.processExited.set(true)
           reading.reader.start()
-          a[FileNotFoundException] should be thrownBy reading.reader.awaitStreamEnd()
+          a[FileNotFoundException] should be thrownBy reading.reader.awaitStreamEnd(startedAProcess = true)
         }
       }
     }

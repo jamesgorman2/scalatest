@@ -130,3 +130,15 @@ Under Mill's `testForked`, several test classes run in each worker JVM, and the 
 
 Count tests as the distinct `<testcase>` names in that report, and read failures, errors and skips from it. Never sum the summary lines.
 </learning>
+
+<learning>
+date: 2026-11-19
+---
+In Mill 1.3.1, `mill.javalib.TestModuleUtil.runTestFuture(filteredClassCount, groupCount, groupFolder, testClassQueueFolder, groupName, maxProcessLength, paddedGroupIndex, processIndex)` is public, on the `@experimental` class, and starts one worker of Mill's own test queue:
+
+- it chooses the worker's `processFolder` (`groupFolder / worker-<i>` where `testParallelism` is on and `filteredClassCount != 1`, else `groupFolder`), claims the worker's first class and calls `callTestRunnerSubprocess` on the same instance;
+- in that parallel case it forks through `Task.fork.async` of the instance's constructor `TaskCtx`, with Mill's priorities; otherwise it runs the worker synchronously on the calling thread and returns a completed future;
+- the future's third element is `None` where a worker other than index 0 found the queue empty and started no JVM.
+
+A plugin that needs per-worker framework arguments or a per-worker `TaskCtx` can build one `TestModuleUtil` per worker and call `runTestFuture` on each, rather than copying Mill's scheduler. Lay out each group's queue with `prepareTestClassesFolder` first. `waitForFutures` and result handling are `private[mill]`: await every future yourself, and do not treat a worker that started no JVM as a process that died.
+</learning>
