@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-The test command runs a JVM test module in one worker, whatever the module's `testParallelism`, and fails where the module has more than one fork group with test classes. This feature runs one JVM test module in every worker that Mill 1.3.1's own `testForked` starts for it, and consolidates each worker's run as a run node under the module. The human-readable output shows a run only where the run has output attached, aborted or stopped, or was assigned test classes and ran none of them; the JSON output keeps every run.
+The test command runs a JVM test module in one worker, whatever the module's `testParallelism`, and fails where the module has more than one fork group with test classes. This feature runs one JVM test module in every worker that Mill 1.3.1's own `testForked` starts for it, and consolidates each worker's run as a run node under the module. The human-readable output shows a run only where the run has output attached, the run aborted or stopped, or the run was assigned test classes and ran none of them; the JSON output keeps every run.
 
 ## Plan
 
@@ -193,7 +193,7 @@ Feature: Runs in the human-readable output
         | aborted | `*** RUN ABORTED ***` |
         | stopped | `*** RUN STOPPED ***` |
 
-  Rule: A run assigned test classes that ran none of them shows its line; a run assigned none that ran none does not
+  Rule: A run assigned test classes that ran none of them shows its line; a run assigned none that ran none does not show its line
     Scenario: AC-009 Assigned classes that did not run
       Given the library directly
       And run 1, fork group 0, worker index 0: `suite Beta runs`, `run ended completed`

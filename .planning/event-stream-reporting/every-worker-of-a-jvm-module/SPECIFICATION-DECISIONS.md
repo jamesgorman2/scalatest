@@ -36,7 +36,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 - Listing each hidden run's suites in turn, in run order, splits the module's suites into chunks that depend on which worker claimed each class, so a suite's place changes between runs of the same build.
 
-**Reasoning** The human-readable output is read by people, who need to see a run only where the run has output attached, aborted or stopped, or ran none of its assigned test classes. Elsewhere the module reads as one list of suites, in an order that does not depend on which worker ran each suite.
+**Reasoning** The human-readable output is read by people, who need to see a run only where the run has output attached, the run aborted or stopped, or the run ran none of its assigned test classes. Elsewhere the module reads as one list of suites, in an order that does not depend on which worker ran each suite.
 
 **Costs** The human-readable output does not say which suites of a hidden run shared a worker.
 

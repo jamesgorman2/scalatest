@@ -11,7 +11,7 @@ Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
 **Reasoning** A fork group's position and a worker's index are fixed by the build and by Mill's scheduling rule, not by timing. A suite run in the same worker of the same build therefore sits under the same run number every time, in both outputs.
 
-**Costs** A run's number says nothing of when the run ran. A worker that Mill does not start, as where its fork group's queue is already drained, changes the number of every later run in the module.
+**Costs** A run's number says nothing of when the run ran. A worker that Mill does not start, for example where its fork group's queue is already drained, changes the number of every later run in the module.
 
 **Settled by** [Plan: every worker of a JVM module](https://github.com/jamesgorman2/scalatest/issues/159).
 
