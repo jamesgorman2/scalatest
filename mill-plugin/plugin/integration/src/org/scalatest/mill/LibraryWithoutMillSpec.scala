@@ -9,11 +9,14 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.CapturedLine
 import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.ModuleSelector
 import org.scalatest.consolidation.RunEvent
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.RunnerArgument
 import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.consolidation.Worker
+import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import scala.collection.mutable
@@ -21,6 +24,9 @@ import scala.collection.mutable
 final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private val module: TestRunLabel = TestRunLabel("core.test")
+
+  private val firstWorkerOfFirstForkGroup: Worker =
+    ForkGroup.from(0).flatMap(forkGroup => WorkerIndex.from(0).map(Worker(forkGroup, _))).fold(fail(_), identity)
 
   private final case class RunOutsideMill(eventLogLines: Seq[String], stdoutLines: Seq[String], stderrLines: Seq[String])
 
@@ -101,7 +107,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   private def time(node: ujson.Value, key: String): Option[Instant] = node.obj.get(key).map(value => Instant.ofEpochMilli(value.num.toLong))
 
-  /** The JSON text the library writes to a [[StringWriter]] when fed the event log and the run's captured lines, and given the JSON output's build tool and its root's and module's times. */
+  /** The JSON text the library writes to a [[StringWriter]] when fed the event log and the run's captured lines, as the run of the module's one worker, and given the JSON output's build tool and its root's and module's times. */
   private def jsonOutputReplaying(eventLogLines: Seq[String], json: ujson.Value): String = {
     var written = Option.empty[String]
     val buildTool = json("buildTool")
@@ -117,7 +123,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
       buildTool = Some(BuildTool(buildTool("name").str, buildTool("version").str)),
       startedAt = time(json, "startedAt")
     )
-    val feed = consolidation.addRun(module)
+    val feed = consolidation.addRun(module, Some(firstWorkerOfFirstForkGroup))
     addEventLog(feed, eventLogLines)
     capturedLines(node(json, "run")).foreach(line => feed.add(line))
     feed.endEventStream()
@@ -160,7 +166,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
         Given("the test command was invoked as mill scalatest/test core.test -fJ <report>, for a module holding CalculatorSuite, whose test prints dividing now")
         val json = jsonOutputOfTestCommand(tester)
 
-        When("the run's test event log is fed directly to the library under module core.test, with module selector core.test resolving to core.test, and build tool Mill at the version the JSON output gives")
+        When("the run's test event log is fed directly to the library under module core.test, as the run of worker 0 of fork group 0, with module selector core.test resolving to core.test, and build tool Mill at the version the JSON output gives")
         And("the text of each stdio item of the run node's output is fed as a line captured from that item's stream")
         And("the library is given the root's and the module's start and end times as the JSON output gives them")
         val replayed = jsonOutputReplaying(eventLogOfTestCommand(tester), json)

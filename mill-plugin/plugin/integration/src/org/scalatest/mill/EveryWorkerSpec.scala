@@ -93,6 +93,10 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   private val workerFolder: Regex = """[/\\](worker-\d+)(?:[/\\]|$)""".r
 
+  // The build's workspace can itself sit in a folder `worker-<i>`, as when Mill runs these tests in parallel workers, so
+  // the folder of the build's own worker is the last one in the path.
+  private def innermostWorkerFolder(path: String): Option[String] = workerFolder.findAllMatchIn(path).map(_.group(1)).toSeq.lastOption
+
   private def eventLogFolders(tester: IntegrationTester): Seq[os.Path] =
     os.walk(tester.workspacePath / "out").filter(_.last == "scalatest-event-log.jsonl").map(_ / os.up)
 
@@ -248,7 +252,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("within each of the module's runs, every info message is a path holding one and the same folder worker-<i>")
         val workerFoldersOfRuns = runs(json).map { run =>
-          val folders = infoMessages(run).map(message => workerFolder.findFirstMatchIn(message).map(_.group(1)))
+          val folders = infoMessages(run).map(innermostWorkerFolder)
           withClue(s"in the info messages ${infoMessages(run)}: ") {
             folders should not be empty
             folders.distinct should have size 1
