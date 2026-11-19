@@ -270,13 +270,22 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
     Scenario("The first fork group's run ends last") {
       withTester("every-worker") { tester =>
-        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
+        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
+        And("the module's testParallelism is false and its testBatchFrameworkTasks is true, so its two fork groups' workers run at the same time")
+        turnOnBatchFrameworkTasks(tester)
         And("B1's test t sleeps for 3 seconds before it succeeds")
         writeSuite(tester, "B1", "Thread.sleep(3000)")
         When("the test command is invoked")
-        val (_, json) = jsonOutputOf(tester)
+        val (result, json) = jsonOutputWithJobs(tester, 2)
 
-        Then("the module's runs are, in order, a run whose number is 1 and forkGroup is 0, then a run whose number is 2 and forkGroup is 1")
+        Then("the endedAt of the run whose forkGroup is 0 is later than the endedAt of the run whose forkGroup is 1")
+        val endedAtByForkGroup = Seq(0, 1).map(forkGroup => runsOfForkGroup(json, forkGroup).map(_("endedAt").num))
+        withClue(result.debugString) {
+          endedAtByForkGroup.map(_.size) shouldBe Seq(1, 1)
+          endedAtByForkGroup(0).head should be > endedAtByForkGroup(1).head
+        }
+
+        And("the module's runs are, in order, a run whose number is 1 and forkGroup is 0, then a run whose number is 2 and forkGroup is 1")
         runs(json).map(run => (run("number").num.toInt, run("forkGroup").num.toInt)) shouldBe Seq((1, 0), (2, 1))
 
         And("the run whose number is 1 holds suites B1 and B2, and the run whose number is 2 holds suites A1 and A2")
