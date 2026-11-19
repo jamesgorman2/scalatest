@@ -48,7 +48,9 @@ Keys, in order:
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
   - for each worker in fork group order, its queue failing to be laid out, as in `Laying out the queue of worker 0 of fork group 1 of core.test failed: …`. That worker does not start. Then, for each worker in the order the test command started them, the worker failing to start, then its test event log failing to be read, as in `Starting worker 0 of fork group 1 of core.test failed: …`. Each message names the worker, its fork group and the module;
-  - or, where two of the module's fork groups would run in one folder, one failure naming the module, the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`.
+  - or one failure laying out the module's workers, naming the module. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
+    - two of the module's fork groups would run in one folder, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
+    - or checking whether the filesystem ignores case failed, and the failure gives what the check threw, as in `Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: …`. The check runs only where two or more fork groups hold a test class.
 - `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's tests are discovered until every run has ended.
 - `contents` — an array holding the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.

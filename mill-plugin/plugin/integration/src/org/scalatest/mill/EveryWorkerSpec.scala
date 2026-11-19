@@ -134,8 +134,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       withTester("every-worker") { tester =>
         Given("the build, whose module holds no test class")
         os.remove.all(samples(tester))
-        val buildFile = tester.workspacePath / "build.mill"
-        os.write.over(buildFile, os.read.lines(buildFile).filterNot(_.contains("testForkGrouping")).mkString("", "\n", "\n"))
         When("the test command is invoked")
         val (result, json) = jsonOutputOf(tester)
 
@@ -155,14 +153,25 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("A worker that cannot start") {
 
-    Scenario("The second fork group's worker cannot start") {
+    Scenario("The second of three fork groups' worker cannot start") {
       withTester("every-worker") { tester =>
-        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
+        Given("the build, whose module holds suites A1, A2, B1 and B2")
+        And("""the module's testForkGrouping is Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1"), Seq("samples.A2")) and its testParallelism is false""")
+        val buildFile = tester.workspacePath / "build.mill"
+        os.write.over(
+          buildFile,
+          os.read(buildFile).replace(
+            """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))""",
+            """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1"), Seq("samples.A2"))"""
+          )
+        )
         And("B1's test t writes a testargs file into the second fork group's processFolder, so Mill cannot start a worker there")
         writeSuite(
           tester,
           "B1",
-          """java.nio.file.Files.write(java.nio.file.Paths.get("..", "..", "group-1-samples.A1", "testargs"), Array.emptyByteArray)"""
+          """val testargs = java.nio.file.Paths.get("..", "..", "samples.A1", "testargs")
+            |    java.nio.file.Files.createDirectories(testargs.getParent)
+            |    java.nio.file.Files.write(testargs, Array.emptyByteArray)""".stripMargin
         )
         When("the test command is invoked")
         val (result, json) = jsonOutputOf(tester)
@@ -174,8 +183,8 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
           failures.head should startWith("Starting worker 0 of fork group 1 of core.test failed: ")
         }
 
-        And("the module's runs are exactly one run, whose forkGroup is 0 and which holds suites B1 and B2")
-        runs(json).map(run => (run("forkGroup").num.toInt, suiteNames(run))) shouldBe Seq((0, Seq("B1", "B2")))
+        And("the module's runs are exactly a run whose forkGroup is 0 and which holds suites B1 and B2, then a run whose forkGroup is 2 and which holds suite A2")
+        runs(json).map(run => (run("forkGroup").num.toInt, suiteNames(run))) shouldBe Seq((0, Seq("B1", "B2")), (2, Seq("A2")))
 
         And("the test command fails")
         withClue(result.debugString) {
