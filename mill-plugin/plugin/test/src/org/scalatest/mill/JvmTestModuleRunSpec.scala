@@ -12,8 +12,8 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
   private val label: TestRunLabel = TestRunLabel("core.test")
 
-  private def forkGroupAt(position: Int): LaidOutForkGroup =
-    ForkGroup.from(position).map(forkGroup => LaidOutForkGroup(forkGroup, position.toString, Seq(s"group-$position"), Nil, 1, Nil)).fold(fail(_), identity)
+  private def forkGroupAt(position: Int): PlannedForkGroup =
+    ForkGroup.from(position).map(forkGroup => PlannedForkGroup(forkGroup, position.toString, Seq(s"group-$position"), Nil, 1, Nil)).fold(fail(_), identity)
 
   "Laying out a module's fork groups" when {
     "laying out the first of two fork groups throws" should {

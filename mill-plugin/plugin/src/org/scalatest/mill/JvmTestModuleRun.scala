@@ -59,8 +59,8 @@ private[mill] final class JvmTestModuleRun(
     else
       WorkerLayout.ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, () => filesystemIgnoresCase())
 
-  private def runWorkers[LaidOut](consolidation: Consolidation, layout: WorkerLayout)(layOut: LaidOutForkGroup => LaidOut)(
-      runWorker: (LaidOutForkGroup, LaidOut, LaidOutWorker) => (WorkerOutputTaskCtx, TestModuleUtil) => Future[Boolean]
+  private def runWorkers[LaidOut](consolidation: Consolidation, layout: WorkerLayout)(layOut: PlannedForkGroup => LaidOut)(
+      runWorker: (PlannedForkGroup, LaidOut, PlannedWorker) => (WorkerOutputTaskCtx, TestModuleUtil) => Future[Boolean]
   ): Unit = {
     val laidOutForkGroups = JvmTestModuleRun.layOutForkGroups(consolidation, label, layout.forkGroups)(layOut)
     val startedAt = Instant.now()
@@ -98,12 +98,12 @@ private[mill] final class JvmTestModuleRun(
       }
     }.toEither.left.map(throwable => s"checking whether the filesystem ignores case failed: $throwable")
 
-  private def layOutQueue(forkGroup: LaidOutForkGroup): os.Path =
+  private def layOutQueue(forkGroup: PlannedForkGroup): os.Path =
     inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(forkGroup.testClasses, moduleFolder / forkGroup.folder)
 
   // As Mill 1.3.1 does, a fork group with no class is given an empty queue, not an empty class list, so the framework's
   // setup and teardown still run without every class being selected.
-  private def layOutBatch(forkGroup: LaidOutForkGroup): JvmTestModuleRun.BatchSelector = {
+  private def layOutBatch(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
     val groupFolder = moduleFolder / forkGroup.folder
     os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
     if (forkGroup.testClasses.isEmpty) {
@@ -118,7 +118,7 @@ private[mill] final class JvmTestModuleRun(
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
-  private def startWorker(consolidation: Consolidation, worker: LaidOutWorker)(
+  private def startWorker(consolidation: Consolidation, worker: PlannedWorker)(
       runWorker: (WorkerOutputTaskCtx, TestModuleUtil) => Future[Boolean]
   ): WorkerRun = {
     val eventLogFile = moduleFolder / worker.processFolder / JvmTestModuleRun.eventLogFileName
@@ -146,7 +146,7 @@ private[mill] final class JvmTestModuleRun(
   // on this thread and ends before this returns; otherwise it runs on a future forked through the given `TaskCtx`. Only
   // whether the worker started a process is kept. The `Result` Mill gives for that process is ignored, even a failure,
   // because the consolidation decides the test command's result.
-  private def runOnQueue(layout: WorkerLayout)(forkGroup: LaidOutForkGroup, queue: os.Path, worker: LaidOutWorker)(
+  private def runOnQueue(layout: WorkerLayout)(forkGroup: PlannedForkGroup, queue: os.Path, worker: PlannedWorker)(
       workerCtx: WorkerOutputTaskCtx,
       util: TestModuleUtil
   ): Future[Boolean] = {
@@ -169,7 +169,7 @@ private[mill] final class JvmTestModuleRun(
   // As Mill 1.3.1 does, the fork group's one worker is forked through the given `TaskCtx` where the module has more than
   // one fork group holding a class, and otherwise runs on this thread. A batch worker always starts a process. The
   // `Result` Mill gives for that process is ignored, as on the queue.
-  private def runBatch(layout: WorkerLayout)(forkGroup: LaidOutForkGroup, selector: JvmTestModuleRun.BatchSelector)(
+  private def runBatch(layout: WorkerLayout)(forkGroup: PlannedForkGroup, selector: JvmTestModuleRun.BatchSelector)(
       workerCtx: WorkerOutputTaskCtx,
       util: TestModuleUtil
   ): Future[Boolean] = {
@@ -205,9 +205,9 @@ private[mill] object JvmTestModuleRun {
    *
    * @return each fork group that was laid out, with what laying it out gave
    */
-  def layOutForkGroups[LaidOut](consolidation: Consolidation, module: TestRunLabel, forkGroups: Seq[LaidOutForkGroup])(
-      layOut: LaidOutForkGroup => LaidOut
-  ): Seq[(LaidOutForkGroup, LaidOut)] =
+  def layOutForkGroups[LaidOut](consolidation: Consolidation, module: TestRunLabel, forkGroups: Seq[PlannedForkGroup])(
+      layOut: PlannedForkGroup => LaidOut
+  ): Seq[(PlannedForkGroup, LaidOut)] =
     forkGroups.flatMap { forkGroup =>
       Try(layOut(forkGroup)).fold(
         throwable => {

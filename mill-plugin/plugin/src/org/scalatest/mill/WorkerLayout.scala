@@ -11,7 +11,7 @@ import org.scalatest.consolidation.WorkerIndex
  *
  * @param testClassCount the number of classes given over every fork group
  */
-private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq[LaidOutForkGroup])
+private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq[PlannedForkGroup])
 
 /**
  * A fork group holding a class to run, or the one fork group of a module holding none.
@@ -25,13 +25,13 @@ private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq
  * @param workerIndexLength the number of digits each worker's index is padded to in its folder's name
  * @param workers the workers Mill starts for the group, in order of index
  */
-private[mill] final case class LaidOutForkGroup(
+private[mill] final case class PlannedForkGroup(
     forkGroup: ForkGroup,
     label: String,
     folder: Seq[String],
     testClasses: Seq[String],
     workerIndexLength: Int,
-    workers: Seq[LaidOutWorker]
+    workers: Seq[PlannedWorker]
 ) {
 
   def describedIn(module: TestRunLabel): String = s"fork group ${forkGroup.position} of ${module.value}"
@@ -43,7 +43,7 @@ private[mill] final case class LaidOutForkGroup(
  *                      folder, or its own folder `worker-<i>` in that folder where Mill runs the group's workers in
  *                      parallel
  */
-private[mill] final case class LaidOutWorker(forkGroupAndIndex: Worker, processFolder: Seq[String]) {
+private[mill] final case class PlannedWorker(forkGroupAndIndex: Worker, processFolder: Seq[String]) {
 
   def describedIn(module: TestRunLabel): String =
     s"worker ${forkGroupAndIndex.index.value} of fork group ${forkGroupAndIndex.forkGroup.position} of ${module.value}"
@@ -76,15 +76,15 @@ private[mill] object WorkerLayout {
     val groupsToRun = forkGroups.map(_.filter(discovered)).zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     val testClassCount = groupsToRun.map { case (classes, _) => classes.size }.sum
     val workersInFolders = testParallelism && testClassCount != 1
-    def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): LaidOutForkGroup = {
+    def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): PlannedForkGroup = {
       val forkGroup = valid(ForkGroup.from(position))
       val workerCount = if (workersInFolders) Math.max(Math.min(jobs, classes.size), 1) else 1
       val workerIndexLength = workerCount.toString.length
       val workers = (0 until workerCount).map { index =>
         val processFolder = if (workersInFolders) folder :+ s"worker-${padded(index, workerIndexLength)}" else folder
-        LaidOutWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), processFolder)
+        PlannedWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), processFolder)
       }
-      LaidOutForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
+      PlannedForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
     }
     groupsToRun match {
       case Seq() => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(Nil, 0, "0", Nil))))
@@ -117,7 +117,7 @@ private[mill] object WorkerLayout {
       case multiple => s"group-$label-${multiple.head}"
     }
 
-  private def sharedFolders(forkGroups: Seq[LaidOutForkGroup], filesystemIgnoresCase: Boolean): Option[String] = {
+  private def sharedFolders(forkGroups: Seq[PlannedForkGroup], filesystemIgnoresCase: Boolean): Option[String] = {
     val folderOnDisk: String => String = if (filesystemIgnoresCase) _.toLowerCase(Locale.ROOT) else identity
     val shared = forkGroups
       .groupBy(_.folder.map(folderOnDisk))
@@ -129,7 +129,7 @@ private[mill] object WorkerLayout {
     Option.when(shared.nonEmpty)(shared.mkString("; "))
   }
 
-  private def describeSharing(sharing: Seq[LaidOutForkGroup]): String = {
+  private def describeSharing(sharing: Seq[PlannedForkGroup]): String = {
     val positions = sharing.map(_.forkGroup.position)
     val processFolder = sharing.head.workers.head.processFolder.mkString("/")
     s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder $processFolder"

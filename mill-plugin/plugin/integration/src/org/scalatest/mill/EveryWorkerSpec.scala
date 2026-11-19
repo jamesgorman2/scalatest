@@ -443,8 +443,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
     Scenario("Under testBatchFrameworkTasks, a module with no fork group") {
       withTester("every-worker") { tester =>
-        Given("the build, whose module holds no test class, and whose testForkGrouping is Seq()")
-        os.remove.all(samples(tester))
+        Given("the build, whose module holds suites A1, A2, B1 and B2, and whose testForkGrouping is Seq()")
         editBuild(tester, """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))""", "Seq()")
         And("the module's testBatchFrameworkTasks is true")
         turnOnBatchFrameworkTasks(tester)
