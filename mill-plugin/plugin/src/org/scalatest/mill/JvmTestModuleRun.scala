@@ -15,8 +15,8 @@ import scala.util.Try
 
 /**
  * Runs the module's tests through Mill's test queue, in the workers Mill 1.3.1's `testForked` starts for each fork group
- * holding a test class: in parallel where the module's `testParallelism` is on and other than exactly one class is
- * queued, else one after another.
+ * holding a test class: in parallel where the module's `testParallelism` is on, unless exactly one class is queued;
+ * else one after another.
  */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
@@ -102,10 +102,10 @@ private[mill] final class JvmTestModuleRun(
     workerRun
   }
 
-  // Mill's own test queue starts the worker: on this thread, ending before it returns, where it runs the fork group's
-  // workers one after another, else on a future forked through the given `TaskCtx`. Only whether the worker started a
-  // process is kept; the `Result` Mill gives for that process is ignored, even a failure, since the consolidation
-  // decides the test command's result.
+  // Mill's own test queue starts the worker. Where it runs the fork group's workers one after another, the worker runs
+  // on this thread and ends before this returns; otherwise it runs on a future forked through the given `TaskCtx`. Only
+  // whether the worker started a process is kept. The `Result` Mill gives for that process is ignored, even a failure,
+  // because the consolidation decides the test command's result.
   private def runOnQueue(
       layout: QueueLayout,
       forkGroup: QueueForkGroup,

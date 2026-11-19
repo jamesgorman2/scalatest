@@ -55,8 +55,8 @@ private[mill] object QueueLayout {
    * `forkGroups` gives, so a group with no discovered class is not run but still counts. Where no group holds a
    * discovered class, fork group 0 is run with no class, as Mill runs it to run the framework's setup and teardown.
    *
-   * Each group gets one worker, unless test parallelism is on and other than exactly one class is queued: then it gets
-   * as many as `jobs`, but no more than it has classes, and at least one, each in a folder of its own.
+   * Each group gets one worker. Where test parallelism is on, unless exactly one class is queued, it instead gets `jobs`
+   * workers, capped at its class count and at least one, each in a folder of its own.
    *
    * @param filesystemIgnoresCase whether the filesystem holding the `processFolder`s is case-insensitive, or why that is
    *                              unknown. Asked only where two or more groups hold a discovered class.

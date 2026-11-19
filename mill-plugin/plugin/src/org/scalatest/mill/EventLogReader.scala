@@ -51,8 +51,8 @@ private[mill] final class EventLogReader(
   }
 
   /**
-   * Lets the reader end without waiting for it, for a worker that will not be awaited: at once where the event log file
-   * has not appeared, else once the run's process has exited.
+   * Lets the reader end for a worker that will not be awaited: at once where the event log file has not appeared, else
+   * once the run's process has exited.
    */
   def abandon(): Unit = workerEnded = true
 

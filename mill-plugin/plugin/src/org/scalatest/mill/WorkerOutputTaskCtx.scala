@@ -7,9 +7,9 @@ import mill.api.daemon.internal.TestReporter
 import scala.concurrent.Future
 
 /**
- * The test command's `TaskCtx`, except that each async body forked through it runs [[capturing]], so a worker Mill's
- * test queue spawns in that body sends its stdout and stderr to `capture` rather than to Mill's logging. Mill sets
- * `os.Inherit` around each async body it runs, so only a value set inside the body reaches the worker.
+ * The test command's `TaskCtx`, except that each async body forked through it runs inside [[capturing]], so a worker
+ * Mill's test queue spawns in that body sends its stdout and stderr to `capture` rather than to Mill's logging. Mill
+ * sets `os.Inherit` around each async body it runs, so only a value set inside the body reaches the worker.
  */
 private[mill] final class WorkerOutputTaskCtx(ctx: TaskCtx, capture: WorkerOutputCapture) extends TaskCtx {
 

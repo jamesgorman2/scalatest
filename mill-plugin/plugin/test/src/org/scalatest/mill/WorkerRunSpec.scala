@@ -129,7 +129,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "starting the worker throws after the worker wrote an unterminated line" should {
-      "leave the capture streams unended, so the line the worker's output pump goes on to finish is captured whole" in {
+      "leave the capture streams open, so the line the worker's output pump goes on to finish is captured whole" in {
         withEventLogFile { file =>
           writeCompletedRun(file)
           val fixture = new WorkerRunFixture(file, opening)
@@ -152,7 +152,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "the worker started on a future fails after it wrote an unterminated line, as where Mill cancels the task" should {
-      "leave the capture streams unended, so the line the worker's output pump goes on to finish is captured whole" in {
+      "leave the capture streams open, so the line the worker's output pump goes on to finish is captured whole" in {
         withEventLogFile { file =>
           writeCompletedRun(file)
           val fixture = new WorkerRunFixture(file, opening)

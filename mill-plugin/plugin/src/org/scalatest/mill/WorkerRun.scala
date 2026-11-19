@@ -52,7 +52,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
           throw fatal
       }
     // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as where Mill
-    // cancels the task, can leave its process and those threads running, so its streams are left unended until
+    // cancels the task, can leave its process and those threads running, so its streams are left open until
     // `WorkerRun.endEach` stops capturing them.
     ended.foreach(_ => capture.endStreams())
     // A worker whose end is unknown may have started a process.
@@ -62,8 +62,8 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
   }
 
   /**
-   * Lets the reader end without waiting for the worker or the reader, and stops capturing the worker's output, as where
-   * another worker threw a fatal throwable.
+   * Lets the reader end without the worker being awaited, and stops capturing the worker's output. Used where a worker
+   * threw a fatal throwable.
    */
   def abandon(): Unit = {
     reader.abandon()
