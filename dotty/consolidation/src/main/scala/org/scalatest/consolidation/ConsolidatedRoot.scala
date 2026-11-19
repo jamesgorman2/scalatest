@@ -9,14 +9,14 @@ private[consolidation] final case class ConsolidatedModule(label: TestRunLabel, 
 private[consolidation] object ConsolidatedModule {
 
   /**
-   * Numbers the module's runs from 1 in ascending order of fork group, then of worker index. A run given no fork group
-   * comes before every run given one, whatever its worker index, and runs that tie keep the order they were added in.
+   * Numbers the module's runs from 1 in ascending order of fork group, then of worker index. A run given no worker comes
+   * before every run given one, and runs that tie keep the order they were added in.
    *
    * @param runs the module's runs, in the order they were added
    */
   def of(label: TestRunLabel, times: MeasuredTimes, runs: Vector[RunAssembly]): ConsolidatedModule = {
     val numbered = runs
-      .sortBy(run => run.forkGroup.map(forkGroup => (forkGroup.position, run.workerIndex.map(_.index))))
+      .sortBy(_.numberingOrder)
       .zipWithIndex
       .map((run, index) => ConsolidatedRun(index + 1, run))
     ConsolidatedModule(label, times, numbered)

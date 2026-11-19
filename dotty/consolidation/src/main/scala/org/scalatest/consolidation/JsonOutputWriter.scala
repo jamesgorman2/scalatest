@@ -71,27 +71,27 @@ private[consolidation] object JsonOutputWriter {
       "duration" -> times.duration.map(JsonValue.Integer(_))
     )
 
-  private def runNode(numbered: ConsolidatedRun): JsonValue = {
-    val run = numbered.assembly
-    val starting = run.runStarting
-    val closing = run.closing
+  private def runNode(run: ConsolidatedRun): JsonValue = {
+    val assembly = run.assembly
+    val starting = assembly.runStarting
+    val closing = assembly.closing
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text("run")),
-        "number" -> Some(JsonValue.Integer(numbered.number.toLong)),
-        "forkGroup" -> run.forkGroup.map(forkGroup => JsonValue.Integer(forkGroup.position.toLong)),
+        "number" -> Some(JsonValue.Integer(run.number.toLong)),
+        "forkGroup" -> assembly.worker.map(worker => JsonValue.Integer(worker.forkGroup.position.toLong)),
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
         "configMap" -> starting.map(started => configMapObject(started.configMap)),
-        "discovery" -> run.discovery.map(discoveryObject),
-        "outcome" -> run.outcome.flatMap(runOutcomeText).map(JsonValue.Text(_)),
-        "message" -> run.runAborted.map(aborted => JsonValue.Text(aborted.message)),
-        "throwable" -> run.runAborted.flatMap(_.throwable).map(throwableRecord),
+        "discovery" -> assembly.discovery.map(discoveryObject),
+        "outcome" -> assembly.outcome.flatMap(runOutcomeText).map(JsonValue.Text(_)),
+        "message" -> assembly.runAborted.map(aborted => JsonValue.Text(aborted.message)),
+        "throwable" -> assembly.runAborted.flatMap(_.throwable).map(throwableRecord),
         "startedAt" -> starting.map(started => JsonValue.Integer(started.timeStamp)),
         "endedAt" -> closing.map(closed => JsonValue.Integer(closed.timeStamp)),
         "duration" -> closing.flatMap(_.duration).map(JsonValue.Integer(_)),
         "summary" -> closing.flatMap(_.summary).map(summaryObject),
-        "contents" -> Some(JsonValue.Array(run.topLevelSuites.map(assembledNode))),
-        "output" -> nonEmptyArray(run.output.map(runOutputItem))
+        "contents" -> Some(JsonValue.Array(assembly.topLevelSuites.map(assembledNode))),
+        "output" -> nonEmptyArray(assembly.output.map(runOutputItem))
       )
     )
   }

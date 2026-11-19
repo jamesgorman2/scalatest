@@ -51,7 +51,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = fed(consolidation.addRun(moduleLabel), parts)
 
   def addRunInWorker(consolidation: Consolidation, forkGroup: Int, workerIndex: Int, parts: TestRunPart*): RunFeed =
-    fed(consolidation.addRun(moduleLabel, Some(ForkGroup(forkGroup)), Some(WorkerIndex(workerIndex))), parts)
+    fed(consolidation.addRun(moduleLabel, Some(Worker(ForkGroup(forkGroup), WorkerIndex(workerIndex)))), parts)
 
   private def fed(feed: RunFeed, parts: Seq[TestRunPart]): RunFeed = {
     TestRunBuilder.build(parts*) match {

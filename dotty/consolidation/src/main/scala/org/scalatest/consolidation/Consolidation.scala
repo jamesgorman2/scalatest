@@ -29,19 +29,18 @@ final class Consolidation private (
 
   /**
    * The run's event stream and captured lines go to the returned feed. A module's runs are numbered from 1 in ascending
-   * order of fork group, then of worker index; runs given no fork group come first, in the order they are added. Numbers are
+   * order of fork group, then of worker index; runs given no worker come first, in the order they are added. Numbers are
    * fixed when the consolidation ends, so a run added later can renumber earlier ones. A run's line in the
    * human-readable output, and its run node in the JSON output, show its number.
    *
    * @param label the run's module, which heads the module's line in the human-readable output
-   * @param forkGroup the position of the run's fork group, which the JSON output records on the run's node
-   * @param workerIndex the index of the run's worker within its fork group, which orders the run and is not recorded
+   * @param worker the worker the run ran in. The JSON output records its fork group on the run's node, and not its index.
    * @throws IllegalArgumentException if the consolidation has ended
    */
-  def addRun(label: TestRunLabel, forkGroup: Option[ForkGroup] = None, workerIndex: Option[WorkerIndex] = None): RunFeed =
+  def addRun(label: TestRunLabel, worker: Option[Worker] = None): RunFeed =
     synchronized {
       requireOpen()
-      val run = new RunAssembly(label, forkGroup, workerIndex)
+      val run = new RunAssembly(label, worker)
       runs += run
       new RunFeed(this, run)
     }

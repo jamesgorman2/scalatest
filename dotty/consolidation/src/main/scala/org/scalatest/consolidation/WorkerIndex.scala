@@ -5,13 +5,9 @@ opaque type WorkerIndex = Int
 
 object WorkerIndex {
 
-  /** @throws IllegalArgumentException if the index is negative */
-  def apply(index: Int): WorkerIndex = {
-    require(index >= 0, s"a worker's index must not be negative, but was $index")
-    index
-  }
+  def apply(value: Int): WorkerIndex = value
 
-  extension (workerIndex: WorkerIndex) {
-    def index: Int = workerIndex
+  extension (index: WorkerIndex) {
+    def value: Int = index
   }
 }

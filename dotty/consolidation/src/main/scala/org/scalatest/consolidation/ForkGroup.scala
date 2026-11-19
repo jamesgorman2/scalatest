@@ -5,11 +5,7 @@ opaque type ForkGroup = Int
 
 object ForkGroup {
 
-  /** @throws IllegalArgumentException if the position is negative */
-  def apply(position: Int): ForkGroup = {
-    require(position >= 0, s"a fork group's position must not be negative, but was $position")
-    position
-  }
+  def apply(position: Int): ForkGroup = position
 
   extension (forkGroup: ForkGroup) {
     def position: Int = forkGroup

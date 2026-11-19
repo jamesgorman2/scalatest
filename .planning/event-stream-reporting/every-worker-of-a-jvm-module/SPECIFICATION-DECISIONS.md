@@ -2,14 +2,14 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## Where a module's runs mix runs given a fork group with runs given none, the runs given none are numbered first, in the order they are added, whatever worker index they were given; runs that share a fork group and worker index are numbered in the order they are added.
+## Where a module's runs mix runs given a fork group with runs given none, the runs given none are numbered first, in the order they are added; runs that share a fork group and worker index are numbered in the order they are added.
 
 **Alternatives**
 
 - Having `addRun` reject a run that would mix runs given a fork group with runs given none in its module, or that shares a fork group and worker index with another run of its module, fails that run over a numbering choice.
 - Numbering the runs given no fork group last makes their numbers change with how many runs were given one.
 
-**Reasoning** The Mill plugin gives every run of a module both values or neither, and no two of its runs share both, so neither case reaches the library from Mill. A caller that mixes them still gets every run, each with a number unique within its module, in an order fixed by what it gave.
+**Reasoning** `addRun` takes a run's fork group and worker index as one value, so a run has both or neither. The Mill plugin gives these values to every run of a module or to none of them, and no two of its runs share both, so neither case reaches the library from Mill. A caller that mixes them still gets every run, each with a number unique within its module, in an order fixed by what it gave.
 
 **Costs** A caller that mixes the two gets no warning that it did.
 

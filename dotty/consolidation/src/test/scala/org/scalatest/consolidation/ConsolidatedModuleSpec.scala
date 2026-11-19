@@ -8,9 +8,9 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
   private val module = TestRunLabel("core.test")
 
   private def runIn(forkGroup: Int, workerIndex: Int): RunAssembly =
-    new RunAssembly(module, Some(ForkGroup(forkGroup)), Some(WorkerIndex(workerIndex)))
+    new RunAssembly(module, Some(Worker(ForkGroup(forkGroup), WorkerIndex(workerIndex))))
 
-  private def runGivenNoForkGroup(): RunAssembly = new RunAssembly(module, None, None)
+  private def runGivenNoForkGroup(): RunAssembly = new RunAssembly(module, None)
 
   private def numbersOf(runs: Vector[RunAssembly]): Vector[(Int, RunAssembly)] =
     ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))
@@ -43,11 +43,6 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers {
       "be numbered in the order they were added" in {
         val first = runGivenNoForkGroup()
         val second = runGivenNoForkGroup()
-        numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
-      }
-      "be numbered in the order they were added, whatever worker index they were given" in {
-        val first = new RunAssembly(module, None, Some(WorkerIndex(1)))
-        val second = new RunAssembly(module, None, Some(WorkerIndex(0)))
         numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
       }
       "come before the runs given one" in {
