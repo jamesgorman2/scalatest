@@ -24,6 +24,14 @@ _Avoid_: Parallelism level, run mode
 A build tool's unit of build, such as a Mill module or an sbt project, whose tests produce one or more runs, for example one per test-worker JVM.
 _Avoid_: Project, subproject, target
 
+**Worker**:
+A JVM process that Mill starts to run some of a module's test classes. A worker hosts at most one run.
+_Avoid_: Fork, test JVM, subprocess
+
+**Fork group**:
+One of the sets of test classes a Mill module's `testForkGrouping` divides its tests into. Only the workers of a fork group run that group's classes.
+_Avoid_: Test group, partition
+
 ## Test structure
 
 **Test structure**:
