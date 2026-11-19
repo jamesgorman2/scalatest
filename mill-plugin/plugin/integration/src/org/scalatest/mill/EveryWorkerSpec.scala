@@ -308,7 +308,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under testBatchFrameworkTasks, each fork group's one worker writes its event log in the group's processFolder, given no queue") {
+    Scenario("Under testBatchFrameworkTasks, each fork group's one worker writes its event log in the group's processFolder, and no queue is laid out") {
       withTester("every-worker") { tester =>
         Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
         And("the module's testParallelism is true and its testBatchFrameworkTasks is true")

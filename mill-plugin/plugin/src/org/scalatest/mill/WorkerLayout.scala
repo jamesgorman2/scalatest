@@ -9,7 +9,7 @@ import org.scalatest.consolidation.WorkerIndex
 /**
  * The fork groups and workers of a JVM test module that the test command starts: those Mill 1.3.1's `testForked` starts.
  *
- * @param testClassCount the number of classes given over every fork group
+ * @param testClassCount the number of test classes, summed over every fork group
  */
 private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq[PlannedForkGroup])
 
@@ -101,8 +101,9 @@ private[mill] object WorkerLayout {
 
   /**
    * The layout for a module that sets `testBatchFrameworkTasks`: one fork group for each group holding a class, or fork
-   * group 0 with no class where none does, as [[ofQueue]] gives them. Each group gets one worker, index 0, in the
-   * group's folder, which is given the group's whole class list, whatever the module's test parallelism.
+   * group 0 with no class where none does, as [[ofQueue]] gives them. Each group gets one worker, a batch worker,
+   * with index 0 in the group's folder. The worker is given the group's whole class list, whatever the module's test
+   * parallelism.
    *
    * @return the layout, or why it cannot run, as [[ofQueue]] gives them
    */

@@ -225,7 +225,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
   "Laying out a module's batch workers" when {
     "the module has two fork groups" should {
-      "give each group one worker, index 0, in the group's folder, given the group's whole class list" in {
+      "give each group one worker, index 0, in the group's folder, with the group's whole class list" in {
         WorkerLayout.ofBatches(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2")), () => Right(false)) shouldBe Right(
           WorkerLayout(
             4,

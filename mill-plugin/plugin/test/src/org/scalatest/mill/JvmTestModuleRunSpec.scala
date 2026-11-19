@@ -32,7 +32,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }
 
-      "give the second fork group what laying it out gave, and the first nothing" in {
+      "keep only the second fork group, with what laying it out returned" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         JvmTestModuleRun.layOutForkGroups(consolidation, label, Seq(forkGroupAt(0), forkGroupAt(1))) { forkGroup =>
           if (forkGroup == forkGroupAt(0)) throw new IllegalStateException("disk full") else s"queue of ${forkGroup.folder.mkString}"

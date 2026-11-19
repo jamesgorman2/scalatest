@@ -146,7 +146,7 @@ A plugin that needs per-worker framework arguments or a per-worker `TaskCtx` can
 <learning>
 date: 2026-11-19
 ---
-In Mill 1.3.1, a test module that sets `testBatchFrameworkTasks` runs through `TestModuleUtil.runTestBatchScheduler`, which is `private`, and differs from the queue scheduler in ways its name does not suggest:
+In Mill 1.3.1, a test module that sets `testBatchFrameworkTasks` runs through the `private` `TestModuleUtil.runTestBatchScheduler`, not through the test queue. It differs from the test queue as follows:
 
 - it runs no `ZincOp.GetTestTasks` discovery: each fork group's worker is given the group's classes exactly as `testForkGrouping` gives them, including classes that do not exist;
 - each fork group holding a class gets one worker, in the group's folder (no `worker-<i>` folder), with `Left(classList)` as the selector;

@@ -19,8 +19,8 @@ import scala.util.Try
  *
  * Where the module does not set `testBatchFrameworkTasks`, the workers run through Mill's test queue: in parallel where
  * the module's `testParallelism` is on, unless exactly one class is queued; else one after another. Where it does, each
- * fork group has one worker, given the group's whole class list: in parallel where the module has more than one fork
- * group holding a class, whatever its `testParallelism`.
+ * fork group has one worker, given the group's whole class list. The workers run in parallel where more than one fork
+ * group holds a class, whatever the module's `testParallelism`.
  */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
@@ -51,8 +51,8 @@ private[mill] final class JvmTestModuleRun(
     )
   }
 
-  // As Mill 1.3.1 does, a module that sets `testBatchFrameworkTasks` runs no discovery of its own: each fork group's
-  // worker is given the group's classes as `testForkGrouping` gives them.
+  // Like Mill 1.3.1, the test command runs no discovery for a module that sets `testBatchFrameworkTasks`: each fork
+  // group's worker is given the group's classes as `testForkGrouping` gives them.
   private def layout(): Either[String, WorkerLayout] =
     if (inputs.testBatchFrameworkTasks)
       WorkerLayout.ofBatches(inputs.forkGroups, () => filesystemIgnoresCase())
@@ -168,7 +168,7 @@ private[mill] final class JvmTestModuleRun(
 
   // As Mill 1.3.1 does, the fork group's one worker is forked through the given `TaskCtx` where the module has more than
   // one fork group holding a class, and otherwise runs on this thread. A batch worker always starts a process. The
-  // `Result` Mill gives for that process is ignored, as on the queue.
+  // `Result` Mill gives for that process is ignored, as in [[runOnQueue]].
   private def runBatch(layout: WorkerLayout)(forkGroup: PlannedForkGroup, selector: JvmTestModuleRun.BatchSelector)(
       workerCtx: WorkerOutputTaskCtx,
       util: TestModuleUtil
@@ -193,8 +193,8 @@ private[mill] object JvmTestModuleRun {
   val eventLogFileName: String = "scalatest-event-log.jsonl"
 
   /**
-   * The class list, or for a fork group with no class its empty queue and its claim folder, that a batch worker is given
-   * in place of Mill's test queue, in the form Mill's `callTestRunnerSubprocess` takes.
+   * What a batch worker is given in place of Mill's test queue, in the form Mill's `callTestRunnerSubprocess` takes: its
+   * fork group's class list or, where the group holds no class, an empty queue and a claim folder.
    */
   type BatchSelector = Either[Seq[String], (Option[String], os.Path, os.Path)]
 
