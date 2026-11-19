@@ -525,7 +525,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
       addRun(consolidation, TestRunPart.Events(laterRun)).endEventStream()
       consolidation.end()
 
-      Then("the later run's suite, test and message come first, then the aborted run's line, whose abort shows the throwable's class")
+      Then("the later run's suite, test and message come first, then the aborted run's line with the throwable's class")
       output.colourMarkedTree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}LaterSpec:{reset}

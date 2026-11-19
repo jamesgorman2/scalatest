@@ -178,8 +178,8 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
   def add(line: CapturedLine): Unit = consolidation.feed(run.add(line))
 
   /**
-   * Adds test classes the run's process was assigned, once that process has ended. A run that was assigned test classes
-   * and reported a suite of none of them shows its line in the human-readable output.
+   * Adds the run's assigned test classes, once the run's process has ended. A run that was assigned test classes and
+   * ran none of them shows its line in the human-readable output.
    *
    * @throws IllegalArgumentException if the consolidation has ended
    */

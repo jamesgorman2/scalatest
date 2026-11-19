@@ -46,7 +46,7 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         When("the library consolidates them")
         val lines = library.consolidated()
 
-        Then("Beta sits under the module's line, then run 2's line holds Alpha and the run's end")
+        Then(s"Beta sits under the module's line, then run 2's line holds Alpha and $line")
         lines.mkString("\n") shouldBe
           s"""[core.test]
             |  Beta:
@@ -99,7 +99,7 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       When("the library consolidates them")
       val lines = library.consolidated()
 
-      Then("the hidden runs' suites are one list by name, with run 1's Alpha before run 3's, then Run 2: and Run 10:")
+      Then("the hidden runs' suites come first, sorted by name with run 1's Alpha before run 3's, then the lines of runs 2 and 10")
       lines.mkString("\n") shouldBe
         """[core.test]
           |  Alpha:
@@ -137,8 +137,8 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       lines shouldBe Vector("[core.test]", "  Beta:", "    - t")
     }
 
-    Scenario("A run never given its assigned test classes, that ran nothing, does not show its line") {
-      Given("a run that ran nothing, given no assigned test classes")
+    Scenario("A run that ran nothing and was never given assigned test classes does not show its line") {
+      Given("a run that ran nothing and was given no assigned test classes")
       val library = new LibraryCalledDirectly
       library.addRun(0, 0, runOfSuites()*)
 
@@ -147,8 +147,8 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       library.consolidated() shouldBe Vector("[core.test]")
     }
 
-    Scenario("Assigned test classes added in more than one call are all the run's assigned test classes") {
-      Given("a run of suite Beta, given samples.Alpha, then samples.Beta, as its assigned test classes")
+    Scenario("A run's assigned test classes accumulate across calls") {
+      Given("a run of suite Beta, given assigned test class samples.Alpha and then samples.Beta")
       val library = new LibraryCalledDirectly
       val feed = library.addRun(0, 0, runOfSuites("Beta")*)
       feed.addAssignedTestClasses(classes("samples.Alpha"))

@@ -181,7 +181,7 @@ private[consolidation] final class RunAssembly(val label: TestRunLabel, val work
 
   def addAssigned(classes: Iterable[TestClassName]): Unit = assignedTestClasses ++= classes
 
-  /** Whether the run was assigned test classes and reported a suite of none of them. */
+  /** Whether the run was assigned test classes and ran none of them. */
   def ranNoneOfItsAssignedTestClasses: Boolean = {
     val reportedClasses = structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet
     assignedTestClasses.nonEmpty && !assignedTestClasses.exists(assigned => reportedClasses.contains(assigned.value))
