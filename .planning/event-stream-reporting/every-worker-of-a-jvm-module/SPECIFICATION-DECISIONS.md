@@ -2,13 +2,13 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## A module's runs are ordered by `number`, compared as numbers, in both outputs, and not by a label.
+## In both outputs, a module's runs are ordered numerically by `number`, not by label.
 
 **Alternatives**
 
-- Ordering runs by label, as `../SPECIFICATION.md` R-105 orders nodes with no declared order, compares `Run 10:` before `Run 2:` as text.
+- Ordering runs by label, as `../SPECIFICATION.md` R-105 orders nodes with no declared order, puts `Run 10:` before `Run 2:`.
 
-**Reasoning** A run has no label of its own: `Run <n>:` is a line the human-readable output writes, and a run node has no `label` key. A run's `number` is fixed by its fork group and worker index ([../JSON-LAYOUT-DECISIONS.md](../JSON-LAYOUT-DECISIONS.md) "A module's runs are numbered by their fork group's position…"), so ordering by it gives the same order each time the test command runs the module. The JSON output's order is [../JSON-LAYOUT.md](../JSON-LAYOUT.md) § Tree's. `Run 10:` follows `Run 2:`.
+**Reasoning** A run has no label: `Run <n>:` is a line the human-readable output writes, and a run node has no `label` key. A run's `number` is fixed by its fork group and worker index ([../JSON-LAYOUT-DECISIONS.md](../JSON-LAYOUT-DECISIONS.md) "A module's runs are numbered by their fork group's position…"), so ordering by it gives the same order each time the test command runs the module. [../JSON-LAYOUT.md](../JSON-LAYOUT.md) § Tree already orders the JSON output's run nodes this way.
 
 **Costs** A module's runs follow a different rule from the other nodes R-105 orders.
 
