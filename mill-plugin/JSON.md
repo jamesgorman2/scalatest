@@ -16,8 +16,8 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Tree
 
 - The root holds one module.
-- The module holds one run node for each worker the test command started: the run of its tests in that worker's forked JVM (README.md § What it supports). Each forked JVM writes its run's events to a file of its own, its test event log, which the test command reads. The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only where laying out its fork group or starting it threw.
-- The module's run nodes appear in ascending order of `number`.
+- The module holds one run node for each worker whose forked JVM the test command started: the run of its tests in that JVM (README.md § What it supports). This includes a worker given no test class, as the one worker of a module with no test class. A worker that found its fork group's queue already empty starts no JVM and has no run node (§ Run node, `forkGroup`). Each forked JVM writes its run's events to a file of its own, its test event log, which the test command reads. The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only where laying out its fork group or starting it threw.
+- The module's run nodes appear in ascending order of `number`, compared as numbers, whatever order the runs started and ended in.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
 - Every node states its `kind`.
 - A suite, scope or test that ran more than once is one node for each time it ran.

@@ -2,6 +2,20 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## A module's runs are ordered by `number`, compared as numbers, in both outputs, and not by a label.
+
+**Alternatives**
+
+- Ordering runs by label, as `../SPECIFICATION.md` R-105 orders nodes with no declared order, compares `Run 10:` before `Run 2:` as text.
+
+**Reasoning** A run has no label of its own: `Run <n>:` is a line the human-readable output writes, and a run node has no `label` key. A run's `number` is fixed by its fork group and worker index ([../JSON-LAYOUT-DECISIONS.md](../JSON-LAYOUT-DECISIONS.md) "A module's runs are numbered by their fork group's position…"), so ordering by it gives the same order on every run of the build. The JSON output's order is [../JSON-LAYOUT.md](../JSON-LAYOUT.md) § Tree's. `Run 10:` follows `Run 2:`.
+
+**Costs** A module's runs follow a different rule from the other nodes R-105 orders.
+
+**Settled by** [Every worker of a JVM module - Documentation and run order](https://github.com/jamesgorman2/scalatest/issues/166).
+
+---
+
 ## A module's runs given no worker are numbered first, and runs that tie on fork group and worker index keep the order they were added in.
 
 **Alternatives**

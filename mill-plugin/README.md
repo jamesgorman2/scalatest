@@ -114,3 +114,22 @@ It also fails when:
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
 Under the test command, ScalaTest prints no end-of-run summary. Mill's own test tasks still print it.
+
+## Runs in the human-readable output
+
+Each worker's run is numbered as [JSON.md](JSON.md) § Run node gives `number`. The human-readable output shows a run's line, `Run <n>:`, only where the run aborted or stopped, or has output attached to the run itself: its worker's stdout or stderr, or a message sent outside any suite.
+
+- The suites of every run whose line is not shown form one list directly under the module's line, ordered by name. A suite that ran in several runs appears once for each, in order of the runs' numbers.
+- Each run whose line is shown follows that list, in order of number, so `Run 10:` follows `Run 2:`. It holds its own suites, then its output.
+
+For example, where fork group 0 runs `Zeta`, whose test writes `hello` to stdout, and fork group 1 runs `Alpha`:
+
+```
+[core.test]
+  Alpha:
+    - t
+  Run 1:
+    Zeta:
+      - t
+    [stdout] hello
+```
