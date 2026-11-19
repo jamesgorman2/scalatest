@@ -122,7 +122,7 @@ private[consolidation] enum RunOutput {
  */
 private[consolidation] final class RunAssembly(val label: TestRunLabel, val worker: Option[Worker]) {
 
-  /** Orders the run among its module's runs by fork group, then by worker index. A run given no worker comes first. */
+  /** The run's sort key among its module's runs: fork group, then worker index. A run given no worker has `None`, which sorts first. */
   def numberingOrder: Option[(Int, Int)] = worker.map(worker => (worker.forkGroup.position, worker.index.value))
 
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]

@@ -207,7 +207,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       }
     }
 
-    "given two runs with no fork group" should {
+    "given two runs with no worker" should {
       "hold their run nodes numbered from 1 in the order they were added" in {
         val json = new JsonSink
         val consolidation = startedWithoutMill(json)

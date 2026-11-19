@@ -186,7 +186,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - The caller splits each stream into lines and decodes them to text before adding them, since a stream reaches it in chunks that can split a line or a character (`research/mill-worker-channels.md` § 1.3).
   - The caller adds a stream's unterminated last line once that stream ends, so a process that dies keeps its last line (R-097a).
   - The caller tells the library when the run's event stream has ended (§ APIs § The emitter and the Mill plugin, "Each event" and "The end of a run's event stream").
-  - The caller may also give the run's worker, as one value holding both the position of the run's fork group among the groups the module's `testForkGrouping` gives and the index of the run's worker within that fork group. The library numbers the module's runs from these two values (`JSON-LAYOUT.md` § Run nodes).
+  - The caller may also give the run's worker: the position of its fork group among the groups the module's `testForkGrouping` gives, and its index within that fork group. The library numbers the module's runs from these two values (`JSON-LAYOUT.md` § Run nodes).
   - The Mill plugin takes the position from its own enumeration of the module's `testForkGrouping`. It takes the worker index from the index under which it starts the worker, which Mill's folder name `worker-<i>` carries; a fork group's only worker has index 0.
 
   Once the run's process has ended, the caller adds the test classes that process was assigned, from the module's test manifest (§ Modules § Mill plugin).

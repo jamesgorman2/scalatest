@@ -190,8 +190,8 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
         TestRunPart.Events("run ended completed")
       )
 
-    Scenario("Each run of a module given no fork group shows its own suites and output under its own line, numbered in the order the runs were added") {
-      Given("two runs of one module given no fork group, each with a suite and a stdout line, the first run's suite sorting after the second's")
+    Scenario("Each run given no worker shows its own suites and output under its own line, numbered in the order the runs were added") {
+      Given("two runs of one module, neither given a worker, each with a suite and a stdout line, the first run's suite sorting after the second's")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
       addRun(consolidation, runWithLine("ZetaSuite", "from the first run")*).endEventStream()
@@ -213,8 +213,8 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
           |    [stdout] from the second run""".stripExpectedMargin
     }
 
-    Scenario("A run's line shows its number by fork group, then worker index, whatever order the runs were added in") {
-      Given("a run in fork group 1, worker index 0, then a run in fork group 0, worker index 1, then a run in fork group 0, worker index 0, each with a suite and a stdout line")
+    Scenario("A module's runs are numbered by fork group, then worker index, whatever order they were added in") {
+      Given("three runs, each with a suite and a stdout line, added with fork group and worker index (1, 0), then (0, 1), then (0, 0)")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
       addRunInWorker(consolidation, 1, 0, runWithLine("FirstAdded", "from fork group 1, worker 0")*).endEventStream()

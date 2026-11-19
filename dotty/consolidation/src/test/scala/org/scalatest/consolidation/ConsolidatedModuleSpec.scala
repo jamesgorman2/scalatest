@@ -37,7 +37,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
         numbersOf(Vector(first, second)) shouldBe Vector(1 -> first, 2 -> second)
       }
     }
-    "given no fork group" should {
+    "given no worker" should {
       "be numbered in the order they were added" in {
         val first = runGivenNoForkGroup()
         val second = runGivenNoForkGroup()

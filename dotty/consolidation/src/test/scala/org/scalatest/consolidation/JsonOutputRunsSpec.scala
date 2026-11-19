@@ -39,7 +39,7 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
       And("run 3, fork group 1, worker index 0, running suites Alpha then Beta")
       val runThree = runOfSuites("Alpha", "Beta")
 
-      When("the runs are given to the library in the order 3, 2, 1, and the library consolidates them")
+      When("the runs are added in the order 3, 2, 1 and the library consolidates them")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
       addRunInWorker(consolidation, 1, 0, runThree*).endEventStream()
@@ -64,13 +64,13 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
         None
       )
 
-      And("each run node writes number then forkGroup as its second and third keys")
+      And("each run node's second and third keys are number then forkGroup")
       runNodes.map(_.keys.slice(1, 3)) shouldBe Vector.fill(3)(Vector("number", "forkGroup"))
     }
 
     Scenario("A run given no fork group has no forkGroup, and a module's runs given none are numbered in the order they are given: runs without a fork group") {
-      Given("a run with no fork group and no worker index, running suite Beta")
-      And("then a run with no fork group and no worker index, running suite Alpha")
+      Given("a run with no worker, running suite Beta")
+      And("then a run with no worker, running suite Alpha")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
       addRun(consolidation, runOfSuites("Beta")*).endEventStream()

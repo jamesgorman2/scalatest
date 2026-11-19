@@ -34,7 +34,7 @@ final class Consolidation private (
    * human-readable output, and its run node in the JSON output, show its number.
    *
    * @param label the run's module, which heads the module's line in the human-readable output
-   * @param worker the worker the run ran in. The JSON output records its fork group on the run's node, and not its index.
+   * @param worker the worker the run ran in. The run node in the JSON output records the worker's fork group but not its index.
    * @throws IllegalArgumentException if the consolidation has ended
    */
   def addRun(label: TestRunLabel, worker: Option[Worker] = None): RunFeed =
