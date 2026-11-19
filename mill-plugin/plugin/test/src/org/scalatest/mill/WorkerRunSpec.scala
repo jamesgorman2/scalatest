@@ -8,10 +8,15 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.Signaler
+import org.scalatest.concurrent.ThreadSignaler
+import org.scalatest.concurrent.TimeLimits
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.matchers.should
+import org.scalatest.time.Seconds
+import org.scalatest.time.Span
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
 import scala.concurrent.Await
@@ -20,7 +25,9 @@ import scala.concurrent.Promise
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
 
-final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventually {
+final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventually with TimeLimits {
+
+  override implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(5, Seconds))
 
   private val label: TestRunLabel = TestRunLabel("core.test")
   private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
@@ -43,6 +50,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     val capture: WorkerOutputCapture = new WorkerOutputCapture(StandardCharsets.UTF_8)
     val runsAdded: AtomicInteger = new AtomicInteger(0)
     val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
+    @volatile var processExited: Boolean = true
     private val reader = new EventLogReader(
       eventLogFile,
       () => {
@@ -55,7 +63,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         processesEndedBeforeAnyRun.incrementAndGet()
         consolidation.addProcessEndedBeforeAnyRun()
       },
-      hasExited = _ => true,
+      hasExited = _ => processExited,
       pollInterval = 1.millis,
       open = open
     )
@@ -72,6 +80,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     def endWorker(): Unit = workerRun.end(workerEnd => Await.ready(workerEnd, Duration.Inf))
+
+    def awaitReaderEnd(): Unit = reader.awaitStreamEnd(startedAProcess = true)
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
   }
@@ -235,11 +245,28 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "starting the worker throws a fatal error before its event log exists" should {
-      "rethrow it once the reader has added the worker as a process that ended before any run" in {
+      "rethrow it once the reader is abandoned, so the reader adds the worker as a process that ended before any run" in {
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(file, opening)
           a[StackOverflowError] should be thrownBy fixture.workerRun.start(throw new StackOverflowError("worker"))
-          fixture.processesEndedBeforeAnyRun.get shouldBe 1
+          eventually(fixture.processesEndedBeforeAnyRun.get shouldBe 1)
+        }
+      }
+    }
+
+    "starting the worker throws a fatal error while the run's process, named in its event log, has not exited" should {
+      "rethrow it without waiting for that process to exit" in {
+        withEventLogFile { file =>
+          writeCompletedRun(file)
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.processExited = false
+          implicit val signaler: Signaler = ThreadSignaler
+          failAfter(patienceConfig.timeout) {
+            a[StackOverflowError] should be thrownBy fixture.workerRun.start(throw new StackOverflowError("worker"))
+          }
+          fixture.processExited = true
+          fixture.awaitReaderEnd()
+          fixture.runsAdded.get shouldBe 1
         }
       }
     }

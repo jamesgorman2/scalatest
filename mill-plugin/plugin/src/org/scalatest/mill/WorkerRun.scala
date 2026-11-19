@@ -19,7 +19,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
   /**
    * Starts reading the worker's event log, then the worker. A fatal throwable from starting the worker is rethrown,
-   * once the reader has ended.
+   * once the reader is abandoned.
    *
    * @param startWorker starts the worker, giving once it has ended whether it started a process
    */
@@ -30,7 +30,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
         Try(startWorker)
       } catch {
         case fatal: Throwable =>
-          endReading(startedAProcess = true)
+          abandon()
           throw fatal
       }
   }

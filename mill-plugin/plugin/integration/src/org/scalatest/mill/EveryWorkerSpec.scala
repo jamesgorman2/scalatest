@@ -62,7 +62,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     editBuild(tester, "def testParallelism = false", "def testParallelism = true")
 
   private def turnOffTestSandboxing(tester: IntegrationTester): Unit =
-    editBuild(tester, "def testParallelism = true", "def testParallelism = true\n    def testSandboxWorkingDir = false")
+    editBuild(tester, "def testForkGrouping", "def testSandboxWorkingDir = false\n    def testForkGrouping")
 
   private val suites: Seq[String] = Seq("A1", "A2", "B1", "B2")
 
