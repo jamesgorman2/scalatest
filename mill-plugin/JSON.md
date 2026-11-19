@@ -46,7 +46,9 @@ Keys, in order:
 - `buildTool` — `{ "name", "version" }`: `Mill` and the version of Mill that ran the test command.
 - `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, present only where `failures` is.
-- `failures` — `[{ "message" }]`: the failures that are not a run's: for each worker in the order the test command started them, the worker failing to start, then its test event log failing to be read. Each message names the worker, its fork group and the module, as in `Starting worker 0 of fork group 1 of core.test failed: …`. Absent where there is none.
+- `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
+  - for each worker in the order the test command started them, the worker failing to start, then its test event log failing to be read. Each message names the worker, its fork group and the module, as in `Starting worker 0 of fork group 1 of core.test failed: …`;
+  - or, where two of the module's fork groups would run in one folder, one failure naming the module, the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`.
 - `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's tests are discovered until every run has ended.
 - `contents` — an array holding the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.

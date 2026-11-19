@@ -19,11 +19,26 @@ private[mill] final class JvmTestModuleRun(
     ctx: TaskCtx
 ) {
 
-  /** Times the module from just before its first worker starts until its last worker has ended and its event log is read. */
+  /**
+   * Times the module from just before its first worker starts until its last worker has ended and its event log is read.
+   * Where two workers would share a `processFolder`, none starts: the failure is attached to the root naming the module,
+   * and the module stays in the output with no times and no run.
+   */
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
-    val workers = QueueWorker.forEachForkGroup(inputs.forkGroups, discoveredTestClasses())
+    QueueWorker
+      .forEachForkGroup(inputs.forkGroups, discoveredTestClasses())
+      .fold(
+        reason => {
+          consolidation.addRootFailure(s"Laying out the workers of ${label.value} failed: $reason")
+          consolidation.timeModule(label, None, None)
+        },
+        workers => runWorkers(consolidation, workers)
+      )
+  }
+
+  private def runWorkers(consolidation: Consolidation, workers: Seq[QueueWorker]): Unit = {
     val queues = workers.map(worker => worker -> layOutQueue(worker))
     val startedAt = Instant.now()
     queues.foreach { case (worker, queue) => runWorker(consolidation, worker, queue) }
@@ -56,7 +71,7 @@ private[mill] final class JvmTestModuleRun(
     val reader = new EventLogReader(
       eventLogFile.toNIO,
       () => {
-        val feed = consolidation.addRun(label, Some(worker.worker))
+        val feed = consolidation.addRun(label, Some(worker.forkGroupAndIndex))
         capture.addTo(feed.add)
         feed
       },
