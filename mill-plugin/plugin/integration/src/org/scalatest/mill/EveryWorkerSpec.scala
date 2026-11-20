@@ -156,36 +156,68 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Two workers in each fork group") {
+    Scenario("Under test parallelism, a fork group's runs are numbered in the order of their workers, however the queue splits the group") {
       withEveryWorkerBuild { build =>
-        Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2)")
-        And("the module's testParallelism is true")
+        givenTheModuleHoldsTwoForkGroups()
+        And("test parallelism is on")
         build.turnOnTestParallelism()
-        And("each suite's test t sleeps for 3 seconds, then sends an info message holding the system property user.dir")
-        suites.foreach(suite => build.writeSuite(suite, "Thread.sleep(3000); info(System.getProperty(\"user.dir\"))"))
-        When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
+        And("each suite's test sends its working directory as an info message")
+        suites.foreach(suite => build.writeSuite(suite, build.sendWorkingDirectory))
+        When("the test command runs the module with four jobs")
         val (result, json) = build.resultAndReportOfTestCommandWithJobs(4)
 
-        Then("for each forkGroup, the module has exactly two runs with that forkGroup")
-        withClue(result.debugString) {
-          Seq(0, 1).map(forkGroup => runsOfForkGroup(json, forkGroup).size) shouldBe Seq(2, 2)
-        }
-
-        And("within each of the module's runs, every info message is a path holding one and the same folder worker-<i>")
-        val runsInWorkers = runs(json).map { run =>
-          withClue(s"in the info messages ${infoMessages(run)}: ") {
-            inside(infoMessages(run).map(build.workerIndexOf).distinct) { case Seq(Some(workerIndex)) =>
-              RunInWorker(run.forkGroup, run.number, workerIndex)
+        Then("each run's info messages all name the same worker folder")
+        val runsInWorkers = withClue(result.debugString) {
+          runs(json).flatMap { run =>
+            withClue(s"in the info messages ${infoMessages(run)}: ") {
+              inside(infoMessages(run).map(build.workerIndexOf).distinct) {
+                case Seq() => None
+                case Seq(Some(workerIndex)) => Some(RunInWorker(run.forkGroup, run.number, workerIndex))
+              }
             }
           }
         }
-
-        And("of the two runs with each forkGroup, the one with the lower number has the lower <i>")
-        Seq(0, 1).foreach { forkGroup =>
-          val indexesInNumberOrder = runsInWorkers.filter(_.forkGroup.contains(forkGroup)).sortBy(_.number).map(_.workerIndex)
-          indexesInNumberOrder.distinct should have size 2
-          indexesInNumberOrder shouldBe indexesInNumberOrder.sorted
+        val workerIndexesInNumberOrderByForkGroup = Seq(0, 1).map { forkGroup =>
+          runsInWorkers.filter(_.forkGroup.contains(forkGroup)).sortBy(_.number).map(_.workerIndex)
         }
+
+        And("no two runs of a fork group ran in the same worker")
+        workerIndexesInNumberOrderByForkGroup.foreach(indexes => indexes.distinct shouldBe indexes)
+
+        And("each fork group has a run in its first worker, worker-0")
+        workerIndexesInNumberOrderByForkGroup.foreach(indexes => indexes should contain(0))
+
+        And("within each fork group, the run with the lower number ran in the worker with the lower index")
+        workerIndexesInNumberOrderByForkGroup.foreach(indexes => indexes shouldBe indexes.sorted)
+      }
+    }
+
+    Scenario("A fork group whose two classes must run at the same time runs in its first two workers, numbered in that order") {
+      withEveryWorkerBuild { build =>
+        givenTheModuleHoldsTwoForkGroups()
+        And("test parallelism is on")
+        build.turnOnTestParallelism()
+        And("A1's and A2's tests each send their working directory as an info message, then wait up to 30 seconds for the other to start")
+        val markers = build.emptyMarkersFolder()
+        build.writeSuiteThatWaitsFor("A1", "A2", markers)
+        build.writeSuiteThatWaitsFor("A2", "A1", markers)
+        When("the test command runs the module with four jobs")
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(4)
+
+        Then("the second fork group has exactly two runs")
+        val secondForkGroupRuns = runsOfForkGroup(json, 1)
+        withClue(result.debugString) {
+          secondForkGroupRuns should have size 2
+        }
+
+        And("one of those runs names only worker-0 in its info messages, and the other only worker-1")
+        val workerIndexesInNumberOrder = secondForkGroupRuns.sortBy(_.number).map(run => infoMessages(run).map(build.workerIndexOf).distinct)
+        withClue(result.debugString) {
+          workerIndexesInNumberOrder should contain theSameElementsAs Seq(Seq(Some(0)), Seq(Some(1)))
+        }
+
+        And("the run in worker-0 has the lower number")
+        workerIndexesInNumberOrder shouldBe Seq(Seq(Some(0)), Seq(Some(1)))
       }
     }
 
@@ -552,6 +584,29 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
     )
 
   def removeSuites(): Unit = os.remove.all(fixtureBuild.samples)
+
+  val sendWorkingDirectory: String = """info(System.getProperty("user.dir"))"""
+
+  def emptyMarkersFolder(): os.Path = {
+    val markers = fixtureBuild.workspace / "markers"
+    os.makeDir(markers)
+    markers
+  }
+
+  def writeSuiteThatWaitsFor(suite: String, otherSuite: String, markers: os.Path): Unit = {
+    val markersLiteral = "\"" + markers.toString.replace('\\', '/') + "\""
+    writeSuite(
+      suite,
+      s"""$sendWorkingDirectory
+         |    val markers = java.nio.file.Paths.get($markersLiteral)
+         |    java.nio.file.Files.write(markers.resolve("$suite"), Array.emptyByteArray)
+         |    val deadline = System.nanoTime() + 30L * 1000 * 1000 * 1000
+         |    while (!java.nio.file.Files.exists(markers.resolve("$otherSuite")) && System.nanoTime() < deadline) {
+         |      Thread.sleep(50)
+         |    }
+         |    assert(java.nio.file.Files.exists(markers.resolve("$otherSuite")), "$otherSuite did not start within 30 seconds")""".stripMargin
+    )
+  }
 
   /** The module holds only the given suites, each in its own fork group, in the order given. */
   def holdOnlySuitesEachInItsOwnForkGroup(testBodies: (String, String)*): Unit = {
