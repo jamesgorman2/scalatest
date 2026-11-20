@@ -16,7 +16,7 @@ class ThreadRecordingReporter extends Reporter {
         .filter(thread => Option(thread.getThreadGroup).exists(_.getName == "main"))
         // Suite.run renames a suite's thread for the run: it appends -ScalaTest unless the name holds ScalaTest-, then
         // -running-<suite name>. An event can arrive before or after the rename,
-        // so the name is recorded without either.
+        // so the name is recorded without either suffix.
         .map(_.getName.replaceAll("(-ScalaTest)?-running-.*$", "").replaceAll("[0-9]+", "N"))
       val unrecorded = alive.distinct.filterNot(recorded.contains).sorted
       unrecorded.foreach(threads.append)

@@ -13,7 +13,7 @@ class EventFieldsRecordingReporter extends Reporter {
 
   def apply(event: Event): Unit = {
     lines.append("received " + EventFields.of(event, withTimeStamp = true))
-    // Without its timestamp, which a test event log takes from when the test made the call that recorded it.
+    // A recorded event is written without its timestamp: a test event log takes that from when the test made the call.
     recordedEvents(event).foreach(recorded => lines.append("recorded " + EventFields.of(recorded, withTimeStamp = false)))
   }
 
