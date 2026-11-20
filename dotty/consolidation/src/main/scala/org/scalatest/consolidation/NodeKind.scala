@@ -2,7 +2,6 @@ package org.scalatest.consolidation
 
 import org.scalatest.events.StructureNode
 
-/** `word` is the kind as the outputs name it. */
 private[consolidation] enum NodeKind(val word: String) {
   case Suite extends NodeKind("suite")
   case Scope extends NodeKind("scope")

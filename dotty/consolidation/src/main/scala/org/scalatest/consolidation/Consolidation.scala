@@ -4,8 +4,7 @@ import java.time.Instant
 import scala.collection.mutable
 
 /**
- * One consolidation: the runs of one test command, consolidated into human-readable output and, where it is given a
- * sink for it, JSON output.
+ * The runs of one test command, consolidated into human-readable output and, where given a sink for it, JSON output.
  *
  * Every operation may be called from any thread. [[state]] takes no lock.
  */
@@ -32,9 +31,10 @@ final class Consolidation private[consolidation] (
    * Adds a run and passes its feed to `feedEventStream`. The run's event stream ends when `feedEventStream` returns or
    * throws; anything it throws is rethrown.
    *
-   * A module's runs are numbered from 1 in ascending order of fork group, then of worker index; runs given no worker come
-   * first, in the order they are added. Numbers are fixed when the consolidation ends, so a run added later can renumber
-   * earlier ones. A run's line in the human-readable output, and its run node in the JSON output, show its number.
+   * A module's runs are numbered from 1 in the order `AssembledRun.numberingOrder` gives their workers, runs that tie
+   * keeping the order they were added in. Numbers are fixed when the consolidation ends, so a run added later can
+   * renumber earlier ones. A run's line in the human-readable output, and its run node in the JSON output, show its
+   * number.
    *
    * @param label the run's module, which heads the module's line in the human-readable output
    * @param worker the worker the run ran in. The run node in the JSON output records the worker's fork group but not its index.
@@ -93,9 +93,8 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Gives a module's start and end time, each by the caller's clock and each where the caller measured it. A later call
-   * for the same module replaces the times an earlier one gave. A module timed but given no run is still a module of
-   * every output, with nothing under it.
+   * Sets a module's start and end time by the caller's clock, replacing those an earlier call set. A module timed but
+   * given no run is still a module of every output, with nothing under it.
    *
    * @param startedAt when the caller started the module's tests
    * @param endedAt when the last of the module's test processes ended
@@ -142,6 +141,8 @@ final class Consolidation private[consolidation] (
 
   private[consolidation] def fail(): Unit = currentState = currentState.withFailure
 
+  private[consolidation] def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "The consolidation's lock is not held")
+
   private def requireOpen(): Unit =
     if (currentState.ended) {
       throw new IllegalStateException("the consolidation has ended")
@@ -153,10 +154,10 @@ object Consolidation {
   /**
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
    * @param coloured whether that output is coloured with ANSI escape sequences
-   * @param jsonOutput the sink given the JSON output once, when the consolidation ends, to write where it chooses; every
-   *                   operation but [[state]] waits until the sink returns. With none, no JSON output is made
+   * @param jsonOutput the sink given the JSON output once, when the consolidation ends. Every operation but [[state]]
+   *                   waits until the sink returns. With none, no JSON output is made
    * @param moduleSelectors each module selector, in the order given, with the test modules it resolved to
-   * @param buildTool the build tool that started the runs, where the caller gives one
+   * @param buildTool the build tool that started the runs
    * @param startedAt the root's start time by the caller's clock: when the consolidation started
    */
   def start(
@@ -181,9 +182,8 @@ object Consolidation {
 /** Receives one run's event stream and captured lines, in the order they were read. */
 final class RunFeed private[consolidation] (consolidation: Consolidation, newRun: RunAssembly) {
 
-  // Read and written only under the consolidation's lock.
-  private var run: RunAssembly = newRun
-  private var endedEventStream: Option[AssembledEventStream] = None
+  private val run = new GuardedByConsolidation(consolidation, newRun)
+  private val endedEventStream = new GuardedByConsolidation(consolidation, Option.empty[AssembledEventStream])
 
   /**
    * Adds the next event of the run's event stream.
@@ -192,10 +192,10 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
    */
   def add(event: RunEvent): Unit =
     consolidation.feed {
-      if (endedEventStream.nonEmpty) {
-        throw new IllegalStateException(s"the event stream of a run under ${run.label.value} has ended")
+      if (endedEventStream.get.nonEmpty) {
+        throw new IllegalStateException(s"the event stream of a run under ${run.get.label.value} has ended")
       }
-      run = run.added(event.decoded)
+      run.set(run.get.added(event.decoded))
       if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsRunAbnormally(event.decoded)) {
         consolidation.fail()
       }
@@ -208,14 +208,14 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
    */
   def add(line: CapturedLine): Unit =
     consolidation.feed {
-      run = run.added(line)
+      run.set(run.get.added(line))
     }
 
   private[consolidation] def endEventStream(): Unit =
     consolidation.feed {
-      if (endedEventStream.isEmpty) {
-        val eventStream = run.assembledWholeEventStream
-        endedEventStream = Some(eventStream)
+      if (endedEventStream.get.isEmpty) {
+        val eventStream = run.get.assembledWholeEventStream
+        endedEventStream.set(Some(eventStream))
         if (eventStream.failsTestCommand) {
           consolidation.fail()
         }
@@ -224,12 +224,12 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
 
   private[consolidation] def addAssigned(classes: Iterable[TestClassName]): Unit =
     consolidation.feed {
-      run = run.withAssigned(classes)
+      run.set(run.get.withAssigned(classes))
     }
 
   private[consolidation] def assembled: AssembledRun =
-    run.assembled(
-      endedEventStream.getOrElse(throw new IllegalStateException(s"the event stream of a run under ${run.label.value} has not ended"))
+    run.get.assembled(
+      endedEventStream.get.getOrElse(throw new IllegalStateException(s"the event stream of a run under ${run.get.label.value} has not ended"))
     )
 }
 
@@ -243,4 +243,19 @@ final class EndedRun private[consolidation] (feed: RunFeed) {
    * @throws IllegalStateException if the consolidation has ended
    */
   def addAssignedTestClasses(classes: Iterable[TestClassName]): Unit = feed.addAssigned(classes)
+}
+
+private[consolidation] final class GuardedByConsolidation[A](consolidation: Consolidation, initial: A) {
+
+  private var current = initial
+
+  def get: A = {
+    consolidation.assertLockHeld()
+    current
+  }
+
+  def set(value: A): Unit = {
+    consolidation.assertLockHeld()
+    current = value
+  }
 }

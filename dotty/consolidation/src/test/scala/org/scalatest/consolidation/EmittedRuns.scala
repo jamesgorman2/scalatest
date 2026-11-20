@@ -16,7 +16,6 @@ import sbt.testing.TaskDef
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 
-/** Runs a suite through `Framework`, outside Mill, writing the run's test event log, and consolidates that log. */
 private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns & JsonOutputs =>
 
   private val ignoringEvents: EventHandler = _ => ()
@@ -47,7 +46,6 @@ private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns &
       case Nil => ()
     }
 
-  /** The human-readable output's lines, with colour on, less the summary line. */
   def colourMarkedTreeLinesFrom(eventLog: Vector[RunEvent]): Vector[String] =
     colourMarkedOutputAfter(_.addRunOf(eventLog)).treeLines
 }

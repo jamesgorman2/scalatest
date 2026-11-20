@@ -22,20 +22,16 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
         case items => fail(s"expected one event, but the notation built $items")
       }
 
-    // An event is a line at the event log's least indentation, with the lines indented below it.
     def interleavingsWith(lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
       ConsolidatedRuns.interleavings(ConsolidatedRuns.eventNotationsOf(literal).map(TestRunPart.Events(_)), lines)
   }
 
   extension (consolidation: Consolidation) {
 
-    /** Adds a run of module `core.test`, given no worker, fed the parts. */
     def addRunOf(parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel)(feed => feed.addAll(parts*))
 
-    /** Adds a run of module `core.test`, given no worker, fed the events. */
     def addRunOf(events: Vector[RunEvent]): EndedRun = consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(event)))
 
-    /** Adds a run of module `core.test` in the worker, fed the parts. */
     def addRunIn(worker: Worker, parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel, Some(worker))(feed => feed.addAll(parts*))
   }
 
@@ -79,27 +75,15 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val runEndsCompleted: TestRunPart = TestRunPart.Events("run: RunCompleted\nrun ended completed")
 
-  /** The event log of a run that starts, sends the events, then ends completed. */
   def completedRunOf(events: String*): String = ("run started" +: events :+ "run ended completed").mkString("\n")
 
-  /**
-   * Suite `samples.<suite>`'s structure, then its SuiteStarting, the events and its SuiteCompleted.
-   *
-   * @param nodes the suite's scopes and tests, one to a line, each indented 2 spaces more than its parent
-   */
   def eventLogOfSuite(suite: String, nodes: String, events: String*): String =
     (structureOf(suite, nodes) +: s"""suite "$suite": SuiteStarting""" +: events.flatMap(ConsolidatedRuns.eventLinesOf) :+ s"""suite "$suite": SuiteCompleted""")
       .mkString("\n")
 
-  /** Suite `samples.<suite>`'s structure, holding the nodes under the suite, written as for `eventLogOfSuite`. */
   def structureOf(suite: String, nodes: String): String =
     (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
 
-  /**
-   * Suite `samples.<suite>` with one test, which succeeds.
-   *
-   * @param occurrenceAmongTestsOfItsName where the test falls among the run's tests of the same name, counted from 1
-   */
   def suiteRuns(suite: String, test: String = "t", occurrenceAmongTestsOfItsName: Int = 1): TestRunPart =
     TestRunPart.Events(
       eventLogOfSuite(
@@ -110,7 +94,6 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
       )
     )
 
-  /** A completed run of the suites, in order, each with one test `t`, which succeeds. */
   def runOfSuites(suites: String*): Vector[TestRunPart] =
     runStarts +: suites.zipWithIndex.map((suite, index) => suiteRuns(suite, occurrenceAmongTestsOfItsName = index + 1)).toVector :+ runEndsCompleted
 
@@ -119,7 +102,6 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   def startedWithColour(output: OutputSink = new OutputSink): Consolidation = Consolidation.start(output, coloured = true)
 
-  /** The human-readable output, with colour on, of a consolidation acted on by `act`, then ended. */
   def colourMarkedOutputAfter(act: Consolidation => Unit): ColourMarkedOutput = {
     val output = new OutputSink
     val consolidation = startedWithColour(output)

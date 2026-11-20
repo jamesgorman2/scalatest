@@ -1,6 +1,6 @@
 package org.scalatest.consolidation
 
-/** The test run label: a run's module, which heads the module's line. The human-readable output writes it in brackets. */
+/** The label naming a run's module. */
 opaque type TestRunLabel = String
 
 object TestRunLabel {

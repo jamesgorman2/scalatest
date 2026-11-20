@@ -5,7 +5,6 @@ import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.Location
 
-/** `word` is the kind as the outputs mark a message of it. */
 private[consolidation] enum MessageKind(val word: String) {
   case Info extends MessageKind("info")
   case Note extends MessageKind("note")
@@ -13,7 +12,6 @@ private[consolidation] enum MessageKind(val word: String) {
   case Markup extends MessageKind("markup")
 }
 
-/** An `info`, `note`, `alert` or `markup` message. */
 private[consolidation] final case class ProvidedMessage(
   kind: MessageKind,
   text: String,

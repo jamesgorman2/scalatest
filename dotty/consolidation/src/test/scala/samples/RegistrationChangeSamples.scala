@@ -9,8 +9,6 @@ import org.scalatest.Suite
 import org.scalatest.Tag
 import org.scalatest.funsuite.AnyFunSuite
 
-// Each test runs in an instance of its own. An instance built after test a has run registers test c in a's place, so
-// the instance that runs b registers c and b. A run of the whole suite forgets that a ran once the run completes.
 abstract class ReplacesARanTest extends AnyFunSuite with OneInstancePerTest {
 
   protected def ranA: AtomicBoolean
@@ -74,8 +72,6 @@ class KeepsItsTestsNestingSuitesSuite extends AnyFunSuite with OneInstancePerTes
 
 object Dropped extends Tag("samples.Dropped")
 
-// Runs test a even where the filter drops it, as it does where samples.Dropped is excluded. The suite's first structure
-// then holds its nested suites alone, and a further structure adds a.
 @DoNotDiscover
 class RunsADroppedTestNestingSuitesSuite extends AnyFunSuite {
 

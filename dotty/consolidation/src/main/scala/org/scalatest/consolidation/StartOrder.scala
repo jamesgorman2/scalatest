@@ -1,6 +1,5 @@
 package org.scalatest.consolidation
 
-/** Where an execution's start falls among the starts of every execution of its run. */
 private[consolidation] opaque type StartOrder = Int
 
 private[consolidation] object StartOrder {

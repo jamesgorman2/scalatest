@@ -38,9 +38,9 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
     (fromBullets ++ fromLists ++ fromShapes).map(_.group(1)).toSet
   }
 
-  // A config map's keys are the run's own, not the format's.
   private def keysOf(value: JsonValue): Set[String] =
     value match {
+      // A config map's keys are the run's own, not the format's.
       case JsonValue.Object(fields) => fields.flatMap((key, field) => if (key == "configMap") Set(key) else keysOf(field) + key).toSet
       case JsonValue.Array(items) => items.flatMap(keysOf).toSet
       case _ => Set.empty

@@ -5,6 +5,5 @@ final case class WorkerIndex private (value: Int)
 
 object WorkerIndex {
 
-  /** The worker index holding the value. Throws `IllegalArgumentException` where the value is negative. */
   def apply(value: Int): WorkerIndex = new WorkerIndex(CountedFromZero.checked(value, "a worker index"))
 }

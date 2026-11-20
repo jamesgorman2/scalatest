@@ -3,7 +3,6 @@ package org.scalatest.consolidation
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedThrowable
 
-/** The `TestFailed`, `TestCanceled` or `SuiteAborted` that ended an execution, whose lines sit under the execution's line. */
 private[consolidation] enum FailureEnding {
   case TestFailed(message: String, throwable: Option[DecodedThrowable], analysis: IndexedSeq[String])
   case TestCanceled(message: String, throwable: Option[DecodedThrowable])

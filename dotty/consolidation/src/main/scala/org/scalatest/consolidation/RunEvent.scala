@@ -10,7 +10,6 @@ import org.scalatest.events.TestEventLogEvent
 /** One event of a run's test event log, as [[RunEvent.decode]] returns it. Only the run's process can be read from it. */
 opaque type RunEvent = DecodedRunEvent
 
-/** A decoded event, with the process its `runStarted` event names, whose start time is parsed once, on decoding. */
 private[scalatest] final case class DecodedRunEvent(event: TestEventLogEvent, runProcess: Option[RunProcess])
 
 opaque type Pid = Long
@@ -43,7 +42,6 @@ object RunEvent {
     }
   }
 
-  /** @throws MalformedTestEventLogException if the event is a `runStarted` whose start time is not an instant */
   private[scalatest] def of(event: TestEventLogEvent): RunEvent =
     event match {
       case TestEventLogEvent.RunStarted(pid, startTime) =>

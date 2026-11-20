@@ -5,7 +5,6 @@ import java.time.Instant
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.Location
 
-/** What a suite's, scope's or test's opening or closing event records of that node's execution. */
 private[consolidation] final case class NodeEvent(at: Instant, duration: Option[Duration], location: Option[Location], threadName: String)
 
 private[consolidation] object NodeEvent {

@@ -6,14 +6,6 @@ import org.scalatest.tools.AnsiGreen
 import org.scalatest.tools.AnsiRed
 import org.scalatest.tools.AnsiYellow
 
-/**
- * The counts the summary line gives. Each suite and test counts once for each of its executions, and once where it
- * has none.
- *
- * @param suitesExpected every suite
- * @param testsExpected  every test that is not ignored
- * @param testsRun       each execution of a test that succeeded, failed, was cancelled or is pending
- */
 private[consolidation] final case class SummaryCounts(
   suitesExpected: Int,
   completed: Int,
@@ -46,10 +38,6 @@ private[consolidation] object SummaryCounts {
 
   val none: SummaryCounts = SummaryCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-  /**
-   * The counts over the assembled tree of the runs, the tree the human-readable output prints. Collapsed subtrees are
-   * counted. Attributed nodes are not in the tree, so they are not counted.
-   */
   def of(runs: Seq[AssembledRun]): SummaryCounts =
     runs.flatMap(_.eventStream.topLevelSuites).flatMap(_.withDescendants).map(countsOf).foldLeft(none)(_.plus(_))
 
@@ -70,13 +58,8 @@ private[consolidation] object SummaryCounts {
   private val testRun: SummaryCounts = none.copy(testsExpected = 1, testsRun = 1)
 }
 
-/** The last line of the human-readable output. */
 private[consolidation] object SummaryLine {
 
-  /**
-   * The summary line of the runs, as segments. Each part (a word and its count) is coloured as a line of its kind,
-   * whatever its count; every other character is cyan.
-   */
   def of(runs: Seq[AssembledRun]): Vector[Segment] = segmentsOf(SummaryCounts.of(runs))
 
   private def segmentsOf(counts: SummaryCounts): Vector[Segment] = {
