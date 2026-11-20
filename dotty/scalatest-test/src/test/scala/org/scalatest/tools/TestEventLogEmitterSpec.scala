@@ -39,7 +39,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
   private val ordinal = new Ordinal(1)
   private val timeStamp = 1700000000000L
-  private val identity = Right(ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z")))
+  private val identity = ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z"))
 
   private val runStartedLine = TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z")
   private val runStartingLine =
@@ -207,7 +207,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     "its process has no identity" should {
       "fail to start, saying why, and create no file" in {
         TemporaryEventLog.in { eventLogFile =>
-          the[IllegalStateException] thrownBy TestEventLogEmitter.started(eventLogFile, Left("this JVM has no java.lang.ProcessHandle")) should
+          val noProcessHandle = new IllegalStateException("this JVM has no java.lang.ProcessHandle")
+          the[IllegalStateException] thrownBy TestEventLogEmitter.startedIfGiven(Some(eventLogFile.toString), throw noProcessHandle) should
             have message s"Cannot write the test event log $eventLogFile: this JVM has no java.lang.ProcessHandle"
           TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set.empty
         }

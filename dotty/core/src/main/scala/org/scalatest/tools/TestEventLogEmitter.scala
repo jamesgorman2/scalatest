@@ -589,8 +589,24 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] =
-    eventLogFile.map(file => started(Paths.get(file), ProcessIdentity.current))
+  /** @throws IllegalStateException where the process has no identity to write */
+  def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] = startedIfGiven(eventLogFile, ProcessIdentity.current)
+
+  def startedIfGiven(eventLogFile: Option[String], processIdentity: => ProcessIdentity): Option[TestEventLogEmitter] = {
+    eventLogFile.map { file =>
+      val path = Paths.get(file)
+      started(path, identityToWriteIn(path, processIdentity))
+    }
+  }
+
+  private def identityToWriteIn(eventLogFile: Path, processIdentity: => ProcessIdentity): ProcessIdentity = {
+    try {
+      processIdentity
+    } catch {
+      case unreadable: IllegalStateException =>
+        throw new IllegalStateException(s"Cannot write the test event log $eventLogFile: ${unreadable.getMessage}", unreadable)
+    }
+  }
 
   /** The hand-off for the events a run's runner sends outside every structure wrapper. */
   def handOffTo(emitter: Option[TestEventLogEmitter]): Event => Unit = {
@@ -619,26 +635,19 @@ private[scalatest] object TestEventLogEmitter {
   /**
    * The `runStarted` event is written to a file of another name and moved into place, so the event log file never exists
    * without its whole `runStarted` event.
-   *
-   * @throws IllegalStateException where the process has no identity to write
    */
-  def started(eventLogFile: Path, processIdentity: Either[String, ProcessIdentity]): TestEventLogEmitter = {
-    processIdentity match {
-      case Right(identity) =>
-        val runStarted = TestEventLogEncoder.runStarted(identity.pid, identity.startTime.toString)
-        val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
-        // Created anew, so a link planted under its name in a shared folder is never followed. A file an earlier run
-        // left there is replaced.
-        if (Files.isRegularFile(unmoved, LinkOption.NOFOLLOW_LINKS)) {
-          Files.delete(unmoved)
-        }
-        Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
-        Files.move(unmoved, eventLogFile, StandardCopyOption.ATOMIC_MOVE)
-        // Not a FileChannel: interrupting a thread that is writing to one closes it for every thread.
-        appendingTo(new FileOutputStream(eventLogFile.toFile, true))
-      case Left(reason) =>
-        throw new IllegalStateException(s"Cannot write the test event log $eventLogFile: $reason")
+  def started(eventLogFile: Path, processIdentity: ProcessIdentity): TestEventLogEmitter = {
+    val runStarted = TestEventLogEncoder.runStarted(processIdentity.pid, processIdentity.startTime.toString)
+    val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
+    // Created anew, so a link planted under its name in a shared folder is never followed. A file an earlier run
+    // left there is replaced.
+    if (Files.isRegularFile(unmoved, LinkOption.NOFOLLOW_LINKS)) {
+      Files.delete(unmoved)
     }
+    Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+    Files.move(unmoved, eventLogFile, StandardCopyOption.ATOMIC_MOVE)
+    // Not a FileChannel: interrupting a thread that is writing to one closes it for every thread.
+    appendingTo(new FileOutputStream(eventLogFile.toFile, true))
   }
 
   /** `eventLog` must already hold the run's `runStarted` event. */

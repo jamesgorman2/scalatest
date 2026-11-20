@@ -95,9 +95,11 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
       .flatMap(_.collect { case suite: StructureNode.Suite if suite.name == suiteName => suite.className })
 
   protected def thisProcess: ProcessIdentity = {
-    val current = ProcessIdentity.current
-    assume(current.isRight, s"an emitter needs its process's identity: ${current.left.getOrElse("")}")
-    current.fold(reason => fail(reason), identity)
+    try {
+      ProcessIdentity.current
+    } catch {
+      case unreadable: IllegalStateException => cancel(s"an emitter needs its process's identity: ${unreadable.getMessage}")
+    }
   }
 
   protected def runnerArgument(eventLogFile: Path): List[String] = TestEventLogArgument.forFile(eventLogFile.toString)

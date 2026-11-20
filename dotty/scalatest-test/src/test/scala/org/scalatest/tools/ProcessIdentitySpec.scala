@@ -48,30 +48,36 @@ final class ProcessIdentitySpec extends AnyWordSpec with Matchers {
     "the JVM has ProcessHandle and the process a start time" should {
       "be the PID and start time the handle gives" in {
         ProcessIdentity.readThrough(loading(classOf[StartedProcessHandle], classOf[StartedProcessInfo])) shouldBe
-          Right(ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z")))
+          ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z"))
       }
     }
 
     "the process has no start time" should {
-      "be absent, for that reason" in {
-        ProcessIdentity.readThrough(loading(classOf[StartlessProcessHandle], classOf[StartlessProcessInfo])) shouldBe
-          Left("this process has no start time")
+      "fail to be read, saying why" in {
+        the[IllegalStateException] thrownBy
+          ProcessIdentity.readThrough(loading(classOf[StartlessProcessHandle], classOf[StartlessProcessInfo])) should
+          have message "this process has no start time"
       }
     }
 
     "the JVM has no ProcessHandle" should {
-      "be absent, for that reason" in {
-        ProcessIdentity.readThrough(className => throw new ClassNotFoundException(className)) shouldBe
-          Left("this JVM has no java.lang.ProcessHandle")
+      "fail to be read, saying why" in {
+        the[IllegalStateException] thrownBy ProcessIdentity.readThrough(className => throw new ClassNotFoundException(className)) should
+          have message "this JVM has no java.lang.ProcessHandle"
       }
     }
 
     "read from this JVM" should {
       "hold the PID the JVM's management bean names" in {
-        val identity = ProcessIdentity.current
-        assume(identity.isRight, "this JVM has no ProcessHandle")
+        val identity = {
+          try {
+            ProcessIdentity.current
+          } catch {
+            case unreadable: IllegalStateException => cancel(unreadable.getMessage)
+          }
+        }
         val pidAtHost = ManagementFactory.getRuntimeMXBean.getName
-        identity.map(_.pid.toString) shouldBe Right(pidAtHost.takeWhile(_ != '@'))
+        identity.pid.toString shouldBe pidAtHost.takeWhile(_ != '@')
       }
     }
   }

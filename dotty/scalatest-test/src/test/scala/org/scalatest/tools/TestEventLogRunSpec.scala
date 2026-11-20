@@ -17,6 +17,7 @@ import org.scalatest.events.TestEventLogEvent
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
 import sbt.testing.Runner as SbtRunner
+import scala.util.Try
 
 final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
@@ -37,7 +38,8 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   private def noProcessHandleMessage(eventLogFile: Path): String = {
     val noProcessHandle = "this JVM has no java.lang.ProcessHandle"
-    assume(ProcessIdentity.current == Left(noProcessHandle), "this scenario needs a JVM that has no java.lang.ProcessHandle")
+    val unreadable = Try(ProcessIdentity.current).failed.toOption.map(_.getMessage)
+    assume(unreadable.contains(noProcessHandle), "this scenario needs a JVM that has no java.lang.ProcessHandle")
     s"Cannot write the test event log $eventLogFile: $noProcessHandle"
   }
 
