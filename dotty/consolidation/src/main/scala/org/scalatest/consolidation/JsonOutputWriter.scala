@@ -114,7 +114,7 @@ private[consolidation] object JsonOutputWriter {
         "number" -> Some(JsonValue.Integer(run.number.value.toLong)),
         "forkGroup" -> assembled.worker.map(worker => JsonValue.Integer(worker.forkGroup.position.toLong)),
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
-        "configMap" -> starting.map(started => configMapJson(started.configMap)),
+        "configMap" -> starting.map(_.configMap.toJson),
         "discovery" -> eventStream.discovery.map(_.toJson),
         "outcome" -> eventStream.outcome.filter(_.isAbnormal).map(outcome => JsonValue.Text(outcome.word)),
         "message" -> eventStream.abort.map(aborted => JsonValue.Text(aborted.message)),
@@ -209,8 +209,10 @@ private[consolidation] object JsonOutputWriter {
       .filterNot(_ == Position.unfilledFilePathname)
       .fold[Field]("fileName" -> fileName.map(JsonValue.Text(_)))(path => "filePath" -> Some(JsonValue.Text(path)))
 
-  private def configMapJson(configMap: Map[String, String]): JsonValue =
-    JsonValue.Object(configMap.toVector.sortBy((key, _) => key).map((key, value) => key -> JsonValue.Text(value)))
+  extension (configMap: Map[String, String]) {
+    private def toJson: JsonValue =
+      JsonValue.Object(configMap.toVector.sortBy((key, _) => key).map((key, value) => key -> JsonValue.Text(value)))
+  }
 
   extension (discovery: RunDiscovery) {
     private def toJson: JsonValue =

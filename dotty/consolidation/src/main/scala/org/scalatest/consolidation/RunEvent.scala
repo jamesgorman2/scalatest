@@ -56,9 +56,10 @@ object RunEvent {
     try {
       Instant.parse(startTime)
     } catch {
-      case _: DateTimeParseException =>
+      case _: DateTimeParseException => {
         val line = TestEventLogEncoder.runStarted(pid, startTime).stripSuffix("\n")
         throw new MalformedTestEventLogException(line, s"the run's start time is not an instant: $startTime")
+      }
     }
 
   extension (event: RunEvent) {

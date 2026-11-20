@@ -275,6 +275,7 @@ private[consolidation] final case class AssembledRun(
 private[consolidation] final case class RunAssembly private (
   label: TestRunLabel,
   worker: Option[Worker],
+  // Assembles the run's top-level suites.
   assembleTree: RecordedRun => Vector[AssembledNode],
   recorded: RecordedRun,
   output: Vector[RunOutput],

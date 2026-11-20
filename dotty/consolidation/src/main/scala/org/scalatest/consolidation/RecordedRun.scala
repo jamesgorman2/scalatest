@@ -13,7 +13,9 @@ private[consolidation] final case class RecordedRun(
   // In the order the structures first named the nodes.
   structure: VectorMap[NodeId, StructureNode],
   childIds: Map[NodeId, Set[NodeId]],
+  // By suite, as the latest structure holding the suite gives them.
   latestScopesAndTests: Map[NodeId, Set[NodeId]],
+  // By suite: the first declared position of any of its scopes or tests.
   firstScopeOrTestPosition: Map[NodeId, Int],
   executions: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]],
   nextStartOrder: StartOrder,
@@ -68,7 +70,7 @@ private[consolidation] final case class RecordedRun(
     val withoutPreviousParent = previousParent.fold(childIds)(parent => childIds.updatedWith(parent)(_.map(_ - id)))
     copy(
       structure = structure.updated(id, node),
-      childIds = node.parentId.fold(withoutPreviousParent)(parent => withoutPreviousParent.updated(parent, withoutPreviousParent.getOrElse(parent, Set.empty) + id))
+      childIds = node.parentId.fold(withoutPreviousParent)(parent => withoutPreviousParent.updatedWith(parent)(ids => Some(ids.getOrElse(Set.empty) + id)))
     )
   }
 
