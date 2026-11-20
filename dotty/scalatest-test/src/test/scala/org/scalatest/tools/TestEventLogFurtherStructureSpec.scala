@@ -974,10 +974,10 @@ final class TestEventLogFurtherStructureDecoderSpec extends AnyWordSpec with Mat
   import TestEventLogFurtherStructureSpec.*
 
   private val runsAndWhatTheirEventLogsHold = List(
-    ("a run of a suite through ConfigMapWrapperSuite, which the command-line runner discovers in the runpath given with -R", "the structure of the wrapped class, then the suite's events", configSpecDiscovered),
+    ("a run in which the command-line runner discovers, in the runpath given with -R, a suite run through ConfigMapWrapperSuite", "the structure of the wrapped class, then the suite's events", configSpecDiscovered),
     ("a run of a wrapped suite whose constructor throws given an empty config map, by a build tool", "the suite's structure, its SuiteStarting and its SuiteAborted, and the run's events", configWithoutDbFailsSpec),
     ("a run of a wrapped suite whose constructor throws given an empty config map, by the command-line runner with -s", "the run's RunAborted and its end", configWithoutDbFailsBySuite),
-    ("a run of a wrapped suite whose constructor throws given an empty config map, which the command-line runner discovers in the runpath given with -R", "the run's RunAborted and its end", configWithoutDbFailsDiscovered)
+    ("a run in which the command-line runner discovers, in the runpath given with -R, a wrapped suite whose constructor throws given an empty config map", "the run's RunAborted and its end", configWithoutDbFailsDiscovered)
   )
 
   runsAndWhatTheirEventLogsHold.foreach { (run, eventLogHolds, stated) =>

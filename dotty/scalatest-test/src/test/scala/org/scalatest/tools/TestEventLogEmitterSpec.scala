@@ -3,11 +3,9 @@ package org.scalatest.tools
 import java.io.IOException
 import java.io.OutputStream
 import java.time.Instant
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.ConfigMap
 import org.scalatest.Filter
 import org.scalatest.InvocationContext
@@ -23,12 +21,10 @@ import org.scalatest.events.Ordinal
 import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunStarting
 import org.scalatest.events.SuiteId
-import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestName
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import scala.jdk.CollectionConverters.*
 
 final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with EventLogRecording {
 
