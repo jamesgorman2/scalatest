@@ -51,7 +51,7 @@ private[scalatest] class SuiteRunner(
 
       val suiteStartTime = System.currentTimeMillis
 
-      // Asked for only once the suite is to start: a suite a stop keeps from starting gets no reporter of its own.
+      // Inside the stop check, so that a suite a stop keeps from starting gets no reporter of its own.
       val start = startOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
       val reporter = start.reporter
       val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)
@@ -61,12 +61,9 @@ private[scalatest] class SuiteRunner(
       }
 
       if (!suite.isInstanceOf[DistributedTestRunnerSuite]) {
-        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
-        val ordinal = tracker.nextOrdinal()
-        val theSuiteName = suite.suiteName
-        val theSuiteId = suite.suiteId
-        start.namesRead(theSuiteName, theSuiteId)
-        send(SuiteStarting(ordinal, theSuiteName, theSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner))
+        send(SuiteStart.suiteStartingReadInOrderOf3_2_20(start, suite, tracker) { (ordinal, theSuiteName, theSuiteId) =>
+          SuiteStarting(ordinal, theSuiteName, theSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner)
+        })
       }
 
       try {

@@ -46,12 +46,13 @@ private[scalatest] class DiscoverySuite(
     for (suiteClassName <- DiscoverySuite.nestedSuiteNames(path, accessibleSuites, wildcard))
       yield DiscoverySuite.getSuiteInstance(suiteClassName, runpathClassLoader)
 
-  // The suites a DiscoverySuite nests are the run's top-level suites.
-  private[scalatest] override def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): SuiteStart =
-    startOfTopLevelSuite(nestedSuite, filter, reporter)
+  private[scalatest] override def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporterForNestedSuite: Reporter): SuiteStart = {
+    // The suites a DiscoverySuite nests are the run's top-level suites.
+    startOfTopLevelSuite(nestedSuite, filter, reporterForNestedSuite)
+  }
 
-  // Runner's distributor starts a suite as the suite starts. Any other distributor is handed the suite already started.
   private[scalatest] override def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status = {
+    // Runner's ConcurrentDistributor starts the suite when it runs it. Any other distributor is handed the suite already started.
     distribute match {
       case concurrent: ConcurrentDistributor => concurrent.apply(nestedSuite, args, TestEventLogHandOff.none, startOfTopLevelSuite)
       case other =>

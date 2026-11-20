@@ -1,6 +1,8 @@
 package org.scalatest
 
 import org.scalatest.events.Event
+import org.scalatest.events.Ordinal
+import org.scalatest.events.SuiteStarting
 
 private[scalatest] final case class ScopePlace(text: String, index: Int)
 
@@ -184,4 +186,12 @@ private[scalatest] object SuiteStart {
 
   def ofNestedSuite(nestedSuite: Suite, reporter: Reporter): SuiteStart =
     InvocationContext.get.fold(inTheContextItFinds(reporter))(_.register(nestedSuite).startWith(reporter))
+
+  def suiteStartingReadInOrderOf3_2_20(start: SuiteStart, suite: Suite, tracker: Tracker)(suiteStarting: (Ordinal, String, String) => SuiteStarting): SuiteStarting = {
+    val ordinal = tracker.nextOrdinal()
+    val suiteName = suite.suiteName
+    val suiteId = suite.suiteId
+    start.namesRead(suiteName, suiteId)
+    suiteStarting(ordinal, suiteName, suiteId)
+  }
 }

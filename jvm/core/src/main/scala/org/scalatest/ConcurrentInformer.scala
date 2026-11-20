@@ -150,19 +150,14 @@ private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAware
   def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location]): Unit =
     apply(message, payload, eventFun, location, MessageRecorder.noHandOff)
 
-  /**
-   * Records a message and, unless the test's recorded events have been taken for its closing event, hands it off.
-   * Recording and handing off under one lock means a message the closing event records has been handed off before
-   * that event is reported, and a message called after it is never handed off.
-   *
-   * The hand-off is prepared before the lock is taken: preparing builds the message's event, which calls the suite's
-   * own methods, and encodes it. Only the prepared hand-off runs under the lock.
-   */
   def apply(message: String, payload: Option[Any], eventFun: RecordedMessageEventFun, location: Option[Location], handOff: MessageHandOff): Unit = {
     requireNonNull(message, payload)
+    // Prepared outside the lock: preparing builds the message's event, which calls the suite's own methods.
     val preparedHandOff = handOff(message, payload, location)
     synchronized {
       messages ::= (message, payload, eventFun, location)
+      // Under the lock, so that every message the closing event records is handed off before that event is reported,
+      // and no message recorded after it is.
       if (!recordedEventsTaken) {
         preparedHandOff()
       }
@@ -220,36 +215,31 @@ private[scalatest] object MessageRecorder {
   // and an optional location.
   type ConcurrentMessageFiringFun = (String, Option[Any], Boolean, Option[Location]) => Unit
 
-  // Prepares the hand-off of a message, with its payload and location, to the emitter of a run's test event log as a
-  // test records it. The recorder runs the returned hand-off under its lock.
   type MessageHandOff = (String, Option[Any], Option[Location]) => PreparedHandOff
 
   type PreparedHandOff = () => Unit
 
   val noHandOff: MessageHandOff = (_, _, _) => EventOrigin.nothingToHandOff
 
-  // Builds the event of a message a path-style test recorded, from what the run that replays the test gives it: the
-  // suite, the reporter, the tracker, the test's name, the indentation and whether to include an icon.
-  type PathMessageEventFun = (Suite, Reporter, Tracker, String, Int, Boolean) => Event
+  type PathMessageEventFun = PathTestReplay => Event
 }
 
-/**
- * The calls a path-style test makes of its four message recorders, in the order it makes them, each with the time of
- * the call. No recorder's own queue gives that order across the four, or the time.
- */
+private[scalatest] final case class PathTestReplay(suite: Suite, reporter: Reporter, tracker: Tracker, testName: String, indentation: Int, includeIcon: Boolean)
+
 private[scalatest] final class PathMessageCalls {
 
   import org.scalatest.ConcurrentLinkedQueue
   import scala.collection.JavaConverters._
 
+  // One queue for the four recorders of a path-style test: no recorder's own queue orders its calls among the others'.
   private val calls = new ConcurrentLinkedQueue[(PathMessageEventFun, Long)]
 
   def add(eventOfCall: PathMessageEventFun): Unit = calls.add((eventOfCall, System.currentTimeMillis))
 
-  // Each event is built with a tracker of its own, so that it takes no ordinal from the run's.
   def handOffTo(origin: EventOrigin, theSuite: Suite, report: Reporter, testName: String, indentation: Int, includeIcon: Boolean): Unit = {
     calls.asScala.foreach { case (eventOfCall, timeOfCall) =>
-      origin.handOffMessage(stamped(eventOfCall(theSuite, report, new Tracker, testName, indentation, includeIcon), timeOfCall))
+      // A tracker of its own, so that the event takes no ordinal from the run's.
+      origin.handOffMessage(stamped(eventOfCall(PathTestReplay(theSuite, report, new Tracker, testName, indentation, includeIcon)), timeOfCall))
     }
   }
 
@@ -284,8 +274,8 @@ private[scalatest] class PathMessageRecordingInformer(eventFun: (String, Option[
     val thread = Thread.currentThread
     val wasConstructingThread = isConstructingThread
     messages add ((message, payload, thread, wasConstructingThread))
-    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
-      eventFun(message, payload, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    calls.add(replay =>
+      eventFun(message, payload, wasConstructingThread, false, replay.suite, replay.reporter, replay.tracker, replay.testName, replay.indentation, replay.includeIcon, thread)
     )
   }
 
@@ -324,8 +314,8 @@ private[scalatest] class PathMessageRecordingNotifier(eventFun: (String, Option[
     val thread = Thread.currentThread
     val wasConstructingThread = isConstructingThread
     messages add ((message, payload, thread, wasConstructingThread))
-    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
-      eventFun(message, payload, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    calls.add(replay =>
+      eventFun(message, payload, wasConstructingThread, false, replay.suite, replay.reporter, replay.tracker, replay.testName, replay.indentation, replay.includeIcon, thread)
     )
   }
 
@@ -364,8 +354,8 @@ private[scalatest] class PathMessageRecordingAlerter(eventFun: (String, Option[A
     val thread = Thread.currentThread
     val wasConstructingThread = isConstructingThread
     messages add ((message, payload, thread, wasConstructingThread))
-    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
-      eventFun(message, payload, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    calls.add(replay =>
+      eventFun(message, payload, wasConstructingThread, false, replay.suite, replay.reporter, replay.tracker, replay.testName, replay.indentation, replay.includeIcon, thread)
     )
   }
 
@@ -404,8 +394,8 @@ private[scalatest] class PathMessageRecordingDocumenter(eventFun: (String, Boole
     val thread = Thread.currentThread
     val wasConstructingThread = isConstructingThread
     messages add ((message, thread, wasConstructingThread))
-    calls.add((theSuite, report, tracker, testName, indentation, includeIcon) =>
-      eventFun(message, wasConstructingThread, false, theSuite, report, tracker, testName, indentation, includeIcon, thread)
+    calls.add(replay =>
+      eventFun(message, wasConstructingThread, false, replay.suite, replay.reporter, replay.tracker, replay.testName, replay.indentation, replay.includeIcon, thread)
     )
   }
 
