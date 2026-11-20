@@ -48,14 +48,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   private val isOpen = new GuardedByEmitter(this, true)
   private val topLevelSuiteCountBySuiteId = new GuardedByEmitter(this, scala.collection.mutable.HashMap.empty[SuiteId, Int])
   // By identity: an event's `equals` compares its fields, which hold the run's own objects. Mapped to the top-level
-  // suite's registration, not the event's own: a reporter that holds events back, such as a `TestSortingReporter`, may
-  // pass one on to the outer wrappers after a nested suite's run has completed.
+  // suite's registration, not that of the suite that sent the event: a reporter that holds events back, such as a
+  // `TestSortingReporter`, may pass one on to the outer wrappers after a nested suite's run has completed.
   private val handedOffAwaitingTopLevelWrapper = new GuardedByEmitter(this, new IdentityHashMap[Event, RegisteredSuite])
 
   def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "The test event log emitter's lock is not held")
 
   private def underLockKeepingThrown(body: => Option[Throwable]): Unit =
-    synchronized(body).foreach(TestEventLogEmitter.rethrowIfUncontained)
+    synchronized(body).foreach(TestEventLogEmitter.rethrowUnlessKeptFromCaller)
 
   def writeRunEvent(event: Event): Unit = {
     val encoded = TestEventLogEmitter.caughtOutsideLock(TestEventLogEncoder.event(event, None))
@@ -70,7 +70,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         registration.startAsTopLevelSuite(reporter)
       case Left(thrown) =>
         endWithoutRunEnded()
-        TestEventLogEmitter.rethrowIfUncontained(thrown)
+        TestEventLogEmitter.rethrowUnlessKeptFromCaller(thrown)
         SuiteStart.withoutEventLog(reporter)
     }
   }
@@ -121,16 +121,17 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         Nil
       }
     }
-    // Stops at the first instance left unsettled: each instance after it is placed below it, so cannot settle yet.
+    // Stops at the first instance left unsettled: each later instance nests within it, so it cannot settle until that
+    // one does.
     val remaining = unsettled.iterator
     var isSettled = true
     while (isSettled && remaining.hasNext) {
       val one = remaining.next()
-      isSettled = isNodeFixedOnceTried(one, handingOff) && isTableSettledOnceTried(one, handingOff)
+      isSettled = tryFixNode(one, handingOff) && trySettleTable(one, handingOff)
     }
   }
 
-  private def isNodeFixedOnceTried(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
+  private def tryFixNode(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
     val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen.get && handingOff && registration.takeReadOfSuiteId()))
     val suiteId = if (readsSuiteId) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
     val (thrown, isFixed) = synchronized {
@@ -144,7 +145,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           case Right(Some(id)) =>
             TestEventLogEmitter.caught(registration.fixNode(Some(id))).fold(Some(_), _.flatMap(writeStructureWhereChanged(_, _)))
           case Right(None) =>
-            // Read by another thread, which fixes the node, unless the instance can have no node table.
+            // Whoever reads the suite ID, the instance's run or another thread handing off, fixes the node. An
+            // instance that can have no node table is fixed here, without one.
             if (!registration.canHaveTable) {
               registration.fixNode(None)
             }
@@ -153,11 +155,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         (thrown, registration.isNodeFixed)
       }
     }
-    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+    thrown.foreach(TestEventLogEmitter.rethrowUnlessKeptFromCaller)
     isFixed
   }
 
-  private def isTableSettledOnceTried(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
+  private def trySettleTable(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
     val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen.get && handingOff && registration.takeReadOfSuiteName()))
     val suiteName = if (readsSuiteName) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
     val (thrown, isSettled) = synchronized {
@@ -178,7 +180,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         (thrown, registration.isTableSettled)
       }
     }
-    thrown.foreach(TestEventLogEmitter.rethrowIfUncontained)
+    thrown.foreach(TestEventLogEmitter.rethrowUnlessKeptFromCaller)
     isSettled
   }
 
@@ -193,7 +195,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def writeStructure(nodes: Vector[StructureNode]): Option[Throwable] = {
     assertLockHeld()
-    // Encoded under the lock that makes it the latest structure: encoding a structure calls none of the run's own code.
+    // Encoded under the lock, so structures are written in the order they become the latest. This is safe because
+    // encoding a structure calls none of the run's own code.
     val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(nodes)))
     if (written.isLeft) {
       close()
@@ -235,9 +238,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   def forget(topLevel: RegisteredSuite): Unit = synchronized {
     topLevel.markRemoved()
-    // An event whose reporter does not pass it on never reaches the top-level suite's wrapper, so would be kept here
-    // until the event log closes. The registration keeps it instead, for that wrapper to skip should it still arrive,
-    // as an alert from a thread the run started or an event a reporter between the wrappers held back.
+    // An event whose reporter does not pass it on never reaches the top-level suite's wrapper, so would stay in
+    // `handedOffAwaitingTopLevelWrapper` until the event log closes. The registration keeps it instead, for that wrapper
+    // to skip should it still arrive late as:
+    // - an alert from a thread the run started;
+    // - an event a reporter between the wrappers held back.
     val kept = handedOffAwaitingTopLevelWrapper.get.entrySet.iterator
     while (kept.hasNext) {
       val entry = kept.next()
@@ -300,8 +305,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     } else if (isLastWrapper && wrapper.registration.takeHandedOffBeforeRemoval(event)) {
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
-      // The top-level suite's wrapper writes it: an inner wrapper that wrote it would have to keep it for that wrapper
-      // to skip, and keep it forever if it never reaches that wrapper.
+      // Left for the top-level suite's wrapper to write. If an inner wrapper wrote it, the event would have to be kept
+      // for that wrapper to skip, until the event log closes if it never arrives there.
       None
     } else if (awaitingTopLevelWrapper.containsKey(event)) {
       if (isLastWrapper) {
@@ -329,20 +334,20 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): TestEventLogEmitter.Assignment = {
     assertLockHeld()
-    val ofWrapper = wrapper.registration.table.get
-    val wrapperNode = ofWrapper.scopeOrTest(wrapper.treeNode)
+    val wrapperTable = wrapper.registration.table.get
+    val wrapperNode = wrapperTable.scopeOrTest(wrapper.treeNode)
     // A `DistributedTestRunnerSuite` runs one test, so its abort is assigned to the wrapper's node, which is that test's node.
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
       case None =>
         val execution = wrapperNode match {
-          case Some(scopeOrTest) => assignToScopeOrTest(ofWrapper, scopeOrTest, None, event)
-          case None => assignToSuite(ofWrapper, None, event)
+          case Some(scopeOrTest) => assignToScopeOrTest(wrapperTable, scopeOrTest, None, event)
+          case None => assignToSuite(wrapperTable, None, event)
         }
         TestEventLogEmitter.Assignment(execution, None)
       case Some(names) =>
-        val found = TestEventLogEmitter.tableNamed(ofWrapper, wrapperNode, names.suiteId)
+        val found = TestEventLogEmitter.tableNamed(wrapperTable, wrapperNode, names.suiteId)
         val table = found.getOrElse {
-          ofWrapper.addSuiteUnder(wrapperNode.getOrElse(ofWrapper.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId.value))
+          wrapperTable.addSuiteUnder(wrapperNode.getOrElse(wrapperTable.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId.value))
         }
         val lackedTest = names.testName.filterNot(table.testsByName.contains)
         val isIgnoredByFilter = false
@@ -494,16 +499,15 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(rethrowIfUncontained)
+  def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(rethrowUnlessKeptFromCaller)
 
   def started(eventLogFile: Path, processIdentity: ProcessIdentity): TestEventLogEmitter = {
     val runStarted = TestEventLogEncoder.runStarted(processIdentity.pid, processIdentity.startTime.toString)
     val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
-    // Created anew, so a link planted under its name in a shared folder is never followed. A file an earlier run
-    // left there is replaced.
     if (Files.isRegularFile(unmoved, LinkOption.NOFOLLOW_LINKS)) {
       Files.delete(unmoved)
     }
+    // Created anew, so a link planted under its name in a shared folder is never followed.
     Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
     // Moved into place whole, so the event log file never exists without its whole `runStarted` event.
     Files.move(unmoved, eventLogFile, StandardCopyOption.ATOMIC_MOVE)
@@ -558,12 +562,12 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  private def tableNamed(ofWrapper: SuiteNodeTable, wrapperNode: Option[NodeId], suiteId: SuiteId): Option[SuiteNodeTable] = {
+  private def tableNamed(wrapperTable: SuiteNodeTable, wrapperNode: Option[NodeId], suiteId: SuiteId): Option[SuiteNodeTable] = {
     def nestedWithin(suite: SuiteNodeTable): Vector[SuiteNodeTable] = suite.childSuites.flatMap(nested => nested +: nestedWithin(nested))
-    if (ofWrapper.suiteId == suiteId) {
-      Some(ofWrapper)
+    if (wrapperTable.suiteId == suiteId) {
+      Some(wrapperTable)
     } else {
-      val underWrapper = wrapperNode.fold(ofWrapper.childSuites)(node => ofWrapper.childSuites.filter(_.parent.contains(node)))
+      val underWrapper = wrapperNode.fold(wrapperTable.childSuites)(node => wrapperTable.childSuites.filter(_.parent.contains(node)))
       val sharingItsId = underWrapper.flatMap(nested => nested +: nestedWithin(nested)).filter(_.suiteId == suiteId)
       sharingItsId.find(!_.hasEnded).orElse(sharingItsId.headOption)
     }
@@ -572,16 +576,16 @@ private[scalatest] object TestEventLogEmitter {
   def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }
 
-  private def caughtOutsideLock[A](callingRunsOwnCode: => A): Either[Throwable, A] = {
+  private def caughtOutsideLock[A](body: => A): Either[Throwable, A] = {
     // Outside the lock: the run's own suites, throwables and config map values may block, and every thread of the run
     // takes the lock.
-    caught(callingRunsOwnCode)
+    caught(body)
   }
 
-  def rethrowIfUncontained(thrown: Throwable): Unit = {
+  def rethrowUnlessKeptFromCaller(thrown: Throwable): Unit = {
     thrown match {
       case _: InterruptedException => Thread.currentThread().interrupt()
-      case uncontained if !isKeptFromCaller(uncontained) => throw uncontained
+      case notKept if !isKeptFromCaller(notKept) => throw notKept
       case _ => ()
     }
   }
@@ -590,7 +594,8 @@ private[scalatest] object TestEventLogEmitter {
     // Kept from the caller unless the JVM or the thread cannot go on, so that a hand-off cannot change what the run's
     // reporters receive.
     thrown match {
-      // A throwable or config map value that recurses without end is one more event that cannot be encoded.
+      // Encoding a throwable or config map value that recurses without end overflows the stack: an encoding failure
+      // like any other.
       case _: StackOverflowError => true
       case _: VirtualMachineError | _: ThreadDeath => false
       case _ => true
