@@ -175,14 +175,14 @@ class SetupSuite extends AnyFunSuite with BeforeAndAfterAll {
   }
 }
 
-private def runWithoutSuiteStarting(nested: Suite, args: Args): Status = nested.run(None, args)
+private def runWithoutSuiteEvents(nested: Suite, args: Args): Status = nested.run(None, args)
 
 @DoNotDiscover
 class RunsItsFirstNestedSuiteTwice extends Suites(new Inner1Suite, new Inner2Suite) {
 
   override protected def runNestedSuites(args: Args): Status = {
     val first = nestedSuites.head
-    val runs = List(runWithoutSuiteStarting(first, args), runWithoutSuiteStarting(first, args))
+    val runs = List(runWithoutSuiteEvents(first, args), runWithoutSuiteEvents(first, args))
     new CompositeStatus(runs.toSet)
   }
 }
@@ -190,7 +190,7 @@ class RunsItsFirstNestedSuiteTwice extends Suites(new Inner1Suite, new Inner2Sui
 @DoNotDiscover
 class RunsItsNestedSuites extends Suites(new Inner1Suite, new Inner2Suite) {
 
-  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.map(runWithoutSuiteStarting(_, args)).toSet)
+  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.map(runWithoutSuiteEvents(_, args)).toSet)
 }
 
 @DoNotDiscover
@@ -204,7 +204,7 @@ class ModeSuite(mode: String) extends AnyFunSuite {
 @DoNotDiscover
 class PairSuites extends Suites(new ModeSuite("fast"), new ModeSuite("slow")) {
 
-  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.reverse.map(runWithoutSuiteStarting(_, args)).toSet)
+  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.reverse.map(runWithoutSuiteEvents(_, args)).toSet)
 }
 
 @DoNotDiscover

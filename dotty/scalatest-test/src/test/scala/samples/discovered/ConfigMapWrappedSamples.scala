@@ -19,7 +19,7 @@ class ConfigSpec(configMap: Map[String, Any]) extends AnyFunSpec {
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigWithoutDbFailsSpec(configMap: Map[String, Any]) extends AnyFunSpec {
 
-  // Other runs discover this suite too, and must construct it.
+  // Throws only in the thread group a test names: other runs discover this suite too, and must construct it.
   if (!configMap.contains("db") && Thread.currentThread.getThreadGroup.getName == ThrowingConstructorSpec.threadGroupItsConstructorThrowsIn) {
     throw new IllegalStateException("no db")
   }

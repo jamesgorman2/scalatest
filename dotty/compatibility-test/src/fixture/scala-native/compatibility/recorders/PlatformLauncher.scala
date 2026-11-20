@@ -11,9 +11,10 @@ object PlatformLauncher {
   }
 
   private def executeAll(tasks: Array[Task], run: PrintedFrameworkRun): Unit =
+    // Stands in for Scala Native's test bridge, which runs each task synchronously and passes what a task throws
+    // back to the build tool.
     tasks.foreach { task =>
       val more =
-        // Scala Native's test bridge runs each task synchronously, and passes what a task throws back to the build tool.
         try {
           task.execute(run.eventHandler, run.loggers)
         } catch {

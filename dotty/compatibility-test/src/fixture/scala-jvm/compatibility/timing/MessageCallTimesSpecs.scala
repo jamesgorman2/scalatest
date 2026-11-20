@@ -11,7 +11,7 @@ private object TimedMessages {
     info("a timed message")
     val after = System.currentTimeMillis
     info(s"a timed message was called between $before and $after")
-    // So that the time of the call and the time of the test's closing event differ.
+    // So that the timed message's call time differs from the time of the test's closing event.
     Thread.sleep(100)
   }
 }

@@ -282,7 +282,8 @@ private[scalatest] object EventLogComparison {
     def frames: Option[String] =
       written.frames.flatMap(texts => differing("stack trace", texts.map(EventNotation.frame), logged.stackTrace.toVector))
 
-    // Recursion follows what the criterion writes, never the logged throwable's own links, which can form a cycle.
+    // suppressed and cause recurse on what the criterion writes,
+    // never on the logged throwable's links, which can cycle.
     def suppressed: Option[String] = {
       written.suppressed.flatMap { expected =>
         if (expected.size != logged.suppressed.size) {

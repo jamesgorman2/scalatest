@@ -142,7 +142,7 @@ class UnregisteredSuite extends Suite {
 
   override def tags: Map[String, Set[String]] = Map("a" -> Set("org.scalatest.Ignore"))
 
-  // Suite.runTests locates ignored test a's TestIgnored at this method, and aborts the suite without it.
+  // Suite.runTests locates ignored test a's TestIgnored at this method, and aborts the suite if it is missing.
   def a(): Unit = ()
 
   override protected def runTest(testName: String, args: Args): Status = {

@@ -11,7 +11,7 @@ object ArgumentsLauncher {
     val result =
       try {
         launchAndArguments.head match {
-          // Runner.run exits the JVM with status 1, after printing why, on an argument list its first check rejects.
+          // On an argument list its first check rejects, Runner.run prints why and exits the JVM with status 1.
           case "Runner.run" => "returned " + Runner.run(arguments)
           case "Framework" =>
             val runner = new Framework().runner(arguments, Array.empty, getClass.getClassLoader)

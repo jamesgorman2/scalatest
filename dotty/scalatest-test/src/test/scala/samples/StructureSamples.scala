@@ -90,7 +90,7 @@ class IgnoringPlainSuite extends Suite {
 
   override def tags: Map[String, Set[String]] = Map("a" -> Set("org.scalatest.Ignore"))
 
-  // Suite.runTests locates ignored test a's TestIgnored at this method, and aborts the suite without it.
+  // Suite.runTests locates ignored test a's TestIgnored at this method, and aborts the suite if it is missing.
   def a(): Unit = ()
 
   override protected def runTest(testName: String, args: Args): Status = {
@@ -192,17 +192,17 @@ class ThrowingSecondScopePathFreeSpec extends PathAnyFreeSpec {
   }
 }
 
-abstract class CountsNoNestedTest(nested: Suite) extends Suites(nested) {
+abstract class CountsNoNestedTests(nested: Suite) extends Suites(nested) {
 
   // Counting the nested suite's tests would ask it for them before this suite runs.
   override def expectedTestCount(filter: Filter): Int = 0
 }
 
 @DoNotDiscover
-class NestsThrowingScopeRefSpec extends CountsNoNestedTest(new ThrowingScopeRefSpec)
+class NestsThrowingScopeRefSpec extends CountsNoNestedTests(new ThrowingScopeRefSpec)
 
 @DoNotDiscover
-class NestsThrowingSecondScopePathFunSpec extends CountsNoNestedTest(new ThrowingSecondScopePathFunSpec)
+class NestsThrowingSecondScopePathFunSpec extends CountsNoNestedTests(new ThrowingSecondScopePathFunSpec)
 
 @DoNotDiscover
-class NestsThrowingSecondScopePathFreeSpec extends CountsNoNestedTest(new ThrowingSecondScopePathFreeSpec)
+class NestsThrowingSecondScopePathFreeSpec extends CountsNoNestedTests(new ThrowingSecondScopePathFreeSpec)
