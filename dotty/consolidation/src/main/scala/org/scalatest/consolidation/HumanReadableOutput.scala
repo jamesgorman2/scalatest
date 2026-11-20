@@ -50,9 +50,9 @@ private[consolidation] object HumanReadableOutput {
       linesOf(rootLine, 0, AnsiCyan) ++ root.modules.flatMap(moduleLines(_, 1)) ++ root.output.flatMap(linesOf(_, 1)) ++
         rootFailureLines(root.failures, 1)
 
-  // A stable sort keeps suites that share a name in order of their runs' numbers, then in the order each run lists them.
   private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] = {
     val (shownRuns, hiddenRuns) = module.runs.partition(showsItsLine)
+    // A stable sort keeps suites that share a name in order of their runs' numbers, then in the order each run lists them.
     val hiddenRunsSuites = hiddenRuns.flatMap(_.assembled.eventStream.topLevelSuites).sortBy(_.name)
     linesOf("[" + module.label.value + "]", depth, AnsiCyan) ++ hiddenRunsSuites.flatMap(nodeLines(_, depth + 1)) ++
       shownRuns.flatMap(runLines(_, depth + 1))
@@ -95,10 +95,10 @@ private[consolidation] object HumanReadableOutput {
         Vector.empty
     }
 
-  // ScalaTest 3.2.20 prints a run abort's message on the line after `*** RUN ABORTED ***`, then the lines it prints
-  // under any error event's first line.
   private def runAbortLines(aborted: DecodedEvent.RunAborted, depth: Int): Vector[OutputLine] = {
     val linesAfterFirst = errorLines(Resources.abortedNote, _ => Resources.runAborted, aborted.message, aborted.throwable, Vector.empty, None, None, None).tail
+    // ScalaTest 3.2.20 prints a run abort's message on the line after `*** RUN ABORTED ***`, then the lines it prints
+    // under any error event's first line.
     linesUnder(Vector(aborted.message).filter(_.nonEmpty) ++ linesAfterFirst, aborted.throwable, depth, AnsiRed)
   }
 
@@ -115,8 +115,6 @@ private[consolidation] object HumanReadableOutput {
     }
   }
 
-  // A collapsed execution shows its messages alone. Any other shows each of its messages after the children that had
-  // started in it when the message arrived.
   private def contentLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
     def messagesAfter(childrenBefore: Int): Vector[OutputLine] =
       execution.messages.filter(_.childrenBefore == childrenBefore).flatMap(placed => messageLines(placed.message, depth))
@@ -214,7 +212,6 @@ private[consolidation] object HumanReadableOutput {
         Segment(StringReporter.stringToPrintWhenNoError(Resources.testSucceeded, formatterOf(test.label), "", Some(test.name), None, presentAllDurations = false, presentUnformatted = false).mkString, AnsiGreen)
     }
 
-  // A message's own line is marked with its kind in place of ScalaTest 3.2.20's icon. The lines under it are as 3.2.20 prints them.
   private def messageLines(message: ProvidedMessage, depth: Int): Vector[OutputLine] =
     message.kind match {
       case MessageKind.Info =>
@@ -239,14 +236,10 @@ private[consolidation] object HumanReadableOutput {
     linesOf(markedText, depth, colour) ++ linesUnder(linesAfterFirst, message.throwable, depth + 1, colour)
   }
 
-  private def markOf(message: ProvidedMessage): String = "[" + message.kind.word + "] "
+  private def markOf(message: ProvidedMessage): String =
+    // In place of ScalaTest 3.2.20's icon.
+    "[" + message.kind.word + "] "
 
-  // An event's first line, then its message, analysis and stack trace lines, with the `S` and `F` reporter options off.
-  //
-  // `StringReporter.stringsToPrintOnError` throws a NullPointerException when the message is blank and the throwable
-  // has no message. ScalaTest 3.2.20 does the same, and core keeps that behaviour. For that case, this builds the lines
-  // without the throwable, then adds the throwable's line number and stack trace lines, as `StringReporter` prints them
-  // for a throwable whose message is empty.
   private def errorLines(
     note: String,
     errorMessage: Any => String,
@@ -275,7 +268,9 @@ private[consolidation] object HumanReadableOutput {
         presentFilePathname = false
       )
     throwable match {
-      case Some(view) if message.trim.isEmpty && view.message.isEmpty => {
+      case Some(view) if stringReporterThrowsOn(message, view) => {
+        // Core's `StringReporter` keeps ScalaTest 3.2.20's NullPointerException here, so these are the lines
+        // `StringReporter` prints for a throwable whose message is empty.
         val withoutThrowable = linesWith(None)
         withoutThrowable.head +: (lineNumberLines(view) ++ withoutThrowable.tail ++ stackTraceLinesOf(throwable))
       }
@@ -284,6 +279,9 @@ private[consolidation] object HumanReadableOutput {
     }
   }
 
+  private def stringReporterThrowsOn(message: String, throwable: ThrowableView): Boolean =
+    message.trim.isEmpty && throwable.message.isEmpty
+
   private def lineNumberLines(throwable: ThrowableView): Vector[String] =
     if (throwable.isPropertyCheckFailure || throwable.stackDepth.isEmpty) Vector.empty
     else Vector(StringReporter.withPossibleLineNumber("", Some(throwable), presentFilePathname = false)).filter(_.nonEmpty)
@@ -291,13 +289,12 @@ private[consolidation] object HumanReadableOutput {
   private def stackTraceLinesOf(throwable: Option[ThrowableView]): Vector[String] =
     StringReporter.stackTraceLines(throwable, presentShortStackTraces = false, presentFullStackTraces = false).toVector
 
-  // The lines under an event's first line: its message lines, then its stack trace lines. A throwable's first line and
-  // each `Cause:` line sit at the message lines' depth, and each frame line one deeper. A line is classed as a frame
-  // line before it is split, so a throwable message's continuation starting `at ` stays at its first line's depth.
   private def linesUnder(lines: Vector[String], throwable: Option[ThrowableView], depth: Int, colour: AnsiColor): Vector[OutputLine] = {
     val stackTraceLineCount = stackTraceLinesOf(throwable).size
     val (messageLines, stackTraceLines) = lines.splitAt(lines.size - stackTraceLineCount)
     messageLines.flatMap(linesOf(_, depth, colour)) ++
+      // A line is classed as a frame line before it is split, so a throwable message's continuation starting `at `
+      // stays at the depth of the message's first line.
       stackTraceLines.flatMap(line => linesOf(line, if (isFrameLine(line)) depth + 1 else depth, colour))
   }
 
@@ -307,23 +304,22 @@ private[consolidation] object HumanReadableOutput {
   private def linesOf(text: String, depth: Int, colour: AnsiColor): Vector[OutputLine] =
     linesOf(Vector(Segment(text, colour)), depth)
 
-  // One output line per line of text, all at `depth`, splitting segments at line breaks, such as in a multi-line label:
-  // - each piece keeps its segment's colour, so no colour runs across a break;
-  // - a segment after the last break, such as an outcome's note, stays on the last line;
-  // - trailing line breaks add no line.
   private def linesOf(segments: Vector[Segment], depth: Int): Vector[OutputLine] = {
     val segmentsByLine = segments.foldLeft(Vector(Vector.empty[Segment]))(withSegmentAdded)
-    val withoutTrailingBlankLines = segmentsByLine.reverse.dropWhile(_.forall(_.text.isEmpty)).reverse
+    val withoutTrailingBlankLines = segmentsByLine.reverse.dropWhile(isBlank).reverse
     (if (withoutTrailingBlankLines.isEmpty) segmentsByLine.take(1) else withoutTrailingBlankLines).map(OutputLine(depth, _))
   }
+
+  private def isBlank(line: Vector[Segment]): Boolean = line.forall(_.text.isEmpty)
 
   private def withSegmentAdded(segmentsByLine: Vector[Vector[Segment]], segment: Segment): Vector[Vector[Segment]] = {
     val pieces = segment.splitAtLineBreaks
     (segmentsByLine.init :+ (segmentsByLine.last :+ pieces.head)) ++ pieces.tail.map(Vector(_))
   }
 
-  // A class name holds no space, so neither a throwable's first line nor its `Cause:` line starts with `at ` or is `...`.
-  private def isFrameLine(line: String): Boolean = line.startsWith("at ") || line == "..."
+  private def isFrameLine(line: String): Boolean =
+    // A class name holds no space, so neither a throwable's first line nor its `Cause:` line starts with `at ` or is `...`.
+    line.startsWith("at ") || line == "..."
 
   private def formatterOf(text: String): Option[IndentedText] = Some(IndentedText(text, text, 0))
 }

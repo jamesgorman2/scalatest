@@ -16,7 +16,7 @@ private[consolidation] object ConsolidatedModule {
    */
   def of(label: TestRunLabel, times: MeasuredTimes, runs: Vector[AssembledRun]): ConsolidatedModule = {
     val numbered = runs
-      .sortBy(_.numberingOrder)
+      .sortBy(_.worker)(AssembledRun.numberingOrder)
       .zipWithIndex
       .map((run, index) => ConsolidatedRun(RunNumber(index + 1), run))
     ConsolidatedModule(label, times, numbered)

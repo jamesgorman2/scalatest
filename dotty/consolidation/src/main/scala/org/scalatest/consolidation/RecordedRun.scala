@@ -10,12 +10,9 @@ import org.scalatest.events.StructureNode
 import org.scalatest.events.TestEventLogEvent
 
 private[consolidation] final case class RecordedRun(
-  // In the order the structures first named the nodes.
   structure: VectorMap[NodeId, StructureNode],
   childIds: Map[NodeId, Set[NodeId]],
-  // By suite, as the latest structure holding the suite gives them.
   latestScopesAndTests: Map[NodeId, Set[NodeId]],
-  // By suite: the lowest declared position among the scopes and tests directly under it.
   firstScopeOrTestPosition: Map[NodeId, Int],
   executions: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]],
   nextStartOrder: StartOrder,
@@ -46,9 +43,6 @@ private[consolidation] final case class RecordedRun(
 
   def suiteClassNames: Set[String] = structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet
 
-  // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
-  // and label it last had. The emitter numbers a suite's scopes and tests from the same first position in every
-  // structure, so the first structure holding any of them gives that position.
   private def withStructure(nodes: IndexedSeq[StructureNode]): RecordedRun = {
     val suites = nodes.collect { case suite: StructureNode.Suite => suite.id }
     val suiteOfNode = nodes.foldLeft(Map.empty[NodeId, NodeId])(RecordedRun.withSuiteOf)
@@ -59,7 +53,9 @@ private[consolidation] final case class RecordedRun(
       positionsByParent.get(Some(suite)).flatMap(_.flatten.minOption).map(suite -> _)
     def latestOf(suite: NodeId): (NodeId, Set[NodeId]) = suite -> scopesAndTestsBySuite.getOrElse(Some(suite), Vector.empty).toSet
     nodes.foldLeft(this)(_.withNode(_)).copy(
+      // The emitter numbers a suite's scopes and tests from the same first position in every structure.
       firstScopeOrTestPosition = firstScopeOrTestPosition ++ suites.filterNot(firstScopeOrTestPosition.contains).flatMap(firstPositionIn),
+      // Each structure holds its suites' scopes and tests whole.
       latestScopesAndTests = latestScopesAndTests ++ suites.map(latestOf)
     )
   }
@@ -74,10 +70,6 @@ private[consolidation] final case class RecordedRun(
     )
   }
 
-  // An event assigned to the run rather than to a node is handled by kind:
-  // - a run or discovery event records the run's own state; only the first of each kind is kept;
-  // - a message is left to the run assembly, which adds it to the run's output;
-  // - a suite's, scope's or test's event, such as a `DiscoverySuite`'s (which the emitter assigns to the run), is dropped.
   private def withRunEvent(event: DecodedEvent): RecordedRun =
     event match {
       case started: DecodedEvent.RunStarting =>
@@ -90,7 +82,10 @@ private[consolidation] final case class RecordedRun(
         copy(abort = abort.orElse(Some(aborted))).closedBy(aborted)
       case closed: DecodedEvent.RunClosing =>
         closedBy(closed)
-      case _: DecodedEvent.Message | _: DecodedEvent.NodeOpening | _: DecodedEvent.NodeClosing =>
+      case _: DecodedEvent.Message =>
+        this
+      // A `DiscoverySuite`'s events arrive here: the emitter assigns them to the run, not to a node.
+      case _: DecodedEvent.NodeOpening | _: DecodedEvent.NodeClosing =>
         this
     }
 
@@ -113,16 +108,12 @@ private[consolidation] final case class RecordedRun(
     copy(executions = executions.updated(executionOfNode.node, nodeExecutions.updated(executionOfNode.index, updated)))
   }
 
-  // Reads the execution path against the latest structure:
-  // - its last index is the node's own; each earlier index belongs to the parent, then the grandparent, and so on,
-  //   counting each scope between a test and its suite;
-  // - an execution keeps the parent execution it first had;
-  // - start order runs top down, so a parent's start precedes its child's.
   private def withExecutionPath(nodeExecution: NodeExecution): RecordedRun = {
     val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(_.parentId)))).toVector
     val executionsUp = nodesUp.zip(nodeExecution.executionPath.reverse).map((node, index) => ExecutionOfNode(node, ExecutionIndex(index)))
     val parentsUp = executionsUp.drop(1).map(Some(_)) :+ None
-    executionsUp.zip(parentsUp).reverse.foldLeft(this) { case (recorded, (execution, parent)) => recorded.withExecutionStarted(execution, parent) }
+    val executionsTopDown = executionsUp.zip(parentsUp).reverse
+    executionsTopDown.foldLeft(this) { case (recorded, (execution, parent)) => recorded.withExecutionStarted(execution, parent) }
   }
 
   private def withExecutionStarted(execution: ExecutionOfNode, parent: Option[ExecutionOfNode]): RecordedRun = {

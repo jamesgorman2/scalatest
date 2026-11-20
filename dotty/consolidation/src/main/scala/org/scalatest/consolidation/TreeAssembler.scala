@@ -8,7 +8,6 @@ import org.scalatest.events.StructureNode
 import org.scalatest.events.SuiteId
 import org.scalatest.events.TestName
 
-/** What attributes a test with no execution to a test that ran: the suite ID of the nearest suite above it, and its test name. */
 private[consolidation] final case class AttributionKey(suiteId: SuiteId, testName: TestName)
 
 private[consolidation] final case class Subtree(started: Boolean, testsBelow: Vector[NodeId]) {
@@ -16,10 +15,6 @@ private[consolidation] final case class Subtree(started: Boolean, testsBelow: Ve
   def isAttributed(isAttributedTest: NodeId => Boolean): Boolean = !started && testsBelow.nonEmpty && testsBelow.forall(isAttributedTest)
 }
 
-/**
- * Assembles a run's tree from its whole event stream, once. It works out once per node whether the node started
- * and which tests are below it.
- */
 private[consolidation] final class TreeAssembler(run: RecordedRun) {
 
   private val structure = run.structure
@@ -64,10 +59,6 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
 
   private def shownChildrenOf(id: NodeId): OrderedChildren = orderedChildren(id, childrenOf(id).filterNot(isAttributed))
 
-  // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
-  // one it holds. A suite's nested suites sit before or after them, as the emitter's numbering placed them. A suite a
-  // later structure added that shares a suite ID with a placed sibling sits directly after the last sibling with that
-  // suite ID, in the order such suites arrived.
   private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): OrderedChildren = {
     val scopesAndTests = children.filter(child => NodeKind.of(child).isScopeOrTest).sortBy(child => (child.declaredPosition, isDropped(child)))
     val suites = children.collect { case suite: StructureNode.Suite => suite }
@@ -97,8 +88,6 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   private def executionOf(id: NodeId, index: Option[ExecutionIndex]): Option[RecordedExecution] =
     index.flatMap(executionIndex => executions.get(id).flatMap(_.get(executionIndex)))
 
-  // An execution sits under the parent execution its path names. A node with no execution, and an execution whose
-  // path names no execution of the node's latest parent, sit under the parent's latest.
   private def parentIndexOf(id: NodeId, index: Option[ExecutionIndex], parent: NodeId, parentsLatest: Option[ExecutionIndex]): Option[ExecutionIndex] =
     executionOf(id, index)
       .flatMap(_.parent)
@@ -113,8 +102,6 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   ): Vector[AssembledNode] =
     indexes.map(index => AssembledNode(node, assembledExecution(node, index, abortedSuiteAround)))
 
-  // A suite with no execution follows the executions of its name, in the order the structures first named those
-  // suites.
   private def inNameAndStartOrder(suites: Vector[AssembledNode]): Vector[AssembledNode] =
     suites.sortBy { suite =>
       val id = suite.node.id
@@ -167,12 +154,6 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
     )
   }
 
-  // Marks as aborted:
-  // - a test whose own execution holds the `SuiteAborted` of the `DistributedTestRunnerSuite` that ran it;
-  // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
-  // - a suite still open when its run aborted or stopped;
-  // - a suite, scope or test with a start event and no closing event, in a run that ended.
-  // A suite run by a test sends no start event, so the last case never marks it aborted.
   private def outcomeOf(
     node: StructureNode,
     execution: Option[RecordedExecution],
@@ -186,10 +167,13 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
       case (test: StructureNode.Test, None) => Some(if (test.ignored) NodeOutcome.Ignored else NodeOutcome.NotRun)
       case (_, None) => Some(NodeOutcome.NotRun)
       case (_: StructureNode.Scope, Some(execution)) =>
-        execution.scopeOutcome(abortedWhereOpen = openScopeOrTestAborted || (runFinished && execution.holds(_.isInstanceOf[DecodedEvent.ScopeOpened])))
+        execution.scopeOutcome(abortedWhereOpen = openScopeOrTestAborted || startedInFinishedRun(execution, _.isInstanceOf[DecodedEvent.ScopeOpened]))
       case (_: StructureNode.Test, Some(execution)) =>
-        execution.testOutcome(abortedWhereOpen = openScopeOrTestAborted || (runFinished && execution.holds(_.isInstanceOf[DecodedEvent.TestStarting])))
+        execution.testOutcome(abortedWhereOpen = openScopeOrTestAborted || startedInFinishedRun(execution, _.isInstanceOf[DecodedEvent.TestStarting]))
     }
+
+  private def startedInFinishedRun(execution: RecordedExecution, isStartEvent: DecodedEvent => Boolean): Boolean =
+    runFinished && execution.holds(isStartEvent)
 
   private def abortTime(abortedSuiteAround: Option[DecodedEvent.SuiteAborted]): Option[Instant] =
     abortedSuiteAround.map(_.timeStamp).orElse(run.abort.map(_.timeStamp)).map(Instant.ofEpochMilli)
@@ -199,7 +183,6 @@ private[consolidation] object TreeAssembler {
 
   def topLevelSuitesOf(run: RecordedRun): Vector[AssembledNode] = new TreeAssembler(run).topLevelSuites
 
-  // The place before a test's is its suite's, which gives the suite ID.
   private def attributionKeyOf(id: NodeId): Option[AttributionKey] =
     id.places.takeRight(2) match {
       case Vector(NodePlace.Suite(suiteId, _), NodePlace.Test(testName)) => Some(AttributionKey(suiteId, testName))

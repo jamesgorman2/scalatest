@@ -17,10 +17,6 @@ import org.scalatest.events.Summary
 import org.scalatest.events.TopOfClass
 import org.scalatest.events.TopOfMethod
 
-/**
- * Writes the JSON output: the root, its modules, their run nodes, and each run's suites, scopes and tests, with their messages and throwables.
- * Each node's keys are written in a fixed order, and a key whose value is absent is left out, so no `null` is written.
- */
 private[consolidation] object JsonOutputWriter {
 
   private type Field = (String, Option[JsonValue])
@@ -31,7 +27,6 @@ private[consolidation] object JsonOutputWriter {
     text.flush()
   }
 
-  // Gives the text to `output` in pieces of about `pieceLength` characters, never splitting a surrogate pair.
   private final class TextInPieces(output: String => Unit) extends Appendable {
 
     private val pieceLength = 8192
@@ -170,8 +165,8 @@ private[consolidation] object JsonOutputWriter {
       case NodeOutcome.Aborted | NodeOutcome.NotRun => "aborted"
     }
 
-  // A suite's events give no line of their own. Its location has a file only when all its scopes' and tests' locations name the same one.
   private def suiteLocation(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
+    // A suite's events name no file, so its location takes the file its scopes and tests share.
     val locations = execution.ownScopesAndTests.flatMap(_.eventLocation)
     val files = locations.map(fileFields).distinct
     val sharedFile = files match {
@@ -203,7 +198,6 @@ private[consolidation] object JsonOutputWriter {
         Vector.empty
     }
 
-  // Code compiled without SCALACTIC_FILL_FILE_PATHNAMES set to yes carries Scalactic's placeholder text in place of the path.
   private def fileField(fileName: Option[String], filePathname: Option[String]): Field =
     filePathname
       .filterNot(_ == Position.unfilledFilePathname)
@@ -246,7 +240,6 @@ private[consolidation] object JsonOutputWriter {
       case RunOutput.Captured(line) => capturedOutputItem(line)
     }
 
-  // A message's thread name is written only where its node has none or a different one.
   private def messageItem(message: ProvidedMessage, nodeThreadName: Option[String]): JsonValue =
     objectOf(
       Vector[Field](
@@ -284,16 +277,15 @@ private[consolidation] object JsonOutputWriter {
     }
   }
 
-  // Builds the record in two passes. Neither recurses, so a cause chain too long to recurse over is still written.
-  //   1. Visit the throwables depth-first, cause before suppressed. A throwable seen for the first time, by identity, gets the
-  //      next id; one seen again becomes a ref.
-  //   2. Build the record from the last entry back to the first.
   private def throwableRecord(throwable: DecodedThrowable): JsonValue =
-    Iterator
-      .unfold(ThrowableVisit(List(throwable), Map.empty))(_.next)
-      .toVector
-      .foldRight(List.empty[JsonValue])(withEntryWritten)
-      .head
+    // Neither `entriesInVisitOrder` nor `recordOf` recurses, so a cause chain too long to recurse over is still written.
+    recordOf(entriesInVisitOrder(throwable))
+
+  private def entriesInVisitOrder(throwable: DecodedThrowable): Vector[ThrowableEntry] =
+    Iterator.unfold(ThrowableVisit(List(throwable), Map.empty))(_.next).toVector
+
+  private def recordOf(entries: Vector[ThrowableEntry]): JsonValue =
+    entries.foldRight(List.empty[JsonValue])(withEntryWritten).head
 
   private def withEntryWritten(entry: ThrowableEntry, written: List[JsonValue]): List[JsonValue] =
     entry match {
