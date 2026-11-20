@@ -47,6 +47,7 @@ private[mill] final class JsonOutputFile(val path: Path) {
     Files.newBufferedWriter(path, StandardCharsets.UTF_8)
   }
 
+  /** Deletes the partly written file, giving the delete's failure, if any. */
   private def deletePartlyWrittenFile(): Option[Throwable] =
     Try(Files.deleteIfExists(path)).failed.toOption
 }
