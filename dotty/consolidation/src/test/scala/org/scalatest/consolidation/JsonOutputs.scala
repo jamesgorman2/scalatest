@@ -1,6 +1,5 @@
 package org.scalatest.consolidation
 
-import java.io.StringWriter
 import scala.collection.mutable
 import org.scalatest.Assertions
 import org.scalatest.events.DecodedEvent
@@ -19,9 +18,9 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     private val received = mutable.ArrayBuffer.empty[String]
 
     def apply(json: JsonOutput): Unit = {
-      val writer = new StringWriter
-      json.writeTo(writer)
-      synchronized(received += writer.toString)
+      val text = new StringBuilder
+      json.writeTo(piece => text.append(piece))
+      synchronized(received += text.toString)
     }
 
     def texts: Vector[String] = synchronized(received.toVector)

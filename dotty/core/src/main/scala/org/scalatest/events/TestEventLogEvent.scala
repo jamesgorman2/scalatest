@@ -57,94 +57,104 @@ private[scalatest] enum TestEventLogEvent {
 }
 
 private[scalatest] enum DecodedEvent {
-  case TestStarting(location: Option[Location], threadName: String, timeStamp: Long)
-  case TestSucceeded(duration: Option[Long], location: Option[Location], threadName: String, timeStamp: Long)
+  case TestStarting(override val location: Option[Location], threadName: String, timeStamp: Long)
+  case TestSucceeded(override val duration: Option[Long], override val location: Option[Location], threadName: String, timeStamp: Long)
   case TestFailed(
     message: String,
     analysis: IndexedSeq[String],
     throwable: Option[DecodedThrowable],
-    duration: Option[Long],
-    location: Option[Location],
+    override val duration: Option[Long],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
-  case TestIgnored(location: Option[Location], threadName: String, timeStamp: Long)
-  case TestPending(duration: Option[Long], location: Option[Location], threadName: String, timeStamp: Long)
+  case TestIgnored(override val location: Option[Location], threadName: String, timeStamp: Long)
+  case TestPending(override val duration: Option[Long], override val location: Option[Location], threadName: String, timeStamp: Long)
   case TestCanceled(
     message: String,
     throwable: Option[DecodedThrowable],
-    duration: Option[Long],
-    location: Option[Location],
+    override val duration: Option[Long],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
-  case SuiteStarting(location: Option[Location], threadName: String, timeStamp: Long)
-  case SuiteCompleted(duration: Option[Long], location: Option[Location], threadName: String, timeStamp: Long)
+  case SuiteStarting(override val location: Option[Location], threadName: String, timeStamp: Long)
+  case SuiteCompleted(override val duration: Option[Long], override val location: Option[Location], threadName: String, timeStamp: Long)
   case SuiteAborted(
     message: String,
     throwable: Option[DecodedThrowable],
-    duration: Option[Long],
-    location: Option[Location],
+    override val duration: Option[Long],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case RunStarting(
     testCount: Int,
     configMap: Map[String, String],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case RunCompleted(
-    duration: Option[Long],
+    override val duration: Option[Long],
     summary: Option[Summary],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case RunStopped(
-    duration: Option[Long],
+    override val duration: Option[Long],
     summary: Option[Summary],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case RunAborted(
     message: String,
     throwable: Option[DecodedThrowable],
-    duration: Option[Long],
+    override val duration: Option[Long],
     summary: Option[Summary],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case InfoProvided(
     message: String,
     throwable: Option[DecodedThrowable],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case AlertProvided(
     message: String,
     throwable: Option[DecodedThrowable],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
   case NoteProvided(
     message: String,
     throwable: Option[DecodedThrowable],
-    location: Option[Location],
+    override val location: Option[Location],
     threadName: String,
     timeStamp: Long
   )
-  case MarkupProvided(text: String, location: Option[Location], threadName: String, timeStamp: Long)
-  case ScopeOpened(location: Option[Location], threadName: String, timeStamp: Long)
-  case ScopeClosed(location: Option[Location], threadName: String, timeStamp: Long)
-  case ScopePending(location: Option[Location], threadName: String, timeStamp: Long)
+  case MarkupProvided(text: String, override val location: Option[Location], threadName: String, timeStamp: Long)
+  case ScopeOpened(override val location: Option[Location], threadName: String, timeStamp: Long)
+  case ScopeClosed(override val location: Option[Location], threadName: String, timeStamp: Long)
+  case ScopePending(override val location: Option[Location], threadName: String, timeStamp: Long)
   case DiscoveryStarting(threadName: String, timeStamp: Long)
-  case DiscoveryCompleted(duration: Option[Long], threadName: String, timeStamp: Long)
+  case DiscoveryCompleted(override val duration: Option[Long], threadName: String, timeStamp: Long)
+
+  def threadName: String
+
+  def timeStamp: Long
+
+  /** Absent where the event records none, as a discovery event never does. */
+  def location: Option[Location] = None
+
+  /** Absent where the event records none, as an event that starts a run, suite, scope or test never does. */
+  def duration: Option[Long] = None
 }
 
 private[scalatest] final case class DecodedStackDepth(

@@ -1,14 +1,13 @@
 package org.scalatest.consolidation
 
-import java.io.Writer
-
 /** The JSON output of an ended consolidation, written as it is produced rather than held whole as text. */
 final class JsonOutput private[consolidation] (root: ConsolidatedRoot) {
 
   /**
-   * Writes the JSON output's text to the writer, which this neither flushes nor closes.
+   * Gives the JSON output's text to `output` piece by piece, in order, so that the pieces joined are the whole text. No
+   * piece ends part way through a surrogate pair.
    *
-   * @throws java.io.IOException what the writer throws
+   * Throws what `output` throws.
    */
-  def writeTo(writer: Writer): Unit = JsonOutputWriter.write(root, writer)
+  def writeTo(output: String => Unit): Unit = JsonOutputWriter.write(root, output)
 }

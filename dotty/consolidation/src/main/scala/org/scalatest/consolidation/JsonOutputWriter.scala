@@ -1,10 +1,10 @@
 package org.scalatest.consolidation
 
-import java.io.Writer
+import java.time.Duration
+import java.time.Instant
 import java.util.IdentityHashMap
 import org.scalactic.source.Position
 import org.scalatest.ScalaTestVersions
-import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedStackDepth
 import org.scalatest.events.DecodedStackFrame
 import org.scalatest.events.DecodedThrowable
@@ -27,7 +27,37 @@ private[consolidation] object JsonOutputWriter {
 
   private type Field = (String, Option[JsonValue])
 
-  def write(root: ConsolidatedRoot, out: Writer): Unit = JsonWriter.write(rootNode(root), out)
+  def write(root: ConsolidatedRoot, output: String => Unit): Unit = {
+    val text = new TextInPieces(output)
+    JsonWriter.write(rootNode(root), text)
+    text.flush()
+  }
+
+  // Gives the text to `output` in pieces of about `pieceLength` characters, never splitting a surrogate pair.
+  private final class TextInPieces(output: String => Unit) extends Appendable {
+
+    private val pieceLength = 8192
+    private val piece = new java.lang.StringBuilder
+
+    def append(char: Char): Appendable = {
+      piece.append(char)
+      if (piece.length >= pieceLength && !Character.isHighSurrogate(char)) flush()
+      this
+    }
+
+    def append(text: CharSequence): Appendable = append(text, 0, text.length)
+
+    def append(text: CharSequence, start: Int, end: Int): Appendable = {
+      (start until end).foreach(index => append(text.charAt(index)))
+      this
+    }
+
+    def flush(): Unit =
+      if (piece.length > 0) {
+        output(piece.toString)
+        piece.setLength(0)
+      }
+  }
 
   private def rootNode(root: ConsolidatedRoot): JsonValue =
     objectOf(
@@ -66,9 +96,9 @@ private[consolidation] object JsonOutputWriter {
 
   private def measuredTimeFields(times: MeasuredTimes): Vector[Field] =
     Vector(
-      "startedAt" -> times.startedAt.map(time => JsonValue.Integer(time.toEpochMilli)),
-      "endedAt" -> times.endedAt.map(time => JsonValue.Integer(time.toEpochMilli)),
-      "duration" -> times.duration.map(JsonValue.Integer(_))
+      "startedAt" -> times.startedAt.map(epochMillis),
+      "endedAt" -> times.endedAt.map(epochMillis),
+      "duration" -> times.duration.map(millis)
     )
 
   private def runNode(run: ConsolidatedRun): JsonValue = {
@@ -78,17 +108,17 @@ private[consolidation] object JsonOutputWriter {
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text("run")),
-        "number" -> Some(JsonValue.Integer(run.number.toLong)),
+        "number" -> Some(JsonValue.Integer(run.number.value.toLong)),
         "forkGroup" -> assembly.worker.map(worker => JsonValue.Integer(worker.forkGroup.position.toLong)),
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
         "configMap" -> starting.map(started => configMapObject(started.configMap)),
         "discovery" -> assembly.discovery.map(discoveryObject),
-        "outcome" -> assembly.outcome.flatMap(runOutcomeText).map(JsonValue.Text(_)),
+        "outcome" -> assembly.outcome.filter(_ != RunOutcome.Completed).map(outcome => JsonValue.Text(outcome.word)),
         "message" -> assembly.runAborted.map(aborted => JsonValue.Text(aborted.message)),
         "throwable" -> assembly.runAborted.flatMap(_.throwable).map(throwableRecord),
         "startedAt" -> starting.map(started => JsonValue.Integer(started.timeStamp)),
-        "endedAt" -> closing.map(closed => JsonValue.Integer(closed.timeStamp)),
-        "duration" -> closing.flatMap(_.duration).map(JsonValue.Integer(_)),
+        "endedAt" -> closing.map(closed => epochMillis(closed.at)),
+        "duration" -> closing.flatMap(_.duration).map(millis),
         "summary" -> closing.flatMap(_.summary).map(summaryObject),
         "contents" -> Some(JsonValue.Array(assembly.topLevelSuites.map(assembledNode))),
         "output" -> nonEmptyArray(assembly.output.map(runOutputItem))
@@ -97,73 +127,34 @@ private[consolidation] object JsonOutputWriter {
   }
 
   private def assembledNode(assembled: AssembledNode): JsonValue = {
-    val node = assembled.node
     val execution = assembled.execution
-    val startedAt = execution.opening.map(_.timeStamp)
-    val endedAt = execution.closing.map(_.timeStamp).orElse(execution.abortedAt)
-    val threadName = threadNameOf(node, execution)
-    val ending = execution.ending.map(EndingReport.of)
+    val threadName = assembled.threadName
+    val ending = execution.ending
     objectOf(
       Vector[Field](
-        "kind" -> Some(JsonValue.Text(kindOf(node))),
+        "kind" -> Some(JsonValue.Text(assembled.kind.word)),
         "name" -> Some(JsonValue.Text(assembled.name)),
-        "label" -> labelOf(node).map(JsonValue.Text(_)),
-        "suiteId" -> suiteIdOf(node).map(JsonValue.Text(_)),
-        "location" -> locationOf(node, execution),
+        "label" -> assembled.label.map(JsonValue.Text(_)),
+        "suiteId" -> assembled.suiteId.map(suiteId => JsonValue.Text(suiteId.value)),
+        "location" -> locationOf(assembled),
         "outcome" -> execution.outcome.map(outcome => JsonValue.Text(outcomeText(outcome))),
         "reason" -> execution.outcome.filter(_ == NodeOutcome.NotRun).map(_ => JsonValue.Text("notRun")),
-        "message" -> ending.map(report => JsonValue.Text(report.message)),
+        "message" -> ending.map(failure => JsonValue.Text(failure.message)),
         "throwable" -> ending.flatMap(_.throwable).map(throwableRecord),
-        "startedAt" -> startedAt.map(JsonValue.Integer(_)),
-        "endedAt" -> endedAt.map(JsonValue.Integer(_)),
-        "duration" -> durationOf(node, execution, startedAt, endedAt).map(JsonValue.Integer(_)),
+        "startedAt" -> assembled.startedAt.map(epochMillis),
+        "endedAt" -> assembled.endedAt.map(epochMillis),
+        "duration" -> assembled.duration.map(millis),
         "threadName" -> threadName.map(JsonValue.Text(_)),
         "contents" -> Some(JsonValue.Array(execution.children.map(assembledNode))),
-        "output" -> nonEmptyArray(execution.messages.map(placed => messageItem(placed.event, threadName)))
+        "output" -> nonEmptyArray(execution.messages.map(placed => messageItem(placed.message, threadName)))
       )
     )
   }
 
-  private def kindOf(node: StructureNode): String =
-    node match {
-      case _: StructureNode.Suite => "suite"
-      case _: StructureNode.Scope => "scope"
-      case _: StructureNode.Test => "test"
-    }
-
-  private def labelOf(node: StructureNode): Option[String] =
-    node match {
-      case _: StructureNode.Suite => None
-      case scope: StructureNode.Scope => Some(scope.label)
-      case test: StructureNode.Test => Some(test.label)
-    }
-
-  private def suiteIdOf(node: StructureNode): Option[String] =
-    node match {
-      case suite: StructureNode.Suite => Some(suite.suiteId.value)
-      case _ => None
-    }
-
-  private def locationOf(node: StructureNode, execution: AssembledExecution): Option[JsonValue] =
-    node match {
-      case suite: StructureNode.Suite => Some(suiteLocationObject(suite, execution))
-      case _ => scopeOrTestLocation(node, execution).flatMap(locationObject)
-    }
-
-  // A suite's or test's duration comes from its closing event. A scope's closing event carries none, and an aborted node
-  // may have no closing event of its own; either way the duration is endedAt less startedAt.
-  private def durationOf(node: StructureNode, execution: AssembledExecution, startedAt: Option[Long], endedAt: Option[Long]): Option[Long] = {
-    val measured = for (started <- startedAt; ended <- endedAt) yield ended - started
-    node match {
-      case _: StructureNode.Scope => measured
-      case _ => execution.closing.fold(measured)(_.duration)
-    }
-  }
-
-  private def threadNameOf(node: StructureNode, execution: AssembledExecution): Option[String] =
-    node match {
-      case _: StructureNode.Scope => None
-      case _ => execution.opening.orElse(execution.closing).map(_.threadName)
+  private def locationOf(assembled: AssembledNode): Option[JsonValue] =
+    assembled.node match {
+      case suite: StructureNode.Suite => Some(suiteLocationObject(suite, assembled.execution))
+      case _ => assembled.eventLocation.flatMap(locationObject)
     }
 
   private def outcomeText(outcome: NodeOutcome): String =
@@ -176,31 +167,9 @@ private[consolidation] object JsonOutputWriter {
       case NodeOutcome.Aborted | NodeOutcome.NotRun => "aborted"
     }
 
-  private final case class EndingReport(message: String, throwable: Option[DecodedThrowable])
-
-  private object EndingReport {
-
-    def of(ending: DecodedEvent): EndingReport =
-      ending match {
-        case failed: DecodedEvent.TestFailed => EndingReport(failed.message, failed.throwable)
-        case canceled: DecodedEvent.TestCanceled => EndingReport(canceled.message, canceled.throwable)
-        case aborted: DecodedEvent.SuiteAborted => EndingReport(aborted.message, aborted.throwable)
-        case other => throw new IllegalArgumentException(s"$other ends no suite, scope or test with a message")
-      }
-  }
-
-  // Where an opening event's location is `SeeStackDepthException`, which defers to the throwable, the closing event's location is used.
-  private def scopeOrTestLocation(node: StructureNode, execution: AssembledExecution): Option[Location] = {
-    val events = node match {
-      case _: StructureNode.Scope => execution.opening.toVector
-      case _ => (execution.opening ++ execution.closing).toVector
-    }
-    events.flatMap(_.location).find(_ != SeeStackDepthException)
-  }
-
   // A suite's events give no line of their own. Its location has a file only when all its scopes' and tests' locations name the same one.
   private def suiteLocationObject(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
-    val locations = ownScopesAndTestsOf(execution).flatMap(child => scopeOrTestLocation(child.node, child.execution))
+    val locations = execution.ownScopesAndTests.flatMap(_.eventLocation)
     val files = locations.map(fileFields).distinct
     val sharedFile = files match {
       case Vector(file) if file.nonEmpty => file
@@ -208,9 +177,6 @@ private[consolidation] object JsonOutputWriter {
     }
     objectOf(("className" -> Some(JsonValue.Text(suite.className))) +: sharedFile)
   }
-
-  private def ownScopesAndTestsOf(execution: AssembledExecution): Vector[AssembledNode] =
-    execution.children.filterNot(_.node.isInstanceOf[StructureNode.Suite]).flatMap(child => child +: ownScopesAndTestsOf(child.execution))
 
   private def locationObject(location: Location): Option[JsonValue] =
     location match {
@@ -244,17 +210,10 @@ private[consolidation] object JsonOutputWriter {
   private def discoveryObject(discovery: RunDiscovery): JsonValue =
     objectOf(
       Vector[Field](
-        "startedAt" -> Some(JsonValue.Integer(discovery.startedAt)),
-        "duration" -> discovery.duration.map(JsonValue.Integer(_))
+        "startedAt" -> Some(epochMillis(discovery.startedAt)),
+        "duration" -> discovery.duration.map(millis)
       )
     )
-
-  private def runOutcomeText(outcome: RunOutcome): Option[String] =
-    outcome match {
-      case RunOutcome.Aborted => Some("aborted")
-      case RunOutcome.Stopped => Some("stopped")
-      case RunOutcome.Completed => None
-    }
 
   private def summaryObject(summary: Summary): JsonValue =
     JsonValue.Object(
@@ -272,45 +231,22 @@ private[consolidation] object JsonOutputWriter {
 
   private def runOutputItem(output: RunOutput): JsonValue =
     output match {
-      case RunOutput.Message(event) => messageItem(event, nodeThreadName = None)
+      case RunOutput.Message(message) => messageItem(message, nodeThreadName = None)
       case RunOutput.Captured(line) => capturedOutputItem(line)
     }
 
   // A message's thread name is written only where its node has none or a different one.
-  private def messageItem(event: DecodedEvent, nodeThreadName: Option[String]): JsonValue = {
-    val message = ProvidedMessage.of(event)
+  private def messageItem(message: ProvidedMessage, nodeThreadName: Option[String]): JsonValue =
     objectOf(
       Vector[Field](
-        "kind" -> Some(JsonValue.Text(message.kind)),
+        "kind" -> Some(JsonValue.Text(message.kind.word)),
         "message" -> Some(JsonValue.Text(message.text)),
-        "at" -> Some(JsonValue.Integer(message.at)),
+        "at" -> Some(epochMillis(message.at)),
         "location" -> message.location.flatMap(locationObject),
         "throwable" -> message.throwable.map(throwableRecord),
         "threadName" -> Option.when(!nodeThreadName.contains(message.threadName))(JsonValue.Text(message.threadName))
       )
     )
-  }
-
-  private final case class ProvidedMessage(
-    kind: String,
-    text: String,
-    at: Long,
-    location: Option[Location],
-    throwable: Option[DecodedThrowable],
-    threadName: String
-  )
-
-  private object ProvidedMessage {
-
-    def of(event: DecodedEvent): ProvidedMessage =
-      event match {
-        case info: DecodedEvent.InfoProvided => ProvidedMessage("info", info.message, info.timeStamp, info.location, info.throwable, info.threadName)
-        case alert: DecodedEvent.AlertProvided => ProvidedMessage("alert", alert.message, alert.timeStamp, alert.location, alert.throwable, alert.threadName)
-        case note: DecodedEvent.NoteProvided => ProvidedMessage("note", note.message, note.timeStamp, note.location, note.throwable, note.threadName)
-        case markup: DecodedEvent.MarkupProvided => ProvidedMessage("markup", markup.text, markup.timeStamp, markup.location, None, markup.threadName)
-        case other => throw new IllegalArgumentException(s"$other is not a message")
-      }
-  }
 
   private enum ThrowableLink {
     case Cause
@@ -420,6 +356,10 @@ private[consolidation] object JsonOutputWriter {
       )
     )
   }
+
+  private def epochMillis(at: Instant): JsonValue = JsonValue.Integer(at.toEpochMilli)
+
+  private def millis(duration: Duration): JsonValue = JsonValue.Integer(duration.toMillis)
 
   private def nonEmptyArray(items: Vector[JsonValue]): Option[JsonValue] = Option.when(items.nonEmpty)(JsonValue.Array(items))
 

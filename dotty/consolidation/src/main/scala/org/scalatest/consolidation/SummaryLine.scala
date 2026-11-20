@@ -51,7 +51,7 @@ private[consolidation] object SummaryCounts {
    * counted. Attributed nodes are not in the tree, so they are not counted. Requires each run's event stream to have ended.
    */
   def of(runs: Seq[RunAssembly]): SummaryCounts =
-    runs.flatMap(_.topLevelSuites).flatMap(suite => suite +: suite.descendants).map(countsOf).foldLeft(none)(_.plus(_))
+    runs.flatMap(_.topLevelSuites).flatMap(_.withDescendants).map(countsOf).foldLeft(none)(_.plus(_))
 
   private def countsOf(node: AssembledNode): SummaryCounts =
     (node.node, node.execution.outcome) match {

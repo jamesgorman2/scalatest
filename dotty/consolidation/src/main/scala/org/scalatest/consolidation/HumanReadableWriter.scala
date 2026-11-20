@@ -67,13 +67,13 @@ private[consolidation] object HumanReadableWriter {
 
   private def runLines(run: ConsolidatedRun, depth: Int): Vector[OutputLine] = {
     val assembly = run.assembly
-    linesOf(s"Run ${run.number}:", depth, AnsiCyan) ++ assembly.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++
+    linesOf(s"Run ${run.number.value}:", depth, AnsiCyan) ++ assembly.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++
       assembly.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(assembly, depth + 1)
   }
 
   private def outputLines(output: RunOutput, depth: Int): Vector[OutputLine] =
     output match {
-      case RunOutput.Message(event) => messageLines(event, depth)
+      case RunOutput.Message(message) => messageLines(message, depth)
       case RunOutput.Captured(line) => capturedLineLines(line, depth)
     }
 
@@ -117,9 +117,9 @@ private[consolidation] object HumanReadableWriter {
   // started in it when the message arrived.
   private def contentLines(execution: AssembledExecution, depth: Int): Vector[OutputLine] = {
     def messagesAfter(childrenBefore: Int): Vector[OutputLine] =
-      execution.messages.filter(_.childrenBefore == childrenBefore).flatMap(message => messageLines(message.event, depth))
+      execution.messages.filter(_.childrenBefore == childrenBefore).flatMap(placed => messageLines(placed.message, depth))
     if (execution.isCollapsed)
-      execution.messages.flatMap(message => messageLines(message.event, depth))
+      execution.messages.flatMap(placed => messageLines(placed.message, depth))
     else
       execution.children.indices.toVector.flatMap(index => messagesAfter(index) ++ nodeLines(execution.children(index), depth)) ++
         messagesAfter(execution.children.size)
@@ -132,11 +132,7 @@ private[consolidation] object HumanReadableWriter {
 
   private def countLine(notRun: Vector[AssembledNode]): String = {
     def count(kind: String, n: Int): Option[String] = if (n == 0) None else Some(s"$n $kind" + (if (n == 1) "" else "s"))
-    val counts = Vector(
-      count("suite", notRun.count(_.node.isInstanceOf[StructureNode.Suite])),
-      count("scope", notRun.count(_.node.isInstanceOf[StructureNode.Scope])),
-      count("test", notRun.count(_.node.isInstanceOf[StructureNode.Test]))
-    ).flatten
+    val counts = NodeKind.values.toVector.flatMap(kind => count(kind.word, notRun.count(_.kind == kind)))
     "(" + counts.mkString(", ") + " not run)"
   }
 
@@ -147,7 +143,7 @@ private[consolidation] object HumanReadableWriter {
     (execution.outcome, execution.ending) match {
       case (Some(NodeOutcome.NotRun), _) =>
         linesOf(Resources.specTextAndNote(suite.className, notRunNote), depth, AnsiRed)
-      case (Some(NodeOutcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
+      case (Some(NodeOutcome.Aborted), Some(aborted: FailureEnding.SuiteAborted)) =>
         val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, suite.className, Some(suite.name), None)
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
       case (Some(NodeOutcome.Aborted), _) =>
@@ -173,13 +169,13 @@ private[consolidation] object HumanReadableWriter {
 
   private def testLines(test: StructureNode.Test, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
     (execution.outcome, execution.ending) match {
-      case (Some(NodeOutcome.Failed), Some(failed: DecodedEvent.TestFailed)) =>
+      case (Some(NodeOutcome.Failed), Some(failed: FailureEnding.TestFailed)) =>
         val lines = linesOnError(Resources.failedNote, Resources.testFailed _, failed.message, failed.throwable, failed.analysis, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, failed.throwable, depth + 1, AnsiRed)
-      case (Some(NodeOutcome.Canceled), Some(canceled: DecodedEvent.TestCanceled)) =>
+      case (Some(NodeOutcome.Canceled), Some(canceled: FailureEnding.TestCanceled)) =>
         val lines = linesOnError(Resources.canceledNote, Resources.testCanceled _, canceled.message, canceled.throwable, Vector.empty, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiYellow) ++ linesUnder(lines.tail, canceled.throwable, depth + 1, AnsiYellow)
-      case (Some(NodeOutcome.Aborted), Some(aborted: DecodedEvent.SuiteAborted)) =>
+      case (Some(NodeOutcome.Aborted), Some(aborted: FailureEnding.SuiteAborted)) =>
         val lines = linesOnError(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, test.label, None, Some(test.name))
         linesOf(lines.head, depth, AnsiRed) ++ linesUnder(lines.tail, aborted.throwable, depth + 1, AnsiRed)
       case (outcome, _) =>
@@ -201,32 +197,31 @@ private[consolidation] object HumanReadableWriter {
     }
 
   // A message's own line is marked with its kind in place of ScalaTest 3.2.20's icon. The lines under it are as 3.2.20 prints them.
-  private def messageLines(message: DecodedEvent, depth: Int): Vector[OutputLine] =
-    message match {
-      case info: DecodedEvent.InfoProvided =>
-        markedMessageLines("[info] ", Resources.infoProvidedNote, Resources.infoProvided _, info.message, info.throwable, depth, AnsiGreen)
-      case note: DecodedEvent.NoteProvided =>
-        markedMessageLines("[note] ", Resources.noteProvidedNote, Resources.noteProvided _, note.message, note.throwable, depth, AnsiGreen)
-      case alert: DecodedEvent.AlertProvided =>
-        markedMessageLines("[alert] ", Resources.alertProvidedNote, Resources.alertProvided _, alert.message, alert.throwable, depth, AnsiYellow)
-      case markup: DecodedEvent.MarkupProvided =>
-        StringReporter.stringToPrintWhenMarkup(formatterOf("[markup] " + markup.text), None, None, markup.text, presentUnformatted = false).flatMap(linesOf(_, depth, AnsiGreen))
-      case _ =>
-        Vector.empty
+  private def messageLines(message: ProvidedMessage, depth: Int): Vector[OutputLine] =
+    message.kind match {
+      case MessageKind.Info =>
+        markedMessageLines(message, Resources.infoProvidedNote, Resources.infoProvided _, depth, AnsiGreen)
+      case MessageKind.Note =>
+        markedMessageLines(message, Resources.noteProvidedNote, Resources.noteProvided _, depth, AnsiGreen)
+      case MessageKind.Alert =>
+        markedMessageLines(message, Resources.alertProvidedNote, Resources.alertProvided _, depth, AnsiYellow)
+      case MessageKind.Markup =>
+        StringReporter.stringToPrintWhenMarkup(formatterOf(markOf(message) + message.text), None, None, message.text, presentUnformatted = false).flatMap(linesOf(_, depth, AnsiGreen))
     }
 
   private def markedMessageLines(
-    mark: String,
+    message: ProvidedMessage,
     note: String,
     errorMessage: Any => String,
-    message: String,
-    throwable: Option[ThrowableView],
     depth: Int,
     colour: AnsiColor
   ): Vector[OutputLine] = {
-    val lines = linesOnError(note, errorMessage, message, throwable, Vector.empty, mark + message, None, None)
-    linesOf(mark + message, depth, colour) ++ linesUnder(lines.tail, throwable, depth + 1, colour)
+    val markedText = markOf(message) + message.text
+    val lines = linesOnError(note, errorMessage, message.text, message.throwable, Vector.empty, markedText, None, None)
+    linesOf(markedText, depth, colour) ++ linesUnder(lines.tail, message.throwable, depth + 1, colour)
   }
+
+  private def markOf(message: ProvidedMessage): String = "[" + message.kind.word + "] "
 
   // An event's first line, then its message, analysis and stack trace lines, with the `S` and `F` reporter options off.
   private def linesOnError(

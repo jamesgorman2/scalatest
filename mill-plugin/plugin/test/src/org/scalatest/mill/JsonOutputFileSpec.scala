@@ -66,7 +66,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
       "hold the JSON output in UTF-8, replacing what it held" in {
         withFolder { folder =>
           val path = Files.writeString(folder.resolve("report.json"), "left over, and longer than the output")
-          new JsonOutputFile(path).write(_.write("""{"name":"café"}""")) shouldBe Right(())
+          new JsonOutputFile(path).write(output => output("""{"name":"café"}""")) shouldBe Right(())
           read(path) shouldBe """{"name":"café"}"""
         }
       }
@@ -74,7 +74,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
       "create its missing parent folders" in {
         withFolder { folder =>
           val path = folder.resolve("missing").resolve("nested").resolve("report.json")
-          new JsonOutputFile(path).write(_.write("{}")) shouldBe Right(())
+          new JsonOutputFile(path).write(output => output("{}")) shouldBe Right(())
           read(path) shouldBe "{}"
         }
       }
@@ -83,7 +83,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         withFolder { folder =>
           val blocker = Files.writeString(folder.resolve("blocker"), "a file")
           val path = blocker.resolve("report.json")
-          new JsonOutputFile(path).write(_.write("{}")) should matchPattern {
+          new JsonOutputFile(path).write(output => output("{}")) should matchPattern {
             case Left(TestCommandFailure.JsonOutputNotWritten(`path`, _: IOException, None)) =>
           }
         }
@@ -93,9 +93,8 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         withFolder { folder =>
           val path = folder.resolve("report.json")
           val cause = new IOException("no space left")
-          val written = new JsonOutputFile(path).write { writer =>
-            writer.write("""{"kind":"root",""")
-            writer.flush()
+          val written = new JsonOutputFile(path).write { output =>
+            output("""{"kind":"root",""")
             throw cause
           }
           written shouldBe Left(TestCommandFailure.JsonOutputNotWritten(path, cause, None))

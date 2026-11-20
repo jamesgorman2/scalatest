@@ -9,13 +9,14 @@ import scala.collection.mutable
  *
  * Every operation may be called from any thread. [[state]] takes no lock.
  */
-final class Consolidation private (
+final class Consolidation private[consolidation] (
   humanReadableOutput: String => Unit,
   coloured: Boolean,
   jsonOutput: Option[JsonOutput => Unit],
   moduleSelectors: Seq[ModuleSelector],
   buildTool: Option[BuildTool],
-  startedAt: Option[Instant]
+  startedAt: Option[Instant],
+  newRun: (TestRunLabel, Option[Worker]) => RunAssembly
 ) {
 
   @volatile private var currentState: ConsolidationState = ConsolidationState.Open
@@ -40,7 +41,7 @@ final class Consolidation private (
   def addRun(label: TestRunLabel, worker: Option[Worker] = None): RunFeed =
     synchronized {
       requireOpen()
-      val run = new RunAssembly(label, worker)
+      val run = newRun(label, worker)
       runs += run
       new RunFeed(this, run)
     }
@@ -151,7 +152,15 @@ object Consolidation {
     buildTool: Option[BuildTool] = None,
     startedAt: Option[Instant] = None
   ): Consolidation =
-    new Consolidation(humanReadableOutput, coloured, jsonOutput, moduleSelectors, buildTool, startedAt)
+    new Consolidation(
+      humanReadableOutput,
+      coloured,
+      jsonOutput,
+      moduleSelectors,
+      buildTool,
+      startedAt,
+      (label, worker) => new RunAssembly(label, worker, TreeAssembler.topLevelSuitesOf)
+    )
 }
 
 /** Receives one run's event stream and captured lines, in the order they were read. */

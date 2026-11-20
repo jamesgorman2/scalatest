@@ -37,6 +37,26 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
       }
     }
 
+    "given a run" should {
+      "make the run with the run factory it was made with, from the run's module and worker" in {
+        var made = Vector.empty[(TestRunLabel, Option[Worker])]
+        val consolidation = new Consolidation(
+          new OutputSink,
+          coloured = false,
+          jsonOutput = None,
+          moduleSelectors = Vector.empty,
+          buildTool = None,
+          startedAt = None,
+          newRun = (label, worker) => {
+            made :+= (label -> worker)
+            new RunAssembly(label, worker, TreeAssembler.topLevelSuitesOf)
+          }
+        )
+        consolidation.addRun(moduleLabel, Some(workerAt(1, 2)))
+        made shouldBe Vector(moduleLabel -> Some(workerAt(1, 2)))
+      }
+    }
+
     "given a run whose events report no failure" should {
       "stay open" in {
         stateAfterRunOf(

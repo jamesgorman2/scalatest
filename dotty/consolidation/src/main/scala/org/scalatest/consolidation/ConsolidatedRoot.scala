@@ -1,7 +1,7 @@
 package org.scalatest.consolidation
 
 /** A run of a module, numbered from 1 among its module's runs. */
-private[consolidation] final case class ConsolidatedRun(number: Int, assembly: RunAssembly)
+private[consolidation] final case class ConsolidatedRun(number: RunNumber, assembly: RunAssembly)
 
 /** A module of the consolidation: its run nodes, in ascending order by number, and its times. */
 private[consolidation] final case class ConsolidatedModule(label: TestRunLabel, times: MeasuredTimes, runs: Vector[ConsolidatedRun])
@@ -18,7 +18,7 @@ private[consolidation] object ConsolidatedModule {
     val numbered = runs
       .sortBy(_.numberingOrder)
       .zipWithIndex
-      .map((run, index) => ConsolidatedRun(index + 1, run))
+      .map((run, index) => ConsolidatedRun(RunNumber(index + 1), run))
     ConsolidatedModule(label, times, numbered)
   }
 }
