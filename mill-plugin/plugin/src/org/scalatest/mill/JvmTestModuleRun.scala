@@ -35,7 +35,7 @@ private[mill] final class JvmTestModuleRun(
     ctx: TaskCtx
 ) {
 
-  private val writtenScalaTestArguments: Seq[String] = scalaTestArguments.flatMap(_.arguments)
+  private val scalaTestArgumentStrings: Seq[String] = scalaTestArguments.flatMap(_.arguments)
 
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
@@ -81,7 +81,7 @@ private[mill] final class JvmTestModuleRun(
           inputs.testClasspath.map(_.path),
           inputs.testFramework,
           Nil,
-          writtenScalaTestArguments,
+          scalaTestArgumentStrings,
           inputs.discoveredClasses
         ),
         javaHome = inputs.javaHome
@@ -110,7 +110,7 @@ private[mill] final class JvmTestModuleRun(
     val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(label), reader, capture)
     workerRun.start { workerStarting =>
       val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
-      runWorker(workerCtx, inputs.testModuleUtil(writtenScalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
+      runWorker(workerCtx, inputs.testModuleUtil(scalaTestArgumentStrings ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun
   }
@@ -148,7 +148,7 @@ private[mill] final class JvmTestModuleRun(
     type LaidOut = os.Path
 
     def layOut(forkGroup: PlannedForkGroup): os.Path =
-      inputs.testModuleUtil(writtenScalaTestArguments, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), moduleFolder / forkGroup.folder.segments)
+      inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), moduleFolder / forkGroup.folder.segments)
 
     def launch(
         forkGroup: PlannedForkGroup,
@@ -189,7 +189,7 @@ private[mill] final class JvmTestModuleRun(
       val groupFolder = moduleFolder / forkGroup.folder.segments
       os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
       if (forkGroup.testClasses.isEmpty) {
-        val queue = inputs.testModuleUtil(writtenScalaTestArguments, ctx).prepareTestClassesFolder(Nil, groupFolder)
+        val queue = inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(Nil, groupFolder)
         val claimFolder = groupFolder / "claim"
         os.makeDir.all(claimFolder)
         Right((None, queue, claimFolder))

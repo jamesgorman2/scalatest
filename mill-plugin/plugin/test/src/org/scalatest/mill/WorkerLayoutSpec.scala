@@ -128,11 +128,11 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
       "a fork group has ten workers" should {
         "pad each worker's index to two digits in its folder's name" in {
-          val classes = (0 until 10).map(index => s"samples.S$index")
-          val workers = workersOf(layoutOf(Seq(classes), classes.toSet, testParallelism = true, jobs = 10)).fold(failure => fail(failure.message), identity)
+          val classNames = (0 until 10).map(index => s"samples.S$index")
+          val workers = workersOf(layoutOf(Seq(classNames), classNames.toSet, testParallelism = true, jobs = 10)).fold(failure => fail(failure.message), identity)
           workers.take(2).map(_.processFolder.segments) shouldBe Seq(Seq("worker-00"), Seq("worker-01"))
           workers.last.worker shouldBe workerOf(0, 9)
-          layoutOf(Seq(classes), classes.toSet, testParallelism = true, jobs = 10).map(_.forkGroups.map(_.workerIndexLength)) shouldBe Right(Seq(2))
+          layoutOf(Seq(classNames), classNames.toSet, testParallelism = true, jobs = 10).map(_.forkGroups.map(_.workerIndexLength)) shouldBe Right(Seq(2))
         }
       }
 

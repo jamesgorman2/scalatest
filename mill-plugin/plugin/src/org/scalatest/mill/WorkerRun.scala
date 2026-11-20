@@ -109,10 +109,9 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     }
 
   // Once closed, a worker starting late, as where Mill runs an async body after the task is cancelled, starts no reader.
-  // Gives whether the reader was started.
   private def closeReader(): Boolean =
     synchronized {
-      readerState = readerState.closed
+      readerState = readerState.afterClosing
       readerState == WorkerRun.ReaderState.ClosedAfterStarting
     }
 
@@ -130,7 +129,7 @@ private[mill] object WorkerRun {
     case ClosedBeforeStarting
     case ClosedAfterStarting
 
-    def closed: ReaderState =
+    def afterClosing: ReaderState =
       this match {
         case NotStarted | ClosedBeforeStarting => ClosedBeforeStarting
         case Started | ClosedAfterStarting => ClosedAfterStarting

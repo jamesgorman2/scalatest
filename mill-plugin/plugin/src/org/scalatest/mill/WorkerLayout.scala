@@ -18,7 +18,7 @@ private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq
 /**
  * A fork group holding a class to run, or the one fork group of a module holding none.
  *
- * @param folder the group's folder: the folder Mill's `testForked` would give the group, under its own `Task.dest`
+ * @param folder the folder Mill's `testForked` would give the group under `testForked`'s `Task.dest`
  * @param testClasses the classes the group's workers are given: the classes of its queue, or its batch worker's class
  *                    list
  * @param workerIndexLength the number of digits each worker's index is padded to in its folder's name
@@ -33,18 +33,18 @@ private[mill] final case class PlannedForkGroup(
     workers: Seq[PlannedWorker]
 ) {
 
-  def describedIn(label: TestRunLabel): String = s"fork group ${forkGroup.position} of ${label.value}"
+  def describedIn(module: TestRunLabel): String = s"fork group ${forkGroup.position} of ${module.value}"
 }
 
 /**
  * @param worker the fork group and index that identify the worker and label its run
- * @param processFolder the worker's `processFolder`: its fork group's folder, or its own folder `worker-<i>` in that
- *                      folder where Mill runs the group's workers in parallel
+ * @param processFolder the worker's `processFolder`: its fork group's folder or, where Mill runs the group's workers in
+ *                      parallel, its own folder `worker-<i>` inside it
  */
 private[mill] final case class PlannedWorker(worker: Worker, processFolder: PathUnderModule) {
 
-  def describedIn(label: TestRunLabel): String =
-    s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${label.value}"
+  def describedIn(module: TestRunLabel): String =
+    s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${module.value}"
 }
 
 /**

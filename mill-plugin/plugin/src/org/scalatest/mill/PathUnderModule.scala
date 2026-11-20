@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-/** A path under a module's folder, as its segments. With no segment, it is the module's folder. */
 private[mill] opaque type PathUnderModule = Seq[String]
 
 private[mill] object PathUnderModule {

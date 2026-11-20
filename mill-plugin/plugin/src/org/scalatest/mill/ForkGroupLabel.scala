@@ -1,6 +1,6 @@
 package org.scalatest.mill
 
-/** A fork group's index among the groups Mill runs, as Mill pads it, which keys the group's workers in Mill's logging. */
+// The group's zero-padded index among the fork groups Mill runs; Mill keys the group's workers' log lines by it.
 private[mill] opaque type ForkGroupLabel = String
 
 private[mill] object ForkGroupLabel {
