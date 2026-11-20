@@ -121,8 +121,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         Nil
       }
     }
-    // Stops at the first instance left unsettled: each later instance nests within it, so it cannot settle until that
-    // one does.
+    // Stops at the first instance left unsettled: each later instance nests within it, so cannot settle before it does.
     val remaining = unsettled.iterator
     var isSettled = true
     while (isSettled && remaining.hasNext) {
@@ -146,7 +145,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
             TestEventLogEmitter.caught(registration.fixNode(Some(id))).fold(Some(_), _.flatMap(writeStructureWhereChanged(_, _)))
           case Right(None) =>
             // Whoever reads the suite ID, the instance's run or another thread handing off, fixes the node. An
-            // instance that can have no node table is fixed here, without one.
+            // instance that can have no node table is fixed here with no suite ID, since no one reads it.
             if (!registration.canHaveTable) {
               registration.fixNode(None)
             }
@@ -305,8 +304,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     } else if (isLastWrapper && wrapper.registration.takeHandedOffBeforeRemoval(event)) {
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
-      // Left for the top-level suite's wrapper to write. If an inner wrapper wrote it, the event would have to be kept
-      // for that wrapper to skip, until the event log closes if it never arrives there.
+      // Left for the top-level suite's wrapper to write. If an inner wrapper wrote it, the top-level suite's wrapper
+      // would have to skip it, so it would be kept until that wrapper receives it, or until the event log closes if it
+      // never does.
       None
     } else if (awaitingTopLevelWrapper.containsKey(event)) {
       if (isLastWrapper) {
