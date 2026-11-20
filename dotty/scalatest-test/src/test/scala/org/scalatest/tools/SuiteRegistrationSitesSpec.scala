@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Args
 import org.scalatest.DistributedTestSorter
 import org.scalatest.Distributor
-import org.scalatest.Filter
 import org.scalatest.InvocationContext
 import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
