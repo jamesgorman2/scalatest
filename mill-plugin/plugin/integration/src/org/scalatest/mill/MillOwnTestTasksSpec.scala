@@ -34,7 +34,7 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
     tasks.foreach { task =>
       val command = s"mill ${task.mkString(" ")}"
 
-      Scenario(s"`$command`") {
+      Scenario(s"`$command` gives the same result and console output with the plugin as without it") {
         Given("core.test holds CalculatorSuite, whose test writes dividing now to stdout, and StackFlatSpec, whose test fails")
         When(s"`$command` runs in a build that adds the plugin, and in the same build without it")
         val run = runs(task)

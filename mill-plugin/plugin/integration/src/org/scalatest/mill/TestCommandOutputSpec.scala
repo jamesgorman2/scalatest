@@ -97,7 +97,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("A suite whose constructor throws is aborted, and the module's other suites still run") {
 
-    Scenario("A suite's constructor throws") {
+    Scenario("A suite whose constructor throws is shown aborted with its exception, and the other suite still runs") {
       Given("suite BrokenCtorSpec, class samples.BrokenCtorSpec, an AnyFunSuite whose constructor throws IllegalStateException(\"no config\")")
       And("suite SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
       And("Mill colours its console output")

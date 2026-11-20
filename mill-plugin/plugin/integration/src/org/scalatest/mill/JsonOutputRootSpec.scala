@@ -10,7 +10,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("The root, the module and the run in the JSON output") {
 
-    Scenario("One run of one suite") {
+    Scenario("One run of one suite is written as the root, module, run, suite and test, each with its times") {
       Given("CalculatorSuite, whose one test, `adds two numbers`, registered at line 5, prints dividing now and succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("CalculatorSuite") { build =>
@@ -68,10 +68,10 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
 
     Scenario("A run's config map is written with each value's toString") {
-      Given("CalculatorSuite, and the module's testArgsDefault is -Dgreeting=hello")
-      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("CalculatorSuite") { build =>
+        Given("CalculatorSuite, and the module's testArgsDefault is -Dgreeting=hello")
         build.setModuleArguments(Seq("-Dgreeting=hello"))
+        When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
         val json = build.jsonOutputOfTestCommand()
 
         Then("the run node holds the config map greeting = hello")

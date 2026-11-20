@@ -9,7 +9,7 @@ final class AddingThePluginSpec extends AnyFeatureSpec with GivenWhenThen with s
   Feature("The test command runs a module whose definition names nothing from the plugin") {
 
     for (scala <- Seq("3.3", "3.9")) {
-      Scenario(s"The plugin is added by its header line to a build on Scala $scala") {
+      Scenario(s"Adding the plugin's header line alone lets the test command run a module built with Scala $scala") {
         withFixtureBuild(FixtureName.withoutPluginOnScala(scala)) { build =>
           Given(s"the build does not add the plugin, its build.mill header has no mvnDeps, and the module is built with Scala $scala")
           And("the module is at Mill's default testLogLevel")

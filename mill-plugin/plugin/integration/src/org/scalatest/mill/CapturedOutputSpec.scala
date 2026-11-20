@@ -39,10 +39,10 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     millModes.foreach { case (mode, daemonMode) =>
       Scenario(s"A test's stdout line is shown under Run 1:, under $mode") {
-        Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
-        And("Mill colours its console output")
-        When("the test command runs core.test")
         val result = withSuitesIn(daemonMode)("CalculatorSuite") { build =>
+          Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
+          And("Mill colours its console output")
+          When("the test command runs core.test")
           build.runTestCommandWithColour("core.test")
         }
 
@@ -53,10 +53,10 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
 
       Scenario(s"Each stream's lines keep their order, under $mode") {
-        Given("ChattySuite, whose one test writes out 1 to out 2000 to stdout and err 1 to err 2000 to stderr, alternating")
-        And("Mill colours its console output")
-        When("the test command runs core.test")
         val result = withSuitesIn(daemonMode)("ChattySuite") { build =>
+          Given("ChattySuite, whose one test writes out 1 to out 2000 to stdout and err 1 to err 2000 to stderr, alternating")
+          And("Mill colours its console output")
+          When("the test command runs core.test")
           build.runTestCommandWithColour("core.test")
         }
         val underRunLines = result.subtreeOf("Run 1:").drop(1).map(_.trim)
@@ -72,11 +72,11 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
 
     Scenario("A test's line and the JVM's own line take one form") {
-      Given("CalculatorSuite, in a module whose forkArgs make the worker's JVM write a line ending Using Serial to stdout")
-      And("Mill colours its console output")
-      When("the test command runs core.test")
       val result = withSuites("CalculatorSuite") { build =>
+        Given("CalculatorSuite, in a module whose forkArgs make the worker's JVM write a line ending Using Serial to stdout")
         build.addToTestModule("""def forkArgs = Seq("-XX:+UseSerialGC", "-Xlog:gc:stdout")""")
+        And("Mill colours its console output")
+        When("the test command runs core.test")
         build.runTestCommandWithColour("core.test")
       }
       val underRunLines = result.subtreeOf("Run 1:").drop(1).map(_.trim)
@@ -99,11 +99,11 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("A run's line holds the worker's output whatever the module's testLogLevel") {
 
-    Scenario("A module whose testLogLevel is Debug") {
-      Given("CalculatorSuite, in a module whose testLogLevel is Debug, at which Mill prints Running Test Class")
-      When("the test command runs core.test")
+    Scenario("At testLogLevel Debug, the run's line still holds the test's output, and Mill's Running Test Class line is not shown") {
       val result = withSuites("CalculatorSuite") { build =>
+        Given("CalculatorSuite, in a module whose testLogLevel is Debug, at which Mill prints Running Test Class")
         build.addToTestModule("def testLogLevel = mill.api.daemon.internal.TestReporter.LogLevel.Debug")
+        When("the test command runs core.test")
         build.runTestCommand("core.test")
       }
       val console = result.consoleLines
@@ -121,10 +121,10 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("Human-readable output on stdout is coloured whether or not Mill colours its own console output") {
 
-    Scenario("The same output with Mill's colour on and off") {
-      Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds")
-      When("the test command runs core.test once with Mill's --color true and once with Mill's --color false")
+    Scenario("The human-readable output is the same, colours included, with Mill's colour on and off") {
       val outputs = withSuites("CalculatorSuite") { build =>
+        Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds")
+        When("the test command runs core.test once with Mill's --color true and once with Mill's --color false")
         Seq("true", "false").map(colour => colour -> build.runTestCommandWithMillArguments(Seq("--ticker", "true", "--color", colour))("core.test"))
       }
 
@@ -144,16 +144,16 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("A test sees the environment and working directory Mill's testForked gives it") {
 
-    Scenario("A forkEnv variable and the working directory with test sandboxing off") {
-      Given("the build adds the Mill plugin at that release as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps, without changing the module's definition")
-      And("the module's forkEnv sets FIXTURE_ENV to from-forkEnv, and its testSandboxWorkingDir is false")
-      And("WhereSuite, which writes FIXTURE_ENV and its working directory to stdout")
-      When("the test command runs core.test, and testForked runs it")
+    Scenario("With test sandboxing off, a test sees the module's forkEnv variable and the working directory testForked gives it") {
       val (result, testForked) = withSuites("WhereSuite") { build =>
+        Given("the build adds the Mill plugin at that release as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps, without changing the module's definition")
+        And("WhereSuite, which writes FIXTURE_ENV and its working directory to stdout")
+        And("the module's forkEnv sets FIXTURE_ENV to from-forkEnv, and its testSandboxWorkingDir is false")
         build.addToTestModule(
           """def forkEnv = super.forkEnv() ++ Map("FIXTURE_ENV" -> "from-forkEnv")""",
           "def testSandboxWorkingDir = false"
         )
+        When("the test command runs core.test, and testForked runs it")
         (build.runTestCommand("core.test"), build.eval(Seq("core.test.testForked")))
       }
       val underRunLines = result.subtreeOf("Run 1:").drop(1).map(_.trim)
@@ -174,11 +174,11 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("A run reaches the console only through the human-readable output") {
 
-    Scenario("A failing test that writes to both streams") {
-      Given("QueueFlatSpec, whose test be empty succeeds, and have size 0 writes to stdout and stderr, then fails")
-      And("Mill's ticker is on and Mill colours its console output")
-      When("the test command runs core.test, and Mill's own test task runs core.test in the same build without the plugin")
+    Scenario("A failing test that writes to both streams reaches the console only through the human-readable output") {
       val (result, withoutPlugin) = withSuites("QueueFlatSpec") { build =>
+        Given("QueueFlatSpec, whose test be empty succeeds, and have size 0 writes to stdout and stderr, then fails")
+        And("Mill's ticker is on and Mill colours its console output")
+        When("the test command runs core.test, and Mill's own test task runs core.test in the same build without the plugin")
         val result = build.runTestCommandWithTickerAndColour("core.test")
         build.removePlugin()
         (result, MillConsole(build.eval(Seq("--ticker", "true", "--color", "true", "core.test"))))
@@ -206,10 +206,10 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("Output of a task named before the test command") {
-      Given("AddSuite, and the build's task banner, which writes building banner to stdout")
-      When("one mill command runs banner and then the test command, with Mill's ticker on")
+    Scenario("A task named before the test command keeps its output on the console, outside the human-readable output") {
       val result = withSuites("AddSuite") { build =>
+        Given("AddSuite, and the build's task banner, which writes building banner to stdout")
+        When("one mill command runs banner and then the test command, with Mill's ticker on")
         build.runTestCommandWithMillArguments(Seq("--ticker", "true", "banner", "+"))("core.test")
       }
 
@@ -229,18 +229,17 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("A second test command after a test is fixed") {
-      Given("CalculatorSuite, whose test adds two numbers has been changed to fail, and the test command has run core.test")
-      When("the test is changed back to succeed, and the test command runs core.test again")
-      val (first, second) = withSuites("CalculatorSuite") { build =>
+    Scenario("After a failing test is fixed, a second test command shows the fixed run alone and succeeds") {
+      val second = withSuites("CalculatorSuite") { build =>
+        Given("CalculatorSuite, whose test adds two numbers has been changed to fail, and the test command has run core.test")
         val source = build.samples / "CalculatorSuite.scala"
         val succeeding = os.read(source)
         os.write.over(source, succeeding.replace("1 + 1 == 2", "1 + 1 == 3"))
-        val first = build.runTestCommand("core.test")
+        shouldFail(build.runTestCommand("core.test"))
+        When("the test is changed back to succeed, and the test command runs core.test again")
         os.write.over(source, succeeding)
-        (first, build.runTestCommand("core.test"))
+        build.runTestCommand("core.test")
       }
-      shouldFail(first)
 
       Then("the second human-readable output is Run 1:, holding the suite and the test's line, alone")
       withClue(second.debugString) {

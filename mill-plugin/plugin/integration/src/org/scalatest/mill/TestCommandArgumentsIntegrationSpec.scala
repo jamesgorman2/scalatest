@@ -165,7 +165,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     for (moduleArguments <- Seq(Seq("-oD"), Seq("-eD"), Seq("-s", "samples.OtherSuite"))) {
-      Scenario(s"${moduleArguments.mkString(" ")} has no effect") {
+      Scenario(s"The module's own ${moduleArguments.mkString(" ")} leaves the human-readable output unchanged") {
         Given(s"CalculatorSuite and OtherSuite, in a module whose own ScalaTest arguments are ${moduleArguments.mkString(" ")}")
         And("the module's testParallelism is false")
         When("the test command runs core.test, and runs it again with the module's own arguments removed")

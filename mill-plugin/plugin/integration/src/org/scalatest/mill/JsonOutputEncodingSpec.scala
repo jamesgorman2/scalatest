@@ -24,7 +24,7 @@ final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   Feature("Encoding of the JSON output") {
 
-    Scenario("A message holding characters JSON must escape") {
+    Scenario("A message holding characters JSON must escape is written as valid UTF-8 and reads back unchanged") {
       Given("EscapeSuite, whose test `escapes` calls info with a tab, a quote, a backslash, a bell, é, an emoji and a lone surrogate")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("EscapeSuite") { build =>
