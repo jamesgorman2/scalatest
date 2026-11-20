@@ -13,7 +13,7 @@ import org.scalatest.events.TestName
 /** A scope's `text` is the text it is registered with, which may hold more words than its name. */
 private[scalatest] enum ScopeOrTest {
   case Scope(name: String, text: String, label: String, scopesAndTests: List[ScopeOrTest])
-  case Test(name: String, testName: TestName, label: String, ignored: Boolean = false)
+  case Test(name: String, scalaTestName: TestName, label: String, ignored: Boolean = false)
 }
 
 /** What `Filter.apply` says of one test: whether the filter drops it, and whether it ignores it. */
@@ -82,7 +82,7 @@ private[scalatest] object SuiteStructure {
   def ofTestNames(testNames: Seq[(String, Boolean)]): List[ScopeOrTest] =
     testNames.toList.map { (testName, isIgnored) =>
       val unregistered = RegisteredNode.unregisteredTest(testName)
-      ScopeOrTest.Test(unregistered.name, TestName(unregistered.testName), unregistered.label, isIgnored)
+      ScopeOrTest.Test(unregistered.name, TestName(unregistered.scalaTestName), unregistered.label, isIgnored)
     }
 
   /** Keeps every scope, as the engine opens a scope whose tests the filter all drops. */
@@ -105,7 +105,7 @@ private[scalatest] object SuiteStructure {
    * `added`, which is not marked ignored. `None` where the tree holds no test of that name.
    */
   def withTestAdded(registered: List[RegisteredNode], latest: List[ScopeOrTest], added: TestName): Option[List[ScopeOrTest]] = {
-    val latestTests = testsIn(latest).map(latestTest => latestTest.testName -> latestTest).toMap
+    val latestTests = testsIn(latest).map(latestTest => latestTest.scalaTestName -> latestTest).toMap
     // Recurses once for each scope nested in another, as registering them does.
     def nodesIn(nodes: List[RegisteredNode]): List[ScopeOrTest] =
       nodes.flatMap {

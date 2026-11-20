@@ -672,11 +672,14 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
   }
 
-  private def throwable(className: String, message: Option[String] = None, frames: Vector[DecodedStackFrame] = Vector.empty): DecodedThrowable =
-    new DecodedThrowable(className, message, None, false, frames)
-
-  private def linked(throwable: DecodedThrowable, cause: => Option[DecodedThrowable] = None, suppressed: Vector[DecodedThrowable] = Vector.empty): DecodedThrowable =
-    LinkedThrowables.relinked(throwable, cause, suppressed)
+  private def throwable(
+    className: String,
+    message: Option[String] = None,
+    frames: Vector[DecodedStackFrame] = Vector.empty,
+    cause: => Option[DecodedThrowable] = None,
+    suppressed: Vector[DecodedThrowable] = Vector.empty
+  ): DecodedThrowable =
+    new DecodedThrowable(className, message, None, false, frames, cause, suppressed)
 
   private def stackDepthException(stackDepth: DecodedStackDepth): DecodedThrowable =
     new DecodedThrowable("org.scalatest.exceptions.TestFailedException", Some("failed"), Some(stackDepth), false, Vector.empty)
@@ -853,9 +856,9 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     "its cause has a cause, and it has two suppressed throwables" should {
       "number them depth-first, the whole cause chain before the suppressed throwables" in {
         val record = recordOf(
-          linked(
-            throwable("Outer"),
-            cause = Some(linked(throwable("Cause"), cause = Some(throwable("RootCause")))),
+          throwable(
+            "Outer",
+            cause = Some(throwable("Cause", cause = Some(throwable("RootCause")))),
             suppressed = Vector(throwable("FirstSuppressed"), throwable("SecondSuppressed"))
           )
         )
@@ -869,7 +872,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     "one throwable is both its cause and its suppressed throwable" should {
       "record it as the cause and refer to it as the suppressed throwable" in {
         val shared = throwable("Shared")
-        val record = recordOf(linked(throwable("Outer"), cause = Some(shared), suppressed = Vector(shared)))
+        val record = recordOf(throwable("Outer", cause = Some(shared), suppressed = Vector(shared)))
         record("cause")("id") shouldBe integer(2L)
         record("suppressed") shouldBe arrayOf(objectOf("ref" -> integer(2L)))
       }
@@ -877,14 +880,14 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "two throwables are alike but not the same object" should {
       "record each in full" in {
-        val record = recordOf(linked(throwable("Outer"), cause = Some(throwable("Same", Some("same"))), suppressed = Vector(throwable("Same", Some("same")))))
+        val record = recordOf(throwable("Outer", cause = Some(throwable("Same", Some("same"))), suppressed = Vector(throwable("Same", Some("same")))))
         record("suppressed").only("id") shouldBe integer(3L)
       }
     }
 
     "it is its own cause" should {
       "refer to itself as its cause" in {
-        lazy val itself: DecodedThrowable = linked(throwable("Itself"), cause = Some(itself))
+        lazy val itself: DecodedThrowable = throwable("Itself", cause = Some(itself))
         recordOf(itself)("cause") shouldBe objectOf("ref" -> integer(1L))
       }
     }
@@ -892,7 +895,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     "its cause chain is too long to recurse over" should {
       "record every throwable of the chain" in {
         val chainLength = 100000
-        val outermost = (1 until chainLength).foldLeft(throwable("Innermost"))((cause, _) => linked(throwable("Outer"), cause = Some(cause)))
+        val outermost = (1 until chainLength).foldLeft(throwable("Innermost"))((cause, _) => throwable("Outer", cause = Some(cause)))
         val ids = Iterator.iterate(Option(recordOf(outermost)))(_.flatMap(_.get("cause"))).takeWhile(_.nonEmpty).flatten.map(_("id")).toVector
         ids.size shouldBe chainLength
         ids.last shouldBe integer(chainLength.toLong)

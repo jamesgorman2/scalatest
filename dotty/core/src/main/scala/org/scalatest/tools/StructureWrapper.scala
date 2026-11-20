@@ -10,7 +10,7 @@ private[scalatest] enum WrapperNode {
   /** A suite's, put in the `Args` of its run by the first site of the run that registered it. */
   case RegisteredByItsRun(ofSuite: RegisteredSuite)
   case SuiteAheadOfSorter(ofSuite: RegisteredSuite)
-  case Test(ofSuite: RegisteredSuite, testName: TestName)
+  case Test(ofSuite: RegisteredSuite, scalaTestName: TestName)
 
   def registration: RegisteredSuite = {
     this match {

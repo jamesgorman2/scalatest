@@ -10,7 +10,7 @@ private[scalatest] final case class RegisteredScope(name: String, text: String, 
  * A test. Its `label` is the text ScalaTest's formatter gives its closing event, and `labelWhenIgnored` the text it
  * gives its `TestIgnored`, each without leading indentation.
  */
-private[scalatest] final case class RegisteredTest(name: String, testName: String, label: String, labelWhenIgnored: String) extends RegisteredNode
+private[scalatest] final case class RegisteredTest(name: String, scalaTestName: String, label: String, labelWhenIgnored: String) extends RegisteredNode
 
 private[scalatest] object RegisteredNode {
 
@@ -20,10 +20,10 @@ private[scalatest] object RegisteredNode {
   def scopeLabel(textWithChildPrefix: String): String =
     Suite.getIndentedTextForInfo(textWithChildPrefix, unindented, false, false).formattedText
 
-  def test(name: String, testName: String, textWithChildPrefix: String, includeIcon: Boolean): RegisteredTest =
+  def test(name: String, scalaTestName: String, textWithChildPrefix: String, includeIcon: Boolean): RegisteredTest =
     RegisteredTest(
       name,
-      testName,
+      scalaTestName,
       Suite.getIndentedTextForTest(textWithChildPrefix, unindented, includeIcon).formattedText,
       Suite.getIndentedTextForTest(textWithChildPrefix, unindented, true).formattedText
     )

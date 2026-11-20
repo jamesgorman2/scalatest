@@ -7,7 +7,7 @@ import org.scalatest.tools.ThrowableView
 private[scalatest] enum NodePlace {
   case Suite(suiteId: SuiteId, index: Int)
   case Scope(text: String, index: Int)
-  case Test(testName: TestName)
+  case Test(scalaTestName: TestName)
 }
 
 /** Places from the top-level suite down. */

@@ -62,6 +62,7 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: Stri
   private var latestName = firstName
   private var latestParent = firstParent
   private var executions = Set.empty[Int]
+  private var endedExecutions = Set.empty[Int]
 
   def name: String = latestName
 
@@ -72,8 +73,6 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: Stri
     latestName = name
     latestParent = parent
   }
-
-  private var endedExecutions = Set.empty[Int]
 
   def record(execution: Int, endsIt: Boolean): Unit = {
     executions += execution

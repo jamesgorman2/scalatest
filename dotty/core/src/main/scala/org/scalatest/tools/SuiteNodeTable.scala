@@ -224,12 +224,12 @@ private[scalatest] final class SuiteNodeTable(
   /**
    * What the filter says of each test of `testNames`, as `Filter.apply` says it for one test. A test an earlier
    * structure of the suite filtered keeps that result, since the first structure is filtered by the suite's own
-   * `tags`, which a further structure cannot call. Any other test is filtered by `filtered`, and the table keeps the
+   * `tags`, which a further structure cannot call. Any other test is filtered by `verdictOn`, and the table keeps the
    * result for later structures.
    */
-  def filterKeepingEarlier(testNames: List[TestName], filtered: TestName => FilterVerdict): Map[TestName, FilterVerdict] = {
+  def filterKeepingEarlier(testNames: List[TestName], verdictOn: TestName => FilterVerdict): Map[TestName, FilterVerdict] = {
     emitter.assertLockHeld()
-    val filteredNow = testNames.map(testName => testName -> filteredTests.getOrElse(testName, filtered(testName))).toMap
+    val filteredNow = testNames.map(testName => testName -> filteredTests.getOrElse(testName, verdictOn(testName))).toMap
     filteredTests = filteredTests ++ filteredNow
     filteredNow
   }
@@ -324,7 +324,7 @@ private[scalatest] final class SuiteNodeTable(
 
 private[scalatest] object SuiteNodeTable {
 
-  private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[TestName] = SuiteStructure.testsIn(scopesAndTests).map(_.testName).toSet
+  private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[TestName] = SuiteStructure.testsIn(scopesAndTests).map(_.scalaTestName).toSet
 
   private def nestedSuitePath(parent: NodeId, suiteId: SuiteId, suiteIdsBefore: Vector[SuiteId]): NodeId =
     NodeId.nestedSuite(parent, suiteId, suiteIdsBefore.count(_ == suiteId))

@@ -21,7 +21,7 @@ import org.scalatest.events.TestName
 private[scalatest] enum TreeNode {
   case OfSuite
   case Scope(places: List[ScopePlace])
-  case Test(testName: TestName)
+  case Test(scalaTestName: TestName)
 }
 
 /**
@@ -73,7 +73,7 @@ private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite, v
 /** @param executionsOfTest called under the emitter's lock */
 private[scalatest] final class InExecutionOfTest(
   val registration: RegisteredSuite,
-  val testName: TestName,
+  val scalaTestName: TestName,
   val execution: Execution,
   val executionsOfTest: () => NamedExecutions
 ) extends ContextOfRegisteredSuite {
@@ -322,7 +322,7 @@ private[scalatest] final class RegisteredSuite(
       case Some(inTest: InExecutionOfTest) =>
         val outer = inTest.registration
         val index = inTest.execution.indexOfStartingSuite(suiteId)
-        val testNode = outer.tableOfNode.flatMap(_.testsByName.get(inTest.testName))
+        val testNode = outer.tableOfNode.flatMap(_.testsByName.get(inTest.scalaTestName))
         placeUnder(outer, testNode, inTest.executionsOfTest(), suiteId, index)
       case None => ()
     }

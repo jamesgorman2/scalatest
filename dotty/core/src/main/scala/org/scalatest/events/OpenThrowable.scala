@@ -8,7 +8,10 @@ import scala.annotation.tailrec
  */
 private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Source], suppressed: Iterator[Source]) {
 
-  private var causeIsNext = cause.nonEmpty
+  // Each source is dropped once read: the closed value can hold this throwable until its links are first read, and must
+  // not keep the sources alive with it.
+  private var unreadCause = cause
+  private var unreadSuppressed = suppressed
   private var addsCause = false
   private var causeLinked: Option[Linked] = None
   private var suppressedLinked = Vector.empty[Linked]
@@ -21,9 +24,18 @@ private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Sourc
   protected def linkedSuppressed: Vector[Linked] = suppressedLinked
 
   private def nextLink(): Option[Source] = {
-    addsCause = causeIsNext
-    causeIsNext = false
-    if (addsCause) cause else suppressed.nextOption()
+    addsCause = unreadCause.nonEmpty
+    if (addsCause) {
+      val next = unreadCause
+      unreadCause = None
+      next
+    } else {
+      val next = unreadSuppressed.nextOption()
+      if (next.isEmpty) {
+        unreadSuppressed = Iterator.empty
+      }
+      next
+    }
   }
 
   private def add(linked: Linked): Unit = {

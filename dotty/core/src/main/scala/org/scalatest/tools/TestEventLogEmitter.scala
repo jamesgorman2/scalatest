@@ -680,13 +680,13 @@ private[scalatest] object TestEventLogEmitter {
       case suiteEvent: SuiteStarting => Some(NamesInEvent.from(suiteEvent.suiteName, suiteEvent.suiteId, suiteEvent.suiteClassName, None))
       case suiteEvent: SuiteCompleted => Some(NamesInEvent.from(suiteEvent.suiteName, suiteEvent.suiteId, suiteEvent.suiteClassName, None))
       case suiteEvent: SuiteAborted => Some(NamesInEvent.from(suiteEvent.suiteName, suiteEvent.suiteId, suiteEvent.suiteClassName, None))
-      case scope: ScopeOpened => Some(of(scope.nameInfo).copy(testName = None))
-      case scope: ScopeClosed => Some(of(scope.nameInfo).copy(testName = None))
-      case scope: ScopePending => Some(of(scope.nameInfo).copy(testName = None))
+      case scopeEvent: ScopeOpened => Some(of(scopeEvent.nameInfo).copy(testName = None))
+      case scopeEvent: ScopeClosed => Some(of(scopeEvent.nameInfo).copy(testName = None))
+      case scopeEvent: ScopePending => Some(of(scopeEvent.nameInfo).copy(testName = None))
       case provided: InfoProvided => provided.nameInfo.map(of)
       case provided: NoteProvided => provided.nameInfo.map(of)
       case provided: AlertProvided => provided.nameInfo.map(of)
-      case markup: MarkupProvided => markup.nameInfo.map(of)
+      case provided: MarkupProvided => provided.nameInfo.map(of)
       case _ => None
     }
   }
