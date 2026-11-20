@@ -158,7 +158,12 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   ): AssembledExecution = {
     val id = node.id
     val execution = executionOf(id, index)
-    val abortedSuiteHere = execution.filter(_ => NodeKind.of(node) == NodeKind.Suite).flatMap(_.suiteAborted).orElse(abortedSuiteAround)
+    // Only a suite's own `SuiteAborted` aborts its subtree: a test's execution can hold the `SuiteAborted` of the
+    // `DistributedTestRunnerSuite` that ran it, which aborts only that test.
+    val abortedSuiteHere = node match {
+      case _: StructureNode.Suite => execution.flatMap(_.suiteAborted).orElse(abortedSuiteAround)
+      case _ => abortedSuiteAround
+    }
     val latest = executionIndexesOf(id).last
     val shownChildren = shownChildrenOf(id)
     def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =

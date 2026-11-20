@@ -20,7 +20,6 @@ private[consolidation] final case class ExecutionOfNode(node: NodeId, index: Exe
 
 extension (executions: collection.Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]]) {
 
-  /** The node's executions, by execution index. */
   private[consolidation] def of(id: NodeId): Vector[RecordedExecution] =
     executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
 }
@@ -443,7 +442,6 @@ private[consolidation] final class RunAssembly(
 
 private[consolidation] object RunAssembly {
 
-  /** A run assembly whose tree the tree assembler assembles. */
   def apply(label: TestRunLabel, worker: Option[Worker]): RunAssembly = new RunAssembly(label, worker, TreeAssembler.topLevelSuitesOf)
 
   def reportsFailure(event: TestEventLogEvent): Boolean =
