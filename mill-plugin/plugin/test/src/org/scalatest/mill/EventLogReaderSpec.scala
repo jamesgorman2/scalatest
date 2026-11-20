@@ -200,7 +200,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     }
 
     "a line cannot be decoded" should {
-      "fail the reading with why, naming the line" in {
+      "make the reader throw, naming the line and why it cannot be decoded" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
           val reading = new Reading(file)

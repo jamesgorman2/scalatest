@@ -139,7 +139,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "a line of its event log cannot be decoded" should {
-      "attach why to the root, naming the line, end the run's event stream and fail the consolidation" in {
+      "add a root failure naming the line and why, end the run's event stream and fail the consolidation" in {
         withEventLogFile { file =>
           Files.write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n".getBytes(StandardCharsets.UTF_8))
           val fixture = new WorkerRunFixture(file, opening)
