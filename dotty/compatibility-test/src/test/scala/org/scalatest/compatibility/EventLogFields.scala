@@ -61,7 +61,6 @@ object EventLogFields {
       case other => String.valueOf(other)
     }
 
-
   private final class Throwables {
 
     private val ids = new IdentityHashMap[DecodedThrowable, Integer]

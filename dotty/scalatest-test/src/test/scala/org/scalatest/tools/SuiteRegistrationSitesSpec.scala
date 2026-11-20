@@ -771,7 +771,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
 
 final class SuiteRegistrationUnderABuildToolSpec extends AnyFreeSpec with Matchers with TestEventLogRuns {
 
-  "A suite a build tool runs" - {
+  "A suite run by a build tool" - {
     "runs its test in the context of its registration with the runner argument" in {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>

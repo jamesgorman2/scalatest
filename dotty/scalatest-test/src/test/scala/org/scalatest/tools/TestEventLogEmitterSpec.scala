@@ -20,11 +20,8 @@ import org.scalatest.events.Event
 import org.scalatest.events.NodeId
 import org.scalatest.events.NodePlace
 import org.scalatest.events.Ordinal
-import org.scalatest.events.RunAborted
 import org.scalatest.events.RunCompleted
-import org.scalatest.events.RunOutcome
 import org.scalatest.events.RunStarting
-import org.scalatest.events.RunStopped
 import org.scalatest.events.SuiteId
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
@@ -36,33 +33,6 @@ import scala.jdk.CollectionConverters.*
 final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with EventLogRecording {
 
   import TestEventLogEmitterSpec.*
-
-  private val runStartingLine =
-    """{"item":"event","event":"RunStarting","testCount":3,"configMap":{},"threadName":"main","timeStamp":1700000000000}"""
-
-  private def runStarting: Event = RunStarting(ordinal, 3, ConfigMap.empty, threadName = "main", timeStamp = timeStamp)
-
-  private def alert(message: String, threadName: String): Event =
-    AlertProvided(ordinal, message, None, threadName = threadName, timeStamp = timeStamp)
-
-  private def eventLine(eventName: String, fields: String): String =
-    s"""{"item":"event","event":"$eventName",$fields"threadName":"main","timeStamp":1700000000000}"""
-
-  private def linesAfterHandingOff(events: Event*): Vector[String] = {
-    TemporaryEventLog.in { eventLogFile =>
-      val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-      events.foreach(emitter.writeRunEvent)
-      emitter.writeRunEvent(runCompleted)
-      TemporaryEventLog.lines(eventLogFile)
-    }
-  }
-
-  private final class ThrowsFromToString(thrown: Throwable) {
-    override def toString: String = throw thrown
-  }
-
-  private def cannotBeEncodedFor(thrown: Throwable): Event =
-    RunStarting(ordinal, 3, ConfigMap("key" -> new ThrowsFromToString(thrown)), threadName = "main", timeStamp = timeStamp)
 
   private final class RecursesWithoutEndFromToString {
     override def toString: String = "recursing " + toString
@@ -127,59 +97,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
   }
 
   "An emitter" when {
-    "handed a run event" should {
-      "append it as one line assigned to the run" in {
-        TemporaryEventLog.in { eventLogFile =>
-          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          try {
-            emitter.writeRunEvent(runStarting)
-            TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
-          } finally {
-            emitter.writeRunEvent(runCompleted)
-          }
-        }
-      }
-    }
-
-    "handed the event that closes the run" should {
-      "write that the run ended completed after a RunCompleted" in {
-        linesAfterHandingOff() shouldBe Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
-      }
-
-      "write that the run ended stopped after a RunStopped" in {
-        linesAfterHandingOff(RunStopped(ordinal, threadName = "main", timeStamp = timeStamp)) shouldBe
-          Vector(runStartedLine, eventLine("RunStopped", ""), TestEventLogLine.runEnded("stopped"))
-      }
-
-      "write that the run ended aborted after a RunAborted" in {
-        linesAfterHandingOff(RunAborted(ordinal, "no suites", None, threadName = "main", timeStamp = timeStamp)) shouldBe
-          Vector(runStartedLine, eventLine("RunAborted", """"message":"no suites","""), TestEventLogLine.runEnded("aborted"))
-      }
-
-      "write nothing handed to it afterwards" in {
-        TemporaryEventLog.in { eventLogFile =>
-          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          emitter.writeRunEvent(runCompleted)
-          emitter.writeRunEvent(alert("late", "main"))
-          emitter.writeRunEvent(runCompleted)
-          TemporaryEventLog.lines(eventLogFile) shouldBe
-            Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
-        }
-      }
-    }
-
-    "handed an event it cannot encode" should {
-      "not throw, and end the event log before that event" in {
-        TemporaryEventLog.in { eventLogFile =>
-          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          emitter.writeRunEvent(runStarting)
-          emitter.writeRunEvent(cannotBeEncodedFor(new IllegalStateException("no text")))
-          emitter.writeRunEvent(runCompleted)
-          TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
-        }
-      }
-    }
-
     "handed an event whose encoding is interrupted" should {
       "not throw, close the event log, and leave its thread interrupted" in {
         val eventLog = new RecordingEventLog
@@ -245,7 +162,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val emitter = TestEventLogEmitter.appendingTo(eventLog)
         val heldBack = new MessageHeldBack
         val waiting = new Thread(() => emitter.writeRunEvent(AlertProvided(ordinal, "waiting", None, Some(heldBack), threadName = "main", timeStamp = timeStamp)))
-        val meanwhile = new Thread(() => emitter.writeRunEvent(alert("meanwhile", "main")))
+        val meanwhile = new Thread(() => emitter.writeRunEvent(alertProvided("meanwhile", "main")))
         waiting.start()
         try {
           heldBack.isBeingRead.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
@@ -276,7 +193,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val threadCount = 4
         val eventsOfEachThread = 25
         val decoded = wholeLinesWrittenByThreadsAtOnce(threadCount) { (emitter, thread) =>
-          (1 to eventsOfEachThread).foreach(event => emitter.writeRunEvent(alert(s"alert $event", s"thread $thread")))
+          (1 to eventsOfEachThread).foreach(event => emitter.writeRunEvent(alertProvided(s"alert $event", s"thread $thread")))
         }
         val messagesByThread =
           decoded.collect { case TestEventLogEvent.ScalaTestEvent(None, alert: org.scalatest.events.DecodedEvent.AlertProvided) =>
@@ -284,24 +201,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           }.groupMap((threadName, _) => threadName)((_, message) => message)
         messagesByThread shouldBe
           (1 to threadCount).map(thread => s"thread $thread" -> (1 to eventsOfEachThread).map(event => s"alert $event").toVector).toMap
-      }
-    }
-
-    "handed an event by a thread that has been interrupted" should {
-      "write that event and those handed to it afterwards" in {
-        TemporaryEventLog.in { eventLogFile =>
-          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-          val interrupted = new Thread(() => {
-            Thread.currentThread.interrupt()
-            emitter.writeRunEvent(alert("while interrupted", "main"))
-          })
-          interrupted.start()
-          interrupted.join()
-          emitter.writeRunEvent(runCompleted)
-          TemporaryEventLog.decoded(eventLogFile).collect { case TestEventLogEvent.RunEnded(outcome) => outcome } shouldBe
-            Vector(RunOutcome.Completed)
-          TemporaryEventLog.lines(eventLogFile).count(_.contains("while interrupted")) shouldBe 1
-        }
       }
     }
 
@@ -480,7 +379,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val reporter = new RecordingReporter
         val suite = new OneTestSuite
         val wrapper = TestEventLogEmitter.appendingTo(new RecordingEventLog).startOfTopLevelSuite(suite, Filter.default, reporter).reporter
-        val events = Vector(alert("first", "main"), alert("second", "main"))
+        val events = Vector(alertProvided("first", "main"), alertProvided("second", "main"))
         events.foreach(wrapper(_))
         reporter.events.size shouldBe 2
         reporter.events.zip(events).foreach((received, sent) => received should be theSameInstanceAs sent)
@@ -581,4 +480,22 @@ private[tools] object TestEventLogEmitterSpec {
   val runStartedLine: String = TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z")
 
   def runCompleted: Event = RunCompleted(ordinal, threadName = "main", timeStamp = timeStamp)
+
+  val runStartingLine: String =
+    """{"item":"event","event":"RunStarting","testCount":3,"configMap":{},"threadName":"main","timeStamp":1700000000000}"""
+
+  def runStarting: Event = RunStarting(ordinal, 3, ConfigMap.empty, threadName = "main", timeStamp = timeStamp)
+
+  def alertProvided(message: String, threadName: String): Event =
+    AlertProvided(ordinal, message, None, threadName = threadName, timeStamp = timeStamp)
+
+  def eventLine(eventName: String, fields: String): String =
+    s"""{"item":"event","event":"$eventName",$fields"threadName":"main","timeStamp":1700000000000}"""
+
+  private final class ThrowsFromToString(thrown: Throwable) {
+    override def toString: String = throw thrown
+  }
+
+  def cannotBeEncodedFor(thrown: Throwable): Event =
+    RunStarting(ordinal, 3, ConfigMap("key" -> new ThrowsFromToString(thrown)), threadName = "main", timeStamp = timeStamp)
 }

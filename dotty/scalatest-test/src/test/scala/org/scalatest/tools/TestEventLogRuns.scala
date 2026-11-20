@@ -31,7 +31,7 @@ import scala.jdk.CollectionConverters.*
 
 private[tools] enum Launch(val named: String) {
   case ByFramework extends Launch("a build tool")
-  case ByRunner extends Launch("Runner.run")
+  case ByRunner extends Launch("the command-line runner")
 }
 
 private[tools] final class RecordingLogger extends Logger {

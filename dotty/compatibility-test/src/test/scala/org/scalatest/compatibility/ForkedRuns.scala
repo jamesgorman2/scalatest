@@ -19,7 +19,7 @@ enum Library(val label: String) {
 
 /** @param named how `compatibility.recorders.ArgumentsLauncher` names the launch */
 enum Launch(val mainClass: String, val named: String, val described: String) {
-  case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher", "Runner.run", "Runner.run")
+  case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher", "Runner.run", "the command-line runner")
   case Framework extends Launch("compatibility.recorders.FrameworkLauncher", "Framework", "a build tool")
 }
 

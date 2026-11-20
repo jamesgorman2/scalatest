@@ -1532,9 +1532,21 @@ trait DottyBuild { this: BuildCommons =>
         val sources = (scalatestCompatibilityTestDotty / sourceDirectory).value
         Seq(sources / "comparison" / "scala", sources / "platform-test" / "scala")
       },
+      Test / sourceGenerators += Def.task {
+        val source = (Test / sourceManaged).value / "org" / "scalatest" / "compatibility" / "CompatibilityPlatform.scala"
+        IO.write(
+          source,
+          s"""package org.scalatest.compatibility
+             |
+             |object CompatibilityPlatform {
+             |  val name: String = "$platform"
+             |}
+             |""".stripMargin
+        )
+        Seq(source)
+      }.taskValue,
       Test / resourceGenerators += Def.task {
         val properties = new java.util.Properties
-        properties.setProperty("platform", platform)
         properties.setProperty("launcher", launcher)
         properties.setProperty("upstreamProgram", upstreamProgram.value.getAbsolutePath)
         properties.setProperty("forkProgram", forkProgram.value.getAbsolutePath)

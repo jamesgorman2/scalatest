@@ -146,12 +146,12 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
   // The time a slowpoke alert's message gives is the run's own.
   Feature("Each suite's structure") {
 
-    Scenario("Suites Runner discovers are top-level") {
+    Scenario("Suites the command-line runner discovers are top-level") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         Given("a runpath holding two suites, an AnyFunSuite whose one test succeeds and an AnyPropSpec whose one property succeeds")
         withRunpathOf(eventLogFile.resolveSibling("runpath"), classFilesOf("AddSuite", "SqrtPropSpec")) { runpath =>
-          When("Runner.run discovers and runs the runpath's suites without the runner argument, and again with it")
+          When("the command-line runner discovers and runs the runpath's suites without the runner argument, and again with it")
           val arguments = List("-R", runpath, "-C", classOf[RunRecordingReporter].getName)
           val reportedWithoutTheArgument = ReportedEvents.of(RunRecordingReporter.eventsReportedIn(runnerRun(arguments)))
           val toldWithTheArgument = RunRecordingReporter.eventsReportedIn(runnerRun(arguments ++ runnerArgument(eventLogFile)))
@@ -271,7 +271,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     )
 
     runAndDecoderScenariosInAnyOrder(
-      "Tests run in parallel by Runner",
+      "Tests run in parallel by the command-line runner",
       "an AnyFunSuite mixing in ParallelTestExecution, whose tests a and b succeed",
       "samples.ParFunSuite",
       "one structure holding the suite and no structure holding a DistributedTestRunnerSuite, then the suite's events, " +
@@ -337,7 +337,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
       TemporaryEventLog.in { eventLogFile =>
         Given("a runpath holding one suite class, whose constructor throws")
         withRunpathOf(eventLogFile.resolveSibling("runpath"), classFilesOf("ThrowingConstructorSpec", "ThrowingConstructorSpec$")) { runpath =>
-          When("Runner.run discovers and runs the runpath's suites without the runner argument, and again with it")
+          When("the command-line runner discovers and runs the runpath's suites without the runner argument, and again with it")
           val arguments = List("-R", runpath, "-C", classOf[RunRecordingReporter].getName)
           val whereTheConstructorThrows = Some(samples.discovered.ThrowingConstructorSpec.threadGroupItsConstructorThrowsIn)
           val reportedWithoutTheArgument =
@@ -397,7 +397,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     runAndDecoderScenarios(
-      "Runner.run aborts on an OutOfMemoryError",
+      "The command-line runner aborts on an OutOfMemoryError",
       "an AnyFunSuite whose one test throws OutOfMemoryError",
       "samples.AbortSuite",
       "the test's TestStarting assigned to the test, then the RunAborted assigned to the run and that the run ended aborted, " +
@@ -1987,14 +1987,14 @@ final class TestEventLogNodeEventsDecoderSpec extends AnyWordSpec with Matchers 
   import TestEventLogNodeEventsSpec.*
 
   private val runsAndWhatTheirEventLogsHold = List(
-    ("Suites Runner discovers are top-level", "each suite's own structure and events, and the discovery suite's events assigned to the run", discoveredWithAddSuiteFirst),
-    ("A suite's constructor throws under discovery", "the suite's structure, and its SuiteAborted assigned to it, with the throwable and its cause", throwingConstructorSpecDiscovered),
-    ("A slowpoke alert", "the alert assigned to the run, between the test's events", slowSuiteAlerted),
-    ("A test writes to both streams", "the run's and the suite's events", bothStreamsSuite)
+    ("a run of suites the command-line runner discovers", "each suite's own structure and events, and the discovery suite's events assigned to the run", discoveredWithAddSuiteFirst),
+    ("a run in which a discovered suite's constructor throws", "the suite's structure, and its SuiteAborted assigned to it, with the throwable and its cause", throwingConstructorSpecDiscovered),
+    ("a run with a slowpoke alert", "the alert assigned to the run, between the test's events", slowSuiteAlerted),
+    ("a run in which a test writes to both streams", "the run's and the suite's events", bothStreamsSuite)
   )
 
   runsAndWhatTheirEventLogsHold.foreach { (run, eventLogHolds, stated) =>
-    s"The decoder, given the lines of the event log of: $run" should {
+    s"The decoder, given the lines of the event log of $run" should {
       s"yield $eventLogHolds" in {
         EventLogComparison.mismatchWhenIs(decoded(stated.eventLogInFormat), built(stated.eventLogInNotation)) shouldBe None
       }

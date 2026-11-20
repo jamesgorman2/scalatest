@@ -104,7 +104,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A build tool's run's events outside every suite are assigned to the run") {
+    Scenario("The events of a build tool's run that fall outside every suite are assigned to the run") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
@@ -126,11 +126,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A Runner.run run of a suite it is given by name writes that suite's structure and events between its run events") {
+    Scenario("A run by the command-line runner of a suite it is given by name writes that suite's structure and events between its run events") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
-        When("Runner.run runs it by name with the runner argument")
+        When("the command-line runner runs it by name with the runner argument")
         launched(Launch.ByRunner, "samples.SqrtPropSpec", runnerArgument(eventLogFile))
 
         Then("the event log is the run's start, its run events assigned to the run with the suite's structure and events between them, and its end")
@@ -156,12 +156,12 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     }
 
     List("sequentially" -> Nil, "in parallel" -> List("-P2")).foreach { (how, parallelArguments) =>
-      Scenario(s"The events outside every suite are assigned to the run when Runner.run discovers its suites and runs them $how") {
+      Scenario(s"The events outside every suite are assigned to the run when the command-line runner discovers its suites and runs them $how") {
         thisProcess
         TemporaryEventLog.in { eventLogFile =>
           Given("a runpath holding one suite, whose one test succeeds")
           withRunpathOfOneSuite(eventLogFile.resolveSibling("runpath")) { runpath =>
-            When(s"Runner.run discovers and runs the runpath's suites $how, with the runner argument")
+            When(s"the command-line runner discovers and runs the runpath's suites $how, with the runner argument")
             runnerRun(List("-R", runpath) ++ parallelArguments ++ runnerArgument(eventLogFile))
 
             Then("the event log holds the run's start, discovery's events, the run events and the discovery suite's own, and the run's end")
@@ -194,10 +194,10 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     )
 
     runsThatAbortEarly.foreach { (description, argumentsIn) =>
-      Scenario(s"A Runner.run run given $description ends aborted") {
+      Scenario(s"A run by the command-line runner given $description ends aborted") {
         thisProcess
         TemporaryEventLog.in { eventLogFile =>
-          When(s"Runner.run is given $description, and the runner argument")
+          When(s"the command-line runner is given $description, and the runner argument")
           val allTestsPassed = runnerRun(argumentsIn(eventLogFile.getParent) ++ runnerArgument(eventLogFile))
 
           Then("it returns that not all tests passed")
@@ -343,11 +343,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("Runner.run given the runner argument fails before it runs a suite") {
+    Scenario("The command-line runner given the runner argument fails before it runs a suite") {
       TemporaryEventLog.in { eventLogFile =>
         val message = noProcessHandleMessage(eventLogFile)
 
-        When("Runner.run is given a suite and the runner argument")
+        When("the command-line runner is given a suite and the runner argument")
         val failure = the[IllegalStateException] thrownBy
           runnerRun(List("-R", testClassesRunpath, "-s", "samples.SqrtPropSpec") ++ runnerArgument(eventLogFile))
 
@@ -405,9 +405,9 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("Runner.run rejects the graphic reporter with the runner argument") {
+    Scenario("The command-line runner rejects the graphic reporter with the runner argument") {
       TemporaryEventLog.in { eventLogFile =>
-        When("Runner.run is given -g and the runner argument")
+        When("the command-line runner is given -g and the runner argument")
         val rejection = the[IllegalArgumentException] thrownBy runnerRun(List("-g") ++ runnerArgument(eventLogFile))
 
         Then("it fails, naming both")

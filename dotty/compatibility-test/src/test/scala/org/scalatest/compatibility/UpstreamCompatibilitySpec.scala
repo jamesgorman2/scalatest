@@ -48,9 +48,9 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
   Feature("Compatibility with ScalaTest 3.2.20") {
-    Scenario("A recording reporter of a Runner.run launch receives what 3.2.20 sends it, with the emitter off") {
+    Scenario("A recording reporter of a launch by the command-line runner receives what 3.2.20 sends it, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
-      When("each run is launched through Runner.run, its one reporter a -C recording reporter compiled against 3.2.20")
+      When("each run is launched by the command-line runner, its one reporter a -C recording reporter compiled against 3.2.20")
       And("this fork's run is not given the runner argument")
       val events = runs.ofFixture(Launch.RunnerRun, List("-C", "compatibility.recorders.RecordingReporter")).map(_.events)
 
@@ -125,9 +125,9 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
       List("-oNCXEHLOPQRM"),
       List("-e", "-C", "compatibility.recorders.RecordingReporter")
     ).foreach { reporters =>
-      Scenario(s"A Runner.run launch writes the same event log with ${reporters.mkString(" ")} as with no reporter argument") {
+      Scenario(s"A launch by the command-line runner writes the same event log with ${reporters.mkString(" ")} as with no reporter argument") {
         Given("a set of suites holding at least one suite of each style, compiled against ScalaTest 3.2.20")
-        When(s"Runner.run runs it on this fork with the runner argument, once with no reporter argument and once with ${reporters.mkString(" ")}")
+        When(s"the command-line runner runs it on this fork with the runner argument, once with no reporter argument and once with ${reporters.mkString(" ")}")
         val withoutReporters = runs.ofFixtureOnFork(Launch.RunnerRun, Nil, Emitter.On).eventLog
         val withReporters = runs.ofFixtureOnFork(Launch.RunnerRun, reporters, Emitter.On).eventLog
 

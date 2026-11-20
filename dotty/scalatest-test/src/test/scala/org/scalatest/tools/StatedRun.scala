@@ -4,6 +4,7 @@ package org.scalatest.tools
  * What a criterion states of a run.
  *
  * @param reported what the run's reporters are told, as `ReportedEvents` describes it
+ * @param eventLogInNotation the event log the run writes, in the notation `built` reads
  * @param eventLogInFormat the lines the run writes, holding only the keys the criterion fixes
  * @param eventNamesOfEachNode the names of the events the event log assigns to each node, in order
  * @param linesTheDecoderReads the same event log with the keys the decoder needs and the criterion does not fix

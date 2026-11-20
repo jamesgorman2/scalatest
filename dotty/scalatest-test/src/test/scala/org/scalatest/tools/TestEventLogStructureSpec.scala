@@ -446,12 +446,12 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     List("sequentially" -> Nil, "in parallel" -> List("-P2")).foreach { (how, parallelArguments) =>
-      Scenario(s"A suite Runner.run discovers and runs $how is a top-level suite") {
+      Scenario(s"A suite the command-line runner discovers and runs $how is a top-level suite") {
         thisProcess
         TemporaryEventLog.in { eventLogFile =>
           Given("a runpath holding one suite, whose one test succeeds")
           withRunpathOfOneSuite(eventLogFile.resolveSibling("runpath")) { runpath =>
-            When(s"Runner.run discovers and runs the runpath's suites $how, with the runner argument")
+            When(s"the command-line runner discovers and runs the runpath's suites $how, with the runner argument")
             runnerRun(List("-R", runpath) ++ parallelArguments ++ runnerArgument(eventLogFile))
 
             Then("the event log's one structure is the discovered suite's, with no parent, after the discovery suite's SuiteStarting")
@@ -583,7 +583,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       structureLinesOf(lines) shouldBe Vector(shuffledSuite.line)
       EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(runHolding(shuffledSuite, StatedEvents.none))) shouldBe None
     }
-
 
     structureScenarios(
       "A suite with no registration tree",

@@ -5,13 +5,25 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import org.scalatest.events.Event
+import org.scalatest.events.RunAborted
+import org.scalatest.events.RunOutcome
+import org.scalatest.events.RunStopped
+import org.scalatest.events.TestEventLogEvent
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.tools.TestEventLogEmitterSpec.identity
-import org.scalatest.tools.TestEventLogEmitterSpec.runCompleted
-import org.scalatest.tools.TestEventLogEmitterSpec.runStartedLine
+import org.scalatest.tools.TestEventLogEmitterSpec.*
 
 final class TestEventLogEmitterStartSpec extends AnyFreeSpec with Matchers {
+
+  private def linesAfterHandingOff(events: Event*): Vector[String] = {
+    TemporaryEventLog.in { eventLogFile =>
+      val emitter = TestEventLogEmitter.started(eventLogFile, identity)
+      events.foreach(emitter.writeRunEvent)
+      emitter.writeRunEvent(runCompleted)
+      TemporaryEventLog.lines(eventLogFile)
+    }
+  }
 
   "An emitter started on the file system" - {
     "has written the run's PID and start time as the event log's one line" in {
@@ -56,6 +68,77 @@ final class TestEventLogEmitterStartSpec extends AnyFreeSpec with Matchers {
           (TemporaryEventLog.namesIn(eventLogFile.getParent), TemporaryEventLog.lines(eventLogFile)) shouldBe ((Set("events.log"), Vector(runStartedLine)))
         } finally {
           emitter.writeRunEvent(runCompleted)
+        }
+      }
+    }
+
+    "when handed a run event" - {
+      "appends it as one line assigned to the run" in {
+        TemporaryEventLog.in { eventLogFile =>
+          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
+          try {
+            emitter.writeRunEvent(runStarting)
+            TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
+          } finally {
+            emitter.writeRunEvent(runCompleted)
+          }
+        }
+      }
+    }
+
+    "when handed the event that closes the run" - {
+      "writes that the run ended completed after a RunCompleted" in {
+        linesAfterHandingOff() shouldBe Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
+      }
+
+      "writes that the run ended stopped after a RunStopped" in {
+        linesAfterHandingOff(RunStopped(ordinal, threadName = "main", timeStamp = timeStamp)) shouldBe
+          Vector(runStartedLine, eventLine("RunStopped", ""), TestEventLogLine.runEnded("stopped"))
+      }
+
+      "writes that the run ended aborted after a RunAborted" in {
+        linesAfterHandingOff(RunAborted(ordinal, "no suites", None, threadName = "main", timeStamp = timeStamp)) shouldBe
+          Vector(runStartedLine, eventLine("RunAborted", """"message":"no suites","""), TestEventLogLine.runEnded("aborted"))
+      }
+
+      "writes nothing handed to it afterwards" in {
+        TemporaryEventLog.in { eventLogFile =>
+          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
+          emitter.writeRunEvent(runCompleted)
+          emitter.writeRunEvent(alertProvided("late", "main"))
+          emitter.writeRunEvent(runCompleted)
+          TemporaryEventLog.lines(eventLogFile) shouldBe
+            Vector(runStartedLine, eventLine("RunCompleted", ""), TestEventLogLine.runEnded("completed"))
+        }
+      }
+    }
+
+    "when handed an event it cannot encode" - {
+      "does not throw, and ends the event log before that event" in {
+        TemporaryEventLog.in { eventLogFile =>
+          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
+          emitter.writeRunEvent(runStarting)
+          emitter.writeRunEvent(cannotBeEncodedFor(new IllegalStateException("no text")))
+          emitter.writeRunEvent(runCompleted)
+          TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine, runStartingLine)
+        }
+      }
+    }
+
+    "when handed an event by a thread that has been interrupted" - {
+      "writes that event and those handed to it afterwards" in {
+        TemporaryEventLog.in { eventLogFile =>
+          val emitter = TestEventLogEmitter.started(eventLogFile, identity)
+          val interrupted = new Thread(() => {
+            Thread.currentThread.interrupt()
+            emitter.writeRunEvent(alertProvided("while interrupted", "main"))
+          })
+          interrupted.start()
+          interrupted.join()
+          emitter.writeRunEvent(runCompleted)
+          TemporaryEventLog.decoded(eventLogFile).collect { case TestEventLogEvent.RunEnded(outcome) => outcome } shouldBe
+            Vector(RunOutcome.Completed)
+          TemporaryEventLog.lines(eventLogFile).count(_.contains("while interrupted")) shouldBe 1
         }
       }
     }
