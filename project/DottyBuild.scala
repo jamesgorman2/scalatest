@@ -1489,17 +1489,15 @@ trait DottyBuild { this: BuildCommons =>
       noPublishSettings,
     ).dependsOn(scalatestDotty % "test", commonTestDotty % "test")
 
-  // The fixture compiles against 3.2.20 alone, so it takes the notation's quoting as a source file rather than from the
-  // fork's common-test project.
-  private def notationTextSource: Def.Initialize[File] =
+  private def notationTextSource: Def.Initialize[File] = {
+    // The fixture compiles against 3.2.20 alone, so it takes the notation's quoting as a source file rather than from the
+    // fork's common-test project.
     Def.setting((commonTestDotty / baseDirectory).value / "src" / "main" / "scala" / "org" / "scalatest" / "events" / "NotationText.scala")
+  }
 
   private def testInterfaceJar: File =
     new File(classOf[sbt.testing.Framework].getProtectionDomain.getCodeSource.getLocation.toURI)
 
-  // The fixture for Scala.js and Native compiles once against 3.2.20's artefacts for the platform, in a project that
-  // links it with 3.2.20. A second project links the same compiled classes with the fork, and a JVM test project runs
-  // and compares the two programs.
   private def compatibilityFixtureSettings(platformDirectory: String): Seq[Setting[_]] =
     Seq(
       libraryDependencies += upstreamScalatestOrganization %%% "scalatest" % previousReleaseVersion,
