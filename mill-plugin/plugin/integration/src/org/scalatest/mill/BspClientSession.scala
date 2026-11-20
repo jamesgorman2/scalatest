@@ -45,7 +45,6 @@ final case class BspSessionRecord(responses: Map[String, String], notifications:
       notifications.map(notification => s"notification: $notification")).mkString("\n")
 }
 
-// `recorded` holds the error, as normalised JSON, when the server answered with one.
 final case class BspResponse[A](result: Option[A], recorded: String) {
 
   def map[B](f: A => B): BspResponse[B] = BspResponse(result.map(f), recorded)
