@@ -6,8 +6,6 @@ import java.util.Optional
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-// Stand-ins for java.lang.ProcessHandle and ProcessHandle.Info, read by method name as the real ones are.
-// Each companion's `current` is a static method of its class, as ProcessHandle.current is.
 private[tools] final class StartedProcessHandle {
   def pid(): Long = 4242L
   def info(): StartedProcessInfo = new StartedProcessInfo

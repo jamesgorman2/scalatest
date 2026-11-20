@@ -29,8 +29,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   import TestEventLogEventsSpec.*
 
-  /** As both a JSON string and the event notation write it. */
-  private def escaped(text: String): String = {
+  private def escapedAsJsonAndNotationWriteIt(text: String): String = {
     val backslash = 92.toChar.toString
     text.flatMap {
       case '\n' => backslash + "n"
@@ -54,7 +53,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
   private def throwableOfTestFailed(log: Vector[TestEventLogEvent]): DecodedThrowable =
     decodedEventsIn(log).collectFirst { case failed: DecodedEvent.TestFailed => failed.throwable }.flatten.getOrElse(fail("no TestFailed holds a throwable"))
 
-  /** Registers two scenarios: the run writing the event log, and the decoder reading it. */
   private def eventScenarios(
     scenario: String,
     suite: String,
@@ -129,8 +127,8 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
     Vector("NoteProvided a note", "AlertProvided an alert", closing)
   }
 
-  // 3.2.20 passes on only a path-style test's infos, and only inside its closing event.
   private def reportedByPathStyleSpec(fails: Boolean): Vector[String] = {
+    // 3.2.20 reports only a path-style test's infos, and only inside its closing event.
     Vector(if (fails) "TestFailed is empty: not empty, recording InfoProvided checked size" else "TestSucceeded is empty, recording InfoProvided checked size")
   }
 
@@ -189,7 +187,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     texts.foreach { (description, suiteClassName) =>
       val text = Class.forName(suiteClassName).getDeclaredConstructor().newInstance().asInstanceOf[ReportsText].text
-      val inFormat = s""""message":"${escaped(text)}","""
+      val inFormat = s""""message":"${escapedAsJsonAndNotationWriteIt(text)}","""
       eventScenarios(
         s"Text: $description",
         s"an AnyFunSuite whose test reports calls info with $description, then fails with it",
@@ -209,8 +207,8 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
             suiteClassName,
             "reports",
             "TestStarting",
-            s"InfoProvided(message: \"${escaped(text)}\")",
-            s"TestFailed(message: \"${escaped(text)}\")"
+            s"InfoProvided(message: \"${escapedAsJsonAndNotationWriteIt(text)}\")",
+            s"TestFailed(message: \"${escapedAsJsonAndNotationWriteIt(text)}\")"
           ),
           frameworkRunOfOneTest("TextSuite", suiteClassName, "reports", ofTest("TestStarting"), ofTest("InfoProvided", inFormat), ofTest("TestFailed", inFormat))
         )
@@ -259,7 +257,6 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
       )
     }
 
-    // What Scalactic gives as a pathname in code compiled without SCALACTIC_FILL_FILE_PATHNAMES=yes.
     val pathnameUnfilled = "Please set the environment variable SCALACTIC_FILL_FILE_PATHNAMES to yes at compile time to enable this feature."
 
     eventScenarios(

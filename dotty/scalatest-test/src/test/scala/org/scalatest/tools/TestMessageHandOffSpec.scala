@@ -1,5 +1,6 @@
 package org.scalatest.tools
 
+import org.scalactic.NameUtil
 import org.scalatest.EventOrigin
 import org.scalatest.PathMessageCalls
 import org.scalatest.PathMessageRecordingAlerter
@@ -27,15 +28,10 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
 
   private val ordinal = new Ordinal(1)
   private val timeStamp = 1700000000000L
-  private val suiteName = "OneTestSpec"
-  private val suiteId = "samples.OneTestSpec"
+  private val suiteId = classOf[OneTestSpec].getName
+  private val suiteName = NameUtil.parseSimpleName(suiteId)
 
-  // Its names are those the events this spec builds carry.
   private final class OneTestSpec extends AnyFunSpec {
-    override def suiteName: String = TestMessageHandOffSpec.this.suiteName
-
-    override def suiteId: String = TestMessageHandOffSpec.this.suiteId
-
     it("t") {}
   }
 

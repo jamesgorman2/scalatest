@@ -1,5 +1,6 @@
 package org.scalatest.tools
 
+import org.scalactic.NameUtil
 import org.scalatest.Args
 import org.scalatest.CompositeStatus
 import org.scalatest.Filter
@@ -38,15 +39,10 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
   private val ordinal = new Ordinal(1)
   private val timeStamp = 1700000000000L
-  private val suiteName = "ScopedSuite"
-  private val suiteId = "samples.ScopedSuite"
+  private val suiteId = classOf[ScopedSuite].getName
+  private val suiteName = NameUtil.parseSimpleName(suiteId)
 
-  // Its names are those the events this spec builds carry.
   private final class ScopedSuite extends AnyFunSpec {
-    override def suiteName: String = SuiteEventHandOffSpec.this.suiteName
-
-    override def suiteId: String = SuiteEventHandOffSpec.this.suiteId
-
     describe("s") {
       it("t") {}
     }
@@ -91,13 +87,12 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
   private object InFirstOpeningOnly extends Tag("org.scalatest.tools.SuiteEventHandOffSpec.InFirstOpeningOnly")
 
-  // Its runTests opens its scope twice in one run. The first opening reports its ignored test once test `t` completes,
-  // which is when `queued` runs, after the second opening has closed. The second opening excludes `t`, so it reports
-  // its ignored test at once.
   private final class OpensItsAsyncScopeTwiceSpec(queued: QueuingExecutionContext) extends AsyncFunSpec {
     implicit override def executionContext: ExecutionContext = queued
 
     override protected def runTests(testName: Option[String], args: Args): Status = {
+      // The first opening of scope s reports its ignored test once test t completes, which is when `queued` runs,
+      // after the second opening has closed. The second opening excludes t, so it reports its ignored test at once.
       val first = super.runTests(testName, args)
       val second = super.runTests(testName, args.copy(filter = Filter(tagsToExclude = Set("org.scalatest.Ignore", InFirstOpeningOnly.name))))
       new CompositeStatus(Set(first, second))
@@ -193,7 +188,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
 
     def wrapperOfTest(testName: String): Reporter = registration.reporterOfTest(testName, wrapperOfSuite)
 
-    // Removes its registration.
     def complete(): Unit = started.complete()
 
     def linesAfterItsStructure: Vector[String] = eventLog.writes.drop(1).map(_.stripSuffix("\n"))
@@ -330,7 +324,6 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
       }
   }
 
-  // Of a suite no structure of the run holds.
   private def otherTestStarting: Event =
     TestStarting(ordinal, "Other", "samples.Other", Some("samples.Other"), "x", "x", threadName = "main", timeStamp = timeStamp)
 
@@ -570,7 +563,7 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   "An emitter handed an event by a structure wrapper once its top-level suite's registration is removed" should {
     val structureOfScopedSuite =
       TestEventLogLine.structure(
-        TestEventLogLine.topLevelSuiteWithId(top, suiteName, suiteId, "org.scalatest.tools.SuiteEventHandOffSpec$ScopedSuite"),
+        TestEventLogLine.topLevelSuite(suiteName, classOf[ScopedSuite].getName),
         TestEventLogLine.scope(firstS, 0, "s", "s"),
         TestEventLogLine.test(st, firstS, 0, "t", "- t"),
         TestEventLogLine.scope(secondS, 1, "s", "s"),

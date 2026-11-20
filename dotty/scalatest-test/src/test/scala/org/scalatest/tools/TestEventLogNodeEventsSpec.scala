@@ -68,17 +68,12 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
   }
 
-  // Framework's SuiteSortingReporter gives the run's reporters a nested suite's events after those of the suite that nests it.
-  // Discovery gives the runpath's suites in no stated order.
   private def classFilesOf(simpleNames: String*): List[String] = simpleNames.toList.map(name => s"samples/discovered/$name.class")
 
-  /**
-   * `Runner.run` without `-P` tells its reporters each event in the order the event log holds it, so the event log's
-   * ScalaTest events pair with the told events by position, and each pair shares its thread and time.
-   */
   private def suiteEventsAssignedToTheRun(events: Vector[TestEventLogEvent], told: Vector[Event]): Vector[String] = {
     val logged = events.collect { case event: TestEventLogEvent.ScalaTestEvent => event }
     logged.size shouldBe told.size
+    // Runner.run without -P tells its reporters each event in the order the event log holds it, so the logged and told events pair by position.
     logged.zip(told).flatMap {
       case (TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.SuiteStarting(_, threadName, timeStamp)), starting: SuiteStarting)
           if starting.threadName == threadName && starting.timeStamp == timeStamp =>
@@ -99,7 +94,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
   }
 
-  // Each test runs in an instance of its own, one after another, in any order.
   private def runAndDecoderScenariosInAnyOrder(
     scenario: String,
     suite: String,
@@ -143,7 +137,6 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
     }
   }
 
-  // The time a slowpoke alert's message gives is the run's own.
   Feature("Each suite's structure") {
 
     Scenario("Suites the command-line runner discovers are top-level") {
@@ -375,11 +368,9 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         EventLogComparison.mismatchWhenHoldsInOrder(eventLog, built(slowSuiteAlerted.eventLogInNotation)) shouldBe None
 
         And("for each AlertProvided the emitter receives before the run ends, the event log holds a run: AlertProvided with that alert's message, in the order the emitter received the alerts")
-        // The recording reporter observes what the emitter receives. The slowpoke timer hands each alert to the
-        // emitter, then queues it for the reporters, all on its one thread, and no reporter reorders an alert assigned
-        // to no suite. So the reporter receives the alerts in the emitter's order, and each it receives before
-        // RunCompleted reached the emitter before RunCompleted did. One the timer sends as the run ends can reach the
-        // reporter only after RunCompleted, once the event log has closed.
+        // The slowpoke timer hands each alert to the emitter and then to the reporters, on its one thread, and no reporter
+        // reorders an alert assigned to no suite. So the alerts reported before RunCompleted are the first in the event log,
+        // in the same order. An alert sent as the run ends reaches the reporters after RunCompleted, once the event log has closed.
         val alertsReported = events.takeWhile(!_.isInstanceOf[RunCompleted]).collect { case alert: AlertProvided => alert.message }
         val alertsInEventLog = eventLog.collect { case TestEventLogEvent.ScalaTestEvent(execution, alert: DecodedEvent.AlertProvided) =>
           execution.map(_.node) -> alert.message
@@ -628,6 +619,7 @@ private[tools] object TestEventLogNodeEventsSpec {
     val inner2 = top.suite("samples.Inner2Suite")
     val innerTwo = inner2.test("inner two")
     StatedRun(
+      // Framework's SuiteSortingReporter tells the reporters a nested suite's events after those of the suite that nests it.
       Vector(
         "RunStarting",
         "SuiteStarting OuterSuites",

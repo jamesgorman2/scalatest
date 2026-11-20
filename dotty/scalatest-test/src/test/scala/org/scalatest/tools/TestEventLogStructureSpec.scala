@@ -19,12 +19,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
   import TestEventLogStructureSpec.*
 
-  /**
-   * The events a test expects of a run, besides the suite's structure.
-   *
-   * @param description shown as an And step
-   * @param holdsInOrder in the event notation
-   */
   private final case class StatedEvents(description: String, holdsInOrder: List[String], mustNotHold: String => Boolean)
 
   private object StatedEvents {
@@ -87,7 +81,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
   private def testsInTheOrderTheyStarted(lines: Seq[String]): Vector[String] =
     lines.toVector.flatMap(line => startedTest.findFirstMatchIn(line).map(_.group(1)))
 
-  // A run starts the tests in declared order with a chance of 1 in 6, so all of these runs do with a chance below 1 in 10^23.
+  // A run starts the three tests in declared order with a chance of 1 in 6, so every one of these runs does with a chance below 1 in 10^23.
   private val runsToStartTheTestsOutOfDeclaredOrder = 30
 
   private def linesOfARunOutOfDeclaredOrder(structure: StatedStructure, declared: Vector[String]): Vector[String] = {
@@ -128,7 +122,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     "org.scalatest.exceptions.NotAllowedException: " +
       "java.lang.RuntimeException was thrown inside \"b\" -, construction cannot continue: \"boom\""
 
-  // Each suite, the simple name of its sample class, which a sample named Nests<that name> nests, and what its registration throws.
   private val suitesWhoseRegistrationThrows = List(
     ("a RefSpec whose scope object throws as it is registered", "ThrowingScopeRefSpec", refSpecScopeThrew),
     ("a PathAnyFunSpec whose second scope throws as it is registered", "ThrowingSecondScopePathFunSpec", pathFunSpecScopeThrew),
@@ -160,14 +153,12 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       }
     }
 
-  // Ends the run so that its event log is closed.
   private def thrownByFrameworkTask(suiteClassName: String, arguments: Seq[String]): String = {
     val runner = frameworkRunner(arguments)
     try thrownBy(scala.util.Try(execute(runner, suiteClassName, new RecordingLogger)).failed.toOption)
     finally runner.done()
   }
 
-  /** A scope named s, registered with and labelled `scopeText`, holding tests named t and then u, each given as its test name and label. */
   private def scopeHoldingTests(scopeText: String, testNamesAndLabels: (String, String)*): NodePath => List[String] = { suite =>
     val scope = suite.scope(scopeText)
     TestEventLogLine.scope(scope, 0, "s", scopeText) ::
@@ -684,10 +675,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
 private[tools] object TestEventLogStructureSpec {
 
-  /**
-   * @param nodesInNotation the nodes below the suite, the outermost unindented
-   * @param nodesInFormat the nodes below the suite, in the order the event holds them, given the suite's node path
-   */
   final case class StatedStructure(
     suiteName: String,
     suiteClassName: String,

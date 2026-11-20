@@ -139,7 +139,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // So that an event that reaches it reaches no wrapper after it.
   private val sortingNoEventOn: DistributedTestSorter = new DistributedTestSorter {
     def distributingTest(testName: String): Unit = ()
     def apply(testName: String, event: Event): Unit = ()
@@ -367,7 +366,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   "A suite whose scope's events a TestSortingReporter holds back until its test completes" should {
-    // Each event handed off is named by the text of its scope or test: "s" or "t".
     def scopeAndItsTest(suite: Suite, eventsInOrderHandedOff: List[(String, String)]): List[String] = {
       val top = NodePath.topLevel(suite.getClass.getName)
       val scopeS = top.scope("s")
@@ -504,7 +502,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val suite = new MarkupDocSpec
       val started = new StartedTopLevelSuite(anEmitter, suite)
       try {
-        // Sent to a reporter that is no structure wrapper, so the emitter keeps the handed-off markup until the registration is removed.
+        // No structure wrapper receives the markup, so the emitter holds it until the registration is removed.
         started.runningInItsContext(suite.run(None, Args(passingNoEventOn)))
         anEmitter.handedOffEventCount shouldBe 1
       } finally {

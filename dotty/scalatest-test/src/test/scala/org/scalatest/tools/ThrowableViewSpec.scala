@@ -20,7 +20,6 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
   private def testFailedException(message: Option[String], cause: Option[Throwable], position: Position): TestFailedException =
     new TestFailedException((_: StackDepthException) => message, cause, Left(position), None, Vector.empty)
 
-  // The stack depth is past the last frame, so no frame gives a file name and line number.
   private def failureWithoutFileNameAndLineNumber: TestFailedException =
     withFrames(
       new TestFailedException((_: StackDepthException) => Some("the stack was empty"), None, Right((_: StackDepthException) => 7), None, Vector.empty),

@@ -43,9 +43,9 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     stopper
   }
 
-  // Suite.runNestedSuites asks once before it runs a nested suite, and again as it starts that suite.
   private def stopperStoppedOnceAsked: Stopper = new Stopper {
     private val timesAsked = new AtomicInteger
+    // Suite.runNestedSuites asks once before it runs a nested suite, and again as it starts that suite.
     def stopRequested: Boolean = timesAsked.incrementAndGet() > 1
     def requestStop(): Unit = ()
   }

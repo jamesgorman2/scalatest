@@ -113,14 +113,12 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
   private val place = """\{[^}]*\}""".r
   private val executionPath = """"executions":\[([0-9,]*)\]""".r
 
-  /**
-   * A test's node path holds no place for its scopes, but its execution path does. No scope sits above the helper in
-   * these scenarios, so the helper's place is at the same index in both.
-   */
   private def isOfASecondExecutionUnderAHelper(line: String): Boolean = {
     val places = placesOfTheNode.findFirstMatchIn(line).toList.flatMap(node => place.findAllIn(node.group(1)).toList)
     val executions = executionPath.findFirstMatchIn(line).toList.flatMap(_.group(1).split(',').toList.map(_.toInt))
     val helper = places.indexWhere(_.startsWith("""{"suiteId":"samples.HelperSuite","""))
+    // A node path holds no place for a scope above a test, but an execution path does. No scope sits above the helper
+    // here, so the helper's place has the same index in both.
     helper >= 0 && executions.drop(helper + 1).contains(2)
   }
 
@@ -499,16 +497,20 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
+  private def withoutUnstartedNestedSuiteEvents(nestingSuiteName: String): Vector[String] = {
+    // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
+    Vector("RunStarting", s"SuiteStarting $nestingSuiteName", s"SuiteCompleted $nestingSuiteName", "RunCompleted")
+  }
+
   private val runsItsNestedSuitesNode = NodePath.topLevel("samples.RunsItsNestedSuites")
   private val inner1 = runsItsNestedSuitesNode.suite("samples.Inner1Suite")
   private val inner2 = runsItsNestedSuitesNode.suite("samples.Inner2Suite")
 
-  // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
   private val runsItsNestedSuites = {
     val innerOne = inner1.test("inner one")
     val innerTwo = inner2.test("inner two")
     StatedRun(
-      Vector("RunStarting", "SuiteStarting RunsItsNestedSuites", "SuiteCompleted RunsItsNestedSuites", "RunCompleted"),
+      withoutUnstartedNestedSuiteEvents("RunsItsNestedSuites"),
       """
       structure
         suite "RunsItsNestedSuites", class "samples.RunsItsNestedSuites"
@@ -542,14 +544,13 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
-  // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
   private val runsItsFirstNestedSuiteTwice = {
     val top = NodePath.topLevel("samples.RunsItsFirstNestedSuiteTwice")
     val declared = top.suite("samples.Inner1Suite")
     val second = top.suite("samples.Inner1Suite", 1)
     val inner2 = top.suite("samples.Inner2Suite")
     StatedRun(
-      Vector("RunStarting", "SuiteStarting RunsItsFirstNestedSuiteTwice", "SuiteCompleted RunsItsFirstNestedSuiteTwice", "RunCompleted"),
+      withoutUnstartedNestedSuiteEvents("RunsItsFirstNestedSuiteTwice"),
       """
       structure
         suite "RunsItsFirstNestedSuiteTwice", class "samples.RunsItsFirstNestedSuiteTwice"
@@ -590,13 +591,12 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
-  // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
   private val pairSuites = {
     val top = NodePath.topLevel("samples.PairSuites")
     val first = top.suite("samples.ModeSuite")
     val second = top.suite("samples.ModeSuite", 1)
     StatedRun(
-      Vector("RunStarting", "SuiteStarting PairSuites", "SuiteCompleted PairSuites", "RunCompleted"),
+      withoutUnstartedNestedSuiteEvents("PairSuites"),
       """
       structure
         suite "PairSuites", class "samples.PairSuites"

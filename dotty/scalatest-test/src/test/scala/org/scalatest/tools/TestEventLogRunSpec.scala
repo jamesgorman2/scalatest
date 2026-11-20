@@ -43,12 +43,12 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     s"Cannot write the test event log $eventLogFile: $noProcessHandle"
   }
 
-  // Neither thread is a daemon. The one that waits for a sub-process's events ends when it reads RunCompleted.
   private def endThreadsLeftByDoneThrowing(runner: SbtRunner, subProcessServer: Array[String]): Unit = {
     val scalaTestRunner = runner.asInstanceOf[Framework#ScalaTestRunner]
     val socket = new Socket(subProcessServer(0), subProcessServer(1).toInt)
     try {
       val events = new ObjectOutputStream(socket.getOutputStream)
+      // The server thread is no daemon, and ends only when it reads RunCompleted.
       events.writeObject(RunCompleted(new Ordinal(1)))
       events.flush()
       scalaTestRunner.serverThread.get.foreach(_.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds)))
