@@ -2,9 +2,9 @@ package org.scalatest.consolidation
 
 private[consolidation] object CountedFromZero {
 
-  def checked(count: Int, name: String): Int =
-    if (count >= 0)
-      count
+  def checked(value: Int, name: String): Int =
+    if (value >= 0)
+      value
     else
-      throw new IllegalArgumentException(s"$name must not be negative, but was $count")
+      throw new IllegalArgumentException(s"$name must not be negative, but was $value")
 }

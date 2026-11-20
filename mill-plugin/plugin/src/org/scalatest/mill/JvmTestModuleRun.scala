@@ -60,9 +60,9 @@ private[mill] final class JvmTestModuleRun(
   private def runWorkers(consolidation: Consolidation, launcher: WorkerLauncher): Unit = {
     val laidOutForkGroups = JvmTestModuleRun.layOutForkGroups(consolidation, label, launcher.layout.forkGroups)(launcher.layOut)
     val startedAt = Instant.now()
-    val workers = laidOutForkGroups.flatMap { case (forkGroup, laidOut) => forkGroup.workers.map(worker => (forkGroup, laidOut, worker)) }
-    val workerRuns = WorkerRun.startEach(workers) { case (forkGroup, laidOut, worker) =>
-      startWorker(consolidation, worker)((workerCtx, util) => launcher.launch(forkGroup, laidOut, worker, workerCtx, util))
+    val workers = laidOutForkGroups.flatMap { case (forkGroup, laidOut) => forkGroup.workers.map(plannedWorker => (forkGroup, laidOut, plannedWorker)) }
+    val workerRuns = WorkerRun.startEach(workers) { case (forkGroup, laidOut, plannedWorker) =>
+      startWorker(consolidation, plannedWorker)((workerCtx, util) => launcher.launch(forkGroup, laidOut, plannedWorker, workerCtx, util))
     }
     WorkerRun.endEach(workerRuns)(workerEnd => ctx.fork.blocking(Await.ready(workerEnd, Duration.Inf)))
     consolidation.timeModule(label, Some(startedAt), Some(Instant.now()))
@@ -96,15 +96,15 @@ private[mill] final class JvmTestModuleRun(
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
-  private def startWorker(consolidation: Consolidation, worker: PlannedWorker)(
+  private def startWorker(consolidation: Consolidation, plannedWorker: PlannedWorker)(
       runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[WorkerProcess]
   ): WorkerRun = {
-    val eventLogFile = moduleFolder / worker.processFolder / JvmTestModuleRun.eventLogFileName
+    val eventLogFile = moduleFolder / plannedWorker.processFolder / JvmTestModuleRun.eventLogFileName
     val capture = new WorkerOutputCapture(WorkerOutputCapture.workerCharset)
     val reader = new EventLogReader(
       eventLogFile.toNIO,
       () => {
-        val feed = consolidation.addRun(label, Some(worker.worker))
+        val feed = consolidation.addRun(label, Some(plannedWorker.worker))
         capture.addTo(feed.add)
         feed
       },
@@ -112,7 +112,7 @@ private[mill] final class JvmTestModuleRun(
       ProcessExit.hasExited,
       10.millis
     )
-    val workerRun = new WorkerRun(consolidation, worker.describedIn(label), reader, capture)
+    val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(label), reader, capture)
     workerRun.start { workerStarting =>
       val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
       runWorker(workerCtx, inputs.testModuleUtil(scalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
@@ -136,7 +136,7 @@ private[mill] final class JvmTestModuleRun(
     def launch(
         forkGroup: PlannedForkGroup,
         laidOut: LaidOut,
-        worker: PlannedWorker,
+        plannedWorker: PlannedWorker,
         workerCtx: WorkerTaskCtx,
         util: TestModuleUtil
     ): Future[WorkerProcess]
@@ -158,7 +158,7 @@ private[mill] final class JvmTestModuleRun(
     def launch(
         forkGroup: PlannedForkGroup,
         queue: os.Path,
-        worker: PlannedWorker,
+        plannedWorker: PlannedWorker,
         workerCtx: WorkerTaskCtx,
         util: TestModuleUtil
     ): Future[WorkerProcess] = {
@@ -172,9 +172,9 @@ private[mill] final class JvmTestModuleRun(
           groupFolder.last,
           forkGroup.workerIndexLength,
           forkGroup.label,
-          worker.worker.index.value
+          plannedWorker.worker.index.value
         )
-      val (_, workerEnd) = if (worker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
+      val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
       workerEnd.map { case (_, _, processResult) =>
         if (processResult.isDefined) WorkerProcess.Started else WorkerProcess.NotStarted
       }(using ExecutionContext.parasitic)
@@ -206,7 +206,7 @@ private[mill] final class JvmTestModuleRun(
     def launch(
         forkGroup: PlannedForkGroup,
         selector: JvmTestModuleRun.BatchSelector,
-        worker: PlannedWorker,
+        plannedWorker: PlannedWorker,
         workerCtx: WorkerTaskCtx,
         util: TestModuleUtil
     ): Future[WorkerProcess] = {
