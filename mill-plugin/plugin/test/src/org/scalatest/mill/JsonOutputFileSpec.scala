@@ -44,7 +44,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
-      "fail as a folder at its path, and keep the folder with what it holds" in {
+      "fail on a folder at its path, and keep the folder with what it holds" in {
         withFolder { folder =>
           val path = Files.createDirectory(folder.resolve("report.json"))
           val kept = Files.writeString(path.resolve("keep.txt"), "kept")
@@ -53,7 +53,7 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
-      "fail as a folder at its path, and keep an empty folder" in {
+      "fail on an empty folder at its path, and keep the folder" in {
         withFolder { folder =>
           val path = Files.createDirectory(folder.resolve("report.json"))
           new JsonOutputFile(path).delete() shouldBe Left(TestCommandFailure.JsonOutputPathIsFolder(path))

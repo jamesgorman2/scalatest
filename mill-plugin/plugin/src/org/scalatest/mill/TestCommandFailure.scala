@@ -1,8 +1,9 @@
 package org.scalatest.mill
 
 import java.nio.file.Path
+import scala.util.control.NoStackTrace
 
-private[mill] enum TestCommandFailure {
+private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case JsonOutputPathMissing
   case UnexpectedArgument(argument: String)
   case NoModuleSelector
@@ -14,6 +15,8 @@ private[mill] enum TestCommandFailure {
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partialFileNotDeleted: Option[Throwable])
+
+  override def getMessage: String = message
 
   def message: String = {
     val jsonOutputArgument = TestCommandArguments.jsonOutputArgument

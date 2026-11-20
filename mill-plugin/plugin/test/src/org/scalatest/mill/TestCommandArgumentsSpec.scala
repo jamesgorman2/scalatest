@@ -45,7 +45,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
     }
 
     "given -fJ with nothing after it" should {
-      "reject it, naming it" in {
+      "reject it as missing its path" in {
         rejection("core.test", "-fJ") shouldBe TestCommandFailure.JsonOutputPathMissing
       }
     }
