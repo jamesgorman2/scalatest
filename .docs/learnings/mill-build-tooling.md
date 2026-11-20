@@ -180,3 +180,11 @@ Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on e
 
 An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue. Mill's default is `testParallelism = true`, so set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
 </learning>
+
+<learning>
+date: 2026-11-20
+---
+In Mill 1.3.1, `<module>.testForked <fully qualified class>` does not narrow the run: `testForked`'s arguments go to the test framework, and every discovered class still runs. To run only some classes, use `<module>.testOnly <class> [<class> ...]`; Mill's progress line then reports only those (`2/2 completed.`).
+
+`testOnly` writes its report to `out/<module>/testOnly.dest/test-report.xml`, not `testForked.dest`, so read results from there after a narrowed run.
+</learning>

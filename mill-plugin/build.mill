@@ -71,14 +71,19 @@ object plugin extends PluginScalaModule, PublishModule {
     // recorders. These tests compile the recorders, and copy the fixture's suites into the builds they test.
     private def compatibilityTest: os.Path = BuildCtx.workspaceRoot / os.up / "dotty" / "compatibility-test" / "src"
 
+    private def commonTest: os.Path = BuildCtx.workspaceRoot / os.up / "dotty" / "common-test" / "src"
+
     def compatibilityFixtureSuites: T[Seq[PathRef]] = Task.Sources(
       compatibilityTest / "fixture" / "scala" / "compatibility" / "fixture",
       compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "fixture"
     )
 
+    // The recorders quote text as the fork's notation does. Like the sbt fixture, which builds against 3.2.20 alone,
+    // they take that quoting as a source file rather than from the fork's common-test project.
     def compatibilityRecorders: T[Seq[PathRef]] = Task.Sources(
       compatibilityTest / "fixture" / "scala" / "compatibility" / "recorders",
-      compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "recorders"
+      compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "recorders",
+      commonTest / "main" / "scala" / "org" / "scalatest" / "events" / "NotationText.scala"
     )
 
     def sources: T[Seq[PathRef]] = Task { super.sources() ++ compatibilityRecorders() }
