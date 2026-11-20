@@ -33,10 +33,8 @@ private[tools] object StatedLines {
     missing.map(statedLine => s"the event log does not hold, after the stated lines before it:\n$statedLine\nIt is:\n${written.mkString("\n")}")
   }
 
-  private def holds(writtenLine: String, statedLine: String): Boolean = holds(parsed(writtenLine), parsed(statedLine))
-
-  private def parsed(line: String): JsonValue =
-    JsonReader.read(line).fold(reason => throw new IllegalArgumentException(s"$reason, in $line"), identity)
+  private def holds(writtenLine: String, statedLine: String): Boolean =
+    holds(JsonReader.read(writtenLine), JsonReader.read(statedLine))
 
   // The recursion is shallow: in an event log line, only a node path's places and a throwable's parts nest.
   private def holds(written: JsonValue, stated: JsonValue): Boolean = {

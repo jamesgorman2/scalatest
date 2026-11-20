@@ -98,13 +98,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
         Then(s"the event log is $eventLogHolds")
         StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
-        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
+        EventLogComparison.mismatchWhenIs(decoded(lines), built(stated.eventLogInNotation)) shouldBe None
       }
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(stated.eventLogInFormat)
+      val events = decoded(stated.eventLogInFormat)
 
       Then(s"it yields $eventLogHolds")
       EventLogComparison.mismatchWhenIs(events, built(stated.eventLogInNotation)) shouldBe None
@@ -1598,13 +1598,13 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         withClue(s"The event log is:\n${lines.mkString("\n")}\n") {
           runInOrderWritten should have size 1
         }
-        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(runInOrderWritten.head.eventLogInNotation)) shouldBe None
+        EventLogComparison.mismatchWhenIs(decoded(lines), built(runInOrderWritten.head.eventLogInNotation)) shouldBe None
       }
     }
 
     Scenario(s"The decoder reads the event log of: $scenario") {
       When("the decoder is given the lines of that event log, in each order the tests may run in")
-      val mismatches = runInEachOrder.flatMap(run => EventLogComparison.mismatchWhenIs(decodedOrFail(run.eventLogInFormat), built(run.eventLogInNotation)))
+      val mismatches = runInEachOrder.flatMap(run => EventLogComparison.mismatchWhenIs(decoded(run.eventLogInFormat), built(run.eventLogInNotation)))
 
       Then(s"it yields $eventLogHolds")
       mismatches shouldBe Nil
@@ -1662,8 +1662,8 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
           And("no structure holds the discovery suite, whose SuiteStarting and SuiteCompleted are assigned to the run")
           val runInOrderDiscovered = runsOfDiscoveredSuites.filter(_.reported == reportedWithTheArgument)
           runInOrderDiscovered.map(run => StatedLines.mismatchWhenIs(lines, run.eventLogInFormat)) shouldBe List(None)
-          runInOrderDiscovered.map(run => EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(run.eventLogInNotation))) shouldBe List(None)
-          suiteEventsAssignedToTheRun(decodedOrFail(lines), toldWithTheArgument) shouldBe
+          runInOrderDiscovered.map(run => EventLogComparison.mismatchWhenIs(decoded(lines), built(run.eventLogInNotation))) shouldBe List(None)
+          suiteEventsAssignedToTheRun(decoded(lines), toldWithTheArgument) shouldBe
             Vector("SuiteStarting DiscoverySuite", "SuiteCompleted DiscoverySuite")
         }
       }
@@ -1671,7 +1671,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("The decoder reads the event log of: Suites Runner discovers are top-level") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(discoveredWithAddSuiteFirst.eventLogInFormat)
+      val events = decoded(discoveredWithAddSuiteFirst.eventLogInFormat)
 
       Then("it yields each suite's own structure and events, and the discovery suite's events assigned to the run")
       EventLogComparison.mismatchWhenIs(events, built(discoveredWithAddSuiteFirst.eventLogInNotation)) shouldBe None
@@ -1855,14 +1855,14 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
           And("the event log holds a structure holding the suite, every structure holding it giving it the class that failed to construct, and in this order after it the suite's SuiteAborted")
           StatedLines.mismatchWhenIs(lines, brokenCtorSpecDiscovered.eventLogInFormat) shouldBe None
-          EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(brokenCtorSpecDiscovered.eventLogInNotation)) shouldBe None
+          EventLogComparison.mismatchWhenIs(decoded(lines), built(brokenCtorSpecDiscovered.eventLogInNotation)) shouldBe None
         }
       }
     }
 
     Scenario("The decoder reads the event log of: A suite's constructor throws under discovery") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(brokenCtorSpecDiscovered.eventLogInFormat)
+      val events = decoded(brokenCtorSpecDiscovered.eventLogInFormat)
 
       Then("it yields the suite's structure, and its SuiteAborted assigned to it, with the throwable and its cause")
       EventLogComparison.mismatchWhenIs(events, built(brokenCtorSpecDiscovered.eventLogInNotation)) shouldBe None
@@ -1880,7 +1880,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
         val lines = TemporaryEventLog.lines(eventLogFile)
 
         Then("each line of the run's test event log decodes to one event")
-        val eventLog = decodedOrFail(lines)
+        val eventLog = decoded(lines)
 
         And("the event log holds the test's TestStarting, an AlertProvided assigned to the run, and the test's TestSucceeded, in that order")
         StatedLines.mismatchWhenHoldsInOrder(lines, slowSuiteAlertedWithAnyMessage) shouldBe None
@@ -1910,7 +1910,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("The decoder reads the event log of: A slowpoke alert") {
       When("the decoder is given the lines of the suite's structure, its test's TestStarting, a slowpoke alert and the test's TestSucceeded")
-      val events = decodedOrFail(slowSuiteAlerted.eventLogInFormat)
+      val events = decoded(slowSuiteAlerted.eventLogInFormat)
 
       Then("it yields the alert assigned to the run, between the test's events")
       EventLogComparison.mismatchWhenIs(events, built(slowSuiteAlerted.eventLogInNotation)) shouldBe None
@@ -2008,7 +2008,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
         Then("the event log is the run's and the suite's events, and holds no captured output")
         StatedLines.mismatchWhenIs(lines, bothStreamsSuite.eventLogInFormat) shouldBe None
-        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(bothStreamsSuite.eventLogInNotation)) shouldBe None
+        EventLogComparison.mismatchWhenIs(decoded(lines), built(bothStreamsSuite.eventLogInNotation)) shouldBe None
         lines.filter(line => line.contains("dividing now") || line.contains("warn: careful")) shouldBe Vector.empty
 
         And("the JVM's stdout holds the line written to stdout, and its stderr the line written to stderr")
@@ -2021,7 +2021,7 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("The decoder reads the event log of: A test writes to both streams") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(bothStreamsSuite.eventLogInFormat)
+      val events = decoded(bothStreamsSuite.eventLogInFormat)
 
       Then("it yields the run's and the suite's events")
       EventLogComparison.mismatchWhenIs(events, built(bothStreamsSuite.eventLogInNotation)) shouldBe None

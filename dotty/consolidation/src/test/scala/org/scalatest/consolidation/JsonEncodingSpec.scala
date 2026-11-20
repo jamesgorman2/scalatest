@@ -59,7 +59,7 @@ final class JsonEncodingSpec extends AnyWordSpec with Matchers {
 
       "write text that decodes to the string it was given" in {
         val decoded = strictlyDecodedUtf8(strictlyEncodedUtf8(encoded(textJsonMustEscape)))
-        JsonReader.read(decoded) shouldBe Right(JsonValue.Text(textJsonMustEscape))
+        JsonReader.read(decoded) shouldBe JsonValue.Text(textJsonMustEscape)
       }
     }
 

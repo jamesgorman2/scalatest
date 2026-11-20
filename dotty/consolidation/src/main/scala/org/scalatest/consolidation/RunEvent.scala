@@ -2,6 +2,7 @@ package org.scalatest.consolidation
 
 import java.time.Instant
 import java.time.format.DateTimeParseException
+import org.scalatest.events.MalformedTestEventLogException
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 
@@ -32,7 +33,12 @@ object RunEvent {
    *
    * @return the event the line holds, or why it cannot be decoded
    */
-  def decode(line: String): Either[String, RunEvent] = TestEventLogDecoder.decode(line).flatMap(of)
+  def decode(line: String): Either[String, RunEvent] =
+    try {
+      of(TestEventLogDecoder.decode(line))
+    } catch {
+      case malformed: MalformedTestEventLogException => Left(malformed.reason)
+    }
 
   /** The event, or why it cannot be one: a `runStarted` event whose start time is not an instant. */
   private[scalatest] def of(event: TestEventLogEvent): Either[String, RunEvent] =

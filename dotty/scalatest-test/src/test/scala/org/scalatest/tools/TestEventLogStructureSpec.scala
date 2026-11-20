@@ -78,7 +78,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
           And(events.description)
         }
         structureLinesOf(lines) shouldBe Vector(structure.line)
-        EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(structure, events))) shouldBe None
+        EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(runHolding(structure, events))) shouldBe None
         lines.filter(events.mustNotHold) shouldBe empty
       }
     }
@@ -92,7 +92,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       val event = TestEventLogDecoder.decode(structure.line)
 
       Then(s"it yields a structure that holds $holds")
-      EventLogComparison.mismatchWhenIs(event.toSeq, built(structure.inNotation)) shouldBe None
+      EventLogComparison.mismatchWhenIs(Seq(event), built(structure.inNotation)) shouldBe None
     }
   }
 
@@ -606,7 +606,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       Then("the event log's one structure holds a, b and c in that order, though the tests ran in another")
       testsInTheOrderTheyStarted(lines).sorted shouldBe Vector("a", "b", "c")
       structureLinesOf(lines) shouldBe Vector(shuffledSuite.line)
-      EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(runHolding(shuffledSuite, StatedEvents.none))) shouldBe None
+      EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(runHolding(shuffledSuite, StatedEvents.none))) shouldBe None
     }
 
     structureDecoderScenario("A suite whose tests run in random order", "a, b and c in that order, whatever order the tests ran in", shuffledSuite)

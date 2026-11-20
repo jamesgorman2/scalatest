@@ -671,10 +671,10 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         Then(s"the event log ${if (eventLogIsOnlyTheStated) "is" else "holds, in order,"} $eventLogHolds")
         if (eventLogIsOnlyTheStated) {
           StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
-          EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
+          EventLogComparison.mismatchWhenIs(decoded(lines), built(stated.eventLogInNotation)) shouldBe None
         } else {
           StatedLines.mismatchWhenHoldsInOrder(lines, stated.eventLogInFormat) shouldBe None
-          EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
+          EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(stated.eventLogInNotation)) shouldBe None
         }
         structures.foreach { count =>
           And(s"the event log holds $count structure${if (count == 1) "" else "s"}")
@@ -682,7 +682,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
         }
         classNameOfEveryStructure.foreach { case SuiteNameAndClassName(suiteName, className) =>
           And(s"every structure holding $suiteName gives it class name $className")
-          val classNames = classNamesGivenTo(suiteName, decodedOrFail(lines))
+          val classNames = classNamesGivenTo(suiteName, decoded(lines))
           classNames should not be empty
           classNames.distinct shouldBe Vector(className)
         }
@@ -695,7 +695,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
   private def decoderScenario(scenario: String, eventLogHolds: String, stated: StatedRun): Unit = {
     Scenario(s"The decoder reads the event log of: $scenario") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(stated.eventLogInFormat)
+      val events = decoded(stated.eventLogInFormat)
 
       Then(s"it yields $eventLogHolds")
       EventLogComparison.mismatchWhenIs(events, built(stated.eventLogInNotation)) shouldBe None
@@ -743,7 +743,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
           And("the event log holds, in order, the structure of the wrapped class, then the suite's events, and no other structure")
           StatedLines.mismatchWhenHoldsInOrder(lines, configSpecDiscovered.eventLogInFormat) shouldBe None
-          EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(configSpecDiscovered.eventLogInNotation)) shouldBe None
+          EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(configSpecDiscovered.eventLogInNotation)) shouldBe None
           structuresIn(lines) shouldBe 1
         }
       }
@@ -821,7 +821,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
         And("the event log is the suite's structure, its SuiteStarting and its SuiteAborted, and the run's events")
         StatedLines.mismatchWhenIs(lines, configWithoutDbFailsSpec.eventLogInFormat) shouldBe None
-        EventLogComparison.mismatchWhenIs(decodedOrFail(lines), built(configWithoutDbFailsSpec.eventLogInNotation)) shouldBe None
+        EventLogComparison.mismatchWhenIs(decoded(lines), built(configWithoutDbFailsSpec.eventLogInNotation)) shouldBe None
       }
     }
 
@@ -849,7 +849,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
         Then("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
         StatedLines.mismatchWhenHoldsInOrder(lines, configWithoutDbFailsBySuite.eventLogInFormat) shouldBe None
-        EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(configWithoutDbFailsBySuite.eventLogInNotation)) shouldBe None
+        EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(configWithoutDbFailsBySuite.eventLogInNotation)) shouldBe None
         structuresIn(lines) shouldBe 0
         lines.exists(_.contains(""""event":"SuiteAborted"""")) shouldBe false
       }
@@ -883,7 +883,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
 
           And("the event log holds, in order, the run's RunAborted and its end, and no structure or SuiteAborted")
           StatedLines.mismatchWhenHoldsInOrder(lines, configWithoutDbFailsDiscovered.eventLogInFormat) shouldBe None
-          EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(configWithoutDbFailsDiscovered.eventLogInNotation)) shouldBe None
+          EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(configWithoutDbFailsDiscovered.eventLogInNotation)) shouldBe None
           structuresIn(lines) shouldBe 0
           lines.exists(_.contains(""""event":"SuiteAborted"""")) shouldBe false
         }

@@ -872,7 +872,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
         Then(s"the event log holds, in order, $eventLogHolds")
         StatedLines.mismatchWhenHoldsInOrder(lines, stated.eventLogInFormat) shouldBe None
-        EventLogComparison.mismatchWhenHoldsInOrder(decodedOrFail(lines), built(stated.eventLogInNotation)) shouldBe None
+        EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(stated.eventLogInNotation)) shouldBe None
         assertNoEventIsAssignedToAnAncestor(lines, stated)
         alsoThen(lines)
       }
@@ -880,7 +880,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
     Scenario(s"The decoder reads the event log of: $scenario") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(stated.eventLogInFormat)
+      val events = decoded(stated.eventLogInFormat)
 
       Then(s"it yields $eventLogHolds")
       EventLogComparison.mismatchWhenIs(events, built(stated.eventLogInNotation)) shouldBe None

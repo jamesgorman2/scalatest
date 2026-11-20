@@ -394,7 +394,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           interrupted.start()
           interrupted.join()
           emitter.writeRunEvent(runCompleted)
-          TemporaryEventLog.decoded(eventLogFile).collect { case Right(TestEventLogEvent.RunEnded(outcome)) => outcome } shouldBe
+          TemporaryEventLog.decoded(eventLogFile).collect { case TestEventLogEvent.RunEnded(outcome) => outcome } shouldBe
             Vector(RunOutcome.Completed)
           TemporaryEventLog.lines(eventLogFile).count(_.contains("while interrupted")) shouldBe 1
         }

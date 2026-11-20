@@ -143,7 +143,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
         val lines = TemporaryEventLog.lines(eventLogFile)
 
         Then(s"the event log is $eventLogHolds")
-        val log = decodedOrFail(lines)
+        val log = decoded(lines)
         StatedLines.mismatchWhenIs(lines, stated.eventLogInFormat) shouldBe None
         EventLogComparison.mismatchWhenIs(log, built(stated.eventLogInNotation)) shouldBe None
         furtherChecksOfRun(reportedWithTheArgument, log)
@@ -152,7 +152,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     Scenario(s"The decoder reads the event log of: $scenario") {
       When("the decoder is given the lines of that event log")
-      val events = decodedOrFail(stated.linesTheDecoderReads.getOrElse(stated.eventLogInFormat))
+      val events = decoded(stated.linesTheDecoderReads.getOrElse(stated.eventLogInFormat))
 
       Then(s"it yields $eventLogHolds")
       EventLogComparison.mismatchWhenIs(events, built(stated.eventLogInNotation)) shouldBe None
@@ -331,7 +331,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
           + s""""suppressed":[{"id":3,"className":"java.lang.RuntimeException","message":"closing","stackTrace":[$frame]}]}"""
       )
       When("the decoder is given the lines of an event log whose test failed with such a chain, each throwable holding a frame")
-      val events = decodedOrFail(stated.eventLogInFormat)
+      val events = decoded(stated.eventLogInFormat)
 
       Then("it yields each throwable of the chain with its frame")
       EventLogComparison.mismatchWhenIs(events, built(stated.eventLogInNotation)) shouldBe None
@@ -389,7 +389,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     Scenario("The decoder reads a StackDepth exception's pathname") {
       When("the decoder is given the lines of an event log whose TestFailedException gives the failed code's pathname")
-      val events = decodedOrFail(
+      val events = decoded(
         frameworkRunOfOneTest(
           "FailSuite",
           "samples.FailSuite",

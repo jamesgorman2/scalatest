@@ -375,7 +375,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
 
   private def decoded(lines: Seq[String]): Seq[TestEventLogEvent] = {
     lines should not be empty
-    lines.map(line => TestEventLogDecoder.decode(line).fold(reason => fail(s"$reason, in $line"), identity))
+    lines.map(TestEventLogDecoder.decode)
   }
 
   private val timesAndThreads = List(

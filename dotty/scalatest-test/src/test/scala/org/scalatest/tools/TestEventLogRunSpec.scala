@@ -73,7 +73,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
           Then("before it is given a task, the event log's first event is the run's start")
           And("that event's PID and process start time are those ProcessHandle.current() gives in the run's process")
           lines.head shouldBe TestEventLogLine.runStarted(pid, startTimeText)
-          val events = decodedOrFail(lines)
+          val events = decoded(lines)
           events.head shouldBe TestEventLogEvent.RunStarted(pid, startTimeText)
           EventLogComparison.mismatchWhenIs(events.take(1), built("run started")) shouldBe None
 
@@ -91,8 +91,8 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       val event = TestEventLogDecoder.decode(TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z"))
 
       Then("it yields the run's start, with the line's PID and process start time")
-      event shouldBe Right(TestEventLogEvent.RunStarted(4242L, "2026-01-02T03:04:05.678Z"))
-      EventLogComparison.mismatchWhenIs(event.toSeq, built("run started")) shouldBe None
+      event shouldBe TestEventLogEvent.RunStarted(4242L, "2026-01-02T03:04:05.678Z")
+      EventLogComparison.mismatchWhenIs(Seq(event), built("run started")) shouldBe None
     }
 
     runsThatEnd.foreach { run =>
@@ -106,7 +106,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
           Then(s"the event log's last event is that the run ended ${run.ended}")
           lines.last shouldBe TestEventLogLine.runEnded(run.ended)
-          EventLogComparison.mismatchWhenIs(decodedOrFail(lines).takeRight(1), built(s"run ended ${run.ended}")) shouldBe None
+          EventLogComparison.mismatchWhenIs(decoded(lines).takeRight(1), built(s"run ended ${run.ended}")) shouldBe None
         }
       }
     }
@@ -117,8 +117,8 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
         val event = TestEventLogDecoder.decode(TestEventLogLine.runEnded(ended))
 
         Then(s"it yields that the run ended $ended")
-        event shouldBe Right(TestEventLogEvent.RunEnded(outcome))
-        EventLogComparison.mismatchWhenIs(event.toSeq, built(s"run ended $ended")) shouldBe None
+        event shouldBe TestEventLogEvent.RunEnded(outcome)
+        EventLogComparison.mismatchWhenIs(Seq(event), built(s"run ended $ended")) shouldBe None
       }
     }
 

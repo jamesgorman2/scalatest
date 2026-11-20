@@ -32,7 +32,7 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
         case other => fail(s"expected the JSON output written once, but it was written ${other.size} times")
       }
 
-    def root: JsonValue = JsonReader.read(text).fold(reason => fail(s"the JSON output is not JSON: $reason"), identity)
+    def root: JsonValue = JsonReader.read(text)
 
     def module: JsonValue = root("contents").only
 

@@ -85,10 +85,9 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected def built(notation: String): Vector[BuiltEvent] =
     TestRunBuilder.build(TestRunPart.Events(notation)).fold(reason => fail(reason), _.events)
 
-  protected def decodedOrFail(lines: Seq[String]): Vector[TestEventLogEvent] =
-    lines.toVector.map(line => TestEventLogDecoder.decode(line).fold(reason => fail(s"$reason, in $line"), identity))
+  protected def decoded(lines: Seq[String]): Vector[TestEventLogEvent] = lines.toVector.map(TestEventLogDecoder.decode)
 
-  protected def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
+  protected def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decoded(TemporaryEventLog.lines(eventLogFile))
 
   protected def classNamesGivenTo(suiteName: String, events: Seq[TestEventLogEvent]): Vector[String] =
     events.toVector

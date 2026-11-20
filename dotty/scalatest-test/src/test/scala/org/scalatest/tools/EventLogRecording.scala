@@ -100,9 +100,7 @@ private[tools] trait EventLogRecording { this: Matchers =>
     val writes = eventLog.writes
     eventLog.hadOverlappingWrites shouldBe false
     writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
-    val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
-    decoded.filter(_.isLeft) shouldBe Vector.empty
-    decoded.collect { case Right(event) => event }
+    writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
   }
 }
 
