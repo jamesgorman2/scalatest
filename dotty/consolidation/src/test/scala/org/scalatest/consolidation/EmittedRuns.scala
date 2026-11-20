@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Comparator
-import org.scalatest.Assertions
 import org.scalatest.tools.Framework
 import sbt.testing.EventHandler
 import sbt.testing.Logger
@@ -15,7 +14,7 @@ import sbt.testing.TaskDef
 import scala.jdk.CollectionConverters.*
 
 /** Runs a suite through `Framework`, outside Mill, writing the run's test event log, and consolidates that log. */
-private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns & JsonOutputs =>
+private[consolidation] trait EmittedRuns { this: ConsolidatedRuns & JsonOutputs =>
 
   def eventLogOfFrameworkRun(suiteClassName: String, runnerArguments: Seq[String] = Nil): Vector[String] = {
     val folder = Files.createTempDirectory("emitted-run")
@@ -41,11 +40,9 @@ private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns &
   /** The human-readable output's lines, with colour on, less the summary line. */
   def colourMarkedTreeLinesFrom(eventLog: Vector[String]): Vector[String] = {
     val output = new OutputSink
-    consolidateRun(Consolidation.start(output, coloured = true), eventLog.map(decoded))
+    consolidateRun(Consolidation.start(output, coloured = true), eventLog.map(RunEvent.decode))
     output.linesWithoutSummaryLine.map(ConsolidatedRuns.withColoursMarked)
   }
 
-  def jsonOutputOfEventLog(eventLog: Vector[String]): JsonSink = jsonOutputOfRunEvents(eventLog.map(decoded))
-
-  private def decoded(line: String): RunEvent = RunEvent.decode(line).fold(reason => fail(s"$reason, in $line"), identity)
+  def jsonOutputOfEventLog(eventLog: Vector[String]): JsonSink = jsonOutputOfRunEvents(eventLog.map(RunEvent.decode))
 }

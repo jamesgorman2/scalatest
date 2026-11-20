@@ -89,7 +89,7 @@ Keys, in order:
 
 A key is absent where the run never reported the event that supplies it.
 
-A run's test event log can end before it records the run's end, as when the worker's JVM dies. The run node then has no `outcome`, though the run did not complete, and the suites, scopes and tests the run left open have no `outcome` either. The test command fails. Such a run node has no `endedAt` unless the log recorded the run's `RunCompleted`, `RunStopped` or `RunAborted`; every run node without `endedAt` is such a run.
+A run's test event log can end before it records the run's end, as when the worker's JVM dies. The test command also reads a log only up to its first line it cannot decode, and the root then has a failure reading that worker's test event log, naming the line and why it cannot be decoded (§ Root). The run node then has no `outcome`, though the run did not complete, and the suites, scopes and tests the run left open have no `outcome` either. The test command fails. Such a run node has no `endedAt` unless the log recorded the run's `RunCompleted`, `RunStopped` or `RunAborted`; every run node without `endedAt` is such a run.
 
 ## Suite, scope and test
 

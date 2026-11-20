@@ -217,27 +217,29 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "it holds the run's start" should {
       "be decoded to an event naming the run's process" in {
-        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}""").map(_.runProcess) shouldBe
-          Right(Some(RunProcess(Pid(4242L), Instant.parse("2026-01-02T03:04:05.678Z"))))
+        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}""").runProcess shouldBe
+          Some(RunProcess(Pid(4242L), Instant.parse("2026-01-02T03:04:05.678Z")))
       }
     }
 
     "it holds the run's start with a start time that is not an instant" should {
-      "not be decoded" in {
-        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"yesterday"}""") shouldBe
-          Left("the run's start time is not an instant: yesterday")
+      "throw, naming the start time and the line as it was given" in {
+        val line = """{ "item": "runStarted", "pid": 4242, "startTime": "yesterday" }"""
+        val thrown = intercept[MalformedTestEventLogException](RunEvent.decode(line))
+        thrown.reason shouldBe "the run's start time is not an instant: yesterday"
+        thrown.line shouldBe line
       }
     }
 
     "it holds another event" should {
       "be decoded to an event naming no process" in {
-        RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").map(_.runProcess) shouldBe Right(None)
+        RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").runProcess shouldBe None
       }
     }
 
     "it is not an event" should {
-      "not be decoded" in {
-        RunEvent.decode("not an event").isLeft shouldBe true
+      "throw, naming the line" in {
+        intercept[MalformedTestEventLogException](RunEvent.decode("not an event")).line shouldBe "not an event"
       }
     }
   }

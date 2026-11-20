@@ -16,9 +16,9 @@ import scala.concurrent.duration.FiniteDuration
  *
  * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
  * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
- * end and ends the run's event stream. A line that cannot be decoded ends the stream there. If the worker ends before
- * the file appears, no run existed in it: where the worker started a process, the reader adds that process as one that
- * ended before any run.
+ * end and ends the run's event stream. A line that cannot be decoded ends the stream there and fails the reading. If
+ * the worker ends before the file appears, no run existed in it: where the worker started a process, the reader adds
+ * that process as one that ended before any run.
  */
 private[mill] final class EventLogReader(
     eventLogFile: Path,
@@ -120,15 +120,13 @@ private[mill] final class EventLogReader(
     private val lines = new EventLogLines
     private val buffer = new Array[Byte](64 * 1024)
     private var process: Option[RunProcess] = None
-    private var undecodable: Boolean = false
 
     def readUntilStreamEnds(): Unit = {
-      var ended = false
-      while (!ended) {
-        val exitedBeforeRead = process.exists(hasExited)
+      var exitedBeforeRead = false
+      while (!exitedBeforeRead) {
+        exitedBeforeRead = process.exists(hasExited)
         readToEnd()
-        ended = undecodable || exitedBeforeRead
-        if (!ended) {
+        if (!exitedBeforeRead) {
           Thread.sleep(pollInterval.toMillis)
         }
       }
@@ -136,20 +134,17 @@ private[mill] final class EventLogReader(
 
     private def readToEnd(): Unit = {
       var read = input.read(buffer)
-      while (read >= 0 && !undecodable) {
-        lines.append(buffer, read).iterator.takeWhile(_ => !undecodable).foreach(add)
-        read = if (undecodable) -1 else input.read(buffer)
+      while (read >= 0) {
+        lines.append(buffer, read).foreach(add)
+        read = input.read(buffer)
       }
     }
 
-    private def add(line: String): Unit =
-      RunEvent.decode(line) match {
-        case Right(event) =>
-          feed.add(event)
-          process = process.orElse(event.runProcess)
-        case Left(_) =>
-          undecodable = true
-      }
+    private def add(line: String): Unit = {
+      val event = RunEvent.decode(line)
+      feed.add(event)
+      process = process.orElse(event.runProcess)
+    }
   }
 }
 

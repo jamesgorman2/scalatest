@@ -82,12 +82,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
   }
 
   private def addEventLog(feed: RunFeed, eventLogLines: Seq[String]): Unit =
-    eventLogLines.foreach { line =>
-      RunEvent.decode(line) match {
-        case Right(event) => feed.add(event)
-        case Left(reason) => fail(s"the event log line $line cannot be decoded: $reason")
-      }
-    }
+    eventLogLines.foreach(line => feed.add(RunEvent.decode(line)))
 
   private def eventLogOfTestCommand(tester: IntegrationTester): Seq[String] = {
     val eventLogs = os.walk(tester.workspacePath / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)

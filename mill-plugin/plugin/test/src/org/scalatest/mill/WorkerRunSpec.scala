@@ -138,6 +138,24 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
+    "a line of its event log cannot be decoded" should {
+      "attach why to the root, naming the line, end the run's event stream and fail the consolidation" in {
+        withEventLogFile { file =>
+          Files.write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n".getBytes(StandardCharsets.UTF_8))
+          val fixture = new WorkerRunFixture(file, opening)
+          fixture.processExited = false
+          fixture.runAndEndConsolidation(startedAProcess)
+          fixture.outputWithoutSummaryLine shouldBe Seq(
+            "Consolidated tests:",
+            "  [core.test]",
+            "  *** CONSOLIDATED TESTS ABORTED ***",
+            "    Reading the event log of worker 0 of fork group 1 of core.test failed: org.scalatest.events.MalformedTestEventLogException: no value starts at offset 0, in not an event"
+          )
+          fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
     "starting the worker throws after the worker wrote an unterminated line" should {
       "leave the capture streams open, so the line the worker's output pump goes on to finish is captured whole" in {
         withEventLogFile { file =>

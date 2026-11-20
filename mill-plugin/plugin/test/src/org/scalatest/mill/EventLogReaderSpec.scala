@@ -14,6 +14,7 @@ import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.RunProcess
 import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.events.MalformedTestEventLogException
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
@@ -199,12 +200,24 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     }
 
     "a line cannot be decoded" should {
+      "fail the reading with why, naming the line" in {
+        withEventLogFile { file =>
+          write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
+          val reading = new Reading(file)
+          reading.reader.start()
+          val thrown = intercept[MalformedTestEventLogException](reading.stateAfterEnd())
+          thrown.line shouldBe "not an event"
+          thrown.reason should not be empty
+        }
+      }
       "end the run's event stream there, though the process still runs" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
           val reading = new Reading(file)
           reading.reader.start()
-          reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
+          intercept[MalformedTestEventLogException](reading.stateAfterEnd())
+          reading.consolidation.end()
+          reading.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
       }
     }

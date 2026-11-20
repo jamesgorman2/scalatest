@@ -32,14 +32,16 @@ object RunEvent {
   /**
    * Decodes one whole line of a run's test event log, given without its line end.
    *
-   * @return the event the line holds, or why it cannot be decoded
+   * @throws MalformedTestEventLogException if the line cannot be decoded, naming the line
    */
-  def decode(line: String): Either[String, RunEvent] =
+  def decode(line: String): RunEvent = {
+    val event = TestEventLogDecoder.decode(line)
     try {
-      Right(of(TestEventLogDecoder.decode(line)))
+      of(event)
     } catch {
-      case malformed: MalformedTestEventLogException => Left(malformed.reason)
+      case malformed: MalformedTestEventLogException => throw new MalformedTestEventLogException(line, malformed.reason)
     }
+  }
 
   /** @throws MalformedTestEventLogException if the event is a `runStarted` whose start time is not an instant */
   private[scalatest] def of(event: TestEventLogEvent): RunEvent =
