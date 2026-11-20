@@ -417,8 +417,8 @@ final class TestEventLogEventsDecoderSpec extends AnyWordSpec with Matchers with
 
   import TestEventLogEventsSpec.*
 
-  "The decoder, given the lines of an event log whose test failed with a cause chain with a suppressed throwable, each throwable holding a frame" should {
-    "yield each throwable of the chain with its frame" in {
+  "The decoder, given the lines of an event log whose test failed with a throwable that has a cause and a suppressed throwable, each with a frame" should {
+    "yield each throwable with its frame" in {
       val frame = """{"className":"samples.ThrowSuite","methodName":"f","fileName":"ThrowSuite.scala","lineNumber":9,"text":"samples.ThrowSuite.f(ThrowSuite.scala:9)"}"""
       val stated = throwSuite(
         """java.lang.IllegalStateException "outer" frames ["samples.ThrowSuite.f(ThrowSuite.scala:9)"] """ +

@@ -9,7 +9,7 @@ import org.scalatest.events.JsonValue
  */
 private[tools] object StatedLines {
 
-  // A stated line holds these only so that it decodes. No criterion fixes their values, so they are not compared.
+  // A stated line holds these only so that it decodes. No test checks their values, so they are not compared.
   private val keysNoCriterionFixes = Set("threadName", "timeStamp", "pid", "startTime")
 
   def mismatchWhenIs(written: Seq[String], stated: Seq[String]): Option[String] = {

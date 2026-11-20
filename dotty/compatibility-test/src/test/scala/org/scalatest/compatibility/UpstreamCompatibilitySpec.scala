@@ -50,7 +50,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
   Feature("Compatibility with ScalaTest 3.2.20") {
     Scenario("A recording reporter of a launch by the command-line runner receives what 3.2.20 sends it, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
-      When("each run is launched by the command-line runner, its one reporter a -C recording reporter compiled against 3.2.20")
+      When("the command-line runner launches each run with one reporter: a -C recording reporter compiled against 3.2.20")
       And("this fork's run is not given the runner argument")
       val events = runs.ofFixture(Launch.RunnerRun, List("-C", "compatibility.recorders.RecordingReporter")).map(_.events)
 
@@ -86,7 +86,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
       loggerLines.upstream should not be empty
       Compared.firstDifference(loggerLines) shouldBe None
 
-      And("the runner's done returns on this fork the summary it returns on 3.2.20")
+      And("the runner's done() returns on this fork the summary it returns on 3.2.20")
       firstDifferenceOfSummaries(output) shouldBe None
     }
   }
@@ -157,7 +157,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         When(s"${launch.described} runs it on 3.2.20 and on this fork, with a -f reporter and a -C reporter that records the run's threads")
         val output = runs.ofFixture(launch, List("-f", "report.txt", "-C", "compatibility.recorders.ThreadRecordingReporter"))
 
-        Then("the fork's run leaves in its working directory only the files 3.2.20's leaves")
+        Then("the fork's run leaves in its working directory only the files 3.2.20's run leaves")
         output.upstream.files.keySet shouldBe Set("report.txt")
         output.fork.files.keySet.diff(output.upstream.files.keySet) shouldBe Set.empty
 
@@ -172,7 +172,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
       characters <- reporterCharacterLists
     } {
       val arguments = reporterArguments(characters)
-      Scenario(s"The reporters of a launch by ${launch.described} given ${arguments.mkString(" ")} write what 3.2.20's write, with the emitter off") {
+      Scenario(s"The reporters of a launch by ${launch.described} given ${arguments.mkString(" ")} write what they write on 3.2.20, with the emitter off") {
         Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
         When(s"${launch.described} runs it on 3.2.20 and on this fork with ${arguments.mkString(" ")}, with the emitter off")
         val output = runs.ofFixture(launch, arguments)
@@ -193,13 +193,13 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         } shouldBe Nil
 
         if (launch == Launch.Framework) {
-          And("the runner's done returns on this fork the summary it returns on 3.2.20")
+          And("the runner's done() returns on this fork the summary it returns on 3.2.20")
           firstDifferenceOfSummaries(output) shouldBe None
         }
       }
     }
 
-    Scenario("The reporter of a build tool's launch given no reporter argument writes what 3.2.20's writes, with the emitter off") {
+    Scenario("The reporter of a build tool's launch given no reporter argument writes what it writes on 3.2.20, with the emitter off") {
       Given("the compatibility fixture, compiled against ScalaTest 3.2.20")
       When("a build tool runs it on 3.2.20 and on this fork with no reporter argument, with the emitter off")
       val output = runs.ofFixture(Launch.Framework, Nil)
@@ -218,7 +218,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         Compared.firstDifference(text.map(lines => ReporterText.normalised(lines(name)))).map(name + ", " + _)
       } shouldBe Nil
 
-      And("the runner's done returns on this fork the summary it returns on 3.2.20")
+      And("the runner's done() returns on this fork the summary it returns on 3.2.20")
       firstDifferenceOfSummaries(output) shouldBe None
     }
 
@@ -238,7 +238,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     Launch.values.toList.foreach { launch =>
-      Scenario(s"A launch by ${launch.described} accepts and rejects each argument list without the runner argument as 3.2.20's does") {
+      Scenario(s"A launch by ${launch.described} accepts and rejects each argument list without the runner argument as 3.2.20 does") {
         Given("argument lists that do not hold the runner argument, which 3.2.20 accepts, and others that it rejects")
         val argumentLists = argumentListsOf(launch)
 
@@ -252,7 +252,7 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
         outcomes.map((_, outcome) => isAccepted(outcome.upstream)).toSet shouldBe Set(true, false)
       }
 
-      Scenario(s"A launch by ${launch.described} given the runner argument once, with a file, accepts or rejects the rest of the list as 3.2.20's does") {
+      Scenario(s"A launch by ${launch.described} given the runner argument once, with a file, accepts or rejects the other arguments as 3.2.20 does") {
         Given("argument lists that do not hold the runner argument, which 3.2.20 accepts, and others that it rejects")
         val argumentLists = argumentListsOf(launch)
 

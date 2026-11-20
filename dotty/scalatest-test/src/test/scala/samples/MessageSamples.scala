@@ -23,7 +23,7 @@ object MessageCallTimes {
   private val current = new AtomicReference(new ConcurrentLinkedQueue[(Long, Long)])
 
   /**
-   * Gives what `launch` gives, and the times of the message calls of the suites constructed while it ran. Each suite
+   * Returns the result of `launch`, and the times of the message calls made by suites constructed while it ran. Each suite
    * records into the recording current when it is constructed, so a run that outlives its recording cannot write into a
    * later one.
    */

@@ -112,7 +112,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       structures = Some(1)
     )
 
-    Scenario("A suite run through ConfigMapWrapperSuite, by the command-line runner with the runpath given with -R and no -s") {
+    Scenario("A suite run through ConfigMapWrapperSuite, discovered by the command-line runner with -R and no -s") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         Given("a runpath holding one suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), declaring scope 'A config' holding test 'reads'")
@@ -167,7 +167,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       arguments = List("-Ddb=on")
     )
 
-    Scenario("A wrapped suite's constructor throws given an empty config map, by a build tool") {
+    Scenario("A build tool runs a wrapped suite whose constructor throws given an empty config map") {
       thisProcess
       Given("a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), whose constructor throws IllegalStateException(\"no db\") where its config map lacks db")
       val suiteClassName = "samples.ConfigWithoutDbFailsSpec"
@@ -204,7 +204,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       }
     }
 
-    Scenario("A wrapped suite's constructor throws given an empty config map, by the command-line runner with -s") {
+    Scenario("The command-line runner, given -s, runs a wrapped suite whose constructor throws given an empty config map") {
       thisProcess
       Given("a suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), whose constructor throws IllegalStateException(\"no db\") where its config map lacks db")
       When("the command-line runner runs it without the runner argument")
@@ -226,7 +226,7 @@ final class TestEventLogFurtherStructureSpec extends AnyFeatureSpec with GivenWh
       }
     }
 
-    Scenario("A wrapped suite's constructor throws given an empty config map, by the command-line runner with the runpath given with -R and no -s") {
+    Scenario("The command-line runner discovers with -R, without -s, a wrapped suite whose constructor throws given an empty config map") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         Given("a runpath holding one suite annotated @WrapWith(classOf[ConfigMapWrapperSuite]), whose constructor throws where its config map lacks db")
@@ -974,10 +974,10 @@ final class TestEventLogFurtherStructureDecoderSpec extends AnyWordSpec with Mat
   import TestEventLogFurtherStructureSpec.*
 
   private val runsAndWhatTheirEventLogsHold = List(
-    ("a run in which the command-line runner discovers, in the runpath given with -R, a suite run through ConfigMapWrapperSuite", "the structure of the wrapped class, then the suite's events", configSpecDiscovered),
+    ("a run in which the command-line runner discovers with -R a suite run through ConfigMapWrapperSuite", "the structure of the wrapped class, then the suite's events", configSpecDiscovered),
     ("a run of a wrapped suite whose constructor throws given an empty config map, by a build tool", "the suite's structure, its SuiteStarting and its SuiteAborted, and the run's events", configWithoutDbFailsSpec),
     ("a run of a wrapped suite whose constructor throws given an empty config map, by the command-line runner with -s", "the run's RunAborted and its end", configWithoutDbFailsBySuite),
-    ("a run in which the command-line runner discovers, in the runpath given with -R, a wrapped suite whose constructor throws given an empty config map", "the run's RunAborted and its end", configWithoutDbFailsDiscovered)
+    ("a run in which the command-line runner discovers with -R a wrapped suite whose constructor throws given an empty config map", "the run's RunAborted and its end", configWithoutDbFailsDiscovered)
   )
 
   runsAndWhatTheirEventLogsHold.foreach { (run, eventLogHolds, stated) =>

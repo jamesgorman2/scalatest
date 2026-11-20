@@ -60,7 +60,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   Feature("The run in its test event log") {
 
-    Scenario("A build tool's runner is constructed") {
+    Scenario("A build tool's runner writes the run's start when it is constructed") {
       val process = ProcessHandle.current()
       val startTime = process.info().startInstant()
       assume(startTime.isPresent, "this process has no start time")
@@ -126,7 +126,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A run by the command-line runner of a suite it is given by name writes that suite's structure and events between its run events") {
+    Scenario("The command-line runner, given a suite by name, writes the suite's structure and events between the run's events") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
@@ -235,17 +235,17 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     }
   }
 
-  Feature("A build tool's run whose done throws before it sends RunCompleted") {
+  Feature("A build tool's run whose done() throws before it sends RunCompleted") {
 
-    Scenario("A build tool's runner whose done is interrupted while it waits for a sub-process's events closes its event log") {
+    Scenario("A build tool's runner whose done() is interrupted while it waits for a sub-process's events closes its event log") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         Given("a build tool's runner constructed with the runner argument, waiting for the events of a sub-process")
         val runner = frameworkRunner(runnerArgument(eventLogFile))
         val subProcessServer = runner.remoteArgs()
         try {
-          When("its done is called by a thread that has been interrupted")
-          Then("done throws InterruptedException")
+          When("its done() is called by a thread that has been interrupted")
+          Then("done() throws InterruptedException")
           Thread.currentThread.interrupt()
           try an[InterruptedException] should be thrownBy runner.done() finally Thread.interrupted()
 
@@ -397,15 +397,15 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
         execute(runnerWithArgument, "samples.SqrtPropSpec", new RecordingLogger)
         val summaryWithArgument = runnerWithArgument.done()
 
-        Then("done returns the end-of-run summary without the runner argument")
+        Then("done() returns the end-of-run summary without the runner argument")
         summaryWithoutArgument should include("Run completed in")
 
-        And("done returns nothing with it")
+        And("done() returns nothing with it")
         summaryWithArgument shouldBe ""
       }
     }
 
-    Scenario("The command-line runner rejects the graphic reporter with the runner argument") {
+    Scenario("The command-line runner rejects the graphic reporter given alongside the runner argument") {
       TemporaryEventLog.in { eventLogFile =>
         When("the command-line runner is given -g and the runner argument")
         val rejection = the[IllegalArgumentException] thrownBy runnerRun(List("-g") ++ runnerArgument(eventLogFile))

@@ -60,7 +60,7 @@ final class TestEventLogEmitterStartSpec extends AnyFreeSpec with Matchers {
       }
     }
 
-    "replaces a file an earlier run left under the name of the file it moves to the event log's name" in {
+    "replaces a temporary file an earlier run left behind" in {
       TemporaryEventLog.in { eventLogFile =>
         Files.write(eventLogFile.resolveSibling("events.log.tmp"), "an earlier run's start\n".getBytes(StandardCharsets.UTF_8))
         val emitter = TestEventLogEmitter.started(eventLogFile, identity)
@@ -145,7 +145,7 @@ final class TestEventLogEmitterStartSpec extends AnyFreeSpec with Matchers {
   }
 
   "An emitter fails to start" - {
-    "and creates no event log file, where it cannot write the file it moves to the event log's name" in {
+    "and creates no event log file, where it cannot write its temporary file" in {
       TemporaryEventLog.in { eventLogFile =>
         Files.createDirectory(eventLogFile.resolveSibling("events.log.tmp"))
         an[IOException] should be thrownBy TestEventLogEmitter.started(eventLogFile, identity)
@@ -153,7 +153,7 @@ final class TestEventLogEmitterStartSpec extends AnyFreeSpec with Matchers {
       }
     }
 
-    "without writing to the link's target, where it finds a link under the name of the file it moves to the event log's name" in {
+    "without writing to the link's target, where its temporary file's path is a symbolic link" in {
       TemporaryEventLog.in { eventLogFile =>
         val target = Files.write(eventLogFile.resolveSibling("target"), "the target's own content\n".getBytes(StandardCharsets.UTF_8))
         try Files.createSymbolicLink(eventLogFile.resolveSibling("events.log.tmp"), target)
@@ -163,7 +163,7 @@ final class TestEventLogEmitterStartSpec extends AnyFreeSpec with Matchers {
       }
     }
 
-    "saying why, and creates no file, where its process has no identity" in {
+    "saying why, and creates no file, where the JVM has no ProcessHandle" in {
       TemporaryEventLog.in { eventLogFile =>
         val noProcessHandle = new IllegalStateException("this JVM has no java.lang.ProcessHandle")
         the[IllegalStateException] thrownBy TestEventLogEmitter.startedIfGiven(Some(eventLogFile.toString), throw noProcessHandle) should

@@ -20,7 +20,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
   import TestEventLogStructureSpec.*
 
   /**
-   * The events a criterion states for a run, besides the suite's structure.
+   * The events a test expects of a run, besides the suite's structure.
    *
    * @param description shown as an And step
    * @param holdsInOrder in the event notation
