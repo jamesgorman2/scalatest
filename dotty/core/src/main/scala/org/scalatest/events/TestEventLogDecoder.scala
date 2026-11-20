@@ -5,13 +5,20 @@ import scala.collection.mutable
 
 private[scalatest] object TestEventLogDecoder {
 
-  /** @throws MalformedTestEventLogException where the line is not one event the format writes */
+  /** @throws MalformedTestEventLogException if the line is not an event the format writes */
   def decode(line: String): TestEventLogEvent = {
-    JsonReader.read(line) match {
+    jsonValue(line) match {
       case JsonValue.Object(fields) => whole(new JsonObjectReader(line, fields))(logEvent)
       case _ => throw new MalformedTestEventLogException(line, "the line is not a JSON object")
     }
   }
+
+  private def jsonValue(line: String): JsonValue =
+    try {
+      JsonReader.read(line)
+    } catch {
+      case malformed: MalformedJsonException => throw new MalformedTestEventLogException(line, malformed.reason)
+    }
 
   private def whole[A](reader: JsonObjectReader)(decodeFrom: JsonObjectReader => A): A = {
     val decoded = decodeFrom(reader)

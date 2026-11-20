@@ -243,7 +243,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
   }
 
   "A run's start event whose start time is not an instant" should {
-    "not be made a run event, but throw naming the start time and the event's line" in {
+    "throw, naming the start time and the event's line, instead of becoming a run event" in {
       val thrown = intercept[MalformedTestEventLogException](RunEvent.of(TestEventLogEvent.RunStarted(4242L, "yesterday")))
       thrown.reason shouldBe "the run's start time is not an instant: yesterday"
       thrown.line shouldBe """{"item":"runStarted","pid":4242,"startTime":"yesterday"}"""

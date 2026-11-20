@@ -41,7 +41,7 @@ object RunEvent {
       case malformed: MalformedTestEventLogException => Left(malformed.reason)
     }
 
-  /** @throws MalformedTestEventLogException where the event is a `runStarted` event whose start time is not an instant */
+  /** @throws MalformedTestEventLogException if the event is a `runStarted` whose start time is not an instant */
   private[scalatest] def of(event: TestEventLogEvent): RunEvent =
     event match {
       case TestEventLogEvent.RunStarted(pid, startTime) =>

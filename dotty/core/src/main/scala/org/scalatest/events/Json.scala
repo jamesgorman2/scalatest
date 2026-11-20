@@ -106,7 +106,7 @@ private[scalatest] object JsonWriter {
 
 private[scalatest] object JsonReader {
 
-  /** @throws MalformedTestEventLogException where the text is not one JSON value */
+  /** @throws MalformedJsonException if the text is not exactly one JSON value */
   def read(text: String): JsonValue = {
     val reader = new JsonReader(text)
     val value = reader.value()
@@ -181,7 +181,7 @@ private final class JsonReader(text: String) {
     }
   }
 
-  private def malformed(reason: String): Nothing = throw new MalformedTestEventLogException(text, reason)
+  private def malformed(reason: String): Nothing = throw new MalformedJsonException(text, reason)
 
   private def valueStart(): Option[JsonValue] = {
     skipWhitespace()
