@@ -9,10 +9,10 @@ private[scalatest] object ProcessIdentity {
 
   def current: ProcessIdentity = readThrough(Class.forName(_))
 
-  // Reads through reflection because ProcessHandle is absent on Java 8, which core still compiles on. Each method is
-  // looked up on the two public interfaces: the handle's runtime class is not accessible.
   def readThrough(loadClass: String => Class[?]): ProcessIdentity = {
     try {
+      // Reads through reflection because ProcessHandle is absent on Java 8, which core still compiles on. Each method is
+      // looked up on the two public interfaces: the handle's runtime class is not accessible.
       val handleInterface = loadClass("java.lang.ProcessHandle")
       val infoInterface = loadClass("java.lang.ProcessHandle$Info")
       val handle = handleInterface.getMethod("current").invoke(null)

@@ -4,13 +4,11 @@ import scala.collection.mutable.ListBuffer
 
 private[scalatest] enum SplitArgument {
 
-  /** @param flag the flag without what is written onto it: `-o` for `-oD` */
   case Flagged(flag: String, argumentAndValues: List[String])
 
   case Unrecognised(argument: String)
 }
 
-/** Gives each flag the values the JVM `ArgsParser.parseArgs` reads for it, so that a value is never read as a flag. */
 private[scalatest] object ArgumentSplitter {
 
   private enum Values {
@@ -21,6 +19,8 @@ private[scalatest] object ArgumentSplitter {
 
   import Values.*
 
+  // Both tables give each flag the values the JVM `ArgsParser.parseArgs` reads for it, so that a value is never read as
+  // a flag.
   private val flagsWrittenOnto: Map[String, Values] = Map(
     "-D" -> Following(0),
     "-R" -> Following(1),
@@ -62,26 +62,25 @@ private[scalatest] object ArgumentSplitter {
 
   private val cssFileFlag = "-Y"
 
-  /** Never throws: a null argument is returned as unrecognised where a flag is read and kept as a value where one is read, and a flag short of values keeps those it has. */
   def split(arguments: Seq[String]): List[SplitArgument] = {
     val remaining = arguments.iterator.buffered
     val split = new ListBuffer[SplitArgument]
     while (remaining.hasNext) {
       val argument = remaining.next()
-      split += (flagAndValuesOf(argument) match {
-        case Some((flag, values)) => SplitArgument.Flagged(flag, argument :: take(values, remaining))
+      split += (flagOf(argument) match {
+        case Some(flag) => SplitArgument.Flagged(flag, argument :: take(valuesOf(flag), remaining))
         case None => SplitArgument.Unrecognised(argument)
       })
     }
     split.toList
   }
 
-  private def flagAndValuesOf(argument: String): Option[(String, Values)] =
+  private def flagOf(argument: String): Option[String] =
     Option(argument).flatMap { written =>
-      val flagWrittenOnto = written.take(2)
-      flagsWrittenOnto.get(flagWrittenOnto).map(values => (flagWrittenOnto, values))
-        .orElse(flagsWrittenAlone.get(written).map(values => (written, values)))
+      Some(written.take(2)).filter(flagsWrittenOnto.contains).orElse(Some(written).filter(flagsWrittenAlone.contains))
     }
+
+  private def valuesOf(flag: String): Values = flagsWrittenOnto.getOrElse(flag, flagsWrittenAlone(flag))
 
   private def take(values: Values, remaining: BufferedIterator[String]): List[String] =
     values match {

@@ -66,7 +66,8 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     TestEventLogEmitter.caughtOutsideLock(SuiteStructure.read(suite, filter)) match {
       case Right(structure) =>
         val registration = new RegisteredSuite(this, suite, None)
-        registration.fixAsTopLevelSuite(addTopLevelSuite(structure))
+        val table = addTopLevelSuite(structure)
+        synchronized(registration.fixAsTopLevelSuite(table))
         registration.startAsTopLevelSuite(reporter)
       case Left(thrown) =>
         endWithoutRunEnded()
@@ -131,7 +132,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   private def tryFixNode(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
-    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen.get && handingOff && registration.takeReadOfSuiteId()))
+    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen.get && handingOff && registration.tryTakeReadOfSuiteId()))
     val suiteId = if (readsSuiteId) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
     val (thrown, isFixed) = synchronized {
       if (!isOpen.get) {
@@ -159,7 +160,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   private def trySettleTable(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
-    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen.get && handingOff && registration.takeReadOfSuiteName()))
+    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen.get && handingOff && registration.tryTakeReadOfSuiteName()))
     val suiteName = if (readsSuiteName) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
     val (thrown, isSettled) = synchronized {
       if (!isOpen.get) {
@@ -301,7 +302,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     val awaitingTopLevelWrapper = handedOffAwaitingTopLevelWrapper.get
     if (!isOpen.get || wrapper.registration.table.isEmpty) {
       None
-    } else if (isLastWrapper && wrapper.registration.takeHandedOffBeforeRemoval(event)) {
+    } else if (isLastWrapper && wrapper.registration.tryTakeHandedOffBeforeRemoval(event)) {
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
       // Left for the top-level suite's wrapper to write. If an inner wrapper wrote it, the top-level suite's wrapper
@@ -317,7 +318,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       if (!isLastWrapper) {
         awaitingTopLevelWrapper.put(event, wrapper.registration.topLevel)
       }
-      Some(wrapper.registration.topLevel.takeClosingEventWithMessagesHandedOff(event))
+      Some(wrapper.registration.topLevel.tryTakeClosingEventWithMessagesHandedOff(event))
     }
   }
 
