@@ -1,31 +1,25 @@
 package org.scalatest.mill
 
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
 final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
-
-  /** Each suite is a source file in the fixture's `suites` folder, and the name of the class it defines. */
-  private def runResultFixture(suites: (String, String)*)(prepare: IntegrationTester => Unit = _ => ()): TestCommandResult =
-    withTester("result") { tester =>
-      val samples = tester.workspacePath / "core" / "test" / "src" / "samples"
-      os.makeDir.all(samples)
-      suites.foreach { case (source, className) =>
-        os.copy(tester.workspacePath / "suites" / source, samples / s"$className.scala")
-      }
-      prepare(tester)
-      runTestCommand(tester, "core.test")
+  /** `source` is a file in the fixture's `suites` folder, and `className` the name of the class it defines. */
+  /** The suite is a source file in the fixture's `suites` folder, and the name of the class it defines. */
+  private def runResultFixture(source: String, className: String)(prepare: FixtureBuild => Unit = _ => ()): TestCommandResult =
+    withFixtureBuild(FixtureName.result) { build =>
+      build.addSuiteFile(build.workspace / "suites" / source, s"$className.scala")
+      prepare(build)
+      build.runTestCommand("core.test")
     }
 
-  private def resultSuite(source: String): TestCommandResult = runResultFixture(source -> "ResultSuite")()
+  private def resultSuite(source: String): TestCommandResult = runResultFixture(source, "ResultSuite")()
 
-  private def shouldFail(result: TestCommandResult): Unit =
-    withClue(result.debugString) {
-      result.succeeded shouldBe false
-      (result.eval.out + result.eval.err) should include("The tests of core.test failed")
-    }
+  private def shouldFailTheModulesTests(result: TestCommandResult): Unit = {
+    shouldFail(result)
+    shouldWriteToTheConsole(result, "The tests of core.test failed")
+  }
 
   Feature("A completed run fails the test command only where it reports a failure") {
 
@@ -50,7 +44,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the test command runs core.test")
       val result = resultSuite("ResultCancelled.scala")
       Then("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
 
     Scenario("A test fails, and another succeeds") {
@@ -58,7 +52,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the test command runs core.test")
       val result = resultSuite("ResultFails.scala")
       Then("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
 
     Scenario("beforeAll throws, so the suite aborts") {
@@ -66,7 +60,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the test command runs core.test")
       val result = resultSuite("ResultBeforeAllThrows.scala")
       Then("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
   }
 
@@ -75,7 +69,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A suite skips one of its registered tests") {
       Given("SkipSuite, whose test \"runs\" succeeds, and whose runTest returns SucceededStatus for \"skipped\" without running it")
       When("the test command runs core.test")
-      val result = runResultFixture("SkipSuite.scala" -> "SkipSuite")()
+      val result = runResultFixture("SkipSuite.scala", "SkipSuite")()
 
       Then("the human-readable output shows \"skipped\" as not run")
       withClue(result.debugString) {
@@ -88,14 +82,14 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       }
 
       And("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
 
     Scenario("A suite run through ConfigMapWrapperSuite registers a test with an empty config map that it does not register with the run's config map") {
       Given("ConfigSpec, run through ConfigMapWrapperSuite, whose scope \"A config\" holds \"remote\" where its config map holds db, and \"local\" where it does not")
       And("the module's own ScalaTest arguments are -Ddb=on")
       When("the test command runs core.test")
-      val result = runResultFixture("ConfigSpec.scala" -> "ConfigSpec")(setModuleArguments(_, Seq("-Ddb=on")))
+      val result = runResultFixture("ConfigSpec.scala", "ConfigSpec")(_.setModuleArguments(Seq("-Ddb=on")))
 
       Then("the human-readable output shows \"remote\", then \"local\" as not run")
       withClue(result.debugString) {
@@ -109,7 +103,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       }
 
       And("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
   }
 
@@ -118,17 +112,17 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A test calls System.exit(0)") {
       Given("ExitSuite, whose test \"exits\" calls System.exit(0)")
       When("the test command runs core.test")
-      val result = runResultFixture("ExitSuite.scala" -> "ExitSuite")()
+      val result = runResultFixture("ExitSuite.scala", "ExitSuite")()
       Then("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
 
     Scenario("The worker's JVM exits before any run exists in it") {
       Given("AddSuite, and forkArgs holding -XX:+NoSuchOption")
       When("the test command runs core.test")
-      val result = runResultFixture("AddSuite.scala" -> "AddSuite")(addForkArgument(_, "-XX:+NoSuchOption"))
+      val result = runResultFixture("AddSuite.scala", "AddSuite")(_.addToTestModule("""def forkArgs = Seq("-XX:+NoSuchOption")"""))
       Then("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
     }
   }
 
@@ -137,10 +131,10 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A failed test is not named outside the human-readable output") {
       Given("StackFlatSpec, whose test \"have size 0\" fails")
       When("the test command runs core.test")
-      val result = runResultFixture("StackFlatSpec.scala" -> "StackFlatSpec")()
+      val result = runResultFixture("StackFlatSpec.scala", "StackFlatSpec")()
 
       Then("the test command fails")
-      shouldFail(result)
+      shouldFailTheModulesTests(result)
 
       And("the human-readable output names \"have size 0\", and no other console line does")
       withClue(result.debugString) {
@@ -153,27 +147,19 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
   Feature("A module that does not test with this fork fails the test command") {
 
     Seq(
-      "MUnit" -> "munit",
-      "uTest" -> "utest",
-      "org.scalatest:scalatest 3.2.20" -> "upstream-scalatest"
+      "MUnit" -> FixtureName.munit,
+      "uTest" -> FixtureName.utest,
+      "org.scalatest:scalatest 3.2.20" -> FixtureName.upstreamScalaTest
     ).foreach { case (framework, fixture) =>
       Scenario(s"The module tests with $framework") {
         Given(s"core.test tests with $framework, and its one suite, FrameworkSuite, has one test, \"runs\", which succeeds")
         When("the test command runs core.test")
-        val result = withTester(fixture) { tester =>
-          runTestCommand(tester, "core.test")
+        val result = withFixtureBuild(fixture) { build =>
+          build.runTestCommand("core.test")
         }
         Then("the test command fails")
-        shouldFail(result)
+        shouldFailTheModulesTests(result)
       }
     }
-  }
-
-  private def addForkArgument(tester: IntegrationTester, argument: String): Unit = {
-    val buildFile = tester.workspacePath / "build.mill"
-    val testModule = "object test extends ScalaTests, TestModule.ScalaTest {"
-    val build = os.read(buildFile)
-    require(build.contains(testModule), s"$buildFile declares no $testModule")
-    os.write.over(buildFile, build.replace(testModule, s"""$testModule\n    def forkArgs = Seq("$argument")"""))
   }
 }

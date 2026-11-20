@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -10,13 +9,7 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
   private val fixtureSuiteFolders: Seq[os.Path] =
     sys.env("COMPATIBILITY_FIXTURE_SUITES").split(java.io.File.pathSeparatorChar).toSeq.map(os.Path(_))
 
-  private def addFixtureSuites(tester: IntegrationTester): Unit =
-    for {
-      folder <- fixtureSuiteFolders
-      source <- os.list(folder)
-    } {
-      os.copy(source, tester.workspacePath / "core" / "test" / "src" / "compatibility" / "fixture" / source.last, createFolders = true)
-    }
+  private def fixtureSuites: Seq[os.Path] = fixtureSuiteFolders.flatMap(os.list(_))
 
   private val expectedOutput: String =
     """[core.test]
@@ -264,12 +257,12 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
   Feature("Every suite, scope, test, failure and line of captured output a run holds is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution") {
 
     Scenario("The compatibility fixture") {
-      withTester("compatibility-fixture") { tester =>
+      withFixtureBuild(FixtureName.compatibilityFixture) { build =>
         Given("core.test's suites are the compatibility fixture")
-        addFixtureSuites(tester)
+        fixtureSuites.foreach(source => os.copy(source, build.testSources / "compatibility" / "fixture" / source.last, createFolders = true))
 
         When("the test command runs core.test")
-        val result = TestCommandResult(tester.eval(Seq("scalatest/test", "core.test")))
+        val result = build.runTestCommand("core.test")
 
         Then("the human-readable output shows every suite, scope and test, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution, every failure with its message, and every line the fixture wrote to stdout or stderr")
         withClue(result.debugString) {

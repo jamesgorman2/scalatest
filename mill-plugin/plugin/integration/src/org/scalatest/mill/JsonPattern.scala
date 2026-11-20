@@ -23,12 +23,13 @@ final class JsonPattern private (pattern: ujson.Value) {
     val keys = pattern.obj.keys.toSeq
     actual.objOpt match {
       case None => Seq(s"$$: expected an object holding ${keys.mkString(", ")}, found $actual")
-      case Some(fields) =>
+      case Some(fields) => {
         val missing = keys.filterNot(fields.contains).map(key => s"$$: no key $key in $actual")
         val heldInOrder = fields.keys.toSeq.filter(keys.contains)
         val order = if (missing.isEmpty && heldInOrder != keys) Seq(s"$$: keys ${heldInOrder.mkString(", ")} are not in the order ${keys.mkString(", ")}") else Nil
         val values = keys.filter(fields.contains).flatMap(key => JsonPattern.mismatches(s"$$.$key", pattern(key), fields(key)))
         missing ++ order ++ values
+      }
     }
   }
 }

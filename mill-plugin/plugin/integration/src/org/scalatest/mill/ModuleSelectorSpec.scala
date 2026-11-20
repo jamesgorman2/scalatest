@@ -43,21 +43,16 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     for ((what, arguments, rejection) <- selectorsThatFail) {
       Scenario(s"Given ${arguments.mkString(" ")}: $what") {
-        withTester("module-selectors") { tester =>
+        withFixtureBuild(FixtureName.moduleSelectors) { build =>
           Given("JVM test modules core.test and util.test, and Scala.js test module coreJS.test, each holding AddSuite")
           When(s"the test command is given ${arguments.mkString(" ")}")
-          val result = runTestCommand(tester, arguments*)
+          val result = build.runTestCommand(arguments*)
 
           Then("the test command fails before any test starts")
-          withClue(result.debugString) {
-            result.succeeded shouldBe false
-            anyTestWorkerStarted(tester) shouldBe false
-          }
+          shouldFailBeforeAnyTestStarts(build, result)
 
           And(s"the console holds the test command's rejection: $rejection")
-          withClue(result.debugString) {
-            (result.eval.out + result.eval.err) should include(rejection)
-          }
+          shouldWriteToTheConsole(result, rejection)
 
           And("the console holds no line of human-readable output")
           result.treeLines shouldBe empty
@@ -66,15 +61,15 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
 
     Scenario("Given core.test: one resolving to one JVM test module") {
-      withTester("module-selectors") { tester =>
+      withFixtureBuild(FixtureName.moduleSelectors) { build =>
         Given("JVM test modules core.test and util.test, and Scala.js test module coreJS.test, each holding AddSuite")
         When("the test command is given core.test")
-        val result = runTestCommand(tester, "core.test")
+        val result = build.runTestCommand("core.test")
 
         Then("the test command succeeds, having started a test worker")
         withClue(result.debugString) {
           result.succeeded shouldBe true
-          anyTestWorkerStarted(tester) shouldBe true
+          build.anyTestWorkerStarted shouldBe true
         }
 
         And("the human-readable output is core.test's label, with AddSuite under it")

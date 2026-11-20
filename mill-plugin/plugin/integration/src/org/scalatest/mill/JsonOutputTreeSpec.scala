@@ -11,31 +11,33 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   private val timingKeys: Set[String] = Set("startedAt", "endedAt", "duration", "at", "threadName")
 
-  private def suitesScopesAndTests(json: ujson.Value): List[ujson.Value] =
-    nodes(json).filter(found => Set("suite", "scope", "test").contains(found("kind").str)).toList
+  private val kindsShownInTheTree: Set[NodeKind] = Set(NodeKind.Suite, NodeKind.Scope, NodeKind.Test)
 
-  private def isLineOf(node: ujson.Value)(line: String): Boolean = {
+  private def suitesScopesAndTests(json: JsonNode): List[JsonNode] = json.nodes.filter(found => kindsShownInTheTree.contains(found.kind)).toList
+
+  private def isLineOf(node: JsonNode)(line: String): Boolean = {
     val unindented = line.dropWhile(_ == ' ')
-    if (node("kind").str == "suite") unindented == s"${node("name").str}:" else unindented.startsWith(node("label").str)
+    if (node.kind == NodeKind.Suite) unindented == s"${node.name}:" else unindented.startsWith(node.label)
   }
 
-  private def shouldMarkOutcome(node: ujson.Value, line: String): Unit = {
-    val marker = node.obj.get("outcome").flatMap(outcome => outcomeMarkers.get(outcome.str))
+  private def shouldMarkOutcome(node: JsonNode, line: String): Unit = {
+    val marker = node.outcome.flatMap(outcomeMarkers.get)
     withClue(s"the line $line of node $node: ") {
       outcomeMarkers.values.filter(line.contains).toSeq shouldBe marker.toSeq
     }
   }
 
-  private def shouldWalkInOrder(treeNodes: List[ujson.Value], lines: List[String]): Unit =
+  private def shouldWalkInOrder(treeNodes: List[JsonNode], lines: List[String]): Unit =
     treeNodes match {
       case Nil => ()
-      case node :: rest =>
+      case node :: rest => {
         val index = lines.indexWhere(isLineOf(node))
         withClue(s"no line for node $node among the remaining lines\n${lines.mkString("\n")}\n") {
           index should be >= 0
         }
         shouldMarkOutcome(node, lines(index))
         shouldWalkInOrder(rest, lines.drop(index + 1))
+      }
     }
 
   private def withTimingValuesMasked(value: ujson.Value): ujson.Value =
@@ -46,24 +48,22 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
       case other => other
     }
 
-  private def contentNames(node: ujson.Value): Seq[(String, String)] = contents(node).map(found => (found("kind").str, found("name").str))
-
   Feature("The JSON output and the human-readable output hold one node tree") {
 
     Scenario("Walking both outputs") {
       Given("suites holding a nested suite, scopes nested in scopes, a pending scope, and tests of every outcome except aborted")
       And("a suite wrapped with ConfigMapWrapperSuite, holding a scope whose tests two instances of the suite register")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputTree { tester =>
-        val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
-        val json = withClue(result.debugString)(jsonOutput(report(tester)))
+      withJsonOutputTree { build =>
+        val result = build.runTestCommandWritingReport()
+        val json = withClue(result.debugString)(build.reportJson)
         val treeNodes = suitesScopesAndTests(json)
-        withClue(s"in ${ujson.write(json, indent = 2)}\n") {
-          treeNodes.flatMap(_.obj.get("outcome")).map(_.str).toSet should contain allOf ("succeeded", "failed", "canceled", "ignored", "pending")
-          contentNames(node(json, "suite", "NestingSuite")) shouldBe Seq("suite" -> "NestedSuite")
-          contentNames(node(json, "scope", "A calculator")) shouldBe Seq("scope" -> "when adding")
-          node(json, "scope", "A queue")("outcome").str shouldBe "pending"
-          contentNames(node(json, "scope", "A wrapped scope")) shouldBe Seq("test" -> "succeeds", "test" -> "also succeeds")
+        withClue(s"in ${ujson.write(json.raw, indent = 2)}\n") {
+          treeNodes.flatMap(_.outcome).toSet should contain allOf ("succeeded", "failed", "canceled", "ignored", "pending")
+          json.node(NodeKind.Suite, "NestingSuite").kindsAndNamesOfContents shouldBe Seq(NodeKind.Suite -> "NestedSuite")
+          json.node(NodeKind.Scope, "A calculator").kindsAndNamesOfContents shouldBe Seq(NodeKind.Scope -> "when adding")
+          json.node(NodeKind.Scope, "A queue").outcome shouldBe Some("pending")
+          json.node(NodeKind.Scope, "A wrapped scope").kindsAndNamesOfContents shouldBe Seq(NodeKind.Test -> "succeeds", NodeKind.Test -> "also succeeds")
         }
 
         Then("the human-readable output holds a line for each suite, scope and test of the JSON output, in the order of a depth-first walk")
@@ -75,15 +75,15 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     Scenario("The module's reporter arguments do not change the JSON output") {
       Given("the JSON output of the test command invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputTree { tester =>
-        val withoutReporterArguments = jsonOutputOfTestCommand(tester)
+      withJsonOutputTree { build =>
+        val withoutReporterArguments = build.jsonOutputOfTestCommand()
 
         When("the module's testArgsDefault is set to -oDW and the test command is invoked again the same way")
-        setModuleArguments(tester, Seq("-oDW"))
-        val withReporterArguments = jsonOutputOfTestCommand(tester)
+        build.setModuleArguments(Seq("-oDW"))
+        val withReporterArguments = build.jsonOutputOfTestCommand()
 
         Then("the JSON output is the same, key for key and in the same order, apart from the values of its times and thread names")
-        ujson.write(withTimingValuesMasked(withReporterArguments), indent = 2) shouldBe ujson.write(withTimingValuesMasked(withoutReporterArguments), indent = 2)
+        ujson.write(withTimingValuesMasked(withReporterArguments.raw), indent = 2) shouldBe ujson.write(withTimingValuesMasked(withoutReporterArguments.raw), indent = 2)
       }
     }
   }

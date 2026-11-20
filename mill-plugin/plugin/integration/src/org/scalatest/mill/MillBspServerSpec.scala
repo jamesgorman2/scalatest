@@ -3,7 +3,6 @@ package org.scalatest.mill
 import ch.epfl.scala.bsp4j.JvmTestEnvironmentParams
 import ch.epfl.scala.bsp4j.ScalaTestClassesParams
 import ch.epfl.scala.bsp4j.TestParams
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -20,19 +19,19 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
   )
 
   private lazy val sessions: BuildComparison[BspSessionRecord] =
-    withTester("mill-own-tasks", daemonMode = true) { tester =>
-      val withoutPlugin = recordSession(tester, "without-plugin")
-      addPlugin(tester)
-      BuildComparison(withoutPlugin, recordSession(tester, "with-plugin"))
+    withFixtureBuild(FixtureName.millOwnTasks, daemonMode = true) { build =>
+      val withoutPlugin = recordSession(build, "without-plugin")
+      build.addPlugin()
+      BuildComparison(withoutPlugin, recordSession(build, "with-plugin"))
     }
 
   // BSP deprecates buildTarget/scalaTestClasses, but Metals and IntelliJ still send it, and Mill still serves it.
   @nowarn("cat=deprecation")
-  private def recordSession(tester: IntegrationTester, build: String): BspSessionRecord = {
-    MillBuild.removeModuleOutput(tester)
-    val stderrLog = tester.workspacePath / os.up / s"${tester.workspacePath.last}-bsp-$build.log"
+  private def recordSession(build: FixtureBuild, pluginState: String): BspSessionRecord = {
+    build.removeModuleOutput()
+    val stderrLog = build.workspace / os.up / s"${build.workspace.last}-bsp-$pluginState.log"
     try {
-      val (responses, notifications) = BspClientSession.withSession(tester, millExecutable, stderrLog) { session =>
+      val (responses, notifications) = build.withBspSession(stderrLog) { session =>
         val (targets, buildTargets) = session.exchange(_.workspaceBuildTargets())
         val coreTest = BspClientSession.targetsNamed("core.test", targets.toSeq.flatMap(_.getTargets.asScala))
         withClue(buildTargets) {
@@ -45,7 +44,7 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
       }
       BspSessionRecord(responses, notifications)
     } finally {
-      tester.removeProcessIdFile()
+      build.removeProcessIdFile()
     }
   }
 
