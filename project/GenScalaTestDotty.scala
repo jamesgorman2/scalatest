@@ -23,7 +23,8 @@ object GenScalaTestDotty {
 
   val PlatformLineEnding: String = System.lineSeparator
 
-  // Scala.js's line separator is "\n" on every machine, so that the copies' multi-line literals match its output.
+  // "\n" on every machine, as Scala.js's line separator is,
+  // so that the copies' multi-line literals match Scala.js's output.
   val ScalaJsLineEnding: String = "\n"
 
   private def uncommentJsExport(line: String): String =

@@ -408,7 +408,6 @@ class Framework extends SbtFramework {
     startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ) extends Task {
 
-    // The constructor of 3.2.20, which the binary compatibility check requires.
     def this(
       taskDefinition: TaskDef,
       loader: ClassLoader,
@@ -436,6 +435,7 @@ class Framework extends SbtFramework {
       configSet: Set[ReporterConfigParam],
       execService: ExecutorService
     ) =
+      // The constructor of 3.2.20, which the binary compatibility check requires.
       this(
         taskDefinition,
         loader,
@@ -600,7 +600,7 @@ class Framework extends SbtFramework {
 
     private def handOffAbortOfSuiteThatCannotStart(thrown: Throwable): Unit = {
       val aborted = new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, thrown)
-      // No reporter receives the events, so that the run's reporters receive what ScalaTest 3.2.20 sends them.
+      // The run's reporters receive neither this suite's SuiteStarting nor its SuiteAborted, as in ScalaTest 3.2.20.
       val passingNoEventOn: Reporter = (_: Event) => ()
       val start = startOfTopLevelSuite(aborted, Filter.default, passingNoEventOn)
       val report = start.reporter

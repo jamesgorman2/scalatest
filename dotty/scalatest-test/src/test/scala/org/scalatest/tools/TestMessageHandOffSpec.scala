@@ -7,7 +7,7 @@ import org.scalatest.PathMessageRecordingAlerter
 import org.scalatest.PathMessageRecordingDocumenter
 import org.scalatest.PathMessageRecordingInformer
 import org.scalatest.PathMessageRecordingNotifier
-import org.scalatest.PathTestReplay
+import org.scalatest.PathMessageReplay
 import org.scalatest.Reporter
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
@@ -208,7 +208,7 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       override def handOffMessage(message: => Event): Unit = received :+= message
     }
 
-    def callOf(message: String, kind: String): PathTestReplay => Event = {
+    def callOf(message: String, kind: String): PathMessageReplay => Event = {
       replay =>
         kind match {
           case "info" => InfoProvided(replay.tracker.nextOrdinal(), message, None)

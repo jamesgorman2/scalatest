@@ -1244,7 +1244,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
           for (nestedSuite <- nestedSuitesArray) {
             val start = SuiteStart.ofNestedSuite(nestedSuite, reporter)
             val nestedArgs = args.copy(reporter = start.reporter, tracker = tracker.nextTracker())
-            // A distributor runs the nested suite in the invocation context it is called in.
+            // Distributed in the nested suite's context, which ConcurrentDistributor carries to the suite's thread.
             statusBuffer += start.run(distributeNestedSuite(distribute, nestedSuite, nestedArgs))
           }
       }

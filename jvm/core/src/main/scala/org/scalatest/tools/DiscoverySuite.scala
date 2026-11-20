@@ -52,7 +52,8 @@ private[scalatest] class DiscoverySuite(
   }
 
   private[scalatest] override def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status = {
-    // Runner's ConcurrentDistributor starts the suite when it runs it. Any other distributor is handed the suite already started.
+    // A ConcurrentDistributor starts the nested suite when it runs that suite.
+    // Any other distributor is handed the suite already started.
     distribute match {
       case concurrent: ConcurrentDistributor => concurrent.apply(nestedSuite, args, TestEventLogHandOff.none, startOfTopLevelSuite)
       case other =>

@@ -51,7 +51,7 @@ private[scalatest] class SuiteRunner(
 
       val suiteStartTime = System.currentTimeMillis
 
-      // Inside the stop check, so that a suite a stop keeps from starting gets no reporter of its own.
+      // Inside the stop check, so that a suite that a requested stop keeps from starting gets no reporter of its own.
       val start = startOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
       val reporter = start.reporter
       val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)

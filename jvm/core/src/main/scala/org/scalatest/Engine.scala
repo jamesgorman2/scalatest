@@ -470,6 +470,7 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     try register
     catch {
       case thrown: Throwable =>
+        // A suite registers once, so its first use rethrows what register throws, as in ScalaTest 3.2.20.
         failureOfRegistrationAheadOfFirstUse.set(Some(thrown))
         throw thrown
     }

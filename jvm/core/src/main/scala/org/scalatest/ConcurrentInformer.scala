@@ -157,7 +157,7 @@ private[scalatest] class MessageRecorder(dispatch: Reporter) extends ThreadAware
     synchronized {
       messages ::= (message, payload, eventFun, location)
       // Under the lock, so that every message the closing event records is handed off before that event is reported,
-      // and no message recorded after it is.
+      // and a message recorded after the closing event takes the test's messages is never handed off.
       if (!recordedEventsTaken) {
         preparedHandOff()
       }
@@ -221,10 +221,17 @@ private[scalatest] object MessageRecorder {
 
   val noHandOff: MessageHandOff = (_, _, _) => EventOrigin.nothingToHandOff
 
-  type PathMessageEventFun = PathTestReplay => Event
+  type PathMessageEventFun = PathMessageReplay => Event
 }
 
-private[scalatest] final case class PathTestReplay(suite: Suite, reporter: Reporter, tracker: Tracker, testName: String, indentation: Int, includeIcon: Boolean)
+private[scalatest] final case class PathMessageReplay(
+  suite: Suite,
+  reporter: Reporter,
+  tracker: Tracker,
+  testName: String,
+  indentation: Int,
+  includeIcon: Boolean
+)
 
 private[scalatest] final class PathMessageCalls {
 
@@ -239,7 +246,8 @@ private[scalatest] final class PathMessageCalls {
   def handOffTo(origin: EventOrigin, theSuite: Suite, report: Reporter, testName: String, indentation: Int, includeIcon: Boolean): Unit = {
     calls.asScala.foreach { case (eventOfCall, timeOfCall) =>
       // A tracker of its own, so that the event takes no ordinal from the run's.
-      origin.handOffMessage(stamped(eventOfCall(PathTestReplay(theSuite, report, new Tracker, testName, indentation, includeIcon)), timeOfCall))
+      val replay = PathMessageReplay(theSuite, report, new Tracker, testName, indentation, includeIcon)
+      origin.handOffMessage(stamped(eventOfCall(replay), timeOfCall))
     }
   }
 
