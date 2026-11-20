@@ -2,10 +2,10 @@ package org.scalatest.consolidation
 
 import org.scalatest.consolidation.ScalaTestArgument.Flagged
 import org.scalatest.consolidation.ScalaTestArgument.Unrecognised
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class ScalaTestArgumentSpec extends AnyWordSpec with Matchers {
+final class ScalaTestArgumentSpec extends AnyWordSpec with should.Matchers {
 
   "A module's ScalaTest arguments" when {
     "split" should {

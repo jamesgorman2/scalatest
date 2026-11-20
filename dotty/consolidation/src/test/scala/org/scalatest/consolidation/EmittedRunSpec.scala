@@ -2,9 +2,9 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs with EmittedRuns {
+final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs with EmittedRuns {
 
   Feature("A failure message reaches the human-readable output unchanged") {
 

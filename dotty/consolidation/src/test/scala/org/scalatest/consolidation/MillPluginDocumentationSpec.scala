@@ -13,9 +13,9 @@ import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.JsonValue
 import org.scalatest.events.Summary
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
+final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   private val millPluginDirectory: Path = {
     val properties = new Properties

@@ -5,9 +5,9 @@ import org.scalatest.events.CapturedStream
 import org.scalatest.events.JsonValue
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
+final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   private def namesIn(runNode: JsonValue): Vector[JsonValue] = runNode("contents").items.map(_("name"))
 
@@ -22,12 +22,11 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
       val runThree = runOfSuites("Alpha", "Beta")
 
       When("the runs are added in the order 3, 2, 1 and the library consolidates them")
-      val json = new JsonSink
-      val consolidation = startedWithoutMill(json)
-      addRunInWorker(consolidation, 1, 0, runThree*)
-      addRunInWorker(consolidation, 0, 1, runTwo*)
-      addRunInWorker(consolidation, 0, 0, runOne*)
-      consolidation.end()
+      val json = jsonOutputAfter { consolidation =>
+        consolidation.addRunIn(workerAt(1, 0), runThree*)
+        consolidation.addRunIn(workerAt(0, 1), runTwo*)
+        consolidation.addRunIn(workerAt(0, 0), runOne*)
+      }
       val runNodes = json.module("contents").items
 
       Then("the module's runs are numbered 1, 2 and 3, in that order")
@@ -52,14 +51,15 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
 
     Scenario("A run given no fork group has no forkGroup, and a module's runs given none are numbered in the order they are given: runs without a fork group") {
       Given("a run with no worker, running suite Beta")
+      val betaRun = runOfSuites("Beta")
       And("then a run with no worker, running suite Alpha")
-      val json = new JsonSink
-      val consolidation = startedWithoutMill(json)
-      addRun(consolidation, runOfSuites("Beta")*)
-      addRun(consolidation, runOfSuites("Alpha")*)
+      val alphaRun = runOfSuites("Alpha")
 
       When("the library consolidates them")
-      consolidation.end()
+      val json = jsonOutputAfter { consolidation =>
+        consolidation.addRunOf(betaRun*)
+        consolidation.addRunOf(alphaRun*)
+      }
       val runNodes = json.module("contents").items
 
       Then("the module's runs are run 1, holding Beta, then run 2, holding Alpha")

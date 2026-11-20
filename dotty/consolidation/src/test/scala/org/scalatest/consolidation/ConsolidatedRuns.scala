@@ -21,6 +21,32 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
         case Vector(BuiltRunItem.Event(built)) => RunEvent.of(built.event)
         case items => fail(s"expected one event, but the notation built $items")
       }
+
+    // An event is a line at the event log's least indentation, with the lines indented below it.
+    def interleavingsWith(lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
+      ConsolidatedRuns.interleavings(ConsolidatedRuns.eventNotationsOf(literal).map(TestRunPart.Events(_)), lines)
+  }
+
+  extension (consolidation: Consolidation) {
+
+    /** Adds a run of module `core.test`, given no worker, fed the parts. */
+    def addRunOf(parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel)(feed => feed.addAll(parts*))
+
+    /** Adds a run of module `core.test`, given no worker, fed the events. */
+    def addRunOf(events: Vector[RunEvent]): EndedRun = consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(event)))
+
+    /** Adds a run of module `core.test` in the worker, fed the parts. */
+    def addRunIn(worker: Worker, parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel, Some(worker))(feed => feed.addAll(parts*))
+  }
+
+  extension (feed: RunFeed) {
+
+    def addAll(parts: TestRunPart*): Unit =
+      TestRunBuilder.build(parts*).items.foreach {
+        case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
+        case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
+        case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
+      }
   }
 
   final class OutputSink extends (String => Unit) {
@@ -51,6 +77,22 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val runEndsCompleted: TestRunPart = TestRunPart.Events("run: RunCompleted\nrun ended completed")
 
+  /** The event log of a run that starts, sends the events, then ends completed. */
+  def completedRunOf(events: String*): String = ("run started" +: events :+ "run ended completed").mkString("\n")
+
+  /**
+   * Suite `samples.<suite>`'s structure, then its SuiteStarting, the events and its SuiteCompleted.
+   *
+   * @param nodes the suite's scopes and tests, one to a line, each nested under the one above by 2 more spaces
+   */
+  def suiteRunning(suite: String, nodes: String, events: String*): String =
+    (structureOf(suite, nodes) +: s"""suite "$suite": SuiteStarting""" +: events.flatMap(ConsolidatedRuns.eventLinesOf) :+ s"""suite "$suite": SuiteCompleted""")
+      .mkString("\n")
+
+  /** Suite `samples.<suite>`'s structure, holding the nodes under the suite, written as for `suiteRunning`. */
+  def structureOf(suite: String, nodes: String): String =
+    (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
+
   /**
    * Suite `samples.<suite>` with one test, which succeeds.
    *
@@ -58,15 +100,12 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
    */
   def suiteRuns(suite: String, test: String = "t", occurrenceAmongTestsOfItsName: Int = 1): TestRunPart =
     TestRunPart.Events(
-      s"""
-      structure
-        suite "$suite", class "samples.$suite"
-          test "$test", label "- $test"
-      suite "$suite": SuiteStarting
-      test "$test" #$occurrenceAmongTestsOfItsName: TestStarting
-      test "$test" #$occurrenceAmongTestsOfItsName: TestSucceeded
-      suite "$suite": SuiteCompleted
-      """
+      suiteRunning(
+        suite,
+        s"""test "$test", label "- $test"""",
+        s"""test "$test" #$occurrenceAmongTestsOfItsName: TestStarting""",
+        s"""test "$test" #$occurrenceAmongTestsOfItsName: TestSucceeded"""
+      )
     )
 
   /** A completed run of the suites, in order, each with one test `t`, which succeeds. */
@@ -76,27 +115,16 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def workerAt(forkGroup: Int, workerIndex: Int): Worker =
     Worker(ForkGroup.at(forkGroup), WorkerIndex(workerIndex))
 
-  def addRun(consolidation: Consolidation, parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel)(feedParts(_, parts))
+  def startedWithColour(output: OutputSink = new OutputSink): Consolidation = Consolidation.start(output, coloured = true)
 
-  def addRunInWorker(consolidation: Consolidation, forkGroup: Int, workerIndex: Int, parts: TestRunPart*): EndedRun =
-    consolidation.addRun(moduleLabel, Some(workerAt(forkGroup, workerIndex)))(feedParts(_, parts))
-
-  def feedParts(feed: RunFeed, parts: Seq[TestRunPart]): Unit =
-    TestRunBuilder.build(parts*).items.foreach {
-      case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
-      case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
-      case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
-    }
-
-  /** Feeds the events to one run of module `core.test`, then ends the consolidation. */
-  def consolidateRun(consolidation: Consolidation, events: Vector[RunEvent]): Unit = {
-    consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(event)))
+  /** The human-readable output, with colour on, of a consolidation given the runs, then ended. */
+  def colourMarkedOutputAfter(addRuns: Consolidation => Unit): ColourMarkedOutput = {
+    val output = new OutputSink
+    val consolidation = startedWithColour(output)
+    addRuns(consolidation)
     consolidation.end()
+    output.colourMarkedOutput
   }
-
-  // An event is a line at the event log's least indentation, with the lines indented below it.
-  def interleavingsOf(eventLog: String, lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
-    ConsolidatedRuns.interleavings(ConsolidatedRuns.eventNotationsOf(eventLog).map(TestRunPart.Events(_)), lines)
 
   def colourMarkedTreeFrom(eventLog: String): String = colourMarkedTreeFrom(TestRunPart.Events(eventLog))
 
@@ -104,13 +132,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   def colourMarkedOutputFrom(eventLog: String): ColourMarkedOutput = colourMarkedOutputFrom(TestRunPart.Events(eventLog))
 
-  def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = {
-    val output = new OutputSink
-    val consolidation = Consolidation.start(output, coloured = true)
-    addRun(consolidation, parts*)
-    consolidation.end()
-    output.colourMarkedOutput
-  }
+  def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = colourMarkedOutputAfter(_.addRunOf(parts*))
 }
 
 private[consolidation] object ConsolidatedRuns {
@@ -126,11 +148,23 @@ private[consolidation] object ConsolidatedRuns {
   def withColoursMarked(line: String): String =
     markers.foldLeft(line) { case (marked, (sequence, marker)) => marked.replace(sequence, marker) }
 
+  private def indentationOf(line: String): Int = line.takeWhile(_ == ' ').length
+
+  private def nonBlankLinesOf(notation: String): Vector[String] = notation.linesIterator.filter(_.trim.nonEmpty).toVector
+
+  private def eventLinesOf(notation: String): Vector[String] = nonBlankLinesOf(notation).map(_.trim)
+
+  private def nested(notation: String, depth: Int): Vector[String] = {
+    val lines = nonBlankLinesOf(notation)
+    val leastIndentation = lines.map(indentationOf).minOption.getOrElse(0)
+    lines.map(line => "  " * depth + line.drop(leastIndentation))
+  }
+
   private def eventNotationsOf(eventLog: String): Vector[String] = {
-    val lines = eventLog.linesIterator.filter(_.trim.nonEmpty).toVector
-    val leastIndentation = lines.map(_.takeWhile(_ == ' ').length).min
+    val lines = nonBlankLinesOf(eventLog)
+    val leastIndentation = lines.map(indentationOf).min
     lines.foldLeft(Vector.empty[String]) { (events, line) =>
-      if (line.takeWhile(_ == ' ').length == leastIndentation || events.isEmpty) {
+      if (indentationOf(line) == leastIndentation || events.isEmpty) {
         events :+ line
       } else {
         events.init :+ (events.last + "\n" + line)

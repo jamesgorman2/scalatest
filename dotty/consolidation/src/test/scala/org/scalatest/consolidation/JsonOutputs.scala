@@ -38,15 +38,15 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     def runNode: JsonValue = module("contents").only
 
     /** The one suite, scope or test of the kind and name anywhere in the JSON output. */
-    def node(kind: String, name: String): JsonValue =
+    def node(kind: NodeKind, name: String): JsonValue =
       nodes(kind, name) match {
         case Vector(only) => only
-        case other => fail(s"expected one $kind named $name, but found ${other.size}")
+        case other => fail(s"expected one ${kind.word} named $name, but found ${other.size}")
       }
 
     /** Every suite, scope or test of the kind and name, in the order the JSON output holds them. */
-    def nodes(kind: String, name: String): Vector[JsonValue] =
-      allNodesUnder(root).filter(found => found.get("kind").contains(JsonValue.Text(kind)) && found.get("name").contains(JsonValue.Text(name)))
+    def nodes(kind: NodeKind, name: String): Vector[JsonValue] =
+      allNodesUnder(root).filter(found => found.get("kind").contains(JsonValue.Text(kind.word)) && found.get("name").contains(JsonValue.Text(name)))
 
     private def allNodesUnder(parent: JsonValue): Vector[JsonValue] =
       parent.get("contents").fold(Vector.empty[JsonValue])(_.items.flatMap(child => child +: allNodesUnder(child)))
@@ -56,29 +56,24 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
   def startedWithoutMill(json: JsonSink): Consolidation =
     Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(json), moduleSelectors = Vector(moduleSelectedAsItself))
 
-  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the parts. */
-  def jsonOutputOfRun(parts: TestRunPart*): JsonSink = {
+  /** The JSON output of a consolidation started without Mill, given the runs, then ended. */
+  def jsonOutputAfter(addRuns: Consolidation => Unit): JsonSink = {
     val json = new JsonSink
     val consolidation = startedWithoutMill(json)
-    addRun(consolidation, parts*)
+    addRuns(consolidation)
     consolidation.end()
     json
   }
 
+  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the parts. */
+  def jsonOutputOfRun(parts: TestRunPart*): JsonSink = jsonOutputAfter(_.addRunOf(parts*))
+
+  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the events. */
+  def jsonOutputOfRun(events: Vector[RunEvent]): JsonSink = jsonOutputAfter(_.addRunOf(events))
+
   /** The events of the test event log written in notation, in order, so a test can alter them before feeding them. */
   def eventsOf(eventLog: String): Vector[TestEventLogEvent] =
     TestRunBuilder.build(TestRunPart.Events(eventLog)).events.map(_.event)
-
-  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the events. */
-  def jsonOutputOfEvents(events: Vector[TestEventLogEvent]): JsonSink =
-    jsonOutputOfRunEvents(events.map(RunEvent.of))
-
-  /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the run events. */
-  def jsonOutputOfRunEvents(events: Vector[RunEvent]): JsonSink = {
-    val json = new JsonSink
-    consolidateRun(startedWithoutMill(json), events)
-    json
-  }
 
   def runEvent(event: DecodedEvent): RunEvent = RunEvent.of(TestEventLogEvent.ScalaTestEvent(None, event))
 

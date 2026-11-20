@@ -5,55 +5,44 @@ import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
   private def eventLogOfTestEndingWith(ending: String): String =
-    s"""
-    run started
-    structure
-      suite "StackFlatSpec", class "samples.StackFlatSpec"
+    completedRunOf(
+      suiteRunning(
+        "StackFlatSpec",
+        """
         scope "A Stack", label "A Stack"
           test "have size 0", label "- must have size 0"
-    suite "StackFlatSpec": SuiteStarting
-    scope "A Stack": ScopeOpened
-    test "have size 0": TestStarting
-    test "have size 0": InfoProvided(message: "checked")
-    test "have size 0": NoteProvided(message: "a note")
-    test "have size 0": AlertProvided(message: "an alert")
-    $ending
-    scope "A Stack": ScopeClosed
-    suite "StackFlatSpec": SuiteCompleted
-    run ended completed
-    """
+        """,
+        """scope "A Stack": ScopeOpened""",
+        """test "have size 0": TestStarting""",
+        """test "have size 0": InfoProvided(message: "checked")""",
+        """test "have size 0": NoteProvided(message: "a note")""",
+        """test "have size 0": AlertProvided(message: "an alert")""",
+        ending,
+        """scope "A Stack": ScopeClosed"""
+      )
+    )
 
   private def eventLogOfTestEndingThenAbortedBy(ending: String, aborted: String): String =
-    s"""
-    run started
-    structure
-      suite "ParAbortSuite", class "samples.ParAbortSuite"
-        test "a", label "- a"
-    suite "ParAbortSuite": SuiteStarting
-    test "a": TestStarting
-    $ending
-    $aborted
-    suite "ParAbortSuite": SuiteCompleted
-    run ended completed
-    """
+    completedRunOf(suiteRunning("ParAbortSuite", """test "a", label "- a"""", """test "a": TestStarting""", ending, aborted))
 
   private def eventLogOfSuiteAbortingWith(aborted: String): String =
-    s"""
-    run started
-    structure
-      suite "SetupFailsSpec", class "samples.SetupFailsSpec"
+    completedRunOf(
+      structureOf(
+        "SetupFailsSpec",
+        """
         scope "A repo", label "A repo"
           test "read", label "- should read"
           test "write", label "- should write"
-    suite "SetupFailsSpec": SuiteStarting
-    $aborted
-    run ended completed
-    """
+        """
+      ),
+      """suite "SetupFailsSpec": SuiteStarting""",
+      aborted
+    )
 
   Feature("A failure's or cancel's lines sit under its test's line") {
 
@@ -353,21 +342,20 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
   Feature("An event with an empty message and a throwable with no message") {
 
     def eventLogOfTwoTestsWhoseFirstEndsWith(ending: String): String =
-      s"""
-      run started
-      structure
-        suite "SilentSpec", class "samples.SilentSpec"
+      completedRunOf(
+        suiteRunning(
+          "SilentSpec",
+          """
           test "first", label "- first"
           test "second", label "- second"
-      suite "SilentSpec": SuiteStarting
-      test "first": TestStarting
-      $ending
-      test "second": TestStarting
-      test "second": InfoProvided(message: "still checked")
-      test "second": TestSucceeded
-      suite "SilentSpec": SuiteCompleted
-      run ended completed
-      """
+          """,
+          """test "first": TestStarting""",
+          ending,
+          """test "second": TestStarting""",
+          """test "second": InfoProvided(message: "still checked")""",
+          """test "second": TestSucceeded"""
+        )
+      )
 
     Scenario("A failed test shows its throwable's class and frames, and every other test's output still shows") {
       Given("an event log of a test that fails with an empty message and a throwable with no message, then a test that succeeds")
@@ -420,13 +408,10 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
       }
 
       When("the library consolidates it")
-      val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(RunEvent.of(event))))
-      consolidation.end()
+      val output = colourMarkedOutputAfter(_.addRunOf(events.map(RunEvent.of)))
 
       Then("the failure shows the throwable's class and frames once, with no `Cause:` line, and the second test follows")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}SilentSpec:{reset}
           |    {red}- first *** FAILED ***{reset}
@@ -518,14 +503,13 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
         """
 
       When("the library consolidates both runs")
-      val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events(abortedRun))
-      addRun(consolidation, TestRunPart.Events(laterRun))
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunOf(TestRunPart.Events(abortedRun))
+        consolidation.addRunOf(TestRunPart.Events(laterRun))
+      }
 
       Then("the later run's suite, test and message come first, then the aborted run's line with the throwable's class")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {green}LaterSpec:{reset}
           |    {green}- later{reset}

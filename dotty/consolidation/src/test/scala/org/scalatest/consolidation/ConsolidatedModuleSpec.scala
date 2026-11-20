@@ -14,7 +14,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
   private def runIn(forkGroup: Int, workerIndex: Int, assignedTestClass: String = "samples.Suite"): AssembledRun =
     runIn(Some(workerAt(forkGroup, workerIndex)), assignedTestClass)
 
-  private def runGivenNoForkGroup(assignedTestClass: String = "samples.Suite"): AssembledRun = runIn(None, assignedTestClass)
+  private def runGivenNoWorker(assignedTestClass: String = "samples.Suite"): AssembledRun = runIn(None, assignedTestClass)
 
   private def numbersOf(runs: Vector[AssembledRun]): Vector[(RunNumber, AssembledRun)] =
     ConsolidatedModule.of(moduleLabel, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembled))
@@ -45,14 +45,14 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
     }
     "given no worker" should {
       "be numbered in the order they were added" in {
-        val first = runGivenNoForkGroup("samples.First")
-        val second = runGivenNoForkGroup("samples.Second")
+        val first = runGivenNoWorker("samples.First")
+        val second = runGivenNoWorker("samples.Second")
         numbersOf(Vector(first, second)) shouldBe Vector(RunNumber(1) -> first, RunNumber(2) -> second)
       }
       "come before the runs given one" in {
-        val withForkGroup = runIn(0, 0)
-        val withoutForkGroup = runGivenNoForkGroup()
-        numbersOf(Vector(withForkGroup, withoutForkGroup)) shouldBe Vector(RunNumber(1) -> withoutForkGroup, RunNumber(2) -> withForkGroup)
+        val givenAWorker = runIn(0, 0)
+        val givenNoWorker = runGivenNoWorker()
+        numbersOf(Vector(givenAWorker, givenNoWorker)) shouldBe Vector(RunNumber(1) -> givenNoWorker, RunNumber(2) -> givenAWorker)
       }
     }
   }

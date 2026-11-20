@@ -4,9 +4,9 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
   private def stdout(line: String): TestRunPart = TestRunPart.CapturedLine(CapturedStream.Stdout, line)
 
@@ -20,7 +20,7 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
     val consolidation: Consolidation = Consolidation.start(output, coloured = false)
 
-    def addRun(forkGroup: Int, workerIndex: Int, parts: TestRunPart*): EndedRun = addRunInWorker(consolidation, forkGroup, workerIndex, parts*)
+    def addRun(forkGroup: Int, workerIndex: Int, parts: TestRunPart*): EndedRun = consolidation.addRunIn(workerAt(forkGroup, workerIndex), parts*)
 
     def consolidated(): Vector[String] = {
       consolidation.end()

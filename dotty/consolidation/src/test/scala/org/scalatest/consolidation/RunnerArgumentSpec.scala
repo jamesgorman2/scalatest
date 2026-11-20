@@ -1,10 +1,10 @@
 package org.scalatest.consolidation
 
 import java.nio.file.Paths
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class RunnerArgumentSpec extends AnyWordSpec with Matchers {
+final class RunnerArgumentSpec extends AnyWordSpec with should.Matchers {
 
   "The runner argument" when {
     "built for an event log file's absolute path" should {

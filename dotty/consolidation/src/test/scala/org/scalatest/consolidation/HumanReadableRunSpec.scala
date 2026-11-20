@@ -4,17 +4,16 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
   import HumanReadableRunSpec.*
 
   private def stateAfterEnd(parts: TestRunPart*): ConsolidationState = {
-    val consolidation = Consolidation.start(new OutputSink, coloured = true)
-    addRun(consolidation, parts*)
+    val consolidation = startedWithColour()
+    consolidation.addRunOf(parts*)
     consolidation.end()
-    consolidation.state
   }
 
   Feature("A run's line") {
@@ -39,8 +38,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("Captured stdout and stderr lines keep the order they were fed, wherever they are fed among the events") {
       Given("an event log holding `run started`, then `run ended completed`, consolidated as a run of the module `core.test`")
       And("stderr, stdout and stderr lines captured, fed in that order at each combination of points among the event log's events")
-      val runs = interleavingsOf(
-        "run started\nrun ended completed",
+      val runs = "run started\nrun ended completed".interleavingsWith(
         Vector(
           TestRunPart.CapturedLine(CapturedStream.Stderr, "SLF4J: No SLF4J providers were found."),
           TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
@@ -85,8 +83,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("Captured lines sit after the lines for the run's suites, wherever they are fed among the events") {
       Given("an event log of a completed run of a suite with one test, consolidated as a run of the module `core.test`")
       And("a stdout line and a stderr line captured, fed in that order at each combination of points among the event log's events")
-      val runs = interleavingsOf(
-        calculatorSuiteEventLog,
+      val runs = calculatorSuiteEventLog.interleavingsWith(
         Vector(
           TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
           TestRunPart.CapturedLine(CapturedStream.Stderr, "warn: slow")
@@ -174,34 +171,24 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     def runWithLine(suite: String, line: String): Vector[TestRunPart] =
       Vector(
-        TestRunPart.Events(
-          s"""
-          run started
-          structure
-            suite "$suite", class "samples.$suite"
-              test "runs", label "- runs"
-          suite "$suite": SuiteStarting
-          test "runs": TestStarting
-          test "runs": TestSucceeded
-          suite "$suite": SuiteCompleted
-          """
-        ),
+        TestRunPart.Events("run started\n" + suiteRunning(suite, """test "runs", label "- runs"""", """test "runs": TestStarting""", """test "runs": TestSucceeded""")),
         TestRunPart.CapturedLine(CapturedStream.Stdout, line),
         TestRunPart.Events("run ended completed")
       )
 
     Scenario("Each run given no worker shows its own suites and output under its own line, numbered in the order the runs were added") {
       Given("two runs of one module, neither given a worker, each with a suite and a stdout line, the first run's suite sorting after the second's")
-      val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, runWithLine("ZetaSuite", "from the first run")*)
-      addRun(consolidation, runWithLine("AlphaSuite", "from the second run")*)
+      val firstRun = runWithLine("ZetaSuite", "from the first run")
+      val secondRun = runWithLine("AlphaSuite", "from the second run")
 
       When("the library consolidates them")
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunOf(firstRun*)
+        consolidation.addRunOf(secondRun*)
+      }
 
       Then("the module shows Run 1: with the first run's suite and line, then Run 2: with the second's")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 1:{reset}
           |    {green}ZetaSuite:{reset}
@@ -215,17 +202,19 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A module's runs are numbered by fork group, then worker index, whatever order they were added in") {
       Given("three runs, each with a suite and a stdout line, added with fork group and worker index (1, 0), then (0, 1), then (0, 0)")
-      val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRunInWorker(consolidation, 1, 0, runWithLine("FirstAdded", "from fork group 1, worker 0")*)
-      addRunInWorker(consolidation, 0, 1, runWithLine("SecondAdded", "from fork group 0, worker 1")*)
-      addRunInWorker(consolidation, 0, 0, runWithLine("ThirdAdded", "from fork group 0, worker 0")*)
+      val firstAdded = runWithLine("FirstAdded", "from fork group 1, worker 0")
+      val secondAdded = runWithLine("SecondAdded", "from fork group 0, worker 1")
+      val thirdAdded = runWithLine("ThirdAdded", "from fork group 0, worker 0")
 
       When("the library consolidates them")
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunIn(workerAt(1, 0), firstAdded*)
+        consolidation.addRunIn(workerAt(0, 1), secondAdded*)
+        consolidation.addRunIn(workerAt(0, 0), thirdAdded*)
+      }
 
       Then("the module shows Run 1: for the last run added, Run 2: for the second and Run 3: for the first")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 1:{reset}
           |    {green}ThirdAdded:{reset}
@@ -243,21 +232,21 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A run keeps its number when an earlier run of its module shows no line") {
       Given("two runs of one module, the first completed with no output, the second with a stdout line")
-      val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events("run started\nrun ended completed"))
-      addRun(
-        consolidation,
+      val runWithNoOutput = TestRunPart.Events("run started\nrun ended completed")
+      val runWithStdoutLine = Vector(
         TestRunPart.Events("run started"),
         TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
         TestRunPart.Events("run ended completed")
       )
 
       When("the library consolidates them")
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunOf(runWithNoOutput)
+        consolidation.addRunOf(runWithStdoutLine*)
+      }
 
       Then("the second run's line is Run 2:")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}[core.test]{reset}
           |  {cyan}Run 2:{reset}
           |    [stdout] dividing now""".stripExpectedMargin
@@ -367,8 +356,8 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
   Feature("The root") {
 
     def consolidationOfSqrtPropSpec(output: OutputSink): Consolidation = {
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events(sqrtPropSpecEventLog))
+      val consolidation = startedWithColour(output)
+      consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
       consolidation
     }
 
@@ -451,8 +440,8 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       Given("an event log of a run that ends aborted, consolidated as a run of the module `core.test`")
       And("the stdout line `discovering tests` attached to the root")
       val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events("run started\nrun ended aborted"))
+      val consolidation = startedWithColour(output)
+      consolidation.addRunOf(TestRunPart.Events("run started\nrun ended aborted"))
       consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
 
       When("the library consolidates it")
@@ -523,10 +512,10 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A run whose event stream ends without its runEnded event leaves the state ended and failed") {
       Given("an event log of a run that starts and never ends")
-      val consolidation = Consolidation.start(new OutputSink, coloured = true)
+      val consolidation = startedWithColour()
 
       When("the caller feeds it and so ends the run's event stream")
-      addRun(consolidation, TestRunPart.Events("run started"))
+      consolidation.addRunOf(TestRunPart.Events("run started"))
 
       Then("the consolidation state is failed at once, and ended and failed after End")
       consolidation.state shouldBe ConsolidationState.OpenFailed
@@ -536,9 +525,9 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("The runEnded event fails the state, not RunAborted or RunStopped") {
       Given("a run fed RunAborted and RunStopped events")
-      val consolidation = Consolidation.start(new OutputSink, coloured = true)
+      val consolidation = startedWithColour()
       consolidation.addRun(moduleLabel) { feed =>
-        feedParts(feed, Vector(TestRunPart.Events("run started\nrun: RunAborted\nrun: RunStopped")))
+        feed.addAll(TestRunPart.Events("run started\nrun: RunAborted\nrun: RunStopped"))
         consolidation.state shouldBe ConsolidationState.Open
 
         When("the run's runEnded event, ended aborted, is added")

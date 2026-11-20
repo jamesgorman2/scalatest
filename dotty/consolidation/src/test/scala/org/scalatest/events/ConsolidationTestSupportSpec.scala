@@ -1,9 +1,9 @@
 package org.scalatest.events
 
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class ConsolidationTestSupportSpec extends AnyWordSpec with Matchers {
+final class ConsolidationTestSupportSpec extends AnyWordSpec with should.Matchers {
 
   private val run = TestRunBuilder.build(
     TestRunPart.Events(

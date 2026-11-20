@@ -2,21 +2,12 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
-  private def eventLogOf(nodeLine: String, nodeEvents: String): String =
-    s"""
-    run started
-    structure
-      suite "OutcomeSpec", class "samples.OutcomeSpec"
-        $nodeLine
-    suite "OutcomeSpec": SuiteStarting
-    $nodeEvents
-    suite "OutcomeSpec": SuiteCompleted
-    run ended completed
-    """
+  private def eventLogOf(nodes: String, nodeEvents: String): String =
+    completedRunOf(suiteRunning("OutcomeSpec", nodes, nodeEvents))
 
   private def outputWithNodeLine(nodeLine: String): String =
     s"""{cyan}[core.test]{reset}
@@ -92,8 +83,10 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A scope with no outcome shows its label alone, in green") {
       Given("an event log of a scope that opened and closed around a test")
       val eventLog = eventLogOf(
-        """scope "A calculator", label "A calculator"
-          |          test "adds", label "- adds"""".stripMargin,
+        """
+        scope "A calculator", label "A calculator"
+          test "adds", label "- adds"
+        """,
         """scope "A calculator": ScopeOpened
           |    test "adds": TestStarting
           |    test "adds": TestSucceeded
