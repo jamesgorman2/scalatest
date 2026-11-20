@@ -57,7 +57,6 @@ import collection.mutable.ListBuffer
 private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessageFun: => String, simpleClassName: String) {
 
   sealed abstract class Node(val parentOption: Option[Branch]) {
-    // The name the suite's source gives this scope or test, where its style registers it with more words than that.
     @volatile var nameInSource: Option[String] = None
     def indentationLevel: Int = {
       def calcLevel(currentParentOpt: Option[Branch], currentLevel: Int): Int = 
@@ -376,7 +375,6 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
     }
   }
 
-  // The path by which a test event log names the branch's scope.
   private def scopePathTo(branch: Branch): List[ScopePlace] =
     branch match {
       case scope @ DescriptionBranch(parent, descriptionText, _, _) =>
@@ -466,52 +464,38 @@ private[scalatest] sealed abstract class SuperEngine[T](concurrentBundleModMessa
       case _ => testText
     }
 
-  // Held until the suite's next registration call throws it.
-  private val failureOfRegistrationForStructure = new AtomicReference[Option[Throwable]](None)
+  private val failureOfRegistrationAheadOfFirstUse = new AtomicReference[Option[Throwable]](None)
 
-  /**
-   * For a suite that registers on first use. Such a suite registers only once, so the first call ScalaTest 3.2.20 would
-   * have made finds the registration already done. What `register` throws is therefore both kept and thrown, and
-   * `throwFailureOfRegistrationForStructure` rethrows it from that call.
-   */
-  def registeredForStructure(register: => Unit): Unit = {
+  def registerAheadOfFirstUse(register: => Unit): Unit = {
     try register
     catch {
       case thrown: Throwable =>
-        failureOfRegistrationForStructure.set(Some(thrown))
+        failureOfRegistrationAheadOfFirstUse.set(Some(thrown))
         throw thrown
     }
   }
 
-  // A suite that registers on first use calls it before registering.
-  def throwFailureOfRegistrationForStructure(): Unit =
-    failureOfRegistrationForStructure.getAndSet(None).foreach(thrown => throw thrown)
+  def throwFailureOfRegistrationAheadOfFirstUse(): Unit =
+    failureOfRegistrationAheadOfFirstUse.getAndSet(None).foreach(thrown => throw thrown)
 
-  // Called from the scope's own registration function.
-  def nameCurrentScope(nameInSource: String): Unit = atomic.get.currentBranch.nameInSource = Some(nameInSource)
+  def nameScopeBeingRegistered(nameInSource: String): Unit = atomic.get.currentBranch.nameInSource = Some(nameInSource)
 
-  // Called as that test's registration returns.
   def nameLastRegisteredTest(nameInSource: String): Unit =
     atomic.get.currentBranch.subNodes.headOption.foreach(test => test.nameInSource = Some(nameInSource))
 
-  /**
-   * Labels each scope and test as `runTestsInBranch` and `runTestImpl` label its events. `includeIcon` is the one the
-   * style's `runTest` passes `runTestImpl`. The name functions apply only where registration recorded no name in source.
-   */
-  def registeredNodes(includeIcon: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
-    // Recurses once for each scope nested in another, as registering and running them do.
+  def registeredNodes(includeIconAsRunTestDoes: Boolean, nameOfScope: String => String, nameOfTest: String => String): List[RegisteredNode] = {
     def nodesIn(branch: Branch): List[RegisteredNode] =
       branch.subNodes.reverse.collect {
         case test @ TestLeaf(_, testName, testText, _, _, _, _, _) =>
-          RegisteredNode.test(test.nameInSource.getOrElse(nameOfTest(testText)), testName, prependChildPrefix(branch, testText), includeIcon)
+          RegisteredNode.test(test.nameInSource.getOrElse(nameOfTest(testText)), testName, prependChildPrefix(branch, testText), includeIconAsRunTestDoes)
         case scope @ DescriptionBranch(_, descriptionText, _, _) =>
           RegisteredScope(scope.nameInSource.getOrElse(nameOfScope(descriptionText)), descriptionText, RegisteredNode.scopeLabel(prependChildPrefix(branch, descriptionText)), nodesIn(scope))
       }
     nodesIn(Trunk)
   }
 
-  def registeredNodes(includeIcon: Boolean): List[RegisteredNode] =
-    registeredNodes(includeIcon, (text: String) => text, (text: String) => text)
+  def registeredNodes(includeIconAsRunTestDoes: Boolean): List[RegisteredNode] =
+    registeredNodes(includeIconAsRunTestDoes, (text: String) => text, (text: String) => text)
 
   def runTestsImpl(
     theSuite: Suite,
@@ -963,7 +947,7 @@ private[scalatest] class PathEngine(concurrentBundleModMessageFun: => String, si
   @volatile private var testResultsRegistered = false
   def ensureTestResultsRegistered(callingInstance: Suite with OneInstancePerTest): Unit = {
     synchronized {
-      throwFailureOfRegistrationForStructure()
+      throwFailureOfRegistrationAheadOfFirstUse()
       val isAnInitialInstance = targetPath.isEmpty
       // Only register tests if this is an initial instance (and only if they haven't
       // already been registered).
