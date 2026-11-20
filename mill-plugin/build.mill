@@ -78,8 +78,8 @@ object plugin extends PluginScalaModule, PublishModule {
       compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "fixture"
     )
 
-    // The recorders quote text as the fork's notation does. Like the sbt fixture, which builds against 3.2.20 alone,
-    // they take that quoting as a source file rather than from the fork's common-test project.
+    // NotationText lives in the fork's sbt common-test project, which this module cannot depend on, so the recorders
+    // take it as a source file, as the sbt fixture does.
     def compatibilityRecorders: T[Seq[PathRef]] = Task.Sources(
       compatibilityTest / "fixture" / "scala" / "compatibility" / "recorders",
       compatibilityTest / "fixture" / "scala-jvm" / "compatibility" / "recorders",

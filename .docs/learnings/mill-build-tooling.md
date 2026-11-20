@@ -184,7 +184,7 @@ An integration test that compares output across invocations, or expects a fixed 
 <learning>
 date: 2026-11-20
 ---
-In Mill 1.3.1, `<module>.testForked <fully qualified class>` does not narrow the run: `testForked`'s arguments go to the test framework, and every discovered class still runs. To run only some classes, use `<module>.testOnly <class> [<class> ...]`; Mill's progress line then reports only those (`2/2 completed.`).
+In Mill 1.3.1, `<module>.testForked <fully qualified class>` does not narrow the run: `testForked`'s arguments go to the test framework, and every discovered class still runs. To run only some classes, use `<module>.testOnly <class> [<class> ...]`.
 
 `testOnly` writes its report to `out/<module>/testOnly.dest/test-report.xml`, not `testForked.dest`, so read results from there after a narrowed run.
 </learning>
