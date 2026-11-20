@@ -228,7 +228,7 @@ private[mill] object JvmTestModuleRun {
   /**
    * Whether the filesystem holding `folder` ignores case, found by writing a probe file in `folder`.
    *
-   * @throws FilesystemCaseCheckFailure where writing or deleting the probe fails
+   * @throws FilesystemCaseCheckFailure if writing or deleting the probe fails
    */
   def filesystemIgnoresCase(folder: Path): Boolean =
     try {
@@ -247,7 +247,7 @@ private[mill] object JvmTestModuleRun {
    * ignores case fails, a failure naming the module is attached to the consolidation's root, and the module is timed
    * with no times.
    *
-   * @return what laying out the workers gave, where it succeeded
+   * @return the launcher, if laying out the workers succeeded
    */
   def layOutWorkers[Launcher](consolidation: Consolidation, module: TestRunLabel)(
       layOut: => Either[ForkGroupsShareProcessFolders, Launcher]
