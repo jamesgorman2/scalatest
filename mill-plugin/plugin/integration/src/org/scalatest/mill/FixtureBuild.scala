@@ -109,6 +109,6 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def removeProcessIdFile(): Unit = tester.removeProcessIdFile()
 
-  def withBspSession[A](stderrLog: os.Path)(use: BspClientSession => A): (A, Seq[String]) =
-    BspClientSession.withSession(tester, IntegrationEnvironment.millExecutable, stderrLog)(use)
+  def resultWithBspNotifications[A](stderrLog: os.Path)(use: BspClientSession => A): WithNotifications[A] =
+    BspClientSession.resultWithNotifications(tester, IntegrationEnvironment.millExecutable, stderrLog)(use)
 }

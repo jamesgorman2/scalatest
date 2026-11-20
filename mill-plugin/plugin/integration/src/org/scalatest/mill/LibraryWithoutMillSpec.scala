@@ -38,7 +38,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
   private def codeSource(loaded: Class[?]): os.Path = os.Path(java.nio.file.Paths.get(loaded.getProtectionDomain.getCodeSource.getLocation.toURI))
 
   private def runOutsideMill(build: FixtureBuild, suite: String): RunOutsideMill = {
-    val runFolder = build.workspace / os.up / s"${build.workspace.last}-outside-mill"
+    val runFolder = build.workspace / "outside-mill"
     os.makeDir.all(runFolder)
     val eventLog = runFolder / "event-log.jsonl"
     // The launcher needs the test interface and the Scala library these tests are compiled with.

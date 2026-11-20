@@ -1,13 +1,8 @@
 package org.scalatest.mill
 
-import ch.epfl.scala.bsp4j.JvmTestEnvironmentParams
-import ch.epfl.scala.bsp4j.ScalaTestClassesParams
-import ch.epfl.scala.bsp4j.TestParams
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import scala.annotation.nowarn
-import scala.jdk.CollectionConverters.*
 
 final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
@@ -25,24 +20,21 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
       BuildComparison(withoutPlugin, recordSession(build, "with-plugin"))
     }
 
-  // BSP deprecates buildTarget/scalaTestClasses, but Metals and IntelliJ still send it, and Mill still serves it.
-  @nowarn("cat=deprecation")
   private def recordSession(build: FixtureBuild, pluginState: String): BspSessionRecord = {
     build.removeModuleOutput()
-    val stderrLog = build.workspace / os.up / s"${build.workspace.last}-bsp-$pluginState.log"
     try {
-      val (responses, notifications) = build.withBspSession(stderrLog) { session =>
-        val (targets, buildTargets) = session.exchange(_.workspaceBuildTargets())
-        val coreTest = BspClientSession.targetsNamed("core.test", targets.toSeq.flatMap(_.getTargets.asScala))
-        withClue(buildTargets) {
-          coreTest.asScala should not be empty
-        }
-        val (_, scalaTestClasses) = session.exchange(_.buildTargetScalaTestClasses(new ScalaTestClassesParams(coreTest)))
-        val (_, jvmTestEnvironment) = session.exchange(_.buildTargetJvmTestEnvironment(new JvmTestEnvironmentParams(coreTest)))
-        val (_, test) = session.exchange(_.buildTargetTest(new TestParams(coreTest)))
-        requests.zip(Seq(buildTargets, scalaTestClasses, jvmTestEnvironment, test)).toMap
+      val session = build.resultWithBspNotifications(build.workspace / s"bsp-$pluginState.log") { session =>
+        val buildTargets = session.buildTargets()
+        val coreTest = buildTargets.result
+          .map(_.named("core.test"))
+          .filterNot(_.isEmpty)
+          .getOrElse(fail(s"no build target is named core.test in ${buildTargets.recorded}"))
+        val scalaTestClasses = session.scalaTestClasses(coreTest)
+        val jvmTestEnvironment = session.jvmTestEnvironment(coreTest)
+        val test = session.test(coreTest)
+        requests.zip(Seq(buildTargets.recorded, scalaTestClasses, jvmTestEnvironment, test)).toMap
       }
-      BspSessionRecord(responses, notifications)
+      BspSessionRecord(session.result, session.notifications)
     } finally {
       build.removeProcessIdFile()
     }
