@@ -60,14 +60,14 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A pending test is pending") {
+    Scenario("A pending test's outcome is pending") {
       jsonOutputOfRow("pending-test", "an AnyFunSuite whose test adds is pending") { json =>
         Then("test adds is pending")
         shouldHold(json.node(NodeKind.Test, "adds"), """{ "outcome": "pending" }""")
       }
     }
 
-    Scenario("A scope holds its test, with its label, location and times but no outcome") {
+    Scenario("A scope is written with its label, location and times but no outcome, and holds its test") {
       jsonOutputOfRow("scope", "an AnyFunSpec whose describe A Stack, at line 6, holds the test pops") { json =>
         val suite = json.node(NodeKind.Suite, "RowSuite")
         Then("the suite's contents is one scope, A Stack, with its label, location and times, and no outcome or thread")
@@ -86,7 +86,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A pending scope is pending") {
+    Scenario("A pending scope's outcome is pending") {
       jsonOutputOfRow("pending-scope", "an AnyFunSpec whose describe A Queue is pending") { json =>
         Then("scope A Queue is pending")
         shouldHold(json.node(NodeKind.Scope, "A Queue"), """{ "outcome": "pending" }""")

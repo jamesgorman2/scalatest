@@ -59,7 +59,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       }
     }
 
-    Scenario("The module selector may follow the path, and the root still records it") {
+    Scenario("The module selector may follow the path, and the root still records the selector") {
       Given("CalculatorSuite")
       When("the test command is invoked as mill scalatest/test -fJ <report> core.test")
       withJsonOutputFixture("CalculatorSuite") { build =>
@@ -232,7 +232,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       }
     }
 
-    Scenario("A relative path with a folder in it is written below the workspace root") {
+    Scenario("The JSON output at a relative path with a folder in it is written below the workspace root") {
       Given("CalculatorSuite")
       When("the test command is invoked as mill scalatest/test core.test -fJ reports/report.json")
       withJsonOutputFixture("CalculatorSuite") { build =>

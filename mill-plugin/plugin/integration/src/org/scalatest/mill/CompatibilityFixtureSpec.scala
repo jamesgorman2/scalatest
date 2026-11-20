@@ -256,7 +256,7 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
 
   Feature("Every suite, scope, test, failure and line of captured output a run holds is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution") {
 
-    Scenario("The compatibility fixture is shown in full, apart from below collapsed subtrees") {
+    Scenario("The compatibility fixture is shown in full, apart from the nodes below each collapsed subtree's root") {
       withFixtureBuild(FixtureName.compatibilityFixture) { build =>
         Given("core.test's suites are the compatibility fixture")
         fixtureSuites.foreach(source => os.copy(source, build.testSources / "compatibility" / "fixture" / source.last, createFolders = true))

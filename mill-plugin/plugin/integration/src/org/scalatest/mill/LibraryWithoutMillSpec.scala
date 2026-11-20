@@ -121,7 +121,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   Feature("The library writes the same human-readable output without Mill as under the test command") {
 
-    Scenario("The library writes the test command's human-readable output for the same run outside Mill") {
+    Scenario("Outside Mill, the library writes the same human-readable output as the test command for the same run") {
       withFixtureBuild(FixtureName.libraryWithoutMill) { build =>
         Given("the test command, invoked as mill scalatest/test core.test, has run core.test, a module holding CalculatorSuite")
         val testCommand = build.runTestCommandWithTicker("core.test")

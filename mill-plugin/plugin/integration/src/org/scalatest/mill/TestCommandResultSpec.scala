@@ -24,7 +24,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("A completed run fails the test command only where it reports a failure") {
 
-    Scenario("A succeeding test succeeds the test command") {
+    Scenario("A succeeding test lets the test command succeed") {
       Given("ResultSuite, mixing in BeforeAndAfterAll, whose test \"succeeds\" succeeds")
       When("the test command runs core.test")
       val result = resultSuite("ResultSucceeds.scala")
@@ -32,7 +32,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       shouldSucceed(result)
     }
 
-    Scenario("Ignored and pending tests beside a succeeding one succeed the test command") {
+    Scenario("Ignored and pending tests beside a succeeding one let the test command succeed") {
       Given("ResultSuite, whose test \"ignored\" is ignored, \"pending\" is pending, and \"succeeds\" succeeds")
       When("the test command runs core.test")
       val result = resultSuite("ResultIgnoredAndPending.scala")

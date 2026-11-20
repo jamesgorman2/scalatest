@@ -54,7 +54,7 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
       }
     }
 
-    Scenario("The server fails a request to run core.test's tests with the same error with the plugin as without it") {
+    Scenario("The server fails a request to run core.test's tests with the same error whether or not the build adds the plugin") {
       givenTheSession()
       val compared = whenTheSessionRunsWithAndWithoutThePlugin()
       Then(s"the client receives an error in response to $testRequest, and the same one under both")

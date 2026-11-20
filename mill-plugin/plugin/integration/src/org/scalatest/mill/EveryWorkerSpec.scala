@@ -46,7 +46,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("Every worker of a JVM module") {
 
-    Scenario("Without test parallelism, each fork group's suites run in one worker of the group's own") {
+    Scenario("Without test parallelism, each fork group runs its suites in one worker of its own") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is off")
@@ -62,7 +62,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under test parallelism, each fork group's suites run in one or two workers of the group's own") {
+    Scenario("Under test parallelism, each fork group runs its suites in one or two workers of its own") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on, and test sandboxing is on by default")
@@ -79,7 +79,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under test parallelism with test sandboxing off, each fork group's suites run in one or two workers of the group's own") {
+    Scenario("Under test parallelism with test sandboxing off, each fork group runs its suites in one or two workers of its own") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on and test sandboxing is off")
@@ -97,7 +97,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under testBatchFrameworkTasks, each fork group's suites run in one worker of the group's own") {
+    Scenario("Under testBatchFrameworkTasks, each fork group runs its suites in one worker of its own") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks is on and test parallelism is off")
@@ -194,7 +194,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks is on and test parallelism is off, so the two fork groups' workers run at the same time")
         build.turnOnBatchFrameworkTasks()
-        And("B1's test sleeps for 3 seconds before it succeeds, so the first fork group's run ends last")
+        And("B1's test sleeps before it succeeds, so the first fork group's run ends last")
         build.writeSuite("B1", "Thread.sleep(3000)")
         When("the test command runs the module with two jobs")
         val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
@@ -288,7 +288,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks is on and test parallelism is off")
         build.turnOnBatchFrameworkTasks()
-        And("B1's test writes from B1 to stdout, and A1's test writes from A1 to stdout")
+        And("B1's test and A1's test each write a line naming their suite to stdout")
         build.writeSuite("B1", """println("from B1")""")
         build.writeSuite("A1", """println("from A1")""")
         When("the test command runs the module")
@@ -307,10 +307,10 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Each of two workers' stdout lines are on its own run, in the order written") {
+    Scenario("Each worker's stdout lines are on that worker's run, in the order written") {
       withEveryWorkerBuild { build =>
-        Given("a module holding only suites B1 and A1, each in a fork group of its own, B1's first, with test parallelism off")
-        And("B1's test writes three lines B 1 to B 3 to stdout, and A1's test writes three lines A 1 to A 3")
+        Given("a module holding only suites B1 and A1, each in a fork group of its own, B1's group first, with test parallelism off")
+        And("B1's test and A1's test each write three numbered lines to stdout")
         build.holdOnlySuitesEachInItsOwnForkGroup(
           "B1" -> """(1 to 3).foreach(i => println("B " + i))""",
           "A1" -> """(1 to 3).foreach(i => println("A " + i))"""
@@ -339,7 +339,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on")
         build.turnOnTestParallelism()
-        And("B1's test writes out from B1 to stdout, and A1's test writes err from A1 to stderr")
+        And("B1's test writes a line to stdout, and A1's test writes a line to stderr")
         build.writeSuite("B1", """println("out from B1")""")
         build.writeSuite("A1", """System.err.println("err from A1")""")
         When("the test command runs the module with four jobs")
@@ -383,12 +383,12 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("Runs in the human-readable output") {
 
-    Scenario("Only the run whose worker wrote to stdout is shown, after the suites of the run that is not") {
+    Scenario("Only the run whose worker wrote to stdout is shown, after the suites of the run whose worker did not") {
       withEveryWorkerBuild { build =>
-        Given("a module holding only suites Zeta and Alpha, each in a fork group of its own, Zeta's first, with test parallelism off")
-        And("Zeta's test writes hello to stdout, and nothing else in either run writes to stdout or stderr")
+        Given("a module holding only suites Zeta and Alpha, each in a fork group of its own, Zeta's group first, with test parallelism off")
+        And("Zeta's test writes a line to stdout, and nothing else in either run writes to stdout or stderr")
         build.holdOnlySuitesEachInItsOwnForkGroup("Zeta" -> """println("hello")""", "Alpha" -> "()")
-        When("the test command runs the module as at a user's console")
+        When("the test command runs the module with two jobs and Mill's ticker on, as at a user's console")
         val result = build.runTestCommandAsAtTheConsole()
 
         Then("the human-readable output lists Alpha under the module, then shows Run 1 holding Zeta and its stdout line")
@@ -406,12 +406,12 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("A failing test does not show its run, and both runs' suites are listed by name under the module") {
+    Scenario("When a test fails and no worker writes output, no run is shown, and both runs' suites are listed directly under the module") {
       withEveryWorkerBuild { build =>
-        Given("a module holding only suites Zeta and Alpha, each in a fork group of its own, Zeta's first, with test parallelism off")
+        Given("a module holding only suites Zeta and Alpha, each in a fork group of its own, Zeta's group first, with test parallelism off")
         And("Zeta's test fails, and nothing in either run writes to stdout or stderr")
         build.holdOnlySuitesEachInItsOwnForkGroup("Zeta" -> """fail("Zeta fails")""", "Alpha" -> "()")
-        When("the test command runs the module as at a user's console")
+        When("the test command runs the module with two jobs and Mill's ticker on, as at a user's console")
         val result = build.runTestCommandAsAtTheConsole()
 
         Then("the human-readable output shows no run")
@@ -455,7 +455,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
     Scenario("Under testBatchFrameworkTasks, a module with no fork group has one empty run") {
       withEveryWorkerBuild { build =>
-        Given("a module holding suites A1, A2, B1 and B2, whose testForkGrouping gives no fork group")
+        Given("a module whose testForkGrouping gives no fork group, holding suites A1, A2, B1 and B2")
         build.setForkGrouping("Seq()")
         And("testBatchFrameworkTasks is on")
         build.turnOnBatchFrameworkTasks()
@@ -491,7 +491,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command runs the module")
         val (result, json) = build.resultAndReportOfTestCommand()
 
-        Then("the report's only failure names the module and the worker that could not start")
+        Then("the JSON output's only failure names the module and the worker that could not start")
         val failures = json.failureMessages
         withClue(result.debugString) {
           failures should have size 1
@@ -516,7 +516,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command runs the module")
         val (result, json) = build.resultAndReportOfTestCommand()
 
-        Then("the report's only failure says the two fork groups share a processFolder")
+        Then("the JSON output's only failure says the two fork groups share a processFolder")
         json.failureMessages shouldBe Seq(
           "Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
         )
