@@ -265,7 +265,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     val written = encoded.flatMap { events =>
       TestEventLogEmitter.caught {
         val assignment = assigned
-        // Before the events, which may name its nodes.
+        // Written before the events, since they may name the nodes it adds.
         assignment.furtherStructure.foreach(nodes => write(TestEventLogEncoder.structure(nodes)))
         events.foreach(one => write(TestEventLogEncoder.line(one, Some(assignment.execution))))
       }
@@ -301,7 +301,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
       // The top-level suite's wrapper writes it: an inner wrapper that wrote it would have to keep it for that wrapper
-      // to skip, for good where it never reaches that wrapper.
+      // to skip, and keep it forever if it never reaches that wrapper.
       None
     } else if (awaitingTopLevelWrapper.containsKey(event)) {
       if (isLastWrapper) {
@@ -331,7 +331,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     assertLockHeld()
     val ofWrapper = wrapper.registration.table.get
     val wrapperNode = ofWrapper.scopeOrTest(wrapper.treeNode)
-    // A `DistributedTestRunnerSuite` runs one test, so its abort is assigned to the wrapper's node, that test's.
+    // A `DistributedTestRunnerSuite` runs one test, so its abort is assigned to the wrapper's node, which is that test's node.
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
       case None =>
         val execution = wrapperNode match {
@@ -455,7 +455,6 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  @throws[IllegalStateException]("if this process's PID or start time cannot be read")
   def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] = startedIfGiven(eventLogFile, ProcessIdentity.current)
 
   def startedIfGiven(eventLogFile: Option[String], processIdentity: => ProcessIdentity): Option[TestEventLogEmitter] = {
@@ -573,10 +572,10 @@ private[scalatest] object TestEventLogEmitter {
   def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }
 
-  private def caughtOutsideLock[A](runOwnCode: => A): Either[Throwable, A] = {
+  private def caughtOutsideLock[A](callingRunsOwnCode: => A): Either[Throwable, A] = {
     // Outside the lock: the run's own suites, throwables and config map values may block, and every thread of the run
     // takes the lock.
-    caught(runOwnCode)
+    caught(callingRunsOwnCode)
   }
 
   def rethrowIfUncontained(thrown: Throwable): Unit = {
@@ -588,7 +587,8 @@ private[scalatest] object TestEventLogEmitter {
   }
 
   private def isKeptFromCaller(thrown: Throwable): Boolean = {
-    // Kept, so that a hand-off cannot change what the run's reporters receive, unless the JVM or the thread cannot go on.
+    // Kept from the caller unless the JVM or the thread cannot go on, so that a hand-off cannot change what the run's
+    // reporters receive.
     thrown match {
       // A throwable or config map value that recurses without end is one more event that cannot be encoded.
       case _: StackOverflowError => true
