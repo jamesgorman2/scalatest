@@ -63,20 +63,25 @@ private[scalatest] abstract class InvocationContext {
 private[scalatest] object InvocationContext {
 
   // Set only while a run's emitter is on, and cleared around a top-level suite of a run that writes no test event log.
-  private val current = new ThreadLocal[InvocationContext]
+  private val current: ThreadLocal[Option[InvocationContext]] =
+    new ThreadLocal[Option[InvocationContext]] {
+      override def initialValue(): Option[InvocationContext] = None
+    }
 
-  def get: Option[InvocationContext] = Option(current.get)
+  def get: Option[InvocationContext] = current.get
 
-  def within[A](context: InvocationContext)(body: => A): A = replacedBy(context)(body)
+  def within[A](context: InvocationContext)(body: => A): A = replacedBy(Some(context))(body)
 
-  def cleared[A](body: => A): A = replacedBy(null)(body)
+  def cleared[A](body: => A): A = replacedBy(None)(body)
 
-  def carriedTo(runnable: Runnable): Runnable = {
-    val context = current.get
-    if (context eq null) runnable else () => replacedBy(context)(runnable.run())
-  }
+  def carriedTo(runnable: Runnable): Runnable =
+    current.get.fold(runnable) { context =>
+      new Runnable {
+        def run(): Unit = replacedBy(Some(context))(runnable.run())
+      }
+    }
 
-  private def replacedBy[A](context: InvocationContext)(body: => A): A = {
+  private def replacedBy[A](context: Option[InvocationContext])(body: => A): A = {
     val previous = current.get
     current.set(context)
     try body finally current.set(previous)
