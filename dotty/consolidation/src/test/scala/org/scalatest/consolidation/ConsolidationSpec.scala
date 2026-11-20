@@ -49,7 +49,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
           startedAt = None,
           newRun = (label, worker) => {
             made :+= (label -> worker)
-            new RunAssembly(label, worker, TreeAssembler.topLevelSuitesOf)
+            RunAssembly(label, worker)
           }
         )
         consolidation.addRun(moduleLabel, Some(workerAt(1, 2)))

@@ -40,7 +40,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   private val structure = run.structure
   private val executions = run.executions
   private val runFinished = run.outcome.nonEmpty
-  private val runEndedAbnormally = RunAssembly.isAbnormal(run.outcome)
+  private val runEndedAbnormally = run.outcome.exists(_.isAbnormal)
   private val childrenByParent = structure.values.toVector.groupBy(_.parentId)
   private val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
   private val keysOfTestsThatRan = executions.keysIterator.flatMap(TreeAssembler.attributionKeyOf).toSet
@@ -54,8 +54,6 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
     )
 
   private def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
-
-  private def executionsOf(id: NodeId): Vector[RecordedExecution] = executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
 
   private def started(id: NodeId): Boolean =
     startedById.getOrElseUpdate(id, executions.contains(id) || childrenOf(id).exists(child => started(child.id)))
@@ -88,7 +86,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   // later structure added that shares a suite ID with a placed sibling sits directly after the last sibling with that
   // suite ID, in the order such suites arrived.
   private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): OrderedChildren = {
-    val scopesAndTests = children.filter(RunAssembly.isScopeOrTest).sortBy(child => (RunAssembly.declaredPositionOf(child), isDropped(child)))
+    val scopesAndTests = children.filter(child => NodeKind.of(child).isScopeOrTest).sortBy(child => (child.declaredPosition, isDropped(child)))
     val suites = children.collect { case suite: StructureNode.Suite => suite }
     val (placedSuites, suitesWithoutPosition) = suites.partition(_.position.nonEmpty)
     val (furtherRunsOfPlacedSuites, otherSuites) = suitesWithoutPosition.partition(suite => placedSuites.exists(_.suiteId == suite.suiteId))
@@ -99,7 +97,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   }
 
   private def isDropped(node: StructureNode): Boolean =
-    RunAssembly.isScopeOrTest(node) &&
+    NodeKind.of(node).isScopeOrTest &&
       !suiteOf(node).exists(suite => run.latestScopesAndTests.getOrElse(suite, Set.empty).contains(node.id))
 
   private def suiteOf(node: StructureNode): Option[NodeId] =
@@ -109,7 +107,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
     }
 
   private def executionIndexesOf(id: NodeId): Vector[Option[ExecutionIndex]] = {
-    val indexes = executionsOf(id).map(_.index)
+    val indexes = executions.of(id).map(_.index)
     if (indexes.isEmpty) Vector(None) else indexes.map(Some(_))
   }
 
@@ -160,7 +158,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   ): AssembledExecution = {
     val id = node.id
     val execution = executionOf(id, index)
-    val abortedSuiteHere = TreeAssembler.suiteAbortOf(node, execution).orElse(abortedSuiteAround)
+    val abortedSuiteHere = execution.filter(_ => NodeKind.of(node) == NodeKind.Suite).flatMap(_.suiteAborted).orElse(abortedSuiteAround)
     val latest = executionIndexesOf(id).last
     val shownChildren = shownChildrenOf(id)
     def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =
@@ -227,8 +225,4 @@ private[consolidation] object TreeAssembler {
     }
     if (lastSharingSuiteId < 0) siblings :+ added else siblings.patch(lastSharingSuiteId + 1, Vector(added), 0)
   }
-
-  private def suiteAbortOf(node: StructureNode, execution: Option[RecordedExecution]): Option[DecodedEvent.SuiteAborted] =
-    if (node.isInstanceOf[StructureNode.Suite]) execution.flatMap(_.suiteAborted)
-    else None
 }

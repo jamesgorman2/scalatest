@@ -159,7 +159,7 @@ object Consolidation {
       moduleSelectors,
       buildTool,
       startedAt,
-      (label, worker) => new RunAssembly(label, worker, TreeAssembler.topLevelSuitesOf)
+      RunAssembly.apply
     )
 }
 

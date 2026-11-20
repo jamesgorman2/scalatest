@@ -6,17 +6,25 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class JsonOutputSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
+  private def piecesOf(message: String): Vector[String] = {
+    var pieces = Vector.empty[String]
+    val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(json => json.writeTo(piece => pieces :+= piece)))
+    consolidation.addRootFailure(message)
+    consolidation.end()
+    pieces
+  }
+
   "The JSON output" when {
     "its text is many pieces long" should {
-      "be given in pieces that join to the whole text, none ending part way through a surrogate pair" in {
+      "be given in pieces that join to the whole text" in {
         val message = "😀" * 10000
-        var pieces = Vector.empty[String]
-        val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(json => json.writeTo(piece => pieces :+= piece)))
-        consolidation.addRootFailure(message)
-        consolidation.end()
+        val pieces = piecesOf(message)
         pieces.size should be > 1
-        pieces.filter(piece => Character.isHighSurrogate(piece.last)) shouldBe empty
         JsonReader.read(pieces.mkString)("failures").only("message") shouldBe text(message)
+      }
+      "end no piece part way through a surrogate pair, at either parity of the text before the pairs" in {
+        val pieces = Vector("😀" * 10000, "x" + "😀" * 10000).flatMap(piecesOf)
+        pieces.filter(piece => Character.isHighSurrogate(piece.last)) shouldBe empty
       }
     }
   }

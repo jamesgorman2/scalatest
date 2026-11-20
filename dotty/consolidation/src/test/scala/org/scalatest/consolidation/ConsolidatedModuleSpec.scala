@@ -6,9 +6,9 @@ import org.scalatest.wordspec.AnyWordSpec
 final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns {
 
   private def runIn(forkGroup: Int, workerIndex: Int): RunAssembly =
-    new RunAssembly(moduleLabel, Some(workerAt(forkGroup, workerIndex)), TreeAssembler.topLevelSuitesOf)
+    RunAssembly(moduleLabel, Some(workerAt(forkGroup, workerIndex)))
 
-  private def runGivenNoForkGroup(): RunAssembly = new RunAssembly(moduleLabel, None, TreeAssembler.topLevelSuitesOf)
+  private def runGivenNoForkGroup(): RunAssembly = RunAssembly(moduleLabel, None)
 
   private def numbersOf(runs: Vector[RunAssembly]): Vector[(RunNumber, RunAssembly)] =
     ConsolidatedModule.of(moduleLabel, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))

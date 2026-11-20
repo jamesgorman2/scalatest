@@ -41,6 +41,14 @@ private[scalatest] enum StructureNode {
       case scope: Scope => Some(scope.parent)
       case test: Test => Some(test.parent)
     }
+
+  /** Absent for a suite the emitter gave no position. */
+  def declaredPosition: Option[Int] =
+    this match {
+      case suite: Suite => suite.position
+      case scope: Scope => Some(scope.position)
+      case test: Test => Some(test.position)
+    }
 }
 
 /** @param executionPath an execution index for each node from the top-level suite down to `node`, each test's scopes included */

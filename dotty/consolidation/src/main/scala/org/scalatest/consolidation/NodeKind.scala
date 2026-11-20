@@ -7,6 +7,8 @@ private[consolidation] enum NodeKind(val word: String) {
   case Suite extends NodeKind("suite")
   case Scope extends NodeKind("scope")
   case Test extends NodeKind("test")
+
+  def isScopeOrTest: Boolean = this != Suite
 }
 
 private[consolidation] object NodeKind {

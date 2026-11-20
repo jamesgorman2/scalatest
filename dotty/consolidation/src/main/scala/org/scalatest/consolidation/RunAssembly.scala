@@ -18,6 +18,13 @@ import org.scalatest.events.TestEventLogEvent
 
 private[consolidation] final case class ExecutionOfNode(node: NodeId, index: ExecutionIndex)
 
+extension (executions: collection.Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]]) {
+
+  /** The node's executions, by execution index. */
+  private[consolidation] def of(id: NodeId): Vector[RecordedExecution] =
+    executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
+}
+
 /** A message, with the executions of its node's children that had started in its execution when it arrived. */
 private[consolidation] final case class ReceivedMessage(message: ProvidedMessage, childrenStarted: Set[ExecutionOfNode]) {
 
@@ -145,7 +152,7 @@ private[consolidation] final case class AssembledExecution(
 
   /** The scopes and tests below this execution that belong to its own suite: nested suites, and what they hold, are left out. */
   def ownScopesAndTests: Vector[AssembledNode] =
-    children.filterNot(_.kind == NodeKind.Suite).flatMap(child => child +: child.execution.ownScopesAndTests)
+    children.filter(_.kind.isScopeOrTest).flatMap(child => child +: child.execution.ownScopesAndTests)
 }
 
 /** A node of a run's test structure as the human-readable output shows it, once for each of its executions. */
@@ -256,6 +263,9 @@ private[consolidation] final class RunAssembly(
 
   def isEventStreamOpen: Boolean = eventStreamOpen
 
+  /** The time of the run's first `RunStarting`. */
+  def startedAt: Option[Instant] = starting.map(started => Instant.ofEpochMilli(started.timeStamp))
+
   /** How the run ended, from its `runEnded` event alone: absent until that event arrives. */
   def outcome: Option[RunOutcome] = ending
 
@@ -301,7 +311,7 @@ private[consolidation] final class RunAssembly(
   }
 
   /** Whether the run ended aborted or stopped. */
-  def endedAbnormally: Boolean = RunAssembly.isAbnormal(ending)
+  def endedAbnormally: Boolean = ending.exists(_.isAbnormal)
 
   /** Ends the event stream and assembles the run's tree, which every later reader of the tree shares. */
   def endEventStream(): Unit =
@@ -348,11 +358,11 @@ private[consolidation] final class RunAssembly(
         case scopeOrTest => scopeOrTest.parentId.flatMap(suites.get).fold(suites)(suites.updated(scopeOrTest.id, _))
       }
     }
-    val scopesAndTests = nodes.filter(RunAssembly.isScopeOrTest)
-    val positionsByParent = scopesAndTests.groupMap(_.parentId)(RunAssembly.declaredPositionOf)
+    val scopesAndTests = nodes.filter(node => NodeKind.of(node).isScopeOrTest)
+    val positionsByParent = scopesAndTests.groupMap(_.parentId)(_.declaredPosition)
     val scopesAndTestsBySuite = scopesAndTests.groupMap(node => suiteOfNode.get(node.id))(_.id)
     suites.filterNot(firstScopeOrTestPosition.contains).foreach { suite =>
-      positionsByParent.get(Some(suite)).flatMap(_.minOption).foreach(firstScopeOrTestPosition(suite) = _)
+      positionsByParent.get(Some(suite)).flatMap(_.flatten.minOption).foreach(firstScopeOrTestPosition(suite) = _)
     }
     suites.foreach { suite =>
       latestScopesAndTests(suite) = scopesAndTestsBySuite.getOrElse(Some(suite), Vector.empty).toSet
@@ -365,8 +375,6 @@ private[consolidation] final class RunAssembly(
     structure(id) = node
     node.parentId.foreach(parent => childIds.getOrElseUpdate(parent, mutable.Set.empty) += id)
   }
-
-  private def executionsOf(id: NodeId): Vector[RecordedExecution] = executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
 
   // An event assigned to the run rather than to a node is handled by kind:
   // - a run or discovery event records the run's own state; only the first of each kind is kept;
@@ -426,7 +434,7 @@ private[consolidation] final class RunAssembly(
   private def childrenStarted(parent: NodeId, parentExecution: ExecutionIndex): Set[ExecutionOfNode] =
     childIds.get(parent).fold(Set.empty[ExecutionOfNode]) { children =>
       children.iterator.flatMap { child =>
-        executionsOf(child)
+        executions.of(child)
           .filter(_.parent.contains(ExecutionOfNode(parent, parentExecution)))
           .map(execution => ExecutionOfNode(child, execution.index))
       }.toSet
@@ -434,6 +442,9 @@ private[consolidation] final class RunAssembly(
 }
 
 private[consolidation] object RunAssembly {
+
+  /** A run assembly whose tree the tree assembler assembles. */
+  def apply(label: TestRunLabel, worker: Option[Worker]): RunAssembly = new RunAssembly(label, worker, TreeAssembler.topLevelSuitesOf)
 
   def reportsFailure(event: TestEventLogEvent): Boolean =
     event match {
@@ -443,18 +454,7 @@ private[consolidation] object RunAssembly {
 
   def endsOtherThanCompleted(event: TestEventLogEvent): Boolean =
     event match {
-      case TestEventLogEvent.RunEnded(outcome) => isAbnormal(Some(outcome))
+      case TestEventLogEvent.RunEnded(outcome) => outcome.isAbnormal
       case _ => false
-    }
-
-  def isAbnormal(outcome: Option[RunOutcome]): Boolean = outcome.exists(_ != RunOutcome.Completed)
-
-  def isScopeOrTest(node: StructureNode): Boolean = NodeKind.of(node) != NodeKind.Suite
-
-  def declaredPositionOf(node: StructureNode): Int =
-    node match {
-      case suite: StructureNode.Suite => suite.position.getOrElse(Int.MaxValue)
-      case scope: StructureNode.Scope => scope.position
-      case test: StructureNode.Test => test.position
     }
 }

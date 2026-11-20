@@ -12,7 +12,6 @@ import org.scalatest.events.JsonValue
 import org.scalatest.events.JsonWriter
 import org.scalatest.events.LineInFile
 import org.scalatest.events.Location
-import org.scalatest.events.RunOutcome
 import org.scalatest.events.SeeStackDepthException
 import org.scalatest.events.StructureNode
 import org.scalatest.events.Summary
@@ -113,10 +112,10 @@ private[consolidation] object JsonOutputWriter {
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
         "configMap" -> starting.map(started => configMapObject(started.configMap)),
         "discovery" -> assembly.discovery.map(discoveryObject),
-        "outcome" -> assembly.outcome.filter(_ != RunOutcome.Completed).map(outcome => JsonValue.Text(outcome.word)),
+        "outcome" -> assembly.outcome.filter(_.isAbnormal).map(outcome => JsonValue.Text(outcome.word)),
         "message" -> assembly.runAborted.map(aborted => JsonValue.Text(aborted.message)),
         "throwable" -> assembly.runAborted.flatMap(_.throwable).map(throwableRecord),
-        "startedAt" -> starting.map(started => JsonValue.Integer(started.timeStamp)),
+        "startedAt" -> assembly.startedAt.map(epochMillis),
         "endedAt" -> closing.map(closed => epochMillis(closed.at)),
         "duration" -> closing.flatMap(_.duration).map(millis),
         "summary" -> closing.flatMap(_.summary).map(summaryObject),
