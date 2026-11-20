@@ -32,11 +32,13 @@ import org.scalatest.events.ScopePending
 import org.scalatest.events.SuiteAborted
 import org.scalatest.events.SuiteCompleted
 import org.scalatest.events.StructureNode
+import org.scalatest.events.SuiteId
 import org.scalatest.events.SuiteStarting
 import org.scalatest.events.TestCanceled
 import org.scalatest.events.TestEventLogEncoder
 import org.scalatest.events.TestFailed
 import org.scalatest.events.TestIgnored
+import org.scalatest.events.TestName
 import org.scalatest.events.TestPending
 import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
@@ -51,7 +53,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private var isOpen = true
   // Read and written only under this emitter's lock.
-  private val topLevelSuiteCountBySuiteId = scala.collection.mutable.HashMap.empty[String, Int]
+  private val topLevelSuiteCountBySuiteId = scala.collection.mutable.HashMap.empty[SuiteId, Int]
   // The events handed off at a send site or by an inner wrapper that have not reached their top-level suite's
   // wrapper, each mapped to that suite's registration. Keyed by the event's identity, since an event's `equals`
   // compares its fields, which hold the run's own objects. Read and written only under this emitter's lock.
@@ -125,7 +127,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    * only where the structure lacks the test, as when a `runTests` override runs a test the filter drops. An instance
    * whose node table is not settled, or that has none, adds nothing.
    */
-  def addTestWhereLacking(registration: RegisteredSuite, testName: String, registered: => Option[List[RegisteredNode]]): Unit = {
+  def addTestWhereLacking(registration: RegisteredSuite, testName: TestName, registered: => Option[List[RegisteredNode]]): Unit = {
     val lacking = synchronized(Option.when(isOpen && registration.isTableSettled)(registration.table).flatten.filterNot(_.latestHoldsTest(testName)))
     lacking.foreach { table =>
       registered.foreach { tree =>
@@ -173,7 +175,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
    *
    * What reading a name or writing a structure throws is kept from the caller as `writeRunEvent` keeps it.
    */
-  def fixNode(registration: RegisteredSuite, suiteIdRead: Option[String], suiteNameRead: Option[String], handingOff: Boolean): Unit = {
+  def fixNode(registration: RegisteredSuite, suiteIdRead: Option[SuiteId], suiteNameRead: Option[String], handingOff: Boolean): Unit = {
     val unsettled = synchronized {
       if (isOpen) {
         suiteIdRead.foreach(registration.keepSuiteIdItsRunRead)
@@ -471,11 +473,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       case Some(names) =>
         val found = TestEventLogEmitter.tableNamed(ofWrapper, wrapperNode, names.suiteId)
         val table = found.getOrElse {
-          ofWrapper.addSuiteUnder(wrapperNode.getOrElse(ofWrapper.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId))
+          ofWrapper.addSuiteUnder(wrapperNode.getOrElse(ofWrapper.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId.value))
         }
         val lackedTest = names.testName.filterNot(table.testsByName.contains)
         val furtherStructure = Option.when(found.isEmpty || lackedTest.isDefined) {
-          table.replaceLatestStructure(table.latestScopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_ -> false)))
+          table.replaceLatestStructure(table.latestScopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_.value -> false)))
         }
         val execution = names.testName.flatMap(table.testsByName.get) match {
           case Some(test) => assignToScopeOrTest(table, test, None, event)
@@ -658,27 +660,33 @@ private[scalatest] object TestEventLogEmitter {
     caught(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
   }
 
-  final case class NamesInEvent(suiteName: String, suiteId: String, suiteClassName: Option[String], testName: Option[String])
+  final case class NamesInEvent(suiteName: String, suiteId: SuiteId, suiteClassName: Option[String], testName: Option[TestName])
+
+  object NamesInEvent {
+
+    def from(suiteName: String, suiteId: String, suiteClassName: Option[String], testName: Option[String]): NamesInEvent =
+      NamesInEvent(suiteName, SuiteId(suiteId), suiteClassName, testName.map(TestName(_)))
+  }
 
   def namesIn(event: Event): Option[NamesInEvent] = {
-    def of(nameInfo: NameInfo): NamesInEvent = NamesInEvent(nameInfo.suiteName, nameInfo.suiteId, nameInfo.suiteClassName, nameInfo.testName)
+    def of(nameInfo: NameInfo): NamesInEvent = NamesInEvent.from(nameInfo.suiteName, nameInfo.suiteId, nameInfo.suiteClassName, nameInfo.testName)
     event match {
-      case e: TestStarting => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
-      case e: TestSucceeded => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
-      case e: TestFailed => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
-      case e: TestIgnored => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
-      case e: TestPending => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
-      case e: TestCanceled => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, Some(e.testName)))
-      case e: SuiteStarting => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, None))
-      case e: SuiteCompleted => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, None))
-      case e: SuiteAborted => Some(NamesInEvent(e.suiteName, e.suiteId, e.suiteClassName, None))
-      case e: ScopeOpened => Some(of(e.nameInfo).copy(testName = None))
-      case e: ScopeClosed => Some(of(e.nameInfo).copy(testName = None))
-      case e: ScopePending => Some(of(e.nameInfo).copy(testName = None))
-      case e: InfoProvided => e.nameInfo.map(of)
-      case e: NoteProvided => e.nameInfo.map(of)
-      case e: AlertProvided => e.nameInfo.map(of)
-      case e: MarkupProvided => e.nameInfo.map(of)
+      case testEvent: TestStarting => Some(NamesInEvent.from(testEvent.suiteName, testEvent.suiteId, testEvent.suiteClassName, Some(testEvent.testName)))
+      case testEvent: TestSucceeded => Some(NamesInEvent.from(testEvent.suiteName, testEvent.suiteId, testEvent.suiteClassName, Some(testEvent.testName)))
+      case testEvent: TestFailed => Some(NamesInEvent.from(testEvent.suiteName, testEvent.suiteId, testEvent.suiteClassName, Some(testEvent.testName)))
+      case testEvent: TestIgnored => Some(NamesInEvent.from(testEvent.suiteName, testEvent.suiteId, testEvent.suiteClassName, Some(testEvent.testName)))
+      case testEvent: TestPending => Some(NamesInEvent.from(testEvent.suiteName, testEvent.suiteId, testEvent.suiteClassName, Some(testEvent.testName)))
+      case testEvent: TestCanceled => Some(NamesInEvent.from(testEvent.suiteName, testEvent.suiteId, testEvent.suiteClassName, Some(testEvent.testName)))
+      case suiteEvent: SuiteStarting => Some(NamesInEvent.from(suiteEvent.suiteName, suiteEvent.suiteId, suiteEvent.suiteClassName, None))
+      case suiteEvent: SuiteCompleted => Some(NamesInEvent.from(suiteEvent.suiteName, suiteEvent.suiteId, suiteEvent.suiteClassName, None))
+      case suiteEvent: SuiteAborted => Some(NamesInEvent.from(suiteEvent.suiteName, suiteEvent.suiteId, suiteEvent.suiteClassName, None))
+      case scope: ScopeOpened => Some(of(scope.nameInfo).copy(testName = None))
+      case scope: ScopeClosed => Some(of(scope.nameInfo).copy(testName = None))
+      case scope: ScopePending => Some(of(scope.nameInfo).copy(testName = None))
+      case provided: InfoProvided => provided.nameInfo.map(of)
+      case provided: NoteProvided => provided.nameInfo.map(of)
+      case provided: AlertProvided => provided.nameInfo.map(of)
+      case markup: MarkupProvided => markup.nameInfo.map(of)
       case _ => None
     }
   }
@@ -695,7 +703,7 @@ private[scalatest] object TestEventLogEmitter {
   // `table`, where that has the suite ID. Otherwise it is the first not yet ended of the suites with that ID at or below
   // the wrapper's node, else the first of them. The wrapper's node is `test` for a test's wrapper, else its suite's.
   // Recurses once for each suite nested in another.
-  private def tableNamed(table: SuiteNodeTable, test: Option[NodeId], suiteId: String): Option[SuiteNodeTable] = {
+  private def tableNamed(table: SuiteNodeTable, test: Option[NodeId], suiteId: SuiteId): Option[SuiteNodeTable] = {
     def nestedWithin(suite: SuiteNodeTable): Vector[SuiteNodeTable] = suite.childSuites.flatMap(nested => nested +: nestedWithin(nested))
     if (table.suiteId == suiteId) {
       Some(table)

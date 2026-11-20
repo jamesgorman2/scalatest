@@ -3,8 +3,9 @@ package org.scalatest.tools
 import java.util.IdentityHashMap
 import org.scalatest.ScopePlace
 import org.scalatest.events.NodeId
-import org.scalatest.events.NodePlace
 import org.scalatest.events.StructureNode
+import org.scalatest.events.SuiteId
+import org.scalatest.events.TestName
 import scala.collection.mutable
 
 /**
@@ -14,10 +15,10 @@ import scala.collection.mutable
  */
 private[scalatest] final class Execution(emitter: TestEventLogEmitter) {
 
-  private val suitesStartedBySuiteId = mutable.HashMap.empty[String, Int]
+  private val suitesStartedBySuiteId = mutable.HashMap.empty[SuiteId, Int]
 
   /** Also counts the suite as started in this execution. */
-  def indexOfStartingSuite(suiteId: String): Int = {
+  def indexOfStartingSuite(suiteId: SuiteId): Int = {
     emitter.assertLockHeld()
     val index = suitesStartedBySuiteId.getOrElse(suiteId, 0)
     suitesStartedBySuiteId(suiteId) = index + 1
@@ -94,7 +95,7 @@ private[scalatest] final case class NamedExecutions(
 )
 
 private[scalatest] final case class ScopeAndTestIds(
-  testsByName: Map[String, NodeId],
+  testsByName: Map[TestName, NodeId],
   scopesByPath: Map[List[ScopePlace], NodeId],
   parents: Map[NodeId, NodeId]
 )
@@ -124,7 +125,7 @@ private[scalatest] final class SuiteNodeTable(
   emitter: TestEventLogEmitter,
   val node: NodeId,
   val name: String,
-  val suiteId: String,
+  val suiteId: SuiteId,
   val className: String,
   val parentSuite: Option[SuiteNodeTable],
   val parent: Option[NodeId],
@@ -132,7 +133,7 @@ private[scalatest] final class SuiteNodeTable(
   firstPositionOfScopesAndTests: Int,
   firstScopesAndTests: List[ScopeOrTest],
   firstIds: ScopeAndTestIds,
-  firstFilteredTests: Map[String, (Boolean, Boolean)]
+  firstFilteredTests: Map[TestName, FilterVerdict]
 ) {
 
   // All are read and written only under the emitter's lock. The IDs are those of every scope and test any structure
@@ -177,7 +178,7 @@ private[scalatest] final class SuiteNodeTable(
    * Adds a suite node directly under `parentNode`, this suite's node or that of one of its tests, after the suites
    * already under it. Its first structure holds the suite alone, and is the caller's to write.
    */
-  def addSuiteUnder(parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
+  def addSuiteUnder(parentNode: NodeId, name: String, suiteId: SuiteId, className: String): SuiteNodeTable = {
     emitter.assertLockHeld()
     val id = SuiteNodeTable.nestedSuitePath(parentNode, suiteId, childSuites.filter(_.parent.contains(parentNode)).map(_.suiteId))
     addSuite(id, parentNode, name, suiteId, className)
@@ -187,14 +188,14 @@ private[scalatest] final class SuiteNodeTable(
    * Adds a suite node of node path `id` under `parentNode`, which is this suite's node or that of one of its tests,
    * after the other suites under this one. Its first structure holds the suite alone, and is the caller's to write.
    */
-  def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: String, className: String): SuiteNodeTable = {
+  def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: SuiteId, className: String): SuiteNodeTable = {
     emitter.assertLockHeld()
     val added = new SuiteNodeTable(emitter, id, name, suiteId, className, Some(this), Some(parentNode), None, 0, Nil, ScopeAndTestIds.none, Map.empty)
     nestedSuitesAdded :+= added
     added
   }
 
-  def testsByName: Map[String, NodeId] = {
+  def testsByName: Map[TestName, NodeId] = {
     emitter.assertLockHeld()
     ids.testsByName
   }
@@ -215,7 +216,7 @@ private[scalatest] final class SuiteNodeTable(
     scopesAndTestsOfLatest
   }
 
-  def latestHoldsTest(testName: String): Boolean = {
+  def latestHoldsTest(testName: TestName): Boolean = {
     emitter.assertLockHeld()
     testNamesOfLatest.contains(testName)
   }
@@ -226,7 +227,7 @@ private[scalatest] final class SuiteNodeTable(
    * `tags`, which a further structure cannot call. Any other test is filtered by `filtered`, and the table keeps the
    * result for later structures.
    */
-  def filterKeepingEarlier(testNames: List[String], filtered: String => (Boolean, Boolean)): Map[String, (Boolean, Boolean)] = {
+  def filterKeepingEarlier(testNames: List[TestName], filtered: TestName => FilterVerdict): Map[TestName, FilterVerdict] = {
     emitter.assertLockHeld()
     val filteredNow = testNames.map(testName => testName -> filteredTests.getOrElse(testName, filtered(testName))).toMap
     filteredTests = filteredTests ++ filteredNow
@@ -323,10 +324,10 @@ private[scalatest] final class SuiteNodeTable(
 
 private[scalatest] object SuiteNodeTable {
 
-  private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[String] = SuiteStructure.testsIn(scopesAndTests).map(_.testName).toSet
+  private def testNamesIn(scopesAndTests: List[ScopeOrTest]): Set[TestName] = SuiteStructure.testsIn(scopesAndTests).map(_.testName).toSet
 
-  private def nestedSuitePath(parent: NodeId, suiteId: String, suiteIdsBefore: Vector[String]): NodeId =
-    NodeId(parent.places :+ NodePlace.Suite(suiteId, suiteIdsBefore.count(_ == suiteId)))
+  private def nestedSuitePath(parent: NodeId, suiteId: SuiteId, suiteIdsBefore: Vector[SuiteId]): NodeId =
+    NodeId.nestedSuite(parent, suiteId, suiteIdsBefore.count(_ == suiteId))
 
   /**
    * Gives a top-level suite, and each node of its structure, its node path. The suite's is its `suiteId` and `index`,
@@ -335,7 +336,7 @@ private[scalatest] object SuiteNodeTable {
    */
   def ofTopLevelSuite(emitter: TestEventLogEmitter, structure: SuiteStructure, index: Int): (SuiteNodeTable, Vector[StructureNode]) = {
     val nodes = Vector.newBuilder[StructureNode]
-    val table = suite(emitter, structure, NodeId(Vector(NodePlace.Suite(structure.suiteId, index))), None, None, nodes)
+    val table = suite(emitter, structure, NodeId.topLevelSuite(structure.suiteId, index), None, None, nodes)
     (table, nodes.result())
   }
 
@@ -393,13 +394,13 @@ private[scalatest] object SuiteNodeTable {
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
         case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), offset)) =>
-          val id = NodeId(suite.places :+ NodePlace.Test(testName))
+          val id = NodeId.test(suite, testName)
           nodes += StructureNode.Test(id, parent, firstPosition + offset, name, label, ignored)
           added = added.copy(testsByName = added.testsByName.updated(testName, id), parents = added.parents.updated(id, parent))
           scopesSoFarByText
         case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), offset)) =>
           val index = scopesSoFarByText.getOrElse(text, 0)
-          val id = NodeId(parent.places :+ NodePlace.Scope(text, index))
+          val id = NodeId.scope(parent, text, index)
           val path = pathOfParent :+ ScopePlace(text, index)
           nodes += StructureNode.Scope(id, parent, firstPosition + offset, name, label)
           added = added.copy(scopesByPath = added.scopesByPath.updated(path, id), parents = added.parents.updated(id, parent))

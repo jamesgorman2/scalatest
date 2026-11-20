@@ -1,5 +1,7 @@
 package org.scalatest.events
 
+import NotationText.quoted
+
 /**
  * Compares the events of a test event log with those a criterion gives, built by `TestRunBuilder`.
  *
@@ -163,19 +165,10 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  private def quoted(text: String): String = {
-    val escaped = text.flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case other => other.toString
-    }
-    "\"" + escaped + "\""
-  }
-
   private def inNotation(node: StructureNode): String = {
     node match {
       case StructureNode.Suite(_, _, position, name, suiteId, className) =>
-        s"suite ${quoted(name)}, class ${quoted(className)}, id ${quoted(suiteId)}, ${position.fold("no position")("position " + _)}"
+        s"suite ${quoted(name)}, class ${quoted(className)}, id ${quoted(suiteId.value)}, ${position.fold("no position")("position " + _)}"
       case StructureNode.Scope(_, _, position, name, label) => s"scope ${quoted(name)}, label ${quoted(label)}, position $position"
       case StructureNode.Test(_, _, position, name, label, ignored) =>
         s"test ${quoted(name)}, label ${quoted(label)}, position $position${if (ignored) ", ignored" else ""}"

@@ -1,6 +1,5 @@
 package org.scalatest.events
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 
 private[scalatest] object TestEventLogDecoder {
@@ -33,12 +32,8 @@ private[scalatest] object TestEventLogDecoder {
         TestEventLogEvent.Structure(reader.required("nodes", reader.optionalObjects("nodes")).map(whole(_)(structureNode)))
       case "event" => TestEventLogEvent.ScalaTestEvent(nodeExecution(reader), scalaTestEvent(reader.text("event"), reader))
       case "runEnded" =>
-        reader.text("outcome") match {
-          case "completed" => TestEventLogEvent.RunEnded(RunOutcome.Completed)
-          case "aborted" => TestEventLogEvent.RunEnded(RunOutcome.Aborted)
-          case "stopped" => TestEventLogEvent.RunEnded(RunOutcome.Stopped)
-          case other => reader.malformed(s"unknown outcome $other")
-        }
+        val outcome = reader.text("outcome")
+        TestEventLogEvent.RunEnded(RunOutcome.fromWord(outcome).getOrElse(reader.malformed(s"unknown outcome $outcome")))
       case other => reader.malformed(s"unknown item $other")
     }
   }
@@ -51,7 +46,7 @@ private[scalatest] object TestEventLogDecoder {
       case "suite" =>
         val parent = optionalNodePath(reader, "parent")
         val position = reader.optionalIntAtLeast("position", 0)
-        val suiteId = reader.text("suiteId")
+        val suiteId = SuiteId(reader.text("suiteId"))
         val className = reader.text("className")
         requireParentOnNodePath(reader, id, parent)
         StructureNode.Suite(id, parent, position, name, suiteId, className)
@@ -90,11 +85,11 @@ private[scalatest] object TestEventLogDecoder {
 
   private def place(reader: JsonObjectReader): NodePlace = {
     if (reader.holds("suiteId")) {
-      NodePlace.Suite(reader.text("suiteId"), reader.intAtLeast("index", 0))
+      NodePlace.Suite(SuiteId(reader.text("suiteId")), reader.intAtLeast("index", 0))
     } else if (reader.holds("scope")) {
       NodePlace.Scope(reader.text("scope"), reader.intAtLeast("index", 0))
     } else if (reader.holds("test")) {
-      NodePlace.Test(reader.text("test"))
+      NodePlace.Test(TestName(reader.text("test")))
     } else {
       reader.malformed("a place holds none of the keys suiteId, scope and test")
     }
@@ -116,8 +111,8 @@ private[scalatest] object TestEventLogDecoder {
     def readMessage: String = reader.text("message")
     def readThrowable: Option[DecodedThrowable] = reader.optionalObject("throwable").map(throwables.decode)
     def readDuration: Option[Long] = reader.optionalLong("duration")
-    def readSummary: Option[Summary] = reader.optionalObject("summary").map(whole(_)(decodeSummary))
-    def readLocation: Option[Location] = reader.optionalObject("location").map(whole(_)(decodeLocation))
+    def readSummary: Option[Summary] = reader.optionalObject("summary").map(whole(_)(summary))
+    def readLocation: Option[Location] = reader.optionalObject("location").map(whole(_)(location))
     def readThreadName: String = reader.text("threadName")
     def readTimeStamp: Long = reader.long("timeStamp")
 
@@ -184,7 +179,7 @@ private[scalatest] object TestEventLogDecoder {
     }
   }
 
-  private def decodeLocation(reader: JsonObjectReader): Location = {
+  private def location(reader: JsonObjectReader): Location = {
     reader.text("kind") match {
       case "TopOfClass" => TopOfClass(reader.text("className"))
       case "TopOfMethod" => TopOfMethod(reader.text("className"), reader.text("methodId"))
@@ -194,7 +189,7 @@ private[scalatest] object TestEventLogDecoder {
     }
   }
 
-  private def decodeSummary(reader: JsonObjectReader): Summary = {
+  private def summary(reader: JsonObjectReader): Summary = {
     Summary(
       reader.int("testsSucceededCount"),
       reader.int("testsFailedCount"),
@@ -213,58 +208,39 @@ private[scalatest] object TestEventLogDecoder {
     private val decoded = mutable.Map.empty[Long, DecodedThrowable]
 
     def decode(reader: JsonObjectReader): DecodedThrowable = {
-      val (throwable, opened) = whole(reader)(throwableOrRef)
-      linked(opened.toList)
-      throwable
-    }
-
-    // Keeps the throwables whose causes and suppressed throwables are still to read in a list, not on the call
-    // stack, so that a long chain of causes cannot overflow the stack.
-    @tailrec
-    private def linked(open: List[OpenThrowable]): Unit = {
-      open match {
-        case Nil => ()
-        case innermost :: outer =>
-          innermost.nextLinked() match {
-            case None =>
-              innermost.close()
-              linked(outer)
-            case Some(reader) =>
-              val (throwable, opened) = whole(reader)(throwableOrRef)
-              innermost.add(throwable)
-              linked(opened.toList ::: open)
-          }
+      whole(reader)(throwableOrRef) match {
+        case Left(ref) => ref
+        case Right(opened) => OpenThrowable.closedFrom(opened)(linked => whole(linked)(throwableOrRef))
       }
     }
 
-    private def throwableOrRef(reader: JsonObjectReader): (DecodedThrowable, Option[OpenThrowable]) = {
+    private def throwableOrRef(reader: JsonObjectReader): Either[DecodedThrowable, DecodingThrowable] = {
       reader.optionalLong("ref") match {
-        case Some(id) =>
-          decoded.getOrElse(id, reader.malformed(s"ref $id names no throwable the event holds before it")) -> None
+        case Some(id) => Left(decoded.getOrElse(id, reader.malformed(s"ref $id names no throwable the event holds before it")))
         case None =>
           val id = reader.longAtLeast("id", 1L)
-          val className = reader.text("className")
-          val message = reader.optionalText("message")
-          val stackDepth = reader.optionalObject("stackDepth").map(whole(_)(decodeStackDepth))
-          val isPropertyCheckFailure = reader.trueOrAbsent("propertyCheck")
-          val stackTrace = reader.objects("stackTrace").map(whole(_)(frame))
-          val cause = reader.optionalObject("cause")
-          val suppressed = reader.objects("suppressed")
-          val throwable =
-            registered(reader, id, new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, stackTrace))
-          throwable -> Some(new OpenThrowable(throwable, cause, suppressed.iterator))
+          val opened = new DecodingThrowable(
+            className = reader.text("className"),
+            message = reader.optionalText("message"),
+            stackDepth = reader.optionalObject("stackDepth").map(whole(_)(stackDepth)),
+            isPropertyCheckFailure = reader.trueOrAbsent("propertyCheck"),
+            stackTrace = reader.objects("stackTrace").map(whole(_)(frame)),
+            cause = reader.optionalObject("cause"),
+            suppressed = reader.objects("suppressed").iterator
+          )
+          registered(reader, id, opened.closed)
+          Right(opened)
       }
     }
 
-    private def registered(reader: JsonObjectReader, id: Long, throwable: DecodedThrowable): DecodedThrowable = {
+    private def registered(reader: JsonObjectReader, id: Long, throwable: DecodedThrowable): Unit = {
       if (decoded.contains(id)) {
         reader.malformed(s"two throwables have id $id")
       }
       decoded.update(id, throwable)
-      throwable
     }
 
-    private def decodeStackDepth(reader: JsonObjectReader): DecodedStackDepth =
+    private def stackDepth(reader: JsonObjectReader): DecodedStackDepth =
       DecodedStackDepth(reader.optionalText("fileName"), reader.optionalText("filePathname"), reader.optionalInt("lineNumber"))
 
     private def frame(reader: JsonObjectReader): DecodedStackFrame = {
@@ -279,32 +255,19 @@ private[scalatest] object TestEventLogDecoder {
     }
   }
 
-  private final class OpenThrowable(
-    throwable: DecodedThrowable,
+  // Built before its links are read, so that a ref among them yields this throwable.
+  private final class DecodingThrowable(
+    className: String,
+    message: Option[String],
+    stackDepth: Option[DecodedStackDepth],
+    isPropertyCheckFailure: Boolean,
+    stackTrace: IndexedSeq[DecodedStackFrame],
     cause: Option[JsonObjectReader],
     suppressed: Iterator[JsonObjectReader]
-  ) {
+  ) extends OpenThrowable[JsonObjectReader, DecodedThrowable](cause, suppressed) {
 
-    private var causeIsNext = cause.nonEmpty
-    private var addsCause = false
-    private var readCause: Option[DecodedThrowable] = None
-    private val readSuppressed = Vector.newBuilder[DecodedThrowable]
-
-    def nextLinked(): Option[JsonObjectReader] = {
-      addsCause = causeIsNext
-      causeIsNext = false
-      if (addsCause) cause else suppressed.nextOption()
-    }
-
-    def add(linked: DecodedThrowable): Unit = {
-      if (addsCause) {
-        readCause = Some(linked)
-      } else {
-        readSuppressed += linked
-      }
-    }
-
-    def close(): Unit = throwable.link(readCause, readSuppressed.result())
+    val closed: DecodedThrowable =
+      new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, stackTrace, linkedCause, linkedSuppressed)
   }
 }
 

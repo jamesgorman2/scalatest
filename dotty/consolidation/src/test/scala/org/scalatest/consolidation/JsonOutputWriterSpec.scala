@@ -675,10 +675,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   private def throwable(className: String, message: Option[String] = None, frames: Vector[DecodedStackFrame] = Vector.empty): DecodedThrowable =
     new DecodedThrowable(className, message, None, false, frames)
 
-  private def linked(throwable: DecodedThrowable, cause: Option[DecodedThrowable] = None, suppressed: Vector[DecodedThrowable] = Vector.empty): DecodedThrowable = {
-    throwable.link(cause, suppressed)
-    throwable
-  }
+  private def linked(throwable: DecodedThrowable, cause: => Option[DecodedThrowable] = None, suppressed: Vector[DecodedThrowable] = Vector.empty): DecodedThrowable =
+    LinkedThrowables.relinked(throwable, cause, suppressed)
 
   private def stackDepthException(stackDepth: DecodedStackDepth): DecodedThrowable =
     new DecodedThrowable("org.scalatest.exceptions.TestFailedException", Some("failed"), Some(stackDepth), false, Vector.empty)
@@ -886,8 +884,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "it is its own cause" should {
       "refer to itself as its cause" in {
-        val itself = throwable("Itself")
-        recordOf(linked(itself, cause = Some(itself)))("cause") shouldBe objectOf("ref" -> integer(1L))
+        lazy val itself: DecodedThrowable = linked(throwable("Itself"), cause = Some(itself))
+        recordOf(itself)("cause") shouldBe objectOf("ref" -> integer(1L))
       }
     }
 

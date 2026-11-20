@@ -12,6 +12,8 @@ import org.scalatest.TestsBeforeNestedSuites
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.events.SuiteId
+import org.scalatest.events.TestName
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.immutable.ListSet
@@ -54,9 +56,9 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
 
   private final class TestsFirst(nested: Suite*) extends Suites(nested*) with TestsBeforeNestedSuites
 
-  private def keptTest(name: String, testName: String, label: String): ScopeOrTest = ScopeOrTest.Test(name, testName, label, ignored = false)
+  private def keptTest(name: String, testName: String, label: String): ScopeOrTest = ScopeOrTest.Test(name, TestName(testName), label, ignored = false)
 
-  private def ignoredTest(name: String, testName: String, label: String): ScopeOrTest = ScopeOrTest.Test(name, testName, label, ignored = true)
+  private def ignoredTest(name: String, testName: String, label: String): ScopeOrTest = ScopeOrTest.Test(name, TestName(testName), label, ignored = true)
 
   "The structure read from a suite with a registration tree" should {
     "hold each scope and each test the filter keeps, in the order registered, marking each test the filter ignores as ignored" in {
@@ -64,6 +66,15 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
         ScopeOrTest.Scope("first", "first", "first", List(keptTest("runs", "first runs", "- runs"))),
         ScopeOrTest.Scope("second", "second", "second", Nil),
         ScopeOrTest.Scope("third", "third", "third", List(ignoredTest("is ignored", "third is ignored", "- is ignored")))
+      )
+    }
+
+    "hold what the filter says of each test of the tree, dropped tests included" in {
+      SuiteStructure.read(new ScopedSuite, excludingSlow).filteredTests shouldBe Map(
+        TestName("first runs") -> FilterVerdict(isDropped = false, isIgnored = false),
+        TestName("first is slow") -> FilterVerdict(isDropped = true, isIgnored = false),
+        TestName("second is slow too") -> FilterVerdict(isDropped = true, isIgnored = false),
+        TestName("third is ignored") -> FilterVerdict(isDropped = false, isIgnored = true)
       )
     }
 
@@ -94,7 +105,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
       val suite = new ScenarioSuite
       val structure = SuiteStructure.read(suite, Filter.default)
       structure.instance should be theSameInstanceAs suite
-      (structure.name, structure.suiteId) shouldBe ((suite.suiteName, classOf[ScenarioSuite].getName))
+      (structure.name, structure.suiteId) shouldBe ((suite.suiteName, SuiteId(classOf[ScenarioSuite].getName)))
     }
 
     "take the suite's class name from the class of the instance" in {
@@ -105,7 +116,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
       val standIn = new DeferredAbortedSuite("samples.BrokenCtorSpec", "samples.BrokenCtorSpec", new IllegalStateException("no config"))
       val structure = SuiteStructure.read(standIn, Filter.default)
       (structure.name, structure.suiteId, structure.className, structure.scopesAndTests, structure.nestedSuites) shouldBe
-        (("BrokenCtorSpec", "samples.BrokenCtorSpec", "samples.BrokenCtorSpec", Nil, Nil))
+        (("BrokenCtorSpec", SuiteId("samples.BrokenCtorSpec"), "samples.BrokenCtorSpec", Nil, Nil))
     }
 
     "hold each nested suite in the order the suite nests them, read from that instance with the same filter" in {
@@ -140,7 +151,7 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
         RegisteredScope("s", "s", "s", List(RegisteredTest("ignored", "s ignored", "- ignored", "- ignored"), RegisteredTest("added", "s added", "- added", "- added")))
       )
       val latest = List(ScopeOrTest.Scope("s", "s", "s", List(ignoredTest("ignored", "s ignored", "- ignored"))))
-      SuiteStructure.withTestAdded(registered, latest, "s added") shouldBe Some(
+      SuiteStructure.withTestAdded(registered, latest, TestName("s added")) shouldBe Some(
         List(ScopeOrTest.Scope("s", "s", "s", List(ignoredTest("ignored", "s ignored", "- ignored"), keptTest("added", "s added", "- added"))))
       )
     }

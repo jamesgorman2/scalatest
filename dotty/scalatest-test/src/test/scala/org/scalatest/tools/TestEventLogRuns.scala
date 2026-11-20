@@ -83,7 +83,7 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected val runTimeLimitSeconds = 120L
 
   protected def built(notation: String): Vector[BuiltEvent] =
-    TestRunBuilder.build(TestRunPart.Events(notation)).fold(reason => fail(reason), _.events)
+    TestRunBuilder.build(TestRunPart.Events(notation)).events
 
   protected def decoded(lines: Seq[String]): Vector[TestEventLogEvent] = lines.toVector.map(TestEventLogDecoder.decode)
 

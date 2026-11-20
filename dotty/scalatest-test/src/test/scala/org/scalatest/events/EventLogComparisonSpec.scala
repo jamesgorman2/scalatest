@@ -20,21 +20,18 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     "structure\n  suite \"StackSuite\", class \"samples.StackSuite\"\n    scope \"A Stack\", label \"A Stack\"\n" +
       "      test \"pops\", label \"- pops\"\n      test \"pushes\", label \"- pushes\""
 
-  private val stackSuiteNode = NodeId(Vector(NodePlace.Suite("samples.StackSuite", 0)))
+  private val stackSuiteNode = NodeId(Vector(NodePlace.Suite(SuiteId("samples.StackSuite"), 0)))
 
   private def under(parent: NodeId, place: NodePlace): NodeId = NodeId(parent.places :+ place)
 
   private def expected(blocks: String*): Vector[BuiltEvent] = {
-    TestRunBuilder.build(TestRunPart.Events(dedentedAndJoined(blocks*))) match {
-      case Right(run) => run.events
-      case Left(reason) => fail(s"the run was not built: $reason")
-    }
+    TestRunBuilder.build(TestRunPart.Events(dedentedAndJoined(blocks*))).events
   }
 
   private def log(blocks: String*): Vector[TestEventLogEvent] = expected(blocks*).map(_.event)
 
   private def logWithOtherNodeIds(blocks: String*): Vector[TestEventLogEvent] = {
-    def otherId(id: NodeId): NodeId = NodeId(NodePlace.Suite("samples.OtherSuite", 0) +: id.places)
+    def otherId(id: NodeId): NodeId = NodeId(NodePlace.Suite(SuiteId("samples.OtherSuite"), 0) +: id.places)
     log(blocks*).map {
       case TestEventLogEvent.Structure(tree) =>
         TestEventLogEvent.Structure(tree.map {
@@ -319,12 +316,12 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
 
     "report a node under another parent" in {
       val scope = under(stackSuiteNode, NodePlace.Scope("A Stack", 0))
-      val test = under(stackSuiteNode, NodePlace.Test("A Stack pops"))
+      val test = under(stackSuiteNode, NodePlace.Test(TestName("A Stack pops")))
       val expectedTree = BuiltEvent(
         "structure",
         TestEventLogEvent.Structure(
           Vector(
-            StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+            StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
             StructureNode.Scope(scope, stackSuiteNode, 0, "A Stack", "A Stack"),
             StructureNode.Test(test, scope, 0, "pops", "- pops")
           )
@@ -333,7 +330,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
       val loggedTree = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
           StructureNode.Scope(scope, stackSuiteNode, 0, "A Stack", "A Stack"),
           StructureNode.Test(test, stackSuiteNode, 0, "pops", "- pops")
         )
@@ -436,16 +433,16 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "report a further structure that gives a new node the ID of a node the log already holds" in {
-      val test = under(stackSuiteNode, NodePlace.Test("pops"))
+      val test = under(stackSuiteNode, NodePlace.Test(TestName("pops")))
       val first = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
           StructureNode.Test(test, stackSuiteNode, 0, "pops", "- pops")
         )
       )
       val further = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", "samples.StackSuite", "samples.StackSuite"),
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
           StructureNode.Test(test, stackSuiteNode, 0, "pushes", "- pushes")
         )
       )
@@ -740,8 +737,8 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
     }
 
     "compare a throwable that is its own cause only as deep as the throwable written" in {
-      val selfCaused = new DecodedThrowable("java.lang.Error", Some("loop"), None, false, Vector.empty)
-      selfCaused.link(Some(selfCaused), Vector(selfCaused))
+      lazy val selfCaused: DecodedThrowable =
+        new DecodedThrowable("java.lang.Error", Some("loop"), None, false, Vector.empty, Some(selfCaused), Vector(selfCaused))
       val logged = TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.RunAborted("loop", Some(selfCaused), None, None, None, "main", 0L))
 
       EventLogComparison.mismatchWhenIs(

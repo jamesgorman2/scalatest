@@ -9,10 +9,12 @@ import org.scalatest.events.NodePlace
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
 import org.scalatest.events.Summary
+import org.scalatest.events.SuiteId
 import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.TestName
 
 /** What attributes a test with no execution to a test that ran: the suite ID of the nearest suite above it, and its test name. */
-private[consolidation] final case class AttributionKey(suiteId: String, testName: String)
+private[consolidation] final case class AttributionKey(suiteId: SuiteId, testName: TestName)
 
 private[consolidation] final case class ExecutionOfNode(node: NodeId, index: Int)
 

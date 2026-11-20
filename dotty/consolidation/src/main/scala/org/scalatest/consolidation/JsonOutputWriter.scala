@@ -140,7 +140,7 @@ private[consolidation] object JsonOutputWriter {
 
   private def suiteIdOf(node: StructureNode): Option[String] =
     node match {
-      case suite: StructureNode.Suite => Some(suite.suiteId)
+      case suite: StructureNode.Suite => Some(suite.suiteId.value)
       case _ => None
     }
 

@@ -98,9 +98,10 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       Vector(
         DecodedStackFrame("samples.Row", "add", Some("Row.scala"), Some(3), false, "samples.Row.add(Row.scala:3)"),
         DecodedStackFrame("java.lang.Thread", "sleep", None, Some(-2), true, "java.lang.Thread.sleep(Native Method)")
-      )
+      ),
+      Some(shared),
+      Vector(shared)
     )
-    thrown.link(Some(shared), Vector(shared))
     val runLevelEvents = Vector(
       DecodedEvent.RunStarting(3, Map("zone" -> "UTC"), None, "main", 100L),
       DecodedEvent.DiscoveryStarting("main", 110L),

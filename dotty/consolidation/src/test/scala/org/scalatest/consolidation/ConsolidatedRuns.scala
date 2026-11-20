@@ -17,10 +17,9 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     def stripExpectedMargin: String = literal.stripMargin.replace("\r\n", "\n")
 
     def toRunEvent: RunEvent =
-      TestRunBuilder.build(TestRunPart.Events(literal)).map(_.items) match {
-        case Right(Vector(BuiltRunItem.Event(built))) => RunEvent.of(built.event)
-        case Right(items) => fail(s"expected one event, but the notation built $items")
-        case Left(reason) => fail(reason)
+      TestRunBuilder.build(TestRunPart.Events(literal)).items match {
+        case Vector(BuiltRunItem.Event(built)) => RunEvent.of(built.event)
+        case items => fail(s"expected one event, but the notation built $items")
       }
   }
 
@@ -83,14 +82,10 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     feedParts(consolidation.addRun(moduleLabel, Some(workerAt(forkGroup, workerIndex))), parts)
 
   private def feedParts(feed: RunFeed, parts: Seq[TestRunPart]): RunFeed = {
-    TestRunBuilder.build(parts*) match {
-      case Right(run) =>
-        run.items.foreach {
-          case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
-          case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
-          case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
-        }
-      case Left(reason) => fail(reason)
+    TestRunBuilder.build(parts*).items.foreach {
+      case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
+      case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
+      case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
     }
     feed
   }

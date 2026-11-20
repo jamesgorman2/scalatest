@@ -42,14 +42,7 @@ private[scalatest] object TestEventLogEncoder {
     assigned.substring(0, assigned.length - 1) + fields + "}\n"
   }
 
-  def runEnded(outcome: RunOutcome): String = {
-    val outcomeName = outcome match {
-      case RunOutcome.Completed => "completed"
-      case RunOutcome.Aborted => "aborted"
-      case RunOutcome.Stopped => "stopped"
-    }
-    line(text("item", "runEnded"), text("outcome", outcomeName))
-  }
+  def runEnded(outcome: RunOutcome): String = line(text("item", "runEnded"), text("outcome", outcome.word))
 
   private def line(fields: Field*): String = JsonWriter.write(record(fields: _*)) + "\n"
 
@@ -80,7 +73,7 @@ private[scalatest] object TestEventLogEncoder {
           nested("parent", parent.map(nodePath)),
           optionalInteger("position", position.map(_.toLong)),
           text("name", name),
-          text("suiteId", suiteId),
+          text("suiteId", suiteId.value),
           text("className", className)
         )
       case StructureNode.Scope(id, parent, position, name, label) =>
@@ -104,9 +97,9 @@ private[scalatest] object TestEventLogEncoder {
   private def nodePath(id: NodeId): JsonValue =
     JsonValue.Array(
       id.places.map {
-        case NodePlace.Suite(suiteId, index) => record(text("suiteId", suiteId), integer("index", index.toLong))
+        case NodePlace.Suite(suiteId, index) => record(text("suiteId", suiteId.value), integer("index", index.toLong))
         case NodePlace.Scope(scopeText, index) => record(text("scope", scopeText), integer("index", index.toLong))
-        case NodePlace.Test(name) => record(text("test", name))
+        case NodePlace.Test(testName) => record(text("test", testName.value))
       }
     )
 
@@ -116,44 +109,44 @@ private[scalatest] object TestEventLogEncoder {
     val origin = Seq(location(event.location), text("threadName", event.threadName), integer("timeStamp", event.timeStamp))
     event match {
       case _: TestStarting => "TestStarting" -> origin
-      case e: TestSucceeded => "TestSucceeded" -> (duration(e.duration) +: origin)
-      case e: TestFailed =>
+      case test: TestSucceeded => "TestSucceeded" -> (duration(test.duration) +: origin)
+      case test: TestFailed =>
         "TestFailed" -> (Seq(
-          text("message", e.message),
-          array("analysis", e.analysis.map(JsonValue.Text(_))),
-          throwable(e.throwable),
-          duration(e.duration)
+          text("message", test.message),
+          array("analysis", test.analysis.map(JsonValue.Text(_))),
+          throwable(test.throwable),
+          duration(test.duration)
         ) ++ origin)
       case _: TestIgnored => "TestIgnored" -> origin
-      case e: TestPending => "TestPending" -> (duration(e.duration) +: origin)
-      case e: TestCanceled =>
-        "TestCanceled" -> (Seq(text("message", e.message), throwable(e.throwable), duration(e.duration)) ++ origin)
+      case test: TestPending => "TestPending" -> (duration(test.duration) +: origin)
+      case test: TestCanceled =>
+        "TestCanceled" -> (Seq(text("message", test.message), throwable(test.throwable), duration(test.duration)) ++ origin)
       case _: SuiteStarting => "SuiteStarting" -> origin
-      case e: SuiteCompleted => "SuiteCompleted" -> (duration(e.duration) +: origin)
-      case e: SuiteAborted =>
-        "SuiteAborted" -> (Seq(text("message", e.message), throwable(e.throwable), duration(e.duration)) ++ origin)
-      case e: RunStarting =>
-        "RunStarting" -> (Seq(integer("testCount", e.testCount.toLong), configMap(e.configMap)) ++ origin)
-      case e: RunCompleted => "RunCompleted" -> (Seq(duration(e.duration), summary(e.summary)) ++ origin)
-      case e: RunStopped => "RunStopped" -> (Seq(duration(e.duration), summary(e.summary)) ++ origin)
-      case e: RunAborted =>
+      case suite: SuiteCompleted => "SuiteCompleted" -> (duration(suite.duration) +: origin)
+      case suite: SuiteAborted =>
+        "SuiteAborted" -> (Seq(text("message", suite.message), throwable(suite.throwable), duration(suite.duration)) ++ origin)
+      case run: RunStarting =>
+        "RunStarting" -> (Seq(integer("testCount", run.testCount.toLong), configMap(run.configMap)) ++ origin)
+      case run: RunCompleted => "RunCompleted" -> (Seq(duration(run.duration), summary(run.summary)) ++ origin)
+      case run: RunStopped => "RunStopped" -> (Seq(duration(run.duration), summary(run.summary)) ++ origin)
+      case run: RunAborted =>
         "RunAborted" -> (Seq(
-          text("message", e.message),
-          throwable(e.throwable),
-          duration(e.duration),
-          summary(e.summary)
+          text("message", run.message),
+          throwable(run.throwable),
+          duration(run.duration),
+          summary(run.summary)
         ) ++ origin)
-      case e: InfoProvided => "InfoProvided" -> (Seq(text("message", e.message), throwable(e.throwable)) ++ origin)
-      case e: AlertProvided => "AlertProvided" -> (Seq(text("message", e.message), throwable(e.throwable)) ++ origin)
-      case e: NoteProvided => "NoteProvided" -> (Seq(text("message", e.message), throwable(e.throwable)) ++ origin)
-      case e: MarkupProvided => "MarkupProvided" -> (text("text", e.text) +: origin)
+      case provided: InfoProvided => "InfoProvided" -> (Seq(text("message", provided.message), throwable(provided.throwable)) ++ origin)
+      case provided: AlertProvided => "AlertProvided" -> (Seq(text("message", provided.message), throwable(provided.throwable)) ++ origin)
+      case provided: NoteProvided => "NoteProvided" -> (Seq(text("message", provided.message), throwable(provided.throwable)) ++ origin)
+      case markup: MarkupProvided => "MarkupProvided" -> (text("text", markup.text) +: origin)
       case _: ScopeOpened => "ScopeOpened" -> origin
       case _: ScopeClosed => "ScopeClosed" -> origin
       case _: ScopePending => "ScopePending" -> origin
-      case e: DiscoveryStarting =>
-        "DiscoveryStarting" -> Seq(text("threadName", e.threadName), integer("timeStamp", e.timeStamp))
-      case e: DiscoveryCompleted =>
-        "DiscoveryCompleted" -> Seq(duration(e.duration), text("threadName", e.threadName), integer("timeStamp", e.timeStamp))
+      case discovery: DiscoveryStarting =>
+        "DiscoveryStarting" -> Seq(text("threadName", discovery.threadName), integer("timeStamp", discovery.timeStamp))
+      case discovery: DiscoveryCompleted =>
+        "DiscoveryCompleted" -> Seq(duration(discovery.duration), text("threadName", discovery.threadName), integer("timeStamp", discovery.timeStamp))
     }
   }
 
@@ -206,37 +199,17 @@ private[scalatest] object TestEventLogEncoder {
 
     private val written = mutable.ArrayBuffer.empty[Throwable]
 
-    // Keeps the throwables whose causes and suppressed throwables are still to write in a list, not on the call
-    // stack, so that a long chain of causes cannot overflow the stack.
-    def encode(throwable: Throwable): JsonValue = {
-      refTo(throwable).getOrElse {
-        val outermost = opened(throwable)
-        var open = List(outermost)
-        while (open.nonEmpty) {
-          val innermost = open.head
-          innermost.nextLinked() match {
-            case Some(linked) =>
-              refTo(linked) match {
-                case Some(ref) => innermost.add(ref)
-                case None => open = opened(linked) :: open
-              }
-            case None =>
-              open = open.tail
-              open.headOption.foreach(_.add(innermost.closed))
-          }
-        }
-        outermost.closed
-      }
-    }
+    def encode(throwable: Throwable): JsonValue =
+      refTo(throwable).getOrElse(OpenThrowable.closedFrom(opened(throwable))(linked => refTo(linked).toLeft(opened(linked))))
 
     private def refTo(throwable: Throwable): Option[JsonValue] = {
       val index = written.indexWhere(_ eq throwable)
       if (index >= 0) Some(record(integer("ref", index + 1L))) else None
     }
 
-    private def opened(throwable: Throwable): OpenThrowable = {
+    private def opened(throwable: Throwable): OpenThrowable[Throwable, JsonValue] = {
       written += throwable
-      new OpenThrowable(
+      new EncodingThrowable(
         Seq(
           integer("id", written.size.toLong),
           text("className", throwable.getClass.getName),
@@ -275,28 +248,9 @@ private[scalatest] object TestEventLogEncoder {
       )
   }
 
-  private final class OpenThrowable(ownFields: Seq[Field], cause: Option[Throwable], suppressed: Iterator[Throwable]) {
+  private final class EncodingThrowable(ownFields: Seq[Field], cause: Option[Throwable], suppressed: Iterator[Throwable])
+      extends OpenThrowable[Throwable, JsonValue](cause, suppressed) {
 
-    private var causeIsNext = cause.nonEmpty
-    private var addsCause = false
-    private var writtenCause: Option[JsonValue] = None
-    private val writtenSuppressed = Vector.newBuilder[JsonValue]
-
-    def nextLinked(): Option[Throwable] = {
-      addsCause = causeIsNext
-      causeIsNext = false
-      if (addsCause) cause else suppressed.nextOption()
-    }
-
-    def add(linked: JsonValue): Unit = {
-      if (addsCause) {
-        writtenCause = Some(linked)
-      } else {
-        writtenSuppressed += linked
-      }
-    }
-
-    def closed: JsonValue =
-      record((ownFields :+ nested("cause", writtenCause) :+ array("suppressed", writtenSuppressed.result())): _*)
+    def closed: JsonValue = record((ownFields :+ nested("cause", linkedCause) :+ array("suppressed", linkedSuppressed)): _*)
   }
 }

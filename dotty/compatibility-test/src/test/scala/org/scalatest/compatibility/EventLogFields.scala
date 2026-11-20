@@ -41,8 +41,8 @@ object EventLogFields {
       val places = assigned.node.places
       val suiteId = places.collect { case NodePlace.Suite(id, _) => id }.last
       places.last match {
-        case NodePlace.Test(name) => "test " + quoted(suiteId) + " " + quoted(name)
-        case _ => "suite " + quoted(suiteId)
+        case NodePlace.Test(testName) => "test " + quoted(suiteId.value) + " " + quoted(testName.value)
+        case _ => "suite " + quoted(suiteId.value)
       }
     }
 

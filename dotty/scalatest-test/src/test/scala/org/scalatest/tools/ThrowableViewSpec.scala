@@ -55,9 +55,7 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
     isPropertyCheckFailure: Boolean = false,
     cause: Option[DecodedThrowable] = None
   ): DecodedThrowable = {
-    val throwable = new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, decodedFrames(frameCount))
-    throwable.link(cause, Vector.empty)
-    throwable
+    new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, decodedFrames(frameCount), cause)
   }
 
   private def errorLines(
@@ -259,8 +257,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
         ("org.scalatest.exceptions.TestFailedException:" +: decodedFrames(10).map("at " + _.text) :+ "...")
     }
     "stop at a decoded throwable that is its own cause" in {
-      val failure = new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, decodedFrames(1))
-      failure.link(Some(failure), Vector.empty)
+      lazy val failure: DecodedThrowable =
+        new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, decodedFrames(1), Some(failure))
       StringReporter.stackTraceLines(Some(failure), presentShortStackTraces = false, presentFullStackTraces = true) shouldBe
         List("java.lang.IllegalStateException: boom", "at Stack.method0(Stack.scala:10)")
     }

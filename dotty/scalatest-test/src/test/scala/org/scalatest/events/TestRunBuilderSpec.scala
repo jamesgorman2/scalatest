@@ -19,16 +19,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
   private val aStackId = id(suiteAt("samples.StackSuite"), scopeAt("A Stack"))
   private val popsId = id(suiteAt("samples.StackSuite"), testAt("A Stack pops"))
 
-  private def built(parts: TestRunPart*): BuiltRun = {
-    TestRunBuilder.build(parts*) match {
-      case Right(run) => run
-      case Left(reason) => fail(s"the run was not built: $reason")
-    }
-  }
+  private def built(parts: TestRunPart*): BuiltRun = TestRunBuilder.build(parts*)
 
   private def eventsOf(notation: String): Vector[TestEventLogEvent] = built(TestRunPart.Events(notation)).events.map(_.event)
 
-  private def rejection(notation: String): Option[String] = TestRunBuilder.build(TestRunPart.Events(notation)).left.toOption
+  private def rejection(notation: String): String = intercept[NotationError](TestRunBuilder.build(TestRunPart.Events(notation))).getMessage
 
   private def structuresOf(notation: String): Vector[IndexedSeq[StructureNode]] =
     eventsOf(notation).collect { case TestEventLogEvent.Structure(nodes) => nodes }
@@ -54,16 +49,16 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
   private def id(places: NodePlace*): NodeId = NodeId(places.toVector)
 
-  private def suiteAt(suiteId: String, index: Int = 0): NodePlace = NodePlace.Suite(suiteId, index)
+  private def suiteAt(suiteId: String, index: Int = 0): NodePlace = NodePlace.Suite(SuiteId(suiteId), index)
 
   private def scopeAt(text: String, index: Int = 0): NodePlace = NodePlace.Scope(text, index)
 
-  private def testAt(testName: String): NodePlace = NodePlace.Test(testName)
+  private def testAt(testName: String): NodePlace = NodePlace.Test(TestName(testName))
 
   private def under(parent: NodeId, places: NodePlace*): NodeId = NodeId(parent.places ++ places)
 
   private def suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String): StructureNode =
-    StructureNode.Suite(id, parent, position, name, suiteId, className)
+    StructureNode.Suite(id, parent, position, name, SuiteId(suiteId), className)
 
   private def scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String): StructureNode =
     StructureNode.Scope(id, parent, position, name, label)
@@ -142,7 +137,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject any other ending" in {
-        rejection("run ended failed") shouldBe Some("a run ends completed, aborted or stopped, not 'failed'")
+        rejection("run ended failed") shouldBe "a run ends completed, aborted or stopped, not 'failed'"
       }
     }
 
@@ -277,9 +272,8 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure
             suite "StackSuite" #3, class "samples.StackSuite"
           """
-        ) shouldBe Some(
+        ) shouldBe
           "a suite new to the event log is #2 among the suites that share its name, not #3: 'suite \"StackSuite\" #3, class \"samples.StackSuite\"'"
-        )
       }
 
       "reject an ordinal that names a suite of another suite ID" in {
@@ -290,13 +284,12 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure
             suite "SameSuite" #1, class "b.SameSuite"
           """
-        ) shouldBe Some(
+        ) shouldBe
           "suite \"SameSuite\" #1 is not a suite of suite ID b.SameSuite under the structure's parent: 'suite \"SameSuite\" #1, class \"b.SameSuite\"'"
-        )
       }
 
       "reject a structure that holds no suite" in {
-        rejection("structure") shouldBe Some("a structure starts with its suite, indented 2 spaces:\nstructure")
+        rejection("structure") shouldBe "a structure starts with its suite, indented 2 spaces:\nstructure"
       }
 
       "reject a structure that starts with a scope" in {
@@ -305,7 +298,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure
             scope "A Stack", label "A Stack"
           """
-        ) shouldBe Some("a structure starts with its suite, indented 2 spaces:\nstructure\n  scope \"A Stack\", label \"A Stack\"")
+        ) shouldBe "a structure starts with its suite, indented 2 spaces:\nstructure\n  scope \"A Stack\", label \"A Stack\""
       }
 
       "reject a second tree in one structure" in {
@@ -315,7 +308,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
             suite "OneSuite", class "samples.OneSuite"
             suite "TwoSuite", class "samples.TwoSuite"
           """
-        ) shouldBe Some("'suite \"TwoSuite\", class \"samples.TwoSuite\"' is not indented 2 spaces under a suite or scope of its structure")
+        ) shouldBe "'suite \"TwoSuite\", class \"samples.TwoSuite\"' is not indented 2 spaces under a suite or scope of its structure"
       }
 
       "reject a node under a test" in {
@@ -326,7 +319,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               test "pops", label "- pops"
                 test "pushes", label "- pushes"
           """
-        ) shouldBe Some("'test \"pushes\", label \"- pushes\"' is not indented 2 spaces under a suite or scope of its structure")
+        ) shouldBe "'test \"pushes\", label \"- pushes\"' is not indented 2 spaces under a suite or scope of its structure"
       }
 
       "reject a suite under a scope" in {
@@ -337,7 +330,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               scope "A Stack", label "A Stack"
                 suite "InnerSuite", class "samples.InnerSuite"
           """
-        ) shouldBe Some("a suite is nested in a suite, not in a scope: 'suite \"InnerSuite\", class \"samples.InnerSuite\"'")
+        ) shouldBe "a suite is nested in a suite, not in a scope: 'suite \"InnerSuite\", class \"samples.InnerSuite\"'"
       }
 
       "reject a node indented by an odd number of spaces" in {
@@ -347,7 +340,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
             suite "StackSuite", class "samples.StackSuite"
                test "pops", label "- pops"
           """
-        ) shouldBe Some("'test \"pops\", label \"- pops\"' is not indented by a multiple of 2 spaces under its structure")
+        ) shouldBe "'test \"pops\", label \"- pops\"' is not indented by a multiple of 2 spaces under its structure"
       }
 
       "reject a line indented under an event" in {
@@ -356,7 +349,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           run started
             suite "StackSuite", class "samples.StackSuite"
           """
-        ) shouldBe Some("'suite \"StackSuite\", class \"samples.StackSuite\"' is indented under a line that is not a structure")
+        ) shouldBe "'suite \"StackSuite\", class \"samples.StackSuite\"' is indented under a line that is not a structure"
       }
 
       "reject a node that is no suite, scope or test" in {
@@ -365,7 +358,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure
             spec "StackSuite", class "samples.StackSuite"
           """
-        ) shouldBe Some("expected suite, scope or test at column 1 of 'spec \"StackSuite\", class \"samples.StackSuite\"'")
+        ) shouldBe "expected suite, scope or test at column 1 of 'spec \"StackSuite\", class \"samples.StackSuite\"'"
       }
 
       "reject two tests of one suite that have one test name" in {
@@ -377,7 +370,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               scope "A Stack", label "A Stack"
                 test "pops", label "- pops"
           """
-        ) shouldBe Some("two tests of one suite have the test name \"A Stack pops\": give 'test \"pops\", label \"- pops\"' its own test name")
+        ) shouldBe "two tests of one suite have the test name \"A Stack pops\": give 'test \"pops\", label \"- pops\"' its own test name"
       }
     }
 
@@ -469,7 +462,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
         rejection(dedentedAndJoined(stackSuite, """
           structure under scope "A Stack"
             suite "HelperSuite", class "samples.HelperSuite"
-          """)) shouldBe Some("a structure is under a suite or a test at column 32 of 'structure under scope \"A Stack\"'")
+          """)) shouldBe "a structure is under a suite or a test at column 32 of 'structure under scope \"A Stack\"'"
       }
 
       "reject a structure under a suite no structure holds" in {
@@ -478,7 +471,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure under suite "OuterSuite"
             suite "HelperSuite", class "samples.HelperSuite"
           """
-        ) shouldBe Some("no structure so far holds suite \"OuterSuite\"")
+        ) shouldBe "no structure so far holds suite \"OuterSuite\""
       }
     }
 
@@ -816,7 +809,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
             suite "OuterSuite", class "samples.OuterSuite"
               suite "InnerSuite", class "samples.InnerSuite"
           """
-        ) shouldBe Some("a further structure holds its suite's scopes and tests only, not 'suite \"InnerSuite\", class \"samples.InnerSuite\"'")
+        ) shouldBe "a further structure holds its suite's scopes and tests only, not 'suite \"InnerSuite\", class \"samples.InnerSuite\"'"
       }
 
       "reject another class for the suite" in {
@@ -827,9 +820,8 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
           structure
             suite "StackSpec", class "samples.OtherSpec", id "stack"
           """
-        ) shouldBe Some(
+        ) shouldBe
           "a further structure keeps its suite's class, samples.StackSpec:\nstructure\n  suite \"StackSpec\", class \"samples.OtherSpec\", id \"stack\""
-        )
       }
     }
 
@@ -917,7 +909,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
                 test "pops", label "- pops"
           test "A Stack pops": TestSucceeded
           """
-        ) shouldBe Some("no structure so far holds test \"A Stack pops\"")
+        ) shouldBe "no structure so far holds test \"A Stack pops\""
       }
 
       "assign an event of the run to no node" in {
@@ -927,11 +919,11 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject a node that only a later structure holds" in {
-        rejection(dedentedAndJoined("""test "pops": TestStarting""", stackSuite)) shouldBe Some("no structure so far holds test \"pops\"")
+        rejection(dedentedAndJoined("""test "pops": TestStarting""", stackSuite)) shouldBe "no structure so far holds test \"pops\""
       }
 
       "reject a node of another kind than the one that has the name" in {
-        rejection(dedentedAndJoined(stackSuite, """scope "pops": ScopeOpened""")) shouldBe Some("no structure so far holds scope \"pops\"")
+        rejection(dedentedAndJoined(stackSuite, """scope "pops": ScopeOpened""")) shouldBe "no structure so far holds scope \"pops\""
       }
 
       "reject a name shared by several nodes when the event gives no ordinal" in {
@@ -943,32 +935,32 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
               scope "A Stack", label "A Stack"
           scope "A Stack": ScopeOpened
           """
-        ) shouldBe Some("the structures so far hold 2 nodes named scope \"A Stack\": add #<n>")
+        ) shouldBe "the structures so far hold 2 nodes named scope \"A Stack\": add #<n>"
       }
 
       "reject an ordinal beyond the number of nodes sharing the name" in {
-        rejection(dedentedAndJoined(stackSuite, """test "pops" #2: TestStarting""")) shouldBe Some("no structure so far holds test \"pops\" #2: 1 share that name")
+        rejection(dedentedAndJoined(stackSuite, """test "pops" #2: TestStarting""")) shouldBe "no structure so far holds test \"pops\" #2: 1 share that name"
       }
 
       "reject an execution for an event of the run" in {
-        rejection("run execution 2: RunStopped") shouldBe Some("an event assigned to the run has no execution: 'run execution 2: RunStopped'")
+        rejection("run execution 2: RunStopped") shouldBe "an event assigned to the run has no execution: 'run execution 2: RunStopped'"
       }
 
       "reject an ancestor's execution for an event of the run" in {
         rejection(dedentedAndJoined(stackSuite, """run, in suite "StackSuite" execution 1: RunStopped""")) shouldBe
-          Some("an event assigned to the run has no execution: 'run, in suite \"StackSuite\" execution 1: RunStopped'")
+          "an event assigned to the run has no execution: 'run, in suite \"StackSuite\" execution 1: RunStopped'"
       }
 
       "reject a line that names no run, suite, scope or test" in {
-        rejection("""spec "pops": TestStarting""") shouldBe Some("expected run, suite, scope or test at column 1 of 'spec \"pops\": TestStarting'")
+        rejection("""spec "pops": TestStarting""") shouldBe "expected run, suite, scope or test at column 1 of 'spec \"pops\": TestStarting'"
       }
 
       "reject a line that names no event class" in {
-        rejection("""run: (message: "lost")""") shouldBe Some("expected an event class at column 6 of 'run: (message: \"lost\")'")
+        rejection("""run: (message: "lost")""") shouldBe "expected an event class at column 6 of 'run: (message: \"lost\")'"
       }
 
       "reject text after the event" in {
-        rejection("run: RunStopped and more") shouldBe Some("unexpected text at column 16 of 'run: RunStopped and more'")
+        rejection("run: RunStopped and more") shouldBe "unexpected text at column 16 of 'run: RunStopped and more'"
       }
     }
 
@@ -1024,36 +1016,32 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "reject a marked node that is not above the event's node" in {
         rejection(dedentedAndJoined(stackSuite, """suite "StackSuite", in scope "A Stack" execution 1: SuiteStarting""")) shouldBe
-          Some("scope \"A Stack\" is not above suite \"StackSuite\": 'suite \"StackSuite\", in scope \"A Stack\" execution 1: SuiteStarting'")
+          "scope \"A Stack\" is not above suite \"StackSuite\": 'suite \"StackSuite\", in scope \"A Stack\" execution 1: SuiteStarting'"
       }
 
       "reject ancestors marked other than from the top-level suite down" in {
         rejection(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 1, in suite "StackSuite" execution 1: TestStarting""")) shouldBe
-          Some(
             "an event marks each ancestor's execution once, from the top-level suite down: 'test \"pops\", in scope \"A Stack\" execution 1, in suite \"StackSuite\" execution 1: TestStarting'"
-          )
       }
 
       "reject an ancestor marked twice" in {
         rejection(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 1, in scope "A Stack" execution 2: TestStarting""")) shouldBe
-          Some(
             "an event marks each ancestor's execution once, from the top-level suite down: 'test \"pops\", in scope \"A Stack\" execution 1, in scope \"A Stack\" execution 2: TestStarting'"
-          )
       }
 
       "reject an execution below 1" in {
         rejection(dedentedAndJoined(stackSuite, """test "pops" execution 0: TestStarting""")) shouldBe
-          Some("expected a number from 1 at column 23 of 'test \"pops\" execution 0: TestStarting'")
+          "expected a number from 1 at column 23 of 'test \"pops\" execution 0: TestStarting'"
       }
 
       "reject an ancestor's execution below 1" in {
         rejection(dedentedAndJoined(stackSuite, """test "pops", in scope "A Stack" execution 0: TestStarting""")) shouldBe
-          Some("expected a number from 1 at column 43 of 'test \"pops\", in scope \"A Stack\" execution 0: TestStarting'")
+          "expected a number from 1 at column 43 of 'test \"pops\", in scope \"A Stack\" execution 0: TestStarting'"
       }
 
       "reject an execution that does not fit an Int" in {
         rejection(dedentedAndJoined(stackSuite, """test "pops" execution 2147483648: TestStarting""")) shouldBe
-          Some("'2147483648' does not fit an Int at column 23 of 'test \"pops\" execution 2147483648: TestStarting'")
+          "'2147483648' does not fit an Int at column 23 of 'test \"pops\" execution 2147483648: TestStarting'"
       }
     }
 
@@ -1216,7 +1204,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject a class the test event log does not carry" in {
-        rejection("run: TestExploded") shouldBe Some("the test event log has no event class TestExploded: 'run: TestExploded'")
+        rejection("run: TestExploded") shouldBe "the test event log has no event class TestExploded: 'run: TestExploded'"
       }
     }
 
@@ -1273,66 +1261,65 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
       }
 
       "reject a field the event's class does not have" in {
-        rejection("""run: RunStopped(message: "stopped")""") shouldBe Some("a RunStopped has no message: 'run: RunStopped(message: \"stopped\")'")
+        rejection("""run: RunStopped(message: "stopped")""") shouldBe "a RunStopped has no message: 'run: RunStopped(message: \"stopped\")'"
       }
 
       "reject a field the notation cannot write" in {
         rejection("run: RunCompleted(summary: 3)") shouldBe
-          Some("the notation writes no field 'summary' at column 28 of 'run: RunCompleted(summary: 3)'")
+          "the notation writes no field 'summary' at column 28 of 'run: RunCompleted(summary: 3)'"
       }
 
       "reject parentheses that hold no field" in {
-        rejection("run: RunStopped()") shouldBe Some("expected a field name at column 17 of 'run: RunStopped()'")
+        rejection("run: RunStopped()") shouldBe "expected a field name at column 17 of 'run: RunStopped()'"
       }
 
       "reject a field written twice" in {
         rejection("""run: InfoProvided(message: "one", message: "two")""") shouldBe
-          Some("an event writes its message once: 'run: InfoProvided(message: \"one\", message: \"two\")'")
+          "an event writes its message once: 'run: InfoProvided(message: \"one\", message: \"two\")'"
       }
 
       "reject an escape Java's string literals do not have" in {
         rejection("""run: InfoProvided(message: "a\qb")""") shouldBe
-          Some("the notation has no escape '\\q' at column 31 of 'run: InfoProvided(message: \"a\\qb\")'")
+          "the notation has no escape '\\q' at column 31 of 'run: InfoProvided(message: \"a\\qb\")'"
       }
 
       "reject a Unicode escape of fewer than 4 hexadecimal digits" in {
         rejection("""run: InfoProvided(message: "\u12G4")""") shouldBe
-          Some("expected 4 hexadecimal digits at column 31 of 'run: InfoProvided(message: \"\\u12G4\")'")
+          "expected 4 hexadecimal digits at column 31 of 'run: InfoProvided(message: \"\\u12G4\")'"
       }
 
       "reject a string that ends in a lone backslash" in {
         rejection("run: InfoProvided(message: \"a\\") shouldBe
-          Some("an escape that is not finished at column 31 of 'run: InfoProvided(message: \"a\\'")
+          "an escape that is not finished at column 31 of 'run: InfoProvided(message: \"a\\'"
       }
 
       "reject a string that is not closed" in {
         rejection("""run: InfoProvided(message: "open)""") shouldBe
-          Some("a string that is not closed at column 34 of 'run: InfoProvided(message: \"open)'")
+          "a string that is not closed at column 34 of 'run: InfoProvided(message: \"open)'"
       }
 
       "reject a number when the field holds a string" in {
-        rejection("run: InfoProvided(message: 3)") shouldBe Some("expected '\"' at column 28 of 'run: InfoProvided(message: 3)'")
+        rejection("run: InfoProvided(message: 3)") shouldBe "expected '\"' at column 28 of 'run: InfoProvided(message: 3)'"
       }
 
       "reject a number that does not fit its field" in {
         rejection("run: TestSucceeded(duration: 9223372036854775808)") shouldBe
-          Some("'9223372036854775808' does not fit a Long at column 30 of 'run: TestSucceeded(duration: 9223372036854775808)'")
+          "'9223372036854775808' does not fit a Long at column 30 of 'run: TestSucceeded(duration: 9223372036854775808)'"
       }
 
       "reject a test count that does not fit an Int" in {
         rejection("run: RunStarting(testCount: 2147483648)") shouldBe
-          Some("the test count 2147483648 does not fit an Int: 'run: RunStarting(testCount: 2147483648)'")
+          "the test count 2147483648 does not fit an Int: 'run: RunStarting(testCount: 2147483648)'"
       }
 
       "reject a location's line number that does not fit an Int" in {
         rejection("""run: TestStarting(location: LineInFile(2147483648, "FailSuite.scala", None))""") shouldBe
-          Some("'2147483648' does not fit an Int at column 40 of 'run: TestStarting(location: LineInFile(2147483648, \"FailSuite.scala\", None))'")
+          "'2147483648' does not fit an Int at column 40 of 'run: TestStarting(location: LineInFile(2147483648, \"FailSuite.scala\", None))'"
       }
 
       "reject a location that is not one of the Location classes" in {
-        rejection("run: TestStarting(location: Somewhere)") shouldBe Some(
+        rejection("run: TestStarting(location: Somewhere)") shouldBe
           "expected SeeStackDepthException, TopOfClass, TopOfMethod or LineInFile at column 29 of 'run: TestStarting(location: Somewhere)'"
-        )
       }
     }
 
@@ -1474,37 +1461,37 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
 
       "reject a frame that is not the text StackTraceElement.toString gives" in {
         rejection("""run: RunAborted(throwable: java.lang.Error frames ["not a frame"])""") shouldBe
-          Some("'not a frame' is not the text StackTraceElement.toString gives a frame")
+          "'not a frame' is not the text StackTraceElement.toString gives a frame"
       }
 
       "reject a frame whose line number is not a number" in {
         rejection("""run: RunAborted(throwable: java.lang.Error frames ["samples.A.f(A.scala:nine)"])""") shouldBe
-          Some("'samples.A.f(A.scala:nine)' holds a line number that is not a number")
+          "'samples.A.f(A.scala:nine)' holds a line number that is not a number"
       }
 
       "reject a throwable that writes no class name" in {
         rejection("run: RunAborted(throwable: )") shouldBe
-          Some("expected a throwable's class name at column 28 of 'run: RunAborted(throwable: )'")
+          "expected a throwable's class name at column 28 of 'run: RunAborted(throwable: )'"
       }
 
       "reject a throwable that writes no failed code after at" in {
         rejection("run: RunAborted(throwable: java.lang.Error at )") shouldBe
-          Some("expected <file name>:<line number> at column 47 of 'run: RunAborted(throwable: java.lang.Error at )'")
+          "expected <file name>:<line number> at column 47 of 'run: RunAborted(throwable: java.lang.Error at )'"
       }
 
       "reject failed code with no line number" in {
         rejection("run: RunAborted(throwable: java.lang.Error at StackSpec.scala)") shouldBe
-          Some("'StackSpec.scala' is not <file name>:<line number> at column 62 of 'run: RunAborted(throwable: java.lang.Error at StackSpec.scala)'")
+          "'StackSpec.scala' is not <file name>:<line number> at column 62 of 'run: RunAborted(throwable: java.lang.Error at StackSpec.scala)'"
       }
 
       "reject failed code whose line number is not a number" in {
         rejection("run: RunAborted(throwable: java.lang.Error at StackSpec.scala:nine)") shouldBe
-          Some("'nine' is not a line number at column 67 of 'run: RunAborted(throwable: java.lang.Error at StackSpec.scala:nine)'")
+          "'nine' is not a line number at column 67 of 'run: RunAborted(throwable: java.lang.Error at StackSpec.scala:nine)'"
       }
 
       "reject parts written out of order" in {
         rejection("""run: RunAborted(throwable: java.lang.Error property check at StackSpec.scala:9)""") shouldBe
-          Some("expected ')' at column 58 of 'run: RunAborted(throwable: java.lang.Error property check at StackSpec.scala:9)'")
+          "expected ')' at column 58 of 'run: RunAborted(throwable: java.lang.Error property check at StackSpec.scala:9)'"
       }
     }
 

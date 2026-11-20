@@ -29,8 +29,10 @@ import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.RunStarting
 import org.scalatest.events.RunStopped
+import org.scalatest.events.SuiteId
 import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.TestName
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.jdk.CollectionConverters.*
@@ -103,9 +105,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     nestedSuites: List[SuiteStructure] = Nil,
     testsBeforeNestedSuites: Boolean = false
   ): SuiteStructure =
-    SuiteStructure(instance, name, s"samples.$name", s"samples.$name", scopesAndTests, nestedSuites, testsBeforeNestedSuites)
+    SuiteStructure(instance, name, SuiteId(s"samples.$name"), s"samples.$name", scopesAndTests, nestedSuites, testsBeforeNestedSuites)
 
-  private def test(name: String): ScopeOrTest = ScopeOrTest.Test(name, name, s"- $name")
+  private def test(name: String): ScopeOrTest = ScopeOrTest.Test(name, TestName(name), s"- $name")
 
   private final class TestNamesThrow(thrown: Throwable) extends Suite {
     override def testNames: Set[String] = throw thrown
@@ -410,14 +412,14 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
           outer,
           "Outer",
           List(
-            ScopeOrTest.Scope("s", "s", "s", List(ScopeOrTest.Test("t", "s t", "- t"))),
+            ScopeOrTest.Scope("s", "s", "s", List(ScopeOrTest.Test("t", TestName("s t"), "- t"))),
             ScopeOrTest.Scope("s", "s", "s", Nil),
             test("flat")
           ),
           List(structureOf(inner, "Inner", List(test("i"))))
         )
       val outerPath = NodePath.topLevel("samples.Outer")
-      val outerPlace = NodePlace.Suite("samples.Outer", 0)
+      val outerPlace = NodePlace.Suite(SuiteId("samples.Outer"), 0)
       def nodeId(places: NodePlace*): NodeId = NodeId(places.toVector)
 
       "write it as one line, the suite first and each node's children after it in declared order, nested suites before scopes and tests" in {
@@ -454,13 +456,13 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
       "return the suite's node table, holding the suite's node, suite ID and class name" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).addTopLevelSuite(nestedThenScopesAndTests)
-        (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), "samples.Outer", "samples.Outer"))
+        (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), SuiteId("samples.Outer"), "samples.Outer"))
       }
 
       "return a node table holding each test's node by its test name" in {
         val emitter = TestEventLogEmitter.appendingTo(new RecordingEventLog)
         val table = emitter.addTopLevelSuite(nestedThenScopesAndTests)
-        emitter.synchronized(table.testsByName) shouldBe Map("s t" -> nodeId(outerPlace, NodePlace.Test("s t")), "flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
+        emitter.synchronized(table.testsByName) shouldBe Map(TestName("s t") -> nodeId(outerPlace, NodePlace.Test(TestName("s t"))), TestName("flat") -> nodeId(outerPlace, NodePlace.Test(TestName("flat"))))
       }
 
       "return a node table holding each scope's node by its path of registered texts, telling sibling scopes of one text apart by their place" in {
@@ -489,9 +491,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         val firstS = nodeId(outerPlace, NodePlace.Scope("s", 0))
         emitter.synchronized(table.parents) shouldBe Map(
           firstS -> outerId,
-          nodeId(outerPlace, NodePlace.Test("s t")) -> firstS,
+          nodeId(outerPlace, NodePlace.Test(TestName("s t"))) -> firstS,
           nodeId(outerPlace, NodePlace.Scope("s", 1)) -> outerId,
-          nodeId(outerPlace, NodePlace.Test("flat")) -> outerId
+          nodeId(outerPlace, NodePlace.Test(TestName("flat"))) -> outerId
         )
       }
 
@@ -501,10 +503,10 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         emitter.synchronized(table.nestedSuites.map(nested => (nested.node, nested.suiteId, nested.className, nested.testsByName, nested.scopesByPath, nested.nestedSuites))) shouldBe
           Vector(
             (
-              nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0)),
+              nodeId(outerPlace, NodePlace.Suite(SuiteId("samples.Inner"), 0)),
+              SuiteId("samples.Inner"),
               "samples.Inner",
-              "samples.Inner",
-              Map("i" -> nodeId(outerPlace, NodePlace.Suite("samples.Inner", 0), NodePlace.Test("i"))),
+              Map(TestName("i") -> nodeId(outerPlace, NodePlace.Suite(SuiteId("samples.Inner"), 0), NodePlace.Test(TestName("i")))),
               Map.empty,
               Vector.empty
             )
@@ -535,7 +537,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
         emitter.endWithoutRunEnded()
         val table = emitter.addTopLevelSuite(structureOf(outer, "Outer", List(test("flat"))))
         eventLog.writes shouldBe Vector.empty
-        emitter.synchronized(table.testsByName) shouldBe Map("flat" -> nodeId(outerPlace, NodePlace.Test("flat")))
+        emitter.synchronized(table.testsByName) shouldBe Map(TestName("flat") -> nodeId(outerPlace, NodePlace.Test(TestName("flat"))))
       }
 
       "not throw where its event log rejects the write, and close the event log" in {

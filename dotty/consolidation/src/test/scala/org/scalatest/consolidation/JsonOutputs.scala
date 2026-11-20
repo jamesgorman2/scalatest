@@ -68,7 +68,7 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
 
   /** The events of the test event log written in notation, in order, so a test can alter them before feeding them. */
   def eventsOf(eventLog: String): Vector[TestEventLogEvent] =
-    TestRunBuilder.build(TestRunPart.Events(eventLog)).fold(fail(_), _.events.map(_.event))
+    TestRunBuilder.build(TestRunPart.Events(eventLog)).events.map(_.event)
 
   /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the events. */
   def jsonOutputOfEvents(events: Vector[TestEventLogEvent]): JsonSink =

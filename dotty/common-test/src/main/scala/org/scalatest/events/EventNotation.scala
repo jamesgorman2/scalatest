@@ -173,14 +173,8 @@ private[events] object EventNotation {
     }
   }
 
-  private def outcome(how: String): RunOutcome = {
-    how match {
-      case "completed" => RunOutcome.Completed
-      case "aborted" => RunOutcome.Aborted
-      case "stopped" => RunOutcome.Stopped
-      case other => throw new NotationError(s"a run ends completed, aborted or stopped, not '$other'")
-    }
-  }
+  private def outcome(how: String): RunOutcome =
+    RunOutcome.fromWord(how).getOrElse(throw new NotationError(s"a run ends completed, aborted or stopped, not '$how'"))
 
   private def event(text: String): NotationLine = {
     val cursor = new LineCursor(text)
@@ -314,6 +308,21 @@ private[events] object EventNotation {
     }
     WrittenStackDepth(file, lineNumber)
   }
+}
+
+/** Writes text as the notation quotes it, the inverse of reading a quoted string. */
+private[scalatest] object NotationText {
+
+  def quoted(text: String): String =
+    text.flatMap {
+      case '"' => "\\\""
+      case '\\' => "\\\\"
+      case '\n' => "\\n"
+      case '\r' => "\\r"
+      case '\t' => "\\t"
+      case char if char < ' ' || Character.isSurrogate(char) => f"\\u${char.toInt}%04x"
+      case char => char.toString
+    }.mkString("\"", "", "\"")
 }
 
 private final class LineCursor(line: String) {

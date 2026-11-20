@@ -7,11 +7,21 @@ import org.scalatest.RegisteredScope
 import org.scalatest.RegisteredTest
 import org.scalatest.Suite
 import org.scalatest.TestsBeforeNestedSuites
+import org.scalatest.events.SuiteId
+import org.scalatest.events.TestName
 
 /** A scope's `text` is the text it is registered with, which may hold more words than its name. */
 private[scalatest] enum ScopeOrTest {
   case Scope(name: String, text: String, label: String, scopesAndTests: List[ScopeOrTest])
-  case Test(name: String, testName: String, label: String, ignored: Boolean = false)
+  case Test(name: String, testName: TestName, label: String, ignored: Boolean = false)
+}
+
+/** What `Filter.apply` says of one test: whether the filter drops it, and whether it ignores it. */
+private[scalatest] final case class FilterVerdict(isDropped: Boolean, isIgnored: Boolean)
+
+private[scalatest] object FilterVerdict {
+
+  def of(filtered: (Boolean, Boolean)): FilterVerdict = FilterVerdict(filtered._1, filtered._2)
 }
 
 /**
@@ -23,12 +33,12 @@ private[scalatest] enum ScopeOrTest {
 private[scalatest] final case class SuiteStructure(
   instance: Suite,
   name: String,
-  suiteId: String,
+  suiteId: SuiteId,
   className: String,
   scopesAndTests: List[ScopeOrTest],
   nestedSuites: List[SuiteStructure],
   testsBeforeNestedSuites: Boolean,
-  filteredTests: Map[String, (Boolean, Boolean)] = Map.empty
+  filteredTests: Map[TestName, FilterVerdict] = Map.empty
 )
 
 private[scalatest] object SuiteStructure {
@@ -48,14 +58,15 @@ private[scalatest] object SuiteStructure {
     val (scopesAndTests, filteredTests) = readFrom.scopesAndTestsOfRegistrationTree match {
       case Some(registered) =>
         val tags = readFrom.tags
-        val filteredTests = testNamesIn(registered).map(testName => testName -> filter(testName, tags, suiteId)).toMap
+        val filteredTests =
+          testNamesIn(registered).map(testName => testName -> FilterVerdict.of(filter(testName.value, tags, suiteId))).toMap
         (keptByFilter(registered, filteredTests), filteredTests)
-      case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId)), Map.empty)
+      case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId)), Map.empty[TestName, FilterVerdict])
     }
     SuiteStructure(
       suite,
       readFrom.suiteName,
-      suiteId,
+      SuiteId(suiteId),
       Suite.getSuiteClassName(readFrom),
       scopesAndTests,
       if (filter.excludeNestedSuites) Nil else readFrom.nestedSuites.toList.map(read(_, filter)),
@@ -70,17 +81,22 @@ private[scalatest] object SuiteStructure {
    */
   def ofTestNames(testNames: Seq[(String, Boolean)]): List[ScopeOrTest] =
     testNames.toList.map { (testName, isIgnored) =>
-      val test = RegisteredNode.unregisteredTest(testName)
-      ScopeOrTest.Test(test.name, test.testName, test.label, isIgnored)
+      val unregistered = RegisteredNode.unregisteredTest(testName)
+      ScopeOrTest.Test(unregistered.name, TestName(unregistered.testName), unregistered.label, isIgnored)
     }
 
   /** Keeps every scope, as the engine opens a scope whose tests the filter all drops. */
-  def keptByFilter(registered: List[RegisteredNode], droppedAndIgnored: String => (Boolean, Boolean)): List[ScopeOrTest] = {
+  def keptByFilter(registered: List[RegisteredNode], verdictOn: TestName => FilterVerdict): List[ScopeOrTest] = {
     registered.flatMap {
-      case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, keptByFilter(nodes, droppedAndIgnored)))
-      case RegisteredTest(name, testName, label, labelWhenIgnored) =>
-        val (isDropped, isIgnored) = droppedAndIgnored(testName)
-        if (isDropped) None else Some(ScopeOrTest.Test(name, testName, if (isIgnored) labelWhenIgnored else label, isIgnored))
+      case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, keptByFilter(nodes, verdictOn)))
+      case RegisteredTest(name, registeredName, label, labelWhenIgnored) =>
+        val testName = TestName(registeredName)
+        val verdict = verdictOn(testName)
+        if (verdict.isDropped) {
+          None
+        } else {
+          Some(ScopeOrTest.Test(name, testName, if (verdict.isIgnored) labelWhenIgnored else label, verdict.isIgnored))
+        }
     }
   }
 
@@ -88,13 +104,14 @@ private[scalatest] object SuiteStructure {
    * A registration tree's scopes, holding only the tests `latest` holds, as `latest` holds them, and the test named
    * `added`, which is not marked ignored. `None` where the tree holds no test of that name.
    */
-  def withTestAdded(registered: List[RegisteredNode], latest: List[ScopeOrTest], added: String): Option[List[ScopeOrTest]] = {
-    val latestTests = testsIn(latest).map(test => test.testName -> test).toMap
+  def withTestAdded(registered: List[RegisteredNode], latest: List[ScopeOrTest], added: TestName): Option[List[ScopeOrTest]] = {
+    val latestTests = testsIn(latest).map(latestTest => latestTest.testName -> latestTest).toMap
     // Recurses once for each scope nested in another, as registering them does.
     def nodesIn(nodes: List[RegisteredNode]): List[ScopeOrTest] =
       nodes.flatMap {
         case RegisteredScope(name, text, label, scopesAndTests) => Some(ScopeOrTest.Scope(name, text, label, nodesIn(scopesAndTests)))
-        case RegisteredTest(name, testName, label, _) =>
+        case RegisteredTest(name, registeredName, label, _) =>
+          val testName = TestName(registeredName)
           latestTests.get(testName).orElse(Option.when(testName == added)(ScopeOrTest.Test(name, testName, label, ignored = false)))
       }
     Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
@@ -108,9 +125,9 @@ private[scalatest] object SuiteStructure {
     }
 
   // Recurses once for each scope nested in another, as registering them does.
-  def testNamesIn(registered: List[RegisteredNode]): List[String] =
+  def testNamesIn(registered: List[RegisteredNode]): List[TestName] =
     registered.flatMap {
       case RegisteredScope(_, _, _, nodes) => testNamesIn(nodes)
-      case test: RegisteredTest => List(test.testName)
+      case RegisteredTest(_, testName, _, _) => List(TestName(testName))
     }
 }

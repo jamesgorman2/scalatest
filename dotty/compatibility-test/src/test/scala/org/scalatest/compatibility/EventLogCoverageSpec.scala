@@ -4,14 +4,16 @@ import org.scalatest.events.DecodedEvent
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
 import org.scalatest.events.NodePlace
+import org.scalatest.events.SuiteId
 import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.TestName
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
 
-  private val suite = NodeExecution(NodeId(Vector(NodePlace.Suite("s", 0))), Vector(1))
-  private val test = NodeExecution(NodeId(Vector(NodePlace.Suite("s", 0), NodePlace.Test("t"))), Vector(1, 1))
+  private val suite = NodeExecution(NodeId(Vector(NodePlace.Suite(SuiteId("s"), 0))), Vector(1))
+  private val test = NodeExecution(NodeId(Vector(NodePlace.Suite(SuiteId("s"), 0), NodePlace.Test(TestName("t")))), Vector(1, 1))
 
   private val suiteStarting = new TestEventLogEvent.ScalaTestEvent(Some(suite), DecodedEvent.SuiteStarting(None, "main", 1L))
   private val testStarting = new TestEventLogEvent.ScalaTestEvent(Some(test), DecodedEvent.TestStarting(None, "main", 2L))
@@ -44,7 +46,7 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
     }
     "in the event log in each suite's order, though not the run's" should {
       val otherSuiteStarting = new TestEventLogEvent.ScalaTestEvent(
-        Some(NodeExecution(NodeId(Vector(NodePlace.Suite("other", 0))), Vector(1))),
+        Some(NodeExecution(NodeId(Vector(NodePlace.Suite(SuiteId("other"), 0))), Vector(1))),
         DecodedEvent.SuiteStarting(None, "main", 0L)
       )
       val receivedFromTwoSuites = received :+ ("received " + EventLogFields.of(otherSuiteStarting, withTimeStamp = true))
@@ -61,7 +63,7 @@ final class EventLogCoverageSpec extends AnyWordSpec with Matchers {
 
   "The suites' starts" when {
     val otherSuiteStarting = new TestEventLogEvent.ScalaTestEvent(
-      Some(NodeExecution(NodeId(Vector(NodePlace.Suite("other", 0))), Vector(1))),
+      Some(NodeExecution(NodeId(Vector(NodePlace.Suite(SuiteId("other"), 0))), Vector(1))),
       DecodedEvent.SuiteStarting(None, "main", 4L)
     )
     val received = List(suiteStarting, testStarting, otherSuiteStarting).map(event => "received " + EventLogFields.of(event, withTimeStamp = true))

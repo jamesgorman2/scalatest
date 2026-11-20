@@ -13,14 +13,15 @@ import org.scalatest.SuiteRegistration
 import org.scalatest.SuiteStart
 import org.scalatest.events.Event
 import org.scalatest.events.NodeId
-import org.scalatest.events.NodePlace
 import org.scalatest.events.StructureNode
+import org.scalatest.events.SuiteId
 import org.scalatest.events.SuiteStarting
+import org.scalatest.events.TestName
 
 private[scalatest] enum TreeNode {
   case OfSuite
   case Scope(places: List[ScopePlace])
-  case Test(testName: String)
+  case Test(testName: TestName)
 }
 
 /**
@@ -31,7 +32,7 @@ private[scalatest] enum TreeNode {
  */
 private[scalatest] final class ScopeExecution(emitter: TestEventLogEmitter, val places: List[ScopePlace], val above: Option[ScopeExecution]) {
 
-  val execution = new Execution(emitter)
+  val execution: Execution = new Execution(emitter)
 
   // Read and written only under the emitter's lock.
   private var executionOfItsRun = Option.empty[Execution]
@@ -72,7 +73,7 @@ private[scalatest] final class InRunOfSuite(val registration: RegisteredSuite, v
 /** @param executionsOfTest called under the emitter's lock */
 private[scalatest] final class InExecutionOfTest(
   val registration: RegisteredSuite,
-  val testName: String,
+  val testName: TestName,
   val execution: Execution,
   val executionsOfTest: () => NamedExecutions
 ) extends ContextOfRegisteredSuite {
@@ -122,9 +123,9 @@ private[scalatest] final class RegisteredSuite(
   // until its suite name is known.
   private var newNodeAwaitingName = Option.empty[(SuiteNodeTable, NodeId)]
   // None where the node was fixed with no node.
-  private var suiteIdOfNode = Option.empty[String]
+  private var suiteIdOfNode = Option.empty[SuiteId]
   private var emitterHasReadSuiteId = false
-  private var firstSuiteIdItsRunRead = Option.empty[String]
+  private var firstSuiteIdItsRunRead = Option.empty[SuiteId]
   private var firstSuiteNameItsRunRead = Option.empty[String]
   private var emitterHasReadSuiteName = false
   private var suiteItIs = Option.empty[RegisteredSuite]
@@ -218,14 +219,14 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  def keepSuiteIdItsRunRead(suiteId: String): Unit = {
+  def keepSuiteIdItsRunRead(suiteId: SuiteId): Unit = {
     emitter.assertLockHeld()
     if (!nodeIsFixed && firstSuiteIdItsRunRead.isEmpty) {
       firstSuiteIdItsRunRead = Some(suiteId)
     }
   }
 
-  def suiteIdReadByItsRun: Option[String] = {
+  def suiteIdReadByItsRun: Option[SuiteId] = {
     emitter.assertLockHeld()
     Option.when(!nodeIsFixed)(firstSuiteIdItsRunRead).flatten
   }
@@ -262,7 +263,7 @@ private[scalatest] final class RegisteredSuite(
    * Where a structure holds the node, or it has no table, its table is settled and this returns the structure it keeps
    * to write, if any. Called outermost first.
    */
-  def fixNode(suiteId: Option[String]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
+  def fixNode(suiteId: Option[SuiteId]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
     emitter.assertLockHeld()
     if (nodeIsFixed) {
       None
@@ -304,7 +305,7 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  private def placeBy(suiteId: String): Unit = {
+  private def placeBy(suiteId: SuiteId): Unit = {
     emitter.assertLockHeld()
     startedIn match {
       case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfNode.contains(suiteId) =>
@@ -327,9 +328,9 @@ private[scalatest] final class RegisteredSuite(
     }
   }
 
-  private def placeUnder(outer: RegisteredSuite, parentNode: Option[NodeId], above: NamedExecutions, suiteId: String, index: Int): Unit = {
+  private def placeUnder(outer: RegisteredSuite, parentNode: Option[NodeId], above: NamedExecutions, suiteId: SuiteId, index: Int): Unit = {
     emitter.assertLockHeld()
-    nodePath = parentNode.map(path => NodeId(path.places :+ NodePlace.Suite(suiteId, index)))
+    nodePath = parentNode.map(NodeId.nestedSuite(_, suiteId, index))
     executionsAbove = Some(above)
     tableOfNode = outer.tableOfNode.flatMap(_.childSuites.find(child => nodePath.contains(child.node)))
     if (tableOfNode.isEmpty) {
@@ -400,7 +401,7 @@ private[scalatest] final class RegisteredSuite(
   }
 
   /** Called outside the emitter's lock: it is user code. */
-  def readSuiteIdOfInstance(): String = instance.suiteId
+  def readSuiteIdOfInstance(): SuiteId = SuiteId(instance.suiteId)
 
   /** Called outside the emitter's lock: it is user code. */
   def readSuiteNameOfInstance(): String = instance.suiteName
@@ -421,12 +422,12 @@ private[scalatest] final class RegisteredSuite(
   def originOfStartAndEnd: EventOrigin = new OriginOfStartAndEnd
 
   def startTestExecution(testName: String): EventOrigin = {
-    emitter.addTestWhereLacking(this, testName, instance.scopesAndTestsOfRegistrationTree)
-    new OriginOfTestExecution(testName, scopeInContext)
+    emitter.addTestWhereLacking(this, TestName(testName), instance.scopesAndTestsOfRegistrationTree)
+    new OriginOfTestExecution(TestName(testName), scopeInContext)
   }
 
   def reporterOfTest(testName: String, reporter: Reporter): Reporter =
-    new StructureWrapper(reporter, WrapperNode.Test(this, testName), emitter.writeEventFrom)
+    new StructureWrapper(reporter, WrapperNode.Test(this, TestName(testName)), emitter.writeEventFrom)
 
   def reporterAheadOf(reporter: Reporter): Reporter =
     new StructureWrapper(reporter, WrapperNode.SuiteAheadOfSorter(this), emitter.writeEventFrom)
@@ -481,9 +482,11 @@ private[scalatest] final class RegisteredSuite(
 
   def updateStructureFromRegistrationTree(tagsOfTests: => Map[String, Set[String]], filter: Filter): Unit = {
     instance.scopesAndTestsOfRegistrationTree.foreach { registered =>
-      val tags = Suite.autoTagClassAnnotations(tagsOfTests, instance, SuiteStructure.testNamesIn(registered))
+      val testNames = SuiteStructure.testNamesIn(registered)
+      val tags = Suite.autoTagClassAnnotations(tagsOfTests, instance, testNames.map(_.value))
       emitter.writeStructureOnceTableIsSettled(this) { table =>
-        SuiteStructure.keptByFilter(registered, table.filterKeepingEarlier(SuiteStructure.testNamesIn(registered), testName => filter(testName, tags, table.suiteId)))
+        val verdicts = table.filterKeepingEarlier(testNames, testName => FilterVerdict.of(filter(testName.value, tags, table.suiteId.value)))
+        SuiteStructure.keptByFilter(registered, verdicts)
       }
     }
   }
@@ -501,7 +504,7 @@ private[scalatest] final class RegisteredSuite(
 
   def suiteIdRead(suiteId: String): Unit = {
     if (!tableIsSettled) {
-      emitter.fixNode(this, Some(suiteId), None, handingOff = false)
+      emitter.fixNode(this, Some(SuiteId(suiteId)), None, handingOff = false)
     }
   }
 
@@ -542,7 +545,7 @@ private[scalatest] final class RegisteredSuite(
 
   // The test ran in the run in flight when its first event was handed off. Where it ran in a scope execution, that is
   // `scopeOpened` where the instance's run opened it, else `scopeOfSuiteItIs`.
-  private final class OriginOfTestExecution(testName: String, scopeOpened: Option[ScopeExecution])
+  private final class OriginOfTestExecution(testName: TestName, scopeOpened: Option[ScopeExecution])
       extends OriginInRegisteredSuite(RegisteredSuite.this, TreeNode.Test(testName)) {
 
     private val execution = new Execution(emitter)

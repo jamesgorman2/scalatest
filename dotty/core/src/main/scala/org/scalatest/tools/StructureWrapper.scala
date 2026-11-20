@@ -2,6 +2,7 @@ package org.scalatest.tools
 
 import org.scalatest.Reporter
 import org.scalatest.events.Event
+import org.scalatest.events.TestName
 
 private[scalatest] enum WrapperNode {
   case TopLevelSuite(ofSuite: RegisteredSuite)
@@ -9,7 +10,7 @@ private[scalatest] enum WrapperNode {
   /** A suite's, put in the `Args` of its run by the first site of the run that registered it. */
   case RegisteredByItsRun(ofSuite: RegisteredSuite)
   case SuiteAheadOfSorter(ofSuite: RegisteredSuite)
-  case Test(ofSuite: RegisteredSuite, testName: String)
+  case Test(ofSuite: RegisteredSuite, testName: TestName)
 
   def registration: RegisteredSuite = {
     this match {

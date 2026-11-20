@@ -5,16 +5,30 @@ import org.scalatest.tools.ThrowableView
 
 /** A suite's index is its order among the parent's suites of its `suiteId`; a scope's, among the parent's scopes of its text. */
 private[scalatest] enum NodePlace {
-  case Suite(suiteId: String, index: Int)
+  case Suite(suiteId: SuiteId, index: Int)
   case Scope(text: String, index: Int)
-  case Test(name: String)
+  case Test(testName: TestName)
 }
 
 /** Places from the top-level suite down. */
 private[scalatest] final case class NodeId(places: Vector[NodePlace])
 
+private[scalatest] object NodeId {
+
+  def topLevelSuite(suiteId: SuiteId, index: Int): NodeId = NodeId(Vector(NodePlace.Suite(suiteId, index)))
+
+  /** `index` is the suite's order among the parent's suites of its `suiteId`. */
+  def nestedSuite(parent: NodeId, suiteId: SuiteId, index: Int): NodeId = NodeId(parent.places :+ NodePlace.Suite(suiteId, index))
+
+  /** `text` is the text the scope is registered with; `index` is its order among the parent's scopes of that text. */
+  def scope(parent: NodeId, text: String, index: Int): NodeId = NodeId(parent.places :+ NodePlace.Scope(text, index))
+
+  /** A test sits directly under its suite's node, whichever scopes it is registered in. */
+  def test(suite: NodeId, testName: TestName): NodeId = NodeId(suite.places :+ NodePlace.Test(testName))
+}
+
 private[scalatest] enum StructureNode {
-  case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String)
+  case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: SuiteId, className: String)
   case Scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String)
   case Test(id: NodeId, parent: NodeId, position: Int, name: String, label: String, ignored: Boolean = false)
 
@@ -159,27 +173,22 @@ private[scalatest] final case class DecodedStackFrame(
   text: String
 )
 
-// Not a case class, and linked after construction: a throwable can be its own cause or suppressed throwable,
-// so a structural equals, hashCode or toString would never return.
+// Not a case class: a throwable can be its own cause or suppressed throwable, so a structural equals, hashCode or
+// toString would never return. Its cause and suppressed throwables are evaluated on first read, so that a decoder can
+// build a throwable before the throwables that link back to it.
 private[scalatest] final class DecodedThrowable(
   val className: String,
   val message: Option[String],
   val stackDepth: Option[DecodedStackDepth],
   val isPropertyCheckFailure: Boolean,
-  val stackTrace: IndexedSeq[DecodedStackFrame]
+  val stackTrace: IndexedSeq[DecodedStackFrame],
+  linkedCause: => Option[DecodedThrowable] = None,
+  linkedSuppressed: => IndexedSeq[DecodedThrowable] = Vector.empty
 ) extends ThrowableView {
 
-  private var linkedCause: Option[DecodedThrowable] = None
-  private var linkedSuppressed: IndexedSeq[DecodedThrowable] = Vector.empty
+  lazy val cause: Option[DecodedThrowable] = linkedCause
 
-  def cause: Option[DecodedThrowable] = linkedCause
-
-  def suppressed: IndexedSeq[DecodedThrowable] = linkedSuppressed
+  lazy val suppressed: IndexedSeq[DecodedThrowable] = linkedSuppressed
 
   def frames: IndexedSeq[String] = stackTrace.map(_.text)
-
-  def link(cause: Option[DecodedThrowable], suppressed: IndexedSeq[DecodedThrowable]): Unit = {
-    linkedCause = cause
-    linkedSuppressed = suppressed
-  }
 }

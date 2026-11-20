@@ -1,9 +1,8 @@
 package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
-import org.scalatest.events.DecodedEvent
+import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.JsonValue
-import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
@@ -286,15 +285,17 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
 
     Scenario("A throwable whose cause chain loops back to it ends the loop with a ref") {
       Given("a run of suite RowSuite whose test `loops` throws RuntimeException `b`, caused by RuntimeException `a`, whose cause is `b`")
-      val events = eventsOf(
+      val built = eventsOf(
         rowSuiteWithTest(
           "loops",
           """TestFailed(throwable: java.lang.RuntimeException "b" frames ["samples.RowSuite.loops(RowSuite.scala:9)"] caused by java.lang.RuntimeException "a" frames ["samples.RowSuite.loops(RowSuite.scala:8)"])"""
         )
       )
-      val b = events.collectFirst { case TestEventLogEvent.ScalaTestEvent(_, failed: DecodedEvent.TestFailed) => failed.throwable.get }.get
-      val a = b.cause.get
-      a.link(Some(b), Vector.empty)
+      val events = LinkedThrowables.withFailuresRelinked(built) { b =>
+        lazy val loopedB: DecodedThrowable = LinkedThrowables.relinked(b, Some(loopedA))
+        lazy val loopedA: DecodedThrowable = LinkedThrowables.relinked(b.cause.get, Some(loopedB))
+        loopedB
+      }
 
       When("the library writes the JSON output")
       val loops = jsonOutputOfEvents(events).node("test", "loops")

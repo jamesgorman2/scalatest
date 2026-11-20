@@ -1,8 +1,7 @@
 package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
-import org.scalatest.events.DecodedEvent
-import org.scalatest.events.TestEventLogEvent
+import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -412,11 +411,13 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("A failed test whose throwable is its own cause shows the throwable once") {
       Given("an event log of a test that fails with an empty message and a throwable with no message that is its own cause")
-      val events = TestRunBuilder.build(TestRunPart.Events(eventLogOfTwoTestsWhoseFirstEndsWith(
+      val built = TestRunBuilder.build(TestRunPart.Events(eventLogOfTwoTestsWhoseFirstEndsWith(
         """test "first": TestFailed(message: "", throwable: java.lang.IllegalStateException frames ["samples.SilentSpec.check(SilentSpec.scala:9)"])"""
-      ))).fold(fail(_), _.events.map(_.event))
-      events.collect { case TestEventLogEvent.ScalaTestEvent(_, failed: DecodedEvent.TestFailed) => failed.throwable }.flatten
-        .foreach(throwable => throwable.link(Some(throwable), Vector.empty))
+      ))).events.map(_.event)
+      val events = LinkedThrowables.withFailuresRelinked(built) { throwable =>
+        lazy val itsOwnCause: DecodedThrowable = LinkedThrowables.relinked(throwable, Some(itsOwnCause))
+        itsOwnCause
+      }
 
       When("the library consolidates it")
       val output = new OutputSink
