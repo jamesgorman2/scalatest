@@ -43,58 +43,27 @@ import org.scalatest.events.TestPending
 import org.scalatest.events.TestStarting
 import org.scalatest.events.TestSucceeded
 
-/**
- * Writes one run's test event log to a file, which already holds the run's `runStarted` event.
- *
- * Each event is appended as one unbuffered write, under this emitter's lock, so that events handed off from
- * different threads never interleave and a reader sees each event as soon as it is handed off.
- */
 private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStream) {
 
-  private var isOpen = true
-  // Read and written only under this emitter's lock.
-  private val topLevelSuiteCountBySuiteId = scala.collection.mutable.HashMap.empty[SuiteId, Int]
-  // The events handed off at a send site or by an inner wrapper that have not reached their top-level suite's
-  // wrapper, each mapped to that suite's registration. Keyed by the event's identity, since an event's `equals`
-  // compares its fields, which hold the run's own objects. Read and written only under this emitter's lock.
-  private val handedOff = new IdentityHashMap[Event, RegisteredSuite]
+  private val isOpen = new GuardedByEmitter(this, true)
+  private val topLevelSuiteCountBySuiteId = new GuardedByEmitter(this, scala.collection.mutable.HashMap.empty[SuiteId, Int])
+  // By identity: an event's `equals` compares its fields, which hold the run's own objects. Mapped to the top-level
+  // suite's registration, not the event's own: a reporter that holds events back, such as a `TestSortingReporter`, may
+  // pass one on to the outer wrappers after a nested suite's run has completed.
+  private val handedOffAwaitingTopLevelWrapper = new GuardedByEmitter(this, new IdentityHashMap[Event, RegisteredSuite])
 
   def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "The test event log emitter's lock is not held")
 
   private def underLockKeepingThrown(body: => Option[Throwable]): Unit =
     synchronized(body).foreach(TestEventLogEmitter.rethrowIfUncontained)
 
-  /**
-   * Writes an event assigned to the run. After the event that closes the run it writes how the run ended, and
-   * nothing after that.
-   *
-   * An event that cannot be encoded or written ends the event log there, which leaves the run without its
-   * `runEnded` event. So that a hand-off cannot change what the run's reporters receive, what encoding or writing
-   * throws does not reach the caller. Two kinds of throwable are treated differently:
-   *
-   *  - an `InterruptedException` does not reach the caller either, but the calling thread is left interrupted;
-   *  - a `VirtualMachineError` other than a `StackOverflowError`, or a `ThreadDeath`, is thrown once the event log
-   *    is closed. A `StackOverflowError` is not thrown: a throwable or config map value that recurses without end
-   *    is one more event that cannot be encoded.
-   */
   def writeRunEvent(event: Event): Unit = {
-    // Encoded outside the lock: encoding calls the methods of the run's own throwables and config map values, which
-    // may block, and every thread of the run takes the lock.
-    val encoded = TestEventLogEmitter.caught(TestEventLogEncoder.event(event, None))
+    val encoded = TestEventLogEmitter.caughtOutsideLock(TestEventLogEncoder.event(event, None))
     append(encoded, RunOutcome.reportedBy(event).map(TestEventLogEncoder.runEnded))
   }
 
-  /**
-   * Before it returns, it builds the suite's node table and writes the suite's structure to the event log: the suite,
-   * its nested suites, and the scopes and tests the filter keeps.
-   *
-   * A structure that cannot be read ends the event log before it, as an event that cannot be encoded does, and the
-   * suite then starts as one of a run that writes no test event log. What reading or writing the structure throws is
-   * kept from the caller as `writeRunEvent` keeps it.
-   */
   def startOfTopLevelSuite(suite: Suite, filter: Filter, reporter: Reporter): SuiteStart = {
-    // Read outside the lock: reading calls the suite's own methods.
-    TestEventLogEmitter.caught(SuiteStructure.read(suite, filter)) match {
+    TestEventLogEmitter.caughtOutsideLock(SuiteStructure.read(suite, filter)) match {
       case Right(structure) =>
         val registration = new RegisteredSuite(this, suite, None)
         registration.fixAsTopLevelSuite(addTopLevelSuite(structure))
@@ -106,14 +75,12 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  /**
-   * Writes the structure. A top-level suite that shares its suite ID with an earlier one takes the next index, so no
-   * two nodes of the run share a node path.
-   */
   def addTopLevelSuite(structure: SuiteStructure): SuiteNodeTable = {
+    // A top-level suite sharing its suite ID with an earlier one takes the next index, so no two nodes share a node path.
     val index = synchronized {
-      val earlier = topLevelSuiteCountBySuiteId.getOrElse(structure.suiteId, 0)
-      topLevelSuiteCountBySuiteId(structure.suiteId) = earlier + 1
+      val countBySuiteId = topLevelSuiteCountBySuiteId.get
+      val earlier = countBySuiteId.getOrElse(structure.suiteId, 0)
+      countBySuiteId(structure.suiteId) = earlier + 1
       earlier
     }
     val (table, nodes) = SuiteNodeTable.ofTopLevelSuite(this, structure, index)
@@ -121,14 +88,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     table
   }
 
-  /**
-   * Where the latest structure of the suite node of a registered instance's run lacks a test that the instance's
-   * registration tree, `registered`, holds, adds the test and writes a further `structure` event. The tree is read
-   * only where the structure lacks the test, as when a `runTests` override runs a test the filter drops. An instance
-   * whose node table is not settled, or that has none, adds nothing.
-   */
   def addTestWhereLacking(registration: RegisteredSuite, testName: TestName, registered: => Option[List[RegisteredNode]]): Unit = {
-    val lacking = synchronized(Option.when(isOpen && registration.isTableSettled)(registration.table).flatten.filterNot(_.latestHoldsTest(testName)))
+    // The latest structure lacks a test that a `runTests` override runs though the filter drops it.
+    val lacking = synchronized(Option.when(isOpen.get && registration.isTableSettled)(registration.table).flatten.filterNot(_.latestHoldsTest(testName)))
     lacking.foreach { table =>
       registered.foreach { tree =>
         // The latest structure is read again under the lock, since another instance of the suite may have changed it.
@@ -139,18 +101,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  /**
-   * Where the node table of a registered instance's run is settled, writes a further `structure` event of the scopes
-   * and tests `scopesAndTestsFor` gives for its node table, where they differ from the suite's latest structure, and
-   * makes them the latest. A scope or test an earlier structure of the suite held keeps its node. Otherwise the
-   * registration keeps them, and they are written once its node table is settled.
-   *
-   * It writes under the lock, so that two instances of one suite that run at once write their structures one after
-   * the other. What writing throws is kept from the caller as `writeRunEvent` keeps it.
-   */
   def writeStructureOnceTableIsSettled(registration: RegisteredSuite)(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Unit = {
     underLockKeepingThrown {
-      if (isOpen) {
+      if (isOpen.get) {
         registration.structureOnceTableIsSettled(scopesAndTestsFor).flatMap(writeStructureWhereChanged(_, _))
       } else {
         None
@@ -158,26 +111,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  /**
-   * Fixes the node of a registered instance's run and settles its node table, after doing so for each instance whose
-   * run it started in. Each uses the suite ID and suite name its run read; `suiteIdRead` and `suiteNameRead` are this
-   * instance's, where its run has read none before. A node that no structure holds needs both: its table is added,
-   * and its first structure written, once its name is known.
-   *
-   * Where a run has not read one of them and `handingOff` says an event is about to be handed off, the emitter reads
-   * it from the instance, outside the lock, once at most, and only while the event log is open and the instance may
-   * have a node table. An instance whose read throws, or that can have no node table, is left without one. Each node
-   * fixed writes the structure its registration keeps for it, where that differs from its node table.
-   *
-   * An inner instance's node is placed below its outer one's, so it stays unsettled while an outer one is, as where
-   * another thread is reading that one's suite ID. The names its run read are kept, and it is settled by a later
-   * call once the outer node is.
-   *
-   * What reading a name or writing a structure throws is kept from the caller as `writeRunEvent` keeps it.
-   */
   def fixNode(registration: RegisteredSuite, suiteIdRead: Option[SuiteId], suiteNameRead: Option[String], handingOff: Boolean): Unit = {
     val unsettled = synchronized {
-      if (isOpen) {
+      if (isOpen.get) {
         suiteIdRead.foreach(registration.keepSuiteIdItsRunRead)
         suiteNameRead.foreach(registration.keepSuiteNameItsRunRead)
         registration.unsettledFromOutermost
@@ -185,21 +121,20 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         Nil
       }
     }
-    // Stops at the first instance left unsettled: each instance after it is placed below it.
+    // Stops at the first instance left unsettled: each instance after it is placed below it, so cannot settle yet.
     val remaining = unsettled.iterator
     var isSettled = true
     while (isSettled && remaining.hasNext) {
       val one = remaining.next()
-      isSettled = fixNodeOf(one, handingOff) && settleTableOf(one, handingOff)
+      isSettled = isNodeFixedOnceTried(one, handingOff) && isTableSettledOnceTried(one, handingOff)
     }
   }
 
-  // Returns whether the node is fixed.
-  private def fixNodeOf(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
-    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen && handingOff && registration.takeReadOfSuiteId()))
-    val suiteId = if (readsSuiteId) TestEventLogEmitter.caught(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
+  private def isNodeFixedOnceTried(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
+    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen.get && handingOff && registration.takeReadOfSuiteId()))
+    val suiteId = if (readsSuiteId) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
     val (thrown, isFixed) = synchronized {
-      if (!isOpen) {
+      if (!isOpen.get) {
         (None, false)
       } else {
         val thrown = suiteId match {
@@ -222,12 +157,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     isFixed
   }
 
-  // Returns whether the table is settled.
-  private def settleTableOf(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
-    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen && handingOff && registration.takeReadOfSuiteName()))
-    val suiteName = if (readsSuiteName) TestEventLogEmitter.caught(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
+  private def isTableSettledOnceTried(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
+    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen.get && handingOff && registration.takeReadOfSuiteName()))
+    val suiteName = if (readsSuiteName) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
     val (thrown, isSettled) = synchronized {
-      if (!isOpen) {
+      if (!isOpen.get) {
         (None, false)
       } else if (registration.isTableSettled) {
         (None, true)
@@ -248,10 +182,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     isSettled
   }
 
-  // Encoding a structure calls no user code, so it is encoded under the lock that makes it the latest.
   private def writeStructureWhereChanged(table: SuiteNodeTable, scopesAndTests: List[ScopeOrTest]): Option[Throwable] = {
     assertLockHeld()
-    if (isOpen && table.latestScopesAndTests != scopesAndTests) {
+    if (isOpen.get && table.latestScopesAndTests != scopesAndTests) {
       writeStructure(table.replaceLatestStructure(scopesAndTests))
     } else {
       None
@@ -260,6 +193,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def writeStructure(nodes: Vector[StructureNode]): Option[Throwable] = {
     assertLockHeld()
+    // Encoded under the lock that makes it the latest structure: encoding a structure calls none of the run's own code.
     val written = TestEventLogEmitter.caught(write(TestEventLogEncoder.structure(nodes)))
     if (written.isLeft) {
       close()
@@ -271,21 +205,6 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     registration.startRunOnceNodeIsFixed()
   }
 
-  /**
-   * Writes an event a send site hands off with its origin, assigned to the node and executions the origin names. It
-   * keeps the event so that no structure wrapper it reaches hands it off again. The messages recorded in a test's
-   * closing event are written before it, assigned as it is, unless `messagesHandedOff` says the test handed them off
-   * one by one.
-   *
-   * First, where they are not yet, the node of the origin's suite instance is fixed and its node table settled.
-   * Nothing is handed off where the event log has ended, the instance has no node table, or its top-level suite's
-   * registration has been removed: a wrapper the event reaches then hands it off as an event with no origin. A test's
-   * closing event sent after the removal, whose messages the test handed off, is marked so that the top-level suite's
-   * wrapper writes it without them.
-   *
-   * The event is encoded outside the lock, as `writeRunEvent` encodes. What encoding or writing throws is kept from the
-   * caller as `writeRunEvent` keeps it.
-   */
   def handOff(origin: OriginInRegisteredSuite, event: Event, messagesHandedOff: Boolean): Unit = {
     val registration = origin.registration
     if (!registration.isTableSettled) {
@@ -296,7 +215,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
       underLockKeepingThrown {
         if (handsOffAtSendSite(registration, event, messagesHandedOff)) {
-          handedOff.put(event, registration.topLevel)
+          handedOffAwaitingTopLevelWrapper.get.put(event, registration.topLevel)
           writeEvent(encoded, assignWithOrigin(origin, event))
         } else {
           None
@@ -307,78 +226,46 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def handsOffAtSendSite(registration: RegisteredSuite, event: Event, messagesHandedOff: Boolean): Boolean = {
     assertLockHeld()
-    val hasTable = isOpen && registration.table.isDefined
+    val hasTable = isOpen.get && registration.table.isDefined
     if (hasTable && registration.hasBeenRemoved && messagesHandedOff) {
       registration.topLevel.keepClosingEventWithMessagesHandedOff(event)
     }
     hasTable && !registration.hasBeenRemoved
   }
 
-  /**
-   * Marks a top-level suite's registration removed, once the suite's run has completed, and stops keeping the events
-   * handed off for its run, at their send sites or by its inner wrappers, that have not reached its own wrapper. An
-   * event whose reporter does not pass it on reaches no further wrapper, and would otherwise be kept until the event
-   * log closes.
-   *
-   * Those events move to the top-level suite's registration, which its wrapper holds. One may still reach that
-   * wrapper, as an alert from a thread the run started or an event a reporter between the wrappers held back. The
-   * wrapper then writes nothing, since the event has been written.
-   *
-   * A nested suite's handed-off events stay here until then, since a reporter that holds events back, such as a
-   * `TestSortingReporter`, may pass one on to the outer wrappers after the nested suite's run has completed. After the
-   * removal, nothing is handed off for an event sent late until it reaches the top-level suite's wrapper, which writes
-   * it.
-   */
-  def forget(registration: RegisteredSuite): Unit = synchronized {
-    registration.markRemoved()
-    val kept = handedOff.entrySet.iterator
+  def forget(topLevel: RegisteredSuite): Unit = synchronized {
+    topLevel.markRemoved()
+    // An event whose reporter does not pass it on never reaches the top-level suite's wrapper, so would be kept here
+    // until the event log closes. The registration keeps it instead, for that wrapper to skip should it still arrive,
+    // as an alert from a thread the run started or an event a reporter between the wrappers held back.
+    val kept = handedOffAwaitingTopLevelWrapper.get.entrySet.iterator
     while (kept.hasNext) {
       val entry = kept.next()
-      if (entry.getValue eq registration) {
-        registration.keepHandedOffBeforeRemoval(entry.getKey)
+      if (entry.getValue eq topLevel) {
+        topLevel.keepHandedOffBeforeRemoval(entry.getKey)
         kept.remove()
       }
     }
   }
 
-  def handedOffEventCount: Int = synchronized(handedOff.size)
+  def handedOffEventCount: Int = synchronized(handedOffAwaitingTopLevelWrapper.get.size)
 
-  /**
-   * Writes the event unless it has already been handed off, at its send site or by another wrapper. An event reaches
-   * the wrapper of its test, of its suite and of each suite around that one; only the first wrapper that finds it not
-   * handed off writes it.
-   *
-   * The event is assigned as one with no origin, from its own data: to the suite its suite ID names (the wrapper's own
-   * suite, or one at or below the wrapper's node), and to the test its test name names in that suite. A suite that no
-   * table at or below the wrapper's node holds is first given a node directly under the wrapper's node. A test that its
-   * suite's table lacks is first given a node directly under its suite. Either node is written in a further structure.
-   * A message that names no suite is assigned to the wrapper's node. The messages recorded in a test's closing event
-   * are written before it, assigned as it is, unless the test has handed them off one by one.
-   *
-   * First, where they are not yet and the instance may have a node table, the node of the wrapper's suite instance is
-   * fixed and its node table settled. A wrapper of an instance that has no node table hands nothing off, so the event
-   * is handed off by a wrapper around it.
-   *
-   * What encoding or writing throws is kept from the caller as `writeRunEvent` keeps it.
-   */
   def writeEventFrom(wrapper: WrapperNode, event: Event): Unit = {
-    if (!wrapper.registration.isTableSettled && synchronized(isOpen && wrapper.registration.canHaveTable)) {
+    if (!wrapper.registration.isTableSettled && synchronized(isOpen.get && wrapper.registration.canHaveTable)) {
       fixNode(wrapper.registration, None, None, handingOff = true)
     }
     messagesHandedOffWhereFirstHandedOff(wrapper, event).foreach { messagesHandedOff =>
-      // Encoded outside the lock, as `writeRunEvent` encodes.
       val encoded = TestEventLogEmitter.encodedWithRecorded(event, messagesHandedOff)
-      underLockKeepingThrown(if (isOpen) writeEvent(encoded, assignFromItsOwnData(wrapper, event)) else encoded.left.toOption)
+      underLockKeepingThrown(if (isOpen.get) writeEvent(encoded, assignFromItsOwnData(wrapper, event)) else encoded.left.toOption)
     }
   }
 
-  // The events are assigned only where they were encoded. Closes the event log where they cannot be assigned or
-  // written.
   private def writeEvent(encoded: Either[Throwable, Vector[EncodedEvent]], assigned: => TestEventLogEmitter.Assignment): Option[Throwable] = {
     assertLockHeld()
     val written = encoded.flatMap { events =>
       TestEventLogEmitter.caught {
         val assignment = assigned
+        // Before the events, which may name its nodes.
         assignment.furtherStructure.foreach(nodes => write(TestEventLogEncoder.structure(nodes)))
         events.foreach(one => write(TestEventLogEncoder.line(one, Some(assignment.execution))))
       }
@@ -389,18 +276,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     written.left.toOption
   }
 
-  /**
-   * Writes a message a test's informer or documenter handed off as the test called it, and that no reporter receives
-   * as an event of its own, assigned to the test in the execution `origin` names. A registration that has been
-   * removed, or whose instance has no node table, writes no message.
-   *
-   * `TestEventLogEmitter.builtTestMessage` builds and encodes the message outside the lock, as `writeRunEvent` encodes.
-   * What building, encoding or writing it throws is kept from the caller as `writeRunEvent` keeps it.
-   */
   def writeTestMessage(origin: OriginInRegisteredSuite, built: Either[Throwable, (Event, EncodedEvent)]): Unit = {
     val registration = origin.registration
     underLockKeepingThrown {
-      if (isOpen && registration.table.isDefined && !registration.hasBeenRemoved) {
+      if (isOpen.get && registration.table.isDefined && !registration.hasBeenRemoved) {
         built match {
           case Right((message, encoded)) => writeEvent(Right(Vector(encoded)), assignWithOrigin(origin, message))
           case Left(thrownByBuild) =>
@@ -413,37 +292,30 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Returns `None` where this wrapper is not to hand the event off. Otherwise returns `Some` of whether the event is a
-  // test's closing event whose messages the test handed off one by one. A wrapper of an instance with no node table
-  // hands nothing off.
-  // The top-level suite's wrapper is the last an event reaches, so it forgets the event. Once the top-level suite's
-  // registration is removed, inner wrappers hand nothing off and that wrapper writes the event: an inner wrapper that
-  // wrote it would have to keep it for that wrapper to skip, for good where it never reaches that wrapper. An event
-  // handed off before the removal is kept by the top-level suite's registration instead.
   private def messagesHandedOffWhereFirstHandedOff(wrapper: WrapperNode, event: Event): Option[Boolean] = synchronized {
     val isLastWrapper = wrapper.isInstanceOf[WrapperNode.TopLevelSuite]
-    if (!isOpen || wrapper.registration.table.isEmpty) {
+    val awaitingTopLevelWrapper = handedOffAwaitingTopLevelWrapper.get
+    if (!isOpen.get || wrapper.registration.table.isEmpty) {
       None
     } else if (isLastWrapper && wrapper.registration.takeHandedOffBeforeRemoval(event)) {
       None
     } else if (!isLastWrapper && wrapper.registration.topLevel.hasBeenRemoved) {
+      // The top-level suite's wrapper writes it: an inner wrapper that wrote it would have to keep it for that wrapper
+      // to skip, for good where it never reaches that wrapper.
       None
-    } else if (handedOff.containsKey(event)) {
+    } else if (awaitingTopLevelWrapper.containsKey(event)) {
       if (isLastWrapper) {
-        handedOff.remove(event)
+        awaitingTopLevelWrapper.remove(event)
       }
       None
     } else {
       if (!isLastWrapper) {
-        handedOff.put(event, wrapper.registration.topLevel)
+        awaitingTopLevelWrapper.put(event, wrapper.registration.topLevel)
       }
       Some(wrapper.registration.topLevel.takeClosingEventWithMessagesHandedOff(event))
     }
   }
 
-  // Called where the origin's instance has a node table. Indexes the executions the origin names, where the event is
-  // the first to name them. A scope or test the suite's structure does not hold has no node, so its event is assigned
-  // to the suite.
   private def assignWithOrigin(origin: OriginInRegisteredSuite, event: Event): TestEventLogEmitter.Assignment = {
     assertLockHeld()
     val table = origin.registration.table.get
@@ -455,14 +327,11 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     TestEventLogEmitter.Assignment(execution, None)
   }
 
-  // The suite an event's data names is the wrapper's own suite, else one at or below the wrapper's node, and is
-  // otherwise given a node directly under the wrapper's node. A test its suite's table lacks is given a node directly
-  // under the suite, not marked ignored, since nothing filtered it. Either node is added to the suite's latest
-  // structure, which the assignment returns for the caller to write before the event.
   private def assignFromItsOwnData(wrapper: WrapperNode, event: Event): TestEventLogEmitter.Assignment = {
     assertLockHeld()
     val ofWrapper = wrapper.registration.table.get
     val wrapperNode = ofWrapper.scopeOrTest(wrapper.treeNode)
+    // A `DistributedTestRunnerSuite` runs one test, so its abort is assigned to the wrapper's node, that test's.
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
       case None =>
         val execution = wrapperNode match {
@@ -476,8 +345,9 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           ofWrapper.addSuiteUnder(wrapperNode.getOrElse(ofWrapper.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(names.suiteId.value))
         }
         val lackedTest = names.testName.filterNot(table.testsByName.contains)
+        val isIgnoredByFilter = false
         val furtherStructure = Option.when(found.isEmpty || lackedTest.isDefined) {
-          table.replaceLatestStructure(table.latestScopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_.value -> false)))
+          table.replaceLatestStructure(table.latestScopesAndTests ++ SuiteStructure.ofTestNames(lackedTest.toList.map(_.value -> isIgnoredByFilter)))
         }
         val execution = names.testName.flatMap(table.testsByName.get) match {
           case Some(test) => assignToScopeOrTest(table, test, None, event)
@@ -487,7 +357,6 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     }
   }
 
-  // Where the event has an origin, its node's execution and those above it are those the origin names.
   private def assignToScopeOrTest(table: SuiteNodeTable, node: NodeId, named: Option[NamedExecutions], event: Event): NodeExecution = {
     assertLockHeld()
     val executions = table.executionsOf(node)
@@ -523,16 +392,15 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   def endWithoutRunEnded(): Unit = {
     synchronized {
-      if (isOpen) {
+      if (isOpen.get) {
         close()
       }
     }
   }
 
-  // A line that could not be encoded or written closes the event log.
   private def append(encoded: Either[Throwable, String], runEnded: Option[String]): Unit = {
     underLockKeepingThrown {
-      if (isOpen) {
+      if (isOpen.get) {
         val written = encoded.flatMap(line => TestEventLogEmitter.caught((line +: runEnded.toList).foreach(write)))
         if (written.isLeft || runEnded.isDefined) {
           close()
@@ -551,19 +419,17 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   private def close(): Unit = {
     assertLockHeld()
-    isOpen = false
-    handedOff.clear()
-    try eventLog.close() catch { case contained: Throwable if TestEventLogEmitter.isContained(contained) => () }
+    isOpen.set(false)
+    handedOffAwaitingTopLevelWrapper.get.clear()
+    try eventLog.close() catch { case kept: Throwable if TestEventLogEmitter.isKeptFromCaller(kept) => () }
   }
 }
 
 private[scalatest] object TestEventLogEmitter {
 
-  // `furtherStructure`, present where assigning the event gave a suite or test a node, must be written before the event.
   private final case class Assignment(execution: NodeExecution, furtherStructure: Option[Vector[StructureNode]])
 
-  // The messages a test's closing event carries, which no reporter receives as events of their own.
-  private def recordedIn(event: Event): Vector[RecordableEvent] = {
+  private def messagesRecordedIn(event: Event): Vector[RecordableEvent] = {
     event match {
       case closing: TestSucceeded => closing.recordedEvents.toVector
       case closing: TestFailed => closing.recordedEvents.toVector
@@ -573,8 +439,6 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  // The execution of an event that has no origin: the node's execution that opened last and has not closed. Where
-  // none is open, an event that opens an execution takes a new one, and any other the node's latest, or a first.
   private def executionWithNoOrigin(executions: NodeExecutions, event: Event): Execution = {
     val opensAnExecution = event match {
       case _: SuiteStarting | _: TestStarting | _: ScopeOpened | _: TestIgnored => true
@@ -591,7 +455,7 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  /** @throws IllegalStateException if this process's PID or start time cannot be read */
+  @throws[IllegalStateException]("if this process's PID or start time cannot be read")
   def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] = startedIfGiven(eventLogFile, ProcessIdentity.current)
 
   def startedIfGiven(eventLogFile: Option[String], processIdentity: => ProcessIdentity): Option[TestEventLogEmitter] = {
@@ -610,7 +474,6 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  /** The hand-off for the events a run's runner sends outside every structure wrapper. */
   def handOffTo(emitter: Option[TestEventLogEmitter]): Event => Unit = {
     emitter match {
       case Some(started) => started.writeRunEvent(_)
@@ -626,7 +489,7 @@ private[scalatest] object TestEventLogEmitter {
   }
 
   def builtTestMessage(message: => Event): Either[Throwable, (Event, EncodedEvent)] = {
-    caught {
+    caughtOutsideLock {
       val built = message
       (built, TestEventLogEncoder.encoded(built))
     }
@@ -634,10 +497,6 @@ private[scalatest] object TestEventLogEmitter {
 
   def keptFromCaller(handOff: => Unit): Unit = caught(handOff).left.foreach(rethrowIfUncontained)
 
-  /**
-   * The `runStarted` event is written to a file of another name and moved into place, so the event log file never exists
-   * without its whole `runStarted` event.
-   */
   def started(eventLogFile: Path, processIdentity: ProcessIdentity): TestEventLogEmitter = {
     val runStarted = TestEventLogEncoder.runStarted(processIdentity.pid, processIdentity.startTime.toString)
     val unmoved = eventLogFile.resolveSibling(eventLogFile.getFileName.toString + ".tmp")
@@ -647,17 +506,19 @@ private[scalatest] object TestEventLogEmitter {
       Files.delete(unmoved)
     }
     Files.write(unmoved, runStarted.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+    // Moved into place whole, so the event log file never exists without its whole `runStarted` event.
     Files.move(unmoved, eventLogFile, StandardCopyOption.ATOMIC_MOVE)
-    // Not a FileChannel: interrupting a thread that is writing to one closes it for every thread.
+    // Unbuffered, so a reader sees each event as soon as it is handed off. Not a FileChannel: interrupting a thread
+    // that is writing to one closes it for every thread.
     appendingTo(new FileOutputStream(eventLogFile.toFile, true))
   }
 
-  /** `eventLog` must already hold the run's `runStarted` event. */
-  def appendingTo(eventLog: OutputStream): TestEventLogEmitter = new TestEventLogEmitter(eventLog)
+  def appendingTo(eventLogHoldingRunStarted: OutputStream): TestEventLogEmitter = new TestEventLogEmitter(eventLogHoldingRunStarted)
 
   def encodedWithRecorded(event: Event, messagesHandedOff: Boolean): Either[Throwable, Vector[EncodedEvent]] = {
-    val recorded = if (messagesHandedOff) Vector.empty else recordedIn(event)
-    caught(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
+    // A test's recorded messages reach no reporter as events of their own, so are written with its closing event.
+    val recorded = if (messagesHandedOff) Vector.empty else messagesRecordedIn(event)
+    caughtOutsideLock(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
   }
 
   final case class NamesInEvent(suiteName: String, suiteId: SuiteId, suiteClassName: Option[String], testName: Option[TestName])
@@ -691,7 +552,6 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  // A `DistributedTestRunnerSuite` runs one test, so its `SuiteAborted` is assigned to that test's node.
   private def isAbortOfDistributedTest(event: Event): Boolean = {
     event match {
       case aborted: SuiteAborted => aborted.suiteClassName.contains(classOf[DistributedTestRunnerSuite].getName)
@@ -699,16 +559,12 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  // The table of the suite with this suite ID, named by an event a wrapper hands off. It is the wrapper's own suite,
-  // `table`, where that has the suite ID. Otherwise it is the first not yet ended of the suites with that ID at or below
-  // the wrapper's node, else the first of them. The wrapper's node is `test` for a test's wrapper, else its suite's.
-  // Recurses once for each suite nested in another.
-  private def tableNamed(table: SuiteNodeTable, test: Option[NodeId], suiteId: SuiteId): Option[SuiteNodeTable] = {
+  private def tableNamed(ofWrapper: SuiteNodeTable, wrapperNode: Option[NodeId], suiteId: SuiteId): Option[SuiteNodeTable] = {
     def nestedWithin(suite: SuiteNodeTable): Vector[SuiteNodeTable] = suite.childSuites.flatMap(nested => nested +: nestedWithin(nested))
-    if (table.suiteId == suiteId) {
-      Some(table)
+    if (ofWrapper.suiteId == suiteId) {
+      Some(ofWrapper)
     } else {
-      val underWrapper = test.fold(table.childSuites)(node => table.childSuites.filter(_.parent.contains(node)))
+      val underWrapper = wrapperNode.fold(ofWrapper.childSuites)(node => ofWrapper.childSuites.filter(_.parent.contains(node)))
       val sharingItsId = underWrapper.flatMap(nested => nested +: nestedWithin(nested)).filter(_.suiteId == suiteId)
       sharingItsId.find(!_.hasEnded).orElse(sharingItsId.headOption)
     }
@@ -717,20 +573,42 @@ private[scalatest] object TestEventLogEmitter {
   def caught[A](body: => A): Either[Throwable, A] =
     try Right(body) catch { case thrown: Throwable => Left(thrown) }
 
+  private def caughtOutsideLock[A](runOwnCode: => A): Either[Throwable, A] = {
+    // Outside the lock: the run's own suites, throwables and config map values may block, and every thread of the run
+    // takes the lock.
+    caught(runOwnCode)
+  }
+
   def rethrowIfUncontained(thrown: Throwable): Unit = {
     thrown match {
       case _: InterruptedException => Thread.currentThread().interrupt()
-      case uncontained if !isContained(uncontained) => throw uncontained
+      case uncontained if !isKeptFromCaller(uncontained) => throw uncontained
       case _ => ()
     }
   }
 
-  // Whether a hand-off keeps a throwable from its caller. One that says the JVM or the thread cannot go on reaches it.
-  private def isContained(thrown: Throwable): Boolean = {
+  private def isKeptFromCaller(thrown: Throwable): Boolean = {
+    // Kept, so that a hand-off cannot change what the run's reporters receive, unless the JVM or the thread cannot go on.
     thrown match {
+      // A throwable or config map value that recurses without end is one more event that cannot be encoded.
       case _: StackOverflowError => true
       case _: VirtualMachineError | _: ThreadDeath => false
       case _ => true
     }
+  }
+}
+
+private[scalatest] final class GuardedByEmitter[A](emitter: TestEventLogEmitter, initial: A) {
+
+  private var current = initial
+
+  def get: A = {
+    emitter.assertLockHeld()
+    current
+  }
+
+  def set(value: A): Unit = {
+    emitter.assertLockHeld()
+    current = value
   }
 }

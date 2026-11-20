@@ -7,7 +7,6 @@ import org.scalatest.events.TestName
 private[scalatest] enum WrapperNode {
   case TopLevelSuite(ofSuite: RegisteredSuite)
   case NestedSuite(ofSuite: RegisteredSuite)
-  /** A suite's, put in the `Args` of its run by the first site of the run that registered it. */
   case RegisteredByItsRun(ofSuite: RegisteredSuite)
   case SuiteAheadOfSorter(ofSuite: RegisteredSuite)
   case Test(ofSuite: RegisteredSuite, scalaTestName: TestName)
@@ -30,13 +29,6 @@ private[scalatest] enum WrapperNode {
   }
 }
 
-/**
- * The reporter a suite or test is given in a run that writes a test event log.
- *
- * Whatever the hand-off throws is kept from the reporter's caller as `TestEventLogEmitter.writeRunEvent` keeps what it
- * throws, so the wrapped reporter misses an event only where the hand-off throws a `VirtualMachineError` other than
- * a `StackOverflowError`, or a `ThreadDeath`.
- */
 private[scalatest] final class StructureWrapper(
   wrapped: Reporter,
   node: WrapperNode,
