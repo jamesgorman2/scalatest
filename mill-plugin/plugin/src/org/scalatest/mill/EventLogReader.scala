@@ -10,17 +10,6 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-/**
- * Reads one worker's test event log on a thread of its own, while the worker runs. It may also start after the worker
- * has ended, and then reads the finished event log.
- *
- * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
- * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
- * end and ends the run's event stream. A line that cannot be decoded ends the stream there, and `awaitStreamEnd` throws
- * an exception naming the line and why. If
- * the worker ends before the file appears, no run existed in it: where the worker started a process, the reader adds
- * that process as one that ended before any run.
- */
 private[mill] final class EventLogReader(
     eventLogFile: EventLogFile,
     addRun: (RunFeed => Unit) => Unit,
@@ -36,12 +25,6 @@ private[mill] final class EventLogReader(
 
   def start(): Unit = thread.start()
 
-  /**
-   * Tells the reader the worker has ended, so a missing event log file will not appear. The reader then ends at once if
-   * the file has not appeared, else once the run's process has exited. Only the first call counts.
-   *
-   * @param process whether the worker started a process
-   */
   def workerHasEnded(process: WorkerProcess): Unit =
     synchronized {
       if (endedWorkerProcess.isEmpty) {
@@ -49,11 +32,6 @@ private[mill] final class EventLogReader(
       }
     }
 
-  /**
-   * Call it once the reader has been told the worker has ended: until then, the reader may wait on the event log file.
-   *
-   * @throws Throwable what reading threw
-   */
   def awaitStreamEnd(): Unit = {
     thread.join()
     failure.foreach(throwable => throw throwable)
@@ -123,7 +101,7 @@ private[mill] final class EventLogReader(
 
     @tailrec
     private def readToEnd(process: Option[RunProcess]): Option[RunProcess] = {
-      val bytes = input.read()
+      val bytes = input.readAvailable()
       if (bytes.isEmpty)
         process
       else

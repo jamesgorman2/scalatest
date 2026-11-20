@@ -17,8 +17,7 @@ private[mill] trait EventLogFile {
 
 private[mill] trait EventLogInput {
 
-  // Empty at the file's current end, which the emitter may yet append to.
-  def read(): Array[Byte]
+  def readAvailable(): Array[Byte]
 
   def close(): Unit
 }
@@ -38,7 +37,7 @@ private[mill] object EventLogFile {
 
     private val buffer = new Array[Byte](64 * 1024)
 
-    def read(): Array[Byte] = Arrays.copyOf(buffer, Math.max(stream.read(buffer), 0))
+    def readAvailable(): Array[Byte] = Arrays.copyOf(buffer, Math.max(stream.read(buffer), 0))
 
     def close(): Unit = stream.close()
   }

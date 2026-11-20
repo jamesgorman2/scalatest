@@ -22,14 +22,6 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-/**
- * Runs the module's tests in the workers Mill 1.3.1's `testForked` starts for each fork group holding a test class.
- *
- * Where the module does not set `testBatchFrameworkTasks`, the workers run through Mill's test queue: in parallel where
- * the module's `testParallelism` is on, unless exactly one class is queued; else one after another. Where it does, each
- * fork group has one worker, given the group's whole class list. The workers run in parallel where more than one fork
- * group holds a class, whatever the module's `testParallelism`.
- */
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
     inputs: JvmTestModuleInputs,
@@ -44,21 +36,16 @@ private[mill] final class JvmTestModuleRun(
 
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
-  /**
-   * Times the module from just before its first worker starts until its last worker has ended and its event log is read.
-   * Where two fork groups would share a folder, or checking whether the filesystem ignores case fails, no worker starts.
-   * A failure naming the module is attached to the root, and the module stays in the output with no times and no run.
-   */
   def execute(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     JvmTestModuleRun.layOutWorkers(consolidation, label)(launcher()).foreach(launcher => runWorkers(consolidation, launcher))
   }
 
-  // Like Mill 1.3.1, the test command runs no discovery for a module that sets `testBatchFrameworkTasks`: each fork
-  // group's worker is given the group's classes as `testForkGrouping` gives them.
   private def launcher(): Either[ForkGroupsShareProcessFolders, WorkerLauncher] = {
     val filesystemIgnoresCase = () => JvmTestModuleRun.filesystemIgnoresCase(moduleFolder.toNIO)
+    // As Mill 1.3.1 does, batch workers are given each fork group's classes as `testForkGrouping` gives them, with no
+    // discovery.
     if (inputs.testBatchFrameworkTasks)
       WorkerLayout.ofBatches(forkGroups, filesystemIgnoresCase).map(new BatchLauncher(_))
     else
@@ -122,19 +109,14 @@ private[mill] final class JvmTestModuleRun(
     workerRun
   }
 
-  /**
-   * Lays out and launches the workers of a [[WorkerLayout]]. Each fork group is laid out before any worker starts.
-   */
   private sealed trait WorkerLauncher {
 
     def layout: WorkerLayout
 
-    /** What laying out a fork group gives each of its workers. */
     type LaidOut
 
     def layOut(forkGroup: PlannedForkGroup): LaidOut
 
-    /** @return a future that completes once the worker has ended, giving whether it started a process */
     def launch(
         forkGroup: PlannedForkGroup,
         laidOut: LaidOut,
@@ -144,12 +126,6 @@ private[mill] final class JvmTestModuleRun(
     ): Future[WorkerProcess]
   }
 
-  // Mill's own test queue starts the worker. Where Mill runs the fork group's workers one after another, the worker runs
-  // on this thread and ends before `launch` returns. Otherwise it runs on a future forked through the given `TaskCtx`:
-  // Mill forks exactly the workers it gives a folder of their own.
-  //
-  // Only whether the worker started a process is kept. The `Result` Mill gives for that process is ignored, even a
-  // failure, as the consolidation decides the test command's result.
   private final class QueueLauncher(val layout: WorkerLayout) extends WorkerLauncher {
 
     type LaidOut = os.Path
@@ -172,36 +148,36 @@ private[mill] final class JvmTestModuleRun(
           groupFolder,
           queue,
           groupFolder.last,
-          forkGroup.workerIndexLength,
+          forkGroup.workerIndexDigits,
           forkGroup.label.value,
           plannedWorker.worker.index.value
         )
+      // Mill forks, through `workerCtx`, exactly the workers it gives a folder of their own, and runs the others on this
+      // thread.
       val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
+      // The `Result` Mill gives for the process is ignored, even a failure: the consolidation decides the test command's
+      // result.
       workerEnd.map { case (_, _, processResult) =>
         if (processResult.isDefined) WorkerProcess.Started else WorkerProcess.NotStarted
       }(using ExecutionContext.parasitic)
     }
   }
 
-  // As Mill 1.3.1 does, the fork group's one worker is forked through the given `TaskCtx` where the module has more than
-  // one fork group holding a class, and otherwise runs on this thread. A batch worker always starts a process. The
-  // `Result` Mill gives for that process is ignored, as in [[QueueLauncher]].
   private final class BatchLauncher(val layout: WorkerLayout) extends WorkerLauncher {
 
     type LaidOut = JvmTestModuleRun.BatchSelector
 
-    // As Mill 1.3.1 does, a fork group with no class is given an empty queue, not an empty class list, so the
-    // framework's setup and teardown still run without every class being selected.
     def layOut(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
       val groupFolder = inModuleFolder(forkGroup.folder)
       os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
+      // As Mill 1.3.1 does: an empty class list would select every class.
       if (forkGroup.testClasses.isEmpty) {
         val queue = inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(Nil, groupFolder)
         val claimFolder = groupFolder / "claim"
         os.makeDir.all(claimFolder)
-        Right((None, queue, claimFolder))
+        JvmTestModuleRun.BatchSelector.EmptyQueue(queue, claimFolder)
       } else {
-        Left(forkGroup.testClasses.map(_.value))
+        JvmTestModuleRun.BatchSelector.ClassList(forkGroup.testClasses)
       }
     }
 
@@ -214,9 +190,12 @@ private[mill] final class JvmTestModuleRun(
     ): Future[WorkerProcess] = {
       val groupFolder = inModuleFolder(forkGroup.folder)
       def runProcess(): WorkerProcess = {
-        testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
+        // The `Result` Mill gives for the process is ignored, even a failure: the consolidation decides the test
+        // command's result.
+        testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector.toMill, () => ())(using workerCtx)
         WorkerProcess.Started
       }
+      // As Mill 1.3.1 does, whatever the module's `testParallelism`.
       if (layout.forkGroups.size > 1)
         workerCtx.fork.async(groupFolder, forkGroup.label.value, "", priority = -1)(_ => runProcess())(using workerCtx)
       else
@@ -227,23 +206,23 @@ private[mill] final class JvmTestModuleRun(
 
 private[mill] object JvmTestModuleRun {
 
-  /** Mill writes no file of this name in a worker's `processFolder`. */
+  // Mill writes no file of this name in a worker's `processFolder`.
   val eventLogFileName: String = "scalatest-event-log.jsonl"
 
-  /**
-   * What a batch worker is given in place of Mill's test queue, in the form Mill's `callTestRunnerSubprocess` takes: its
-   * fork group's class list or, where the group holds no class, an empty queue and a claim folder.
-   */
-  type BatchSelector = Either[Seq[String], (Option[String], os.Path, os.Path)]
+  enum BatchSelector {
+    case ClassList(testClasses: Seq[TestClassName])
+    case EmptyQueue(queue: os.Path, claimFolder: os.Path)
+
+    def toMill: Either[Seq[String], (Option[String], os.Path, os.Path)] =
+      this match {
+        case ClassList(testClasses) => Left(testClasses.map(_.value))
+        case EmptyQueue(queue, claimFolder) => Right((None, queue, claimFolder))
+      }
+  }
 
   final class FilesystemCaseCheckFailure(cause: IOException)
       extends Exception(s"checking whether the filesystem ignores case failed: $cause", cause)
 
-  /**
-   * Whether the filesystem holding `folder` ignores case, found by writing a probe file in `folder`.
-   *
-   * @throws FilesystemCaseCheckFailure if writing or deleting the probe fails
-   */
   def filesystemIgnoresCase(folder: Path): Boolean =
     try {
       val probe = Files.createFile(folder.resolve("case-probe"))
@@ -256,13 +235,6 @@ private[mill] object JvmTestModuleRun {
       case failure: IOException => throw new FilesystemCaseCheckFailure(failure)
     }
 
-  /**
-   * Lays out a module's workers. Where two fork groups would share a `processFolder`, or checking whether the filesystem
-   * ignores case fails, a failure naming the module is attached to the consolidation's root, and the module is timed
-   * with no times.
-   *
-   * @return the launcher, if laying out the workers succeeded
-   */
   def layOutWorkers[Launcher](consolidation: Consolidation, label: TestRunLabel)(
       layOut: => Either[ForkGroupsShareProcessFolders, Launcher]
   ): Option[Launcher] = {
@@ -282,13 +254,6 @@ private[mill] object JvmTestModuleRun {
     )
   }
 
-  /**
-   * Lays out each fork group's files, in order, before any worker starts: its queue, or its batch worker's files. What
-   * laying out a group throws is attached to the consolidation's root as a failure naming the fork group, and that
-   * group's workers are left out, so the module's other groups still run.
-   *
-   * @return each fork group that was laid out, with what laying it out gave
-   */
   def layOutForkGroups[LaidOut](consolidation: Consolidation, label: TestRunLabel, forkGroups: Seq[PlannedForkGroup])(
       layOut: PlannedForkGroup => LaidOut
   ): Seq[(PlannedForkGroup, LaidOut)] = {
