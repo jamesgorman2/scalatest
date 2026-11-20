@@ -353,12 +353,12 @@ private final class JsonReader(text: String) {
     if (!at('"')) {
       malformed(s"no key starts at offset $position")
     }
-    val read = string()
+    val fieldKey = string()
     skipWhitespace()
     if (!at(':')) {
-      malformed(s"no ':' follows the key $read")
+      malformed(s"no ':' follows the key $fieldKey")
     }
     position += 1
-    read
+    fieldKey
   }
 }
