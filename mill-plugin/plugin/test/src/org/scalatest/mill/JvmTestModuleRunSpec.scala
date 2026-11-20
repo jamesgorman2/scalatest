@@ -52,7 +52,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "the workers are laid out" should {
-      "give what laying them out gave, attaching nothing to the root" in {
+      "give the launcher, attaching nothing to the root" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         JvmTestModuleRun.layOutWorkers(consolidation, label)(Right("launcher")) shouldBe Some("launcher")
         consolidation.end()
@@ -76,7 +76,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "the folder is missing" should {
-      "throw, naming the IOException the check met" in {
+      "throw, naming the IOException that caused the failure" in {
         val folder = Files.createTempDirectory("case-check")
         Files.delete(folder)
         the[JvmTestModuleRun.FilesystemCaseCheckFailure] thrownBy {
