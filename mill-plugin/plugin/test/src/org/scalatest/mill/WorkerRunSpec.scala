@@ -66,12 +66,12 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     def startWithoutMillStartingIt(startWorker: => Future[WorkerProcess]): Unit = workerRun.start(_ => recordingWorkerEnd(startWorker))
 
     def startWithMillStartingItLater(startWorker: => Future[WorkerProcess]): () => Unit = {
-      val millStartsWorker = new AtomicReference[() => Unit](() => ())
-      workerRun.start { starting =>
-        millStartsWorker.set(starting)
+      val millStartsWorkerLater = new AtomicReference[() => Unit](() => ())
+      workerRun.start { millStartsWorker =>
+        millStartsWorkerLater.set(millStartsWorker)
         recordingWorkerEnd(startWorker)
       }
-      millStartsWorker.get()
+      millStartsWorkerLater.get()
     }
 
     def endWorker(): Unit = {
