@@ -16,7 +16,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   private val label: TestRunLabel = TestRunLabel("core.test")
 
   private def forkGroupAt(position: Int): PlannedForkGroup =
-    PlannedForkGroup(ForkGroup.at(position), position.toString, Seq(s"group-$position"), Nil, 1, Nil)
+    PlannedForkGroup(ForkGroup.at(position), ForkGroupLabel(position.toString), PathUnderModule(s"group-$position"), Nil, 1, Nil)
 
   private def outputOf(consolidate: Consolidation => Unit): Seq[String] = {
     val output = mutable.ArrayBuffer.empty[String]
@@ -29,14 +29,14 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   "Laying out a module's workers" when {
     "two fork groups would share a processFolder" should {
       "attach the groups and the folder to the root, naming the module" in {
-        val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), Seq("samples.A1"))))
+        val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
         outputOf(consolidation => JvmTestModuleRun.layOutWorkers(consolidation, label)(Left(sharing))) should contain(
           "    Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
         )
       }
 
       "give nothing to launch" in {
-        val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), Seq("samples.A1"))))
+        val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
         val consolidation = Consolidation.start(_ => (), coloured = false)
         JvmTestModuleRun.layOutWorkers(consolidation, label)(Left(sharing)) shouldBe None
       }
@@ -106,7 +106,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       "keep only the second fork group, with what laying it out returned" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         JvmTestModuleRun.layOutForkGroups(consolidation, label, Seq(forkGroupAt(0), forkGroupAt(1))) { forkGroup =>
-          if (forkGroup == forkGroupAt(0)) throw new IllegalStateException("disk full") else s"queue of ${forkGroup.folder.mkString}"
+          if (forkGroup == forkGroupAt(0)) throw new IllegalStateException("disk full") else s"queue of ${forkGroup.folder.render}"
         } shouldBe Seq(forkGroupAt(1) -> "queue of group-1")
       }
     }

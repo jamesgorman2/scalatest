@@ -2,6 +2,7 @@ package org.scalatest.mill
 
 import java.util.Locale
 import org.scalatest.consolidation.ForkGroup
+import org.scalatest.consolidation.TestClassName
 import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
@@ -17,10 +18,7 @@ private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq
 /**
  * A fork group holding a class to run, or the one fork group of a module holding none.
  *
- * @param label the group's index among the groups Mill runs, as Mill pads it, which keys the group's workers in Mill's
- *              logging
- * @param folder the group's folder, as path segments under the module's folder: the folder Mill's `testForked` would
- *               give the group, under its own `Task.dest`
+ * @param folder the group's folder: the folder Mill's `testForked` would give the group, under its own `Task.dest`
  * @param testClasses the classes the group's workers are given: the classes of its queue, or its batch worker's class
  *                    list
  * @param workerIndexLength the number of digits each worker's index is padded to in its folder's name
@@ -28,26 +26,25 @@ private[mill] final case class WorkerLayout(testClassCount: Int, forkGroups: Seq
  */
 private[mill] final case class PlannedForkGroup(
     forkGroup: ForkGroup,
-    label: String,
-    folder: Seq[String],
-    testClasses: Seq[String],
+    label: ForkGroupLabel,
+    folder: PathUnderModule,
+    testClasses: Seq[TestClassName],
     workerIndexLength: Int,
     workers: Seq[PlannedWorker]
 ) {
 
-  def describedIn(module: TestRunLabel): String = s"fork group ${forkGroup.position} of ${module.value}"
+  def describedIn(label: TestRunLabel): String = s"fork group ${forkGroup.position} of ${label.value}"
 }
 
 /**
  * @param worker the fork group and index that identify the worker and label its run
- * @param processFolder the worker's `processFolder`, as path segments under the module's folder: its fork group's
- *                      folder, or its own folder `worker-<i>` in that folder where Mill runs the group's workers in
- *                      parallel
+ * @param processFolder the worker's `processFolder`: its fork group's folder, or its own folder `worker-<i>` in that
+ *                      folder where Mill runs the group's workers in parallel
  */
-private[mill] final case class PlannedWorker(worker: Worker, processFolder: Seq[String]) {
+private[mill] final case class PlannedWorker(worker: Worker, processFolder: PathUnderModule) {
 
-  def describedIn(module: TestRunLabel): String =
-    s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${module.value}"
+  def describedIn(label: TestRunLabel): String =
+    s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${label.value}"
 }
 
 /**
@@ -62,13 +59,13 @@ private[mill] final case class ForkGroupsShareProcessFolders(sharing: Seq[Shared
 }
 
 /**
- * @param processFolder the `processFolder` of the fork groups' first workers, as path segments under the module's folder
+ * @param processFolder the `processFolder` of the fork groups' first workers
  */
-private[mill] final case class SharedProcessFolder(forkGroups: Seq[ForkGroup], processFolder: Seq[String]) {
+private[mill] final case class SharedProcessFolder(forkGroups: Seq[ForkGroup], processFolder: PathUnderModule) {
 
   def message: String = {
     val positions = forkGroups.map(_.position)
-    s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder ${processFolder.mkString("/")}"
+    s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder ${processFolder.render}"
   }
 }
 
@@ -89,8 +86,8 @@ private[mill] object WorkerLayout {
    * @return the layout, or the fork groups that would share a `processFolder`
    */
   def ofQueue(
-      forkGroups: Seq[Seq[String]],
-      discovered: Set[String],
+      forkGroups: Seq[Seq[TestClassName]],
+      discovered: Set[TestClassName],
       testParallelism: Boolean,
       jobs: Int,
       filesystemIgnoresCase: () => Boolean
@@ -111,34 +108,34 @@ private[mill] object WorkerLayout {
    *
    * @return the layout, or the fork groups that would share a `processFolder`
    */
-  def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Boolean): Either[ForkGroupsShareProcessFolders, WorkerLayout] =
+  def ofBatches(forkGroups: Seq[Seq[TestClassName]], filesystemIgnoresCase: () => Boolean): Either[ForkGroupsShareProcessFolders, WorkerLayout] =
     of(forkGroups, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
 
   private enum WorkersPerGroup {
     case OneInGroupFolder
     case UpToJobsInOwnFolders(jobs: Int)
 
-    def count(classes: Seq[String]): Int =
+    def count(classes: Seq[TestClassName]): Int =
       this match {
         case OneInGroupFolder => 1
         case UpToJobsInOwnFolders(jobs) => Math.max(Math.min(jobs, classes.size), 1)
       }
 
-    def processFolder(groupFolder: Seq[String], index: Int, indexLength: Int): Seq[String] =
+    def processFolder(groupFolder: PathUnderModule, index: Int, indexLength: Int): PathUnderModule =
       this match {
         case OneInGroupFolder => groupFolder
-        case UpToJobsInOwnFolders(_) => groupFolder :+ s"worker-${padded(index, indexLength)}"
+        case UpToJobsInOwnFolders(_) => groupFolder.resolve(s"worker-${padded(index, indexLength)}")
       }
   }
 
   private def of(
-      forkGroups: Seq[Seq[String]],
+      forkGroups: Seq[Seq[TestClassName]],
       workersPerGroup: WorkersPerGroup,
       filesystemIgnoresCase: () => Boolean
   ): Either[ForkGroupsShareProcessFolders, WorkerLayout] = {
     val groupsToRun = forkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     val testClassCount = groupsToRun.map { case (classes, _) => classes.size }.sum
-    def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): PlannedForkGroup = {
+    def forkGroupOf(classes: Seq[TestClassName], position: Int, label: ForkGroupLabel, folder: PathUnderModule): PlannedForkGroup = {
       val forkGroup = ForkGroup.at(position)
       val workerCount = workersPerGroup.count(classes)
       val workerIndexLength = workerCount.toString.length
@@ -148,13 +145,13 @@ private[mill] object WorkerLayout {
       PlannedForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
     }
     groupsToRun match {
-      case Seq() => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(Nil, 0, "0", Nil))))
-      case Seq((classes, position)) => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(classes, position, "0", Nil))))
+      case Seq() => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(Nil, 0, ForkGroupLabel("0"), PathUnderModule()))))
+      case Seq((classes, position)) => Right(WorkerLayout(testClassCount, Seq(forkGroupOf(classes, position, ForkGroupLabel("0"), PathUnderModule()))))
       case groups =>
         val labelLength = groups.size.toString.length
         val queued = groups.zipWithIndex.map { case ((classes, position), runIndex) =>
-          val label = padded(runIndex, labelLength)
-          forkGroupOf(classes, position, label, Seq(groupFolderName(classes, label)))
+          val label = ForkGroupLabel(padded(runIndex, labelLength))
+          forkGroupOf(classes, position, label, PathUnderModule(groupFolderName(classes, label)))
         }
         sharedProcessFolders(queued, filesystemIgnoresCase()).toLeft(WorkerLayout(testClassCount, queued))
     }
@@ -162,16 +159,16 @@ private[mill] object WorkerLayout {
 
   private def padded(index: Int, length: Int): String = s"%0${length}d".format(index)
 
-  private def groupFolderName(classes: Seq[String], label: String): String =
+  private def groupFolderName(classes: Seq[TestClassName], label: ForkGroupLabel): String =
     classes match {
-      case Seq(single) => single
-      case multiple => s"group-$label-${multiple.head}"
+      case Seq(single) => single.value
+      case multiple => s"group-${label.value}-${multiple.head.value}"
     }
 
   private def sharedProcessFolders(forkGroups: Seq[PlannedForkGroup], filesystemIgnoresCase: Boolean): Option[ForkGroupsShareProcessFolders] = {
     val folderOnDisk: String => String = if (filesystemIgnoresCase) _.toLowerCase(Locale.ROOT) else identity
     val sharing = forkGroups
-      .groupBy(_.folder.map(folderOnDisk))
+      .groupBy(_.folder.segments.map(folderOnDisk))
       .values
       .filter(_.size > 1)
       .toSeq

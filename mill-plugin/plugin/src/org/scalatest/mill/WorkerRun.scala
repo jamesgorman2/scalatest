@@ -25,8 +25,7 @@ import scala.util.Try
 private[mill] final class WorkerRun(consolidation: Consolidation, workerName: String, reader: EventLogReader, capture: WorkerOutputCapture) {
 
   private var started: Try[Future[WorkerProcess]] = Failure(new IllegalStateException(s"$workerName was never started"))
-  private var readerStarted: Boolean = false
-  private var readerClosed: Boolean = false
+  private var readerState: WorkerRun.ReaderState = WorkerRun.ReaderState.NotStarted
 
   /**
    * Starts the worker, which starts reading the worker's event log as it starts. A fatal throwable from starting the
@@ -94,9 +93,9 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
   private def startReading(): Unit =
     synchronized {
-      if (!readerStarted && !readerClosed) {
+      if (readerState == WorkerRun.ReaderState.NotStarted) {
         reader.start()
-        readerStarted = true
+        readerState = WorkerRun.ReaderState.Started
       }
     }
 
@@ -104,7 +103,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
   // after the worker has ended still reads the whole run.
   private def startReadingLate(): Boolean =
     synchronized {
-      val late = !readerStarted && !readerClosed
+      val late = readerState == WorkerRun.ReaderState.NotStarted
       startReading()
       late
     }
@@ -113,8 +112,8 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
   // Gives whether the reader was started.
   private def closeReader(): Boolean =
     synchronized {
-      readerClosed = true
-      readerStarted
+      readerState = readerState.closed
+      readerState == WorkerRun.ReaderState.ClosedAfterStarting
     }
 
   private def stopCapturing(): Unit = capture.stopCapturing()
@@ -124,6 +123,19 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 }
 
 private[mill] object WorkerRun {
+
+  private enum ReaderState {
+    case NotStarted
+    case Started
+    case ClosedBeforeStarting
+    case ClosedAfterStarting
+
+    def closed: ReaderState =
+      this match {
+        case NotStarted | ClosedBeforeStarting => ClosedBeforeStarting
+        case Started | ClosedAfterStarting => ClosedAfterStarting
+      }
+  }
 
   /**
    * Starts each worker in turn. A fatal throwable from starting one is rethrown, once the workers already started are

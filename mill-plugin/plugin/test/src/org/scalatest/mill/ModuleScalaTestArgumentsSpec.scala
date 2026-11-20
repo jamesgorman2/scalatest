@@ -5,6 +5,9 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matchers {
 
+  private def argumentsForRun(moduleArguments: Seq[String]): Either[TestCommandFailure, Seq[String]] =
+    ModuleScalaTestArguments.forRun(moduleArguments).map(_.flatMap(_.arguments))
+
   "A module's own ScalaTest arguments" when {
     "every flag is one a run receives" should {
       "all reach the run, each with its values, in the order given" in {
@@ -22,7 +25,7 @@ final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matcher
           "-S", "42",
           "-W", "60", "30"
         )
-        ModuleScalaTestArguments.forRun(arguments) shouldBe Right(arguments)
+        argumentsForRun(arguments) shouldBe Right(arguments)
       }
     }
 
@@ -40,24 +43,24 @@ final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matcher
           "-R", "classes",
           "-z", "adds"
         )
-        ModuleScalaTestArguments.forRun(arguments) shouldBe Right(Seq("-l", "samples.Slow", "-z", "adds"))
+        argumentsForRun(arguments) shouldBe Right(Seq("-l", "samples.Slow", "-z", "adds"))
       }
 
       "withhold a value that looks like a flag a run receives" in {
-        ModuleScalaTestArguments.forRun(Seq("-s", "-z", "-l", "samples.Slow")) shouldBe Right(Seq("-l", "samples.Slow"))
+        argumentsForRun(Seq("-s", "-z", "-l", "samples.Slow")) shouldBe Right(Seq("-l", "samples.Slow"))
       }
     }
 
     "they hold an argument whose flag ScalaTest does not recognise" should {
       "fail, naming the first such argument" in {
-        ModuleScalaTestArguments.forRun(Seq("-l", "samples.Slow", "-x", "-y")) shouldBe
+        argumentsForRun(Seq("-l", "samples.Slow", "-x", "-y")) shouldBe
           Left(TestCommandFailure.UnrecognisedModuleArgument("-x"))
       }
     }
 
     "they are empty" should {
       "give the run none" in {
-        ModuleScalaTestArguments.forRun(Nil) shouldBe Right(Nil)
+        argumentsForRun(Nil) shouldBe Right(Nil)
       }
     }
   }

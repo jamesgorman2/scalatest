@@ -31,21 +31,21 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
 
     "several module selectors are given" should {
       "say the command takes one, naming each separated by a space" in {
-        TestCommandFailure.SeveralModuleSelectors(Seq("core.test", "util.test")).message shouldBe
+        TestCommandFailure.SeveralModuleSelectors(Seq(ModuleSelectorArgument("core.test"), ModuleSelectorArgument("util.test"))).message shouldBe
           "The test command takes one module selector, but was given: core.test util.test"
       }
     }
 
     "a module selector resolves to other than one JVM test module" should {
       "name the selector and what it resolved to" in {
-        TestCommandFailure.NotOneJvmTestModule("core", "nothing").message shouldBe
+        TestCommandFailure.NotOneJvmTestModule(ModuleSelectorArgument("core"), "nothing").message shouldBe
           "Module selector core must resolve to one JVM test module, but resolved to: nothing"
       }
     }
 
     "a module selector resolves to no module" should {
       "name the selector and Mill's error" in {
-        TestCommandFailure.UnresolvedModuleSelector("missing", "Cannot resolve missing").message shouldBe
+        TestCommandFailure.UnresolvedModuleSelector(ModuleSelectorArgument("missing"), "Cannot resolve missing").message shouldBe
           "Module selector missing resolves to no module: Cannot resolve missing"
       }
     }

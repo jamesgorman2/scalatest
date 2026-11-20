@@ -7,7 +7,6 @@ import mill.api.Evaluator
 import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
-import org.scalatest.consolidation.ModuleSelector
 import org.scalatest.consolidation.TestRunLabel
 
 private[mill] object TestCommand {
@@ -16,30 +15,33 @@ private[mill] object TestCommand {
     val commandArguments = TestCommandArguments.parse(arguments).fold(failure => ctx.fail(failure.message), identity)
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
     jsonOutputFile.foreach(file => BuildCtx.withFilesystemCheckerDisabled(file.delete()).fold(failure => ctx.fail(failure.message), identity))
-    val module = SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors).fold(failure => ctx.fail(failure.message), identity)
-    val inputs = JvmTestModuleInputs.evaluate(evaluator, module.module, ctx.log).fold(failure => ctx.fail(failure.message), identity)
+    val selectedModule = SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors).fold(failure => ctx.fail(failure.message), identity)
+    val inputs = JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log).fold(failure => ctx.fail(failure.message), identity)
     val scalaTestArguments = ModuleScalaTestArguments.forRun(inputs.testArgs).fold(failure => ctx.fail(failure.message), identity)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
-      if (commandArguments.humanReadableOnStdout) line => output.println(line) else _ => ()
+      commandArguments.stdoutContent match {
+        case StdoutContent.HumanReadableOutput => line => output.println(line)
+        case StdoutContent.NoOutput => _ => ()
+      }
     var jsonOutputWritten: Either[TestCommandFailure, Unit] = Right(())
-    val label = TestRunLabel(module.path)
+    val label = TestRunLabel(selectedModule.path)
     val consolidation = Consolidation.start(
       humanReadableOutput,
       coloured = true,
       jsonOutput = jsonOutputFile.map(file => json => jsonOutputWritten = BuildCtx.withFilesystemCheckerDisabled(file.write(json.writeTo))),
-      moduleSelectors = commandArguments.moduleSelectors.map(selector => ModuleSelector(selector, Vector(label))),
+      moduleSelectors = commandArguments.moduleSelectors.map(_.resolvedTo(Vector(label))),
       buildTool = Some(BuildTool("Mill", BuildInfo.millVersion)),
       startedAt = Some(Instant.now())
     )
-    val run = new JvmTestModuleRun(label, inputs, scalaTestArguments, moduleFolder(ctx, module.path), ctx)
+    val moduleRun = new JvmTestModuleRun(label, inputs, scalaTestArguments, moduleFolder(ctx, selectedModule.path), ctx)
     BuildCtx.withFilesystemCheckerDisabled {
-      run.run(consolidation)
+      moduleRun.execute(consolidation)
     }
     val endedState = consolidation.end(Some(Instant.now()))
     jsonOutputWritten.fold(failure => ctx.fail(failure.message), identity)
     if (endedState.failed) {
-      ctx.fail(s"The tests of ${module.path} failed")
+      ctx.fail(s"The tests of ${selectedModule.path} failed")
     }
   }
 

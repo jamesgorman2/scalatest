@@ -9,6 +9,8 @@ import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.ZincOp
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.RunnerArgument
+import org.scalatest.consolidation.ScalaTestArgument
+import org.scalatest.consolidation.TestClassName
 import org.scalatest.consolidation.TestRunLabel
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
@@ -28,17 +30,21 @@ import scala.util.Try
 private[mill] final class JvmTestModuleRun(
     label: TestRunLabel,
     inputs: JvmTestModuleInputs,
-    scalaTestArguments: Seq[String],
+    scalaTestArguments: Seq[ScalaTestArgument.Flagged],
     moduleFolder: os.Path,
     ctx: TaskCtx
 ) {
+
+  private val writtenScalaTestArguments: Seq[String] = scalaTestArguments.flatMap(_.arguments)
+
+  private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
   /**
    * Times the module from just before its first worker starts until its last worker has ended and its event log is read.
    * Where two fork groups would share a folder, or checking whether the filesystem ignores case fails, no worker starts.
    * A failure naming the module is attached to the root, and the module stays in the output with no times and no run.
    */
-  def run(consolidation: Consolidation): Unit = {
+  def execute(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     JvmTestModuleRun.layOutWorkers(consolidation, label)(launcher()).foreach(launcher => runWorkers(consolidation, launcher))
@@ -49,10 +55,10 @@ private[mill] final class JvmTestModuleRun(
   private def launcher(): Either[ForkGroupsShareProcessFolders, WorkerLauncher] = {
     val filesystemIgnoresCase = () => JvmTestModuleRun.filesystemIgnoresCase(moduleFolder.toNIO)
     if (inputs.testBatchFrameworkTasks)
-      WorkerLayout.ofBatches(inputs.forkGroups, filesystemIgnoresCase).map(new BatchLauncher(_))
+      WorkerLayout.ofBatches(forkGroups, filesystemIgnoresCase).map(new BatchLauncher(_))
     else
       WorkerLayout
-        .ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, filesystemIgnoresCase)
+        .ofQueue(forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, filesystemIgnoresCase)
         .map(new QueueLauncher(_))
   }
 
@@ -61,13 +67,13 @@ private[mill] final class JvmTestModuleRun(
     val startedAt = Instant.now()
     val workers = laidOutForkGroups.flatMap { case (forkGroup, laidOut) => forkGroup.workers.map(plannedWorker => (forkGroup, laidOut, plannedWorker)) }
     val workerRuns = WorkerRun.startEach(workers) { case (forkGroup, laidOut, plannedWorker) =>
-      startWorker(consolidation, plannedWorker)((workerCtx, util) => launcher.launch(forkGroup, laidOut, plannedWorker, workerCtx, util))
+      startWorker(consolidation, plannedWorker)((workerCtx, testModuleUtil) => launcher.launch(forkGroup, laidOut, plannedWorker, workerCtx, testModuleUtil))
     }
     WorkerRun.endEach(workerRuns)(workerEnd => ctx.fork.blocking(Await.ready(workerEnd, Duration.Inf)))
     consolidation.timeModule(label, Some(startedAt), Some(Instant.now()))
   }
 
-  private def discoveredTestClasses(): Set[String] =
+  private def discoveredTestClasses(): Set[TestClassName] =
     inputs.jvmWorker
       .apply(
         ZincOp.GetTestTasks(
@@ -75,11 +81,12 @@ private[mill] final class JvmTestModuleRun(
           inputs.testClasspath.map(_.path),
           inputs.testFramework,
           Nil,
-          scalaTestArguments,
+          writtenScalaTestArguments,
           inputs.discoveredClasses
         ),
         javaHome = inputs.javaHome
       )(using ctx)
+      .map(TestClassName(_))
       .toSet
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
@@ -87,7 +94,7 @@ private[mill] final class JvmTestModuleRun(
   private def startWorker(consolidation: Consolidation, plannedWorker: PlannedWorker)(
       runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[WorkerProcess]
   ): WorkerRun = {
-    val eventLogFile = moduleFolder / plannedWorker.processFolder / JvmTestModuleRun.eventLogFileName
+    val eventLogFile = moduleFolder / plannedWorker.processFolder.segments / JvmTestModuleRun.eventLogFileName
     val capture = new WorkerOutputCapture(WorkerOutputCapture.workerCharset)
     val reader = new EventLogReader(
       eventLogFile.toNIO,
@@ -103,7 +110,7 @@ private[mill] final class JvmTestModuleRun(
     val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(label), reader, capture)
     workerRun.start { workerStarting =>
       val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
-      runWorker(workerCtx, inputs.testModuleUtil(scalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
+      runWorker(workerCtx, inputs.testModuleUtil(writtenScalaTestArguments ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun
   }
@@ -126,7 +133,7 @@ private[mill] final class JvmTestModuleRun(
         laidOut: LaidOut,
         plannedWorker: PlannedWorker,
         workerCtx: WorkerTaskCtx,
-        util: TestModuleUtil
+        testModuleUtil: TestModuleUtil
     ): Future[WorkerProcess]
   }
 
@@ -141,25 +148,25 @@ private[mill] final class JvmTestModuleRun(
     type LaidOut = os.Path
 
     def layOut(forkGroup: PlannedForkGroup): os.Path =
-      inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(forkGroup.testClasses, moduleFolder / forkGroup.folder)
+      inputs.testModuleUtil(writtenScalaTestArguments, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), moduleFolder / forkGroup.folder.segments)
 
     def launch(
         forkGroup: PlannedForkGroup,
         queue: os.Path,
         plannedWorker: PlannedWorker,
         workerCtx: WorkerTaskCtx,
-        util: TestModuleUtil
+        testModuleUtil: TestModuleUtil
     ): Future[WorkerProcess] = {
-      val groupFolder = moduleFolder / forkGroup.folder
+      val groupFolder = moduleFolder / forkGroup.folder.segments
       def joinQueue() =
-        util.runTestFuture(
+        testModuleUtil.runTestFuture(
           layout.testClassCount,
           layout.forkGroups.size,
           groupFolder,
           queue,
           groupFolder.last,
           forkGroup.workerIndexLength,
-          forkGroup.label,
+          forkGroup.label.value,
           plannedWorker.worker.index.value
         )
       val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
@@ -179,15 +186,15 @@ private[mill] final class JvmTestModuleRun(
     // As Mill 1.3.1 does, a fork group with no class is given an empty queue, not an empty class list, so the
     // framework's setup and teardown still run without every class being selected.
     def layOut(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
-      val groupFolder = moduleFolder / forkGroup.folder
+      val groupFolder = moduleFolder / forkGroup.folder.segments
       os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
       if (forkGroup.testClasses.isEmpty) {
-        val queue = inputs.testModuleUtil(scalaTestArguments, ctx).prepareTestClassesFolder(Nil, groupFolder)
+        val queue = inputs.testModuleUtil(writtenScalaTestArguments, ctx).prepareTestClassesFolder(Nil, groupFolder)
         val claimFolder = groupFolder / "claim"
         os.makeDir.all(claimFolder)
         Right((None, queue, claimFolder))
       } else {
-        Left(forkGroup.testClasses)
+        Left(forkGroup.testClasses.map(_.value))
       }
     }
 
@@ -196,15 +203,15 @@ private[mill] final class JvmTestModuleRun(
         selector: JvmTestModuleRun.BatchSelector,
         plannedWorker: PlannedWorker,
         workerCtx: WorkerTaskCtx,
-        util: TestModuleUtil
+        testModuleUtil: TestModuleUtil
     ): Future[WorkerProcess] = {
-      val groupFolder = moduleFolder / forkGroup.folder
+      val groupFolder = moduleFolder / forkGroup.folder.segments
       def runProcess(): WorkerProcess = {
-        util.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
+        testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
         WorkerProcess.Started
       }
       if (layout.forkGroups.size > 1)
-        workerCtx.fork.async(groupFolder, forkGroup.label, "", priority = -1)(_ => runProcess())(using workerCtx)
+        workerCtx.fork.async(groupFolder, forkGroup.label.value, "", priority = -1)(_ => runProcess())(using workerCtx)
       else
         workerCtx.runOnThisThread(Future.successful(runProcess()))
     }
@@ -249,7 +256,7 @@ private[mill] object JvmTestModuleRun {
    *
    * @return the launcher, if laying out the workers succeeded
    */
-  def layOutWorkers[Launcher](consolidation: Consolidation, module: TestRunLabel)(
+  def layOutWorkers[Launcher](consolidation: Consolidation, label: TestRunLabel)(
       layOut: => Either[ForkGroupsShareProcessFolders, Launcher]
   ): Option[Launcher] = {
     val laidOut =
@@ -260,8 +267,8 @@ private[mill] object JvmTestModuleRun {
       }
     laidOut.fold(
       failure => {
-        consolidation.addRootFailure(s"Laying out the workers of ${module.value} failed: ${failure.getMessage}")
-        consolidation.timeModule(module, None, None)
+        consolidation.addRootFailure(s"Laying out the workers of ${label.value} failed: ${failure.getMessage}")
+        consolidation.timeModule(label, None, None)
         None
       },
       launcher => Some(launcher)
@@ -275,13 +282,13 @@ private[mill] object JvmTestModuleRun {
    *
    * @return each fork group that was laid out, with what laying it out gave
    */
-  def layOutForkGroups[LaidOut](consolidation: Consolidation, module: TestRunLabel, forkGroups: Seq[PlannedForkGroup])(
+  def layOutForkGroups[LaidOut](consolidation: Consolidation, label: TestRunLabel, forkGroups: Seq[PlannedForkGroup])(
       layOut: PlannedForkGroup => LaidOut
   ): Seq[(PlannedForkGroup, LaidOut)] =
     forkGroups.flatMap { forkGroup =>
       Try(layOut(forkGroup)).fold(
         throwable => {
-          consolidation.addRootFailure(s"Laying out ${forkGroup.describedIn(module)} failed: $throwable")
+          consolidation.addRootFailure(s"Laying out ${forkGroup.describedIn(label)} failed: $throwable")
           None
         },
         laidOut => Some(forkGroup -> laidOut)

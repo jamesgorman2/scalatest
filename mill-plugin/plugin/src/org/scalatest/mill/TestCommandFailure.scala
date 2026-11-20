@@ -7,9 +7,9 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case JsonOutputPathMissing
   case UnexpectedArgument(argument: String)
   case NoModuleSelector
-  case SeveralModuleSelectors(selectors: Seq[String])
-  case NotOneJvmTestModule(selector: String, resolved: String)
-  case UnresolvedModuleSelector(selector: String, error: String)
+  case SeveralModuleSelectors(selectors: Seq[ModuleSelectorArgument])
+  case NotOneJvmTestModule(selector: ModuleSelectorArgument, resolved: String)
+  case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
   case ModuleInputsNotEvaluated(module: String, error: String)
   case UnrecognisedModuleArgument(argument: String)
   case JsonOutputPathIsFolder(path: Path)
@@ -28,11 +28,11 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case NoModuleSelector =>
         "The test command takes one module selector, but was given none"
       case SeveralModuleSelectors(selectors) =>
-        s"The test command takes one module selector, but was given: ${selectors.mkString(" ")}"
+        s"The test command takes one module selector, but was given: ${selectors.map(_.text).mkString(" ")}"
       case NotOneJvmTestModule(selector, resolved) =>
-        s"Module selector $selector must resolve to one JVM test module, but resolved to: $resolved"
+        s"Module selector ${selector.text} must resolve to one JVM test module, but resolved to: $resolved"
       case UnresolvedModuleSelector(selector, error) =>
-        s"Module selector $selector resolves to no module: $error"
+        s"Module selector ${selector.text} resolves to no module: $error"
       case ModuleInputsNotEvaluated(_, error) =>
         error
       case UnrecognisedModuleArgument(argument) =>

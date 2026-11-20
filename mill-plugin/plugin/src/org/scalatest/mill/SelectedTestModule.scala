@@ -14,7 +14,7 @@ private[mill] final case class SelectedTestModule(module: TestModule) {
 
 private[mill] object SelectedTestModule {
 
-  def resolve(evaluator: Evaluator, moduleSelectors: Seq[String]): Either[TestCommandFailure, SelectedTestModule] =
+  def resolve(evaluator: Evaluator, moduleSelectors: Seq[ModuleSelectorArgument]): Either[TestCommandFailure, SelectedTestModule] =
     moduleSelectors match {
       case Seq(selector) =>
         resolveSelector(evaluator, selector)
@@ -24,8 +24,8 @@ private[mill] object SelectedTestModule {
         Left(TestCommandFailure.SeveralModuleSelectors(moduleSelectors))
     }
 
-  private def resolveSelector(evaluator: Evaluator, selector: String): Either[TestCommandFailure, SelectedTestModule] =
-    evaluator.resolveModulesOrTasks(Seq(selector), SelectMode.Multi) match {
+  private def resolveSelector(evaluator: Evaluator, selector: ModuleSelectorArgument): Either[TestCommandFailure, SelectedTestModule] =
+    evaluator.resolveModulesOrTasks(Seq(selector.text), SelectMode.Multi) match {
       case Result.Success(List(Left(module: TestModule))) if isJvm(module) =>
         Right(SelectedTestModule(module))
       case Result.Success(resolved) =>

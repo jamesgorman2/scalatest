@@ -8,6 +8,7 @@ import java.nio.file.Path
 import org.scalatest.consolidation.RunEvent
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.RunProcess
+import scala.annotation.tailrec
 import scala.concurrent.duration.FiniteDuration
 
 /**
@@ -62,27 +63,29 @@ private[mill] final class EventLogReader(
 
   private def readCapturingFailure(): Unit =
     try {
-      if (awaitEventLogFile()) {
-        addRun(readRun)
-      } else if (endedWorkerProcess.contains(WorkerProcess.Started)) {
-        addProcessEndedBeforeAnyRun()
+      awaitEventLogFile() match {
+        case EventLogReader.EventLogFileArrival.Appeared =>
+          addRun(readRun)
+        case EventLogReader.EventLogFileArrival.WillNotAppear =>
+          if (endedWorkerProcess.contains(WorkerProcess.Started)) {
+            addProcessEndedBeforeAnyRun()
+          }
       }
     } catch {
       case throwable: Throwable => failure = Some(throwable)
     }
 
-  private def awaitEventLogFile(): Boolean = {
-    var appeared = false
-    var noRun = false
-    while (!appeared && !noRun) {
-      val ended = endedWorkerProcess.isDefined
-      appeared = Files.exists(eventLogFile)
-      noRun = !appeared && ended
-      if (!appeared && !noRun) {
-        Thread.sleep(pollInterval.toMillis)
-      }
+  @tailrec
+  private def awaitEventLogFile(): EventLogReader.EventLogFileArrival = {
+    val ended = endedWorkerProcess.isDefined
+    if (Files.exists(eventLogFile)) {
+      EventLogReader.EventLogFileArrival.Appeared
+    } else if (ended) {
+      EventLogReader.EventLogFileArrival.WillNotAppear
+    } else {
+      Thread.sleep(pollInterval.toMillis)
+      awaitEventLogFile()
     }
-    appeared
   }
 
   private def readRun(feed: RunFeed): Unit = {
@@ -149,4 +152,9 @@ private[mill] object EventLogReader {
   def threadName(eventLogFile: Path): String = s"scalatest event log reader: $eventLogFile"
 
   private val retriedOpens: Int = 500
+
+  private enum EventLogFileArrival {
+    case Appeared
+    case WillNotAppear
+  }
 }
