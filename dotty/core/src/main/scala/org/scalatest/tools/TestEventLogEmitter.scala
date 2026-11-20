@@ -589,7 +589,7 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
-  /** @throws IllegalStateException where the process has no identity to write */
+  /** @throws IllegalStateException if this process's PID or start time cannot be read */
   def startedIfGiven(eventLogFile: Option[String]): Option[TestEventLogEmitter] = startedIfGiven(eventLogFile, ProcessIdentity.current)
 
   def startedIfGiven(eventLogFile: Option[String], processIdentity: => ProcessIdentity): Option[TestEventLogEmitter] = {
