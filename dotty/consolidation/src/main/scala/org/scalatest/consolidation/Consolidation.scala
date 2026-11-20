@@ -120,7 +120,7 @@ final class Consolidation private[consolidation] (
     synchronized {
       requireOpen()
       val consolidated = root(endedAt, runs.toVector.map(_.assembled))
-      HumanReadableWriter.lines(consolidated).foreach(line => humanReadableOutput(line.rendered(coloured)))
+      HumanReadableOutput.lines(consolidated).foreach(line => humanReadableOutput(line.rendered(coloured)))
       jsonOutput.foreach(sink => sink(new JsonOutput(consolidated)))
       currentState = currentState.withEnd
       currentState
@@ -179,9 +179,10 @@ object Consolidation {
 }
 
 /** Receives one run's event stream and captured lines, in the order they were read. */
-final class RunFeed private[consolidation] (consolidation: Consolidation, run: RunAssembly) {
+final class RunFeed private[consolidation] (consolidation: Consolidation, newRun: RunAssembly) {
 
   // Read and written only under the consolidation's lock.
+  private var run: RunAssembly = newRun
   private var endedEventStream: Option[AssembledEventStream] = None
 
   /**
@@ -194,8 +195,8 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
       if (endedEventStream.nonEmpty) {
         throw new IllegalStateException(s"the event stream of a run under ${run.label.value} has ended")
       }
-      run.add(event.decoded)
-      if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsOtherThanCompleted(event.decoded)) {
+      run = run.added(event.decoded)
+      if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsRunAbnormally(event.decoded)) {
         consolidation.fail()
       }
     }
@@ -205,12 +206,15 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
    *
    * @throws IllegalStateException if the consolidation has ended
    */
-  def add(line: CapturedLine): Unit = consolidation.feed(run.add(line))
+  def add(line: CapturedLine): Unit =
+    consolidation.feed {
+      run = run.added(line)
+    }
 
   private[consolidation] def endEventStream(): Unit =
     consolidation.feed {
       if (endedEventStream.isEmpty) {
-        val eventStream = run.assembledEventStream()
+        val eventStream = run.assembledEventStream
         endedEventStream = Some(eventStream)
         if (eventStream.failsTestCommand) {
           consolidation.fail()
@@ -218,7 +222,10 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
       }
     }
 
-  private[consolidation] def addAssigned(classes: Iterable[TestClassName]): Unit = consolidation.feed(run.addAssigned(classes))
+  private[consolidation] def addAssigned(classes: Iterable[TestClassName]): Unit =
+    consolidation.feed {
+      run = run.withAssigned(classes)
+    }
 
   private[consolidation] def assembled: AssembledRun =
     run.assembled(

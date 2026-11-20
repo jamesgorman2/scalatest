@@ -1,35 +1,20 @@
 package org.scalatest.consolidation
 
 import java.time.Instant
-import scala.collection.immutable.SortedMap
-import scala.collection.immutable.VectorMap
-import scala.collection.mutable
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.NodeId
 import org.scalatest.events.NodePlace
-import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
 import org.scalatest.events.SuiteId
 import org.scalatest.events.TestName
 
-/**
- * What a run's whole event stream recorded, from which its tree is assembled.
- *
- * @param structure each node by node path, in the order the structures first named them
- * @param latestScopesAndTests each suite's scopes and tests as the latest structure holding the suite gives them
- * @param firstScopeOrTestPosition each suite's first declared position of a scope or test
- */
-private[consolidation] final case class RecordedRun(
-  structure: VectorMap[NodeId, StructureNode],
-  executions: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]],
-  latestScopesAndTests: Map[NodeId, Set[NodeId]],
-  firstScopeOrTestPosition: Map[NodeId, Int],
-  outcome: Option[RunOutcome],
-  runAborted: Option[DecodedEvent.RunAborted]
-)
-
 /** What attributes a test with no execution to a test that ran: the suite ID of the nearest suite above it, and its test name. */
 private[consolidation] final case class AttributionKey(suiteId: SuiteId, testName: TestName)
+
+private[consolidation] final case class Subtree(started: Boolean, testsBelow: Vector[NodeId]) {
+
+  def isAttributed(isAttributedTest: NodeId => Boolean): Boolean = !started && testsBelow.nonEmpty && testsBelow.forall(isAttributedTest)
+}
 
 /**
  * Assembles a run's tree from its whole event stream, once. It works out once per node whether the node started
@@ -44,27 +29,29 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   private val childrenByParent = structure.values.toVector.groupBy(_.parentId)
   private val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
   private val keysOfTestsThatRan = executions.keysIterator.flatMap(TreeAssembler.attributionKeyOf).toSet
-  private val startedById = mutable.HashMap.empty[NodeId, Boolean]
-  private val testsBelowById = mutable.HashMap.empty[NodeId, Vector[NodeId]]
-  private val shownChildrenById = mutable.HashMap.empty[NodeId, OrderedChildren]
+  private val topLevelNodes = childrenByParent.getOrElse(None, Vector.empty)
+  private val subtrees = topLevelNodes.flatMap(withDescendantsChildrenFirst).foldLeft(Map.empty[NodeId, Subtree])(withSubtreeOf)
 
   def topLevelSuites: Vector[AssembledNode] =
-    inNameAndStartOrder(
-      childrenByParent.getOrElse(None, Vector.empty).filterNot(isAttributed).flatMap(suite => assembledNodes(suite, executionIndexesOf(suite.id), abortedSuiteAround = None))
-    )
+    inNameAndStartOrder(topLevelNodes.filterNot(isAttributed).flatMap(assembledTopLevel))
+
+  private def assembledTopLevel(suite: StructureNode): Vector[AssembledNode] =
+    assembledNodes(suite, executionIndexesOf(suite.id), abortedSuiteAround = None)
 
   private def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
 
-  private def started(id: NodeId): Boolean =
-    startedById.getOrElseUpdate(id, executions.contains(id) || childrenOf(id).exists(child => started(child.id)))
+  private def withDescendantsChildrenFirst(node: StructureNode): Vector[StructureNode] =
+    childrenOf(node.id).flatMap(withDescendantsChildrenFirst) :+ node
 
-  private def testsBelow(id: NodeId): Vector[NodeId] =
-    testsBelowById.getOrElseUpdate(id, {
-      childrenOf(id).flatMap {
-        case test: StructureNode.Test => Vector(test.id)
-        case suiteOrScope => testsBelow(suiteOrScope.id)
-      }
-    })
+  private def withSubtreeOf(subtreesBelow: Map[NodeId, Subtree], node: StructureNode): Map[NodeId, Subtree] = {
+    val children = childrenOf(node.id)
+    val started = executions.contains(node.id) || children.exists(child => subtreesBelow(child.id).started)
+    val testsBelow = children.flatMap {
+      case test: StructureNode.Test => Vector(test.id)
+      case suiteOrScope => subtreesBelow(suiteOrScope.id).testsBelow
+    }
+    subtreesBelow.updated(node.id, Subtree(started, testsBelow))
+  }
 
   private def isAttributedTest(id: NodeId): Boolean =
     !executions.contains(id) && TreeAssembler.attributionKeyOf(id).exists(keysOfTestsThatRan)
@@ -72,14 +59,10 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   private def isAttributed(node: StructureNode): Boolean =
     node match {
       case test: StructureNode.Test => isAttributedTest(test.id)
-      case suiteOrScope =>
-        val id = suiteOrScope.id
-        val tests = testsBelow(id)
-        !started(id) && tests.nonEmpty && tests.forall(isAttributedTest)
+      case suiteOrScope => subtrees(suiteOrScope.id).isAttributed(isAttributedTest)
     }
 
-  private def shownChildrenOf(id: NodeId): OrderedChildren =
-    shownChildrenById.getOrElseUpdate(id, orderedChildren(id, childrenOf(id).filterNot(isAttributed)))
+  private def shownChildrenOf(id: NodeId): OrderedChildren = orderedChildren(id, childrenOf(id).filterNot(isAttributed))
 
   // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
   // one it holds. A suite's nested suites sit before or after them, as the emitter's numbering placed them. A suite a
@@ -209,7 +192,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
     }
 
   private def abortTime(abortedSuiteAround: Option[DecodedEvent.SuiteAborted]): Option[Instant] =
-    abortedSuiteAround.map(_.timeStamp).orElse(run.runAborted.map(_.timeStamp)).map(Instant.ofEpochMilli)
+    abortedSuiteAround.map(_.timeStamp).orElse(run.abort.map(_.timeStamp)).map(Instant.ofEpochMilli)
 }
 
 private[consolidation] object TreeAssembler {

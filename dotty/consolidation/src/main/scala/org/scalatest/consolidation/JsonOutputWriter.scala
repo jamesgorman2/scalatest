@@ -2,7 +2,6 @@ package org.scalatest.consolidation
 
 import java.time.Duration
 import java.time.Instant
-import java.util.IdentityHashMap
 import org.scalactic.source.Position
 import org.scalatest.ScalaTestVersions
 import org.scalatest.events.DecodedStackDepth
@@ -63,8 +62,8 @@ private[consolidation] object JsonOutputWriter {
       Vector[Field](
         "kind" -> Some(JsonValue.Text("root")),
         "scalaTestVersion" -> Some(JsonValue.Text(ScalaTestVersions.ScalaTestVersion)),
-        "buildTool" -> root.buildTool.map(buildToolObject),
-        "moduleSelectors" -> Some(JsonValue.Array(root.moduleSelectors.toVector.map(moduleSelectorObject))),
+        "buildTool" -> root.buildTool.map(_.toJson),
+        "moduleSelectors" -> Some(JsonValue.Array(root.moduleSelectors.toVector.map(_.toJson))),
         "outcome" -> Option.when(root.failures.nonEmpty)(JsonValue.Text("aborted")),
         "failures" -> nonEmptyArray(root.failures.map(failure => objectOf(Vector[Field]("message" -> Some(JsonValue.Text(failure))))))
       ) ++ measuredTimeFields(root.times) ++ Vector[Field](
@@ -73,16 +72,20 @@ private[consolidation] object JsonOutputWriter {
       )
     )
 
-  private def buildToolObject(buildTool: BuildTool): JsonValue =
-    objectOf(Vector[Field]("name" -> Some(JsonValue.Text(buildTool.name)), "version" -> Some(JsonValue.Text(buildTool.version))))
+  extension (buildTool: BuildTool) {
+    private def toJson: JsonValue =
+      objectOf(Vector[Field]("name" -> Some(JsonValue.Text(buildTool.name)), "version" -> Some(JsonValue.Text(buildTool.version))))
+  }
 
-  private def moduleSelectorObject(moduleSelector: ModuleSelector): JsonValue =
-    objectOf(
-      Vector[Field](
-        "selector" -> Some(JsonValue.Text(moduleSelector.selector)),
-        "modules" -> Some(JsonValue.Array(moduleSelector.modules.map(module => JsonValue.Text(module.value))))
+  extension (moduleSelector: ModuleSelector) {
+    private def toJson: JsonValue =
+      objectOf(
+        Vector[Field](
+          "selector" -> Some(JsonValue.Text(moduleSelector.text)),
+          "modules" -> Some(JsonValue.Array(moduleSelector.modules.map(module => JsonValue.Text(module.value))))
+        )
       )
-    )
+  }
 
   private def moduleNode(module: ConsolidatedModule): JsonValue =
     objectOf(
@@ -103,7 +106,7 @@ private[consolidation] object JsonOutputWriter {
   private def runNode(run: ConsolidatedRun): JsonValue = {
     val assembled = run.assembled
     val eventStream = assembled.eventStream
-    val starting = eventStream.runStarting
+    val starting = eventStream.starting
     val closing = eventStream.closing
     objectOf(
       Vector[Field](
@@ -111,15 +114,15 @@ private[consolidation] object JsonOutputWriter {
         "number" -> Some(JsonValue.Integer(run.number.value.toLong)),
         "forkGroup" -> assembled.worker.map(worker => JsonValue.Integer(worker.forkGroup.position.toLong)),
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
-        "configMap" -> starting.map(started => configMapObject(started.configMap)),
-        "discovery" -> eventStream.discovery.map(discoveryObject),
+        "configMap" -> starting.map(started => configMapJson(started.configMap)),
+        "discovery" -> eventStream.discovery.map(_.toJson),
         "outcome" -> eventStream.outcome.filter(_.isAbnormal).map(outcome => JsonValue.Text(outcome.word)),
-        "message" -> eventStream.runAborted.map(aborted => JsonValue.Text(aborted.message)),
-        "throwable" -> eventStream.runAborted.flatMap(_.throwable).map(throwableRecord),
+        "message" -> eventStream.abort.map(aborted => JsonValue.Text(aborted.message)),
+        "throwable" -> eventStream.abort.flatMap(_.throwable).map(throwableRecord),
         "startedAt" -> eventStream.startedAt.map(epochMillis),
         "endedAt" -> closing.map(closed => epochMillis(closed.at)),
         "duration" -> closing.flatMap(_.duration).map(millis),
-        "summary" -> closing.flatMap(_.summary).map(summaryObject),
+        "summary" -> closing.flatMap(_.summary).map(_.toJson),
         "contents" -> Some(JsonValue.Array(eventStream.topLevelSuites.map(assembledNode))),
         "output" -> nonEmptyArray(assembled.output.map(runOutputItem))
       )
@@ -153,8 +156,8 @@ private[consolidation] object JsonOutputWriter {
 
   private def locationOf(assembled: AssembledNode): Option[JsonValue] =
     assembled.node match {
-      case suite: StructureNode.Suite => Some(suiteLocationObject(suite, assembled.execution))
-      case _ => assembled.eventLocation.flatMap(locationObject)
+      case suite: StructureNode.Suite => Some(suiteLocation(suite, assembled.execution))
+      case _ => assembled.eventLocation.flatMap(_.toJson)
     }
 
   private def outcomeText(outcome: NodeOutcome): String =
@@ -168,7 +171,7 @@ private[consolidation] object JsonOutputWriter {
     }
 
   // A suite's events give no line of their own. Its location has a file only when all its scopes' and tests' locations name the same one.
-  private def suiteLocationObject(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
+  private def suiteLocation(suite: StructureNode.Suite, execution: AssembledExecution): JsonValue = {
     val locations = execution.ownScopesAndTests.flatMap(_.eventLocation)
     val files = locations.map(fileFields).distinct
     val sharedFile = files match {
@@ -178,17 +181,19 @@ private[consolidation] object JsonOutputWriter {
     objectOf(("className" -> Some(JsonValue.Text(suite.className))) +: sharedFile)
   }
 
-  private def locationObject(location: Location): Option[JsonValue] =
-    location match {
-      case TopOfClass(className) =>
-        Some(objectOf(Vector[Field]("className" -> Some(JsonValue.Text(className)))))
-      case TopOfMethod(className, methodId) =>
-        Some(objectOf(Vector[Field]("className" -> Some(JsonValue.Text(className)), "methodId" -> Some(JsonValue.Text(methodId)))))
-      case line: LineInFile =>
-        Some(objectOf(fileFields(line) :+ ("lineNumber" -> Some(JsonValue.Integer(line.lineNumber.toLong)))))
-      case SeeStackDepthException =>
-        None
-    }
+  extension (location: Location) {
+    private def toJson: Option[JsonValue] =
+      location match {
+        case TopOfClass(className) =>
+          Some(objectOf(Vector[Field]("className" -> Some(JsonValue.Text(className)))))
+        case TopOfMethod(className, methodId) =>
+          Some(objectOf(Vector[Field]("className" -> Some(JsonValue.Text(className)), "methodId" -> Some(JsonValue.Text(methodId)))))
+        case line: LineInFile =>
+          Some(objectOf(fileFields(line) :+ ("lineNumber" -> Some(JsonValue.Integer(line.lineNumber.toLong)))))
+        case SeeStackDepthException =>
+          None
+      }
+  }
 
   private def fileFields(location: Location): Vector[Field] =
     location match {
@@ -204,30 +209,34 @@ private[consolidation] object JsonOutputWriter {
       .filterNot(_ == Position.unfilledFilePathname)
       .fold[Field]("fileName" -> fileName.map(JsonValue.Text(_)))(path => "filePath" -> Some(JsonValue.Text(path)))
 
-  private def configMapObject(configMap: Map[String, String]): JsonValue =
-    JsonValue.Object(configMap.toVector.sortBy(_._1).map((key, value) => key -> JsonValue.Text(value)))
+  private def configMapJson(configMap: Map[String, String]): JsonValue =
+    JsonValue.Object(configMap.toVector.sortBy((key, _) => key).map((key, value) => key -> JsonValue.Text(value)))
 
-  private def discoveryObject(discovery: RunDiscovery): JsonValue =
-    objectOf(
-      Vector[Field](
-        "startedAt" -> Some(epochMillis(discovery.startedAt)),
-        "duration" -> discovery.duration.map(millis)
+  extension (discovery: RunDiscovery) {
+    private def toJson: JsonValue =
+      objectOf(
+        Vector[Field](
+          "startedAt" -> Some(epochMillis(discovery.startedAt)),
+          "duration" -> discovery.duration.map(millis)
+        )
       )
-    )
+  }
 
-  private def summaryObject(summary: Summary): JsonValue =
-    JsonValue.Object(
-      Vector(
-        "testsSucceededCount" -> summary.testsSucceededCount,
-        "testsFailedCount" -> summary.testsFailedCount,
-        "testsIgnoredCount" -> summary.testsIgnoredCount,
-        "testsPendingCount" -> summary.testsPendingCount,
-        "testsCanceledCount" -> summary.testsCanceledCount,
-        "suitesCompletedCount" -> summary.suitesCompletedCount,
-        "suitesAbortedCount" -> summary.suitesAbortedCount,
-        "scopesPendingCount" -> summary.scopesPendingCount
-      ).map((key, count) => key -> JsonValue.Integer(count.toLong))
-    )
+  extension (summary: Summary) {
+    private def toJson: JsonValue =
+      JsonValue.Object(
+        Vector(
+          "testsSucceededCount" -> summary.testsSucceededCount,
+          "testsFailedCount" -> summary.testsFailedCount,
+          "testsIgnoredCount" -> summary.testsIgnoredCount,
+          "testsPendingCount" -> summary.testsPendingCount,
+          "testsCanceledCount" -> summary.testsCanceledCount,
+          "suitesCompletedCount" -> summary.suitesCompletedCount,
+          "suitesAbortedCount" -> summary.suitesAbortedCount,
+          "scopesPendingCount" -> summary.scopesPendingCount
+        ).map((key, count) => key -> JsonValue.Integer(count.toLong))
+      )
+  }
 
   private def runOutputItem(output: RunOutput): JsonValue =
     output match {
@@ -242,83 +251,68 @@ private[consolidation] object JsonOutputWriter {
         "kind" -> Some(JsonValue.Text(message.kind.word)),
         "message" -> Some(JsonValue.Text(message.text)),
         "at" -> Some(epochMillis(message.at)),
-        "location" -> message.location.flatMap(locationObject),
+        "location" -> message.location.flatMap(_.toJson),
         "throwable" -> message.throwable.map(throwableRecord),
         "threadName" -> Option.when(!nodeThreadName.contains(message.threadName))(JsonValue.Text(message.threadName))
       )
     )
 
-  private enum ThrowableLink {
-    case Cause
-    case Suppressed
-  }
-
-  /** A throwable's parent in the record: the parent's entry index, and whether the throwable is the parent's cause or one of its suppressed throwables. */
-  private final case class ThrowableParent(entryIndex: Int, link: ThrowableLink)
-
-  /** A throwable in a record, with its link to its parent, if any. */
-  private final case class LinkedThrowable(throwable: DecodedThrowable, parent: Option[ThrowableParent]) {
-
-    def isLinkedAs(link: ThrowableLink): Boolean = parent.exists(_.link == link)
-  }
-
-  /** A throwable's entry in its record: its first appearance, under a new id, or a ref to that id. */
   private enum ThrowableEntry {
-    case Recorded(id: Int)
+    case Recorded(id: Int, throwable: DecodedThrowable)
     case Ref(id: Int)
   }
 
-  /** A throwable the record has visited, with the entry visiting it produced. */
-  private final case class VisitedThrowable(linkedThrowable: LinkedThrowable, entry: ThrowableEntry)
+  private final case class ThrowableVisit(pending: List[DecodedThrowable], ids: Map[DecodedThrowable, Int]) {
+
+    def next: Option[(ThrowableEntry, ThrowableVisit)] =
+      pending match {
+        case Nil =>
+          None
+        case current :: rest =>
+          ids.get(current) match {
+            case Some(id) => Some(ThrowableEntry.Ref(id) -> copy(pending = rest))
+            case None => Some(firstVisitTo(current, rest))
+          }
+      }
+
+    private def firstVisitTo(throwable: DecodedThrowable, rest: List[DecodedThrowable]): (ThrowableEntry, ThrowableVisit) = {
+      val id = ids.size + 1
+      val linked = throwable.cause.toList ::: throwable.suppressed.toList
+      ThrowableEntry.Recorded(id, throwable) -> ThrowableVisit(linked ::: rest, ids.updated(throwable, id))
+    }
+  }
 
   // Builds the record in two passes. Neither recurses, so a cause chain too long to recurse over is still written.
   //   1. Visit the throwables depth-first, cause before suppressed. A throwable seen for the first time, by identity, gets the
   //      next id; one seen again becomes a ref.
   //   2. Build the record from the last entry back to the first.
-  private def throwableRecord(throwable: DecodedThrowable): JsonValue = {
-    val ids = new IdentityHashMap[DecodedThrowable, Int]
-    val visitedThrowables = Vector.newBuilder[VisitedThrowable]
-    var entryCount = 0
-    var pending = List(LinkedThrowable(throwable, None))
-    while (pending.nonEmpty) {
-      val current = pending.head
-      pending = pending.tail
-      if (ids.containsKey(current.throwable)) {
-        visitedThrowables += VisitedThrowable(current, ThrowableEntry.Ref(ids.get(current.throwable)))
-      } else {
-        val id = ids.size + 1
-        ids.put(current.throwable, id)
-        visitedThrowables += VisitedThrowable(current, ThrowableEntry.Recorded(id))
-        val linked = current.throwable.cause.map(LinkedThrowable(_, Some(ThrowableParent(entryCount, ThrowableLink.Cause)))).toList :::
-          current.throwable.suppressed.toList.map(LinkedThrowable(_, Some(ThrowableParent(entryCount, ThrowableLink.Suppressed))))
-        pending = linked ::: pending
-      }
-      entryCount += 1
-    }
-    val visited = visitedThrowables.result()
-    val linkedByParent = visited.indices.groupBy(index => visited(index).linkedThrowable.parent.map(_.entryIndex))
-    val written = new Array[JsonValue](visited.size)
-    visited.indices.reverse.foreach { index =>
-      val linked = linkedByParent.getOrElse(Some(index), Vector.empty)
-      def recordsLinkedAs(link: ThrowableLink): Vector[JsonValue] = linked.filter(visited(_).linkedThrowable.isLinkedAs(link)).map(written(_)).toVector
-      written(index) = visited(index).entry match {
-        case ThrowableEntry.Ref(id) =>
-          objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong))))
-        case ThrowableEntry.Recorded(id) =>
-          throwableObject(id, visited(index).linkedThrowable.throwable, recordsLinkedAs(ThrowableLink.Cause).headOption, recordsLinkedAs(ThrowableLink.Suppressed))
-      }
-    }
-    written(0)
-  }
+  private def throwableRecord(throwable: DecodedThrowable): JsonValue =
+    Iterator
+      .unfold(ThrowableVisit(List(throwable), Map.empty))(_.next)
+      .toVector
+      .foldRight(List.empty[JsonValue])(withEntryWritten)
+      .head
 
-  private def throwableObject(id: Int, throwable: DecodedThrowable, cause: Option[JsonValue], suppressed: Vector[JsonValue]): JsonValue =
+  private def withEntryWritten(entry: ThrowableEntry, written: List[JsonValue]): List[JsonValue] =
+    entry match {
+      case ThrowableEntry.Ref(id) =>
+        objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong)))) :: written
+      case ThrowableEntry.Recorded(id, throwable) => {
+        // Entries are visited depth-first, so the records written after this one start with its cause's, then its suppressed throwables'.
+        val (causes, afterCauses) = written.splitAt(throwable.cause.size)
+        val (suppressed, rest) = afterCauses.splitAt(throwable.suppressed.size)
+        recordedThrowable(id, throwable, causes.headOption, suppressed.toVector) :: rest
+      }
+    }
+
+  private def recordedThrowable(id: Int, throwable: DecodedThrowable, cause: Option[JsonValue], suppressed: Vector[JsonValue]): JsonValue =
     objectOf(
       Vector[Field](
         "id" -> Some(JsonValue.Integer(id.toLong)),
         "className" -> Some(JsonValue.Text(throwable.className)),
         "message" -> throwable.message.map(JsonValue.Text(_)),
         "location" -> throwable.stackDepth.flatMap(failedCodeLocation),
-        "stackTrace" -> Option.when(throwable.stackDepth.isEmpty)(JsonValue.Array(throwable.stackTrace.toVector.map(stackFrameObject))),
+        "stackTrace" -> Option.when(throwable.stackDepth.isEmpty)(JsonValue.Array(throwable.stackTrace.toVector.map(_.toJson))),
         "cause" -> cause,
         "suppressed" -> nonEmptyArray(suppressed)
       )
@@ -329,19 +323,21 @@ private[consolidation] object JsonOutputWriter {
       fileField(stackDepth.fileName, stackDepth.filePathname),
       "lineNumber" -> stackDepth.lineNumber.map(line => JsonValue.Integer(line.toLong))
     )
-    Option.when(fields.exists(_._2.nonEmpty))(objectOf(fields))
+    Option.when(fields.exists((_, value) => value.nonEmpty))(objectOf(fields))
   }
 
-  private def stackFrameObject(frame: DecodedStackFrame): JsonValue =
-    objectOf(
-      Vector[Field](
-        "className" -> Some(JsonValue.Text(frame.className)),
-        "methodName" -> Some(JsonValue.Text(frame.methodName)),
-        "fileName" -> frame.fileName.map(JsonValue.Text(_)),
-        "lineNumber" -> frame.lineNumber.filter(_ >= 0).map(line => JsonValue.Integer(line.toLong)),
-        "isNative" -> Option.when(frame.isNative)(JsonValue.Bool(true))
+  extension (frame: DecodedStackFrame) {
+    private def toJson: JsonValue =
+      objectOf(
+        Vector[Field](
+          "className" -> Some(JsonValue.Text(frame.className)),
+          "methodName" -> Some(JsonValue.Text(frame.methodName)),
+          "fileName" -> frame.fileName.map(JsonValue.Text(_)),
+          "lineNumber" -> frame.lineNumber.filter(_ >= 0).map(line => JsonValue.Integer(line.toLong)),
+          "isNative" -> Option.when(frame.isNative)(JsonValue.Bool(true))
+        )
       )
-    )
+  }
 
   private def capturedOutputItem(line: CapturedLine): JsonValue = {
     val (stream, text) = line match {
