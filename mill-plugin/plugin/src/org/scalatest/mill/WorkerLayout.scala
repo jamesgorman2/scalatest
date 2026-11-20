@@ -38,7 +38,7 @@ private[mill] final case class PlannedForkGroup(
 }
 
 /**
- * @param worker the worker's fork group and its index within that group, which label the worker's run
+ * @param worker the fork group and index that identify the worker and label its run
  * @param processFolder the worker's `processFolder`, as path segments under the module's folder: its fork group's
  *                      folder, or its own folder `worker-<i>` in that folder where Mill runs the group's workers in
  *                      parallel
