@@ -38,7 +38,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
     }
 
     "given a run" should {
-      "make the run with the run factory it was made with, from the run's module and worker" in {
+      "make the run with the factory it was given, passing the run's module and worker" in {
         var made = Vector.empty[(TestRunLabel, Option[Worker])]
         val consolidation = new Consolidation(
           new OutputSink,

@@ -40,7 +40,7 @@ final class RunAssemblySpec extends AnyWordSpec with should.Matchers with Consol
 
   "A run assembly" when {
     "its event stream ends" should {
-      "give the tree assembler it was made with what the stream recorded" in {
+      "pass what the stream recorded to the tree assembler it was made with" in {
         var recordedRuns = Vector.empty[RecordedRun]
         endedRun { recorded =>
           recordedRuns :+= recorded
@@ -49,7 +49,7 @@ final class RunAssemblySpec extends AnyWordSpec with should.Matchers with Consol
         recordedRuns.map(recorded => (recorded.structure.values.map(_.name).toVector, recorded.outcome)) shouldBe
           Vector((Vector("RowSuite", "t"), Some(RunOutcome.Completed)))
       }
-      "hold the tree its tree assembler assembles" in {
+      "hold the tree its tree assembler returns" in {
         endedRun(_ => assembledTree).topLevelSuites shouldBe assembledTree
       }
     }

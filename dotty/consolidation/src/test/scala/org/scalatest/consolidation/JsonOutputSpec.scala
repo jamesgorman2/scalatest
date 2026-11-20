@@ -15,7 +15,7 @@ final class JsonOutputSpec extends AnyWordSpec with should.Matchers with Consoli
   }
 
   "The JSON output" when {
-    "its text is many pieces long" should {
+    "its text is longer than one piece" should {
       "be given in pieces that join to the whole text" in {
         val message = "😀" * 10000
         val pieces = piecesOf(message)
