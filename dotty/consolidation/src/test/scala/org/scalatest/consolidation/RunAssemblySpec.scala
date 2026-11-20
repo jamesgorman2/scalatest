@@ -31,18 +31,17 @@ final class RunAssemblySpec extends AnyWordSpec with should.Matchers with Consol
     )
   )
 
-  private def endedRun(assembleTree: RecordedRun => Vector[AssembledNode]): RunAssembly = {
+  private def endedEventStream(assembleTree: RecordedRun => Vector[AssembledNode]): AssembledEventStream = {
     val run = new RunAssembly(moduleLabel, None, assembleTree)
     TestRunBuilder.build(TestRunPart.Events(eventLog)).events.foreach(built => run.add(built.event))
     run.endEventStream()
-    run
   }
 
   "A run assembly" when {
     "its event stream ends" should {
       "pass what the stream recorded to the tree assembler it was made with" in {
         var recordedRuns = Vector.empty[RecordedRun]
-        endedRun { recorded =>
+        endedEventStream { recorded =>
           recordedRuns :+= recorded
           assembledTree
         }
@@ -50,7 +49,7 @@ final class RunAssemblySpec extends AnyWordSpec with should.Matchers with Consol
           Vector((Vector("RowSuite", "t"), Some(RunOutcome.Completed)))
       }
       "hold the tree its tree assembler returns" in {
-        endedRun(_ => assembledTree).topLevelSuites shouldBe assembledTree
+        endedEventStream(_ => assembledTree).topLevelSuites shouldBe assembledTree
       }
     }
   }

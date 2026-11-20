@@ -161,6 +161,21 @@ private[scalatest] enum DecodedEvent {
   def duration: Option[Long] = None
 }
 
+// Every event is a node opening, a node closing, a message, a run closing, or a run's start or discovery.
+private[scalatest] object DecodedEvent {
+
+  type NodeOpening = SuiteStarting | ScopeOpened | TestStarting
+
+  type NodeClosing = SuiteCompleted | ScopeClosed | ScopePending | TestSucceeded | TestIgnored | TestPending | NodeFailure
+
+  /** A node closing that carries a failure's message and throwable. */
+  type NodeFailure = TestFailed | TestCanceled | SuiteAborted
+
+  type Message = InfoProvided | AlertProvided | NoteProvided | MarkupProvided
+
+  type RunClosing = RunCompleted | RunStopped | RunAborted
+}
+
 private[scalatest] final case class DecodedStackDepth(
   fileName: Option[String],
   filePathname: Option[String],

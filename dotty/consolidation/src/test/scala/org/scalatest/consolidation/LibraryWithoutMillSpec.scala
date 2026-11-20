@@ -29,17 +29,19 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
       val consolidation = Consolidation.start(output, coloured = true)
 
       When("every event has been fed and the event stream is held open")
-      addRun(consolidation, completedRun)
+      consolidation.addRun(moduleLabel) { feed =>
+        feedParts(feed, Vector(completedRun))
 
-      Then("the library has written no human-readable output")
-      output.lines shouldBe empty
+        Then("the library has written no human-readable output")
+        output.lines shouldBe empty
+      }
     }
 
     Scenario("A completed run whose event stream has ended") {
       Given("an event log of a completed run, every event fed and the event stream ended")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, completedRun).endEventStream()
+      addRun(consolidation, completedRun)
       output.lines shouldBe empty
 
       When("the caller ends the consolidation")

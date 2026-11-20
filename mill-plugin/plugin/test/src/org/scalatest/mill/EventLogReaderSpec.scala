@@ -33,11 +33,11 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     val processExited: AtomicBoolean = new AtomicBoolean(false)
     val processesWatched: mutable.Set[RunProcess] = mutable.Set.empty[RunProcess]
 
-    val reader: EventLogReader = new EventLogReader(eventLogFile, () => addRun(), () => addProcessEndedBeforeAnyRun(), watch, 1.millis, open)
+    val reader: EventLogReader = new EventLogReader(eventLogFile, addRun, () => addProcessEndedBeforeAnyRun(), watch, 1.millis, open)
 
-    private def addRun(): RunFeed = {
+    private def addRun(readRun: RunFeed => Unit): Unit = {
       runsAdded.incrementAndGet()
-      consolidation.addRun(TestRunLabel("core.test"))
+      consolidation.addRun(TestRunLabel("core.test"))(readRun)
     }
 
     private def addProcessEndedBeforeAnyRun(): Unit = {
@@ -54,7 +54,6 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       reader.workerHasEnded(workerProcess)
       reader.awaitStreamEnd()
       consolidation.end()
-      consolidation.state
     }
   }
 

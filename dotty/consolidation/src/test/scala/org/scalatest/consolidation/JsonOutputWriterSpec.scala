@@ -32,15 +32,16 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   private def runNodeOf(feedAfterRunStarted: RunFeed => Unit): JsonValue = {
     val json = new JsonSink
     val consolidation = startedWithoutMill(json)
-    val feed = addRun(consolidation, TestRunPart.Events("run started"))
-    feedAfterRunStarted(feed)
-    feed.endEventStream()
+    consolidation.addRun(moduleLabel) { feed =>
+      feedParts(feed, Vector(TestRunPart.Events("run started")))
+      feedAfterRunStarted(feed)
+    }
     consolidation.end()
     json.runNode
   }
 
   private def endedWithOneRun(consolidation: Consolidation, endedAt: Option[Instant] = None): Unit = {
-    addRun(consolidation, completedRun).endEventStream()
+    addRun(consolidation, completedRun)
     consolidation.end(endedAt)
   }
 
@@ -60,7 +61,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       "write nothing to it before it ends" in {
         val json = new JsonSink
         val consolidation = startedWithoutMill(json)
-        addRun(consolidation, completedRun).endEventStream()
+        addRun(consolidation, completedRun)
         json.texts shouldBe empty
       }
 
@@ -160,10 +161,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       "hold the modules in ascending order by name" in {
         val json = new JsonSink
         val consolidation = startedWithoutMill(json)
-        Vector("core.test", "app.test").foreach { module =>
-          val feed = consolidation.addRun(TestRunLabel(module))
-          feed.endEventStream()
-        }
+        Vector("core.test", "app.test").foreach(module => consolidation.addRun(TestRunLabel(module))(_ => ()))
         consolidation.end()
         json.root("contents").items.map(_("name")) shouldBe Vector(text("app.test"), text("core.test"))
       }
@@ -211,8 +209,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       "hold their run nodes numbered from 1 in the order they were added" in {
         val json = new JsonSink
         val consolidation = startedWithoutMill(json)
-        addRun(consolidation, completedRun).endEventStream()
-        addRun(consolidation, completedRun).endEventStream()
+        addRun(consolidation, completedRun)
+        addRun(consolidation, completedRun)
         consolidation.end()
         json.module("contents").items.map(_("number")) shouldBe Vector(integer(1L), integer(2L))
       }

@@ -16,11 +16,10 @@ private[consolidation] enum FailureEnding {
 
 private[consolidation] object FailureEnding {
 
-  def of(event: DecodedEvent): Option[FailureEnding] =
+  def of(event: DecodedEvent.NodeFailure): FailureEnding =
     event match {
-      case failed: DecodedEvent.TestFailed => Some(TestFailed(failed.message, failed.throwable, failed.analysis))
-      case canceled: DecodedEvent.TestCanceled => Some(TestCanceled(canceled.message, canceled.throwable))
-      case aborted: DecodedEvent.SuiteAborted => Some(SuiteAborted(aborted.message, aborted.throwable))
-      case _ => None
+      case failed: DecodedEvent.TestFailed => TestFailed(failed.message, failed.throwable, failed.analysis)
+      case canceled: DecodedEvent.TestCanceled => TestCanceled(canceled.message, canceled.throwable)
+      case aborted: DecodedEvent.SuiteAborted => SuiteAborted(aborted.message, aborted.throwable)
     }
 }

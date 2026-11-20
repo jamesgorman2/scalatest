@@ -54,11 +54,12 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     @volatile var processExited: Boolean = true
     private val reader = new EventLogReader(
       eventLogFile,
-      () => {
+      readRun => {
         runsAdded.incrementAndGet()
-        val feed = consolidation.addRun(label)
-        capture.addTo(feed.add)
-        feed
+        consolidation.addRun(label) { feed =>
+          capture.addTo(feed.add)
+          readRun(feed)
+        }
       },
       () => {
         processesEndedBeforeAnyRun.incrementAndGet()

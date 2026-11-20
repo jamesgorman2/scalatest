@@ -36,9 +36,9 @@ private[mill] object TestCommand {
     BuildCtx.withFilesystemCheckerDisabled {
       run.run(consolidation)
     }
-    consolidation.end(Some(Instant.now()))
+    val endedState = consolidation.end(Some(Instant.now()))
     jsonOutputWritten.fold(failure => ctx.fail(failure.message), identity)
-    if (consolidation.state.failed) {
+    if (endedState.failed) {
       ctx.fail(s"The tests of ${module.path} failed")
     }
   }

@@ -422,9 +422,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
       When("the library consolidates it")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      val feed = consolidation.addRun(moduleLabel)
-      events.foreach(event => feed.add(RunEvent.of(event)))
-      feed.endEventStream()
+      consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(RunEvent.of(event))))
       consolidation.end()
 
       Then("the failure shows the throwable's class and frames once, with no `Cause:` line, and the second test follows")
@@ -522,8 +520,8 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
       When("the library consolidates both runs")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events(abortedRun)).endEventStream()
-      addRun(consolidation, TestRunPart.Events(laterRun)).endEventStream()
+      addRun(consolidation, TestRunPart.Events(abortedRun))
+      addRun(consolidation, TestRunPart.Events(laterRun))
       consolidation.end()
 
       Then("the later run's suite, test and message come first, then the aborted run's line with the throwable's class")

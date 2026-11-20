@@ -20,10 +20,13 @@ import scala.concurrent.duration.FiniteDuration
  * an exception naming the line and why. If
  * the worker ends before the file appears, no run existed in it: where the worker started a process, the reader adds
  * that process as one that ended before any run.
+ *
+ * @param addRun adds the run and gives the function the run's feed; the run's event stream ends when the function
+ *               returns or throws
  */
 private[mill] final class EventLogReader(
     eventLogFile: Path,
-    addRun: () => RunFeed,
+    addRun: (RunFeed => Unit) => Unit,
     addProcessEndedBeforeAnyRun: () => Unit,
     hasExited: RunProcess => Boolean,
     pollInterval: FiniteDuration,
@@ -63,12 +66,7 @@ private[mill] final class EventLogReader(
   private def readCapturingFailure(): Unit =
     try {
       if (awaitEventLogFile()) {
-        val feed = addRun()
-        try {
-          readRun(feed)
-        } finally {
-          feed.endEventStream()
-        }
+        addRun(readRun)
       } else if (endedWorkerProcess.contains(WorkerProcess.Started)) {
         addProcessEndedBeforeAnyRun()
       }

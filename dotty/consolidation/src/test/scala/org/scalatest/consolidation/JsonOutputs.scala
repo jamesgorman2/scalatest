@@ -60,7 +60,7 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
   def jsonOutputOfRun(parts: TestRunPart*): JsonSink = {
     val json = new JsonSink
     val consolidation = startedWithoutMill(json)
-    addRun(consolidation, parts*).endEventStream()
+    addRun(consolidation, parts*)
     consolidation.end()
     json
   }

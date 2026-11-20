@@ -48,10 +48,10 @@ private[consolidation] object SummaryCounts {
 
   /**
    * The counts over the assembled tree of the runs, the tree the human-readable output prints. Collapsed subtrees are
-   * counted. Attributed nodes are not in the tree, so they are not counted. Requires each run's event stream to have ended.
+   * counted. Attributed nodes are not in the tree, so they are not counted.
    */
-  def of(runs: Seq[RunAssembly]): SummaryCounts =
-    runs.flatMap(_.topLevelSuites).flatMap(_.withDescendants).map(countsOf).foldLeft(none)(_.plus(_))
+  def of(runs: Seq[AssembledRun]): SummaryCounts =
+    runs.flatMap(_.eventStream.topLevelSuites).flatMap(_.withDescendants).map(countsOf).foldLeft(none)(_.plus(_))
 
   private def countsOf(node: AssembledNode): SummaryCounts =
     (node.node, node.execution.outcome) match {
@@ -75,9 +75,9 @@ private[consolidation] object SummaryLine {
 
   /**
    * The summary line of the runs, as segments. Each part (a word and its count) is coloured as a line of its kind,
-   * whatever its count; every other character is cyan. Requires each run's event stream to have ended.
+   * whatever its count; every other character is cyan.
    */
-  def of(runs: Seq[RunAssembly]): Vector[Segment] = segmentsOf(SummaryCounts.of(runs))
+  def of(runs: Seq[AssembledRun]): Vector[Segment] = segmentsOf(SummaryCounts.of(runs))
 
   private def segmentsOf(counts: SummaryCounts): Vector[Segment] = {
     import counts.*

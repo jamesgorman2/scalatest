@@ -51,14 +51,14 @@ private[consolidation] object HumanReadableWriter {
   // A stable sort keeps suites that share a name in order of their runs' numbers, then in the order each run lists them.
   private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] = {
     val (shownRuns, hiddenRuns) = module.runs.partition(showsItsLine)
-    val hiddenRunsSuites = hiddenRuns.flatMap(_.assembly.topLevelSuites).sortBy(_.name)
+    val hiddenRunsSuites = hiddenRuns.flatMap(_.assembled.eventStream.topLevelSuites).sortBy(_.name)
     linesOf("[" + module.label.value + "]", depth, AnsiCyan) ++ hiddenRunsSuites.flatMap(nodeLines(_, depth + 1)) ++
       shownRuns.flatMap(runLines(_, depth + 1))
   }
 
   private def showsItsLine(run: ConsolidatedRun): Boolean = {
-    val assembly = run.assembly
-    assembly.output.nonEmpty || assembly.endedAbnormally || assembly.ranNoneOfItsAssignedTestClasses
+    val assembled = run.assembled
+    assembled.output.nonEmpty || assembled.eventStream.endedAbnormally || assembled.ranNoneOfItsAssignedTestClasses
   }
 
   private def rootFailureLines(failures: Seq[String], depth: Int): Vector[OutputLine] =
@@ -66,9 +66,9 @@ private[consolidation] object HumanReadableWriter {
     else linesOf(rootAbortedLine, depth, AnsiRed) ++ failures.flatMap(linesOf(_, depth + 1, AnsiRed))
 
   private def runLines(run: ConsolidatedRun, depth: Int): Vector[OutputLine] = {
-    val assembly = run.assembly
-    linesOf(s"Run ${run.number.value}:", depth, AnsiCyan) ++ assembly.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++
-      assembly.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(assembly, depth + 1)
+    val assembled = run.assembled
+    linesOf(s"Run ${run.number.value}:", depth, AnsiCyan) ++ assembled.eventStream.topLevelSuites.flatMap(nodeLines(_, depth + 1)) ++
+      assembled.output.flatMap(outputLines(_, depth + 1)) ++ runEndLines(assembled.eventStream, depth + 1)
   }
 
   private def outputLines(output: RunOutput, depth: Int): Vector[OutputLine] =
@@ -83,10 +83,10 @@ private[consolidation] object HumanReadableWriter {
       case CapturedLine.Stderr(text) => linesOf("[stderr] " + text, depth, AnsiYellow)
     }
 
-  private def runEndLines(run: RunAssembly, depth: Int): Vector[OutputLine] =
-    run.outcome match {
+  private def runEndLines(eventStream: AssembledEventStream, depth: Int): Vector[OutputLine] =
+    eventStream.outcome match {
       case Some(RunOutcome.Aborted) =>
-        linesOf(Resources.runAborted, depth, AnsiRed) ++ run.runAborted.fold(Vector.empty[OutputLine])(runAbortLines(_, depth + 1))
+        linesOf(Resources.runAborted, depth, AnsiRed) ++ eventStream.runAborted.fold(Vector.empty[OutputLine])(runAbortLines(_, depth + 1))
       case Some(RunOutcome.Stopped) =>
         linesOf(runStoppedLine, depth, AnsiRed)
       case _ =>

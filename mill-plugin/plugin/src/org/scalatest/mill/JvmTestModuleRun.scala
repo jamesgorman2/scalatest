@@ -91,11 +91,11 @@ private[mill] final class JvmTestModuleRun(
     val capture = new WorkerOutputCapture(WorkerOutputCapture.workerCharset)
     val reader = new EventLogReader(
       eventLogFile.toNIO,
-      () => {
-        val feed = consolidation.addRun(label, Some(plannedWorker.worker))
-        capture.addTo(feed.add)
-        feed
-      },
+      readRun =>
+        consolidation.addRun(label, Some(plannedWorker.worker)) { feed =>
+          capture.addTo(feed.add)
+          readRun(feed)
+        },
       () => consolidation.addProcessEndedBeforeAnyRun(),
       ProcessExit.hasExited,
       10.millis

@@ -5,13 +5,19 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns {
 
-  private def runIn(forkGroup: Int, workerIndex: Int): RunAssembly =
-    RunAssembly(moduleLabel, Some(workerAt(forkGroup, workerIndex)))
+  private val emptyEventStream = AssembledEventStream(None, None, None, None, None, Set.empty, Vector.empty)
 
-  private def runGivenNoForkGroup(): RunAssembly = RunAssembly(moduleLabel, None)
+  // Runs that share a worker differ only by their assigned test class.
+  private def runIn(worker: Option[Worker], assignedTestClass: String): AssembledRun =
+    AssembledRun(moduleLabel, worker, emptyEventStream, Vector.empty, Vector(TestClassName(assignedTestClass)))
 
-  private def numbersOf(runs: Vector[RunAssembly]): Vector[(RunNumber, RunAssembly)] =
-    ConsolidatedModule.of(moduleLabel, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembly))
+  private def runIn(forkGroup: Int, workerIndex: Int, assignedTestClass: String = "samples.Suite"): AssembledRun =
+    runIn(Some(workerAt(forkGroup, workerIndex)), assignedTestClass)
+
+  private def runGivenNoForkGroup(assignedTestClass: String = "samples.Suite"): AssembledRun = runIn(None, assignedTestClass)
+
+  private def numbersOf(runs: Vector[AssembledRun]): Vector[(RunNumber, AssembledRun)] =
+    ConsolidatedModule.of(moduleLabel, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembled))
 
   "A module's runs" when {
     "each given a fork group and a worker index" should {
@@ -32,15 +38,15 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
         numbersOf(Vector(second, first)) shouldBe Vector(RunNumber(1) -> first, RunNumber(2) -> second)
       }
       "keep the order they were added in where two share a fork group and worker index" in {
-        val first = runIn(0, 0)
-        val second = runIn(0, 0)
+        val first = runIn(0, 0, "samples.First")
+        val second = runIn(0, 0, "samples.Second")
         numbersOf(Vector(first, second)) shouldBe Vector(RunNumber(1) -> first, RunNumber(2) -> second)
       }
     }
     "given no worker" should {
       "be numbered in the order they were added" in {
-        val first = runGivenNoForkGroup()
-        val second = runGivenNoForkGroup()
+        val first = runGivenNoForkGroup("samples.First")
+        val second = runGivenNoForkGroup("samples.Second")
         numbersOf(Vector(first, second)) shouldBe Vector(RunNumber(1) -> first, RunNumber(2) -> second)
       }
       "come before the runs given one" in {

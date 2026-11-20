@@ -71,11 +71,11 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
   private def humanReadableOutputOf(run: RunOutsideMill): Seq[String] = {
     val output = mutable.ArrayBuffer.empty[String]
     val consolidation = Consolidation.start(line => output += line, coloured = true)
-    val feed = consolidation.addRun(module)
-    addEventLog(feed, run.eventLogLines)
-    run.stdoutLines.foreach(line => feed.add(CapturedLine.Stdout(line)))
-    run.stderrLines.foreach(line => feed.add(CapturedLine.Stderr(line)))
-    feed.endEventStream()
+    consolidation.addRun(module) { feed =>
+      addEventLog(feed, run.eventLogLines)
+      run.stdoutLines.foreach(line => feed.add(CapturedLine.Stdout(line)))
+      run.stderrLines.foreach(line => feed.add(CapturedLine.Stderr(line)))
+    }
     consolidation.end()
     output.toVector
   }
@@ -119,10 +119,10 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
       buildTool = Some(BuildTool(buildTool("name").str, buildTool("version").str)),
       startedAt = time(json, "startedAt")
     )
-    val feed = consolidation.addRun(module, Some(firstWorkerOfFirstForkGroup))
-    addEventLog(feed, eventLogLines)
-    capturedLines(node(json, "run")).foreach(line => feed.add(line))
-    feed.endEventStream()
+    consolidation.addRun(module, Some(firstWorkerOfFirstForkGroup)) { feed =>
+      addEventLog(feed, eventLogLines)
+      capturedLines(node(json, "run")).foreach(line => feed.add(line))
+    }
     val moduleNode = node(json, "module")
     consolidation.timeModule(module, time(moduleNode, "startedAt"), time(moduleNode, "endedAt"))
     consolidation.end(time(json, "endedAt"))

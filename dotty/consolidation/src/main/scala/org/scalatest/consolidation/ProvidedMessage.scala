@@ -25,13 +25,12 @@ private[consolidation] final case class ProvidedMessage(
 
 private[consolidation] object ProvidedMessage {
 
-  def of(event: DecodedEvent): Option[ProvidedMessage] =
+  def of(event: DecodedEvent.Message): ProvidedMessage =
     event match {
-      case info: DecodedEvent.InfoProvided => Some(provided(MessageKind.Info, info.message, info.throwable, info))
-      case note: DecodedEvent.NoteProvided => Some(provided(MessageKind.Note, note.message, note.throwable, note))
-      case alert: DecodedEvent.AlertProvided => Some(provided(MessageKind.Alert, alert.message, alert.throwable, alert))
-      case markup: DecodedEvent.MarkupProvided => Some(provided(MessageKind.Markup, markup.text, None, markup))
-      case _ => None
+      case info: DecodedEvent.InfoProvided => provided(MessageKind.Info, info.message, info.throwable, info)
+      case note: DecodedEvent.NoteProvided => provided(MessageKind.Note, note.message, note.throwable, note)
+      case alert: DecodedEvent.AlertProvided => provided(MessageKind.Alert, alert.message, alert.throwable, alert)
+      case markup: DecodedEvent.MarkupProvided => provided(MessageKind.Markup, markup.text, None, markup)
     }
 
   private def provided(kind: MessageKind, text: String, throwable: Option[DecodedThrowable], event: DecodedEvent): ProvidedMessage =

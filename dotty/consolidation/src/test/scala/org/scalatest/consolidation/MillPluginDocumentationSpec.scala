@@ -59,10 +59,10 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
     consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(1100L)), Some(Instant.ofEpochMilli(1900L)))
     consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
     consolidation.addRootFailure("discovery failed")
-    val feed = consolidation.addRun(moduleLabel)
-    runEventsWithEveryKey.foreach(event => feed.add(event))
-    feed.add(CapturedLine.Stdout("dividing\n"))
-    feed.endEventStream()
+    consolidation.addRun(moduleLabel) { feed =>
+      runEventsWithEveryKey.foreach(event => feed.add(event))
+      feed.add(CapturedLine.Stdout("dividing\n"))
+    }
     consolidation.end(Some(Instant.ofEpochMilli(2000L)))
     json.root
   }

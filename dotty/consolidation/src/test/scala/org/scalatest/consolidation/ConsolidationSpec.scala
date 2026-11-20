@@ -1,6 +1,7 @@
 package org.scalatest.consolidation
 
 import java.time.Instant
+import scala.collection.mutable
 import org.scalatest.events.MalformedTestEventLogException
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunPart
@@ -52,7 +53,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
             RunAssembly(label, worker)
           }
         )
-        consolidation.addRun(moduleLabel, Some(workerAt(1, 2)))
+        consolidation.addRun(moduleLabel, Some(workerAt(1, 2)))(_ => ())
         made shouldBe Vector(moduleLabel -> Some(workerAt(1, 2)))
       }
     }
@@ -146,7 +147,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
             """test "adds": TestStarting
               |test "adds": TestSucceeded""".stripMargin
           )
-        ).endEventStream()
+        )
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
       }
@@ -159,16 +160,31 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }
+      "give that state as it ends" in {
+        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.end() shouldBe ConsolidationState.EndedFailed
+      }
     }
 
-    "ended while a run's event stream is open" should {
+    "ended twice" should {
+      "be refused" in {
+        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        consolidation.end()
+        an[IllegalStateException] should be thrownBy consolidation.end()
+      }
+    }
+
+    "ended while a run's event stream is being fed" should {
       "be refused, writing nothing" in {
         val output = new OutputSink
         val consolidation = Consolidation.start(output, coloured = true)
-        addRun(consolidation, suiteWithTest(""))
-        an[IllegalArgumentException] should be thrownBy consolidation.end()
+        consolidation.addRun(moduleLabel) { feed =>
+          feedParts(feed, Vector(suiteWithTest("")))
+          an[IllegalStateException] should be thrownBy consolidation.end()
+          consolidation.state shouldBe ConsolidationState.Open
+        }
         output.lines shouldBe empty
-        consolidation.state shouldBe ConsolidationState.Open
       }
     }
 
@@ -176,7 +192,24 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
       "be refused" in {
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
         consolidation.end()
-        an[IllegalArgumentException] should be thrownBy consolidation.addRun(moduleLabel)
+        an[IllegalStateException] should be thrownBy consolidation.addRun(moduleLabel)(_ => ())
+      }
+    }
+
+    "given a run whose feeding throws" should {
+      "end the run's event stream, then rethrow" in {
+        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        val failure = new RuntimeException("reading failed")
+        val thrown = intercept[RuntimeException] {
+          consolidation.addRun(moduleLabel) { feed =>
+            feedParts(feed, Vector(TestRunPart.Events("run started")))
+            throw failure
+          }
+        }
+        thrown shouldBe failure
+        consolidation.state shouldBe ConsolidationState.OpenFailed
+        consolidation.end()
+        consolidation.state shouldBe ConsolidationState.EndedFailed
       }
     }
 
@@ -196,16 +229,28 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
       "be refused" in {
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
         consolidation.end()
-        an[IllegalArgumentException] should be thrownBy consolidation.timeModule(moduleLabel, None, None)
+        an[IllegalStateException] should be thrownBy consolidation.timeModule(moduleLabel, None, None)
       }
     }
 
     "given an event after the run's event stream has ended" should {
       "be refused" in {
         val consolidation = Consolidation.start(new OutputSink, coloured = true)
-        val feed = consolidation.addRun(moduleLabel)
-        feed.endEventStream()
-        an[IllegalArgumentException] should be thrownBy feed.add("run ended completed".toRunEvent)
+        val feeds = mutable.ArrayBuffer.empty[RunFeed]
+        consolidation.addRun(moduleLabel)(feed => feeds += feed)
+        an[IllegalStateException] should be thrownBy feeds.head.add("run ended completed".toRunEvent)
+      }
+    }
+
+    "given a captured line after the run's event stream has ended" should {
+      "show the line under the run" in {
+        val output = new OutputSink
+        val consolidation = Consolidation.start(output, coloured = false)
+        val feeds = mutable.ArrayBuffer.empty[RunFeed]
+        consolidation.addRun(moduleLabel)(feed => feeds += feed)
+        feeds.head.add(CapturedLine.Stdout("late"))
+        consolidation.end()
+        output.linesWithoutSummaryLine shouldBe Vector("[core.test]", "  Run 1:", "    [stdout] late")
       }
     }
 
@@ -220,7 +265,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
               """test "adds": TestStarting
                 |test "adds": TestFailed""".stripMargin
             )
-          ).endEventStream()
+          )
           consolidation.end()
           output.lines
         }

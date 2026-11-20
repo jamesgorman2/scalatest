@@ -20,11 +20,7 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
     val consolidation: Consolidation = Consolidation.start(output, coloured = false)
 
-    def addRun(forkGroup: Int, workerIndex: Int, parts: TestRunPart*): RunFeed = {
-      val feed = addRunInWorker(consolidation, forkGroup, workerIndex, parts*)
-      feed.endEventStream()
-      feed
-    }
+    def addRun(forkGroup: Int, workerIndex: Int, parts: TestRunPart*): EndedRun = addRunInWorker(consolidation, forkGroup, workerIndex, parts*)
 
     def consolidated(): Vector[String] = {
       consolidation.end()
@@ -150,9 +146,9 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     Scenario("A run's assigned test classes accumulate across calls") {
       Given("a run of suite Beta, given assigned test class samples.Alpha and then samples.Beta")
       val library = new LibraryCalledDirectly
-      val feed = library.addRun(0, 0, runOfSuites("Beta")*)
-      feed.addAssignedTestClasses(classes("samples.Alpha"))
-      feed.addAssignedTestClasses(classes("samples.Beta"))
+      val run = library.addRun(0, 0, runOfSuites("Beta")*)
+      run.addAssignedTestClasses(classes("samples.Alpha"))
+      run.addAssignedTestClasses(classes("samples.Beta"))
 
       When("the library consolidates it")
       Then("the run ran one of its assigned test classes, so it does not show its line")
@@ -186,12 +182,12 @@ final class HumanReadableModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     Scenario("Assigned test classes cannot be added once the consolidation has ended") {
       Given("a run whose consolidation has ended")
       val library = new LibraryCalledDirectly
-      val feed = library.addRun(0, 0, runOfSuites("Beta")*)
+      val run = library.addRun(0, 0, runOfSuites("Beta")*)
       library.consolidated()
 
       When("the caller adds the run's assigned test classes")
       Then("the library refuses them")
-      an[IllegalArgumentException] should be thrownBy feed.addAssignedTestClasses(classes("samples.Beta"))
+      an[IllegalStateException] should be thrownBy run.addAssignedTestClasses(classes("samples.Beta"))
     }
   }
 }

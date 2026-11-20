@@ -24,9 +24,9 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
       When("the runs are added in the order 3, 2, 1 and the library consolidates them")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
-      addRunInWorker(consolidation, 1, 0, runThree*).endEventStream()
-      addRunInWorker(consolidation, 0, 1, runTwo*).endEventStream()
-      addRunInWorker(consolidation, 0, 0, runOne*).endEventStream()
+      addRunInWorker(consolidation, 1, 0, runThree*)
+      addRunInWorker(consolidation, 0, 1, runTwo*)
+      addRunInWorker(consolidation, 0, 0, runOne*)
       consolidation.end()
       val runNodes = json.module("contents").items
 
@@ -55,8 +55,8 @@ final class JsonOutputRunsSpec extends AnyFeatureSpec with GivenWhenThen with Ma
       And("then a run with no worker, running suite Alpha")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
-      addRun(consolidation, runOfSuites("Beta")*).endEventStream()
-      addRun(consolidation, runOfSuites("Alpha")*).endEventStream()
+      addRun(consolidation, runOfSuites("Beta")*)
+      addRun(consolidation, runOfSuites("Alpha")*)
 
       When("the library consolidates them")
       consolidation.end()

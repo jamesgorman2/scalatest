@@ -101,26 +101,27 @@ private[consolidation] object JsonOutputWriter {
     )
 
   private def runNode(run: ConsolidatedRun): JsonValue = {
-    val assembly = run.assembly
-    val starting = assembly.runStarting
-    val closing = assembly.closing
+    val assembled = run.assembled
+    val eventStream = assembled.eventStream
+    val starting = eventStream.runStarting
+    val closing = eventStream.closing
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text("run")),
         "number" -> Some(JsonValue.Integer(run.number.value.toLong)),
-        "forkGroup" -> assembly.worker.map(worker => JsonValue.Integer(worker.forkGroup.position.toLong)),
+        "forkGroup" -> assembled.worker.map(worker => JsonValue.Integer(worker.forkGroup.position.toLong)),
         "testCount" -> starting.map(_.testCount).filter(_ != 0).map(count => JsonValue.Integer(count.toLong)),
         "configMap" -> starting.map(started => configMapObject(started.configMap)),
-        "discovery" -> assembly.discovery.map(discoveryObject),
-        "outcome" -> assembly.outcome.filter(_.isAbnormal).map(outcome => JsonValue.Text(outcome.word)),
-        "message" -> assembly.runAborted.map(aborted => JsonValue.Text(aborted.message)),
-        "throwable" -> assembly.runAborted.flatMap(_.throwable).map(throwableRecord),
-        "startedAt" -> assembly.startedAt.map(epochMillis),
+        "discovery" -> eventStream.discovery.map(discoveryObject),
+        "outcome" -> eventStream.outcome.filter(_.isAbnormal).map(outcome => JsonValue.Text(outcome.word)),
+        "message" -> eventStream.runAborted.map(aborted => JsonValue.Text(aborted.message)),
+        "throwable" -> eventStream.runAborted.flatMap(_.throwable).map(throwableRecord),
+        "startedAt" -> eventStream.startedAt.map(epochMillis),
         "endedAt" -> closing.map(closed => epochMillis(closed.at)),
         "duration" -> closing.flatMap(_.duration).map(millis),
         "summary" -> closing.flatMap(_.summary).map(summaryObject),
-        "contents" -> Some(JsonValue.Array(assembly.topLevelSuites.map(assembledNode))),
-        "output" -> nonEmptyArray(assembly.output.map(runOutputItem))
+        "contents" -> Some(JsonValue.Array(eventStream.topLevelSuites.map(assembledNode))),
+        "output" -> nonEmptyArray(assembled.output.map(runOutputItem))
       )
     )
   }

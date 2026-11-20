@@ -12,7 +12,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   private def stateAfterEnd(parts: TestRunPart*): ConsolidationState = {
     val consolidation = Consolidation.start(new OutputSink, coloured = true)
-    addRun(consolidation, parts*).endEventStream()
+    addRun(consolidation, parts*)
     consolidation.end()
     consolidation.state
   }
@@ -194,8 +194,8 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       Given("two runs of one module, neither given a worker, each with a suite and a stdout line, the first run's suite sorting after the second's")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, runWithLine("ZetaSuite", "from the first run")*).endEventStream()
-      addRun(consolidation, runWithLine("AlphaSuite", "from the second run")*).endEventStream()
+      addRun(consolidation, runWithLine("ZetaSuite", "from the first run")*)
+      addRun(consolidation, runWithLine("AlphaSuite", "from the second run")*)
 
       When("the library consolidates them")
       consolidation.end()
@@ -217,9 +217,9 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       Given("three runs, each with a suite and a stdout line, added with fork group and worker index (1, 0), then (0, 1), then (0, 0)")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRunInWorker(consolidation, 1, 0, runWithLine("FirstAdded", "from fork group 1, worker 0")*).endEventStream()
-      addRunInWorker(consolidation, 0, 1, runWithLine("SecondAdded", "from fork group 0, worker 1")*).endEventStream()
-      addRunInWorker(consolidation, 0, 0, runWithLine("ThirdAdded", "from fork group 0, worker 0")*).endEventStream()
+      addRunInWorker(consolidation, 1, 0, runWithLine("FirstAdded", "from fork group 1, worker 0")*)
+      addRunInWorker(consolidation, 0, 1, runWithLine("SecondAdded", "from fork group 0, worker 1")*)
+      addRunInWorker(consolidation, 0, 0, runWithLine("ThirdAdded", "from fork group 0, worker 0")*)
 
       When("the library consolidates them")
       consolidation.end()
@@ -245,13 +245,13 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       Given("two runs of one module, the first completed with no output, the second with a stdout line")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events("run started\nrun ended completed")).endEventStream()
+      addRun(consolidation, TestRunPart.Events("run started\nrun ended completed"))
       addRun(
         consolidation,
         TestRunPart.Events("run started"),
         TestRunPart.CapturedLine(CapturedStream.Stdout, "dividing now"),
         TestRunPart.Events("run ended completed")
-      ).endEventStream()
+      )
 
       When("the library consolidates them")
       consolidation.end()
@@ -368,7 +368,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     def consolidationOfSqrtPropSpec(output: OutputSink): Consolidation = {
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events(sqrtPropSpecEventLog)).endEventStream()
+      addRun(consolidation, TestRunPart.Events(sqrtPropSpecEventLog))
       consolidation
     }
 
@@ -452,7 +452,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       And("the stdout line `discovering tests` attached to the root")
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, TestRunPart.Events("run started\nrun ended aborted")).endEventStream()
+      addRun(consolidation, TestRunPart.Events("run started\nrun ended aborted"))
       consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
 
       When("the library consolidates it")
@@ -524,10 +524,9 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("A run whose event stream ends without its runEnded event leaves the state ended and failed") {
       Given("an event log of a run that starts and never ends")
       val consolidation = Consolidation.start(new OutputSink, coloured = true)
-      val feed = addRun(consolidation, TestRunPart.Events("run started"))
 
-      When("the caller ends the run's event stream")
-      feed.endEventStream()
+      When("the caller feeds it and so ends the run's event stream")
+      addRun(consolidation, TestRunPart.Events("run started"))
 
       Then("the consolidation state is failed at once, and ended and failed after End")
       consolidation.state shouldBe ConsolidationState.OpenFailed
@@ -538,14 +537,16 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("The runEnded event fails the state, not RunAborted or RunStopped") {
       Given("a run fed RunAborted and RunStopped events")
       val consolidation = Consolidation.start(new OutputSink, coloured = true)
-      val feed = addRun(consolidation, TestRunPart.Events("run started\nrun: RunAborted\nrun: RunStopped"))
-      consolidation.state shouldBe ConsolidationState.Open
+      consolidation.addRun(moduleLabel) { feed =>
+        feedParts(feed, Vector(TestRunPart.Events("run started\nrun: RunAborted\nrun: RunStopped")))
+        consolidation.state shouldBe ConsolidationState.Open
 
-      When("the run's runEnded event, ended aborted, is added")
-      feed.add("run ended aborted".toRunEvent)
+        When("the run's runEnded event, ended aborted, is added")
+        feed.add("run ended aborted".toRunEvent)
 
-      Then("the consolidation state is failed before the operation returns")
-      consolidation.state shouldBe ConsolidationState.OpenFailed
+        Then("the consolidation state is failed before the operation returns")
+        consolidation.state shouldBe ConsolidationState.OpenFailed
+      }
     }
 
     Scenario("A test with no events and no test to attribute it to shows as not run, and fails the state") {

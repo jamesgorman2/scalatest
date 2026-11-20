@@ -42,11 +42,11 @@ private[consolidation] final case class RecordedExecution(
   index: ExecutionIndex,
   startOrder: StartOrder,
   parent: Option[ExecutionOfNode],
-  events: Vector[DecodedEvent],
+  events: Vector[DecodedEvent.NodeOpening | DecodedEvent.NodeClosing],
   messages: Vector[ReceivedMessage]
 ) {
 
-  def added(event: DecodedEvent): RecordedExecution = copy(events = events :+ event)
+  def added(event: DecodedEvent.NodeOpening | DecodedEvent.NodeClosing): RecordedExecution = copy(events = events :+ event)
 
   def added(message: ReceivedMessage): RecordedExecution = copy(messages = messages :+ message)
 
@@ -56,13 +56,14 @@ private[consolidation] final case class RecordedExecution(
 
   // A `DistributedTestRunnerSuite`'s `SuiteAborted` ends the test it ran even where the test's own closing event came
   // first, as when the suite's `afterEach` throws after the test succeeded.
-  def closingEvent: Option[DecodedEvent] = suiteAborted.orElse(events.find(event => NodeEvent.closingOf(event).nonEmpty))
+  def closingEvent: Option[DecodedEvent.NodeClosing] =
+    suiteAborted.orElse(events.collectFirst { case closing: DecodedEvent.NodeClosing => closing })
 
-  def opening: Option[NodeEvent] = events.iterator.flatMap(NodeEvent.openingOf).nextOption()
+  def opening: Option[NodeEvent] = events.collectFirst { case opening: DecodedEvent.NodeOpening => NodeEvent.of(opening) }
 
-  def closing: Option[NodeEvent] = closingEvent.flatMap(NodeEvent.closingOf)
+  def closing: Option[NodeEvent] = closingEvent.map(NodeEvent.of)
 
-  def failureEnding: Option[FailureEnding] = closingEvent.flatMap(FailureEnding.of)
+  def failureEnding: Option[FailureEnding] = closingEvent.collect { case failure: DecodedEvent.NodeFailure => FailureEnding.of(failure) }
 
   def suiteOutcome(runFinished: Boolean, runEndedAbnormally: Boolean): Option[NodeOutcome] = {
     val completed = holds(_.isInstanceOf[DecodedEvent.SuiteCompleted])
@@ -215,8 +216,14 @@ private[consolidation] final case class RunClosing(at: Instant, duration: Option
 
 private[consolidation] object RunClosing {
 
-  def of(event: DecodedEvent, summary: Option[Summary]): RunClosing =
+  def of(event: DecodedEvent.RunClosing): RunClosing = {
+    val summary = event match {
+      case completed: DecodedEvent.RunCompleted => completed.summary
+      case stopped: DecodedEvent.RunStopped => stopped.summary
+      case aborted: DecodedEvent.RunAborted => aborted.summary
+    }
     RunClosing(Instant.ofEpochMilli(event.timeStamp), event.duration.map(Duration.ofMillis), summary)
+  }
 }
 
 private[consolidation] final case class RunDiscovery(startedAt: Instant, duration: Option[Duration])
@@ -228,8 +235,54 @@ private[consolidation] enum RunOutput {
 }
 
 /**
- * Builds one run's test structure from its event stream as the stream arrives. It keeps each node's structure by
- * node path, and the node's executions separately, by execution index.
+ * What a run's whole event stream recorded of the run.
+ *
+ * @param runStarting the run's first `RunStarting`
+ * @param discovery from the run's first `DiscoveryStarting` and first `DiscoveryCompleted`, where it reported both
+ * @param outcome how the run ended, from its `runEnded` event alone: absent where the stream held none
+ * @param runAborted the run's first `RunAborted`, whose message and throwable explain an aborted run's end
+ * @param reportedClasses the class of each suite the run reported
+ * @param topLevelSuites the run's top-level suites, once for each execution, by name and then by the order the
+ *                       executions started. Attributed nodes are left out.
+ */
+private[consolidation] final case class AssembledEventStream(
+  runStarting: Option[DecodedEvent.RunStarting],
+  discovery: Option[RunDiscovery],
+  closing: Option[RunClosing],
+  outcome: Option[RunOutcome],
+  runAborted: Option[DecodedEvent.RunAborted],
+  reportedClasses: Set[String],
+  topLevelSuites: Vector[AssembledNode]
+) {
+
+  def startedAt: Option[Instant] = runStarting.map(started => Instant.ofEpochMilli(started.timeStamp))
+
+  def endedAbnormally: Boolean = outcome.exists(_.isAbnormal)
+
+  /** Whether the run did not finish, or any suite, scope or test execution in its tree aborted or did not run. */
+  def failsTestCommand: Boolean =
+    outcome.isEmpty || topLevelSuites.exists(_.withDescendants.exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
+}
+
+/** A run, its event stream ended, as the outputs read it. */
+private[consolidation] final case class AssembledRun(
+  label: TestRunLabel,
+  worker: Option[Worker],
+  eventStream: AssembledEventStream,
+  output: Vector[RunOutput],
+  assignedTestClasses: Vector[TestClassName]
+) {
+
+  /** The run's sort key among its module's runs: fork group, then worker index. A run given no worker has `None`, which sorts first. */
+  def numberingOrder: Option[(Int, Int)] = worker.map(worker => (worker.forkGroup.position, worker.index.value))
+
+  def ranNoneOfItsAssignedTestClasses: Boolean =
+    assignedTestClasses.nonEmpty && !assignedTestClasses.exists(assigned => eventStream.reportedClasses.contains(assigned.value))
+}
+
+/**
+ * Builds one run from its event stream and captured lines as they arrive. It keeps each node's structure by node path,
+ * and the node's executions separately, by execution index.
  *
  * @param worker the worker the run ran in, where the caller gave one
  * @param assembleTree assembles the run's top-level suites from what its whole event stream recorded
@@ -239,9 +292,6 @@ private[consolidation] final class RunAssembly(
   val worker: Option[Worker],
   assembleTree: RecordedRun => Vector[AssembledNode]
 ) {
-
-  /** The run's sort key among its module's runs: fork group, then worker index. A run given no worker has `None`, which sorts first. */
-  def numberingOrder: Option[(Int, Int)] = worker.map(worker => (worker.forkGroup.position, worker.index.value))
 
   private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
   private val childIds = mutable.Map.empty[NodeId, mutable.Set[NodeId]]
@@ -256,35 +306,9 @@ private[consolidation] final class RunAssembly(
   private var closingEvent = Option.empty[RunClosing]
   private var abort = Option.empty[DecodedEvent.RunAborted]
   private var ending = Option.empty[RunOutcome]
-  private var eventStreamOpen = true
   private var assignedTestClasses = Vector.empty[TestClassName]
-  private var assembledTree = Vector.empty[AssembledNode]
 
-  def isEventStreamOpen: Boolean = eventStreamOpen
-
-  /** The time of the run's first `RunStarting`. */
-  def startedAt: Option[Instant] = starting.map(started => Instant.ofEpochMilli(started.timeStamp))
-
-  /** How the run ended, from its `runEnded` event alone: absent until that event arrives. */
-  def outcome: Option[RunOutcome] = ending
-
-  /** The run's first `RunAborted`, whose message and throwable explain an aborted run's end. */
-  def runAborted: Option[DecodedEvent.RunAborted] = abort
-
-  /** The run's first `RunStarting`. */
-  def runStarting: Option[DecodedEvent.RunStarting] = starting
-
-  /** From the run's first `DiscoveryStarting` and first `DiscoveryCompleted`, where it reported both. */
-  def discovery: Option[RunDiscovery] =
-    for (started <- discoveryStart; completed <- discoveryEnd)
-      yield RunDiscovery(Instant.ofEpochMilli(started.timeStamp), completed.duration.map(Duration.ofMillis))
-
-  def closing: Option[RunClosing] = closingEvent
-
-  def output: Vector[RunOutput] = received
-
-  def add(event: TestEventLogEvent): Unit = {
-    require(eventStreamOpen, s"the event stream of a run under ${label.value} has ended")
+  def add(event: TestEventLogEvent): Unit =
     event match {
       case TestEventLogEvent.Structure(nodes) =>
         addStructure(nodes)
@@ -297,43 +321,29 @@ private[consolidation] final class RunAssembly(
       case _: TestEventLogEvent.RunStarted =>
         ()
     }
-  }
 
   def add(line: CapturedLine): Unit = received :+= RunOutput.Captured(line)
 
   def addAssigned(classes: Iterable[TestClassName]): Unit = assignedTestClasses ++= classes
 
-  /** Whether the run was assigned test classes and ran none of them. */
-  def ranNoneOfItsAssignedTestClasses: Boolean = {
-    val reportedClasses = structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet
-    assignedTestClasses.nonEmpty && !assignedTestClasses.exists(assigned => reportedClasses.contains(assigned.value))
-  }
+  /** Assembles the run's tree from the events added so far, which must be the whole event stream. */
+  def endEventStream(): AssembledEventStream =
+    AssembledEventStream(
+      starting,
+      discovery,
+      closingEvent,
+      ending,
+      abort,
+      structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet,
+      assembleTree(recorded)
+    )
 
-  /** Whether the run ended aborted or stopped. */
-  def endedAbnormally: Boolean = ending.exists(_.isAbnormal)
+  /** The run with its captured lines, messages and assigned test classes as they are now. */
+  def assembled(eventStream: AssembledEventStream): AssembledRun = AssembledRun(label, worker, eventStream, received, assignedTestClasses)
 
-  /** Ends the event stream and assembles the run's tree, which every later reader of the tree shares. */
-  def endEventStream(): Unit =
-    if (eventStreamOpen) {
-      eventStreamOpen = false
-      assembledTree = assembleTree(recorded)
-    }
-
-  /**
-   * The run's top-level suites, once for each execution, by name and then by the order the executions started. Attributed
-   * nodes are left out. Attribution needs the whole event stream, so this requires it to have ended.
-   */
-  def topLevelSuites: Vector[AssembledNode] = {
-    require(!eventStreamOpen, s"the event stream of a run under ${label.value} has not ended")
-    assembledTree
-  }
-
-  /**
-   * Whether any suite, scope or test execution in the assembled tree is aborted or not run.
-   * Attributed nodes are not in the tree, so they never count. Requires the event stream to have ended.
-   */
-  def holdsAbortedOrNotRunNode: Boolean =
-    topLevelSuites.exists(_.withDescendants.exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
+  private def discovery: Option[RunDiscovery] =
+    for (started <- discoveryStart; completed <- discoveryEnd)
+      yield RunDiscovery(Instant.ofEpochMilli(started.timeStamp), completed.duration.map(Duration.ofMillis))
 
   private def recorded: RecordedRun =
     RecordedRun(
@@ -378,7 +388,7 @@ private[consolidation] final class RunAssembly(
   // An event assigned to the run rather than to a node is handled by kind:
   // - a run or discovery event records the run's own state; only the first of each kind is kept;
   // - a message is added to the run's output;
-  // - any other event, such as a `DiscoverySuite`'s events (which the emitter assigns to the run), is dropped.
+  // - a suite's, scope's or test's event, such as a `DiscoverySuite`'s (which the emitter assigns to the run), is dropped.
   private def addToRun(event: DecodedEvent): Unit =
     event match {
       case started: DecodedEvent.RunStarting =>
@@ -387,26 +397,33 @@ private[consolidation] final class RunAssembly(
         if (discoveryStart.isEmpty) discoveryStart = Some(started)
       case completed: DecodedEvent.DiscoveryCompleted =>
         if (discoveryEnd.isEmpty) discoveryEnd = Some(completed)
-      case completed: DecodedEvent.RunCompleted =>
-        close(RunClosing.of(completed, completed.summary))
-      case stopped: DecodedEvent.RunStopped =>
-        close(RunClosing.of(stopped, stopped.summary))
       case aborted: DecodedEvent.RunAborted =>
         if (abort.isEmpty) abort = Some(aborted)
-        close(RunClosing.of(aborted, aborted.summary))
-      case other =>
-        ProvidedMessage.of(other).foreach(message => received :+= RunOutput.Message(message))
+        close(RunClosing.of(aborted))
+      case closed: DecodedEvent.RunClosing =>
+        close(RunClosing.of(closed))
+      case message: DecodedEvent.Message =>
+        received :+= RunOutput.Message(ProvidedMessage.of(message))
+      case _: DecodedEvent.NodeOpening | _: DecodedEvent.NodeClosing =>
+        ()
     }
 
   private def close(closed: RunClosing): Unit = if (closingEvent.isEmpty) closingEvent = Some(closed)
 
+  // A run's own event assigned to a node is dropped: the node's execution reads only its suite, scope or test events
+  // and its messages.
   private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
     recordExecutionPath(nodeExecution)
     val node = nodeExecution.node
     val index = ExecutionIndex(nodeExecution.executionIndex)
     val execution = executions(node)(index)
-    val updated = ProvidedMessage.of(event).fold(execution.added(event)) { message =>
-      execution.added(ReceivedMessage(message, childrenStarted(node, index)))
+    val updated = event match {
+      case message: DecodedEvent.Message =>
+        execution.added(ReceivedMessage(ProvidedMessage.of(message), childrenStarted(node, index)))
+      case nodeEvent: (DecodedEvent.NodeOpening | DecodedEvent.NodeClosing) =>
+        execution.added(nodeEvent)
+      case _: DecodedEvent.RunStarting | _: DecodedEvent.DiscoveryStarting | _: DecodedEvent.DiscoveryCompleted | _: DecodedEvent.RunClosing =>
+        execution
     }
     executions(node) = executions(node).updated(index, updated)
   }
@@ -446,7 +463,7 @@ private[consolidation] object RunAssembly {
 
   def reportsFailure(event: TestEventLogEvent): Boolean =
     event match {
-      case TestEventLogEvent.ScalaTestEvent(_, decoded) => FailureEnding.of(decoded).nonEmpty
+      case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.NodeFailure) => true
       case _ => false
     }
 

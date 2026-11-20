@@ -76,25 +76,21 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def workerAt(forkGroup: Int, workerIndex: Int): Worker =
     Worker(ForkGroup.at(forkGroup), WorkerIndex(workerIndex))
 
-  def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = feedParts(consolidation.addRun(moduleLabel), parts)
+  def addRun(consolidation: Consolidation, parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel)(feedParts(_, parts))
 
-  def addRunInWorker(consolidation: Consolidation, forkGroup: Int, workerIndex: Int, parts: TestRunPart*): RunFeed =
-    feedParts(consolidation.addRun(moduleLabel, Some(workerAt(forkGroup, workerIndex))), parts)
+  def addRunInWorker(consolidation: Consolidation, forkGroup: Int, workerIndex: Int, parts: TestRunPart*): EndedRun =
+    consolidation.addRun(moduleLabel, Some(workerAt(forkGroup, workerIndex)))(feedParts(_, parts))
 
-  private def feedParts(feed: RunFeed, parts: Seq[TestRunPart]): RunFeed = {
+  def feedParts(feed: RunFeed, parts: Seq[TestRunPart]): Unit =
     TestRunBuilder.build(parts*).items.foreach {
       case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
       case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
       case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
     }
-    feed
-  }
 
   /** Feeds the events to one run of module `core.test`, then ends the consolidation. */
   def consolidateRun(consolidation: Consolidation, events: Vector[RunEvent]): Unit = {
-    val feed = consolidation.addRun(moduleLabel)
-    events.foreach(event => feed.add(event))
-    feed.endEventStream()
+    consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(event)))
     consolidation.end()
   }
 
@@ -111,7 +107,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = {
     val output = new OutputSink
     val consolidation = Consolidation.start(output, coloured = true)
-    addRun(consolidation, parts*).endEventStream()
+    addRun(consolidation, parts*)
     consolidation.end()
     output.colourMarkedOutput
   }
