@@ -125,7 +125,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds")
       When("the test command runs core.test once with Mill's --color true and once with Mill's --color false")
       val outputs = withSuites("CalculatorSuite") { build =>
-        Seq("true", "false").map(colour => colour -> build.runTestCommandAfter(Seq("--ticker", "true", "--color", colour))("core.test"))
+        Seq("true", "false").map(colour => colour -> build.runTestCommandWithMillArguments(Seq("--ticker", "true", "--color", colour))("core.test"))
       }
 
       outputs.foreach { case (colour, result) =>
@@ -210,7 +210,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       Given("AddSuite, and the build's task banner, which writes building banner to stdout")
       When("one mill command runs banner and then the test command, with Mill's ticker on")
       val result = withSuites("AddSuite") { build =>
-        build.runTestCommandAfter(Seq("--ticker", "true", "banner", "+"))("core.test")
+        build.runTestCommandWithMillArguments(Seq("--ticker", "true", "banner", "+"))("core.test")
       }
 
       Then("the console holds building banner outside the human-readable output, with Mill's prefix")

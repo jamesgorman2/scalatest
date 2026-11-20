@@ -5,8 +5,7 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
 final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
-  /** `source` is a file in the fixture's `suites` folder, and `className` the name of the class it defines. */
-  /** The suite is a source file in the fixture's `suites` folder, and the name of the class it defines. */
+
   private def runResultFixture(source: String, className: String)(prepare: FixtureBuild => Unit = _ => ()): TestCommandResult =
     withFixtureBuild(FixtureName.result) { build =>
       build.addSuiteFile(build.workspace / "suites" / source, s"$className.scala")

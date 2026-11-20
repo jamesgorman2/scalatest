@@ -83,8 +83,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
       Given("CalculatorSuite, whose test adds two numbers succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("CalculatorSuite") { build =>
-        val result = build.runTestCommandWritingReport()
-        val json = withClue(result.debugString)(build.reportJson)
+        val json = build.jsonOutputOfTestCommand()
         val module = json.node(NodeKind.Module)
         val run = json.node(NodeKind.Run)
 

@@ -133,8 +133,8 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
         val messages = Seq("info" -> "one", "note" -> "two", "alert" -> "three", "markup" -> "four")
         output should have size messages.size
         output.zip(messages).foreach { case (item, (kind, message)) =>
-          shouldHold(item.raw, s"""{ "kind": "$kind", "message": "$message", "at": <time> }""")
-          shouldHaveNoKeys(item.raw, "threadName")
+          shouldHold(item, s"""{ "kind": "$kind", "message": "$message", "at": <time> }""")
+          shouldHaveNoKeys(item, "threadName")
         }
       }
     }
@@ -145,7 +145,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
         val test = json.node(NodeKind.Test, "talks")
         val output = test.output
         output should have size 1
-        shouldHold(output.head.raw, """{ "kind": "info", "message": "away", "threadName": <thread> }""")
+        shouldHold(output.head, """{ "kind": "info", "message": "away", "threadName": <thread> }""")
         output.head("threadName") should not be test("threadName")
       }
     }

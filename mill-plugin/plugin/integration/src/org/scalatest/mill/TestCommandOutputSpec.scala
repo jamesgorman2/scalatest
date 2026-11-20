@@ -57,8 +57,8 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
       And("the last line of the human-readable output on stdout, with every ANSI escape sequence removed, is that prefix followed by the summary line")
       withClue(result.debugString) {
-        prefixes.head.map(_ + "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0") shouldBe
-          Some(result.prefixedHumanReadableLines.last)
+        Some(result.prefixedHumanReadableLines.last) shouldBe
+          prefixes.head.map(_ + "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0")
       }
 
       And("in that line 0 aborted and failed 0 are red, succeeded 1 is green, canceled 0, ignored 0 and pending 0 are yellow, and every other character after the prefix is cyan")

@@ -7,7 +7,7 @@ import org.scalatest.matchers.should
 
 final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with Inside with JsonOutputFixture {
 
-  private final case class RunInWorker(forkGroup: Int, number: Int, workerIndex: Int)
+  private final case class RunInWorker(forkGroup: Option[Int], number: Int, workerIndex: Int)
 
   private def withEveryWorkerBuild[A](test: EveryWorkerBuild => A): A =
     withFixtureBuild(FixtureName.everyWorker)(build => test(new EveryWorkerBuild(build)))
@@ -15,7 +15,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   private def runs(json: JsonNode): Seq[JsonNode] = json.node(NodeKind.Module, "core.test").contents
 
   private def runsOfForkGroup(json: JsonNode, forkGroup: Int): Seq[JsonNode] =
-    runs(json).filter(_.field("forkGroup").contains(ujson.Num(forkGroup)))
+    runs(json).filter(_.forkGroup.contains(forkGroup))
 
   private val suites: Seq[String] = Seq("A1", "A2", "B1", "B2")
 
@@ -29,7 +29,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     runsOfForkGroup(json, 1).flatMap(_.contentNames) should contain theSameElementsAs Seq("A1", "A2")
 
     And("for each forkGroup, the module has exactly 1 run with that forkGroup")
-    runs(json).map(_.forkGroup) shouldBe Seq(0, 1)
+    runs(json).map(_.forkGroup) shouldBe Seq(Some(0), Some(1))
   }
 
   private def shouldRunEachForkGroupInItsOwnWorkers(json: JsonNode): Unit = {
@@ -39,7 +39,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     runsOfForkGroup(json, 1).flatMap(_.contentNames).distinct should contain theSameElementsAs Seq("A1", "A2")
 
     And("for each forkGroup, the module has either 1 or 2 runs with that forkGroup")
-    runs(json).map(_.forkGroup).toSet shouldBe Set(0, 1)
+    runs(json).map(_.forkGroup).toSet shouldBe Set(Some(0), Some(1))
     Seq(0, 1).foreach(forkGroup => runsOfForkGroup(json, forkGroup).size should (be >= 1 and be <= 2))
   }
 
@@ -50,7 +50,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         Given("the build, whose module holds suites A1, A2, B1 and B2")
         And("""the module's testForkGrouping is Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2")) and its testParallelism is false""")
         When("the test command is invoked")
-        val (result, json) = build.runTestCommand()
+        val (result, json) = build.resultAndReportOfTestCommand()
 
         withClue(result.debugString) {
           shouldRunEachForkGroupInExactlyOneWorker(json)
@@ -67,7 +67,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("the module's testParallelism is true and its testSandboxWorkingDir is true")
         build.turnOnTestParallelism()
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         withClue(result.debugString) {
           shouldRunEachForkGroupInItsOwnWorkers(json)
@@ -85,7 +85,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         build.turnOnTestParallelism()
         build.turnOffTestSandboxing()
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         withClue(result.debugString) {
           shouldRunEachForkGroupInItsOwnWorkers(json)
@@ -102,7 +102,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("the module's testParallelism is false and its testBatchFrameworkTasks is true")
         build.turnOnBatchFrameworkTasks()
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         withClue(result.debugString) {
           shouldRunEachForkGroupInExactlyOneWorker(json)
@@ -120,7 +120,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         build.turnOnTestParallelism()
         build.turnOnBatchFrameworkTasks()
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         withClue(result.debugString) {
           shouldRunEachForkGroupInExactlyOneWorker(json)
@@ -139,7 +139,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("A2's test t fails")
         build.writeSuite("A2", """fail("A2 fails")""")
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         Then("the JSON output holds a test t in suite A2 whose outcome is failed")
         val a2Tests = runs(json).flatMap(_.contents).filter(_.name == "A2").flatMap(_.contents)
@@ -163,7 +163,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("each suite's test t sleeps for 3 seconds, then sends an info message holding the system property user.dir")
         suites.foreach(suite => build.writeSuite(suite, "Thread.sleep(3000); info(System.getProperty(\"user.dir\"))"))
         When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
-        val (result, json) = build.runTestCommandWithJobs(4)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(4)
 
         Then("for each forkGroup, the module has exactly two runs with that forkGroup")
         withClue(result.debugString) {
@@ -181,7 +181,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("of the two runs with each forkGroup, the one with the lower number has the lower <i>")
         Seq(0, 1).foreach { forkGroup =>
-          val indexesInNumberOrder = runsInWorkers.filter(_.forkGroup == forkGroup).sortBy(_.number).map(_.workerIndex)
+          val indexesInNumberOrder = runsInWorkers.filter(_.forkGroup.contains(forkGroup)).sortBy(_.number).map(_.workerIndex)
           indexesInNumberOrder.distinct should have size 2
           indexesInNumberOrder shouldBe indexesInNumberOrder.sorted
         }
@@ -196,7 +196,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("B1's test t sleeps for 3 seconds before it succeeds")
         build.writeSuite("B1", "Thread.sleep(3000)")
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         Then("the endedAt of the run whose forkGroup is 0 is later than the endedAt of the run whose forkGroup is 1")
         val endedAtByForkGroup = Seq(0, 1).map(forkGroup => runsOfForkGroup(json, forkGroup).map(_.endedAt))
@@ -206,7 +206,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         }
 
         And("the module's runs are, in order, a run whose number is 1 and forkGroup is 0, then a run whose number is 2 and forkGroup is 1")
-        runs(json).map(run => (run.number, run.forkGroup)) shouldBe Seq((1, 0), (2, 1))
+        runs(json).map(run => (run.number, run.forkGroup)) shouldBe Seq((1, Some(0)), (2, Some(1)))
 
         And("the run whose number is 1 holds suites B1 and B2, and the run whose number is 2 holds suites A1 and A2")
         runs(json).map(_.contentNames) shouldBe Seq(Seq("B1", "B2"), Seq("A1", "A2"))
@@ -220,7 +220,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       withEveryWorkerBuild { build =>
         Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
         When("the test command is invoked")
-        val (result, _) = build.runTestCommand()
+        val (result, _) = build.resultAndReportOfTestCommand()
 
         Then("an event log file is in each of the two processFolders Mill's testForked lays out for the fork groups, and nowhere else")
         withClue(result.debugString) {
@@ -241,7 +241,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("each suite's test t sleeps for 3 seconds, so each fork group's two workers each claim a class")
         suites.foreach(suite => build.writeSuite(suite, "Thread.sleep(3000)"))
         When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
-        val (result, _) = build.runTestCommandWithJobs(4)
+        val (result, _) = build.resultAndReportOfTestCommandWithJobs(4)
 
         Then("an event log file is in each worker's own processFolder, worker-0 and worker-1 of each fork group's folder, and nowhere else")
         withClue(result.debugString) {
@@ -265,7 +265,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         build.turnOnTestParallelism()
         build.turnOnBatchFrameworkTasks()
         When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
-        val (result, _) = build.runTestCommandWithJobs(4)
+        val (result, _) = build.resultAndReportOfTestCommandWithJobs(4)
 
         Then("an event log file is in each of the two processFolders Mill's testForked lays out for the fork groups, and nowhere else")
         withClue(result.debugString) {
@@ -289,7 +289,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         build.writeSuite("B1", """println("from B1")""")
         build.writeSuite("A1", """println("from A1")""")
         When("the test command is invoked")
-        val (result, json) = build.runTestCommand()
+        val (result, json) = build.resultAndReportOfTestCommand()
 
         Then("the stdout of the run whose forkGroup is 0 holds from B1 and not from A1")
         withClue(result.debugString) {
@@ -314,7 +314,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
           "A1" -> """(1 to 3).foreach(i => println("A " + i))"""
         )
         When("the test command is invoked")
-        val (result, json) = build.runTestCommandWithJobs(2)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(2)
 
         Then("the stdout text of the output of the run whose forkGroup is 0 holds the lines B 1 to B 3, in order, and no line beginning A ")
         val forkGroup0Lines = runsOfForkGroup(json, 0).flatMap(_.stdoutLines)
@@ -343,7 +343,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         build.writeSuite("A1", """Thread.sleep(3000); System.err.println("err from A1")""")
         Seq("B2", "A2").foreach(suite => build.writeSuite(suite, "Thread.sleep(3000)"))
         When("the test command is invoked as mill -j 4 scalatest/test core.test -fJ <report>")
-        val (result, json) = build.runTestCommandWithJobs(4)
+        val (result, json) = build.resultAndReportOfTestCommandWithJobs(4)
 
         Then("the stdout of a run whose forkGroup is 0 holds out from B1, and no run whose forkGroup is 1 holds it")
         withClue(result.debugString) {
@@ -370,7 +370,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       withEveryWorkerBuild { build =>
         Given("the build, whose module holds suites A1, A2, B1 and B2 in fork groups (B1, B2) and (A1, A2), with testParallelism false")
         When("the test command is invoked")
-        val (_, json) = build.runTestCommand()
+        val (_, json) = build.resultAndReportOfTestCommand()
 
         Then("the module starts no later than its first run, and ends no earlier than its last run")
         val module = json.node(NodeKind.Module, "core.test")
@@ -441,11 +441,11 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         Given("the build, whose module holds no test class")
         build.removeSuites()
         When("the test command is invoked")
-        val (result, json) = build.runTestCommand()
+        val (result, json) = build.resultAndReportOfTestCommand()
 
         Then("the module's runs are exactly one run, whose number is 1 and forkGroup is 0, whose contents is [] and which has no outcome")
         runs(json).map(run => (run.number, run.forkGroup, run.contents, run.holds("outcome"))) shouldBe Seq(
-          (1, 0, Nil, false)
+          (1, Some(0), Nil, false)
         )
 
         And("the human-readable output, apart from its summary line, is [core.test]")
@@ -463,12 +463,12 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("the module's testBatchFrameworkTasks is true")
         build.turnOnBatchFrameworkTasks()
         When("the test command is invoked")
-        val (result, json) = build.runTestCommand()
+        val (result, json) = build.resultAndReportOfTestCommand()
 
         Then("the module's runs are exactly one run, whose number is 1 and forkGroup is 0, whose contents is [] and which has no outcome")
         withClue(result.debugString) {
           runs(json).map(run => (run.number, run.forkGroup, run.contents, run.holds("outcome"))) shouldBe Seq(
-            (1, 0, Nil, false)
+            (1, Some(0), Nil, false)
           )
         }
 
@@ -493,17 +493,17 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
             |    java.nio.file.Files.write(testargs, Array.emptyByteArray)""".stripMargin
         )
         When("the test command is invoked")
-        val (result, json) = build.runTestCommand()
+        val (result, json) = build.resultAndReportOfTestCommand()
 
         Then("the root's failures are exactly one, naming the module and its worker that could not start")
-        val failures = json("failures").arr.map(_("message").str).toSeq
+        val failures = json.failureMessages
         withClue(result.debugString) {
           failures should have size 1
           failures.head should startWith("Starting worker 0 of fork group 1 of core.test failed: ")
         }
 
         And("the module's runs are exactly a run whose forkGroup is 0 and which holds suites B1 and B2, then a run whose forkGroup is 2 and which holds suite A2")
-        runs(json).map(run => (run.forkGroup, run.contentNames)) shouldBe Seq((0, Seq("B1", "B2")), (2, Seq("A2")))
+        runs(json).map(run => (run.forkGroup, run.contentNames)) shouldBe Seq((Some(0), Seq("B1", "B2")), (Some(2), Seq("A2")))
 
         And("the test command fails")
         shouldFail(result)
@@ -519,10 +519,10 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         And("""the module's testForkGrouping is Seq(Seq("samples.A1"), Seq("samples.A1")) and its testParallelism is false""")
         build.setForkGrouping("""Seq(Seq("samples.A1"), Seq("samples.A1"))""")
         When("the test command is invoked")
-        val (result, json) = build.runTestCommand()
+        val (result, json) = build.resultAndReportOfTestCommand()
 
         Then("the root's failures are exactly Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1")
-        json("failures").arr.map(_("message").str).toSeq shouldBe Seq(
+        json.failureMessages shouldBe Seq(
           "Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
         )
 
@@ -538,8 +538,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 }
 
 private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
-
-  import org.scalatest.Assertions.withClue
 
   private val defaultForkGrouping: String = """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))"""
 
@@ -578,18 +576,15 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
   def turnOnBatchFrameworkTasks(): Unit =
     fixtureBuild.replaceInBuild("def testForkGrouping", "def testBatchFrameworkTasks = true\n    def testForkGrouping")
 
-  def runTestCommand(): (TestCommandResult, JsonNode) = withJsonOutput(fixtureBuild.runTestCommandWritingReport())
+  def resultAndReportOfTestCommand(): (TestCommandResult, JsonNode) = fixtureBuild.resultAndReportOfTestCommand()
 
-  def runTestCommandWithJobs(jobs: Int): (TestCommandResult, JsonNode) = withJsonOutput(runTestCommandWritingReport(jobs))
+  def resultAndReportOfTestCommandWithJobs(jobs: Int): (TestCommandResult, JsonNode) =
+    fixtureBuild.resultAndReportOfTestCommand(jobsArguments(jobs))
 
   /** Mill's ticker is on, as at a user's console, so Mill puts its prefix on each line the test command writes. */
-  def runTestCommandAsAtTheConsole(): TestCommandResult = runTestCommandWritingReport(2, "--ticker", "true")
+  def runTestCommandAsAtTheConsole(): TestCommandResult = fixtureBuild.runTestCommandWritingReport(jobsArguments(2) ++ Seq("--ticker", "true"))
 
-  private def runTestCommandWritingReport(jobs: Int, millOptions: String*): TestCommandResult =
-    fixtureBuild.runTestCommandAfter(Seq("-j", jobs.toString) ++ millOptions)("core.test", "-fJ", fixtureBuild.report.toString)
-
-  private def withJsonOutput(result: TestCommandResult): (TestCommandResult, JsonNode) =
-    (result, withClue(result.debugString)(fixtureBuild.reportJson))
+  private def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
 
   // The build's workspace can itself sit in a folder `worker-<i>` of the build running these tests, so only the part of
   // the path below the workspace names the build's own worker.

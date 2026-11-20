@@ -2,7 +2,7 @@ package org.scalatest.mill
 
 import org.scalatest.consolidation.CapturedLine
 
-enum NodeKind(val word: String) {
+enum NodeKind(val json: String) {
   case Root extends NodeKind("root")
   case Module extends NodeKind("module")
   case Run extends NodeKind("run")
@@ -13,11 +13,11 @@ enum NodeKind(val word: String) {
 
 object NodeKind {
 
-  def named(word: String): NodeKind =
-    values.find(_.word == word).getOrElse(throw new IllegalArgumentException(s"No node kind $word"))
+  def fromJson(json: String): NodeKind =
+    values.find(_.json == json).getOrElse(throw new IllegalArgumentException(s"No node kind $json"))
 }
 
-enum OutputItemKind(val word: String) {
+enum OutputItemKind(val json: String) {
   case Stdio extends OutputItemKind("stdio")
   case Info extends OutputItemKind("info")
   case Note extends OutputItemKind("note")
@@ -27,13 +27,13 @@ enum OutputItemKind(val word: String) {
 
 object OutputItemKind {
 
-  def named(word: String): OutputItemKind =
-    values.find(_.word == word).getOrElse(throw new IllegalArgumentException(s"No output item kind $word"))
+  def fromJson(json: String): OutputItemKind =
+    values.find(_.json == json).getOrElse(throw new IllegalArgumentException(s"No output item kind $json"))
 }
 
 final class OutputItem(val raw: ujson.Value) {
 
-  def kind: OutputItemKind = OutputItemKind.named(raw("kind").str)
+  def kind: OutputItemKind = OutputItemKind.fromJson(raw("kind").str)
 
   def message: String = raw("message").str
 
@@ -43,7 +43,7 @@ final class OutputItem(val raw: ujson.Value) {
     raw("stream").str match {
       case "stdout" => CapturedLine.Stdout(raw("text").str)
       case "stderr" => CapturedLine.Stderr(raw("text").str)
-      case stream => throw new IllegalArgumentException(s"The output item $raw names the stream $stream")
+      case stream => throw new IllegalArgumentException(s"The output item $raw names an unknown stream $stream")
     }
 
   override def toString: String = raw.toString
@@ -51,7 +51,7 @@ final class OutputItem(val raw: ujson.Value) {
 
 final class JsonNode(val raw: ujson.Value) {
 
-  def kind: NodeKind = NodeKind.named(raw("kind").str)
+  def kind: NodeKind = NodeKind.fromJson(raw("kind").str)
 
   def name: String = raw("name").str
 
@@ -67,7 +67,9 @@ final class JsonNode(val raw: ujson.Value) {
 
   def number: Int = raw("number").num.toInt
 
-  def forkGroup: Int = raw("forkGroup").num.toInt
+  def forkGroup: Option[Int] = field("forkGroup").map(_.num.toInt)
+
+  def failureMessages: Seq[String] = raw("failures").arr.toSeq.map(_("message").str)
 
   def apply(key: String): ujson.Value = raw(key)
 
@@ -87,13 +89,13 @@ final class JsonNode(val raw: ujson.Value) {
   def node(kind: NodeKind): JsonNode =
     nodes.filter(_.kind == kind) match {
       case Seq(found) => found
-      case found => throw new NoSuchElementException(s"The JSON output holds ${found.size} nodes of kind ${kind.word}: $raw")
+      case found => throw new NoSuchElementException(s"The JSON output holds ${found.size} nodes of kind ${kind.json}: $raw")
     }
 
   def node(kind: NodeKind, name: String): JsonNode =
     nodes.filter(found => found.kind == kind && found.field("name").contains(ujson.Str(name))) match {
       case Seq(found) => found
-      case found => throw new NoSuchElementException(s"The JSON output holds ${found.size} nodes of kind ${kind.word} named $name: $raw")
+      case found => throw new NoSuchElementException(s"The JSON output holds ${found.size} nodes of kind ${kind.json} named $name: $raw")
     }
 
   def testOutcome(name: String): Option[String] = nodes.find(found => found.kind == NodeKind.Test && found.name == name).flatMap(_.outcome)

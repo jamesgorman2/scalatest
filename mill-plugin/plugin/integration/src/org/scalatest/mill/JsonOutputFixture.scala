@@ -43,5 +43,9 @@ trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
       keys.filter(actual.obj.contains) shouldBe empty
     }
 
+  protected def shouldHold(actual: OutputItem, pattern: String): Unit = shouldHold(actual.raw, pattern)
+
   protected def shouldHaveNoKeys(actual: JsonNode, keys: String*): Unit = shouldHaveNoKeys(actual.raw, keys*)
+
+  protected def shouldHaveNoKeys(actual: OutputItem, keys: String*): Unit = shouldHaveNoKeys(actual.raw, keys*)
 }
