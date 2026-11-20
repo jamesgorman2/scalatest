@@ -94,6 +94,16 @@ Feature: Every worker of a JVM module
         | `false`     | `true`  | `true`  | exactly 1     |
         | `true`      | `true`  | `true`  | exactly 1     |
 
+    Scenario: AC-014 A fork group whose two classes must run at the same time
+      Given the module's `testParallelism` is `true`
+      And `<markers>` is an absolute path at which an empty folder exists
+      And `A1`'s test `t` sends an `info` message holding the system property `user.dir`, creates the file `A1` in `<markers>`, then waits until the file `A2` exists in `<markers>`, and fails if `A2` does not exist within 30 seconds
+      And `A2`'s test `t` sends an `info` message holding the system property `user.dir`, creates the file `A2` in `<markers>`, then waits until the file `A1` exists in `<markers>`, and fails if `A1` does not exist within 30 seconds
+      When the test command is invoked as `mill -j 4 scalatest/test core.test -fJ <report>`
+      Then exactly two of the module's runs have `forkGroup` 1
+      And of those two runs, one holds only `info` messages that are paths holding the folder `worker-0`, and the other holds only `info` messages that are paths holding the folder `worker-1`
+      And of those two runs, the run whose `info` messages name the folder `worker-0` has the lower `number`
+
   Rule: A test that fails in any worker fails the test command, and every worker's runs are still in the output
     Scenario: AC-002 A failing test in the second fork group
       Given the module's `testParallelism` is `true`
@@ -117,9 +127,9 @@ Feature: Every worker of a JVM module
       And each suite's test `t` sends an `info` message holding the system property `user.dir`
       When the test command is invoked as `mill -j 4 scalatest/test core.test -fJ <report>`
       Then within each of the module's runs, every `info` message is a path holding one and the same folder `worker-<i>`
-      And no two of the module's runs hold `info` messages naming the same `forkGroup` and the same folder `worker-<i>`
+      And no two of the module's runs with the same `forkGroup` hold `info` messages naming the same folder `worker-<i>`
       And for each `forkGroup`, one of the module's runs with that `forkGroup` holds `info` messages naming the folder `worker-0`
-      And of any two runs with the same `forkGroup` that hold `info` messages, the one with the lower `number` names the lower `<i>`
+      And of any two of the module's runs with the same `forkGroup`, the run with the lower `number` holds `info` messages naming the folder `worker-<i>` with the lower `<i>`
 ```
 
 ```gherkin
@@ -278,17 +288,17 @@ Feature: Runs in the JSON output
       And the `stdout` text of the `output` of the run whose `forkGroup` is 1 holds the lines `A 1` to `A 3`, in order, and no line beginning `B `
 ```
 
-| Requirement | Criteria                                       |
-|-------------|------------------------------------------------|
-| R-053b      | AC-001, AC-004, AC-005                         |
-| R-096a      | AC-001, AC-005, AC-011                         |
-| R-105       | AC-003, AC-004, AC-006, AC-007, AC-010, AC-011 |
-| R-144       | AC-005, AC-006, AC-007, AC-008, AC-009, AC-010 |
-| R-074a      | AC-005, AC-011                                 |
-| R-074b      | AC-008                                         |
-| R-043       | AC-013                                         |
-| R-087       | AC-006, AC-013                                 |
-| R-046c      | AC-002, AC-007                                 |
-| R-137       | AC-002, AC-007                                 |
-| R-028       | AC-001, AC-003, AC-011, AC-012                 |
-| R-113       | AC-012                                         |
+| Requirement | Criteria                                               |
+|-------------|--------------------------------------------------------|
+| R-053b      | AC-001, AC-004, AC-005, AC-014                         |
+| R-096a      | AC-001, AC-005, AC-011, AC-014                         |
+| R-105       | AC-003, AC-004, AC-006, AC-007, AC-010, AC-011, AC-014 |
+| R-144       | AC-005, AC-006, AC-007, AC-008, AC-009, AC-010         |
+| R-074a      | AC-005, AC-011                                         |
+| R-074b      | AC-008                                                 |
+| R-043       | AC-013                                                 |
+| R-087       | AC-006, AC-013                                         |
+| R-046c      | AC-002, AC-007                                         |
+| R-137       | AC-002, AC-007                                         |
+| R-028       | AC-001, AC-003, AC-011, AC-012                         |
+| R-113       | AC-012                                                 |

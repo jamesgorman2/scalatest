@@ -2,15 +2,16 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## AC-004 asserts only what holds for any split of a fork group's classes that Mill's test queue makes, and does not require a second worker to start.
+## The criteria show a fork group's second worker only where a rendezvous between the group's two classes forces it, and otherwise assert only what holds for any split of a fork group's classes.
 
 **Alternatives**
 
-- Keeping AC-004 as two runs in each fork group, made likely by a 3-second sleep in each test, leaves the criterion timing-dependent, so it fails whenever the queue gives both of a group's classes to one worker.
+- Keeping AC-004 as two runs in each fork group, made likely by a 3-second sleep in each test, makes AC-004 timing-dependent: AC-004 fails whenever Mill's test queue gives both of a group's classes to one worker.
+- Asserting only what holds for any split, with no criterion that forces a second worker, passes an implementation that starts only each fork group's `worker-0`, which is the defect this feature fixes.
 
-**Reasoning** Under `testParallelism`, Mill 1.3.1's test queue decides how a fork group's classes split across its workers, and the split varies between invocations. A worker other than index 0 that finds the queue empty starts no JVM, and on Windows the queue sometimes runs one class in two workers. Each run having its own worker folder, a `worker-0` run in each fork group, and runs numbered in the order of their worker indexes hold for every split the queue can make.
+**Reasoning** Under `testParallelism`, Mill 1.3.1's test queue decides how a fork group's classes split across the group's workers, and the split varies between invocations. Three properties hold for every split the queue can make, and AC-004 asserts only these: each run has its own worker folder, each fork group has a `worker-0` run, and a group's runs are numbered in the order of their worker indexes. In AC-014, the test of each of the group's two classes waits until the test of the other class has started, so the group's first worker cannot finish its first class before a second worker claims the other class, unless that test times out. AC-014 asserts nothing about the tests' outcomes, so AC-014 still holds on Windows when the queue runs one class in two workers: both runs of that class time out, and the group still has one run in each of its two workers.
 
-**Costs** No acceptance criterion shows that the test command starts a fork group's second worker when Mill's queue gives that worker a class.
+**Costs** AC-014 holds only while each queue worker claims one class at a time, as Mill 1.3.1's workers do, and only while tests in two worker JVMs can signal each other through files at an absolute path. Where the queue runs one class in two workers, AC-014 takes up to its 30-second timeout longer.
 
 **Settled by** [Every worker of a JVM module - What AC-004 asserts for any split of Mill's queue](https://github.com/jamesgorman2/scalatest/issues/205).
 
