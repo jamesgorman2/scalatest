@@ -47,8 +47,8 @@ private[consolidation] final case class RecordedExecution(
   def suiteAborted: Option[DecodedEvent.SuiteAborted] = events.collectFirst { case aborted: DecodedEvent.SuiteAborted => aborted }
 
   def closingEvent: Option[DecodedEvent.NodeClosing] =
-    // A `DistributedTestRunnerSuite`'s `SuiteAborted` ends the test it ran even where the test's own closing event came
-    // first, as when the suite's `afterEach` throws after the test succeeded.
+    // The `SuiteAborted` of the `DistributedTestRunnerSuite` that ran a test ends that test even when the test's own
+    // closing event came first, as when the suite's `afterEach` throws after the test succeeded.
     suiteAborted.orElse(events.collectFirst { case closing: DecodedEvent.NodeClosing => closing })
 
   def opening: Option[NodeEvent] = events.collectFirst { case opening: DecodedEvent.NodeOpening => NodeEvent.of(opening) }
@@ -59,7 +59,7 @@ private[consolidation] final case class RecordedExecution(
 
   def suiteOutcome(runFinished: Boolean, runEndedAbnormally: Boolean): Option[NodeOutcome] = {
     val completed = holds(_.isInstanceOf[DecodedEvent.SuiteCompleted])
-    // A suite run by a test sends no `SuiteStarting`, so a run that ends normally never aborts it.
+    // A suite run by a test sends no `SuiteStarting`, so it is not marked aborted when its run ends normally.
     val opened = holds(_.isInstanceOf[DecodedEvent.SuiteStarting])
     if (suiteAborted.nonEmpty) Some(NodeOutcome.Aborted)
     else NodeOutcome.abortedWhere(!completed && (runEndedAbnormally || (runFinished && opened)))
@@ -259,7 +259,7 @@ private[consolidation] final case class RunAssembly private (
 
   def withAssigned(classes: Iterable[TestClassName]): RunAssembly = copy(assignedTestClasses = assignedTestClasses ++ classes)
 
-  def assembledEventStream: AssembledEventStream =
+  def assembledWholeEventStream: AssembledEventStream =
     AssembledEventStream(
       recorded.starting,
       recorded.discovery,

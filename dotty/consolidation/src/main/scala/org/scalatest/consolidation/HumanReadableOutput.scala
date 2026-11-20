@@ -237,7 +237,7 @@ private[consolidation] object HumanReadableOutput {
   }
 
   private def markOf(message: ProvidedMessage): String =
-    // In place of ScalaTest 3.2.20's icon.
+    // The kind's word replaces ScalaTest 3.2.20's icon.
     "[" + message.kind.word + "] "
 
   private def errorLines(
@@ -269,7 +269,7 @@ private[consolidation] object HumanReadableOutput {
       )
     throwable match {
       case Some(view) if stringReporterThrowsOn(message, view) => {
-        // Core's `StringReporter` keeps ScalaTest 3.2.20's NullPointerException here, so these are the lines
+        // Core's `StringReporter` keeps ScalaTest 3.2.20's NullPointerException for this case, so this builds the lines
         // `StringReporter` prints for a throwable whose message is empty.
         val withoutThrowable = linesWith(None)
         withoutThrowable.head +: (lineNumberLines(view) ++ withoutThrowable.tail ++ stackTraceLinesOf(throwable))
@@ -306,11 +306,12 @@ private[consolidation] object HumanReadableOutput {
 
   private def linesOf(segments: Vector[Segment], depth: Int): Vector[OutputLine] = {
     val segmentsByLine = segments.foldLeft(Vector(Vector.empty[Segment]))(withSegmentAdded)
-    val withoutTrailingBlankLines = segmentsByLine.reverse.dropWhile(isBlank).reverse
-    (if (withoutTrailingBlankLines.isEmpty) segmentsByLine.take(1) else withoutTrailingBlankLines).map(OutputLine(depth, _))
+    val withoutTrailingEmptyLines = segmentsByLine.reverse.dropWhile(isEmptyLine).reverse
+    val lines = if (withoutTrailingEmptyLines.isEmpty) segmentsByLine.take(1) else withoutTrailingEmptyLines
+    lines.map(OutputLine(depth, _))
   }
 
-  private def isBlank(line: Vector[Segment]): Boolean = line.forall(_.text.isEmpty)
+  private def isEmptyLine(line: Vector[Segment]): Boolean = line.forall(_.text.isEmpty)
 
   private def withSegmentAdded(segmentsByLine: Vector[Vector[Segment]], segment: Segment): Vector[Vector[Segment]] = {
     val pieces = segment.splitAtLineBreaks

@@ -53,9 +53,10 @@ private[consolidation] final case class RecordedRun(
       positionsByParent.get(Some(suite)).flatMap(_.flatten.minOption).map(suite -> _)
     def latestOf(suite: NodeId): (NodeId, Set[NodeId]) = suite -> scopesAndTestsBySuite.getOrElse(Some(suite), Vector.empty).toSet
     nodes.foldLeft(this)(_.withNode(_)).copy(
-      // The emitter numbers a suite's scopes and tests from the same first position in every structure.
+      // The emitter numbers a suite's scopes and tests from the same first position in every structure, so the first
+      // structure holding any of them gives that position.
       firstScopeOrTestPosition = firstScopeOrTestPosition ++ suites.filterNot(firstScopeOrTestPosition.contains).flatMap(firstPositionIn),
-      // Each structure holds its suites' scopes and tests whole.
+      // Each structure lists all of its suites' scopes and tests, so the latest list replaces any earlier one.
       latestScopesAndTests = latestScopesAndTests ++ suites.map(latestOf)
     )
   }
@@ -82,6 +83,7 @@ private[consolidation] final case class RecordedRun(
         copy(abort = abort.orElse(Some(aborted))).closedBy(aborted)
       case closed: DecodedEvent.RunClosing =>
         closedBy(closed)
+      // Run assembly adds a run's messages to its output.
       case _: DecodedEvent.Message =>
         this
       // A `DiscoverySuite`'s events arrive here: the emitter assigns them to the run, not to a node.

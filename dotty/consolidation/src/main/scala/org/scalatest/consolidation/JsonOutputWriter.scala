@@ -257,6 +257,7 @@ private[consolidation] object JsonOutputWriter {
     case Ref(id: Int)
   }
 
+  // `DecodedThrowable` compares by identity, so only the same throwable seen again becomes a ref.
   private final case class ThrowableVisit(pending: List[DecodedThrowable], ids: Map[DecodedThrowable, Int]) {
 
     def next: Option[(ThrowableEntry, ThrowableVisit)] =
@@ -292,8 +293,8 @@ private[consolidation] object JsonOutputWriter {
       case ThrowableEntry.Ref(id) =>
         objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong)))) :: written
       case ThrowableEntry.Recorded(id, throwable) => {
-        // Entries are visited depth-first and written last to first, so `written` starts with this throwable's cause's record,
-        // then its suppressed throwables' records.
+        // Entries were visited depth-first and are written last to first, so `written` starts with the record of this
+        // throwable's cause, then those of its suppressed throwables.
         val (causes, afterCauses) = written.splitAt(throwable.cause.size)
         val (suppressed, rest) = afterCauses.splitAt(throwable.suppressed.size)
         recordedThrowable(id, throwable, causes.headOption, suppressed.toVector) :: rest

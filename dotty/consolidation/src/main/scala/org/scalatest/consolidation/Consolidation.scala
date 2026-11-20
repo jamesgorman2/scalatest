@@ -214,7 +214,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
   private[consolidation] def endEventStream(): Unit =
     consolidation.feed {
       if (endedEventStream.isEmpty) {
-        val eventStream = run.assembledEventStream
+        val eventStream = run.assembledWholeEventStream
         endedEventStream = Some(eventStream)
         if (eventStream.failsTestCommand) {
           consolidation.fail()
