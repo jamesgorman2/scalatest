@@ -97,11 +97,11 @@ Feature: Every worker of a JVM module
     Scenario: AC-014 A fork group whose two classes must run at the same time
       Given the module's `testParallelism` is `true`
       And `<markers>` is an absolute path at which an empty folder exists
-      And `A1`'s test `t` sends an `info` message holding the system property `user.dir`, creates the file `A1` in `<markers>`, then waits until the file `A2` exists in `<markers>`, and fails if `A2` does not exist within 30 seconds
-      And `A2`'s test `t` sends an `info` message holding the system property `user.dir`, creates the file `A2` in `<markers>`, then waits until the file `A1` exists in `<markers>`, and fails if `A1` does not exist within 30 seconds
+      And `A1`'s test `t` sends an `info` message holding the system property `user.dir`, creates the file `A1` in `<markers>`, then waits up to 30 seconds for the file `A2` to exist in `<markers>`, and fails if `A2` does not exist by then
+      And `A2`'s test `t` sends an `info` message holding the system property `user.dir`, creates the file `A2` in `<markers>`, then waits up to 30 seconds for the file `A1` to exist in `<markers>`, and fails if `A1` does not exist by then
       When the test command is invoked as `mill -j 4 scalatest/test core.test -fJ <report>`
       Then exactly two of the module's runs have `forkGroup` 1
-      And of those two runs, one holds only `info` messages that are paths holding the folder `worker-0`, and the other holds only `info` messages that are paths holding the folder `worker-1`
+      And of those two runs, one holds only `info` messages naming the folder `worker-0`, and the other holds only `info` messages naming the folder `worker-1`
       And of those two runs, the run whose `info` messages name the folder `worker-0` has the lower `number`
 
   Rule: A test that fails in any worker fails the test command, and every worker's runs are still in the output
