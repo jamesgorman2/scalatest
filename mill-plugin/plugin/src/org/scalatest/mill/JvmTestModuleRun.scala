@@ -228,7 +228,7 @@ private[mill] object JvmTestModuleRun {
   /**
    * Whether the filesystem holding `folder` ignores case, found by writing a probe file in `folder`.
    *
-   * @throws FilesystemCaseCheckFailure where writing, finding or deleting the probe fails
+   * @throws FilesystemCaseCheckFailure where writing or deleting the probe fails
    */
   def filesystemIgnoresCase(folder: Path): Boolean =
     try {
