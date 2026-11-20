@@ -38,15 +38,15 @@ private[mill] final case class PlannedForkGroup(
 }
 
 /**
- * @param forkGroupAndIndex the worker's fork group and its index within that group, which label the worker's run
+ * @param worker the worker's fork group and its index within that group, which label the worker's run
  * @param processFolder the worker's `processFolder`, as path segments under the module's folder: its fork group's
  *                      folder, or its own folder `worker-<i>` in that folder where Mill runs the group's workers in
  *                      parallel
  */
-private[mill] final case class PlannedWorker(forkGroupAndIndex: Worker, processFolder: Seq[String]) {
+private[mill] final case class PlannedWorker(worker: Worker, processFolder: Seq[String]) {
 
   def describedIn(module: TestRunLabel): String =
-    s"worker ${forkGroupAndIndex.index.value} of fork group ${forkGroupAndIndex.forkGroup.position} of ${module.value}"
+    s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${module.value}"
 }
 
 private[mill] object WorkerLayout {
@@ -117,11 +117,11 @@ private[mill] object WorkerLayout {
     val groupsToRun = forkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     val testClassCount = groupsToRun.map { case (classes, _) => classes.size }.sum
     def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): PlannedForkGroup = {
-      val forkGroup = valid(ForkGroup.from(position))
+      val forkGroup = ForkGroup.at(position)
       val workerCount = workersPerGroup.count(classes)
       val workerIndexLength = workerCount.toString.length
       val workers = (0 until workerCount).map { index =>
-        PlannedWorker(Worker(forkGroup, valid(WorkerIndex.from(index))), workersPerGroup.processFolder(folder, index, workerIndexLength))
+        PlannedWorker(Worker(forkGroup, WorkerIndex(index)), workersPerGroup.processFolder(folder, index, workerIndexLength))
       }
       PlannedForkGroup(forkGroup, label, folder, classes, workerIndexLength, workers)
     }
@@ -163,7 +163,4 @@ private[mill] object WorkerLayout {
     val processFolder = sharing.head.workers.head.processFolder.mkString("/")
     s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder $processFolder"
   }
-
-  // Positions and indexes counted from 0 are never negative.
-  private def valid[A](counted: Either[String, A]): A = counted.fold(reason => throw new IllegalStateException(reason), identity)
 }

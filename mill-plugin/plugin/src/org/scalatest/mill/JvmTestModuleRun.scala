@@ -104,7 +104,7 @@ private[mill] final class JvmTestModuleRun(
     val reader = new EventLogReader(
       eventLogFile.toNIO,
       () => {
-        val feed = consolidation.addRun(label, Some(worker.forkGroupAndIndex))
+        val feed = consolidation.addRun(label, Some(worker.worker))
         capture.addTo(feed.add)
         feed
       },
@@ -172,7 +172,7 @@ private[mill] final class JvmTestModuleRun(
           groupFolder.last,
           forkGroup.workerIndexLength,
           forkGroup.label,
-          worker.forkGroupAndIndex.index.value
+          worker.worker.index.value
         )
       val (_, workerEnd) = if (worker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
       workerEnd.map { case (_, _, processResult) =>

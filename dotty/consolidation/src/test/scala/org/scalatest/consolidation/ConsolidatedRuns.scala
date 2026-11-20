@@ -75,7 +75,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     runStarts +: suites.zipWithIndex.map((suite, index) => suiteRuns(suite, occurrenceAmongTestsOfItsName = index + 1)).toVector :+ runEndsCompleted
 
   def workerAt(forkGroup: Int, workerIndex: Int): Worker =
-    ForkGroup.from(forkGroup).flatMap(group => WorkerIndex.from(workerIndex).map(Worker(group, _))).fold(fail(_), identity)
+    Worker(ForkGroup.at(forkGroup), WorkerIndex(workerIndex))
 
   def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = feedParts(consolidation.addRun(moduleLabel), parts)
 

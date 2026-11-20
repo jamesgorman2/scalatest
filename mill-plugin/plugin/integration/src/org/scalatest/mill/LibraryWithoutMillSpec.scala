@@ -25,8 +25,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   private val module: TestRunLabel = TestRunLabel("core.test")
 
-  private val firstWorkerOfFirstForkGroup: Worker =
-    ForkGroup.from(0).flatMap(forkGroup => WorkerIndex.from(0).map(Worker(forkGroup, _))).fold(fail(_), identity)
+  private val firstWorkerOfFirstForkGroup: Worker = Worker(ForkGroup.at(0), WorkerIndex(0))
 
   private final case class RunOutsideMill(eventLogLines: Seq[String], stdoutLines: Seq[String], stderrLines: Seq[String])
 

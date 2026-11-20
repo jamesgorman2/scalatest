@@ -5,11 +5,6 @@ final case class ForkGroup private (position: Int)
 
 object ForkGroup {
 
-  /** The fork group at the position, or a reason where the position is negative. */
-  def from(position: Int): Either[String, ForkGroup] =
-    if (position >= 0) {
-      Right(ForkGroup(position))
-    } else {
-      Left(s"a fork group's position must not be negative, but was $position")
-    }
+  /** The fork group at the position. Throws `IllegalArgumentException` where the position is negative. */
+  def at(position: Int): ForkGroup = new ForkGroup(CountedFromZero.checked(position, "a fork group's position"))
 }
