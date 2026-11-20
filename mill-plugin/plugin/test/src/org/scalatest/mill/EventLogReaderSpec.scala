@@ -17,10 +17,11 @@ import org.scalatest.mill.EventLogs.*
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
 
 final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
 
-  private val processWatchTimeoutSeconds: Long = 30
+  private val firstWatchTimeout: FiniteDuration = 30.seconds
 
   private final class Reading(eventLogFile: EventLogFile) {
     private val consolidationUnderTest = new ConsolidationUnderTest
@@ -49,7 +50,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       processExited.get
     }
 
-    def awaitFirstWatch(): Boolean = firstWatch.await(processWatchTimeoutSeconds, TimeUnit.SECONDS)
+    def awaitFirstWatch(): Unit =
+      if (!firstWatch.await(firstWatchTimeout.toMillis, TimeUnit.MILLISECONDS)) fail("the reader never watched the run's process")
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
 
@@ -150,7 +152,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           append(file, s"$runStarted\n")
           val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
-          reading.awaitFirstWatch() shouldBe true
+          reading.awaitFirstWatch()
           append(file, s"$runEndedCompleted\n")
           reading.processExited.set(true)
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended

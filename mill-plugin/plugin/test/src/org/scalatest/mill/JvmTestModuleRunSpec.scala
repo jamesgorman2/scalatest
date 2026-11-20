@@ -17,7 +17,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   private def forkGroupAt(position: Int): PlannedForkGroup =
     PlannedForkGroup(ForkGroup.at(position), ForkGroupLabel(position.toString), PathUnderModule(s"group-$position"), Nil, 1, Nil)
 
-  private def queueOfAllButTheFirst(forkGroup: PlannedForkGroup): String =
+  private def layOutAllButTheFirst(forkGroup: PlannedForkGroup): String =
     if (forkGroup == forkGroupAt(0))
       throw new IllegalStateException("disk full")
     else
@@ -95,7 +95,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       "attach what it threw to the root, naming the first fork group, and fail the consolidation" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
-        JvmTestModuleRun.layOutForkGroups(consolidation, label, Seq(forkGroupAt(0), forkGroupAt(1)))(queueOfAllButTheFirst)
+        JvmTestModuleRun.layOutForkGroups(consolidation, label, Seq(forkGroupAt(0), forkGroupAt(1)))(layOutAllButTheFirst)
         consolidation.end()
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
           "Consolidated tests:",
@@ -107,7 +107,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
       "keep only the second fork group, with what laying it out returned" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
-        JvmTestModuleRun.layOutForkGroups(consolidation, label, Seq(forkGroupAt(0), forkGroupAt(1)))(queueOfAllButTheFirst) shouldBe Seq(forkGroupAt(1) -> "queue of group-1")
+        JvmTestModuleRun.layOutForkGroups(consolidation, label, Seq(forkGroupAt(0), forkGroupAt(1)))(layOutAllButTheFirst) shouldBe Seq(forkGroupAt(1) -> "queue of group-1")
       }
     }
   }
