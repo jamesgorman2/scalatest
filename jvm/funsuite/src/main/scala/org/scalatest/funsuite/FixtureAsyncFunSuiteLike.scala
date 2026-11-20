@@ -125,7 +125,6 @@ trait FixtureAsyncFunSuiteLike extends org.scalatest.FixtureAsyncTestSuite with 
   class ResultOfTestInvocation(testName: String, testTags: Tag*) {
     
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = {
@@ -142,7 +141,6 @@ trait FixtureAsyncFunSuiteLike extends org.scalatest.FixtureAsyncTestSuite with 
     //DOTTY-ONLY }
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = {
@@ -189,7 +187,6 @@ trait FixtureAsyncFunSuiteLike extends org.scalatest.FixtureAsyncTestSuite with 
   class ResultOfIgnoreInvocation(testName: String, testTags: Tag*) {
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Future[compatible.Assertion], pos: source.Position): Unit = {
@@ -206,7 +203,6 @@ trait FixtureAsyncFunSuiteLike extends org.scalatest.FixtureAsyncTestSuite with 
     //DOTTY-ONLY }
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Future[compatible.Assertion], pos: source.Position): Unit = {

@@ -133,7 +133,6 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
   protected class ItWord {
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testText: String, testTags: Tag*)(testFun: => Unit, pos: source.Position): Unit = applyImpl(testText, testTags: _*)(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testText: String, testTags: Tag*)(testFun: => Unit /* Assertion */, pos: source.Position): Unit = {
@@ -266,7 +265,6 @@ trait PathAnyFunSpecLike extends org.scalatest.Suite with OneInstancePerTest wit
   protected class TheyWord {
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testText: String, testTags: Tag*)(testFun: => Unit, pos: source.Position): Unit = applyImpl(testText, testTags: _*)(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private def applyImpl(testText: String, testTags: Tag*)(testFun: => Unit /* Assertion */, pos: source.Position): Unit = {
