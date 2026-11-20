@@ -14,24 +14,24 @@ private[mill] final case class SelectedTestModule(module: TestModule) {
 
 private[mill] object SelectedTestModule {
 
-  def resolve(evaluator: Evaluator, moduleSelectors: Seq[String]): Either[String, SelectedTestModule] =
+  def resolve(evaluator: Evaluator, moduleSelectors: Seq[String]): Either[TestCommandFailure, SelectedTestModule] =
     moduleSelectors match {
       case Seq(selector) =>
         resolveSelector(evaluator, selector)
       case Seq() =>
-        Left("The test command takes one module selector, but was given none")
+        Left(TestCommandFailure.NoModuleSelector)
       case _ =>
-        Left(s"The test command takes one module selector, but was given: ${moduleSelectors.mkString(" ")}")
+        Left(TestCommandFailure.SeveralModuleSelectors(moduleSelectors))
     }
 
-  private def resolveSelector(evaluator: Evaluator, selector: String): Either[String, SelectedTestModule] =
+  private def resolveSelector(evaluator: Evaluator, selector: String): Either[TestCommandFailure, SelectedTestModule] =
     evaluator.resolveModulesOrTasks(Seq(selector), SelectMode.Multi) match {
       case Result.Success(List(Left(module: TestModule))) if isJvm(module) =>
         Right(SelectedTestModule(module))
       case Result.Success(resolved) =>
-        Left(s"Module selector $selector must resolve to one JVM test module, but resolved to: ${describe(resolved)}")
+        Left(TestCommandFailure.NotOneJvmTestModule(selector, describe(resolved)))
       case failure: Result.Failure =>
-        Left(s"Module selector $selector resolves to no module: ${failure.error}")
+        Left(TestCommandFailure.UnresolvedModuleSelector(selector, failure.error))
     }
 
   private def isJvm(module: TestModule): Boolean =

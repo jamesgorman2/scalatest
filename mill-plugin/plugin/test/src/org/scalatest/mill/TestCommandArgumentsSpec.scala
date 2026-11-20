@@ -6,9 +6,9 @@ import org.scalatest.wordspec.AnyWordSpec
 final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
 
   private def parsed(arguments: String*): TestCommandArguments =
-    TestCommandArguments.parse(arguments).fold(rejection => fail(s"${arguments.mkString(" ")} was rejected: $rejection"), identity)
+    TestCommandArguments.parse(arguments).fold(rejection => fail(s"${arguments.mkString(" ")} was rejected: ${rejection.message}"), identity)
 
-  private def rejection(arguments: String*): String =
+  private def rejection(arguments: String*): TestCommandFailure =
     TestCommandArguments.parse(arguments).left.getOrElse(fail(s"${arguments.mkString(" ")} was accepted"))
 
   "The test command's arguments" when {
@@ -46,13 +46,13 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
 
     "given -fJ with nothing after it" should {
       "reject it, naming it" in {
-        rejection("core.test", "-fJ") should endWith(": -fJ")
+        rejection("core.test", "-fJ") shouldBe TestCommandFailure.JsonOutputPathMissing
       }
     }
 
     "given a second -fJ" should {
       "reject it, naming it" in {
-        rejection("core.test", "-fJ", "report.json", "-fJ", "other.json") should endWith(": -fJ")
+        rejection("core.test", "-fJ", "report.json", "-fJ", "other.json") shouldBe TestCommandFailure.UnexpectedArgument("-fJ")
       }
     }
 
@@ -65,18 +65,18 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
     "given any other argument beginning with -" should {
       "reject it, naming it" in {
         for (argument <- Seq("-oP", "-oJ", "-oHP", "-oHd", "-oHy", "-f", "-fH", "-fP", "-fHP", "-fJH", "-fJc", "-e", "--halt-on-failure")) {
-          rejection("core.test", argument, "report.json") should endWith(s": $argument")
+          rejection("core.test", argument, "report.json") shouldBe TestCommandFailure.UnexpectedArgument(argument)
         }
       }
 
       "reject it beside -oH and -fJ, naming it" in {
-        rejection("core.test", "-oH", "-fJ", "report.json", "-fH", "other.txt") should endWith(": -fH")
+        rejection("core.test", "-oH", "-fJ", "report.json", "-fH", "other.txt") shouldBe TestCommandFailure.UnexpectedArgument("-fH")
       }
     }
 
     "given two of -oH and a bare -o" should {
       "reject the second" in {
-        rejection("core.test", "-oH", "-o") should endWith(": -o")
+        rejection("core.test", "-oH", "-o") shouldBe TestCommandFailure.UnexpectedArgument("-o")
       }
     }
   }

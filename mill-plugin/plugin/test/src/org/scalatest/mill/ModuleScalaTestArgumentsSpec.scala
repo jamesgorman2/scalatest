@@ -50,9 +50,8 @@ final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matcher
 
     "they hold an argument whose flag ScalaTest does not recognise" should {
       "fail, naming the first such argument" in {
-        val failure = ModuleScalaTestArguments.forRun(Seq("-l", "samples.Slow", "-x", "-y"))
-        failure.isLeft shouldBe true
-        failure.left.getOrElse("") should include(" -x,")
+        ModuleScalaTestArguments.forRun(Seq("-l", "samples.Slow", "-x", "-y")) shouldBe
+          Left(TestCommandFailure.UnrecognisedModuleArgument("-x"))
       }
     }
 

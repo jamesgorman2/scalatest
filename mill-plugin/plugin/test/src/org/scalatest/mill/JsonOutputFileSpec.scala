@@ -44,19 +44,19 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
-      "fail, naming its path, and keep a folder at its path with what it holds" in {
+      "fail as a folder at its path, and keep the folder with what it holds" in {
         withFolder { folder =>
           val path = Files.createDirectory(folder.resolve("report.json"))
           val kept = Files.writeString(path.resolve("keep.txt"), "kept")
-          new JsonOutputFile(path).delete().left.map(_.contains(path.toString)) shouldBe Left(true)
+          new JsonOutputFile(path).delete() shouldBe Left(TestCommandFailure.JsonOutputPathIsFolder(path))
           read(kept) shouldBe "kept"
         }
       }
 
-      "fail, naming its path, and keep an empty folder at its path" in {
+      "fail as a folder at its path, and keep an empty folder" in {
         withFolder { folder =>
           val path = Files.createDirectory(folder.resolve("report.json"))
-          new JsonOutputFile(path).delete().left.map(_.contains(path.toString)) shouldBe Left(true)
+          new JsonOutputFile(path).delete() shouldBe Left(TestCommandFailure.JsonOutputPathIsFolder(path))
           Files.isDirectory(path) shouldBe true
         }
       }
@@ -79,23 +79,26 @@ final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
-      "fail, naming its path, where a parent is a regular file" in {
+      "fail with the cause, where a parent is a regular file" in {
         withFolder { folder =>
           val blocker = Files.writeString(folder.resolve("blocker"), "a file")
           val path = blocker.resolve("report.json")
-          new JsonOutputFile(path).write(_.write("{}")).left.map(_.contains(path.toString)) shouldBe Left(true)
+          new JsonOutputFile(path).write(_.write("{}")) should matchPattern {
+            case Left(TestCommandFailure.JsonOutputNotWritten(`path`, _: IOException, None)) =>
+          }
         }
       }
 
-      "fail, naming its path, and leave nothing at its path, where the JSON output fails part way through" in {
+      "fail with the cause, and leave nothing at its path, where the JSON output fails part way through" in {
         withFolder { folder =>
           val path = folder.resolve("report.json")
+          val cause = new IOException("no space left")
           val written = new JsonOutputFile(path).write { writer =>
             writer.write("""{"kind":"root",""")
             writer.flush()
-            throw new IOException("no space left")
+            throw cause
           }
-          written.left.map(failure => failure.contains(path.toString) && failure.contains("no space left")) shouldBe Left(true)
+          written shouldBe Left(TestCommandFailure.JsonOutputNotWritten(path, cause, None))
           Files.exists(path) shouldBe false
         }
       }

@@ -13,16 +13,16 @@ import org.scalatest.consolidation.TestRunLabel
 private[mill] object TestCommand {
 
   def run(evaluator: Evaluator, arguments: Seq[String], ctx: TaskCtx): Unit = {
-    val commandArguments = TestCommandArguments.parse(arguments).fold(ctx.fail, identity)
+    val commandArguments = TestCommandArguments.parse(arguments).fold(failure => ctx.fail(failure.message), identity)
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
-    jsonOutputFile.foreach(file => BuildCtx.withFilesystemCheckerDisabled(file.delete()).fold(ctx.fail, identity))
-    val module = SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors).fold(ctx.fail, identity)
-    val inputs = JvmTestModuleInputs.evaluate(evaluator, module.module, ctx.log).fold(ctx.fail, identity)
-    val scalaTestArguments = ModuleScalaTestArguments.forRun(inputs.testArgs).fold(ctx.fail, identity)
+    jsonOutputFile.foreach(file => BuildCtx.withFilesystemCheckerDisabled(file.delete()).fold(failure => ctx.fail(failure.message), identity))
+    val module = SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors).fold(failure => ctx.fail(failure.message), identity)
+    val inputs = JvmTestModuleInputs.evaluate(evaluator, module.module, ctx.log).fold(failure => ctx.fail(failure.message), identity)
+    val scalaTestArguments = ModuleScalaTestArguments.forRun(inputs.testArgs).fold(failure => ctx.fail(failure.message), identity)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       if (commandArguments.humanReadableOnStdout) line => output.println(line) else _ => ()
-    var jsonOutputWritten: Either[String, Unit] = Right(())
+    var jsonOutputWritten: Either[TestCommandFailure, Unit] = Right(())
     val label = TestRunLabel(module.path)
     val consolidation = Consolidation.start(
       humanReadableOutput,
@@ -37,7 +37,7 @@ private[mill] object TestCommand {
       run.run(consolidation)
     }
     consolidation.end(Some(Instant.now()))
-    jsonOutputWritten.fold(ctx.fail, identity)
+    jsonOutputWritten.fold(failure => ctx.fail(failure.message), identity)
     if (consolidation.state.failed) {
       ctx.fail(s"The tests of ${module.path} failed")
     }

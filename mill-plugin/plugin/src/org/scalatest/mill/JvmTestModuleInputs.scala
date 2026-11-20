@@ -72,11 +72,11 @@ private[mill] final case class JvmTestModuleInputs(
 
 private[mill] object JvmTestModuleInputs {
 
-  def evaluate(evaluator: Evaluator, module: TestModule, logger: Logger): Either[String, JvmTestModuleInputs] =
+  def evaluate(evaluator: Evaluator, module: TestModule, logger: Logger): Either[TestCommandFailure, JvmTestModuleInputs] =
     evaluator.execute(Seq(task(module)), logger = logger).values match {
       case Result.Success(Seq(inputs)) => Right(inputs)
-      case Result.Success(values) => Left(s"Evaluating ${module.moduleSegments.render} gave ${values.size} values")
-      case failure: Result.Failure => Left(failure.error)
+      case Result.Success(values) => throw new IllegalStateException(s"Evaluating ${module.moduleSegments.render} gave ${values.size} values")
+      case failure: Result.Failure => Left(TestCommandFailure.ModuleInputsNotEvaluated(module.moduleSegments.render, failure.error))
     }
 
   private def task(module: TestModule): Task[JvmTestModuleInputs] = {
