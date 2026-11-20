@@ -132,7 +132,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   private def tryFixNode(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
-    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen.get && handingOff && registration.tryTakeReadOfSuiteId()))
+    val (suiteIdRead, readsSuiteId) = synchronized((registration.suiteIdReadByItsRun, isOpen.get && handingOff && registration.tryClaimSuiteIdRead()))
     val suiteId = if (readsSuiteId) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteIdOfInstance())) else Right(suiteIdRead)
     val (thrown, isFixed) = synchronized {
       if (!isOpen.get) {
@@ -160,7 +160,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
   }
 
   private def trySettleTable(registration: RegisteredSuite, handingOff: Boolean): Boolean = {
-    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen.get && handingOff && registration.tryTakeReadOfSuiteName()))
+    val (suiteNameRead, readsSuiteName) = synchronized((registration.suiteNameReadByItsRun, isOpen.get && handingOff && registration.tryClaimSuiteNameRead()))
     val suiteName = if (readsSuiteName) TestEventLogEmitter.caughtOutsideLock(Some(registration.readSuiteNameOfInstance())) else Right(suiteNameRead)
     val (thrown, isSettled) = synchronized {
       if (!isOpen.get) {

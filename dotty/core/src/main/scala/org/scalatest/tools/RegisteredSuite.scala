@@ -103,7 +103,8 @@ private[scalatest] final class RegisteredSuite(
   private val structureAwaitingSettledTable = new GuardedByEmitter(emitter, Option.empty[SuiteNodeTable => List[ScopeOrTest]])
 
   private val isRemoved = new GuardedByEmitter(emitter, false)
-  // Here rather than in the emitter, so that both sets are dropped with the top-level suite's wrapper.
+  // Only the top-level suite's sets are used. They sit on its registration rather than in the emitter, so that they are
+  // garbage-collected with its wrapper.
   private val handedOffBeforeRemoval = new GuardedByEmitter(emitter, identitySet())
   private val closingEventsWithMessagesHandedOff = new GuardedByEmitter(emitter, identitySet())
 
@@ -172,7 +173,7 @@ private[scalatest] final class RegisteredSuite(
 
   def suiteNameReadByItsRun: Option[String] = firstSuiteNameItsRunRead.get
 
-  def tryTakeReadOfSuiteName(): Boolean = {
+  def tryClaimSuiteNameRead(): Boolean = {
     val takes = newNodeAwaitingName.get.isDefined && firstSuiteNameItsRunRead.get.isEmpty && !emitterHasReadSuiteName.get
     if (takes) {
       emitterHasReadSuiteName.set(true)
@@ -180,7 +181,7 @@ private[scalatest] final class RegisteredSuite(
     takes
   }
 
-  def tryTakeReadOfSuiteId(): Boolean = {
+  def tryClaimSuiteIdRead(): Boolean = {
     emitter.assertLockHeld()
     val takes = !nodeIsFixed && firstSuiteIdItsRunRead.get.isEmpty && !emitterHasReadSuiteId.get && canHaveTable
     if (takes) {
@@ -286,7 +287,6 @@ private[scalatest] final class RegisteredSuite(
     suiteItIs.get.fold(runAwaitingItsStart())(_.executionOfRun())
 
   def startRunOnceNodeIsFixed(): Unit = {
-    emitter.assertLockHeld()
     if (nodeIsFixed) {
       startExecutionOfRun()
     } else {
@@ -295,7 +295,6 @@ private[scalatest] final class RegisteredSuite(
   }
 
   def structureOnceTableIsSettled(scopesAndTestsFor: SuiteNodeTable => List[ScopeOrTest]): Option[(SuiteNodeTable, List[ScopeOrTest])] = {
-    emitter.assertLockHeld()
     if (tableIsSettled) {
       tableOfNode.get.map(table => (table, scopesAndTestsFor(table)))
     } else {
@@ -373,8 +372,8 @@ private[scalatest] final class RegisteredSuite(
     try status.whenCompleted(_ => emitter.forget(this))
     catch {
       case thrown: Throwable =>
-        // The suite's own `run` may have built `status`, so `whenCompleted` may be user code. Where `whenCompleted`
-        // throws, nothing will call back.
+        // The suite's own `run` may have built `status`. If its `whenCompleted` throws, the callback may never run, so
+        // the suite is forgotten here.
         emitter.forget(this)
         TestEventLogEmitter.keptFromCaller(throw thrown)
     }

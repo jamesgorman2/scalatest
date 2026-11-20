@@ -36,8 +36,9 @@ private[scalatest] final case class SuiteStructure(
 private[scalatest] object SuiteStructure {
 
   def read(suite: Suite, filter: Filter): SuiteStructure = {
-    // A ConfigMapWrapperSuite forwards its names, tests, tags and nested suites to the instance it builds with an empty
-    // config map, but not its registration tree or its class name.
+    // A ConfigMapWrapperSuite forwards its suite name and ID, tests, tags and nested suites to the instance it builds
+    // with an empty config map, but not its registration tree or its class name, so everything is read from that
+    // instance.
     val readFrom = suite match {
       case wrapper: ConfigMapWrapperSuite => wrapper.instanceWithEmptyConfigMap
       case _ => suite
@@ -72,7 +73,7 @@ private[scalatest] object SuiteStructure {
 
   def keptByFilter(registered: List[RegisteredNode], verdictOn: TestName => FilterVerdict): List[ScopeOrTest] = {
     registered.flatMap {
-      // Kept even where the filter drops all its tests, since the engine still opens it.
+      // A scope is kept even where the filter drops all its tests, since the engine still opens it.
       case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, keptByFilter(nodes, verdictOn)))
       case RegisteredTest(name, registeredName, label, labelWhenIgnored) =>
         val testName = TestName(registeredName)

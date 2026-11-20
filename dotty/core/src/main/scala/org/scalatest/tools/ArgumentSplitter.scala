@@ -21,7 +21,7 @@ private[scalatest] object ArgumentSplitter {
 
   // Both tables give each flag the values the JVM `ArgsParser.parseArgs` reads for it, so that a value is never read as
   // a flag.
-  private val flagsWrittenOnto: Map[String, Values] = Map(
+  private val flagsWithAttachedValues: Map[String, Values] = Map(
     "-D" -> Following(0),
     "-R" -> Following(1),
     "-g" -> Following(0),
@@ -33,7 +33,7 @@ private[scalatest] object ArgumentSplitter {
     "-P" -> Following(0)
   )
 
-  private val flagsWrittenAlone: Map[String, Values] = Map(
+  private val standaloneFlags: Map[String, Values] = Map(
     "-M" -> Following(1),
     "-u" -> Following(1),
     "-n" -> Following(1),
@@ -77,10 +77,10 @@ private[scalatest] object ArgumentSplitter {
 
   private def flagOf(argument: String): Option[String] =
     Option(argument).flatMap { written =>
-      Some(written.take(2)).filter(flagsWrittenOnto.contains).orElse(Some(written).filter(flagsWrittenAlone.contains))
+      Some(written.take(2)).filter(flagsWithAttachedValues.contains).orElse(Some(written).filter(standaloneFlags.contains))
     }
 
-  private def valuesOf(flag: String): Values = flagsWrittenOnto.getOrElse(flag, flagsWrittenAlone(flag))
+  private def valuesOf(flag: String): Values = flagsWithAttachedValues.getOrElse(flag, standaloneFlags(flag))
 
   private def take(values: Values, remaining: BufferedIterator[String]): List[String] =
     values match {

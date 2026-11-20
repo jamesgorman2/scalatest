@@ -93,7 +93,7 @@ private[scalatest] final class SuiteNodeTable(
 
   def nestedSuites: Vector[SuiteNodeTable] = heldNestedSuites
 
-  // Set by the companion once this table is built, so that each nested table's parent is a whole table. Never written
+  // Set by the companion after this table is built, so that each nested table can take it as its parent. Never written
   // once the table is shared, so read without the emitter's lock.
   private var heldNestedSuites = Vector.empty[SuiteNodeTable]
 
@@ -127,8 +127,8 @@ private[scalatest] final class SuiteNodeTable(
   def latestHoldsTest(testName: TestName): Boolean = testNamesOfLatest.get.contains(testName)
 
   def filterKeepingEarlier(testNames: List[TestName], verdictOn: TestName => FilterVerdict): Map[TestName, FilterVerdict] = {
-    // An earlier verdict stands: the first structure was filtered by the suite's own `tags`, which a further structure
-    // cannot call.
+    // An earlier verdict stands: the first structure was filtered with the suite's own `tags`, which are not read again
+    // for a further structure.
     val filteredNow = testNames.map(testName => testName -> filteredTests.get.getOrElse(testName, verdictOn(testName))).toMap
     filteredTests.set(filteredTests.get ++ filteredNow)
     filteredNow
