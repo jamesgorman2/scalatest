@@ -141,7 +141,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     )
 
   private def plainFailureCausedByStackDepthFailure: Throwable = {
-    // `innermost` is shown only with a stack trace: without one, the cause chain ends at `inner`,
+    // `innermost` is shown only with a stack trace: without one, the cause chain ends before `inner`,
     // the StackDepth exception it causes.
     val innermost = withFrames(new IllegalArgumentException("root cause"), "Disk", 2)
     val inner = new TestFailedException(
