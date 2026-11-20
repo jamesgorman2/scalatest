@@ -16,7 +16,8 @@ import scala.concurrent.duration.FiniteDuration
  *
  * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
  * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
- * end and ends the run's event stream. A line that cannot be decoded ends the stream there and fails the reading. If
+ * end and ends the run's event stream. A line that cannot be decoded ends the stream there, and `awaitStreamEnd` throws
+ * an exception naming the line and why. If
  * the worker ends before the file appears, no run existed in it: where the worker started a process, the reader adds
  * that process as one that ended before any run.
  */
