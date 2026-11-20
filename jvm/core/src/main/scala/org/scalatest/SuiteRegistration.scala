@@ -89,7 +89,7 @@ private[scalatest] abstract class SuiteRegistration {
   def suiteIdRead(suiteId: String): Unit
 
   final def filtered(filter: Filter, testName: String, suite: Suite): (Boolean, Boolean) = {
-    // The tags and suite ID are read in the order 3.2.20 passes them to the filter.
+    // The tags and suite ID are read in the order ScalaTest 3.2.20 passes them to the filter.
     val theTags = suite.tags
     val theSuiteId = suite.suiteId
     suiteIdRead(theSuiteId)

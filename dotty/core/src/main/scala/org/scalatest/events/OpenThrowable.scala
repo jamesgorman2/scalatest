@@ -17,8 +17,8 @@ private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Sourc
   protected def linkedSuppressed: Vector[Linked] = suppressedLinked
 
   private def nextLink(): Option[Source] = {
-    // Each source is dropped once read: the closed value can keep this open throwable reachable until the value's
-    // links are first read, and the sources must not stay reachable that long.
+    // The sources are dropped once all are read: until its links are first read, the closed value can keep this open
+    // throwable reachable, and the sources must not stay reachable that long.
     addsCause = unreadCause.nonEmpty
     if (addsCause) {
       val next = unreadCause
@@ -47,8 +47,8 @@ private[events] object OpenThrowable {
   def closedFrom[Source, Linked](outermost: OpenThrowable[Source, Linked])(
     linkedOrOpened: Source => Either[Linked, OpenThrowable[Source, Linked]]
   ): Linked = {
-    // The throwables still being linked are kept in `outer`, not on the call stack, so that a long chain of causes
-    // cannot overflow the stack.
+    // The throwables whose links are still being added are kept in `outer`, not on the call stack, so that a long chain
+    // of causes cannot overflow the stack.
     @tailrec
     def closing(innermost: OpenThrowable[Source, Linked], outer: List[OpenThrowable[Source, Linked]]): Linked = {
       innermost.nextLink() match {

@@ -28,7 +28,7 @@ private[scalatest] object JsonWriter {
   }
 
   def write(value: JsonValue, out: Appendable): Unit = {
-    // A list, not the call stack, so that deep nesting cannot overflow the stack.
+    // Pending output is held in a list, not on the call stack, so that deep nesting cannot overflow the stack.
     var pending = List[Pending](Pending.Value(value))
     while (pending.nonEmpty) {
       val next = pending.head

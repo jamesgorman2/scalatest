@@ -48,7 +48,7 @@ private[scalatest] enum StructureNode {
 
 private[scalatest] final case class NodeExecution(
   node: NodeId,
-  // Also holds an index for each scope a test runs in, though a test's node names no scope.
+  // Unlike `node`, also holds an index for each scope a test runs in.
   executionPath: Vector[Int]
 ) {
 
@@ -199,7 +199,8 @@ private[scalatest] final class DecodedThrowable(
   // Not a case class: a throwable can be its own cause or suppressed throwable, so a structural equals, hashCode or
   // toString would never return.
 
-  // Evaluated on first read, so that a decoder can build a throwable before the throwables that link back to it.
+  // Evaluated on first read, so that a decoder can build a throwable before its cause and suppressed throwables,
+  // which may refer back to it.
   lazy val cause: Option[DecodedThrowable] = linkedCause
   lazy val suppressed: IndexedSeq[DecodedThrowable] = linkedSuppressed
 

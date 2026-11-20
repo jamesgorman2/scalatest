@@ -8,7 +8,7 @@ private[scalatest] final case class RegisteredTest(name: String, scalaTestName: 
 
 private[scalatest] object RegisteredNode {
 
-  // Labels carry no indentation, which could not be told apart from spaces the text itself starts with.
+  // Labels carry no indentation, since it could not be told apart from spaces the text itself starts with.
   private val unindented = 0
 
   def scopeLabel(textWithChildPrefix: String): String =
@@ -32,7 +32,7 @@ private[scalatest] object RegisteredNode {
   def scenarioName(testText: String): String = testText.stripPrefix(Resources.scenario(""))
 
   def unregisteredTest(testName: String): RegisteredTest = {
-    // As `Suite.runTests` labels a test it ignores.
+    // Labelled as `Suite.runTests` labels a test it ignores.
     val label = Suite.getEscapedIndentedTextForTest(testName, 1, true).formattedText
     RegisteredTest(testName, testName, label, label)
   }
