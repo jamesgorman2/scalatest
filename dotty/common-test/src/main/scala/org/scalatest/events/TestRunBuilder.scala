@@ -45,7 +45,7 @@ private[scalatest] object TestRunBuilder {
   val defaultThreadName: String = "main"
   val defaultTimeStamp: Long = 0L
 
-  /** Throws `NotationError`, naming the mistake, where the notation does not give a run. */
+  /** @throws NotationError if the notation does not describe a run; its message names the mistake. */
   def build(parts: TestRunPart*): BuiltRun = {
     val run = new RunUnderConstruction
     BuiltRun(
@@ -68,7 +68,7 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: Stri
 
   def parent: Option[NodeId] = latestParent
 
-  /** A later structure holds the node with this name, under this parent. */
+  /** Records that a later structure holds the node, with this name and under this parent. */
   def heldAgain(name: String, parent: Option[NodeId]): Unit = {
     latestName = name
     latestParent = parent

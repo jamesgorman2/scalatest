@@ -7,27 +7,27 @@ final class NodeIdSpec extends AnyWordSpec with Matchers {
 
   private val stackSuite = NodeId.topLevelSuite(SuiteId("samples.StackSuite"), 1)
 
-  "A top-level suite's node ID" should {
+  "A top-level suite's node path" should {
     "be its suite ID and index alone" in {
       stackSuite shouldBe NodeId(Vector(NodePlace.Suite(SuiteId("samples.StackSuite"), 1)))
     }
   }
 
-  "A nested suite's node ID" should {
+  "A nested suite's node path" should {
     "be its parent's, then its suite ID and index" in {
       NodeId.nestedSuite(stackSuite, SuiteId("samples.HelperSuite"), 2) shouldBe
         NodeId(Vector(NodePlace.Suite(SuiteId("samples.StackSuite"), 1), NodePlace.Suite(SuiteId("samples.HelperSuite"), 2)))
     }
   }
 
-  "A scope's node ID" should {
+  "A scope's node path" should {
     "be its parent's, then its registered text and index" in {
       NodeId.scope(stackSuite, "A Stack when empty", 0) shouldBe
         NodeId(Vector(NodePlace.Suite(SuiteId("samples.StackSuite"), 1), NodePlace.Scope("A Stack when empty", 0)))
     }
   }
 
-  "A test's node ID" should {
+  "A test's node path" should {
     "be its suite's, then its test name" in {
       NodeId.test(stackSuite, TestName("A Stack pops")) shouldBe
         NodeId(Vector(NodePlace.Suite(SuiteId("samples.StackSuite"), 1), NodePlace.Test(TestName("A Stack pops"))))

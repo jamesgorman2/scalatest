@@ -17,10 +17,9 @@ private[scalatest] object NodeId {
 
   def topLevelSuite(suiteId: SuiteId, index: Int): NodeId = NodeId(Vector(NodePlace.Suite(suiteId, index)))
 
-  /** `index` is the suite's order among the parent's suites of its `suiteId`. */
   def nestedSuite(parent: NodeId, suiteId: SuiteId, index: Int): NodeId = NodeId(parent.places :+ NodePlace.Suite(suiteId, index))
 
-  /** `text` is the text the scope is registered with; `index` is its order among the parent's scopes of that text. */
+  /** `text` is the text the scope is registered with. */
   def scope(parent: NodeId, text: String, index: Int): NodeId = NodeId(parent.places :+ NodePlace.Scope(text, index))
 
   /** A test sits directly under its suite's node, whichever scopes it is registered in. */

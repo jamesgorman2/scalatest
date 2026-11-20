@@ -8,8 +8,8 @@ import scala.annotation.tailrec
  */
 private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Source], suppressed: Iterator[Source]) {
 
-  // Each source is dropped once read: the closed value can hold this throwable until its links are first read, and must
-  // not keep the sources alive with it.
+  // Each source is dropped once read. The closed value may hold this throwable until its links are first read, so this
+  // throwable must not keep the sources reachable.
   private var unreadCause = cause
   private var unreadSuppressed = suppressed
   private var addsCause = false
@@ -50,10 +50,10 @@ private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Sourc
 private[events] object OpenThrowable {
 
   /**
-   * Closes `outermost` and every throwable it links to. `linkedOrOpened` gives each link either its value, as for a
-   * throwable already met, or a throwable to open.
+   * Closes `outermost` and every throwable it links to. `linkedOrOpened` gives each link either its value, for a
+   * throwable already seen, or a throwable to open.
    */
-  // Keeps the throwables whose links are still to add in a list, not on the call stack, so that a long chain of
+  // Keeps the throwables whose links are still to be added in a list, not on the call stack, so that a long chain of
   // causes cannot overflow the stack.
   def closedFrom[Source, Linked](outermost: OpenThrowable[Source, Linked])(
     linkedOrOpened: Source => Either[Linked, OpenThrowable[Source, Linked]]

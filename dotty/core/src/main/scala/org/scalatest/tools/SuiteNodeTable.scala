@@ -224,8 +224,8 @@ private[scalatest] final class SuiteNodeTable(
   /**
    * What the filter says of each test of `testNames`, as `Filter.apply` says it for one test. A test an earlier
    * structure of the suite filtered keeps that result, since the first structure is filtered by the suite's own
-   * `tags`, which a further structure cannot call. Any other test is filtered by `verdictOn`, and the table keeps the
-   * result for later structures.
+   * `tags`, which a further structure cannot call. Any other test is passed to `verdictOn`, and the table keeps what it
+   * returns for later structures.
    */
   def filterKeepingEarlier(testNames: List[TestName], verdictOn: TestName => FilterVerdict): Map[TestName, FilterVerdict] = {
     emitter.assertLockHeld()
