@@ -300,7 +300,8 @@ private[consolidation] object JsonOutputWriter {
       case ThrowableEntry.Ref(id) =>
         objectOf(Vector[Field]("ref" -> Some(JsonValue.Integer(id.toLong)))) :: written
       case ThrowableEntry.Recorded(id, throwable) => {
-        // Entries are visited depth-first, so the records written after this one start with its cause's, then its suppressed throwables'.
+        // Entries are visited depth-first and written last to first, so `written` starts with this throwable's cause's record,
+        // then its suppressed throwables' records.
         val (causes, afterCauses) = written.splitAt(throwable.cause.size)
         val (suppressed, rest) = afterCauses.splitAt(throwable.suppressed.size)
         recordedThrowable(id, throwable, causes.headOption, suppressed.toVector) :: rest

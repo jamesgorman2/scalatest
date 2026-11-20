@@ -275,8 +275,7 @@ private[consolidation] final case class AssembledRun(
 private[consolidation] final case class RunAssembly private (
   label: TestRunLabel,
   worker: Option[Worker],
-  // Assembles the run's top-level suites.
-  assembleTree: RecordedRun => Vector[AssembledNode],
+  assembleTopLevelSuites: RecordedRun => Vector[AssembledNode],
   recorded: RecordedRun,
   output: Vector[RunOutput],
   assignedTestClasses: Vector[TestClassName]
@@ -298,7 +297,7 @@ private[consolidation] final case class RunAssembly private (
       recorded.outcome,
       recorded.abort,
       recorded.suiteClassNames,
-      assembleTree(recorded)
+      assembleTopLevelSuites(recorded)
     )
 
   def assembled(eventStream: AssembledEventStream): AssembledRun = AssembledRun(label, worker, eventStream, output, assignedTestClasses)
@@ -308,8 +307,8 @@ private[consolidation] object RunAssembly {
 
   def apply(label: TestRunLabel, worker: Option[Worker]): RunAssembly = apply(label, worker, TreeAssembler.topLevelSuitesOf)
 
-  def apply(label: TestRunLabel, worker: Option[Worker], assembleTree: RecordedRun => Vector[AssembledNode]): RunAssembly =
-    new RunAssembly(label, worker, assembleTree, RecordedRun.empty, Vector.empty, Vector.empty)
+  def apply(label: TestRunLabel, worker: Option[Worker], assembleTopLevelSuites: RecordedRun => Vector[AssembledNode]): RunAssembly =
+    new RunAssembly(label, worker, assembleTopLevelSuites, RecordedRun.empty, Vector.empty, Vector.empty)
 
   def reportsFailure(event: TestEventLogEvent): Boolean =
     event match {

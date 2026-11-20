@@ -15,7 +15,7 @@ private[consolidation] final case class RecordedRun(
   childIds: Map[NodeId, Set[NodeId]],
   // By suite, as the latest structure holding the suite gives them.
   latestScopesAndTests: Map[NodeId, Set[NodeId]],
-  // By suite: the first declared position of any of its scopes or tests.
+  // By suite: the lowest declared position among the scopes and tests directly under it.
   firstScopeOrTestPosition: Map[NodeId, Int],
   executions: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]],
   nextStartOrder: StartOrder,
@@ -76,7 +76,7 @@ private[consolidation] final case class RecordedRun(
 
   // An event assigned to the run rather than to a node is handled by kind:
   // - a run or discovery event records the run's own state; only the first of each kind is kept;
-  // - a message belongs to the run's output, which the run assembly keeps;
+  // - a message is left to the run assembly, which adds it to the run's output;
   // - a suite's, scope's or test's event, such as a `DiscoverySuite`'s (which the emitter assigns to the run), is dropped.
   private def withRunEvent(event: DecodedEvent): RecordedRun =
     event match {

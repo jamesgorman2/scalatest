@@ -242,6 +242,7 @@ private[consolidation] object HumanReadableOutput {
   private def markOf(message: ProvidedMessage): String = "[" + message.kind.word + "] "
 
   // An event's first line, then its message, analysis and stack trace lines, with the `S` and `F` reporter options off.
+  //
   // `StringReporter.stringsToPrintOnError` throws a NullPointerException when the message is blank and the throwable
   // has no message. ScalaTest 3.2.20 does the same, and core keeps that behaviour. For that case, this builds the lines
   // without the throwable, then adds the throwable's line number and stack trace lines, as `StringReporter` prints them

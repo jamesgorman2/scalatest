@@ -31,9 +31,9 @@ final class RunAssemblySpec extends AnyWordSpec with should.Matchers with Consol
     )
   )
 
-  private def endedEventStream(assembleTree: RecordedRun => Vector[AssembledNode]): AssembledEventStream = {
+  private def endedEventStream(assembleTopLevelSuites: RecordedRun => Vector[AssembledNode]): AssembledEventStream = {
     val events = TestRunBuilder.build(TestRunPart.Events(eventLog)).events.map(_.event)
-    events.foldLeft(RunAssembly(moduleLabel, None, assembleTree))(_.added(_)).assembledEventStream
+    events.foldLeft(RunAssembly(moduleLabel, None, assembleTopLevelSuites))(_.added(_)).assembledEventStream
   }
 
   "A run assembly" when {
