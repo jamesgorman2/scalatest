@@ -9,14 +9,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class JsonOutputFileSpec extends AnyWordSpec with should.Matchers {
 
-  private def withFolder[A](test: Path => A): A = {
-    val folder = Files.createTempDirectory("json-output-file")
-    try {
-      test(folder)
-    } finally {
-      Files.walk(folder).sorted(java.util.Comparator.reverseOrder()).forEach(path => Files.delete(path))
-    }
-  }
+  private def withFolder[A](test: Path => A): A = TemporaryFolder.within("json-output-file")(test)
 
   private def read(path: Path): String = new String(Files.readAllBytes(path), StandardCharsets.UTF_8)
 

@@ -8,122 +8,126 @@ import scala.collection.mutable
 
 final class StreamLinesSpec extends AnyWordSpec with should.Matchers {
 
-  private final class Splitting(charset: Charset = StandardCharsets.UTF_8) {
+  private final class StreamLinesUnderTest(charset: Charset = StandardCharsets.UTF_8) {
     val lines: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
-    val splitter: StreamLines = new StreamLines(charset, line => lines += line)
+    private val streamLines: StreamLines = new StreamLines(charset, line => lines += line)
 
-    def append(bytes: Array[Byte]): Unit = splitter.append(bytes, bytes.length)
+    def append(buffer: Array[Byte], bytesRead: Int): Unit = streamLines.append(buffer, bytesRead)
+
+    def append(bytes: Array[Byte]): Unit = append(bytes, bytes.length)
 
     def append(text: String): Unit = append(text.getBytes(charset))
+
+    def end(): Unit = streamLines.end()
   }
 
   "Stream lines" when {
     "given bytes holding whole lines" should {
       "pass on each line with its line end" in {
-        val splitting = new Splitting
-        splitting.append("first\nsecond\n")
-        splitting.lines shouldBe Seq("first\n", "second\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("first\nsecond\n")
+        streamLines.lines shouldBe Seq("first\n", "second\n")
       }
 
       "keep each carriage return before a line end" in {
-        val splitting = new Splitting
-        splitting.append("first\r\nsecond\r\r\n")
-        splitting.lines shouldBe Seq("first\r\n", "second\r\r\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("first\r\nsecond\r\r\n")
+        streamLines.lines shouldBe Seq("first\r\n", "second\r\r\n")
       }
 
       "keep a lone carriage return in the line" in {
-        val splitting = new Splitting
-        splitting.append("50%\r100%\n")
-        splitting.lines shouldBe Seq("50%\r100%\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("50%\r100%\n")
+        streamLines.lines shouldBe Seq("50%\r100%\n")
       }
 
       "pass on an empty line" in {
-        val splitting = new Splitting
-        splitting.append("\n\r\n")
-        splitting.lines shouldBe Seq("\n", "\r\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("\n\r\n")
+        streamLines.lines shouldBe Seq("\n", "\r\n")
       }
     }
 
     "given a line in several chunks" should {
       "pass it on once its line end arrives" in {
-        val splitting = new Splitting
-        splitting.append("fir")
-        splitting.lines shouldBe empty
-        splitting.append("st\nsec")
-        splitting.lines shouldBe Seq("first\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("fir")
+        streamLines.lines shouldBe empty
+        streamLines.append("st\nsec")
+        streamLines.lines shouldBe Seq("first\n")
       }
 
       "decode a character whose bytes the chunks split" in {
-        val splitting = new Splitting
+        val streamLines = new StreamLinesUnderTest
         val bytes = "café\n".getBytes(StandardCharsets.UTF_8)
-        splitting.append(bytes.take(4))
-        splitting.append(bytes.drop(4))
-        splitting.lines shouldBe Seq("café\n")
+        streamLines.append(bytes.take(4))
+        streamLines.append(bytes.drop(4))
+        streamLines.lines shouldBe Seq("café\n")
       }
 
       "keep a carriage return and line end split across chunks as one line end" in {
-        val splitting = new Splitting
-        splitting.append("first\r")
-        splitting.append("\n")
-        splitting.lines shouldBe Seq("first\r\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("first\r")
+        streamLines.append("\n")
+        streamLines.lines shouldBe Seq("first\r\n")
       }
     }
 
     "given a buffer longer than the bytes read" should {
       "read only the bytes it is told were read" in {
-        val splitting = new Splitting
+        val streamLines = new StreamLinesUnderTest
         val buffer = "one\ntwo\n".getBytes(StandardCharsets.UTF_8)
-        splitting.splitter.append(buffer, 4)
-        splitting.lines shouldBe Seq("one\n")
+        streamLines.append(buffer, 4)
+        streamLines.lines shouldBe Seq("one\n")
       }
     }
 
     "given a charset other than UTF-8" should {
       "decode each line with it" in {
         val windows1252 = Charset.forName("windows-1252")
-        val splitting = new Splitting(windows1252)
-        splitting.append("naïve € line\n")
-        splitting.lines shouldBe Seq("naïve € line\n")
+        val streamLines = new StreamLinesUnderTest(windows1252)
+        streamLines.append("naïve € line\n")
+        streamLines.lines shouldBe Seq("naïve € line\n")
       }
 
       "split a multi-byte charset's lines without cutting a character" in {
         val shiftJis = Charset.forName("MS932")
-        val splitting = new Splitting(shiftJis)
+        val streamLines = new StreamLinesUnderTest(shiftJis)
         val bytes = "表示\n".getBytes(shiftJis)
-        splitting.append(bytes.take(1))
-        splitting.append(bytes.drop(1))
-        splitting.lines shouldBe Seq("表示\n")
+        streamLines.append(bytes.take(1))
+        streamLines.append(bytes.drop(1))
+        streamLines.lines shouldBe Seq("表示\n")
       }
     }
 
     "given malformed bytes" should {
       "decode them to the replacement character" in {
-        val splitting = new Splitting
-        splitting.append(Array[Byte]('a', 0xff.toByte, 'b', '\n'))
-        splitting.lines shouldBe Seq("a�b\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append(Array[Byte]('a', 0xff.toByte, 'b', '\n'))
+        streamLines.lines shouldBe Seq("a�b\n")
       }
     }
 
     "ended" should {
       "pass on the line it still holds, with no line end" in {
-        val splitting = new Splitting
-        splitting.append("first\nlast")
-        splitting.splitter.end()
-        splitting.lines shouldBe Seq("first\n", "last")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("first\nlast")
+        streamLines.end()
+        streamLines.lines shouldBe Seq("first\n", "last")
       }
 
       "pass on nothing when it holds no byte" in {
-        val splitting = new Splitting
-        splitting.append("first\n")
-        splitting.splitter.end()
-        splitting.lines shouldBe Seq("first\n")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("first\n")
+        streamLines.end()
+        streamLines.lines shouldBe Seq("first\n")
       }
 
       "keep a carriage return ending the line it still holds" in {
-        val splitting = new Splitting
-        splitting.append("last\r")
-        splitting.splitter.end()
-        splitting.lines shouldBe Seq("last\r")
+        val streamLines = new StreamLinesUnderTest
+        streamLines.append("last\r")
+        streamLines.end()
+        streamLines.lines shouldBe Seq("last\r")
       }
     }
   }

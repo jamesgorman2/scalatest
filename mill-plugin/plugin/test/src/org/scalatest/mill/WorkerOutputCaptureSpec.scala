@@ -4,16 +4,12 @@ import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import org.scalatest.consolidation.CapturedLine
 import org.scalatest.matchers.should
+import org.scalatest.mill.WorkerOutput.writeStderr
+import org.scalatest.mill.WorkerOutput.writeStdout
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
 
 final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
-
-  private def bytes(text: String): Array[Byte] = text.getBytes(StandardCharsets.UTF_8)
-
-  private def stdout(capture: WorkerOutputCapture, text: String): Unit = capture.stdout(bytes(text), bytes(text).length)
-
-  private def stderr(capture: WorkerOutputCapture, text: String): Unit = capture.stderr(bytes(text), bytes(text).length)
 
   private def linesOfRunAddedTo(capture: WorkerOutputCapture): mutable.ArrayBuffer[CapturedLine] = {
     val lines = mutable.ArrayBuffer.empty[CapturedLine]
@@ -25,9 +21,9 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
     "lines are completed before the run exists" should {
       "pass them to the run once it is named, tagged with their streams, in the order they were completed" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
-        stderr(capture, "warn: about")
-        stdout(capture, "dividing now\n")
-        stderr(capture, " to divide\n")
+        writeStderr(capture, "warn: about")
+        writeStdout(capture, "dividing now\n")
+        writeStderr(capture, " to divide\n")
         val lines = linesOfRunAddedTo(capture)
         lines shouldBe Seq(CapturedLine.Stdout("dividing now\n"), CapturedLine.Stderr("warn: about to divide\n"))
       }
@@ -36,9 +32,9 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
     "lines are completed after the run is named" should {
       "pass each to the run as it is completed, after those held" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
-        stdout(capture, "before\n")
+        writeStdout(capture, "before\n")
         val lines = linesOfRunAddedTo(capture)
-        stderr(capture, "after\n")
+        writeStderr(capture, "after\n")
         lines shouldBe Seq(CapturedLine.Stdout("before\n"), CapturedLine.Stderr("after\n"))
       }
     }
@@ -47,8 +43,8 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
       "pass on each stream's unterminated last line" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
         val lines = linesOfRunAddedTo(capture)
-        stdout(capture, "last out")
-        stderr(capture, "last err")
+        writeStdout(capture, "last out")
+        writeStderr(capture, "last err")
         lines shouldBe empty
         capture.endStreams()
         lines shouldBe Seq(CapturedLine.Stdout("last out"), CapturedLine.Stderr("last err"))
@@ -59,17 +55,17 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
       "drop each line completed after, passing none to the run" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
         val lines = linesOfRunAddedTo(capture)
-        stdout(capture, "before\n")
+        writeStdout(capture, "before\n")
         capture.stopCapturing()
-        stdout(capture, "after\n")
-        stderr(capture, "after\n")
+        writeStdout(capture, "after\n")
+        writeStderr(capture, "after\n")
         lines shouldBe Seq(CapturedLine.Stdout("before\n"))
       }
       "drop the lines it held before the run is named" in {
         val capture = new WorkerOutputCapture(StandardCharsets.UTF_8)
-        stdout(capture, "held\n")
+        writeStdout(capture, "held\n")
         capture.stopCapturing()
-        stdout(capture, "after\n")
+        writeStdout(capture, "after\n")
         linesOfRunAddedTo(capture) shouldBe empty
       }
     }

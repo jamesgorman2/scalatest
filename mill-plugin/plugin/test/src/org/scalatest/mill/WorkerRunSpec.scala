@@ -1,27 +1,28 @@
 package org.scalatest.mill
 
-import java.io.FileNotFoundException
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.Signaler
 import org.scalatest.concurrent.ThreadSignaler
 import org.scalatest.concurrent.TimeLimits
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
+import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.matchers.should
+import org.scalatest.mill.EventLogs.*
+import org.scalatest.mill.WorkerOutput.writeStdout
 import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 import org.scalatest.wordspec.AnyWordSpec
-import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.Promise
-import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 
 final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventually with TimeLimits {
@@ -29,15 +30,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(5, Seconds))
 
   private val label: TestRunLabel = TestRunLabel("core.test")
-  private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
-  private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
+  private val workerEndTimeout: FiniteDuration = 30.seconds
 
-  private final class ConsolidationUnderTest {
-    val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
-    val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
-
-    def outputWithoutSummaryLine: Seq[String] = output.toSeq.dropRight(1)
-  }
+  private def awaitWorkerEnd(workerEnd: Future[WorkerProcess]): Unit = Await.ready(workerEnd, workerEndTimeout)
 
   private final class WorkerRunFixture(
       val eventLogFile: EventLogFile,
@@ -49,22 +44,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     val runsAdded: AtomicInteger = new AtomicInteger(0)
     val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
     @volatile var processExited: Boolean = true
-    private val reader = new EventLogReader(
-      eventLogFile,
-      readRun => {
-        runsAdded.incrementAndGet()
-        consolidation.addRun(label) { feed =>
-          capture.addTo(feed.add)
-          readRun(feed)
-        }
-      },
-      () => {
-        processesEndedBeforeAnyRun.incrementAndGet()
-        consolidation.addProcessEndedBeforeAnyRun()
-      },
-      hasExited = _ => processExited,
-      pollInterval = 1.millis
-    )
+    private val reader = new EventLogReader(eventLogFile, addRun, () => addProcessEndedBeforeAnyRun(), _ => processExited, pollInterval = 1.millis)
     val workerRun: WorkerRun = new WorkerRun(consolidation, workerName, reader, capture)
 
     def runAndEndConsolidation(startWorker: => Future[WorkerProcess]): Unit = {
@@ -83,51 +63,68 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         startWorker
       }
 
-    def endWorker(): Unit = workerRun.end(workerEnd => Await.ready(workerEnd, Duration.Inf))
+    def startWithoutMillStartingIt(startWorker: => Future[WorkerProcess]): Unit = workerRun.start(_ => startWorker)
+
+    def startWithMillStartingItLater(startWorker: => Future[WorkerProcess]): () => Unit = {
+      val workerStarting = new AtomicReference[() => Unit](() => ())
+      workerRun.start { starting =>
+        workerStarting.set(starting)
+        startWorker
+      }
+      workerStarting.get()
+    }
+
+    def endWorker(): Unit = workerRun.end(awaitWorkerEnd)
 
     def awaitReaderEnd(): Unit = reader.awaitStreamEnd()
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
+
+    private def addRun(readRun: RunFeed => Unit): Unit = {
+      runsAdded.incrementAndGet()
+      consolidation.addRun(label) { feed =>
+        capture.addTo(feed.add)
+        readRun(feed)
+      }
+    }
+
+    private def addProcessEndedBeforeAnyRun(): Unit = {
+      processesEndedBeforeAnyRun.incrementAndGet()
+      consolidation.addProcessEndedBeforeAnyRun()
+    }
   }
 
   private def readerThreadsOf(fixture: WorkerRunFixture): Int =
     Thread.getAllStackTraces.keySet.asScala.count(thread => thread.getName == EventLogReader.threadName(fixture.eventLogFile) && thread.isAlive)
 
-  private def withEventLogFile[A](test: Path => A): A = {
-    val folder = Files.createTempDirectory("worker-run")
-    try {
-      test(folder.resolve(JvmTestModuleRun.eventLogFileName))
-    } finally {
-      Files.walk(folder).sorted(java.util.Comparator.reverseOrder()).forEach(path => Files.delete(path))
-    }
-  }
+  private def withWorker[A](test: (Path, WorkerRunFixture) => A): A =
+    withEventLogFile(file => test(file, new WorkerRunFixture(EventLogFile.at(file))))
 
-  private def writeCompletedRun(file: Path): Unit =
-    Files.write(file, s"$runStarted\n$runEndedCompleted\n".getBytes(StandardCharsets.UTF_8))
+  private def withTwoEventLogFiles[A](test: (Path, Path) => A): A =
+    withEventLogFile(firstFile => withEventLogFile(secondFile => test(firstFile, secondFile)))
 
-  private def sharingViolation(file: Path): EventLogFile =
+  private def withTwoWorkers[A](test: (WorkerRunFixture, WorkerRunFixture) => A): A =
+    withTwoEventLogFiles((firstFile, secondFile) => test(new WorkerRunFixture(EventLogFile.at(firstFile)), new WorkerRunFixture(EventLogFile.at(secondFile))))
+
+  private def neverOpening(file: Path): EventLogFile =
     new EventLogFile {
       def name: String = file.toString
 
       def exists: Boolean = EventLogFile.at(file).exists
 
-      def open(): EventLogInput =
-        throw new FileNotFoundException(s"$file (The process cannot access the file because it is being used by another process)")
+      def open(): EventLogInput = throw sharingViolation(file)
     }
 
   private val startedAProcess: Future[WorkerProcess] = Future.successful(WorkerProcess.Started)
 
-  private def writeStdout(capture: WorkerOutputCapture, text: String): Unit = {
-    val bytes = text.getBytes(StandardCharsets.UTF_8)
-    capture.stdout(bytes, bytes.length)
-  }
+  private def unendingWorker: Future[WorkerProcess] = Promise[WorkerProcess]().future
 
   "Running a worker" when {
     "its event log file never becomes readable" should {
       "attach what reading threw to the root, end the run's event stream and fail the consolidation" in {
         withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(sharingViolation(file))
+          appendCompletedRun(file)
+          val fixture = new WorkerRunFixture(neverOpening(file))
           fixture.runAndEndConsolidation(startedAProcess)
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
@@ -142,9 +139,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "a line of its event log cannot be decoded" should {
       "add a root failure naming the line and why, end the run's event stream and fail the consolidation" in {
-        withEventLogFile { file =>
-          Files.write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n".getBytes(StandardCharsets.UTF_8))
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
+          append(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
           fixture.processExited = false
           fixture.runAndEndConsolidation(startedAProcess)
           fixture.outputWithoutSummaryLine shouldBe Seq(
@@ -160,9 +156,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "starting the worker throws after the worker wrote an unterminated line" should {
       "leave the capture streams open, so the line the worker's output pump goes on to finish is captured whole" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
+          appendCompletedRun(file)
           fixture.run {
             writeStdout(fixture.capture, "partial")
             throw new IllegalStateException("claim log unreadable")
@@ -183,9 +178,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker started on a future fails after it wrote an unterminated line, as where Mill cancels the task" should {
       "leave the capture streams open, so the line the worker's output pump goes on to finish is captured whole" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
+          appendCompletedRun(file)
           fixture.run {
             writeStdout(fixture.capture, "partial")
             Future.failed(new InterruptedException("sleep interrupted"))
@@ -206,9 +200,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker ends normally after it wrote an unterminated line" should {
       "end the capture streams, capturing that line" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
+          appendCompletedRun(file)
           fixture.runAndEndConsolidation {
             writeStdout(fixture.capture, "partial")
             startedAProcess
@@ -224,8 +217,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "starting the worker throws before its event log exists" should {
       "attach what starting threw to the root and fail the consolidation" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           fixture.runAndEndConsolidation(throw new IllegalStateException("testargs already exists"))
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
@@ -239,8 +231,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker started on a future fails after it started" should {
       "attach what it failed with to the root, naming the worker, and fail the consolidation" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           fixture.runAndEndConsolidation(Future.failed(new IllegalStateException("claim folder missing")))
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
@@ -254,8 +245,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker started no process, as where it found its fork group's queue empty" should {
       "add neither a run nor a process that ended before any run, and leave the consolidation unfailed" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           fixture.runAndEndConsolidation(Future.successful(WorkerProcess.NotStarted))
           fixture.runsAdded.get shouldBe 0
           fixture.processesEndedBeforeAnyRun.get shouldBe 0
@@ -266,8 +256,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker started a process in which no run existed" should {
       "add that process as one that ended before any run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           fixture.runAndEndConsolidation(startedAProcess)
           fixture.processesEndedBeforeAnyRun.get shouldBe 1
           fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
@@ -277,11 +266,10 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker runs on a future" should {
       "read the event log the worker writes after it started, and add its run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
-          writeCompletedRun(file)
+          appendCompletedRun(file)
           workerEnd.success(WorkerProcess.Started)
           fixture.endWorker()
           fixture.consolidation.end()
@@ -294,10 +282,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker started a process without starting its event log reader, as where it ran on the calling thread uncaptured" should {
       "read the worker's run once it has ended, and attach a failure naming the worker to the root" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
-          fixture.workerRun.start(_ => startedAProcess)
+        withWorker { (file, fixture) =>
+          appendCompletedRun(file)
+          fixture.startWithoutMillStartingIt(startedAProcess)
           fixture.endWorker()
           fixture.consolidation.end()
           fixture.runsAdded.get shouldBe 1
@@ -313,35 +300,32 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "starting the first of two workers throws before its event log exists" should {
       "attach what starting threw to the root, naming the first worker, and still give the second worker's run to the consolidation" in {
-        withEventLogFile { firstFile =>
-          withEventLogFile { secondFile =>
-            writeCompletedRun(secondFile)
-            val consolidationUnderTest = new ConsolidationUnderTest
-            val first = new WorkerRunFixture(EventLogFile.at(firstFile), "worker 0 of fork group 0 of core.test", consolidationUnderTest)
-            val second = new WorkerRunFixture(EventLogFile.at(secondFile), "worker 0 of fork group 1 of core.test", consolidationUnderTest)
-            first.run(throw new IllegalStateException("testargs already exists"))
-            second.run {
-              writeStdout(second.capture, "second\n")
-              startedAProcess
-            }
-            consolidationUnderTest.consolidation.end()
-            consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-              "Consolidated tests:",
-              "  [core.test]",
-              "    Run 1:",
-              "      [stdout] second",
-              "  *** CONSOLIDATED TESTS ABORTED ***",
-              "    Starting worker 0 of fork group 0 of core.test failed: java.lang.IllegalStateException: testargs already exists"
-            )
+        withTwoEventLogFiles { (firstFile, secondFile) =>
+          appendCompletedRun(secondFile)
+          val consolidationUnderTest = new ConsolidationUnderTest
+          val first = new WorkerRunFixture(EventLogFile.at(firstFile), "worker 0 of fork group 0 of core.test", consolidationUnderTest)
+          val second = new WorkerRunFixture(EventLogFile.at(secondFile), "worker 0 of fork group 1 of core.test", consolidationUnderTest)
+          first.run(throw new IllegalStateException("testargs already exists"))
+          second.run {
+            writeStdout(second.capture, "second\n")
+            startedAProcess
           }
+          consolidationUnderTest.consolidation.end()
+          consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
+            "Consolidated tests:",
+            "  [core.test]",
+            "    Run 1:",
+            "      [stdout] second",
+            "  *** CONSOLIDATED TESTS ABORTED ***",
+            "    Starting worker 0 of fork group 0 of core.test failed: java.lang.IllegalStateException: testargs already exists"
+          )
         }
       }
     }
 
     "starting the worker throws a fatal error before its event log exists" should {
       "rethrow it once the reader is abandoned, so the reader adds the worker as a process that ended before any run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           a[StackOverflowError] should be thrownBy fixture.start(throw new StackOverflowError("worker"))
           eventually(fixture.processesEndedBeforeAnyRun.get shouldBe 1)
         }
@@ -350,9 +334,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "starting the worker throws a fatal error while the run's process, named in its event log, has not exited" should {
       "rethrow it without waiting for that process to exit" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
+          appendCompletedRun(file)
           fixture.processExited = false
           implicit val signaler: Signaler = ThreadSignaler
           failAfter(patienceConfig.timeout) {
@@ -369,9 +352,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   "Starting a worker" when {
     "Mill has not yet started it, as where the worker waits for a free job" should {
       "start no event log reader" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
-          fixture.workerRun.start(_ => Promise[WorkerProcess]().future)
+        withWorker { (_, fixture) =>
+          fixture.startWithoutMillStartingIt(unendingWorker)
           readerThreadsOf(fixture) shouldBe 0
           fixture.workerRun.abandon()
         }
@@ -380,17 +362,12 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "Mill goes on to start it" should {
       "start its event log reader then, which adds the worker's run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
           val workerEnd = Promise[WorkerProcess]()
-          var workerStarting: () => Unit = () => ()
-          fixture.workerRun.start { starting =>
-            workerStarting = starting
-            workerEnd.future
-          }
-          workerStarting()
+          val millStartsWorker = fixture.startWithMillStartingItLater(workerEnd.future)
+          millStartsWorker()
           readerThreadsOf(fixture) shouldBe 1
-          writeCompletedRun(file)
+          appendCompletedRun(file)
           workerEnd.success(WorkerProcess.Started)
           fixture.endWorker()
           fixture.runsAdded.get shouldBe 1
@@ -400,8 +377,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "it finds its fork group's queue empty and ends at once, before the test command waits for it" should {
       "end its event log reader then, adding neither a run nor a process that ended before any run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
           readerThreadsOf(fixture) shouldBe 1
@@ -416,8 +392,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "its process dies before any run, before the test command waits for it" should {
       "end its event log reader then, adding the process as one that ended before any run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
           workerEnd.success(WorkerProcess.Started)
@@ -430,8 +405,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "it starts its event log reader then throws, as where it runs on the calling thread, before the test command waits for it" should {
       "end its event log reader then" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (_, fixture) =>
           fixture.start(throw new IllegalStateException("claim log unreadable"))
           eventually(readerThreadsOf(fixture) shouldBe 0)
           fixture.endWorker()
@@ -441,15 +415,10 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "Mill starts it only once the test command has waited for it, as where Mill runs a cancelled task's body" should {
       "start no event log reader" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
-          var workerStarting: () => Unit = () => ()
-          fixture.workerRun.start { starting =>
-            workerStarting = starting
-            Future.failed(new InterruptedException("cancelled"))
-          }
+        withWorker { (_, fixture) =>
+          val millStartsWorker = fixture.startWithMillStartingItLater(Future.failed(new InterruptedException("cancelled")))
           fixture.endWorker()
-          workerStarting()
+          millStartsWorker()
           fixture.awaitReaderEnd()
           fixture.processesEndedBeforeAnyRun.get shouldBe 0
         }
@@ -458,9 +427,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     "the worker ends without Mill having started it, as where Mill cancels the task first" should {
       "add neither a run nor a process that ended before any run" in {
-        withEventLogFile { file =>
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
-          fixture.workerRun.start(_ => Future.failed(new InterruptedException("cancelled")))
+        withWorker { (_, fixture) =>
+          fixture.startWithoutMillStartingIt(Future.failed(new InterruptedException("cancelled")))
           fixture.endWorker()
           fixture.runsAdded.get shouldBe 0
           fixture.processesEndedBeforeAnyRun.get shouldBe 0
@@ -472,34 +440,33 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   "Starting each of two workers" when {
     "Mill starts the first but not yet the second" should {
       "start the first worker's event log reader only" in {
-        withEventLogFile { firstFile =>
-          withEventLogFile { secondFile =>
-            val first = new WorkerRunFixture(EventLogFile.at(firstFile))
-            val second = new WorkerRunFixture(EventLogFile.at(secondFile))
-            val workerRuns = WorkerRun.startEach(Seq(first, second)) { fixture =>
-              if (fixture eq first) fixture.start(Promise[WorkerProcess]().future) else fixture.workerRun.start(_ => Promise[WorkerProcess]().future)
-              fixture.workerRun
-            }
-            Seq(readerThreadsOf(first), readerThreadsOf(second)) shouldBe Seq(1, 0)
-            workerRuns.foreach(_.abandon())
-            eventually(readerThreadsOf(first) shouldBe 0)
+        withTwoWorkers { (first, second) =>
+          def millStartingOnlyTheFirst(fixture: WorkerRunFixture): WorkerRun = {
+            if (fixture eq first)
+              fixture.start(unendingWorker)
+            else
+              fixture.startWithoutMillStartingIt(unendingWorker)
+            fixture.workerRun
           }
+
+          val workerRuns = WorkerRun.startEach(Seq(first, second))(millStartingOnlyTheFirst)
+          Seq(readerThreadsOf(first), readerThreadsOf(second)) shouldBe Seq(1, 0)
+          workerRuns.foreach(_.abandon())
+          eventually(readerThreadsOf(first) shouldBe 0)
         }
       }
     }
 
     "starting the second throws a fatal error" should {
       "rethrow it once the first worker's reader is abandoned, so that reader ends" in {
-        withEventLogFile { firstFile =>
-          withEventLogFile { secondFile =>
-            val first = new WorkerRunFixture(EventLogFile.at(firstFile))
-            val second = new WorkerRunFixture(EventLogFile.at(secondFile))
-            a[StackOverflowError] should be thrownBy WorkerRun.startEach(Seq(first, second)) { fixture =>
-              fixture.start(if (fixture eq first) Promise[WorkerProcess]().future else throw new StackOverflowError("worker"))
-              fixture.workerRun
-            }
-            eventually(first.processesEndedBeforeAnyRun.get shouldBe 1)
+        withTwoWorkers { (first, second) =>
+          def startingTheSecondFatally(fixture: WorkerRunFixture): WorkerRun = {
+            fixture.start(if (fixture eq first) unendingWorker else throw new StackOverflowError("worker"))
+            fixture.workerRun
           }
+
+          a[StackOverflowError] should be thrownBy WorkerRun.startEach(Seq(first, second))(startingTheSecondFatally)
+          eventually(first.processesEndedBeforeAnyRun.get shouldBe 1)
         }
       }
     }
@@ -508,11 +475,10 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   "Ending each worker" when {
     "a worker started on a future failed, and its process goes on writing after the consolidation has ended" should {
       "drop that output, throwing nothing" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val fixture = new WorkerRunFixture(EventLogFile.at(file))
+        withWorker { (file, fixture) =>
+          appendCompletedRun(file)
           fixture.start(Future.failed(new InterruptedException("sleep interrupted")))
-          WorkerRun.endEach(Seq(fixture.workerRun))(workerEnd => Await.ready(workerEnd, Duration.Inf))
+          WorkerRun.endEach(Seq(fixture.workerRun))(awaitWorkerEnd)
           fixture.consolidation.end()
           noException should be thrownBy writeStdout(fixture.capture, "late\n")
         }
@@ -523,16 +489,12 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   "Ending each of two workers" when {
     "waiting on the first throws an InterruptedException, as where Mill cancels the task" should {
       "rethrow it once both workers' readers are abandoned, so both readers end" in {
-        withEventLogFile { firstFile =>
-          withEventLogFile { secondFile =>
-            val first = new WorkerRunFixture(EventLogFile.at(firstFile))
-            val second = new WorkerRunFixture(EventLogFile.at(secondFile))
-            Seq(first, second).foreach(_.start(Promise[WorkerProcess]().future))
-            an[InterruptedException] should be thrownBy WorkerRun.endEach(Seq(first.workerRun, second.workerRun)) { _ =>
-              throw new InterruptedException("cancelled")
-            }
-            eventually(Seq(first, second).map(_.processesEndedBeforeAnyRun.get) shouldBe Seq(1, 1))
+        withTwoWorkers { (first, second) =>
+          Seq(first, second).foreach(_.start(unendingWorker))
+          an[InterruptedException] should be thrownBy WorkerRun.endEach(Seq(first.workerRun, second.workerRun)) { _ =>
+            throw new InterruptedException("cancelled")
           }
+          eventually(Seq(first, second).map(_.processesEndedBeforeAnyRun.get) shouldBe Seq(1, 1))
         }
       }
     }
