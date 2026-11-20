@@ -80,7 +80,6 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def reportJson: JsonNode = JsonNode.read(report)
 
-  /** Deletes any earlier report, invokes the test command as `mill <millArguments> scalatest/test core.test -fJ <report>`, and parses the JSON output it writes. */
   def resultAndReportOfTestCommand(millArguments: Seq[String] = Nil): (TestCommandResult, JsonNode) = {
     os.remove(report)
     val result = runTestCommandWritingReport(millArguments)

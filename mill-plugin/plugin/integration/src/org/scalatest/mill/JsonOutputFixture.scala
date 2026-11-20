@@ -36,16 +36,12 @@ trait JsonOutputFixture extends FixtureBuilds { this: should.Matchers =>
       JsonPattern.parse(pattern).mismatchesHeldBy(actual) shouldBe empty
     }
 
-  protected def shouldHold(actual: JsonNode, pattern: String): Unit = shouldHold(actual.raw, pattern)
+  protected def shouldHold(actual: JsonWrapper, pattern: String): Unit = shouldHold(actual.raw, pattern)
 
   protected def shouldHaveNoKeys(actual: ujson.Value, keys: String*): Unit =
     withClue(s"in ${ujson.write(actual, indent = 2)}\n") {
       keys.filter(actual.obj.contains) shouldBe empty
     }
 
-  protected def shouldHold(actual: OutputItem, pattern: String): Unit = shouldHold(actual.raw, pattern)
-
-  protected def shouldHaveNoKeys(actual: JsonNode, keys: String*): Unit = shouldHaveNoKeys(actual.raw, keys*)
-
-  protected def shouldHaveNoKeys(actual: OutputItem, keys: String*): Unit = shouldHaveNoKeys(actual.raw, keys*)
+  protected def shouldHaveNoKeys(actual: JsonWrapper, keys: String*): Unit = shouldHaveNoKeys(actual.raw, keys*)
 }

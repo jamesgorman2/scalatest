@@ -31,7 +31,11 @@ object OutputItemKind {
     values.find(_.json == json).getOrElse(throw new IllegalArgumentException(s"No output item kind $json"))
 }
 
-final class OutputItem(val raw: ujson.Value) {
+trait JsonWrapper {
+  val raw: ujson.Value
+}
+
+final class OutputItem(val raw: ujson.Value) extends JsonWrapper {
 
   def kind: OutputItemKind = OutputItemKind.fromJson(raw("kind").str)
 
@@ -49,7 +53,7 @@ final class OutputItem(val raw: ujson.Value) {
   override def toString: String = raw.toString
 }
 
-final class JsonNode(val raw: ujson.Value) {
+final class JsonNode(val raw: ujson.Value) extends JsonWrapper {
 
   def kind: NodeKind = NodeKind.fromJson(raw("kind").str)
 
