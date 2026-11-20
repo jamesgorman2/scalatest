@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins, incremental compilation, generated sources and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, linking Scala Native on Windows, adding JVM-only code to Scala 3 core sources, or relying on a build-generated source being current after a version bump.
+description: How sbt, its plugins, incremental compilation, generated sources and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check or on `-Werror` covering Scaladoc, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, linking Scala Native on Windows, adding JVM-only code to Scala 3 core sources, or relying on a build-generated source being current after a version bump.
 ---
 
 <learning>
@@ -128,4 +128,12 @@ date: 2026-11-18
 A build that generates a source file holding the build's `version` can regenerate it only when the generator's own source changes, not when `version` changes. An incremental build after a version bump then compiles in the old version string, while a clean build is correct. Anything that reports the constant, such as a JSON output field recording the ScalaTest version, shows the stale value.
 
 Before trusting a version string read from a generated constant, run a clean build, or touch the generator's source, after any version bump.
+</learning>
+
+<learning>
+date: 2026-11-21
+---
+Scaladoc 3 does not apply `-Werror` or `-old-syntax`: `<project>/doc` logs `Skipping unused scalacOptions: -Werror, … -old-syntax, …` and continues. A Scaladoc link it cannot resolve, written as `[[…]]` or as a `@throws` target, is only a warning, `Couldn't resolve a member for the given link query: <target>`, so `doc` and `publishLocal` succeed and the broken link ships in the published API documentation.
+
+`-Werror` on a project therefore does not keep its API documentation warning-free. Run `<project>/doc` and read its warnings. Name a class outside the file's imports by its full name, such as `@throws java.lang.IllegalStateException`, and a class member from a companion object as `[[Owner#member]]`.
 </learning>
