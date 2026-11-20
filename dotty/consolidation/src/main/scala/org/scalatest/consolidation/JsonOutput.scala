@@ -4,7 +4,7 @@ package org.scalatest.consolidation
 final class JsonOutput private[consolidation] (root: ConsolidatedRoot) {
 
   /**
-   * Gives the JSON output's text to `output` piece by piece, in order, so that the pieces joined are the whole text. No
+   * Gives the whole of the JSON output's text to `output`, in order, piece by piece. No
    * piece ends part way through a surrogate pair.
    *
    * Throws what `output` throws.

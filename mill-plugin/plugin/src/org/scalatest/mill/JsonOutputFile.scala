@@ -33,7 +33,7 @@ private[mill] final class JsonOutputFile(val path: Path) {
    * Streams the JSON output into the file as UTF-8, creating the file's missing parent folders. Where the write fails
    * part way, the partly written file is deleted.
    *
-   * @param writeJson gives the JSON output's text, piece by piece, to the function it is given
+   * @param writeJson passes the JSON output's text, piece by piece, to the function it receives
    */
   def write(writeJson: (String => Unit) => Unit): Either[TestCommandFailure, Unit] =
     for {

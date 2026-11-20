@@ -158,10 +158,10 @@ private[scalatest] enum DecodedEvent {
 
   def timeStamp: Long
 
-  /** Absent where the event records none, as a discovery event never does. */
+  /** Absent where the event records none; a discovery event never records one. */
   def location: Option[Location] = None
 
-  /** Absent where the event records none, as an event that starts a run, suite, scope or test never does. */
+  /** Absent where the event records none; an event that starts a run, suite, scope or test never records one. */
   def duration: Option[Long] = None
 }
 
