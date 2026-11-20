@@ -29,7 +29,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   import TestEventLogEventsSpec.*
 
-  private def escapedAsJsonAndNotationWriteIt(text: String): String = {
+  private def escapedForJsonAndNotation(text: String): String = {
     val backslash = 92.toChar.toString
     text.flatMap {
       case '\n' => backslash + "n"
@@ -128,7 +128,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
   }
 
   private def reportedByPathStyleSpec(fails: Boolean): Vector[String] = {
-    // 3.2.20 reports only a path-style test's infos, and only inside its closing event.
+    // For a path-style test, ScalaTest 3.2.20 reports only its infos, and only inside its closing event.
     Vector(if (fails) "TestFailed is empty: not empty, recording InfoProvided checked size" else "TestSucceeded is empty, recording InfoProvided checked size")
   }
 
@@ -187,7 +187,7 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     texts.foreach { (description, suiteClassName) =>
       val text = Class.forName(suiteClassName).getDeclaredConstructor().newInstance().asInstanceOf[ReportsText].text
-      val inFormat = s""""message":"${escapedAsJsonAndNotationWriteIt(text)}","""
+      val inFormat = s""""message":"${escapedForJsonAndNotation(text)}","""
       eventScenarios(
         s"Text: $description",
         s"an AnyFunSuite whose test reports calls info with $description, then fails with it",
@@ -207,8 +207,8 @@ final class TestEventLogEventsSpec extends AnyFeatureSpec with GivenWhenThen wit
             suiteClassName,
             "reports",
             "TestStarting",
-            s"InfoProvided(message: \"${escapedAsJsonAndNotationWriteIt(text)}\")",
-            s"TestFailed(message: \"${escapedAsJsonAndNotationWriteIt(text)}\")"
+            s"InfoProvided(message: \"${escapedForJsonAndNotation(text)}\")",
+            s"TestFailed(message: \"${escapedForJsonAndNotation(text)}\")"
           ),
           frameworkRunOfOneTest("TextSuite", suiteClassName, "reports", ofTest("TestStarting"), ofTest("InfoProvided", inFormat), ofTest("TestFailed", inFormat))
         )

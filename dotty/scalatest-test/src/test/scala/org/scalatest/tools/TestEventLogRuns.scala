@@ -47,7 +47,8 @@ private[tools] final class RecordingLogger extends Logger {
 }
 
 final class RunRecordingReporter extends Reporter {
-  // Read when the run constructs this reporter, so a run that outlives its recording, having timed out, cannot write into a later one.
+  // The recording current when the run constructs this reporter, so a run that times out and outlives its recording
+  // cannot write into a later one.
   private val recording = RunRecordingReporter.current.get
   def apply(event: Event): Unit = recording.add(event)
 }
@@ -57,7 +58,8 @@ object RunRecordingReporter {
   private val current = new AtomicReference(new ConcurrentLinkedQueue[Event])
 
   def eventsReportedIn(launch: => Unit): Vector[Event] = synchronized {
-    // Specs run in parallel: a run given a RunRecordingReporter outside this lock records into another caller's recording.
+    // Specs run in parallel, so every run given a RunRecordingReporter must be launched here: one launched elsewhere
+    // records into whichever caller's recording is current.
     val recording = new ConcurrentLinkedQueue[Event]
     current.set(recording)
     launch

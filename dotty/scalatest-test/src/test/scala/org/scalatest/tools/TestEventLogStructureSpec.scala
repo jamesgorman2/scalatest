@@ -544,7 +544,8 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
           )
         }
       ),
-      // Framework, given a suite by name, runs none of the tests of the suites it nests.
+      // Runner, because Framework, given a suite by name, runs none of the tests of the suites it nests
+      // unless the task also selects their suite IDs.
       Launch.ByRunner
     )
 

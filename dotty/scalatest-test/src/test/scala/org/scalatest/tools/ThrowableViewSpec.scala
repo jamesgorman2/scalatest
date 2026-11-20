@@ -12,6 +12,7 @@ import org.scalatest.exceptions.StackDepthException
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.tools.StackFrames.frames
+import org.scalatest.tools.StackFrames.lineNumberOfFrame
 import org.scalatest.tools.StackFrames.withFrames
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -95,7 +96,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
       cause.cause shouldBe None
     }
     "hold a StackDepth exception's file name, pathname and line number, and the failed code's stack depth" in {
-      val failure = withFrames(testFailedException(Some("failed"), None, Position("Stack.scala", "/src/Stack.scala", 12)), "Stack", 4)
+      val position = Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(2))
+      val failure = withFrames(testFailedException(Some("failed"), None, position), "Stack", 4)
       val stackDepth = ThrowableView.of(failure).stackDepth.get
       stackDepth.fileNameAndLineNumber shouldBe Some("Stack.scala:12")
       stackDepth.filePathnameAndLineNumber shouldBe Some("/src/Stack.scala:12")
@@ -182,7 +184,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
     }
     "end the cause chain before a StackDepth exception where no stack trace is presented" in {
       val innermost = withFrames(new IllegalArgumentException("root cause"), "Stack", 1)
-      val inner = withFrames(testFailedException(Some("the helper failed"), Some(innermost), Position("Stack.scala", "/src/Stack.scala", 11)), "Stack", 2)
+      val position = Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(1))
+      val inner = withFrames(testFailedException(Some("the helper failed"), Some(innermost), position), "Stack", 2)
       val failure = withFrames(new IllegalStateException("boom", inner), "Stack", 2)
       errorLines("the message", Some(ThrowableView.of(failure))) shouldBe Vector(
         "    - should pop *** FAILED ***",

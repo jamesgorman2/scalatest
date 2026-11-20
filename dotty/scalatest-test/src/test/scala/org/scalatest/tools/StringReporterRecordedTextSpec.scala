@@ -116,7 +116,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       new TestFailedException(
         (_: StackDepthException) => None,
         None,
-        Left(Position("Stack.scala", "/src/Stack.scala", 10)),
+        Left(Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(0))),
         None,
         Vector.empty
       ),
@@ -129,7 +129,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       new GeneratorDrivenPropertyCheckFailedException(
         (_: StackDepthException) => "Property check failed. (StackSpec.scala:30)\n  Falsified after 2 successful property evaluations.",
         Some(withFrames(new IllegalArgumentException("negative size"), "Disk", 3)),
-        Left(Position("Stack.scala", "/src/Stack.scala", 13)),
+        Left(Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(3))),
         None,
         "undecorated",
         List(1),
@@ -141,12 +141,13 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     )
 
   private def plainFailureCausedByStackDepthFailure: Throwable = {
-    // Shown only with a stack trace: without one, the chain ends before `inner`, the StackDepth exception it causes.
+    // `innermost` is shown only with a stack trace: without one, the cause chain ends at `inner`,
+    // the StackDepth exception it causes.
     val innermost = withFrames(new IllegalArgumentException("root cause"), "Disk", 2)
     val inner = new TestFailedException(
       (_: StackDepthException) => Some("the helper failed"),
       Some(innermost),
-      Left(Position("Helper.scala", "/src/Helper.scala", 11)),
+      Left(Position("Helper.scala", "/src/Helper.scala", lineNumberOfFrame(1))),
       None,
       Vector.empty
     )

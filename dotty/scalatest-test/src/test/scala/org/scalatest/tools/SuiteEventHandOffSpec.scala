@@ -91,8 +91,8 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     implicit override def executionContext: ExecutionContext = queued
 
     override protected def runTests(testName: Option[String], args: Args): Status = {
-      // The first opening of scope s reports its ignored test once test t completes, which is when `queued` runs,
-      // after the second opening has closed. The second opening excludes t, so it reports its ignored test at once.
+      // The first opening of scope s reports ignored test i once test t completes, which happens only when `queued`
+      // runs its tasks, after the second opening has closed. The second opening excludes t, so it reports i at once.
       val first = super.runTests(testName, args)
       val second = super.runTests(testName, args.copy(filter = Filter(tagsToExclude = Set("org.scalatest.Ignore", InFirstOpeningOnly.name))))
       new CompositeStatus(Set(first, second))

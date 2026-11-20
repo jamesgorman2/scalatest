@@ -369,8 +369,9 @@ final class TestEventLogNodeEventsSpec extends AnyFeatureSpec with GivenWhenThen
 
         And("for each AlertProvided the emitter receives before the run ends, the event log holds a run: AlertProvided with that alert's message, in the order the emitter received the alerts")
         // The slowpoke timer hands each alert to the emitter and then to the reporters, on its one thread, and no reporter
-        // reorders an alert assigned to no suite. So the alerts reported before RunCompleted are the first in the event log,
-        // in the same order. An alert sent as the run ends reaches the reporters after RunCompleted, once the event log has closed.
+        // reorders an alert assigned to no suite. So the alerts reported before RunCompleted are the event log's first
+        // alerts, in the same order. An alert sent as the run ends reaches the reporters after RunCompleted, once the
+        // event log has closed.
         val alertsReported = events.takeWhile(!_.isInstanceOf[RunCompleted]).collect { case alert: AlertProvided => alert.message }
         val alertsInEventLog = eventLog.collect { case TestEventLogEvent.ScalaTestEvent(execution, alert: DecodedEvent.AlertProvided) =>
           execution.map(_.node) -> alert.message

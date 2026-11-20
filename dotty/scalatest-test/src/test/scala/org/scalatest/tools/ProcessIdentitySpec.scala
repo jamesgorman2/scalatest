@@ -11,6 +11,8 @@ private[tools] final class StartedProcessHandle {
   def info(): StartedProcessInfo = new StartedProcessInfo
 }
 
+// ProcessIdentity calls `current` reflectively, as a static method of the handle class, as ProcessHandle.current is.
+// A companion of a top-level class gives its class that static method.
 private[tools] object StartedProcessHandle {
   def current(): StartedProcessHandle = new StartedProcessHandle
 }

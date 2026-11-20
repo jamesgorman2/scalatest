@@ -497,7 +497,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     )
   }
 
-  private def withoutUnstartedNestedSuiteEvents(nestingSuiteName: String): Vector[String] = {
+  private def reportedOfTheNestingSuiteAlone(nestingSuiteName: String): Vector[String] = {
     // Framework's SuiteSortingReporter passes on no event of a nested suite that sent it no SuiteStarting.
     Vector("RunStarting", s"SuiteStarting $nestingSuiteName", s"SuiteCompleted $nestingSuiteName", "RunCompleted")
   }
@@ -510,7 +510,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     val innerOne = inner1.test("inner one")
     val innerTwo = inner2.test("inner two")
     StatedRun(
-      withoutUnstartedNestedSuiteEvents("RunsItsNestedSuites"),
+      reportedOfTheNestingSuiteAlone("RunsItsNestedSuites"),
       """
       structure
         suite "RunsItsNestedSuites", class "samples.RunsItsNestedSuites"
@@ -550,7 +550,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     val second = top.suite("samples.Inner1Suite", 1)
     val inner2 = top.suite("samples.Inner2Suite")
     StatedRun(
-      withoutUnstartedNestedSuiteEvents("RunsItsFirstNestedSuiteTwice"),
+      reportedOfTheNestingSuiteAlone("RunsItsFirstNestedSuiteTwice"),
       """
       structure
         suite "RunsItsFirstNestedSuiteTwice", class "samples.RunsItsFirstNestedSuiteTwice"
@@ -596,7 +596,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
     val first = top.suite("samples.ModeSuite")
     val second = top.suite("samples.ModeSuite", 1)
     StatedRun(
-      withoutUnstartedNestedSuiteEvents("PairSuites"),
+      reportedOfTheNestingSuiteAlone("PairSuites"),
       """
       structure
         suite "PairSuites", class "samples.PairSuites"

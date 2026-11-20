@@ -48,7 +48,7 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     val socket = new Socket(subProcessServer(0), subProcessServer(1).toInt)
     try {
       val events = new ObjectOutputStream(socket.getOutputStream)
-      // The server thread is no daemon, and ends only when it reads RunCompleted.
+      // The server thread is no daemon, and ends only when it reads RunCompleted, RunStopped or RunAborted.
       events.writeObject(RunCompleted(new Ordinal(1)))
       events.flush()
       scalaTestRunner.serverThread.get.foreach(_.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds)))
