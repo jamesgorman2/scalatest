@@ -31,7 +31,7 @@ object RunEvent {
   /**
    * Decodes one whole line of a run's test event log, given without its line end.
    *
-   * @throws MalformedTestEventLogException if the line cannot be decoded; its message names the line and why
+   * @throws org.scalatest.events.MalformedTestEventLogException if the line cannot be decoded; its message names the line and why
    */
   def decode(line: String): RunEvent = {
     val event = TestEventLogDecoder.decode(line)

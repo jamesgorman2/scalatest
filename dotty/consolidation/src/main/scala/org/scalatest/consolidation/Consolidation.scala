@@ -39,7 +39,7 @@ final class Consolidation private[consolidation] (
    * @param label the run's module, which heads the module's line in the human-readable output
    * @param worker the worker the run ran in. The run node in the JSON output records the worker's fork group but not its index.
    * @return the run, its event stream ended
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addRun(label: TestRunLabel, worker: Option[Worker] = None)(feedEventStream: RunFeed => Unit): EndedRun = {
     val feed = synchronized {
@@ -59,7 +59,7 @@ final class Consolidation private[consolidation] (
   /**
    * Adds a process that ended before any run existed in it. This fails the test command.
    *
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addProcessEndedBeforeAnyRun(): Unit =
     synchronized {
@@ -71,7 +71,7 @@ final class Consolidation private[consolidation] (
    * Attaches a line captured from a runner that is not a run, such as a build tool's discovery runner, to the root.
    * The root's captured lines follow the lines for every module, in the order they were attached.
    *
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addRootOutput(line: CapturedLine): Unit =
     synchronized {
@@ -83,7 +83,7 @@ final class Consolidation private[consolidation] (
    * Attaches the message of a failure of a runner that is not a run to the root. This fails the test command.
    * The root's failures follow its captured lines, in the order they were attached.
    *
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addRootFailure(message: String): Unit =
     synchronized {
@@ -98,7 +98,7 @@ final class Consolidation private[consolidation] (
    *
    * @param startedAt when the caller started the module's tests
    * @param endedAt when the last of the module's test processes ended
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def timeModule(module: TestRunLabel, startedAt: Option[Instant], endedAt: Option[Instant]): Unit =
     synchronized {
@@ -112,7 +112,7 @@ final class Consolidation private[consolidation] (
    *
    * @param endedAt the root's end time by the caller's clock: when every run had ended
    * @return the consolidation's state, now ended
-   * @throws IllegalStateException if the consolidation has ended, or a run's event stream is still being fed, such as
+   * @throws java.lang.IllegalStateException if the consolidation has ended, or a run's event stream is still being fed, such as
    *                               from within [[addRun]]'s `feedEventStream`
    */
   def end(endedAt: Option[Instant] = None): ConsolidationState =
@@ -154,7 +154,7 @@ object Consolidation {
   /**
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
    * @param coloured whether that output is coloured with ANSI escape sequences
-   * @param jsonOutput the sink given the JSON output once, when the consolidation ends. Every operation but [[state]]
+   * @param jsonOutput the sink given the JSON output once, when the consolidation ends. Every operation but [[Consolidation#state]]
    *                   waits until the sink returns. With none, no JSON output is made
    * @param moduleSelectors each module selector, in the order given, with the test modules it resolved to
    * @param buildTool the build tool that started the runs
@@ -188,7 +188,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
   /**
    * Adds the next event of the run's event stream.
    *
-   * @throws IllegalStateException if the run's event stream or the consolidation has ended
+   * @throws java.lang.IllegalStateException if the run's event stream or the consolidation has ended
    */
   def add(event: RunEvent): Unit =
     consolidation.feed {
@@ -204,7 +204,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
   /**
    * Adds the next line captured from the run's processes, before or after the run's event stream ends.
    *
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def add(line: CapturedLine): Unit =
     consolidation.feed {
@@ -240,7 +240,7 @@ final class EndedRun private[consolidation] (feed: RunFeed) {
    * Adds the run's assigned test classes. A run that was assigned test classes and ran none of them shows its line in
    * the human-readable output.
    *
-   * @throws IllegalStateException if the consolidation has ended
+   * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addAssignedTestClasses(classes: Iterable[TestClassName]): Unit = feed.addAssigned(classes)
 }
