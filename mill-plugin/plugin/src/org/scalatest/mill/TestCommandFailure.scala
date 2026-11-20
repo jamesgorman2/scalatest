@@ -14,7 +14,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case UnrecognisedModuleArgument(argument: String)
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
-  case JsonOutputNotWritten(path: Path, cause: Throwable, partialFileNotDeleted: Option[Throwable])
+  case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
 
   override def getMessage: String = message
 
@@ -41,9 +41,9 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
         s"The test command cannot delete $path, the file $jsonOutputArgument names: it is a folder"
       case JsonOutputNotDeleted(path, cause) =>
         s"The test command cannot delete $path, the file $jsonOutputArgument names: $cause"
-      case JsonOutputNotWritten(path, cause, partialFileNotDeleted) =>
+      case JsonOutputNotWritten(path, cause, partlyWrittenFileDeleteFailure) =>
         s"The test command cannot write its JSON output to $path, the file $jsonOutputArgument names: $cause" +
-          partialFileNotDeleted.fold("")(deleteFailure => s"; it cannot delete the partly written file either: $deleteFailure")
+          partlyWrittenFileDeleteFailure.fold("")(deleteFailure => s"; it cannot delete the partly written file either: $deleteFailure")
     }
   }
 }

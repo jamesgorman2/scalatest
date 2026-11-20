@@ -11,7 +11,7 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
 
   "A test command failure's message" when {
     "-fJ has no path after it" should {
-      "say -fJ takes a path, naming -fJ" in {
+      "say -fJ takes a path" in {
         TestCommandFailure.JsonOutputPathMissing.message shouldBe "The test command's -fJ takes a path, but none follows it: -fJ"
       }
     }
