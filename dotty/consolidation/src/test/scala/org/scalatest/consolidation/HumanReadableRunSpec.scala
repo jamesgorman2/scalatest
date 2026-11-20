@@ -356,9 +356,12 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   Feature("The root") {
 
+    def addSqrtPropSpecRun(consolidation: Consolidation): Unit =
+      consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
+
     def consolidationOfSqrtPropSpec(output: OutputSink): Consolidation = {
       val consolidation = startedWithColour(output)
-      consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
+      addSqrtPropSpecRun(consolidation)
       consolidation
     }
 
@@ -416,7 +419,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       And("a failure, a stderr line, a stdout line and a second failure attached to the root, in that order")
       When("the library consolidates it")
       val output = colourMarkedOutputAfter { consolidation =>
-        consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
+        addSqrtPropSpecRun(consolidation)
         consolidation.addRootFailure("first failure")
         consolidation.addRootOutput(CapturedLine.Stderr("warn: slow discovery"))
         consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
@@ -471,7 +474,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       And("the module `app.test` timed but given no run")
       When("the library consolidates it")
       val output = colourMarkedOutputAfter { consolidation =>
-        consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
+        addSqrtPropSpecRun(consolidation)
         consolidation.timeModule(TestRunLabel("app.test"), None, None)
       }
 

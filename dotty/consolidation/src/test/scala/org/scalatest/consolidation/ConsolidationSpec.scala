@@ -227,18 +227,18 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
 
     "ended with colour off" should {
       "write the same text as with colour on, without ANSI escape sequences" in {
-        def outputLines(coloured: Boolean): Vector[String] = {
+        def consolidatedOutput(coloured: Boolean): OutputSink = {
           val output = new OutputSink
           val consolidation = Consolidation.start(output, coloured)
           consolidation.addRunOf(runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestFailed"""))
           consolidation.end()
-          output.lines
+          output
         }
 
-        val uncoloured = outputLines(coloured = false)
-        uncoloured.mkString should not include "\u001b"
-        uncoloured shouldBe outputLines(coloured = true).map(_.replaceAll("\u001b\\[[0-9;]*m", ""))
-        uncoloured.dropRight(1) shouldBe Vector("[core.test]", "  CalculatorSuite:", "    - adds *** FAILED ***")
+        val uncoloured = consolidatedOutput(coloured = false)
+        uncoloured.lines.mkString should not include "\u001b"
+        uncoloured.lines shouldBe consolidatedOutput(coloured = true).lines.map(_.replaceAll("\u001b\\[[0-9;]*m", ""))
+        uncoloured.linesWithoutSummaryLine shouldBe Vector("[core.test]", "  CalculatorSuite:", "    - adds *** FAILED ***")
       }
     }
   }
