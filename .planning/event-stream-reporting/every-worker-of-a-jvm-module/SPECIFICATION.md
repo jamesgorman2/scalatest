@@ -112,13 +112,14 @@ Feature: Every worker of a JVM module
       And the module's runs are, in order, a run whose `number` is 1 and `forkGroup` is 0, then a run whose `number` is 2 and `forkGroup` is 1
       And the run whose `number` is 1 holds suites `B1` and `B2`, and the run whose `number` is 2 holds suites `A1` and `A2`
 
-    Scenario: AC-004 Two workers in each fork group
+    Scenario: AC-004 A fork group's runs are numbered in order of their workers
       Given the module's `testParallelism` is `true`
-      And each suite's test `t` sleeps for 3 seconds, then sends an `info` message holding the system property `user.dir`
+      And each suite's test `t` sends an `info` message holding the system property `user.dir`
       When the test command is invoked as `mill -j 4 scalatest/test core.test -fJ <report>`
-      Then for each `forkGroup`, the module has exactly two runs with that `forkGroup`
-      And within each of the module's runs, every `info` message is a path holding one and the same folder `worker-<i>`
-      And of the two runs with each `forkGroup`, the one with the lower `number` has the lower `<i>`
+      Then within each of the module's runs, every `info` message is a path holding one and the same folder `worker-<i>`
+      And no two of the module's runs hold `info` messages naming the same `forkGroup` and the same folder `worker-<i>`
+      And for each `forkGroup`, one of the module's runs with that `forkGroup` holds `info` messages naming the folder `worker-0`
+      And of any two runs with the same `forkGroup` that hold `info` messages, the one with the lower `number` names the lower `<i>`
 ```
 
 ```gherkin

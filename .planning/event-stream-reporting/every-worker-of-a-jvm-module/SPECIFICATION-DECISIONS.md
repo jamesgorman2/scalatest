@@ -2,6 +2,22 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## AC-004 asserts only what holds for any split of a fork group's classes that Mill's test queue makes, and does not require a second worker to start.
+
+**Alternatives**
+
+- Keeping AC-004 as two runs in each fork group, made likely by a 3-second sleep in each test, leaves the criterion timing-dependent, so it fails whenever the queue gives both of a group's classes to one worker.
+
+**Reasoning** Under `testParallelism`, Mill 1.3.1's test queue decides how a fork group's classes split across its workers, and the split varies between invocations. A worker other than index 0 that finds the queue empty starts no JVM, and on Windows the queue sometimes runs one class in two workers. Each run having its own worker folder, a `worker-0` run in each fork group, and runs numbered in the order of their worker indexes hold for every split the queue can make.
+
+**Costs** No acceptance criterion shows that the test command starts a fork group's second worker when Mill's queue gives that worker a class.
+
+**Settled by** [Every worker of a JVM module - What AC-004 asserts for any split of Mill's queue](https://github.com/jamesgorman2/scalatest/issues/205).
+
+**See** `.docs/learnings/mill-build-tooling.md`, the learnings on `TestModuleUtil.runTestFuture` and on the test queue varying between invocations.
+
+---
+
 ## In both outputs, a module's runs are ordered numerically by `number`, not by label.
 
 **Alternatives**
