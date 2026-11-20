@@ -27,11 +27,8 @@ private[scalatest] object JsonWriter {
     builder.toString
   }
 
-  /**
-   * Appends the value's text to `out` piece by piece, without building the whole text itself. Throws what `out` throws.
-   */
-  // Keeps what is still to write in a list, not on the call stack, so that deep nesting cannot overflow the stack.
   def write(value: JsonValue, out: Appendable): Unit = {
+    // A list, not the call stack, so that deep nesting cannot overflow the stack.
     var pending = List[Pending](Pending.Value(value))
     while (pending.nonEmpty) {
       val next = pending.head
@@ -106,12 +103,16 @@ private[scalatest] object JsonWriter {
 
 private[scalatest] object JsonReader {
 
-  /** @throws MalformedJsonException if the text is not exactly one JSON value */
   def read(text: String): JsonValue = {
     val reader = new JsonReader(text)
     val value = reader.value()
     reader.end()
     value
+  }
+
+  private enum Step {
+    case Read(value: JsonValue)
+    case Opened
   }
 
   private sealed abstract class OpenContainer(val closing: Char) {
@@ -151,10 +152,10 @@ private[scalatest] object JsonReader {
 
 private final class JsonReader(text: String) {
 
-  import JsonReader.{OpenArray, OpenContainer, OpenObject}
+  import JsonReader.{OpenArray, OpenContainer, OpenObject, Step}
 
   private var position = 0
-  // Innermost first. Held here, not on the call stack, so that deep nesting cannot overflow the stack.
+  // Held here, not on the call stack, so that deep nesting cannot overflow the stack.
   private var open = List.empty[OpenContainer]
 
   def end(): Unit = {
@@ -166,12 +167,11 @@ private final class JsonReader(text: String) {
 
   def value(): JsonValue = placed(valueStart())
 
-  // A step is the value just read, or None where it opened a container.
   @tailrec
-  private def placed(step: Option[JsonValue]): JsonValue = {
+  private def placed(step: Step): JsonValue = {
     step match {
-      case None => placed(firstMember())
-      case Some(value) =>
+      case Step.Opened => placed(firstMember())
+      case Step.Read(value) =>
         open match {
           case Nil => value
           case innermost :: _ =>
@@ -183,7 +183,7 @@ private final class JsonReader(text: String) {
 
   private def malformed(reason: String): Nothing = throw new MalformedJsonException(text, reason)
 
-  private def valueStart(): Option[JsonValue] = {
+  private def valueStart(): Step = {
     skipWhitespace()
     if (position >= text.length) {
       malformed(s"the text ends where a value should start, at offset $position")
@@ -191,28 +191,28 @@ private final class JsonReader(text: String) {
       text.charAt(position) match {
         case '{' => opened(new OpenObject)
         case '[' => opened(new OpenArray)
-        case '"' => Some(JsonValue.Text(string()))
+        case '"' => Step.Read(JsonValue.Text(string()))
         case 't' => literal("true", JsonValue.Bool(true))
         case 'f' => literal("false", JsonValue.Bool(false))
-        case char if char == '-' || isDigit(char) => Some(integer())
+        case char if char == '-' || isDigit(char) => Step.Read(integer())
         case _ => malformed(s"no value starts at offset $position")
       }
     }
   }
 
-  private def opened(container: OpenContainer): Option[JsonValue] = {
+  private def opened(container: OpenContainer): Step = {
     position += 1
     open = container :: open
-    None
+    Step.Opened
   }
 
-  private def firstMember(): Option[JsonValue] = {
+  private def firstMember(): Step = {
     val innermost = open.head
     skipWhitespace()
     if (at(innermost.closing)) close(innermost) else member(innermost)
   }
 
-  private def nextMember(innermost: OpenContainer): Option[JsonValue] = {
+  private def nextMember(innermost: OpenContainer): Step = {
     skipWhitespace()
     if (at(',')) {
       position += 1
@@ -224,7 +224,7 @@ private final class JsonReader(text: String) {
     }
   }
 
-  private def member(innermost: OpenContainer): Option[JsonValue] = {
+  private def member(innermost: OpenContainer): Step = {
     skipWhitespace()
     innermost match {
       case _: OpenArray => valueStart()
@@ -238,10 +238,10 @@ private final class JsonReader(text: String) {
     }
   }
 
-  private def close(innermost: OpenContainer): Option[JsonValue] = {
+  private def close(innermost: OpenContainer): Step = {
     position += 1
     open = open.tail
-    Some(innermost.closed)
+    Step.Read(innermost.closed)
   }
 
   private def skipWhitespace(): Unit = {
@@ -254,10 +254,10 @@ private final class JsonReader(text: String) {
 
   private def at(char: Char): Boolean = position < text.length && text.charAt(position) == char
 
-  private def literal(word: String, value: JsonValue): Option[JsonValue] = {
+  private def literal(word: String, value: JsonValue): Step = {
     if (text.startsWith(word, position)) {
       position += word.length
-      Some(value)
+      Step.Read(value)
     } else {
       malformed(s"no value starts at offset $position")
     }
@@ -336,8 +336,8 @@ private final class JsonReader(text: String) {
     digits.foldLeft(0)((codeUnit, digit) => codeUnit * 16 + digit).toChar
   }
 
-  // Character.digit also accepts the digits of other scripts, which JSON does not.
   private def hexDigit(char: Char): Int = {
+    // Not Character.digit, which also accepts the digits of other scripts.
     if (char >= '0' && char <= '9') {
       char - '0'
     } else if (char >= 'a' && char <= 'f') {

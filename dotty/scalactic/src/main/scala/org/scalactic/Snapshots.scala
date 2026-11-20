@@ -231,7 +231,7 @@ object SnapshotsMacro {
     val snapshots: List[Expr[Snapshot]] = expressions.asTerm.underlyingArgument match {
       case Typed(Repeated(args, _), _) => // only sequence literal
         args.map { arg =>
-          val str = CompilerText.withLineSeparator(arg.asExpr.show)
+          val str = CompilerText.withPlatformLineSeparators(arg.asExpr.show)
           '{ Snapshot($str, ${ arg.asExpr }) }
         }
       case arg =>

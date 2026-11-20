@@ -3,14 +3,12 @@ package org.scalatest.events
 import org.scalatest.tools.StackDepthView
 import org.scalatest.tools.ThrowableView
 
-/** A suite's index is its order among the parent's suites of its `suiteId`; a scope's, among the parent's scopes of its text. */
 private[scalatest] enum NodePlace {
   case Suite(suiteId: SuiteId, index: Int)
   case Scope(text: String, index: Int)
   case Test(scalaTestName: TestName)
 }
 
-/** Places from the top-level suite down. */
 private[scalatest] final case class NodeId(places: Vector[NodePlace])
 
 private[scalatest] object NodeId {
@@ -19,10 +17,8 @@ private[scalatest] object NodeId {
 
   def nestedSuite(parent: NodeId, suiteId: SuiteId, index: Int): NodeId = NodeId(parent.places :+ NodePlace.Suite(suiteId, index))
 
-  /** `text` is the text the scope is registered with. */
   def scope(parent: NodeId, text: String, index: Int): NodeId = NodeId(parent.places :+ NodePlace.Scope(text, index))
 
-  /** A test sits directly under its suite's node, whichever scopes it is registered in. */
   def test(suite: NodeId, testName: TestName): NodeId = NodeId(suite.places :+ NodePlace.Test(testName))
 }
 
@@ -42,7 +38,6 @@ private[scalatest] enum StructureNode {
       case test: Test => Some(test.parent)
     }
 
-  /** Absent for a suite the emitter gave no position. */
   def declaredPosition: Option[Int] =
     this match {
       case suite: Suite => suite.position
@@ -51,8 +46,11 @@ private[scalatest] enum StructureNode {
     }
 }
 
-/** @param executionPath an execution index for each node from the top-level suite down to `node`, each test's scopes included */
-private[scalatest] final case class NodeExecution(node: NodeId, executionPath: Vector[Int]) {
+private[scalatest] final case class NodeExecution(
+  node: NodeId,
+  // Also holds an index for each scope a test runs in, though a test's node names no scope.
+  executionPath: Vector[Int]
+) {
 
   def executionIndex: Int = executionPath.last
 }
@@ -158,10 +156,8 @@ private[scalatest] enum DecodedEvent {
 
   def timeStamp: Long
 
-  /** Absent where the event records none; a discovery event never records one. */
   def location: Option[Location] = None
 
-  /** Absent where the event records none; an event that starts a run, suite, scope or test never records one. */
   def duration: Option[Long] = None
 }
 
@@ -190,9 +186,6 @@ private[scalatest] final case class DecodedStackFrame(
   text: String
 )
 
-// Not a case class: a throwable can be its own cause or suppressed throwable, so a structural equals, hashCode or
-// toString would never return. Its cause and suppressed throwables are evaluated on first read, so that a decoder can
-// build a throwable before the throwables that link back to it.
 private[scalatest] final class DecodedThrowable(
   val className: String,
   val message: Option[String],
@@ -203,8 +196,11 @@ private[scalatest] final class DecodedThrowable(
   linkedSuppressed: => IndexedSeq[DecodedThrowable] = Vector.empty
 ) extends ThrowableView {
 
-  lazy val cause: Option[DecodedThrowable] = linkedCause
+  // Not a case class: a throwable can be its own cause or suppressed throwable, so a structural equals, hashCode or
+  // toString would never return.
 
+  // Evaluated on first read, so that a decoder can build a throwable before the throwables that link back to it.
+  lazy val cause: Option[DecodedThrowable] = linkedCause
   lazy val suppressed: IndexedSeq[DecodedThrowable] = linkedSuppressed
 
   def frames: IndexedSeq[String] = stackTrace.map(_.text)

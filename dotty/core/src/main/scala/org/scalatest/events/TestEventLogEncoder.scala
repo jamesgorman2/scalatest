@@ -5,8 +5,10 @@ import org.scalatest.exceptions.PropertyCheckFailedException
 import org.scalatest.exceptions.StackDepth
 import scala.collection.mutable
 
-/** @param fields the event's own fields, as the members of a JSON object without its braces */
-private[scalatest] final class EncodedEvent private[events] (private[events] val name: String, private[events] val fields: String)
+private[scalatest] final class EncodedEvent private[events] (
+  private[events] val name: String,
+  private[events] val membersWithoutBraces: String
+)
 
 private[scalatest] object TestEventLogEncoder {
 
@@ -20,14 +22,12 @@ private[scalatest] object TestEventLogEncoder {
 
   def event(event: Event, execution: Option[NodeExecution]): String = line(encoded(event), execution)
 
-  /** Calls the methods of the event's throwables and config map values, which are the run's own code. */
   def encoded(event: Event): EncodedEvent = {
     val (eventName, eventFields) = nameAndFields(event)
     val members = JsonWriter.write(record(eventFields: _*))
     new EncodedEvent(eventName, members.substring(1, members.length - 1))
   }
 
-  /** Calls none of the run's own code. */
   def line(encoded: EncodedEvent, execution: Option[NodeExecution]): String = {
     val assigned =
       JsonWriter.write(
@@ -38,7 +38,7 @@ private[scalatest] object TestEventLogEncoder {
           text("event", encoded.name)
         )
       )
-    val fields = if (encoded.fields.isEmpty) "" else "," + encoded.fields
+    val fields = if (encoded.membersWithoutBraces.isEmpty) "" else "," + encoded.membersWithoutBraces
     assigned.substring(0, assigned.length - 1) + fields + "}\n"
   }
 
@@ -194,7 +194,6 @@ private[scalatest] object TestEventLogEncoder {
     Some("configMap" -> JsonValue.Object(entries.map { case (key, entry) => key -> JsonValue.Text(String.valueOf(entry)) }))
   }
 
-  // Holds the throwables one event has written, in the order written, so that a throwable's ID is its place among them.
   private final class ThrowableEncoder {
 
     private val written = mutable.ArrayBuffer.empty[Throwable]

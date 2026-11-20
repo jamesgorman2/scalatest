@@ -4,7 +4,6 @@ import scala.collection.mutable
 
 private[scalatest] object TestEventLogDecoder {
 
-  /** @throws MalformedTestEventLogException if the line is not an event the format writes */
   def decode(line: String): TestEventLogEvent = {
     jsonValue(line) match {
       case JsonValue.Object(fields) => whole(new JsonObjectReader(line, fields))(logEvent)
@@ -77,7 +76,6 @@ private[scalatest] object TestEventLogDecoder {
     }
   }
 
-  // An empty node path is read as an omitted key, as an empty array is written.
   private def optionalNodePath(reader: JsonObjectReader, key: String): Option[NodeId] = {
     val places = reader.objects(key).map(whole(_)(place))
     Option.when(places.nonEmpty)(NodeId(places))
@@ -202,7 +200,6 @@ private[scalatest] object TestEventLogDecoder {
     )
   }
 
-  // Holds the throwables one event has read, by ID, so that a ref yields the same object as the throwable it names.
   private final class ThrowableDecoder {
 
     private val decoded = mutable.Map.empty[Long, DecodedThrowable]
@@ -228,6 +225,7 @@ private[scalatest] object TestEventLogDecoder {
             cause = reader.optionalObject("cause"),
             suppressed = reader.objects("suppressed").iterator
           )
+          // Registered before the throwable's links are read, so that a ref among them yields the throwable.
           registered(reader, id, opened.closed)
           Right(opened)
       }
@@ -255,7 +253,6 @@ private[scalatest] object TestEventLogDecoder {
     }
   }
 
-  // Built before its links are read, so that a ref among them yields this throwable.
   private final class DecodingThrowable(
     className: String,
     message: Option[String],
@@ -271,7 +268,6 @@ private[scalatest] object TestEventLogDecoder {
   }
 }
 
-// Records each key it is asked for. A key never asked for is one the format does not give the object.
 private final class JsonObjectReader(line: String, fields: Vector[(String, JsonValue)]) {
 
   private val values = fields.toMap
@@ -311,7 +307,6 @@ private final class JsonObjectReader(line: String, fields: Vector[(String, JsonV
     }
   }
 
-  /** The format never writes `false`. */
   def trueOrAbsent(key: String): Boolean =
     optional(key, "true") { case JsonValue.Bool(true) => true }.isDefined
 

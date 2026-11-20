@@ -2,21 +2,14 @@ package org.scalatest.events
 
 import scala.annotation.tailrec
 
-/**
- * A throwable whose cause and suppressed throwables, each given as a `Source`, are still being turned into `Linked`
- * values: its cause first, then each suppressed throwable in order.
- */
 private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Source], suppressed: Iterator[Source]) {
 
-  // Each source is dropped once read. The closed value may hold this throwable until its links are first read, so this
-  // throwable must not keep the sources reachable.
   private var unreadCause = cause
   private var unreadSuppressed = suppressed
   private var addsCause = false
   private var causeLinked: Option[Linked] = None
   private var suppressedLinked = Vector.empty[Linked]
 
-  /** The throwable's value once each of its links has been added. */
   def closed: Linked
 
   protected def linkedCause: Option[Linked] = causeLinked
@@ -24,6 +17,8 @@ private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Sourc
   protected def linkedSuppressed: Vector[Linked] = suppressedLinked
 
   private def nextLink(): Option[Source] = {
+    // Each source is dropped once read: the closed value can keep this open throwable reachable until the value's
+    // links are first read, and the sources must not stay reachable that long.
     addsCause = unreadCause.nonEmpty
     if (addsCause) {
       val next = unreadCause
@@ -49,15 +44,11 @@ private[events] abstract class OpenThrowable[Source, Linked](cause: Option[Sourc
 
 private[events] object OpenThrowable {
 
-  /**
-   * Closes `outermost` and every throwable it links to. `linkedOrOpened` gives each link either its value, for a
-   * throwable already seen, or a throwable to open.
-   */
-  // Keeps the throwables whose links are still to be added in a list, not on the call stack, so that a long chain of
-  // causes cannot overflow the stack.
   def closedFrom[Source, Linked](outermost: OpenThrowable[Source, Linked])(
     linkedOrOpened: Source => Either[Linked, OpenThrowable[Source, Linked]]
   ): Linked = {
+    // The throwables still being linked are kept in `outer`, not on the call stack, so that a long chain of causes
+    // cannot overflow the stack.
     @tailrec
     def closing(innermost: OpenThrowable[Source, Linked], outer: List[OpenThrowable[Source, Linked]]): Linked = {
       innermost.nextLink() match {

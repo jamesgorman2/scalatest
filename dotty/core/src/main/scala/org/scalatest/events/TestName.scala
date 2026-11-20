@@ -1,6 +1,5 @@
 package org.scalatest.events
 
-/** A test's name within its suite, as `Suite.testNames` lists it. */
 private[scalatest] opaque type TestName = String
 
 private[scalatest] object TestName {
