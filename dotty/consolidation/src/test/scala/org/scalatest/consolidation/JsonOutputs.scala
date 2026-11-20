@@ -56,11 +56,11 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
   def startedWithoutMill(json: JsonSink): Consolidation =
     Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(json), moduleSelectors = Vector(moduleSelectedAsItself))
 
-  /** The JSON output of a consolidation started without Mill, given the runs, then ended. */
-  def jsonOutputAfter(addRuns: Consolidation => Unit): JsonSink = {
+  /** The JSON output of a consolidation started without Mill, acted on by `act`, then ended. */
+  def jsonOutputAfter(act: Consolidation => Unit): JsonSink = {
     val json = new JsonSink
     val consolidation = startedWithoutMill(json)
-    addRuns(consolidation)
+    act(consolidation)
     consolidation.end()
     json
   }

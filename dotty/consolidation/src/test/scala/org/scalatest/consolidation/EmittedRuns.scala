@@ -49,5 +49,5 @@ private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns &
 
   /** The human-readable output's lines, with colour on, less the summary line. */
   def colourMarkedTreeLinesFrom(eventLog: Vector[RunEvent]): Vector[String] =
-    colourMarkedOutputAfter(_.addRunOf(eventLog)).lines.dropRight(1)
+    colourMarkedOutputAfter(_.addRunOf(eventLog)).treeLines
 }

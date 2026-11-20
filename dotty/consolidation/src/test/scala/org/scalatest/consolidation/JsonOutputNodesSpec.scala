@@ -20,7 +20,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
   private def rowSuiteOf(testName: String, eventLinesBetweenSuiteStartAndCompletion: Seq[String]): String =
     completedRunOf(
       "run: RunStarting",
-      suiteRunning("RowSuite", s"""test "$testName", label "- $testName"""", eventLinesBetweenSuiteStartAndCompletion*),
+      eventLogOfSuite("RowSuite", s"""test "$testName", label "- $testName"""", eventLinesBetweenSuiteStartAndCompletion*),
       "run: RunCompleted"
     )
 

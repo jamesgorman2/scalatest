@@ -14,6 +14,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     val consolidation = startedWithColour()
     consolidation.addRunOf(parts*)
     consolidation.end()
+    consolidation.state
   }
 
   Feature("A run's line") {
@@ -171,7 +172,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     def runWithLine(suite: String, line: String): Vector[TestRunPart] =
       Vector(
-        TestRunPart.Events("run started\n" + suiteRunning(suite, """test "runs", label "- runs"""", """test "runs": TestStarting""", """test "runs": TestSucceeded""")),
+        TestRunPart.Events("run started\n" + eventLogOfSuite(suite, """test "runs", label "- runs"""", """test "runs": TestStarting""", """test "runs": TestSucceeded""")),
         TestRunPart.CapturedLine(CapturedStream.Stdout, line),
         TestRunPart.Events("run ended completed")
       )
@@ -413,18 +414,17 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("After the lines for each module, the root's captured lines then its failures, each in the order attached") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
       And("a failure, a stderr line, a stdout line and a second failure attached to the root, in that order")
-      val output = new OutputSink
-      val consolidation = consolidationOfSqrtPropSpec(output)
-      consolidation.addRootFailure("first failure")
-      consolidation.addRootOutput(CapturedLine.Stderr("warn: slow discovery"))
-      consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
-      consolidation.addRootFailure("second failure")
-
       When("the library consolidates it")
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
+        consolidation.addRootFailure("first failure")
+        consolidation.addRootOutput(CapturedLine.Stderr("warn: slow discovery"))
+        consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
+        consolidation.addRootFailure("second failure")
+      }
 
       Then("the root's captured lines come in the order attached, then its abort with each failure's message in the order attached")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {green}SqrtPropSpec:{reset}
@@ -439,16 +439,14 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("A run's line sits one level deeper under the root's line") {
       Given("an event log of a run that ends aborted, consolidated as a run of the module `core.test`")
       And("the stdout line `discovering tests` attached to the root")
-      val output = new OutputSink
-      val consolidation = startedWithColour(output)
-      consolidation.addRunOf(TestRunPart.Events("run started\nrun ended aborted"))
-      consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
-
       When("the library consolidates it")
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunOf(TestRunPart.Events("run started\nrun ended aborted"))
+        consolidation.addRootOutput(CapturedLine.Stdout("discovering tests"))
+      }
 
       Then("the run's line and its abort sit under the module's line, itself under the root's line")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
           |    {cyan}Run 1:{reset}
@@ -471,15 +469,14 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("A module timed but given no run shows its line alone, among the other modules in order by name") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
       And("the module `app.test` timed but given no run")
-      val output = new OutputSink
-      val consolidation = consolidationOfSqrtPropSpec(output)
-      consolidation.timeModule(TestRunLabel("app.test"), None, None)
-
       When("the library consolidates it")
-      consolidation.end()
+      val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
+        consolidation.timeModule(TestRunLabel("app.test"), None, None)
+      }
 
       Then("the line of `app.test` comes first, with nothing under it")
-      output.colourMarkedTree shouldBe
+      output.tree shouldBe
         """{cyan}[app.test]{reset}
           |{cyan}[core.test]{reset}
           |  {green}SqrtPropSpec:{reset}

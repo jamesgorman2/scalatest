@@ -87,7 +87,7 @@ final class ChangedRegistrationOrderSpec extends AnyFeatureSpec with GivenWhenTh
   Feature("A suite's nested suites come before the scopes and tests that a further structure adds") {
 
     def eventLogOfSuiteWhoseFirstStructureHasNoTest(): Vector[RunEvent] = {
-      Given("a suite with nested suites FirstNestedSuite and SecondNestedSuite and one test, a, which its runTests runs even when a's tag is excluded")
+      Given("a suite with nested suites FirstNestedSuite and SecondNestedSuite, and one test, a, that the suite's runTests runs even when a's tag is excluded")
       And("the suite runs through `Framework` with a's tag excluded, writing the run's test event log")
       eventLogOfFrameworkRun(classOf[samples.RunsADroppedTestNestingSuitesSuite].getName, Seq("-l", "samples.Dropped"))
     }

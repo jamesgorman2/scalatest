@@ -128,15 +128,12 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
 
     Scenario("Output and failures attached to the root are written on the root: discovery fails") {
       Given("the library is fed no run")
-      val json = new JsonSink
-      val consolidation = startedWithoutMill(json)
-
       And("the root is given the stderr line `discovering\\n` as output and `Discovery failed` as a failure")
-      consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
-      consolidation.addRootFailure("Discovery failed")
-
       When("the library writes the JSON output")
-      consolidation.end()
+      val json = jsonOutputAfter { consolidation =>
+        consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
+        consolidation.addRootFailure("Discovery failed")
+      }
 
       Then("the root holds, in order, its outcome, failures and output")
       val root = json.root

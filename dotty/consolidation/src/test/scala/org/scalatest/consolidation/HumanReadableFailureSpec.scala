@@ -11,7 +11,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
   private def eventLogOfTestEndingWith(ending: String): String =
     completedRunOf(
-      suiteRunning(
+      eventLogOfSuite(
         "StackFlatSpec",
         """
         scope "A Stack", label "A Stack"
@@ -28,7 +28,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
     )
 
   private def eventLogOfTestEndingThenAbortedBy(ending: String, aborted: String): String =
-    completedRunOf(suiteRunning("ParAbortSuite", """test "a", label "- a"""", """test "a": TestStarting""", ending, aborted))
+    completedRunOf(eventLogOfSuite("ParAbortSuite", """test "a", label "- a"""", """test "a": TestStarting""", ending, aborted))
 
   private def eventLogOfSuiteAbortingWith(aborted: String): String =
     completedRunOf(
@@ -343,7 +343,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
 
     def eventLogOfTwoTestsWhoseFirstEndsWith(ending: String): String =
       completedRunOf(
-        suiteRunning(
+        eventLogOfSuite(
           "SilentSpec",
           """
           test "first", label "- first"

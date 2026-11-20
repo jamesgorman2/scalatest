@@ -8,7 +8,7 @@ final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen w
 
   private def eventLogWithMessages(info: String): String =
     completedRunOf(
-      suiteRunning(
+      eventLogOfSuite(
         "StackFunSuite",
         """test "is empty", label "- is empty"""",
         """test "is empty": TestStarting""",

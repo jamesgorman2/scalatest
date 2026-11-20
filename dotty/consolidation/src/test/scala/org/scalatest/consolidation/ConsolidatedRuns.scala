@@ -57,7 +57,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
     def lines: Vector[String] = synchronized(received.toVector)
 
-    def linesWithoutSummaryLine: Vector[String] = lines.dropRight(1)
+    def linesWithoutSummaryLine: Vector[String] = colourMarkedOutput.treeLines
 
     def colourMarkedTree: String = colourMarkedOutput.tree
 
@@ -66,7 +66,9 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   final case class ColourMarkedOutput(lines: Vector[String]) {
 
-    def tree: String = lines.dropRight(1).mkString("\n")
+    def treeLines: Vector[String] = lines.dropRight(1)
+
+    def tree: String = treeLines.mkString("\n")
 
     def summaryLine: String = lines.lastOption.getOrElse(fail("the human-readable output has no line"))
 
@@ -83,13 +85,13 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   /**
    * Suite `samples.<suite>`'s structure, then its SuiteStarting, the events and its SuiteCompleted.
    *
-   * @param nodes the suite's scopes and tests, one to a line, each nested under the one above by 2 more spaces
+   * @param nodes the suite's scopes and tests, one to a line, each indented 2 spaces more than its parent
    */
-  def suiteRunning(suite: String, nodes: String, events: String*): String =
+  def eventLogOfSuite(suite: String, nodes: String, events: String*): String =
     (structureOf(suite, nodes) +: s"""suite "$suite": SuiteStarting""" +: events.flatMap(ConsolidatedRuns.eventLinesOf) :+ s"""suite "$suite": SuiteCompleted""")
       .mkString("\n")
 
-  /** Suite `samples.<suite>`'s structure, holding the nodes under the suite, written as for `suiteRunning`. */
+  /** Suite `samples.<suite>`'s structure, holding the nodes under the suite, written as for `eventLogOfSuite`. */
   def structureOf(suite: String, nodes: String): String =
     (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
 
@@ -100,7 +102,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
    */
   def suiteRuns(suite: String, test: String = "t", occurrenceAmongTestsOfItsName: Int = 1): TestRunPart =
     TestRunPart.Events(
-      suiteRunning(
+      eventLogOfSuite(
         suite,
         s"""test "$test", label "- $test"""",
         s"""test "$test" #$occurrenceAmongTestsOfItsName: TestStarting""",
@@ -117,11 +119,11 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   def startedWithColour(output: OutputSink = new OutputSink): Consolidation = Consolidation.start(output, coloured = true)
 
-  /** The human-readable output, with colour on, of a consolidation given the runs, then ended. */
-  def colourMarkedOutputAfter(addRuns: Consolidation => Unit): ColourMarkedOutput = {
+  /** The human-readable output, with colour on, of a consolidation acted on by `act`, then ended. */
+  def colourMarkedOutputAfter(act: Consolidation => Unit): ColourMarkedOutput = {
     val output = new OutputSink
     val consolidation = startedWithColour(output)
-    addRuns(consolidation)
+    act(consolidation)
     consolidation.end()
     output.colourMarkedOutput
   }
