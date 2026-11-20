@@ -9,6 +9,7 @@ import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
+import scala.util.Using
 
 final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
@@ -65,7 +66,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       "give whether a file is found under its name in upper case, and leave the folder empty" in {
         val folder = Files.createTempDirectory("case-check")
         val ignoresCase = JvmTestModuleRun.filesystemIgnoresCase(folder)
-        val emptied = Files.list(folder).count() == 0
+        val emptied = Using.resource(Files.list(folder))(_.count() == 0)
         val file = Files.createFile(folder.resolve("file"))
         val foundInUpperCase = Files.exists(folder.resolve("FILE"))
         Files.delete(file)
