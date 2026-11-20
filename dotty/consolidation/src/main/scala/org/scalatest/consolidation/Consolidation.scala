@@ -134,7 +134,7 @@ final class Consolidation private[consolidation] (
     ConsolidatedRoot(buildTool, moduleSelectors, rootFailures.toVector, MeasuredTimes(startedAt, endedAt), modules, rootOutput.toVector)
   }
 
-  private[consolidation] def feed[A](add: => A): A =
+  private[consolidation] def feed(add: => Unit): Unit =
     synchronized {
       requireOpen()
       add
