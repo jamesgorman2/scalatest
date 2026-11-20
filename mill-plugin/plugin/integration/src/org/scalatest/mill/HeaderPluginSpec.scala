@@ -14,10 +14,10 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Fixtu
     upickle.default.read[Seq[PathRef]](result.out).map(_.path.segments.toSeq)
   }
 
-  // An Ivy repository names the group in one folder; a Maven repository, one folder per part.
   private def publishedArtifact(group: String, artifact: String): Seq[String] => Boolean = { segments =>
     val artifactFolder = segments.indexOfSlice(Seq(artifact, IntegrationEnvironment.pluginVersion))
     val groupFolders = segments.take(artifactFolder)
+    // An Ivy repository names the group in one folder; a Maven repository, one folder per part.
     artifactFolder > 0 && (groupFolders.endsWith(Seq(group)) || groupFolders.endsWith(group.split('.').toSeq))
   }
 

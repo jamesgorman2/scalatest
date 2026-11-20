@@ -90,10 +90,6 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   private def time(node: JsonNode, key: String): Option[Instant] = node.field(key).map(value => Instant.ofEpochMilli(value.num.toLong))
 
-  /** The JSON text the library produces when given:
-    *  - the event log and the run's captured lines, fed as the run of the module's one worker;
-    *  - the JSON output's build tool, and its root's and module's times.
-    */
   private def jsonOutputReplaying(eventLogLines: Seq[String], json: JsonNode): String = {
     var written = Option.empty[String]
     val buildTool = json("buildTool")

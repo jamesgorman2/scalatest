@@ -32,13 +32,12 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
   def colourMarkedSummaryLine: Option[String] = colourMarkedHumanReadableLines.drop(prefixedTreeLines.size).headOption
 
-  // The tree starts at the first line that, without Mill's prefix, is a test run label.
   private def prefixedTreeLines: Seq[String] =
     stdoutLines
-      .dropWhile(line => !TestCommandResult.withoutMillPrefix(line).startsWith("["))
+      .dropWhile(line => !TestCommandResult.isTestRunLabel(TestCommandResult.withoutMillPrefix(line)))
       .takeWhile { line =>
         val unprefixed = TestCommandResult.withoutMillPrefix(line)
-        unprefixed.startsWith("[") || unprefixed.startsWith(" ")
+        TestCommandResult.isTestRunLabel(unprefixed) || unprefixed.startsWith(" ")
       }
 
   private def prefixedSummaryLine: Option[String] =
@@ -56,7 +55,6 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
       .map(line => TestCommandResult.colourMarked(TestCommandResult.withoutColouredMillPrefix(line)))
   }
 
-  // Each line is indented relative to `nodeLine`.
   def subtreeOf(nodeLine: String): Seq[String] = {
     val output = treeLines
     val start = output.indexWhere(_.trim == nodeLine)
@@ -82,11 +80,9 @@ object TestCommandResult {
 
   private val colourSequence = "\u001b\\[([0-9;]*)m".r
 
-  /**
-   * `0` and `39` both map to `{reset}`: the human-readable output colours only the foreground, and Mill turns the `0`
-   * that ends each colour in a line it prefixes into `39`.
-   */
   private val colourMarkers: Map[String, String] =
+    // `39` resets only the foreground, the one colour the human-readable output sets. Mill rewrites each `0` in a line
+    // it prefixes as `39`.
     Map("0" -> "{reset}", "39" -> "{reset}", "31" -> "{red}", "32" -> "{green}", "33" -> "{yellow}", "36" -> "{cyan}")
 
   def colourMarked(line: String): String =
@@ -95,15 +91,16 @@ object TestCommandResult {
       sequence => Regex.quoteReplacement(colourMarkers.getOrElse(sequence.group(1), s"{sgr ${sequence.group(1)}}"))
     )
 
-  /**
-   * Removes each reset that the next colour overrides. Mill drops these when it re-renders a line to add its prefix,
-   * and the line's characters keep their colours.
-   */
-  def withoutResetsBeforeAColour(marked: String): String = marked.replaceAll("""\{reset\}(?=\{(?!reset\}))""", "")
+  def withoutResetsBeforeAColour(marked: String): String =
+    // Mill drops each reset directly followed by a colour when it re-renders a line to add its prefix; the line's
+    // characters keep their colours.
+    marked.replaceAll("""\{reset\}(?=\{(?!reset\}))""", "")
 
   private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
 
-  /** Mill's prefix as written, which Mill colours where it colours its own console output. */
+  private def isTestRunLabel(unprefixed: String): Boolean = unprefixed.startsWith("[")
+
+  // Mill colours its prefix where it colours its own console output.
   private val colouredMillPrefix: Regex = "^(?:\u001b\\[[0-9;]*m)*[0-9][0-9-]*\\](?:\u001b\\[[0-9;]*m)* ".r
 
   private def withoutColouredMillPrefix(line: String): String = colouredMillPrefix.replaceFirstIn(line, "")

@@ -273,10 +273,6 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
   }
 }
 
-/**
- * Replaces each run of a throwable's stack-frame lines with one line `at …`, keeping its indentation. The frames name the
- * fork's own internals, and an asynchronous test's frames depend on the thread it completes on.
- */
 object StackFrames {
 
   private val frame = """\s*at \S.*""".r
@@ -286,16 +282,14 @@ object StackFrames {
       if (!frame.matches(line)) {
         line :: following
       } else {
+        // Frames are not compared: they name ScalaTest's internals, and an asynchronous test's frames depend on the
+        // thread the test completes on.
         val placeholder = line.takeWhile(_ == ' ') + "at …"
         if (following.headOption.contains(placeholder)) following else placeholder :: following
       }
     }
 }
 
-/**
- * Puts each run of captured lines in stream order, stdout's before stderr's, keeping each stream's own order. The worker's
- * stdout and stderr are read on threads of their own, so the order between the two streams varies from run to run.
- */
 object CapturedLines {
 
   private def stream(line: String): Option[String] = Seq("[stdout] ", "[stderr] ").find(line.trim.startsWith)
@@ -308,5 +302,7 @@ object CapturedLines {
           case _ => List(line) :: groups
         }
       }
+      // The worker's stdout and stderr are read on separate threads, so the order between the two streams varies from run
+      // to run.
       .flatMap(group => if (stream(group.head).isDefined) group.sortBy(line => stream(line).contains("[stderr] ")) else group)
 }

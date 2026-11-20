@@ -22,7 +22,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     "    [stdout] dividing now"
   )
 
-  // The default decorators: uptime, level and tags.
+  // `-Xlog`'s default decorators: uptime, level and tags.
   private val jvmUnifiedLoggingLine: String = """\[stdout\] \[[0-9]+[.,][0-9]+s\]\[info\]\[gc\] Using Serial"""
 
   private val millModes: Seq[(String, Boolean)] = Seq("Mill's daemon" -> true, "--no-daemon" -> false)

@@ -1,24 +1,9 @@
 package org.scalatest.mill
 
-/**
- * A JSON value written with placeholders, each standing for one whole value:
- *
- *  - `<time>` any integer, `<ms>` any non-negative integer, `<thread>` and `<string>` any string;
- *  - `<frames>` a non-empty array of stack frames, each holding `className` and `methodName`;
- *  - `<line n of F>` a location holding `lineNumber` n and either a `filePath` whose last segment is F or `fileName` F;
- *  - `<class C in F>` a location holding `className` C and either such a `filePath` or `fileName` F.
- *
- * An object in the pattern has exactly the keys written, in that order.
- */
 final class JsonPattern private (pattern: ujson.Value) {
 
-  /** Where `actual` differs from the pattern, each difference named by its path; empty where it matches. */
   def mismatches(actual: ujson.Value): Seq[String] = JsonPattern.mismatches("$", pattern, actual)
 
-  /**
-   * Where `actual`, an object, does not hold the pattern's keys, in the pattern's order, each with a value matching the
-   * pattern's in full. `actual` may hold other keys.
-   */
   def mismatchesHeldBy(actual: ujson.Value): Seq[String] = {
     val keys = pattern.obj.keys.toSeq
     actual.objOpt match {

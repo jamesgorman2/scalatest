@@ -30,12 +30,16 @@ final class FixtureBuild(tester: IntegrationTester) {
       build.replace(from, to)
     }
 
-  /** The build's header must hold no `mvnDeps`. */
-  def addPlugin(): Unit = editBuild(build => s"${IntegrationEnvironment.pluginHeaderLine}\n$build")
+  def addPlugin(): Unit =
+    editBuild { build =>
+      require(!build.linesIterator.exists(isHeaderMvnDepsLine), s"the build's header already holds mvnDeps:\n$build")
+      s"${IntegrationEnvironment.pluginHeaderLine}\n$build"
+    }
 
-  def removePlugin(): Unit = removeBuildLines("header line //| mvnDeps:")(_.startsWith("//| mvnDeps:"))
+  def removePlugin(): Unit = removeBuildLines("header line //| mvnDeps:")(isHeaderMvnDepsLine)
 
-  /** The build's test module must depend on `com.edc::scalatest::3.2.20`. */
+  private def isHeaderMvnDepsLine(line: String): Boolean = line.startsWith("//| mvnDeps:")
+
   def addToTestModule(members: String*): Unit =
     replaceInBuild(testModuleDependencies, (testModuleDependencies +: members.map("    " + _)).mkString("\n"))
 
@@ -66,8 +70,9 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def runTestCommandWithColour(arguments: String*): TestCommandResult = runTestCommandWithMillArguments(Seq("--color", "true"))(arguments*)
 
-  /** The tester turns Mill's ticker off, and with it the prefix Mill puts on each line a task writes. */
-  def runTestCommandWithTicker(arguments: String*): TestCommandResult = runTestCommandWithMillArguments(Seq("--ticker", "true"))(arguments*)
+  def runTestCommandWithTicker(arguments: String*): TestCommandResult =
+    // The tester turns Mill's ticker off, and with it the prefix Mill puts on each line a task writes.
+    runTestCommandWithMillArguments(Seq("--ticker", "true"))(arguments*)
 
   def runTestCommandWithTickerAndColour(arguments: String*): TestCommandResult =
     runTestCommandWithMillArguments(Seq("--ticker", "true", "--color", "true"))(arguments*)
@@ -94,13 +99,14 @@ final class FixtureBuild(tester: IntegrationTester) {
     json
   }
 
-  // Mill writes a `testargs` file for each worker it starts.
-  def anyTestWorkerStarted: Boolean = os.exists(workspace / "out") && os.walk(workspace / "out").exists(_.last == "testargs")
+  def anyTestWorkerStarted: Boolean =
+    // Mill writes a `testargs` file for each worker it starts.
+    os.exists(workspace / "out") && os.walk(workspace / "out").exists(_.last == "testargs")
 
   def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
 
-  /** A later invocation then writes nothing about compiling the build. */
   def compileBuildFile(): Unit = {
+    // Compiling the build here keeps compile messages out of a later invocation's output.
     val result = tester.eval(Seq("resolve", "_"))
     require(result.isSuccess, s"the build did not compile:\n${result.debugString}")
   }

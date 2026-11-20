@@ -608,7 +608,6 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
     )
   }
 
-  /** The module holds only the given suites, each in its own fork group, in the order given. */
   def holdOnlySuitesEachInItsOwnForkGroup(testBodies: (String, String)*): Unit = {
     removeSuites()
     os.makeDir.all(fixtureBuild.samples)
@@ -631,16 +630,16 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
   def resultAndReportOfTestCommandWithJobs(jobs: Int): (TestCommandResult, JsonNode) =
     fixtureBuild.resultAndReportOfTestCommand(jobsArguments(jobs))
 
-  /** Mill's ticker is on, as at a user's console, so Mill puts its prefix on each line the test command writes. */
-  def runTestCommandAsAtTheConsole(): TestCommandResult = fixtureBuild.runTestCommandWritingReport(jobsArguments(2) ++ Seq("--ticker", "true"))
+  def runTestCommandAsAtTheConsole(): TestCommandResult =
+    // As at a user's console, Mill's ticker is on, so Mill puts its prefix on each line the test command writes.
+    fixtureBuild.runTestCommandWritingReport(jobsArguments(2) ++ Seq("--ticker", "true"))
 
   private def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
 
-  // The build's workspace can itself sit in a folder `worker-<i>` of the build running these tests, so only the part of
-  // the path below the workspace names the build's own worker.
   def workerIndexOf(path: String): Option[Int] =
     Some(os.Path(path))
       .filter(_.startsWith(fixtureBuild.workspace))
+      // The workspace can itself sit in a `worker-<i>` folder of the build running these specs.
       .flatMap(_.relativeTo(fixtureBuild.workspace).segments.find(_.matches("worker-\\d+")))
       .map(_.stripPrefix("worker-").toInt)
 

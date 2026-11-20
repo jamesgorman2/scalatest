@@ -87,7 +87,6 @@ final class JsonNode(val raw: ujson.Value) extends JsonWrapper {
 
   def kindsAndNamesOfContents: Seq[(NodeKind, String)] = contents.map(node => (node.kind, node.name))
 
-  /** Every node, this one first, then each node's contents in order, depth first. */
   def nodes: Seq[JsonNode] = this +: field("contents").toSeq.flatMap(_.arr).flatMap(new JsonNode(_).nodes)
 
   def node(kind: NodeKind): JsonNode =

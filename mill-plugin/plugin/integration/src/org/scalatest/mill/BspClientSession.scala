@@ -108,14 +108,11 @@ object BspClientSession {
       require(process.waitFor(exitTimeoutMillis), s"Mill's BSP server did not exit within $exitTimeoutMillis ms of being destroyed")
     }
 
-  /**
-   * Starts the server as `.bsp/mill-bsp.json` would. Once `use` returns, shuts the server down and waits for it to close
-   * the connection, so that every notification it sent has been received.
-   */
   def resultWithNotifications[A](tester: IntegrationTester, millExecutable: os.Path, stderrLog: os.Path)(
     use: BspClientSession => A
   ): WithNotifications[A] = {
     val spawned = os.spawn(
+      // The command `--bsp-install` writes to `.bsp/mill-bsp.json`.
       cmd = (millExecutable, "--bsp", "--jobs", "1"),
       cwd = tester.workspacePath,
       env = tester.millTestSuiteEnv,
@@ -137,6 +134,7 @@ object BspClientSession {
       server.onBuildInitialized()
       val result = Using.resource(new BspClientSession(server))(use)
       require(process.waitFor(exitTimeoutMillis), s"Mill's BSP server did not exit within $exitTimeoutMillis ms of build/exit")
+      // Once the server has closed the connection, every notification it sent has been received.
       listening.get(exitTimeoutMillis, TimeUnit.MILLISECONDS)
       WithNotifications(result, client.notifications)
     }
@@ -170,12 +168,11 @@ private final class RecordingBuildClient extends BuildClient {
   def onRunPrintStderr(params: PrintParams): Unit = record("run/printStderr", params)
 }
 
-/** BSP messages as JSON, without the durations, timestamps and task IDs that differ between two identical requests. */
 private object BspJson {
 
   private val gson = new Gson
 
-  private val keysLeftOut: Set[String] = Set("eventTime", "taskId", "time")
+  private val keysVaryingBetweenIdenticalRequests: Set[String] = Set("eventTime", "taskId", "time")
 
   def normalised(message: Any): String = withoutValuesNotCompared(gson.toJsonTree(message)).toString
 
@@ -183,7 +180,7 @@ private object BspJson {
     element match {
       case obj: JsonObject =>
         val kept = new JsonObject
-        obj.entrySet.asScala.filterNot(entry => keysLeftOut(entry.getKey)).foreach { entry =>
+        obj.entrySet.asScala.filterNot(entry => keysVaryingBetweenIdenticalRequests(entry.getKey)).foreach { entry =>
           kept.add(entry.getKey, withoutValuesNotCompared(entry.getValue))
         }
         kept
