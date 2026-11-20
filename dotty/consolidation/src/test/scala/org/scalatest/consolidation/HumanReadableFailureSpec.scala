@@ -422,7 +422,7 @@ final class HumanReadableFailureSpec extends AnyFeatureSpec with GivenWhenThen w
       val output = new OutputSink
       val consolidation = Consolidation.start(output, coloured = true)
       val feed = consolidation.addRun(moduleLabel)
-      events.foreach(event => feed.add(RunEvent.of(event).fold(fail(_), identity)))
+      events.foreach(event => feed.add(RunEvent.of(event)))
       feed.endEventStream()
       consolidation.end()
 

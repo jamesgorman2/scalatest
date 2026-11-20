@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.format.DateTimeParseException
 import org.scalatest.events.MalformedTestEventLogException
 import org.scalatest.events.TestEventLogDecoder
+import org.scalatest.events.TestEventLogEncoder
 import org.scalatest.events.TestEventLogEvent
 
 /** One event of a run's test event log, as [[RunEvent.decode]] returns it. Only the run's process can be read from it. */
@@ -35,25 +36,27 @@ object RunEvent {
    */
   def decode(line: String): Either[String, RunEvent] =
     try {
-      of(TestEventLogDecoder.decode(line))
+      Right(of(TestEventLogDecoder.decode(line)))
     } catch {
       case malformed: MalformedTestEventLogException => Left(malformed.reason)
     }
 
-  /** The event, or why it cannot be one: a `runStarted` event whose start time is not an instant. */
-  private[scalatest] def of(event: TestEventLogEvent): Either[String, RunEvent] =
+  /** @throws MalformedTestEventLogException where the event is a `runStarted` event whose start time is not an instant */
+  private[scalatest] def of(event: TestEventLogEvent): RunEvent =
     event match {
       case TestEventLogEvent.RunStarted(pid, startTime) =>
-        parsedStartTime(startTime).map(instant => DecodedRunEvent(event, Some(RunProcess(Pid(pid), instant))))
+        DecodedRunEvent(event, Some(RunProcess(Pid(pid), startInstant(pid, startTime))))
       case _ =>
-        Right(DecodedRunEvent(event, None))
+        DecodedRunEvent(event, None)
     }
 
-  private def parsedStartTime(startTime: String): Either[String, Instant] =
+  private def startInstant(pid: Long, startTime: String): Instant =
     try {
-      Right(Instant.parse(startTime))
+      Instant.parse(startTime)
     } catch {
-      case _: DateTimeParseException => Left(s"the run's start time is not an instant: $startTime")
+      case _: DateTimeParseException =>
+        val line = TestEventLogEncoder.runStarted(pid, startTime).stripSuffix("\n")
+        throw new MalformedTestEventLogException(line, s"the run's start time is not an instant: $startTime")
     }
 
   extension (event: RunEvent) {

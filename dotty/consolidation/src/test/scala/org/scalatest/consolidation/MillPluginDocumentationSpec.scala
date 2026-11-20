@@ -88,7 +88,7 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       run: InfoProvided(message: "outside any suite", location: LineInFile(3, "RowSuite.scala", None))
       run ended aborted
       """
-    ).map(event => RunEvent.of(event).fold(fail(_), identity))
+    ).map(RunEvent.of)
     val shared = new DecodedThrowable("java.io.IOException", None, None, false, Vector.empty)
     val thrown = new DecodedThrowable(
       "java.lang.IllegalStateException",

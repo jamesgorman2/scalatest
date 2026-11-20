@@ -1,6 +1,8 @@
 package org.scalatest.consolidation
 
 import java.time.Instant
+import org.scalatest.events.MalformedTestEventLogException
+import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunPart
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -237,6 +239,14 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
       "not be decoded" in {
         RunEvent.decode("not an event").isLeft shouldBe true
       }
+    }
+  }
+
+  "A run's start event whose start time is not an instant" should {
+    "not be made a run event, but throw naming the start time and the event's line" in {
+      val thrown = intercept[MalformedTestEventLogException](RunEvent.of(TestEventLogEvent.RunStarted(4242L, "yesterday")))
+      thrown.reason shouldBe "the run's start time is not an instant: yesterday"
+      thrown.line shouldBe """{"item":"runStarted","pid":4242,"startTime":"yesterday"}"""
     }
   }
 }

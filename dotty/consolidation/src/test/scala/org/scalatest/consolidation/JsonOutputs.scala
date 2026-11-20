@@ -72,7 +72,7 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
 
   /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the events. */
   def jsonOutputOfEvents(events: Vector[TestEventLogEvent]): JsonSink =
-    jsonOutputOfRunEvents(events.map(event => RunEvent.of(event).fold(fail(_), identity)))
+    jsonOutputOfRunEvents(events.map(RunEvent.of))
 
   /** The JSON output of a consolidation started without Mill, given one run of module `core.test` fed the run events. */
   def jsonOutputOfRunEvents(events: Vector[RunEvent]): JsonSink = {
@@ -81,7 +81,7 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
     json
   }
 
-  def runEvent(event: DecodedEvent): RunEvent = RunEvent.of(TestEventLogEvent.ScalaTestEvent(None, event)).fold(fail(_), identity)
+  def runEvent(event: DecodedEvent): RunEvent = RunEvent.of(TestEventLogEvent.ScalaTestEvent(None, event))
 
   def text(value: String): JsonValue = JsonValue.Text(value)
 
