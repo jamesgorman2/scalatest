@@ -23,7 +23,7 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
   private def recordSession(build: FixtureBuild, pluginState: String): BspSessionRecord = {
     build.removeModuleOutput()
     try {
-      val session = build.resultWithBspNotifications(build.workspace / s"bsp-$pluginState.log") { session =>
+      val recorded = build.resultWithBspNotifications(build.workspace / s"bsp-$pluginState.log") { session =>
         val buildTargets = session.buildTargets()
         val coreTest = buildTargets.result
           .map(_.named("core.test"))
@@ -34,7 +34,7 @@ final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with sho
         val test = session.test(coreTest)
         requests.zip(Seq(buildTargets.recorded, scalaTestClasses, jvmTestEnvironment, test)).toMap
       }
-      BspSessionRecord(session.result, session.notifications)
+      BspSessionRecord(recorded.result, recorded.notifications)
     } finally {
       build.removeProcessIdFile()
     }

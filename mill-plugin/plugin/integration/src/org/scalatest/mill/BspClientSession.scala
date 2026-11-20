@@ -36,8 +36,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import scala.util.Using.Releasable
 
-/** The BSP requests these tests send, as Mill's BSP server serves them. */
-trait MillBuildServer extends BuildServer with ScalaBuildServer with JvmBuildServer
+private trait MillBuildServer extends BuildServer with ScalaBuildServer with JvmBuildServer
 
 final case class BspSessionRecord(responses: Map[String, String], notifications: Seq[String]) {
 
@@ -46,7 +45,7 @@ final case class BspSessionRecord(responses: Map[String, String], notifications:
       notifications.map(notification => s"notification: $notification")).mkString("\n")
 }
 
-/** A BSP server's answer to one request: the result, if it answered with one, and the response or error as recorded. */
+// `recorded` holds the error, as normalised JSON, when the server answered with one.
 final case class BspResponse[A](result: Option[A], recorded: String) {
 
   def map[B](f: A => B): BspResponse[B] = BspResponse(result.map(f), recorded)
@@ -61,17 +60,14 @@ final class BspClientSession private (server: MillBuildServer) {
   def buildTargets(): BspResponse[BuildTargets] =
     exchange(server.workspaceBuildTargets()).map(result => new BuildTargets(result.getTargets.asScala.toSeq))
 
-  /** @return the response or error, as recorded */
   // BSP deprecates buildTarget/scalaTestClasses, but Metals and IntelliJ still send it, and Mill still serves it.
   @nowarn("cat=deprecation")
   def scalaTestClasses(targets: BuildTargets): String =
     exchange(server.buildTargetScalaTestClasses(new ScalaTestClassesParams(targets.identifiers))).recorded
 
-  /** @return the response or error, as recorded */
   def jvmTestEnvironment(targets: BuildTargets): String =
     exchange(server.buildTargetJvmTestEnvironment(new JvmTestEnvironmentParams(targets.identifiers))).recorded
 
-  /** @return the response or error, as recorded */
   def test(targets: BuildTargets): String = exchange(server.buildTargetTest(new TestParams(targets.identifiers))).recorded
 
   private def exchange[A](request: CompletableFuture[A]): BspResponse[A] = {
@@ -116,8 +112,6 @@ object BspClientSession {
   /**
    * Starts the server as `.bsp/mill-bsp.json` would. Once `use` returns, shuts the server down and waits for it to close
    * the connection, so that every notification it sent has been received.
-   *
-   * @return what `use` returned, and every notification the server sent in the session
    */
   def resultWithNotifications[A](tester: IntegrationTester, millExecutable: os.Path, stderrLog: os.Path)(
     use: BspClientSession => A
