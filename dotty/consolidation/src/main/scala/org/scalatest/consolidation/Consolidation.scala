@@ -29,8 +29,8 @@ final class Consolidation private[consolidation] (
   def state: ConsolidationState = currentState
 
   /**
-   * Adds a run and gives `feedEventStream` the feed of the run's event stream and captured lines. The run's event stream
-   * ends when `feedEventStream` returns or throws, and what it throws is rethrown.
+   * Adds a run and passes its feed to `feedEventStream`. The run's event stream ends when `feedEventStream` returns or
+   * throws; anything it throws is rethrown.
    *
    * A module's runs are numbered from 1 in ascending order of fork group, then of worker index; runs given no worker come
    * first, in the order they are added. Numbers are fixed when the consolidation ends, so a run added later can renumber
@@ -113,8 +113,8 @@ final class Consolidation private[consolidation] (
    *
    * @param endedAt the root's end time by the caller's clock: when every run had ended
    * @return the consolidation's state, now ended
-   * @throws IllegalStateException if the consolidation has ended, or a run's event stream is still being fed, as where
-   *                               this is called from within [[addRun]]
+   * @throws IllegalStateException if the consolidation has ended, or a run's event stream is still being fed, such as
+   *                               from within [[addRun]]'s `feedEventStream`
    */
   def end(endedAt: Option[Instant] = None): ConsolidationState =
     synchronized {
@@ -207,13 +207,10 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, run: R
    */
   def add(line: CapturedLine): Unit = consolidation.feed(run.add(line))
 
-  // A run whose stream ends without its `runEnded` event does not finish, which fails the test command. So does a tree
-  // holding a suite, scope or test that aborted or did not run: a node that did not run is known only once the stream
-  // has ended.
   private[consolidation] def endEventStream(): Unit =
     consolidation.feed {
       if (endedEventStream.isEmpty) {
-        val eventStream = run.endEventStream()
+        val eventStream = run.assembledEventStream()
         endedEventStream = Some(eventStream)
         if (eventStream.failsTestCommand) {
           consolidation.fail()

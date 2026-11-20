@@ -234,24 +234,15 @@ private[consolidation] enum RunOutput {
   case Captured(line: CapturedLine)
 }
 
-/**
- * What a run's whole event stream recorded of the run.
- *
- * @param runStarting the run's first `RunStarting`
- * @param discovery from the run's first `DiscoveryStarting` and first `DiscoveryCompleted`, where it reported both
- * @param outcome how the run ended, from its `runEnded` event alone: absent where the stream held none
- * @param runAborted the run's first `RunAborted`, whose message and throwable explain an aborted run's end
- * @param reportedClasses the class of each suite the run reported
- * @param topLevelSuites the run's top-level suites, once for each execution, by name and then by the order the
- *                       executions started. Attributed nodes are left out.
- */
 private[consolidation] final case class AssembledEventStream(
   runStarting: Option[DecodedEvent.RunStarting],
   discovery: Option[RunDiscovery],
   closing: Option[RunClosing],
+  // From the runEnded event alone.
   outcome: Option[RunOutcome],
   runAborted: Option[DecodedEvent.RunAborted],
   reportedClasses: Set[String],
+  // Once per execution, by name then start order; attributed nodes are left out.
   topLevelSuites: Vector[AssembledNode]
 ) {
 
@@ -259,12 +250,10 @@ private[consolidation] final case class AssembledEventStream(
 
   def endedAbnormally: Boolean = outcome.exists(_.isAbnormal)
 
-  /** Whether the run did not finish, or any suite, scope or test execution in its tree aborted or did not run. */
   def failsTestCommand: Boolean =
     outcome.isEmpty || topLevelSuites.exists(_.withDescendants.exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
 }
 
-/** A run, its event stream ended, as the outputs read it. */
 private[consolidation] final case class AssembledRun(
   label: TestRunLabel,
   worker: Option[Worker],
@@ -326,8 +315,8 @@ private[consolidation] final class RunAssembly(
 
   def addAssigned(classes: Iterable[TestClassName]): Unit = assignedTestClasses ++= classes
 
-  /** Assembles the run's tree from the events added so far, which must be the whole event stream. */
-  def endEventStream(): AssembledEventStream =
+  // Call only once the whole event stream has been added.
+  def assembledEventStream(): AssembledEventStream =
     AssembledEventStream(
       starting,
       discovery,
@@ -338,7 +327,6 @@ private[consolidation] final class RunAssembly(
       assembleTree(recorded)
     )
 
-  /** The run with its captured lines, messages and assigned test classes as they are now. */
   def assembled(eventStream: AssembledEventStream): AssembledRun = AssembledRun(label, worker, eventStream, received, assignedTestClasses)
 
   private def discovery: Option[RunDiscovery] =
@@ -410,8 +398,6 @@ private[consolidation] final class RunAssembly(
 
   private def close(closed: RunClosing): Unit = if (closingEvent.isEmpty) closingEvent = Some(closed)
 
-  // A run's own event assigned to a node is dropped: the node's execution reads only its suite, scope or test events
-  // and its messages.
   private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
     recordExecutionPath(nodeExecution)
     val node = nodeExecution.node
