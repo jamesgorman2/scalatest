@@ -1,7 +1,6 @@
 package org.scalatest.tools
 
 import org.scalatest.GivenWhenThen
-import org.scalatest.events.Event
 import org.scalatest.events.EventLogComparison
 import org.scalatest.events.InfoProvided
 import org.scalatest.events.ScopeClosed
@@ -16,29 +15,9 @@ import org.scalatest.tools.TestEventLogLine.nodeEvent
 
 final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  private final case class StatedRun(
-    reported: Vector[String],
-    eventLogInNotation: String,
-    eventLogInFormat: List[String],
-    eventNamesOfEachNode: Map[NodePath, Vector[String]]
-  )
-
   private val ofASuite = Vector("SuiteStarting", "SuiteCompleted")
   private val ofAScope = Vector("ScopeOpened", "ScopeClosed")
   private val ofATest = Vector("TestStarting", "TestSucceeded")
-
-  private def reported(events: Vector[Event]): Vector[String] = {
-    events.collect {
-      case starting: SuiteStarting => s"SuiteStarting ${starting.suiteName}"
-      case completed: SuiteCompleted => s"SuiteCompleted ${completed.suiteName}"
-      case opened: ScopeOpened => s"ScopeOpened ${opened.message}"
-      case closed: ScopeClosed => s"ScopeClosed ${closed.message}"
-      case starting: TestStarting => s"TestStarting ${starting.testName}"
-      case succeeded: TestSucceeded => s"TestSucceeded ${succeeded.testName}"
-      case info: InfoProvided => s"InfoProvided ${info.message}"
-      case other => other.getClass.getSimpleName
-    }
-  }
 
   private val direct = """"message":"direct","""
 
@@ -394,8 +373,8 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       )
     StatedRun(
       Vector("RunStarting", "SuiteStarting RetryRunsAHelper", "TestStarting flaky") ++ reportedOfAHelper ++
-        Vector("TestFailed", "TestStarting flaky") ++ reportedOfAHelper ++
-        Vector("TestSucceeded flaky", "SuiteCompleted RetryRunsAHelper", "RunCompleted"),
+        Vector("TestFailed flaky: 1 was not greater than 1, recording InfoProvided trying", "TestStarting flaky") ++ reportedOfAHelper ++
+        Vector("TestSucceeded flaky, recording InfoProvided trying", "SuiteCompleted RetryRunsAHelper", "RunCompleted"),
       """
       structure
         suite "RetryRunsAHelper", class "samples.RetryRunsAHelper"
@@ -700,7 +679,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   private def testSendingStraightToItsSuitesReporter(suite: String, messageAssignedTo: String, isAssignedToTest: Boolean): StatedRun = {
     val top = NodePath.topLevel(s"samples.$suite")
-    val t = top.test("t")
+    val testT = top.test("t")
     val reportedOfT = Vector("TestStarting t", "InfoProvided direct", "TestSucceeded t")
     StatedRun(
       Vector("RunStarting", s"SuiteStarting $suite") ++ reportedOfT ++ Vector(s"SuiteCompleted $suite", "RunCompleted"),
@@ -713,16 +692,16 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       test "t": TestSucceeded
       """,
       List(
-        TestEventLogLine.structure(TestEventLogLine.topLevelSuite(suite, s"samples.$suite"), TestEventLogLine.test(t, top, 0, "t", "- t")),
-        nodeEvent(t, List(1, 1), "TestStarting"),
-        if (isAssignedToTest) nodeEvent(t, List(1, 1), "InfoProvided", direct) else nodeEvent(top, List(1), "InfoProvided", direct),
-        nodeEvent(t, List(1, 1), "TestSucceeded")
+        TestEventLogLine.structure(TestEventLogLine.topLevelSuite(suite, s"samples.$suite"), TestEventLogLine.test(testT, top, 0, "t", "- t")),
+        nodeEvent(testT, List(1, 1), "TestStarting"),
+        if (isAssignedToTest) nodeEvent(testT, List(1, 1), "InfoProvided", direct) else nodeEvent(top, List(1), "InfoProvided", direct),
+        nodeEvent(testT, List(1, 1), "TestSucceeded")
       ),
       {
         if (isAssignedToTest) {
-          Map(top -> ofASuite, t -> Vector("TestStarting", "InfoProvided", "TestSucceeded"))
+          Map(top -> ofASuite, testT -> Vector("TestStarting", "InfoProvided", "TestSucceeded"))
         } else {
-          Map(top -> Vector("SuiteStarting", "InfoProvided", "SuiteCompleted"), t -> ofATest)
+          Map(top -> Vector("SuiteStarting", "InfoProvided", "SuiteCompleted"), testT -> ofATest)
         }
       }
     )
@@ -730,7 +709,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   private def nestedTestSendingStraightToTheOuterSuitesReporter(suite: String, nested: String, messageAssignedTo: String, isAssignedToTest: Boolean): StatedRun = {
     val nestedNode = NodePath.topLevel(s"samples.$suite").suite(s"samples.$nested")
-    val t = nestedNode.test("t")
+    val testT = nestedNode.test("t")
     StatedRun(
       Vector(
         "RunStarting",
@@ -756,17 +735,17 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
         TestEventLogLine.structure(
           TestEventLogLine.topLevelSuite(suite, s"samples.$suite"),
           TestEventLogLine.nestedSuite(nestedNode, 0, nested, s"samples.$nested"),
-          TestEventLogLine.test(t, nestedNode, 0, "t", "- t")
+          TestEventLogLine.test(testT, nestedNode, 0, "t", "- t")
         ),
-        nodeEvent(t, List(1, 1, 1), "TestStarting"),
-        if (isAssignedToTest) nodeEvent(t, List(1, 1, 1), "InfoProvided", direct) else nodeEvent(nestedNode, List(1, 1), "InfoProvided", direct),
-        nodeEvent(t, List(1, 1, 1), "TestSucceeded")
+        nodeEvent(testT, List(1, 1, 1), "TestStarting"),
+        if (isAssignedToTest) nodeEvent(testT, List(1, 1, 1), "InfoProvided", direct) else nodeEvent(nestedNode, List(1, 1), "InfoProvided", direct),
+        nodeEvent(testT, List(1, 1, 1), "TestSucceeded")
       ),
       {
         if (isAssignedToTest) {
-          Map(nestedNode.parent -> ofASuite, nestedNode -> ofASuite, t -> Vector("TestStarting", "InfoProvided", "TestSucceeded"))
+          Map(nestedNode.parent -> ofASuite, nestedNode -> ofASuite, testT -> Vector("TestStarting", "InfoProvided", "TestSucceeded"))
         } else {
-          Map(nestedNode.parent -> ofASuite, nestedNode -> Vector("SuiteStarting", "InfoProvided", "SuiteCompleted"), t -> ofATest)
+          Map(nestedNode.parent -> ofASuite, nestedNode -> Vector("SuiteStarting", "InfoProvided", "SuiteCompleted"), testT -> ofATest)
         }
       }
     )
@@ -774,7 +753,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
   private val directNamingItsSecondRun = {
     val top = NodePath.topLevel("samples.DirectNamingItsSecondRun")
-    val t = top.test("t")
+    val testT = top.test("t")
     StatedRun(
       Vector(
         "RunStarting",
@@ -800,21 +779,21 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       List(
         TestEventLogLine.structure(
           TestEventLogLine.topLevelSuite("DirectNamingItsSecondRun", "samples.DirectNamingItsSecondRun"),
-          TestEventLogLine.test(t, top, 0, "t", "- t")
+          TestEventLogLine.test(testT, top, 0, "t", "- t")
         ),
-        nodeEvent(t, List(1, 1), "TestStarting"),
-        nodeEvent(t, List(1, 1), "TestSucceeded"),
-        nodeEvent(t, List(1, 2), "TestStarting"),
-        nodeEvent(t, List(1, 2), "InfoProvided", direct),
-        nodeEvent(t, List(1, 2), "TestSucceeded")
+        nodeEvent(testT, List(1, 1), "TestStarting"),
+        nodeEvent(testT, List(1, 1), "TestSucceeded"),
+        nodeEvent(testT, List(1, 2), "TestStarting"),
+        nodeEvent(testT, List(1, 2), "InfoProvided", direct),
+        nodeEvent(testT, List(1, 2), "TestSucceeded")
       ),
-      Map(top -> ofASuite, t -> Vector("TestStarting", "TestSucceeded", "TestStarting", "InfoProvided", "TestSucceeded"))
+      Map(top -> ofASuite, testT -> Vector("TestStarting", "TestSucceeded", "TestStarting", "InfoProvided", "TestSucceeded"))
     )
   }
 
   private val directNamingItsTestAfterRun = {
     val top = NodePath.topLevel("samples.DirectNamingItsTestAfterRun")
-    val t = top.test("t")
+    val testT = top.test("t")
     StatedRun(
       Vector(
         "RunStarting",
@@ -836,13 +815,13 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       List(
         TestEventLogLine.structure(
           TestEventLogLine.topLevelSuite("DirectNamingItsTestAfterRun", "samples.DirectNamingItsTestAfterRun"),
-          TestEventLogLine.test(t, top, 0, "t", "- t")
+          TestEventLogLine.test(testT, top, 0, "t", "- t")
         ),
-        nodeEvent(t, List(1, 1), "TestStarting"),
-        nodeEvent(t, List(1, 1), "TestSucceeded"),
-        nodeEvent(t, List(1, 1), "InfoProvided", direct)
+        nodeEvent(testT, List(1, 1), "TestStarting"),
+        nodeEvent(testT, List(1, 1), "TestSucceeded"),
+        nodeEvent(testT, List(1, 1), "InfoProvided", direct)
       ),
-      Map(top -> ofASuite, t -> Vector("TestStarting", "TestSucceeded", "InfoProvided"))
+      Map(top -> ofASuite, testT -> Vector("TestStarting", "TestSucceeded", "InfoProvided"))
     )
   }
 
@@ -859,14 +838,14 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
       thisProcess
       Given(suite)
       alsoGiven.foreach(step => And(step))
-      When("Framework runs it without the runner argument")
-      val reportedWithoutTheArgument = reported(eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, Nil, nestedSuiteIds))
+      When("a build tool runs it without the runner argument")
+      val reportedWithoutTheArgument = ReportedEvents.of(eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, Nil, nestedSuiteIds))
 
       Then("the run's reporters are told what ScalaTest 3.2.20 tells them")
       reportedWithoutTheArgument shouldBe stated.reported
 
       TemporaryEventLog.in { eventLogFile =>
-        When("Framework runs it with the runner argument")
+        When("a build tool runs it with the runner argument")
         eventsReportedWhenLaunched(Launch.ByFramework, suiteClassName, runnerArgument(eventLogFile), nestedSuiteIds)
         val lines = TemporaryEventLog.lines(eventLogFile)
 
@@ -1049,7 +1028,7 @@ final class TestEventLogUserCodeRunsSpec extends AnyFeatureSpec with GivenWhenTh
 
     runAndDecoderScenarios(
       "A suite with no registration tree reports a test twice",
-      "a Suite with no registration tree whose runTests runs test 'a' twice, its runTest sending TestStarting and TestSucceeded itself",
+      "a Suite with no registration tree that runs test 'a' twice when it runs its tests, sending the test's TestStarting and TestSucceeded itself",
       "samples.TwiceRunPlainSuite",
       "test 'a' in a first execution and then a second",
       twiceRunPlainSuite

@@ -2,10 +2,6 @@ package org.scalatest.tools
 
 import java.io.IOException
 import java.io.OutputStream
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.NoSuchFileException
-import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
@@ -39,17 +35,12 @@ import scala.jdk.CollectionConverters.*
 
 final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with EventLogRecording {
 
-  private val ordinal = new Ordinal(1)
-  private val timeStamp = 1700000000000L
-  private val identity = ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z"))
+  import TestEventLogEmitterSpec.*
 
-  private val runStartedLine = TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z")
   private val runStartingLine =
     """{"item":"event","event":"RunStarting","testCount":3,"configMap":{},"threadName":"main","timeStamp":1700000000000}"""
 
   private def runStarting: Event = RunStarting(ordinal, 3, ConfigMap.empty, threadName = "main", timeStamp = timeStamp)
-
-  private def runCompleted: Event = RunCompleted(ordinal, threadName = "main", timeStamp = timeStamp)
 
   private def alert(message: String, threadName: String): Event =
     AlertProvided(ordinal, message, None, threadName = threadName, timeStamp = timeStamp)
@@ -88,8 +79,8 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
   }
 
   private final class MessageHeldBack extends RuntimeException {
-    val isBeingRead = new CountDownLatch(1)
-    val mayBeRead = new CountDownLatch(1)
+    val isBeingRead: CountDownLatch = new CountDownLatch(1)
+    val mayBeRead: CountDownLatch = new CountDownLatch(1)
 
     override def getMessage: String = {
       isBeingRead.countDown()
@@ -126,76 +117,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     )
   }
 
-  "A started emitter" should {
-    "have written the run's PID and start time as the event log's one line" in {
-      TemporaryEventLog.in { eventLogFile =>
-        val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-        try {
-          TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine)
-        } finally {
-          emitter.writeRunEvent(runCompleted)
-        }
-      }
-    }
-
-    "leave the event log file as the only file of its folder" in {
-      TemporaryEventLog.in { eventLogFile =>
-        val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-        try {
-          TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set("events.log")
-        } finally {
-          emitter.writeRunEvent(runCompleted)
-        }
-      }
-    }
-
-    "replace a file an earlier run left under the event log's name" in {
-      TemporaryEventLog.in { eventLogFile =>
-        Files.write(eventLogFile, "an earlier run's log\n".getBytes(StandardCharsets.UTF_8))
-        val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-        try {
-          TemporaryEventLog.lines(eventLogFile) shouldBe Vector(runStartedLine)
-        } finally {
-          emitter.writeRunEvent(runCompleted)
-        }
-      }
-    }
-
-    "replace a file an earlier run left under the name of the file it moves to the event log's name" in {
-      TemporaryEventLog.in { eventLogFile =>
-        Files.write(eventLogFile.resolveSibling("events.log.tmp"), "an earlier run's start\n".getBytes(StandardCharsets.UTF_8))
-        val emitter = TestEventLogEmitter.started(eventLogFile, identity)
-        try {
-          (TemporaryEventLog.namesIn(eventLogFile.getParent), TemporaryEventLog.lines(eventLogFile)) shouldBe ((Set("events.log"), Vector(runStartedLine)))
-        } finally {
-          emitter.writeRunEvent(runCompleted)
-        }
-      }
-    }
-  }
-
-  "An emitter that cannot write the file it moves to the event log's name" should {
-    "fail to start, and create no event log file" in {
-      TemporaryEventLog.in { eventLogFile =>
-        Files.createDirectory(eventLogFile.resolveSibling("events.log.tmp"))
-        an[IOException] should be thrownBy TestEventLogEmitter.started(eventLogFile, identity)
-        TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set("events.log.tmp")
-      }
-    }
-  }
-
-  "An emitter that finds a link under the name of the file it moves to the event log's name" should {
-    "fail to start without writing to the link's target" in {
-      TemporaryEventLog.in { eventLogFile =>
-        val target = Files.write(eventLogFile.resolveSibling("target"), "the target's own content\n".getBytes(StandardCharsets.UTF_8))
-        try Files.createSymbolicLink(eventLogFile.resolveSibling("events.log.tmp"), target)
-        catch { case notPermitted: IOException => cancel(s"This user cannot create a symbolic link: $notPermitted") }
-        an[IOException] should be thrownBy TestEventLogEmitter.started(eventLogFile, identity)
-        (TemporaryEventLog.namesIn(eventLogFile.getParent), Files.readString(target)) shouldBe ((Set("events.log.tmp", "target"), "the target's own content\n"))
-      }
-    }
-  }
-
   "A registration of an emitter's run" should {
     "fail where its node table is read without the emitter's lock" in {
       val emitter = TestEventLogEmitter.appendingTo(new java.io.ByteArrayOutputStream)
@@ -206,26 +127,6 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
   }
 
   "An emitter" when {
-    "its process has no identity" should {
-      "fail to start, saying why, and create no file" in {
-        TemporaryEventLog.in { eventLogFile =>
-          val noProcessHandle = new IllegalStateException("this JVM has no java.lang.ProcessHandle")
-          the[IllegalStateException] thrownBy TestEventLogEmitter.startedIfGiven(Some(eventLogFile.toString), throw noProcessHandle) should
-            have message s"Cannot write the test event log $eventLogFile: this JVM has no java.lang.ProcessHandle"
-          TemporaryEventLog.namesIn(eventLogFile.getParent) shouldBe Set.empty
-        }
-      }
-    }
-
-    "its event log's folder does not exist" should {
-      "fail to start" in {
-        TemporaryEventLog.in { eventLogFile =>
-          val inMissingFolder: Path = eventLogFile.resolveSibling("missing").resolve("events.log")
-          a[NoSuchFileException] should be thrownBy TestEventLogEmitter.started(inMissingFolder, identity)
-        }
-      }
-    }
-
     "handed a run event" should {
       "append it as one line assigned to the run" in {
         TemporaryEventLog.in { eventLogFile =>
@@ -405,9 +306,9 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     }
 
     "handed a top-level suite's structure" should {
-      val inner = new Suite {}
-      val outer = new Suite {}
-      val nestedThenScopesAndTests =
+      def inner: Suite = new Suite {}
+      def outer: Suite = new Suite {}
+      def nestedThenScopesAndTests: SuiteStructure =
         structureOf(
           outer,
           "Outer",
@@ -669,4 +570,15 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
       TestEventLogEmitter.startOfTopLevelSuiteFor(None) should be theSameInstanceAs TestEventLogHandOff.startWithoutEventLog
     }
   }
+}
+
+private[tools] object TestEventLogEmitterSpec {
+
+  val ordinal: Ordinal = new Ordinal(1)
+  val timeStamp: Long = 1700000000000L
+  val identity: ProcessIdentity = ProcessIdentity(4242L, Instant.parse("2026-01-02T03:04:05.678Z"))
+
+  val runStartedLine: String = TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z")
+
+  def runCompleted: Event = RunCompleted(ordinal, threadName = "main", timeStamp = timeStamp)
 }

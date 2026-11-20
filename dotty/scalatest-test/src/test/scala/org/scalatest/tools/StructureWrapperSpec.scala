@@ -19,17 +19,19 @@ final class StructureWrapperSpec extends AnyWordSpec with Matchers {
   private final class HandOffAndPassOnRecording {
     private var recorded = Vector.empty[(String, AnyRef, Event)]
 
-    def inOrder: Vector[(String, AnyRef, Event)] = recorded
+    private def record(step: String, named: AnyRef, event: Event): Unit = synchronized { recorded :+= ((step, named, event)) }
 
-    val handOff: (WrapperNode, Event) => Unit = (named, event) => recorded :+= (("handed off", named, event))
+    def inOrder: Vector[(String, AnyRef, Event)] = synchronized(recorded)
+
+    val handOff: (WrapperNode, Event) => Unit = (named, event) => record("handed off", named, event)
 
     val reporter: Reporter = new Reporter {
-      def apply(event: Event): Unit = recorded :+= (("passed on", "the wrapped reporter", event))
+      def apply(event: Event): Unit = record("passed on", "the wrapped reporter", event)
     }
 
     def handOffThrowing(thrown: Throwable): (WrapperNode, Event) => Unit = (_, _) => throw thrown
 
-    def passedOn: Vector[Event] = recorded.collect { case ("passed on", _, event) => event }
+    def passedOn: Vector[Event] = inOrder.collect { case ("passed on", _, event) => event }
   }
 
   private def passedOnWhenHandOffThrows(thrown: Throwable, event: Event): Vector[Event] = {

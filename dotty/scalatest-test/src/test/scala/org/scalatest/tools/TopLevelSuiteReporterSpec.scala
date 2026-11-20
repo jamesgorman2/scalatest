@@ -27,7 +27,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
 
   private final class RecordingReporterOfSuite {
     private var asked = Vector.empty[(Suite, Filter, Reporter)]
-    val handedOut = new RecordingReporter
+    val handedOut: RecordingReporter = new RecordingReporter
     def askedFor: Vector[(Suite, Filter, Reporter)] = synchronized(asked)
     val function: (Suite, Filter, Reporter) => SuiteStart = (suite, filter, reporter) => {
       synchronized { asked :+= ((suite, filter, reporter)) }

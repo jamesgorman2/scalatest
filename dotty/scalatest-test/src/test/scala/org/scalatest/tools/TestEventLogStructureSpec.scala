@@ -13,25 +13,11 @@ import org.scalatest.events.TestFailed
 import org.scalatest.events.TestSucceeded
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  /**
-   * @param nodesInNotation the nodes below the suite, the outermost unindented
-   * @param nodesInFormat the nodes below the suite, in the order the event holds them, given the suite's node path
-   */
-  private final case class StatedStructure(
-    suiteName: String,
-    suiteClassName: String,
-    nodesInNotation: String,
-    nodesInFormat: NodePath => List[String]
-  ) {
-
-    def inNotation: String =
-      ("structure" :: s"""  suite "$suiteName", class "$suiteClassName"""" :: nodesInNotation.linesIterator.map("    " + _).toList).mkString("\n")
-
-    def line: String = TestEventLogLine.structure((TestEventLogLine.topLevelSuite(suiteName, suiteClassName) :: nodesInFormat(NodePath.topLevel(suiteClassName)))*)
-  }
+  import TestEventLogStructureSpec.*
 
   /**
    * The events a criterion states for a run, besides the suite's structure.
@@ -119,13 +105,9 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
 
   private def reported(events: Vector[Event]): Vector[String] = {
     events.collect {
-      case starting: SuiteStarting => s"SuiteStarting ${starting.suiteName}"
-      case completed: SuiteCompleted => s"SuiteCompleted ${completed.suiteName}"
       case aborted: SuiteAborted => s"SuiteAborted ${aborted.suiteName}, thrown ${thrownBy(aborted.throwable)}"
-      case succeeded: TestSucceeded => s"TestSucceeded ${succeeded.testName}"
-      case failed: TestFailed => s"TestFailed ${failed.testName}"
-      case _: RunCompleted => "RunCompleted"
       case aborted: RunAborted => s"RunAborted, thrown ${thrownBy(aborted.throwable)}"
+      case shown @ (_: SuiteStarting | _: SuiteCompleted | _: TestSucceeded | _: TestFailed | _: RunCompleted) => ReportedEvents.described(shown)
     }
   }
 
@@ -247,12 +229,12 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "scope s, labelled 's', holding scope u, labelled 'when u', holding test t, labelled '- should t'",
       "scope \"s\", label \"s\"\n  scope \"u\", label \"when u\"\n    test \"t\", label \"- should t\"",
       { suite =>
-        val s = suite.scope("s")
-        val u = s.scope("u")
+        val scopeS = suite.scope("s")
+        val scopeU = scopeS.scope("u")
         List(
-          TestEventLogLine.scope(s, 0, "s", "s"),
-          TestEventLogLine.scope(u, 0, "u", "when u"),
-          TestEventLogLine.test(suite.test("s when u should t"), u, 0, "t", "- should t")
+          TestEventLogLine.scope(scopeS, 0, "s", "s"),
+          TestEventLogLine.scope(scopeU, 0, "u", "when u"),
+          TestEventLogLine.test(suite.test("s when u should t"), scopeU, 0, "t", "- should t")
         )
       }
     ),
@@ -280,10 +262,10 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
         |  scope "x", label "should x that provides"
         |    test "t", label "- t"""".stripMargin,
       { suite =>
-        val s = suite.scope("s")
-        TestEventLogLine.scope(s, 0, "s", "s") ::
+        val scopeS = suite.scope("s")
+        TestEventLogLine.scope(scopeS, 0, "s", "s") ::
           List("u which", "v that", "w which provides", "x that provides").zipWithIndex.flatMap { (text, position) =>
-            val scope = s.scope(text)
+            val scope = scopeS.scope(text)
             List(
               TestEventLogLine.scope(scope, position, text.takeWhile(_ != ' '), s"should $text"),
               TestEventLogLine.test(suite.test(s"s should $text t"), scope, 0, "t", "- t")
@@ -503,17 +485,17 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     registrationsThatThrowFromFrameworkTasks.foreach { (suite, suiteClassName, thrown) =>
-      Scenario(s"Framework runs $suite") {
+      Scenario(s"A build tool runs $suite") {
         thisProcess
         Given(suite)
-        When("Framework runs it without the runner argument")
+        When("a build tool runs it without the runner argument")
         val thrownWithoutTheArgument = thrownByFrameworkTask(suiteClassName, Nil)
 
         Then("the suite's task throws what the registration threw, as in ScalaTest 3.2.20")
         thrownWithoutTheArgument shouldBe thrown
 
         TemporaryEventLog.in { eventLogFile =>
-          When("Framework runs it with the runner argument")
+          When("a build tool runs it with the runner argument")
           val thrownWithTheArgument = thrownByFrameworkTask(suiteClassName, runnerArgument(eventLogFile))
 
           Then("the suite's task throws the same")
@@ -529,7 +511,7 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     registrationsThatThrow.foreach { registration =>
-      Scenario(s"${registration.launch.named} runs ${registration.suite}") {
+      Scenario(s"${registration.launch.named.capitalize} runs ${registration.suite}") {
         thisProcess
         Given(registration.suite)
         When(s"${registration.launch.named} runs it without the runner argument")
@@ -590,17 +572,10 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       events = StatedEvents("the event log holds `test \"later\": TestIgnored`, and no event is assigned to `slow`", List("test \"later\": TestIgnored"), _.contains("""{"test":"slow"}"""))
     )
 
-    val shuffledSuite = StatedStructure(
-      "ShuffledSuite",
-      "samples.ShuffledSuite",
-      "test \"a\", label \"- a\"\ntest \"b\", label \"- b\"\ntest \"c\", label \"- c\"",
-      suite => List("a", "b", "c").zipWithIndex.map((name, position) => TestEventLogLine.test(suite.test(name), suite, position, name, s"- $name"))
-    )
-
     Scenario("A suite whose tests run in random order") {
       thisProcess
       Given("a suite mixing in RandomTestOrder that registers tests a, b and c in that order")
-      When("Framework runs it with the runner argument, and again until its tests start in another order")
+      When("a build tool runs it with the runner argument, and again until its tests start in another order")
       val lines = linesOfARunOutOfDeclaredOrder(shuffledSuite, Vector("a", "b", "c"))
 
       Then("the event log's one structure holds a, b and c in that order, though the tests ran in another")
@@ -609,7 +584,6 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       EventLogComparison.mismatchWhenHoldsInOrder(decoded(lines), built(runHolding(shuffledSuite, StatedEvents.none))) shouldBe None
     }
 
-    structureDecoderScenario("A suite whose tests run in random order", "a, b and c in that order, whatever order the tests ran in", shuffledSuite)
 
     structureScenarios(
       "A suite with no registration tree",
@@ -704,7 +678,46 @@ final class TestEventLogStructureSpec extends AnyFeatureSpec with GivenWhenThen 
       "a suite class whose constructor throws",
       Nil,
       "the suite alone, with the class that failed to construct",
-      StatedStructure("BrokenCtorSpec", "samples.BrokenCtorSpec", "", _ => Nil)
+      StatedStructure("ThrowingConstructorSpec", "samples.ThrowingConstructorSpec", "", _ => Nil)
     )
+  }
+}
+
+private[tools] object TestEventLogStructureSpec {
+
+  /**
+   * @param nodesInNotation the nodes below the suite, the outermost unindented
+   * @param nodesInFormat the nodes below the suite, in the order the event holds them, given the suite's node path
+   */
+  final case class StatedStructure(
+    suiteName: String,
+    suiteClassName: String,
+    nodesInNotation: String,
+    nodesInFormat: NodePath => List[String]
+  ) {
+
+    def inNotation: String =
+      ("structure" :: s"""  suite "$suiteName", class "$suiteClassName"""" :: nodesInNotation.linesIterator.map("    " + _).toList).mkString("\n")
+
+    def line: String = TestEventLogLine.structure((TestEventLogLine.topLevelSuite(suiteName, suiteClassName) :: nodesInFormat(NodePath.topLevel(suiteClassName)))*)
+  }
+
+  val shuffledSuite: StatedStructure = StatedStructure(
+    "ShuffledSuite",
+    "samples.ShuffledSuite",
+    "test \"a\", label \"- a\"\ntest \"b\", label \"- b\"\ntest \"c\", label \"- c\"",
+    suite => List("a", "b", "c").zipWithIndex.map((name, position) => TestEventLogLine.test(suite.test(name), suite, position, name, s"- $name"))
+  )
+}
+
+final class TestEventLogStructureDecoderSpec extends AnyWordSpec with Matchers with TestEventLogRuns {
+
+  import TestEventLogStructureSpec.*
+
+  "The decoder, given the line of the structure of a suite whose tests run in random order" should {
+    "yield a structure that holds a, b and c in that order, whatever order the tests ran in" in {
+      val event = TestEventLogDecoder.decode(shuffledSuite.line)
+      EventLogComparison.mismatchWhenIs(Seq(event), built(shuffledSuite.inNotation)) shouldBe None
+    }
   }
 }

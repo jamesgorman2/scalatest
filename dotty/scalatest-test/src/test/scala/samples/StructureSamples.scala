@@ -135,7 +135,7 @@ class OuterSuites extends Suites(new Inner1Suite, new Inner2Suite)
 class StepwiseOuterSuites extends Suites(new Inner1Suite, new Inner2Suite) with StepwiseNestedSuiteExecution
 
 @DoNotDiscover
-class BrokenCtorSpec extends AnyFunSuite {
+class ThrowingConstructorSpec extends AnyFunSuite {
 
   throw new IllegalStateException("no config")
 }

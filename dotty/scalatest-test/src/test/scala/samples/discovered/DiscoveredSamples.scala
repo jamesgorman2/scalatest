@@ -20,13 +20,13 @@ class SqrtPropSpec extends AnyPropSpec {
 }
 
 // Its constructor throws only on a thread of the group a test names for it, so that it constructs wherever else it is discovered.
-class BrokenCtorSpec extends AnyFunSuite {
+class ThrowingConstructorSpec extends AnyFunSuite {
 
-  if (Thread.currentThread.getThreadGroup.getName == BrokenCtorSpec.threadGroupItsConstructorThrowsIn) {
+  if (Thread.currentThread.getThreadGroup.getName == ThrowingConstructorSpec.threadGroupItsConstructorThrowsIn) {
     throw new IllegalStateException("no config")
   }
 }
 
-object BrokenCtorSpec {
-  val threadGroupItsConstructorThrowsIn = "constructs suites whose constructors throw"
+object ThrowingConstructorSpec {
+  val threadGroupItsConstructorThrowsIn: String = "constructs suites whose constructors throw"
 }

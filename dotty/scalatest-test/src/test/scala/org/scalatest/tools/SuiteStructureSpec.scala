@@ -113,10 +113,10 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
     }
 
     "take the class name of a suite that stands for one whose construction failed from the class that failed" in {
-      val standIn = new DeferredAbortedSuite("samples.BrokenCtorSpec", "samples.BrokenCtorSpec", new IllegalStateException("no config"))
+      val standIn = new DeferredAbortedSuite("samples.ThrowingConstructorSpec", "samples.ThrowingConstructorSpec", new IllegalStateException("no config"))
       val structure = SuiteStructure.read(standIn, Filter.default)
       (structure.name, structure.suiteId, structure.className, structure.scopesAndTests, structure.nestedSuites) shouldBe
-        (("BrokenCtorSpec", SuiteId("samples.BrokenCtorSpec"), "samples.BrokenCtorSpec", Nil, Nil))
+        (("ThrowingConstructorSpec", SuiteId("samples.ThrowingConstructorSpec"), "samples.ThrowingConstructorSpec", Nil, Nil))
     }
 
     "hold each nested suite in the order the suite nests them, read from that instance with the same filter" in {

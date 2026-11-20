@@ -30,7 +30,7 @@ import sbt.testing.TaskDef
 import scala.jdk.CollectionConverters.*
 
 private[tools] enum Launch(val named: String) {
-  case ByFramework extends Launch("Framework")
+  case ByFramework extends Launch("a build tool")
   case ByRunner extends Launch("Runner.run")
 }
 
@@ -185,11 +185,11 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   }
 
   // Recurses once for each class loader between this class's and the JVM's own.
-  private def classpathOf(loader: ClassLoader): List[URL] = {
+  private def classpathOf(loader: Option[ClassLoader]): List[URL] = {
     loader match {
-      case null => Nil
-      case ofUrls: URLClassLoader => ofUrls.getURLs.toList ::: classpathOf(ofUrls.getParent)
-      case other => classpathOf(other.getParent)
+      case None => Nil
+      case Some(ofUrls: URLClassLoader) => ofUrls.getURLs.toList ::: classpathOf(Option(ofUrls.getParent))
+      case Some(other) => classpathOf(Option(other.getParent))
     }
   }
 
@@ -199,7 +199,7 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   /** The JVM runs on this JVM's classpath, and writes its stdout and stderr to files in `folder`. */
   protected def outputOfItsOwnJvm(mainClassName: String, arguments: Seq[String], folder: Path): JvmOutput = {
     val classpath =
-      (classpathOf(getClass.getClassLoader).map(url => Paths.get(url.toURI).toString) ++
+      (classpathOf(Option(getClass.getClassLoader)).map(url => Paths.get(url.toURI).toString) ++
         System.getProperty("java.class.path").split(File.pathSeparator)).distinct.mkString(File.pathSeparator)
     val java = Paths.get(System.getProperty("java.home"), "bin", "java").toString
     val stdout = folder.resolve("stdout.txt")

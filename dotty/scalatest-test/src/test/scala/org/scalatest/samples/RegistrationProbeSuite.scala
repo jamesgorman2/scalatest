@@ -1,6 +1,7 @@
 package org.scalatest.samples
 
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.DoNotDiscover
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
@@ -12,22 +13,22 @@ import scala.jdk.CollectionConverters.*
 @DoNotDiscover
 class RegistrationProbeSuite extends AnyFunSuite {
 
+  private val recording = RegistrationProbeSuite.current.get
+
   test("probes its registration") {
-    RegistrationProbeSuite.ran.add(this -> RegistrationInContext.ofCallingThread)
+    recording.add(this -> RegistrationInContext.ofCallingThread)
   }
 }
 
 object RegistrationProbeSuite {
 
-  private val ran = new ConcurrentLinkedQueue[(Suite, SuiteRegistration)]
+  private val current = new AtomicReference(new ConcurrentLinkedQueue[(Suite, SuiteRegistration)])
 
+  /** Each instance records into the recording current when it is constructed, so a run that outlives its recording cannot write into a later one. */
   def instancesRunIn(launch: => Unit): Vector[(Suite, SuiteRegistration)] = synchronized {
-    ran.clear()
-    try {
-      launch
-      ran.asScala.toVector
-    } finally {
-      ran.clear()
-    }
+    val recording = new ConcurrentLinkedQueue[(Suite, SuiteRegistration)]
+    current.set(recording)
+    launch
+    recording.asScala.toVector
   }
 }

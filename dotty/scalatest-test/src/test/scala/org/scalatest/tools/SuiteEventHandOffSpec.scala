@@ -458,14 +458,14 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   "An emitter whose suite runs its scope twice in one run" should {
     "give each opening of the scope, and the test run in it, an execution of its own within the suite's one execution" in {
       val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$RunsItsTestsTwiceSpec")
-      val s = spec.scope("s")
-      val t = spec.test("s t")
+      val scopeS = spec.scope("s")
+      val testT = spec.test("s t")
       val stated = TestEventLogLine.nodeEvent(spec, List(1), "SuiteStarting") :: List(1, 2).flatMap { opening =>
         List(
-          TestEventLogLine.nodeEvent(s, List(1, opening), "ScopeOpened"),
-          TestEventLogLine.nodeEvent(t, List(1, opening, opening), "TestStarting"),
-          TestEventLogLine.nodeEvent(t, List(1, opening, opening), "TestSucceeded"),
-          TestEventLogLine.nodeEvent(s, List(1, opening), "ScopeClosed")
+          TestEventLogLine.nodeEvent(scopeS, List(1, opening), "ScopeOpened"),
+          TestEventLogLine.nodeEvent(testT, List(1, opening, opening), "TestStarting"),
+          TestEventLogLine.nodeEvent(testT, List(1, opening, opening), "TestSucceeded"),
+          TestEventLogLine.nodeEvent(scopeS, List(1, opening), "ScopeClosed")
         )
       } ::: List(TestEventLogLine.nodeEvent(spec, List(1), "SuiteCompleted"))
       StatedLines.mismatchWhenIs(linesAfterStructureOf(new RunsItsTestsTwiceSpec), stated) shouldBe None
@@ -475,12 +475,12 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
   "An emitter whose async suite runs its scope twice in one run, one test after another" should {
     "assign an ignored test, reported once a later opening of its scope has closed, to its own opening's execution" in {
       val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$OpensItsAsyncScopeTwiceSpec")
-      val i = spec.test("s i")
+      val testI = spec.test("s i")
       val queued = new QueuingExecutionContext
       val written = linesAfterStructureOf(new OpensItsAsyncScopeTwiceSpec(queued), () => queued.runAll())
       val stated = List(
-        TestEventLogLine.nodeEvent(i, List(1, 2, 1), "TestIgnored"),
-        TestEventLogLine.nodeEvent(i, List(1, 1, 2), "TestIgnored")
+        TestEventLogLine.nodeEvent(testI, List(1, 2, 1), "TestIgnored"),
+        TestEventLogLine.nodeEvent(testI, List(1, 1, 2), "TestIgnored")
       )
       StatedLines.mismatchWhenHoldsInOrder(written, stated) shouldBe None
     }
@@ -549,14 +549,14 @@ final class SuiteEventHandOffSpec extends AnyWordSpec with Matchers with EventLo
     "write the suite's SuiteStarting and SuiteCompleted, and each event of its scope and test, which their send sites hand off though no reporter receives them" in
       afterTheSuiteRan { (eventLog, _) =>
         val spec = NodePath.topLevel("org.scalatest.tools.SuiteEventHandOffSpec$PassesNoEventOnSpec")
-        val s = spec.scope("s")
-        val t = spec.test("s t")
+        val scopeS = spec.scope("s")
+        val testT = spec.test("s t")
         val stated = List(
           TestEventLogLine.nodeEvent(spec, List(1), "SuiteStarting"),
-          TestEventLogLine.nodeEvent(s, List(1, 1), "ScopeOpened"),
-          TestEventLogLine.nodeEvent(t, List(1, 1, 1), "TestStarting"),
-          TestEventLogLine.nodeEvent(t, List(1, 1, 1), "TestSucceeded"),
-          TestEventLogLine.nodeEvent(s, List(1, 1), "ScopeClosed"),
+          TestEventLogLine.nodeEvent(scopeS, List(1, 1), "ScopeOpened"),
+          TestEventLogLine.nodeEvent(testT, List(1, 1, 1), "TestStarting"),
+          TestEventLogLine.nodeEvent(testT, List(1, 1, 1), "TestSucceeded"),
+          TestEventLogLine.nodeEvent(scopeS, List(1, 1), "ScopeClosed"),
           TestEventLogLine.nodeEvent(spec, List(1), "SuiteCompleted")
         )
         StatedLines.mismatchWhenIs(eventLog.writes.drop(1).map(_.stripSuffix("\n")), stated) shouldBe None

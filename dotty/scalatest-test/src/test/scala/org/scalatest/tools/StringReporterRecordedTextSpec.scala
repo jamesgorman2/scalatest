@@ -649,26 +649,26 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     cases.result()
   }
 
-  "StringReporter's fragmentsForEvent" should {
+  "The text a string reporter prints for an event" should {
     eventCases.foreach { eventCase =>
-      s"return the recorded fragments for ${eventCase.name}" in {
+      s"be the recorded text for ${eventCase.name}" in {
         rendered(eventFlags, fragmentsFor(eventCase.event, _, Vector.empty)) shouldBe recorded(eventCase.name)
       }
     }
     runEndCases.foreach { runEndCase =>
-      s"return the recorded fragments for ${runEndCase.name}" in {
+      s"be the recorded text for ${runEndCase.name}" in {
         rendered(summaryFlags, fragmentsFor(runEndCase.event, _, runEndCase.reminderEvents)) shouldBe recorded(runEndCase.name)
       }
     }
-    "throw a NullPointerException for a blank message and a throwable without a message" in {
+    "not be printed, throwing a NullPointerException, for a blank message and a throwable without a message" in {
       val event = testFailed("", Some(plainFailureWithoutMessage), None)
       a[NullPointerException] should be thrownBy fragmentsFor(event, eventFlags.head, Vector.empty)
     }
   }
 
-  "StringReporter's summaryFragments" should {
+  "The summary a string reporter prints at the end of a run" should {
     summaryCases.foreach { summaryCase =>
-      s"return the recorded fragments for ${summaryCase.name}" in {
+      s"be the recorded text for ${summaryCase.name}" in {
         rendered(summaryFlags, summaryFragmentsFor(summaryCase, _)) shouldBe recorded(summaryCase.name)
       }
     }

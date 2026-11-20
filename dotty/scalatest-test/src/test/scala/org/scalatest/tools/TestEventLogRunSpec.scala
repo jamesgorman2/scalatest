@@ -16,23 +16,23 @@ import org.scalatest.events.TestEventLogDecoder
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import sbt.testing.Runner as SbtRunner
 import scala.util.Try
 
 final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with TestEventLogRuns {
 
-  private final case class EndedRun(suiteClassName: String, description: String, launch: Launch, ended: String, outcome: RunOutcome)
+  private final case class EndedRun(suiteClassName: String, description: String, launch: Launch, ended: String)
 
   private val runsThatEnd = List(
-    EndedRun("samples.SqrtPropSpec", "a suite whose one property succeeds", Launch.ByFramework, "completed", RunOutcome.Completed),
-    EndedRun("samples.SqrtPropSpec", "a suite whose one property succeeds", Launch.ByRunner, "completed", RunOutcome.Completed),
-    EndedRun("samples.AbortSuite", "a suite whose one test throws OutOfMemoryError", Launch.ByRunner, "aborted", RunOutcome.Aborted),
+    EndedRun("samples.SqrtPropSpec", "a suite whose one property succeeds", Launch.ByFramework, "completed"),
+    EndedRun("samples.SqrtPropSpec", "a suite whose one property succeeds", Launch.ByRunner, "completed"),
+    EndedRun("samples.AbortSuite", "a suite whose one test throws OutOfMemoryError", Launch.ByRunner, "aborted"),
     EndedRun(
       "org.scalatest.samples.StopSuite",
       "a suite mixing in StopOnFailure whose first test fails",
       Launch.ByRunner,
-      "stopped",
-      RunOutcome.Stopped
+      "stopped"
     )
   )
 
@@ -60,14 +60,14 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   Feature("The run in its test event log") {
 
-    Scenario("A Framework runner is constructed") {
+    Scenario("A build tool's runner is constructed") {
       val process = ProcessHandle.current()
       val startTime = process.info().startInstant()
       assume(startTime.isPresent, "this process has no start time")
       val pid = process.pid()
       val startTimeText = startTime.get.toString
       TemporaryEventLog.in { eventLogFile =>
-        When("a Framework runner is constructed with the runner argument")
+        When("a build tool's runner is constructed with the runner argument")
         val runner = frameworkRunner(runnerArgument(eventLogFile))
         try {
           val lines = TemporaryEventLog.lines(eventLogFile)
@@ -88,15 +88,6 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("The decoder reads a run's start") {
-      When("the decoder is given the line of a run's start")
-      val event = TestEventLogDecoder.decode(TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z"))
-
-      Then("it yields the run's start, with the line's PID and process start time")
-      event shouldBe TestEventLogEvent.RunStarted(4242L, "2026-01-02T03:04:05.678Z")
-      EventLogComparison.mismatchWhenIs(Seq(event), built("run started")) shouldBe None
-    }
-
     runsThatEnd.foreach { run =>
       Scenario(s"A run of ${run.description}, launched by ${run.launch.named}, ends ${run.ended}") {
         thisProcess
@@ -113,22 +104,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    runsThatEnd.map(run => run.ended -> run.outcome).distinct.foreach { (ended, outcome) =>
-      Scenario(s"The decoder reads that a run ended $ended") {
-        When(s"the decoder is given the line of a run that ended $ended")
-        val event = TestEventLogDecoder.decode(TestEventLogLine.runEnded(ended))
-
-        Then(s"it yields that the run ended $ended")
-        event shouldBe TestEventLogEvent.RunEnded(outcome)
-        EventLogComparison.mismatchWhenIs(Seq(event), built(s"run ended $ended")) shouldBe None
-      }
-    }
-
-    Scenario("A Framework run's events outside every suite are assigned to the run") {
+    Scenario("A build tool's run's events outside every suite are assigned to the run") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
-        When("Framework runs it with the runner argument")
+        When("a build tool runs it with the runner argument")
         launched(Launch.ByFramework, "samples.SqrtPropSpec", runnerArgument(eventLogFile))
 
         Then("the event log holds the run's start, its run events assigned to the run, and its end, in that order")
@@ -238,10 +218,10 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A Framework runner that fails at construction leaves an event log that holds only the run's start") {
+    Scenario("A build tool's runner that fails at construction leaves an event log that holds only the run's start") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
-        When("a Framework runner is constructed with a custom reporter class that does not exist, and the runner argument")
+        When("a build tool's runner is constructed with a custom reporter class that does not exist, and the runner argument")
         Then("its construction fails")
         an[IllegalArgumentException] should be thrownBy frameworkRunner(List("-C", "samples.NoSuchReporter") ++ runnerArgument(eventLogFile))
 
@@ -255,12 +235,12 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
     }
   }
 
-  Feature("A Framework run whose done throws before it sends RunCompleted") {
+  Feature("A build tool's run whose done throws before it sends RunCompleted") {
 
-    Scenario("A Framework runner whose done is interrupted while it waits for a sub-process's events closes its event log") {
+    Scenario("A build tool's runner whose done is interrupted while it waits for a sub-process's events closes its event log") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
-        Given("a Framework runner constructed with the runner argument, waiting for the events of a sub-process")
+        Given("a build tool's runner constructed with the runner argument, waiting for the events of a sub-process")
         val runner = frameworkRunner(runnerArgument(eventLogFile))
         val subProcessServer = runner.remoteArgs()
         try {
@@ -292,10 +272,10 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   Feature("A run whose sub-process stops") {
 
-    Scenario("A Framework runner relays a sub-process's RunStopped and still ends its event log with its own RunCompleted") {
+    Scenario("A build tool's runner relays a sub-process's RunStopped and still ends its event log with its own RunCompleted") {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
-        Given("a Framework runner constructed with the runner argument, waiting for the events of a sub-process")
+        Given("a build tool's runner constructed with the runner argument, waiting for the events of a sub-process")
         val runner = frameworkRunner(runnerArgument(eventLogFile))
         val subProcessServer = runner.remoteArgs()
 
@@ -329,12 +309,12 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   Feature("A sub-process runner") {
 
-    Scenario("A Framework runner given remote arguments writes no event log") {
+    Scenario("A build tool's runner given remote arguments writes no event log") {
       TemporaryEventLog.in { eventLogFile =>
         Given("a server for the runner's events, as sbt's main runner opens for a sub-process it forks")
         val server = new ServerSocket(0)
         try {
-          When("a Framework runner is constructed with the runner argument and that server as its remote arguments, and is done")
+          When("a build tool's runner is constructed with the runner argument and that server as its remote arguments, and is done")
           frameworkRunner(runnerArgument(eventLogFile), List("localhost", server.getLocalPort.toString)).done()
 
           Then("the event log's folder holds no file")
@@ -348,11 +328,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   Feature("A JVM that has no ProcessHandle") {
 
-    Scenario("A Framework runner given the runner argument fails at construction") {
+    Scenario("A build tool's runner given the runner argument fails at construction") {
       TemporaryEventLog.in { eventLogFile =>
         val message = noProcessHandleMessage(eventLogFile)
 
-        When("a Framework runner is constructed with the runner argument")
+        When("a build tool's runner is constructed with the runner argument")
         val failure = the[IllegalStateException] thrownBy frameworkRunner(runnerArgument(eventLogFile))
 
         Then("it fails, saying why")
@@ -382,11 +362,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
   Feature("The reporter ScalaTest uses when none is configured") {
 
-    Scenario("A Framework run given the runner argument and no reporter writes nothing to the loggers") {
+    Scenario("A build tool's run given the runner argument and no reporter writes nothing to the loggers") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
-        When("Framework runs it with no argument, and again with the runner argument alone")
+        When("a build tool runs it with no argument, and again with the runner argument alone")
         val loggerWithoutArgument = new RecordingLogger
         val runnerWithoutArgument = frameworkRunner(Nil)
         execute(runnerWithoutArgument, "samples.SqrtPropSpec", loggerWithoutArgument)
@@ -405,11 +385,11 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
       }
     }
 
-    Scenario("A Framework run given the runner argument returns no end-of-run summary") {
+    Scenario("A build tool's run given the runner argument returns no end-of-run summary") {
       thisProcess
       Given("a suite whose one property succeeds")
       TemporaryEventLog.in { eventLogFile =>
-        When("Framework runs it with no argument, and again with the runner argument alone")
+        When("a build tool runs it with no argument, and again with the runner argument alone")
         val runnerWithoutArgument = frameworkRunner(Nil)
         execute(runnerWithoutArgument, "samples.SqrtPropSpec", new RecordingLogger)
         val summaryWithoutArgument = runnerWithoutArgument.done()
@@ -435,6 +415,27 @@ final class TestEventLogRunSpec extends AnyFeatureSpec with GivenWhenThen with M
 
         And("it writes no event log")
         Files.exists(eventLogFile) shouldBe false
+      }
+    }
+  }
+}
+
+final class TestEventLogRunDecoderSpec extends AnyWordSpec with Matchers with TestEventLogRuns {
+
+  "The decoder, given the line of a run's start" should {
+    "yield the run's start, with the line's PID and process start time" in {
+      val event = TestEventLogDecoder.decode(TestEventLogLine.runStarted(4242L, "2026-01-02T03:04:05.678Z"))
+      event shouldBe TestEventLogEvent.RunStarted(4242L, "2026-01-02T03:04:05.678Z")
+      EventLogComparison.mismatchWhenIs(Seq(event), built("run started")) shouldBe None
+    }
+  }
+
+  List("completed" -> RunOutcome.Completed, "aborted" -> RunOutcome.Aborted, "stopped" -> RunOutcome.Stopped).foreach { (ended, outcome) =>
+    s"The decoder, given the line of a run that ended $ended" should {
+      s"yield that the run ended $ended" in {
+        val event = TestEventLogDecoder.decode(TestEventLogLine.runEnded(ended))
+        event shouldBe TestEventLogEvent.RunEnded(outcome)
+        EventLogComparison.mismatchWhenIs(Seq(event), built(s"run ended $ended")) shouldBe None
       }
     }
   }

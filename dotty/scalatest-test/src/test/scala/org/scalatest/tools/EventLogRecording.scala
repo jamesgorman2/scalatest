@@ -73,8 +73,8 @@ private[tools] trait EventLogRecording { this: Matchers =>
 
   protected final class RecordingReporter extends Reporter {
     private var received = Vector.empty[Event]
-    def events: Vector[Event] = received
-    def apply(event: Event): Unit = received :+= event
+    def events: Vector[Event] = synchronized(received)
+    def apply(event: Event): Unit = synchronized { received :+= event }
   }
 
   protected def joined(thread: Thread): Boolean = {

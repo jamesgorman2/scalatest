@@ -1,6 +1,5 @@
 package samples
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Alerting
@@ -21,31 +20,40 @@ import scala.jdk.CollectionConverters.*
 
 object MessageCallTimes {
 
-  private val bySuiteClass = new ConcurrentHashMap[String, ConcurrentLinkedQueue[(Long, Long)]]
+  private val current = new AtomicReference(new ConcurrentLinkedQueue[(Long, Long)])
 
-  private def of(suiteClassName: String): ConcurrentLinkedQueue[(Long, Long)] =
-    bySuiteClass.computeIfAbsent(suiteClassName, _ => new ConcurrentLinkedQueue[(Long, Long)])
-
-  def clear(suiteClassName: String): Unit = of(suiteClassName).clear()
-
-  def of(suiteClass: Class[?]): Vector[(Long, Long)] = of(suiteClass.getName).asScala.toVector
-
-  def timed(suiteClass: Class[?])(call: => Unit): Unit = {
-    val before = System.currentTimeMillis
-    call
-    of(suiteClass.getName).add(before -> System.currentTimeMillis)
-    // Keeps each call's time apart from the next call's and from the test's close.
-    Thread.sleep(20)
+  /**
+   * Gives what `launch` gives, and the times of the message calls of the suites constructed while it ran. Each suite
+   * records into the recording current when it is constructed, so a run that outlives its recording cannot write into a
+   * later one.
+   */
+  def recordedIn[A](launch: => A): (A, Vector[(Long, Long)]) = synchronized {
+    val recording = new ConcurrentLinkedQueue[(Long, Long)]
+    current.set(recording)
+    val launched = launch
+    (launched, recording.asScala.toVector)
   }
+
+  private[samples] def currentRecording: ConcurrentLinkedQueue[(Long, Long)] = current.get
 }
 
 trait CallsEachMessage extends Suite { this: Informing with Notifying with Alerting with Documenting =>
 
+  private val callTimes = MessageCallTimes.currentRecording
+
   protected def callEachMessage(): Unit = {
-    MessageCallTimes.timed(getClass)(info("checked size"))
-    MessageCallTimes.timed(getClass)(note("a note"))
-    MessageCallTimes.timed(getClass)(alert("an alert"))
-    MessageCallTimes.timed(getClass)(markup("*markup*"))
+    timed(info("checked size"))
+    timed(note("a note"))
+    timed(alert("an alert"))
+    timed(markup("*markup*"))
+  }
+
+  private def timed(call: => Unit): Unit = {
+    val before = System.currentTimeMillis
+    call
+    callTimes.add(before -> System.currentTimeMillis)
+    // Keeps each call's time apart from the next call's and from the test's close.
+    Thread.sleep(20)
   }
 
   override def suiteName: String = "MessagesSpec"
@@ -142,17 +150,12 @@ class ControlCharactersTextSuite extends ReportsText("tab\tand carriage return\r
 @DoNotDiscover
 class EmptyTextSuite extends ReportsText("")
 
-object ThrowSuite {
-  val thrown = new AtomicReference[Throwable]
-}
-
 @DoNotDiscover
 class ThrowSuite extends AnyFunSuite {
 
   test("throws") {
     val outer = new IllegalStateException("outer", new java.io.IOException("inner"))
     outer.addSuppressed(new RuntimeException("closing"))
-    ThrowSuite.thrown.set(outer)
     throw outer
   }
 }
