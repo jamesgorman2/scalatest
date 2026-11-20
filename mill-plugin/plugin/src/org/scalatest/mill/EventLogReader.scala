@@ -89,18 +89,18 @@ private[mill] final class EventLogReader(
   private def readRun(feed: RunFeed): Unit = {
     val input = openOnceReadable(failedOpens = 0)
     try {
-      new RunReading(feed, input).readUntilStreamEnds(process = None)
+      new RunReading(feed, input).readUntilProcessExits(process = None)
     } finally {
       input.close()
     }
   }
 
-  // On Windows, opening the file just after the emitter moves it into place can fail for a moment with a sharing
-  // violation, which Java reports as a `FileNotFoundException`.
   @tailrec
   private def openOnceReadable(failedOpens: Int): EventLogInput =
     Try(eventLogFile.open()) match {
       case Success(input) => input
+      // On Windows, opening the file just after the emitter moves it into place can fail for a moment with a sharing
+      // violation, which Java reports as a `FileNotFoundException`.
       case Failure(_: FileNotFoundException) if failedOpens < EventLogReader.retriedOpens =>
         Thread.sleep(pollInterval.toMillis)
         openOnceReadable(failedOpens + 1)
@@ -112,12 +112,12 @@ private[mill] final class EventLogReader(
     private val lines = new EventLogLines
 
     @tailrec
-    def readUntilStreamEnds(process: Option[RunProcess]): Unit = {
+    def readUntilProcessExits(process: Option[RunProcess]): Unit = {
       val exitedBeforeRead = process.exists(hasExited)
       val processAfterRead = readToEnd(process)
       if (!exitedBeforeRead) {
         Thread.sleep(pollInterval.toMillis)
-        readUntilStreamEnds(processAfterRead)
+        readUntilProcessExits(processAfterRead)
       }
     }
 
@@ -140,7 +140,7 @@ private[mill] final class EventLogReader(
 
 private[mill] object EventLogReader {
 
-  def threadName(eventLogFile: EventLogFile): String = s"scalatest event log reader: $eventLogFile"
+  def threadName(eventLogFile: EventLogFile): String = s"scalatest event log reader: ${eventLogFile.name}"
 
   private val retriedOpens: Int = 500
 

@@ -40,7 +40,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   }
 
   private final class WorkerRunFixture(
-      eventLogFile: EventLogFile,
+      val eventLogFile: EventLogFile,
       workerName: String = "worker 0 of fork group 1 of core.test",
       consolidationUnderTest: ConsolidationUnderTest = new ConsolidationUnderTest
   ) {
@@ -90,8 +90,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
   }
 
-  private def readerThreadsOf(eventLogFile: Path): Int =
-    Thread.getAllStackTraces.keySet.asScala.count(thread => thread.getName == EventLogReader.threadName(EventLogFile.at(eventLogFile)) && thread.isAlive)
+  private def readerThreadsOf(fixture: WorkerRunFixture): Int =
+    Thread.getAllStackTraces.keySet.asScala.count(thread => thread.getName == EventLogReader.threadName(fixture.eventLogFile) && thread.isAlive)
 
   private def withEventLogFile[A](test: Path => A): A = {
     val folder = Files.createTempDirectory("worker-run")
@@ -107,6 +107,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   private def sharingViolation(file: Path): EventLogFile =
     new EventLogFile {
+      def name: String = file.toString
+
       def exists: Boolean = EventLogFile.at(file).exists
 
       def open(): EventLogInput =
@@ -370,7 +372,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(EventLogFile.at(file))
           fixture.workerRun.start(_ => Promise[WorkerProcess]().future)
-          readerThreadsOf(file) shouldBe 0
+          readerThreadsOf(fixture) shouldBe 0
           fixture.workerRun.abandon()
         }
       }
@@ -387,7 +389,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
             workerEnd.future
           }
           workerStarting()
-          readerThreadsOf(file) shouldBe 1
+          readerThreadsOf(fixture) shouldBe 1
           writeCompletedRun(file)
           workerEnd.success(WorkerProcess.Started)
           fixture.endWorker()
@@ -402,9 +404,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           val fixture = new WorkerRunFixture(EventLogFile.at(file))
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
-          readerThreadsOf(file) shouldBe 1
+          readerThreadsOf(fixture) shouldBe 1
           workerEnd.success(WorkerProcess.NotStarted)
-          eventually(readerThreadsOf(file) shouldBe 0)
+          eventually(readerThreadsOf(fixture) shouldBe 0)
           fixture.runsAdded.get shouldBe 0
           fixture.processesEndedBeforeAnyRun.get shouldBe 0
           fixture.endWorker()
@@ -419,7 +421,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
           workerEnd.success(WorkerProcess.Started)
-          eventually(readerThreadsOf(file) shouldBe 0)
+          eventually(readerThreadsOf(fixture) shouldBe 0)
           fixture.processesEndedBeforeAnyRun.get shouldBe 1
           fixture.endWorker()
         }
@@ -431,7 +433,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withEventLogFile { file =>
           val fixture = new WorkerRunFixture(EventLogFile.at(file))
           fixture.start(throw new IllegalStateException("claim log unreadable"))
-          eventually(readerThreadsOf(file) shouldBe 0)
+          eventually(readerThreadsOf(fixture) shouldBe 0)
           fixture.endWorker()
         }
       }
@@ -478,9 +480,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
               if (fixture eq first) fixture.start(Promise[WorkerProcess]().future) else fixture.workerRun.start(_ => Promise[WorkerProcess]().future)
               fixture.workerRun
             }
-            Seq(readerThreadsOf(firstFile), readerThreadsOf(secondFile)) shouldBe Seq(1, 0)
+            Seq(readerThreadsOf(first), readerThreadsOf(second)) shouldBe Seq(1, 0)
             workerRuns.foreach(_.abandon())
-            eventually(readerThreadsOf(firstFile) shouldBe 0)
+            eventually(readerThreadsOf(first) shouldBe 0)
           }
         }
       }

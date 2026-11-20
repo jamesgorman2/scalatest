@@ -35,7 +35,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    *                    call as the worker starts, on whichever thread runs it.
    */
   def start(startWorker: (() => Unit) => Future[WorkerProcess]): Unit = {
-    started = WorkerRun.rethrowingAfter(abandon())(Try(startWorker(() => startReading())))
+    started = WorkerRun.abandoningOnThrow(abandon())(Try(startWorker(() => startReading())))
     started match {
       case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started)))(using ExecutionContext.parasitic)
       // A worker whose start threw may have started a process, as `end` assumes.
@@ -51,7 +51,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    * @param awaitWorker returns once the worker has ended
    */
   def end(awaitWorker: Future[WorkerProcess] => Unit): Unit = {
-    val ended = WorkerRun.rethrowingAfter(abandon()) {
+    val ended = WorkerRun.abandoningOnThrow(abandon()) {
       started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
     }
     // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as where Mill
@@ -130,7 +130,7 @@ private[mill] object WorkerRun {
    */
   def startEach[A](workers: Seq[A])(start: A => WorkerRun): Seq[WorkerRun] =
     workers.foldLeft(Vector.empty[WorkerRun]) { (started, worker) =>
-      started :+ rethrowingAfter(started.foreach(_.abandon()))(start(worker))
+      started :+ abandoningOnThrow(started.foreach(_.abandon()))(start(worker))
     }
 
   /**
@@ -143,7 +143,7 @@ private[mill] object WorkerRun {
     try {
       workerRuns.tails.foreach {
         case workerRun +: notYetEnded =>
-          rethrowingAfter(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
+          abandoningOnThrow(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
         case _ => ()
       }
     } finally {
@@ -158,12 +158,12 @@ private[mill] object WorkerRun {
       case other => other
     }
 
-  private def rethrowingAfter[A](abandonWorkers: => Unit)(body: => A): A =
+  private def abandoningOnThrow[A](abandon: => Unit)(body: => A): A =
     try {
       body
     } catch {
       case throwable: Throwable =>
-        abandonWorkers
+        abandon
         throw throwable
     }
 }

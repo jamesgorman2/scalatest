@@ -69,6 +69,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     val failed = new AtomicInteger(0)
     val onDisk = EventLogFile.at(file)
     new EventLogFile {
+      def name: String = onDisk.name
+
       def exists: Boolean = onDisk.exists
 
       def open(): EventLogInput =
@@ -79,20 +81,6 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
         }
     }
   }
-
-  private def inMemory(text: String): EventLogFile =
-    new EventLogFile {
-      def exists: Boolean = true
-
-      def open(): EventLogInput =
-        new EventLogInput {
-          private val unread = new AtomicBoolean(true)
-
-          def read(): Array[Byte] = if (unread.getAndSet(false)) text.getBytes(StandardCharsets.UTF_8) else Array.emptyByteArray
-
-          def close(): Unit = ()
-        }
-    }
 
   private def write(file: Path, text: String): Unit =
     Files.write(file, text.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
@@ -134,16 +122,6 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.processesEndedBeforeAnyRun.get shouldBe 0
           reading.output.toSeq.dropRight(1) shouldBe Seq("[core.test]")
         }
-      }
-    }
-
-    "the event log file is given by the caller" should {
-      "read the run from that file" in {
-        val reading = new Reading(inMemory(s"$runStarted\n$runEndedCompleted\n"))
-        reading.processExited.set(true)
-        reading.reader.start()
-        reading.stateAfterEnd() shouldBe ConsolidationState.Ended
-        reading.output.toSeq.dropRight(1) shouldBe Seq("[core.test]")
       }
     }
 

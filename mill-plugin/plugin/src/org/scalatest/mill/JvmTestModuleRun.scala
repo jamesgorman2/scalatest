@@ -96,12 +96,12 @@ private[mill] final class JvmTestModuleRun(
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
-  private def folderOf(path: PathUnderModule): os.Path = moduleFolder / path.segments
+  private def inModuleFolder(path: PathUnderModule): os.Path = moduleFolder / path.segments
 
   private def startWorker(consolidation: Consolidation, plannedWorker: PlannedWorker)(
       runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[WorkerProcess]
   ): WorkerRun = {
-    val eventLogFile = folderOf(plannedWorker.processFolder) / JvmTestModuleRun.eventLogFileName
+    val eventLogFile = inModuleFolder(plannedWorker.processFolder) / JvmTestModuleRun.eventLogFileName
     val capture = new WorkerOutputCapture(workerCharset)
     val reader = new EventLogReader(
       EventLogFile.at(eventLogFile.toNIO),
@@ -155,7 +155,7 @@ private[mill] final class JvmTestModuleRun(
     type LaidOut = os.Path
 
     def layOut(forkGroup: PlannedForkGroup): os.Path =
-      inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), folderOf(forkGroup.folder))
+      inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), inModuleFolder(forkGroup.folder))
 
     def launch(
         forkGroup: PlannedForkGroup,
@@ -164,7 +164,7 @@ private[mill] final class JvmTestModuleRun(
         workerCtx: WorkerTaskCtx,
         testModuleUtil: TestModuleUtil
     ): Future[WorkerProcess] = {
-      val groupFolder = folderOf(forkGroup.folder)
+      val groupFolder = inModuleFolder(forkGroup.folder)
       def joinQueue() =
         testModuleUtil.runTestFuture(
           layout.testClassCount,
@@ -193,7 +193,7 @@ private[mill] final class JvmTestModuleRun(
     // As Mill 1.3.1 does, a fork group with no class is given an empty queue, not an empty class list, so the
     // framework's setup and teardown still run without every class being selected.
     def layOut(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
-      val groupFolder = folderOf(forkGroup.folder)
+      val groupFolder = inModuleFolder(forkGroup.folder)
       os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
       if (forkGroup.testClasses.isEmpty) {
         val queue = inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(Nil, groupFolder)
@@ -212,7 +212,7 @@ private[mill] final class JvmTestModuleRun(
         workerCtx: WorkerTaskCtx,
         testModuleUtil: TestModuleUtil
     ): Future[WorkerProcess] = {
-      val groupFolder = folderOf(forkGroup.folder)
+      val groupFolder = inModuleFolder(forkGroup.folder)
       def runProcess(): WorkerProcess = {
         testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector, () => ())(using workerCtx)
         WorkerProcess.Started
