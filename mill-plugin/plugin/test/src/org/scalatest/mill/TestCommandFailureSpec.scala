@@ -38,8 +38,8 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
 
     "a module selector resolves to other than one JVM test module" should {
       "name the selector and what it resolved to" in {
-        TestCommandFailure.NotOneJvmTestModule("core", "core").message shouldBe
-          "Module selector core must resolve to one JVM test module, but resolved to: core"
+        TestCommandFailure.NotOneJvmTestModule("core", "nothing").message shouldBe
+          "Module selector core must resolve to one JVM test module, but resolved to: nothing"
       }
     }
 

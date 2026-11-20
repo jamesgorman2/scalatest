@@ -39,7 +39,7 @@ private[mill] final class JsonOutputFile(val path: Path) {
     for {
       writer <- Try(opened()).toEither.left.map(cause => TestCommandFailure.JsonOutputNotWritten(path, cause, None))
       _ <- Try(Using.resource(writer)(writeJson)).toEither.left
-        .map(cause => TestCommandFailure.JsonOutputNotWritten(path, cause, partlyWrittenFileNotDeleted()))
+        .map(cause => TestCommandFailure.JsonOutputNotWritten(path, cause, deletePartlyWrittenFile()))
     } yield ()
 
   private def opened(): Writer = {
@@ -47,6 +47,6 @@ private[mill] final class JsonOutputFile(val path: Path) {
     Files.newBufferedWriter(path, StandardCharsets.UTF_8)
   }
 
-  private def partlyWrittenFileNotDeleted(): Option[Throwable] =
+  private def deletePartlyWrittenFile(): Option[Throwable] =
     Try(Files.deleteIfExists(path)).failed.toOption
 }
