@@ -98,16 +98,7 @@ private object EventFields {
       case other => String.valueOf(other)
     }
 
-  private def quoted(text: String): String =
-    EventLine.withLineFeeds(text).flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case char if char < ' ' || Character.isSurrogate(char) => f"\\u${char.toInt}%04x"
-      case char => char.toString
-    }.mkString("\"", "", "\"")
+  private def quoted(text: String): String = NotationText.quoted(EventLine.withLineFeeds(text))
 
   // Numbers the throwables of one event in the order rendered, so that a throwable rendered again is written as a ref.
   private final class Throwables {

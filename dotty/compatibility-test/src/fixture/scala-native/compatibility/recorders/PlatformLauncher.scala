@@ -18,7 +18,7 @@ object PlatformLauncher {
           task.execute(run.eventHandler, run.loggers)
         } catch {
           case thrown: Throwable =>
-            println("task threw: " + EventLine.ofThrowable(thrown))
+            println("task threw: " + EventLine.of(thrown))
             Array.empty[Task]
         }
       executeAll(more, run)

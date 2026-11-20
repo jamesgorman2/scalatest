@@ -1,6 +1,7 @@
 package compatibility.recorders
 
 import org.scalatest.events.Event
+import org.scalatest.events.NotationText
 import org.scalatest.events.Ordinal
 import org.scalatest.exceptions.StackDepth
 
@@ -16,20 +17,20 @@ object EventLine {
    */
   def withLineFeeds(text: String): String = text.replace("\r\n", "\n")
 
-  def ofThrowable(throwable: Throwable): String = {
+  def of(throwable: Throwable): String = {
     val failedCode = throwable match {
       case stackDepth: StackDepth =>
         " at " + stackDepth.failedCodeFileName.getOrElse("?") + ":" + stackDepth.failedCodeLineNumber.fold("?")(_.toString)
       case _ => ""
     }
-    val cause = Option(throwable.getCause).fold("")(cause => " caused by " + ofThrowable(cause))
+    val cause = Option(throwable.getCause).fold("")(cause => " caused by " + of(cause))
     throwable.getClass.getName + " " + Option(throwable.getMessage).fold("null")(quoted) + failedCode + cause
   }
 
   private def rendered(value: Any): String =
     value match {
       case event: Event => fields(event, fieldsNotCompared)
-      case throwable: Throwable => ofThrowable(throwable)
+      case throwable: Throwable => of(throwable)
       case ordinal: Ordinal => ordinal.toList.mkString("Ordinal(", ", ", ")")
       case text: String => quoted(text)
       case items: Iterable[?] => items.map(rendered).mkString("[", ", ", "]")
@@ -43,14 +44,5 @@ object EventLine {
       .collect { case (name, value) if !left.contains(name) => name + "=" + rendered(value) }
       .mkString(product.productPrefix + "(", ", ", ")")
 
-  private def quoted(text: String): String =
-    withLineFeeds(text).flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case char if char < ' ' => f"\\u${char.toInt}%04x"
-      case char => char.toString
-    }.mkString("\"", "", "\"")
+  private def quoted(text: String): String = NotationText.quoted(withLineFeeds(text))
 }

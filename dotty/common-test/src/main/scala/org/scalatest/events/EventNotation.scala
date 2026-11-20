@@ -310,21 +310,6 @@ private[events] object EventNotation {
   }
 }
 
-/** Writes text as the notation quotes it, the inverse of reading a quoted string. */
-private[scalatest] object NotationText {
-
-  def quoted(text: String): String =
-    text.flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case char if char < ' ' || Character.isSurrogate(char) => f"\\u${char.toInt}%04x"
-      case char => char.toString
-    }.mkString("\"", "", "\"")
-}
-
 private final class LineCursor(line: String) {
 
   private var position = 0

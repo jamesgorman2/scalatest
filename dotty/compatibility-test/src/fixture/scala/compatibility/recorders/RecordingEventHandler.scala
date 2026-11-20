@@ -15,7 +15,7 @@ final class RecordingEventHandler(record: String => Unit) extends EventHandler {
         "fingerprint=" + rendered(event.fingerprint()),
         "selector=" + event.selector(),
         "status=" + event.status(),
-        "throwable=" + (if (event.throwable().isDefined()) EventLine.ofThrowable(event.throwable().get()) else "none")
+        "throwable=" + (if (event.throwable().isDefined()) EventLine.of(event.throwable().get()) else "none")
       ).mkString(", ")
     )
 

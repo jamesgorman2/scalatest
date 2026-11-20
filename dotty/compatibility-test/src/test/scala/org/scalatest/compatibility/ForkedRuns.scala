@@ -17,9 +17,10 @@ enum Library(val label: String) {
   case Fork extends Library("fork")
 }
 
-enum Launch(val mainClass: String, val named: String) {
-  case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher", "Runner.run")
-  case Framework extends Launch("compatibility.recorders.FrameworkLauncher", "Framework")
+/** @param named how `compatibility.recorders.ArgumentsLauncher` names the launch */
+enum Launch(val mainClass: String, val named: String, val described: String) {
+  case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher", "Runner.run", "Runner.run")
+  case Framework extends Launch("compatibility.recorders.FrameworkLauncher", "Framework", "a build tool")
 }
 
 /** Whether the fork's run is given the runner argument, which turns its emitter on. 3.2.20's run never is. */

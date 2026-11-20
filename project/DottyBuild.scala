@@ -1468,6 +1468,7 @@ trait DottyBuild { this: BuildCommons =>
       // ScalaTest 3.2.20 asks for the Scala 3.1 library, which code compiled by Scala 3.3 cannot link against.
       dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       CompatibilityFixture / unmanagedSourceDirectories += (CompatibilityFixture / sourceDirectory).value / "scala-jvm",
+      CompatibilityFixture / unmanagedSources += notationTextSource.value,
       Test / unmanagedSourceDirectories ++= Seq(sourceDirectory.value / "normalisation" / "scala", sourceDirectory.value / "comparison" / "scala"),
       // ScalaTest leaves the test interface to the build tool, so the fixture configuration takes sbt's own.
       CompatibilityFixture / unmanagedJars += Attributed.blank(testInterfaceJar),
@@ -1485,7 +1486,12 @@ trait DottyBuild { this: BuildCommons =>
       }.taskValue,
       Test / logBuffered := false,
       noPublishSettings,
-    ).dependsOn(scalatestDotty % "test")
+    ).dependsOn(scalatestDotty % "test", commonTestDotty % "test")
+
+  // The fixture compiles against 3.2.20 alone, so it takes the notation's quoting as a source file rather than from the
+  // fork's common-test project.
+  private def notationTextSource: Def.Initialize[File] =
+    Def.setting((commonTestDotty / baseDirectory).value / "src" / "main" / "scala" / "org" / "scalatest" / "events" / "NotationText.scala")
 
   private def testInterfaceJar: File =
     new File(classOf[sbt.testing.Framework].getProtectionDomain.getCodeSource.getLocation.toURI)
@@ -1505,6 +1511,7 @@ trait DottyBuild { this: BuildCommons =>
           sources / "normalisation" / "scala"
         )
       },
+      Compile / unmanagedSources += notationTextSource.value,
       Compile / mainClass := Some("compatibility.recorders.PlatformLauncher")
     ) ++ noPublishSettings
 

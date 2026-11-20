@@ -4,6 +4,7 @@ import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodePlace
+import org.scalatest.events.NotationText.quoted
 import org.scalatest.events.TestEventLogEvent
 
 import java.util.IdentityHashMap
@@ -60,16 +61,6 @@ object EventLogFields {
       case other => String.valueOf(other)
     }
 
-  private def quoted(text: String): String =
-    text.flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case char if char < ' ' || Character.isSurrogate(char) => f"\\u${char.toInt}%04x"
-      case char => char.toString
-    }.mkString("\"", "", "\"")
 
   private final class Throwables {
 

@@ -24,7 +24,7 @@ object ArgumentsLauncher {
             "accepted"
         }
       } catch {
-        case thrown: Throwable => "threw " + EventLine.ofThrowable(thrown)
+        case thrown: Throwable => "threw " + EventLine.of(thrown)
       }
     outcome.append(result)
     System.exit(0)

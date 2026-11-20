@@ -14,7 +14,7 @@ final class RecordingLogger(record: String => Unit) extends Logger {
 
   def debug(message: String): Unit = recordLines("debug", message)
 
-  def trace(throwable: Throwable): Unit = record("trace: " + EventLine.ofThrowable(throwable))
+  def trace(throwable: Throwable): Unit = record("trace: " + EventLine.of(throwable))
 
   private def recordLines(level: String, message: String): Unit =
     message.split("\r?\n", -1).foreach(line => record(level + ": " + line))
