@@ -257,7 +257,6 @@ private[consolidation] object JsonOutputWriter {
     case Ref(id: Int)
   }
 
-  // `DecodedThrowable` compares by identity, so only the same throwable seen again becomes a ref.
   private final case class ThrowableVisit(pending: List[DecodedThrowable], ids: Map[DecodedThrowable, Int]) {
 
     def next: Option[(ThrowableEntry, ThrowableVisit)] =
@@ -265,6 +264,7 @@ private[consolidation] object JsonOutputWriter {
         case Nil =>
           None
         case current :: rest =>
+          // `DecodedThrowable` compares by identity, so only the same throwable seen again becomes a ref.
           ids.get(current) match {
             case Some(id) => Some(ThrowableEntry.Ref(id) -> copy(pending = rest))
             case None => Some(firstVisitTo(current, rest))

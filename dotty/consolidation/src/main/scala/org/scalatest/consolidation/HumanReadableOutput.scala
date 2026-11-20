@@ -270,7 +270,7 @@ private[consolidation] object HumanReadableOutput {
     throwable match {
       case Some(view) if stringReporterThrowsOn(message, view) => {
         // Core's `StringReporter` keeps ScalaTest 3.2.20's NullPointerException for this case, so this builds the lines
-        // `StringReporter` prints for a throwable whose message is empty.
+        // `StringReporter` prints for a throwable whose message is `""`.
         val withoutThrowable = linesWith(None)
         withoutThrowable.head +: (lineNumberLines(view) ++ withoutThrowable.tail ++ stackTraceLinesOf(throwable))
       }
