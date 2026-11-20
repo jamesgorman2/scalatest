@@ -142,7 +142,7 @@ class UnregisteredSuite extends Suite {
 
   override def tags: Map[String, Set[String]] = Map("a" -> Set("org.scalatest.Ignore"))
 
-  // Suite.runTests gives an ignored test's TestIgnored the location of the method of the test's name.
+  // Suite.runTests locates ignored test a's TestIgnored at this method, and aborts the suite without it.
   def a(): Unit = ()
 
   override protected def runTest(testName: String, args: Args): Status = {
@@ -304,11 +304,11 @@ class ParFunSuite extends AnyFunSuite with ParallelTestExecution {
   }
 }
 
-// Its run throws when given a test name, as when the DistributedTestRunnerSuite running its test runs it.
 @DoNotDiscover
 class ParAbortSuite extends AnyFunSuite with ParallelTestExecution {
 
   override def run(testName: Option[String], args: Args): Status = {
+    // A DistributedTestRunnerSuite runs this suite with the name of the test it runs.
     if (testName.isDefined) {
       throw new RuntimeException("no fixture")
     }

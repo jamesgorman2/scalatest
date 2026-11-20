@@ -3,7 +3,7 @@ package samples.discovered
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.propspec.AnyPropSpec
 
-// Discoverable, as OneTestSpec is: a test copies these class files to a runpath of its own for discovery to find.
+// Not @DoNotDiscover: a test copies this package's class files to a runpath of its own for discovery to find.
 
 class AddSuite extends AnyFunSuite {
 
@@ -19,9 +19,9 @@ class SqrtPropSpec extends AnyPropSpec {
   }
 }
 
-// Its constructor throws only on a thread of the group a test names for it, so that it constructs wherever else it is discovered.
 class ThrowingConstructorSpec extends AnyFunSuite {
 
+  // Other runs discover this suite too, and must construct it.
   if (Thread.currentThread.getThreadGroup.getName == ThrowingConstructorSpec.threadGroupItsConstructorThrowsIn) {
     throw new IllegalStateException("no config")
   }

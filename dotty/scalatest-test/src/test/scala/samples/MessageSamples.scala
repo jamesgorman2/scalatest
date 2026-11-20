@@ -22,11 +22,6 @@ object MessageCallTimes {
 
   private val current = new AtomicReference(new ConcurrentLinkedQueue[(Long, Long)])
 
-  /**
-   * Returns the result of `launch`, and the times of the message calls made by suites constructed while it ran. Each suite
-   * records into the recording current when it is constructed, so a run that outlives its recording cannot write into a
-   * later one.
-   */
   def recordedIn[A](launch: => A): (A, Vector[(Long, Long)]) = synchronized {
     val recording = new ConcurrentLinkedQueue[(Long, Long)]
     current.set(recording)
@@ -39,6 +34,7 @@ object MessageCallTimes {
 
 trait CallsEachMessage extends Suite { this: Informing with Notifying with Alerting with Documenting =>
 
+  // Taken at construction, so a run that outlives its recording cannot write into a later one.
   private val callTimes = MessageCallTimes.currentRecording
 
   protected def callEachMessage(): Unit = {

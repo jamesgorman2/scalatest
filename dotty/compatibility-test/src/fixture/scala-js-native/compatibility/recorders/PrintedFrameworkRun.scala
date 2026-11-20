@@ -10,18 +10,6 @@ import sbt.testing.TaskDef
 
 import scala.collection.mutable.ListBuffer
 
-/**
- * A run of the fixture's suites through `Framework`. The launch's arguments are the suites' class names, separated by
- * commas, then the runner's arguments.
- *
- * Once its tasks have run, it prints to stdout, one line each:
- *  1. what the event handler received,
- *  2. what the loggers received,
- *  3. the summary the runner's `done` returns.
- *
- * The logger lines and the summary are normalised as reporter text, in one call each, because the normalisation
- * collapses consecutive stack-trace lines into one.
- */
 final class PrintedFrameworkRun(launchArguments: Array[String]) {
 
   private val eventLines = ListBuffer.empty[String]
@@ -42,6 +30,7 @@ final class PrintedFrameworkRun(launchArguments: Array[String]) {
 
   def printRecorded(): Unit = {
     eventLines.foreach(line => println("event handler: " + line))
+    // Normalised in one call each, because normalisation collapses consecutive stack-trace lines into one.
     ReporterText.normalised(loggerLines.toList).foreach(line => println("logger: " + line))
     ReporterText.normalised(runner.done().split("\r?\n", -1).toList).foreach(line => println("summary: " + line))
   }

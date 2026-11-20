@@ -33,9 +33,6 @@ import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 
-// One suite of each style for each declaration, named <style>With<declaration>. No sample's test body matters:
-// only what each registers.
-
 trait StringFixture { this: org.scalatest.FixtureTestSuite =>
   type FixtureParam = String
   def withFixture(test: OneArgTest): Outcome = test("fixture")

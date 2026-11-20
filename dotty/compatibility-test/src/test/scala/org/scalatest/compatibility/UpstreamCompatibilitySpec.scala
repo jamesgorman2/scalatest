@@ -325,9 +325,9 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     List("-o", "-f")
   )
 
-  // Only Framework is given -g: Runner.run on 3.2.20 opens the graphic reporter's window and waits for it to be closed.
   private def argumentListsOf(launch: Launch): List[List[String]] =
     launch match {
+      // Without -g, which on 3.2.20 opens the graphic reporter's window and waits for it to be closed.
       case Launch.RunnerRun => argumentListsOfBothLaunches
       case Launch.Framework => argumentListsOfBothLaunches :+ List("-g")
     }
@@ -353,11 +353,11 @@ final class UpstreamCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen 
     }
   }
 
-  // Framework's SuiteSortingReporter sits between the emitter and the recording reporter, and holds back a nested suite's
-  // events until the suite enclosing it completes.
   private def emitterOrderIn(launch: Launch): EmitterOrder =
     launch match {
       case Launch.RunnerRun => EmitterOrder.AcrossTheRun
+      // Behind the emitter, Framework's SuiteSortingReporter holds back a nested suite's events from the recording
+      // reporter until the suite enclosing it completes.
       case Launch.Framework => EmitterOrder.WithinEachSuite
     }
 

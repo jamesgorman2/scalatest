@@ -61,11 +61,11 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
   private def boom: Option[DecodedThrowable] =
     Some(new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, Vector.empty))
 
-  // A DecodedThrowable has no structural equality.
   private def comparable(event: TestEventLogEvent): Any = {
     event match {
       case TestEventLogEvent.ScalaTestEvent(execution, decoded) =>
         val fields = decoded.productIterator.map {
+          // A DecodedThrowable has no structural equality.
           case Some(throwable: DecodedThrowable) => Some((throwable.className, throwable.message))
           case other => other
         }

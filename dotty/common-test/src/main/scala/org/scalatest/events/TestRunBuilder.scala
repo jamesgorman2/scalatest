@@ -30,14 +30,6 @@ private[scalatest] final case class BuiltRun(items: Vector[BuiltRunItem]) {
   def events: Vector[BuiltEvent] = items.collect { case BuiltRunItem.Event(built) => built }
 }
 
-/**
- * Builds a run from the event notation the acceptance criteria use, in the form the test event log's decoder
- * yields it.
- *
- * A run is given as its parts in order: blocks of events in the notation, and captured lines where they are fed.
- * Each event is built as a `Given` gives it, with a default for every field it does not write. It also carries the
- * parts the notation writes, which are all `EventLogComparison` compares.
- */
 private[scalatest] object TestRunBuilder {
 
   val defaultPid: Long = 1L
@@ -45,7 +37,6 @@ private[scalatest] object TestRunBuilder {
   val defaultThreadName: String = "main"
   val defaultTimeStamp: Long = 0L
 
-  /** @throws NotationError if the notation does not describe a run; its message names the mistake. */
   def build(parts: TestRunPart*): BuiltRun = {
     val run = new RunUnderConstruction
     BuiltRun(
@@ -68,7 +59,6 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: Stri
 
   def parent: Option[NodeId] = latestParent
 
-  /** Records that a later structure holds the node, with this name and under this parent. */
   def heldAgain(name: String, parent: Option[NodeId]): Unit = {
     latestName = name
     latestParent = parent
@@ -84,7 +74,6 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: Stri
   def defaultExecution: Int = (executions -- endedExecutions).maxOption.orElse(executions.maxOption).getOrElse(1)
 }
 
-// A further structure positions the suite's scopes and tests from where its first structure positioned them.
 private final class HeldSuite(val id: NodeId, val suiteId: SuiteId, val className: String, val parent: Option[NodeId], val position: Option[Int]) {
 
   private var positionOfFirstScopeOrTest = 0
@@ -118,7 +107,6 @@ private final class OpenTreeNode(
     position
   }
 
-  /** The position of the node's first scope or test; where it has none, the position after its nested suites. */
   def firstPositionOfScopesAndTests: Int = positionOfFirstScopeOrTest.getOrElse(positionOfNextChild)
 
   def nextIndexOfScopeNamed(name: String): Int = {
@@ -189,7 +177,6 @@ private final class RunUnderConstruction {
     added
   }
 
-  /** The structure's suite, and whether an earlier structure held it. */
   private final case class StructureRoot(suite: HeldSuite, isFurther: Boolean)
 
   private def structureRootOf(block: NotationLine.Structure): StructureRoot = {
@@ -269,7 +256,6 @@ private final class RunUnderConstruction {
     built.result()
   }
 
-  // A test's scopes are those of the latest structure that holds it.
   private def ancestorsTopDown(node: HeldNode): Vector[HeldNode] =
     Iterator.unfold(node.parent)(parent => parent.map(nodes).map(held => (held, held.parent))).toVector.reverse
 
@@ -390,7 +376,6 @@ private final class WrittenFields(line: NotationLine.Event) {
 
 private object WrittenFields {
 
-  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   def decodedThrowable(written: WrittenThrowable): DecodedThrowable = {
     val message = written.message match {
       case WrittenMessage.Text(value) => Some(value)

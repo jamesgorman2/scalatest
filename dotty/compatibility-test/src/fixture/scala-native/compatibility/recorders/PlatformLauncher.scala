@@ -10,10 +10,10 @@ object PlatformLauncher {
     run.printRecorded()
   }
 
-  // Scala Native's test bridge runs each task synchronously, and passes what a task throws back to the build tool.
   private def executeAll(tasks: Array[Task], run: PrintedFrameworkRun): Unit =
     tasks.foreach { task =>
       val more =
+        // Scala Native's test bridge runs each task synchronously, and passes what a task throws back to the build tool.
         try {
           task.execute(run.eventHandler, run.loggers)
         } catch {

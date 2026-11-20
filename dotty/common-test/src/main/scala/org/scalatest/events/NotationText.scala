@@ -1,6 +1,5 @@
 package org.scalatest.events
 
-/** Writes text as the notation quotes it, the inverse of reading a quoted string. */
 object NotationText {
 
   def quoted(text: String): String =

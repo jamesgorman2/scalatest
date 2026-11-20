@@ -7,20 +7,13 @@ import org.scalatest.exceptions.StackDepth
 
 import java.util.IdentityHashMap
 
-/**
- * Records each event it receives, and each event recorded in one, as the node the event names and every field a test
- * event log keeps of it, including timestamps, durations and thread names. A recorded event is written without its
- * timestamp, because a test event log takes that from when the test made the call that recorded it.
- *
- * Each line is `received <node> <event>` or `recorded <node> <event>`, where the node is `run`, `suite "<suite ID>"`
- * or `test "<suite ID>" "<test name>"`.
- */
 class EventFieldsRecordingReporter extends Reporter {
 
   private val lines = LineFile.namedBy("compatibility.eventFields")
 
   def apply(event: Event): Unit = {
     lines.append("received " + EventFields.of(event, withTimeStamp = true))
+    // A test event log takes a recorded event's timestamp from when the test made the call that recorded it.
     recordedEvents(event).foreach(recorded => lines.append("recorded " + EventFields.of(recorded, withTimeStamp = false)))
   }
 
@@ -100,7 +93,6 @@ private object EventFields {
 
   private def quoted(text: String): String = NotationText.quoted(EventLine.withLineFeeds(text))
 
-  // Numbers the throwables of one event in the order rendered, so that a throwable rendered again is written as a ref.
   private final class Throwables {
 
     private val ids = new IdentityHashMap[Throwable, Integer]

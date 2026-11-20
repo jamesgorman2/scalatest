@@ -17,13 +17,11 @@ enum Library(val label: String) {
   case Fork extends Library("fork")
 }
 
-/** @param named how `compatibility.recorders.ArgumentsLauncher` names the launch */
-enum Launch(val mainClass: String, val named: String, val described: String) {
+enum Launch(val mainClass: String, val nameInArgumentsLauncher: String, val described: String) {
   case RunnerRun extends Launch("compatibility.recorders.RunnerLauncher", "Runner.run", "the command-line runner")
   case Framework extends Launch("compatibility.recorders.FrameworkLauncher", "Framework", "a build tool")
 }
 
-/** Whether the fork's run is given the runner argument, which turns its emitter on. 3.2.20's run never is. */
 enum Emitter {
   case Off
   case On
@@ -40,8 +38,6 @@ final case class RunOutput(
   eventFields: Seq[String],
   eventLog: Seq[String]
 ) {
-  // The fixture's own line is removed as text, not as a line: a reporter may write an event over several writes, and
-  // the fixture's line can land between two of them.
   def reporterText: Map[String, Seq[String]] =
     Map(
       "stdout" -> RunOutput.withoutFirst(CompatibilityFixture.stdoutLine, stdout).linesIterator.toList,
@@ -54,7 +50,6 @@ final case class ArgumentsOutcome(exitCode: Int, launchResult: Seq[String], stdo
 
 object RunOutput {
 
-  /** How many times a line, with its line separator, is written within the text, wherever it begins. */
   def timesWritten(line: String, text: String): Int = {
     val written = line + System.lineSeparator
     var count = 0
@@ -67,6 +62,8 @@ object RunOutput {
   }
 
   private def withoutFirst(line: String, text: String): String = {
+    // Removed as text, not as a line: a reporter may write an event over several writes, and the line can land
+    // between two of them.
     val written = line + System.lineSeparator
     val at = text.indexOf(written)
     if (at < 0) text else text.substring(0, at) + text.substring(at + written.length)
@@ -111,15 +108,12 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
   def ofFixtureOnFork(launch: Launch, arguments: Seq[String], emitter: Emitter, moreSuiteClassNames: Seq[String] = Nil): RunOutput =
     ofFixtureOn(Library.Fork, launch, arguments, emitter, CompatibilityFixture.suiteClassNames ++ moreSuiteClassNames)
 
-  /** Gives the argument list to the launch, without running any suite. */
   def ofArguments(launch: Launch, arguments: Seq[String]): Compared[ArgumentsOutcome] =
     ofArgumentsNamingAFile(launch, _ => arguments)
 
-  /** Gives the launch the argument list that `arguments` builds from a file path in the run's own directory, without running any suite. */
   def ofArgumentsNamingAFile(launch: Launch, arguments: Path => Seq[String]): Compared[ArgumentsOutcome] =
     ofArgumentsOnEach(launch, (_, file) => arguments(file))
 
-  /** Gives 3.2.20's launch the argument list, and the fork's the runner argument, naming a file in the run's own directory, followed by the list. */
   def ofArgumentsGivingTheForkTheRunnerArgument(launch: Launch, arguments: Seq[String]): Compared[ArgumentsOutcome] =
     ofArgumentsOnEach(
       launch,
@@ -139,7 +133,7 @@ final class ForkedRuns(classpaths: ComparisonClasspaths) {
         directory,
         List("-Dcompatibility.outcome=" + outcome, "-Dcompatibility.events=" + directory.resolve("events.txt")),
         "compatibility.recorders.ArgumentsLauncher",
-        launch.named +: arguments(library, directory.resolve("file-named"))
+        launch.nameInArgumentsLauncher +: arguments(library, directory.resolve("file-named"))
       )
       ArgumentsOutcome(exitCode, lines(outcome), text(directory.resolve("stdout.txt")), text(directory.resolve("stderr.txt")))
     }

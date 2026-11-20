@@ -11,10 +11,7 @@ object EventLine {
 
   def of(event: Event): String = rendered(event)
 
-  /**
-   * The text with each "\r\n" written as "\n". The fork separates the lines of the text it writes with the platform's
-   * line separator, and 3.2.20 with "\n", so on Windows the same message differs only there.
-   */
+  // The fork separates the lines of the text it writes with the platform's line separator, and 3.2.20 with "\n".
   def withLineFeeds(text: String): String = text.replace("\r\n", "\n")
 
   def of(throwable: Throwable): String = {

@@ -55,8 +55,8 @@ object EventClassShapes {
     kind + " " + loaded.getName + " fields " + fields.mkString("[", "; ", "]") + " constructors " + constructors.mkString("[", "; ", "]")
   }
 
-  // Scala 3.1 and 3.3 give the field that stores a lazy val different modifiers and types.
   private def described(field: Field): String =
+    // Scala 3.1 and 3.3 give the field that stores a lazy val different modifiers and types.
     if (lazyValStorage.matches(field.getName)) {
       field.getName
     } else {

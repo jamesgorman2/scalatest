@@ -37,9 +37,9 @@ object PerTestInstances {
   private[samples] def currentRecording: ConcurrentLinkedQueue[(Suite, SuiteRegistration)] = current.get
 }
 
-/** Records into the recording that is current when the instance is constructed, so a run that outlives its recording cannot write into a later one. */
 trait RecordsRanItsTest { this: Suite =>
 
+  // Taken at construction, so a run that outlives its recording cannot write into a later one.
   private val recording = PerTestInstances.currentRecording
 
   protected def recordRanItsTest(): Unit = recording.add(this -> RegistrationInContext.ofCallingThread)
@@ -114,7 +114,6 @@ final class QueueingExecutionContext extends ExecutionContext {
   def runQueued(): Unit = Iterator.continually(queued.poll()).takeWhile(_ != null).foreach(_.run())
 }
 
-// Its test completes only once its execution context's queued tasks are run.
 @DoNotDiscover
 class ScopedQueueingAsyncFunSpec extends AsyncFunSpec {
 
