@@ -14,7 +14,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
   private var readerState: WorkerRun.ReaderState = WorkerRun.ReaderState.NotStarted
 
   def start(startWorker: (() => Unit) => Future[WorkerProcess]): Unit = {
-    // The reader starts as the worker does, so a worker Mill has not yet scheduled holds no reader thread.
+    // The reader starts when the worker starts, so a worker Mill has not yet scheduled holds no reader thread.
     started = WorkerRun.abandoningOnThrow(abandon())(Try(startWorker(() => startReading())))
     started match {
       case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started)))(using ExecutionContext.parasitic)
@@ -27,10 +27,10 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     val ended = WorkerRun.abandoningOnThrow(abandon()) {
       started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
     }
-    // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as where Mill
+    // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as when Mill
     // cancels the task, can leave its process and those threads running, so the capture's streams stay open.
     ended.foreach(_ => capture.endStreams())
-    // A worker whose end is unknown may have started a process.
+    // A worker whose end is unknown may have started a process, unless it never started.
     reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started))
     val startedUncaptured = ended.toOption.contains(WorkerProcess.Started) && startReadingLate()
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
@@ -66,7 +66,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
   private def closeReader(): Boolean =
     synchronized {
-      // Once the reader is closed, a worker starting late, as where Mill runs an async body after the task is cancelled,
+      // Once the reader is closed, a worker starting late, as when Mill runs an async body after the task is cancelled,
       // starts no reader.
       readerState = readerState.afterClosing
       readerState == WorkerRun.ReaderState.ClosedAfterStarting
@@ -106,14 +106,14 @@ private[mill] object WorkerRun {
         case _ => ()
       }
     } finally {
-      // A failed worker can go on writing output, which must reach no ended run.
+      // A failed worker can go on writing output, which must not reach a run that has ended.
       workerRuns.foreach(_.stopCapturing())
     }
 
   private def unboxed(throwable: Throwable): Throwable =
     throwable match {
-      // A Scala Promise fails with an InterruptedException or an Error boxed in an ExecutionException with this message,
-      // which names neither.
+      // A Scala `Promise` boxes an `InterruptedException` or an `Error` in an `ExecutionException` whose message,
+      // "Boxed Exception", hides the cause.
       case boxed: ExecutionException if boxed.getMessage == "Boxed Exception" => Option(boxed.getCause).getOrElse(boxed)
       case other => other
     }

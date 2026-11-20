@@ -18,9 +18,10 @@ private[mill] final case class PlannedForkGroup(
     label: ForkGroupLabel,
     folder: PathUnderModule,
     testClasses: Seq[TestClassName],
-    workerIndexDigits: Int,
     workers: Seq[PlannedWorker]
 ) {
+
+  def workerIndexDigits: Int = PaddedIndex.digits(workers.size)
 
   def describedIn(module: TestRunLabel): String = s"fork group ${forkGroup.position} of ${module.value}"
 }
@@ -96,10 +97,11 @@ private[mill] object WorkerLayout {
       val workers = (0 until workerCount).map { index =>
         PlannedWorker(Worker(forkGroup, WorkerIndex(index)), workersPerGroup.processFolder(folder, index, workerCount))
       }
-      PlannedForkGroup(forkGroup, label, folder, classes, PaddedIndex.digits(workerCount), workers)
+      PlannedForkGroup(forkGroup, label, folder, classes, workers)
     }
     groupsToRun match {
-      // As Mill does, fork group 0 runs with no class, to run the framework's setup and teardown.
+      // As Mill does, when no fork group has a class, fork group 0 runs with none, so the framework's setup and
+      // teardown still run.
       case Seq() => Right(WorkerLayout(Seq(forkGroupOf(Nil, 0, ForkGroupLabel.of(0, 1), PathUnderModule()))))
       case Seq((classes, position)) => Right(WorkerLayout(Seq(forkGroupOf(classes, position, ForkGroupLabel.of(0, 1), PathUnderModule()))))
       case groups =>
@@ -107,12 +109,14 @@ private[mill] object WorkerLayout {
           val label = ForkGroupLabel.of(indexAmongGroupsRun, groups.size)
           forkGroupOf(classes, position, label, PathUnderModule(groupFolderName(classes, label)))
         }
-        // Mill's `testForked` fails here too: a `processFolder`'s second worker cannot start.
+        // Mill's `testForked` also fails when two fork groups share a `processFolder`: the second group's worker cannot
+        // start.
         sharedProcessFolders(queued, filesystemIgnoresCase()).toLeft(WorkerLayout(queued))
     }
   }
 
   private def groupFolderName(classes: Seq[TestClassName], label: ForkGroupLabel): String =
+    // Copies Mill 1.3.1's `testForked` folder names, so fork groups share a folder exactly where they would under Mill.
     classes match {
       case Seq(single) => single.value
       case multiple => s"group-${label.value}-${multiple.head.value}"

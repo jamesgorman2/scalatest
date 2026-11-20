@@ -15,7 +15,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   private val label: TestRunLabel = TestRunLabel("core.test")
 
   private def forkGroupAt(position: Int): PlannedForkGroup =
-    PlannedForkGroup(ForkGroup.at(position), ForkGroupLabel.of(position, 2), PathUnderModule(s"group-$position"), Nil, 1, Nil)
+    PlannedForkGroup(ForkGroup.at(position), ForkGroupLabel.of(position, 2), PathUnderModule(s"group-$position"), Nil, Nil)
 
   private def layOutAllButTheFirst(forkGroup: PlannedForkGroup): String =
     if (forkGroup == forkGroupAt(0))

@@ -44,7 +44,7 @@ private[mill] final class JvmTestModuleRun(
 
   private def launcher(): Either[ForkGroupsShareProcessFolders, WorkerLauncher] = {
     val filesystemIgnoresCase = () => JvmTestModuleRun.filesystemIgnoresCase(moduleFolder.toNIO)
-    // As Mill 1.3.1 does, batch workers are given each fork group's classes as `testForkGrouping` gives them, with no
+    // As Mill 1.3.1 does, batch workers run each fork group's classes as `testForkGrouping` lists them, without
     // discovery.
     if (inputs.testBatchFrameworkTasks)
       WorkerLayout.ofBatches(forkGroups, filesystemIgnoresCase).map(new BatchLauncher(_))
@@ -152,8 +152,8 @@ private[mill] final class JvmTestModuleRun(
           forkGroup.label.value,
           plannedWorker.worker.index.value
         )
-      // Mill forks, through `workerCtx`, exactly the workers it gives a folder of their own, and runs the others on this
-      // thread.
+      // Mill forks a worker through `workerCtx` only when the worker has its own `processFolder`; a worker in the fork
+      // group's folder runs on this thread.
       val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
       // The `Result` Mill gives for the process is ignored, even a failure: the consolidation decides the test command's
       // result.
@@ -195,7 +195,8 @@ private[mill] final class JvmTestModuleRun(
         testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector.toMill, () => ())(using workerCtx)
         WorkerProcess.Started
       }
-      // As Mill 1.3.1 does, whatever the module's `testParallelism`.
+      // As Mill 1.3.1 does, each fork group's worker is forked when there is more than one fork group, whatever the
+      // module's `testParallelism`.
       if (layout.forkGroups.size > 1)
         workerCtx.fork.async(groupFolder, forkGroup.label.value, "", priority = -1)(_ => runProcess())(using workerCtx)
       else

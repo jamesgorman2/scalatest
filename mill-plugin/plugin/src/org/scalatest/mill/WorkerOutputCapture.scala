@@ -30,8 +30,8 @@ private[mill] final class WorkerOutputCapture(charset: Charset) {
 
   def stopCapturing(): Unit =
     synchronized {
-      // A worker that failed, as where Mill cancels the task, can leave its process writing and Mill's threads pumping
-      // its output after the run has ended, and a line passed to an ended run throws on the pumping thread.
+      // A failed worker, as when Mill cancels the task, can go on writing after its run has ended, and a line added to
+      // an ended run throws on Mill's pumping thread.
       capturing = false
       held.clear()
     }

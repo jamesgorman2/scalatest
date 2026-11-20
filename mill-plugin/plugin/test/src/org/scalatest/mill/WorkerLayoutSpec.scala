@@ -44,7 +44,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       "the module has one fork group" should {
         "give the group one worker in the module's folder, and queue the group's classes there" in {
           layoutOf(Seq(Seq("samples.A1", "samples.B1"))) shouldBe Right(
-            WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), classes("samples.A1", "samples.B1"), 1, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
+            WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), classes("samples.A1", "samples.B1"), Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
           )
         }
       }
@@ -54,8 +54,8 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
           layoutOf(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))) shouldBe Right(
             WorkerLayout(
               Seq(
-                PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), 1, Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
-                PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(1, 2), PathUnderModule("group-1-samples.A1"), classes("samples.A1", "samples.A2"), 1, Seq(PlannedWorker(workerOf(1), PathUnderModule("group-1-samples.A1"))))
+                PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
+                PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(1, 2), PathUnderModule("group-1-samples.A1"), classes("samples.A1", "samples.A2"), Seq(PlannedWorker(workerOf(1), PathUnderModule("group-1-samples.A1"))))
               )
             )
           )
@@ -144,7 +144,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       "no fork group holds a discovered class" should {
         "give fork group 0 one worker with no class, in a folder of its own" in {
           layoutOf(Seq(Seq("samples.Gone")), testParallelism = true) shouldBe Right(
-            WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, 1, Seq(PlannedWorker(workerOf(0), PathUnderModule("worker-0"))))))
+            WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Seq(PlannedWorker(workerOf(0), PathUnderModule("worker-0"))))))
           )
         }
       }
@@ -159,7 +159,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     "no fork group holds a discovered class" should {
       "give fork group 0 one worker with no class, in the module's folder" in {
         layoutOf(Seq(Seq("samples.Gone"))) shouldBe Right(
-          WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, 1, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
+          WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
         )
       }
     }
@@ -232,8 +232,8 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
         WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))), () => false) shouldBe Right(
           WorkerLayout(
             Seq(
-              PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), 1, Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
-              PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(1, 2), PathUnderModule("group-1-samples.A1"), classes("samples.A1", "samples.A2"), 1, Seq(PlannedWorker(workerOf(1), PathUnderModule("group-1-samples.A1"))))
+              PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
+              PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(1, 2), PathUnderModule("group-1-samples.A1"), classes("samples.A1", "samples.A2"), Seq(PlannedWorker(workerOf(1), PathUnderModule("group-1-samples.A1"))))
             )
           )
         )
@@ -251,7 +251,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     "the module has no fork group" should {
       "give fork group 0 one worker with no class, in the module's folder" in {
         WorkerLayout.ofBatches(Nil, () => false) shouldBe Right(
-          WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, 1, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
+          WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
         )
       }
     }
@@ -282,7 +282,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
   "A fork group" should {
     "be described by its position and its module" in {
-      PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, 1, Nil).describedIn(TestRunLabel("core.test")) shouldBe "fork group 1 of core.test"
+      PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Nil).describedIn(TestRunLabel("core.test")) shouldBe "fork group 1 of core.test"
     }
   }
 }
