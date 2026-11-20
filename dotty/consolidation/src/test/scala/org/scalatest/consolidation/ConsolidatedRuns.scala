@@ -13,8 +13,10 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   extension (literal: String) {
 
-    // A CRLF checkout gives the literal CRLF line endings; the output's are LF.
-    def stripExpectedMargin: String = literal.stripMargin.replace("\r\n", "\n")
+    def stripExpectedMargin: String =
+      literal.stripMargin
+        // A CRLF checkout gives the literal CRLF line endings; the output's are LF.
+        .replace("\r\n", "\n")
 
     def toRunEvent: RunEvent =
       TestRunBuilder.build(TestRunPart.Events(literal)).items match {

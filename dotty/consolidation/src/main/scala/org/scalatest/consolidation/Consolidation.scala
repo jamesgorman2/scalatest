@@ -4,7 +4,7 @@ import java.time.Instant
 import scala.collection.mutable
 
 /**
- * The runs of one test command, consolidated into human-readable output and, where given a sink for it, JSON output.
+ * Consolidates the runs of one test command into human-readable output and, where `jsonOutput` is given, JSON output.
  *
  * Every operation may be called from any thread. [[state]] takes no lock.
  */
@@ -31,8 +31,8 @@ final class Consolidation private[consolidation] (
    * Adds a run and passes its feed to `feedEventStream`. The run's event stream ends when `feedEventStream` returns or
    * throws; anything it throws is rethrown.
    *
-   * A module's runs are numbered from 1 in the order `AssembledRun.numberingOrder` gives their workers, runs that tie
-   * keeping the order they were added in. Numbers are fixed when the consolidation ends, so a run added later can
+   * A module's runs are numbered from 1 by fork group, then by worker index. Runs given no worker come first, and runs
+   * that tie keep the order they were added in. Numbers are fixed when the consolidation ends, so a run added later can
    * renumber earlier ones. A run's line in the human-readable output, and its run node in the JSON output, show its
    * number.
    *
@@ -93,7 +93,7 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Sets a module's start and end time by the caller's clock, replacing those an earlier call set. A module timed but
+   * Sets a module's start and end times by the caller's clock, replacing any an earlier call set. A module timed but
    * given no run is still a module of every output, with nothing under it.
    *
    * @param startedAt when the caller started the module's tests
@@ -141,7 +141,7 @@ final class Consolidation private[consolidation] (
 
   private[consolidation] def fail(): Unit = currentState = currentState.withFailure
 
-  private[consolidation] def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "The consolidation's lock is not held")
+  private[consolidation] def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "the consolidation's lock is not held")
 
   private def requireOpen(): Unit =
     if (currentState.ended) {

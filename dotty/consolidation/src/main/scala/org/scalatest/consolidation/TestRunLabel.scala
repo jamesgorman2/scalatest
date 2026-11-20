@@ -1,6 +1,6 @@
 package org.scalatest.consolidation
 
-/** The label naming a run's module. */
+/** A module's name, such as `core.test`. */
 opaque type TestRunLabel = String
 
 object TestRunLabel {

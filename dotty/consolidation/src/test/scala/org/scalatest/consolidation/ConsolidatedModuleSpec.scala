@@ -7,9 +7,15 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
 
   private val emptyEventStream = AssembledEventStream(None, None, None, None, None, Set.empty, Vector.empty)
 
-  // AssembledRun is a case class: give runs in the same worker distinct assigned test classes so they are not equal.
   private def runIn(worker: Option[Worker], assignedTestClass: String): AssembledRun =
-    AssembledRun(moduleLabel, worker, emptyEventStream, Vector.empty, Vector(TestClassName(assignedTestClass)))
+    AssembledRun(
+      moduleLabel,
+      worker,
+      emptyEventStream,
+      Vector.empty,
+      // AssembledRun is a case class: give runs in the same worker distinct assigned test classes so they are not equal.
+      Vector(TestClassName(assignedTestClass))
+    )
 
   private def runIn(forkGroup: Int, workerIndex: Int, assignedTestClass: String = "samples.Suite"): AssembledRun =
     runIn(Some(workerAt(forkGroup, workerIndex)), assignedTestClass)

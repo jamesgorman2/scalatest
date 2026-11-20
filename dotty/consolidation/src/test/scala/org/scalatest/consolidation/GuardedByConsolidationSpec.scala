@@ -14,13 +14,13 @@ final class GuardedByConsolidationSpec extends AnyWordSpec with should.Matchers 
     "read without the consolidation's lock" should {
       "fail" in {
         val (_, value) = guarded()
-        (the[AssertionError] thrownBy value.get).getMessage should include ("The consolidation's lock is not held")
+        (the[AssertionError] thrownBy value.get).getMessage should include ("the consolidation's lock is not held")
       }
     }
     "set without the consolidation's lock" should {
       "fail" in {
         val (_, value) = guarded()
-        (the[AssertionError] thrownBy value.set(2)).getMessage should include ("The consolidation's lock is not held")
+        (the[AssertionError] thrownBy value.set(2)).getMessage should include ("the consolidation's lock is not held")
       }
     }
     "set and read under the consolidation's lock" should {
