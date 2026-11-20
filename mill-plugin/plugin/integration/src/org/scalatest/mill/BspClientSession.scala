@@ -112,7 +112,7 @@ object BspClientSession {
     use: BspClientSession => A
   ): WithNotifications[A] = {
     val spawned = os.spawn(
-      // The command `--bsp-install` writes to `.bsp/mill-bsp.json`.
+      // The command that `--bsp-install` records in `.bsp/mill-bsp.json`.
       cmd = (millExecutable, "--bsp", "--jobs", "1"),
       cwd = tester.workspacePath,
       env = tester.millTestSuiteEnv,

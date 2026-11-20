@@ -34,10 +34,10 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
   private def prefixedTreeLines: Seq[String] =
     stdoutLines
-      .dropWhile(line => !TestCommandResult.isTestRunLabel(TestCommandResult.withoutMillPrefix(line)))
+      .dropWhile(line => !TestCommandResult.isModuleLine(TestCommandResult.withoutMillPrefix(line)))
       .takeWhile { line =>
         val unprefixed = TestCommandResult.withoutMillPrefix(line)
-        TestCommandResult.isTestRunLabel(unprefixed) || unprefixed.startsWith(" ")
+        TestCommandResult.isModuleLine(unprefixed) || unprefixed.startsWith(" ")
       }
 
   private def prefixedSummaryLine: Option[String] =
@@ -81,8 +81,8 @@ object TestCommandResult {
   private val colourSequence = "\u001b\\[([0-9;]*)m".r
 
   private val colourMarkers: Map[String, String] =
-    // `39` resets only the foreground, the one colour the human-readable output sets. Mill rewrites each `0` in a line
-    // it prefixes as `39`.
+    // Mill rewrites each `0` in a line it prefixes as `39`, which resets only the foreground; the human-readable output
+    // sets only the foreground, so both are a reset.
     Map("0" -> "{reset}", "39" -> "{reset}", "31" -> "{red}", "32" -> "{green}", "33" -> "{yellow}", "36" -> "{cyan}")
 
   def colourMarked(line: String): String =
@@ -98,7 +98,7 @@ object TestCommandResult {
 
   private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
 
-  private def isTestRunLabel(unprefixed: String): Boolean = unprefixed.startsWith("[")
+  private def isModuleLine(unprefixed: String): Boolean = unprefixed.startsWith("[")
 
   // Mill colours its prefix where it colours its own console output.
   private val colouredMillPrefix: Regex = "^(?:\u001b\\[[0-9;]*m)*[0-9][0-9-]*\\](?:\u001b\\[[0-9;]*m)* ".r

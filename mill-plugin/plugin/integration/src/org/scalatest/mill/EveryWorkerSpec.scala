@@ -631,7 +631,7 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
     fixtureBuild.resultAndReportOfTestCommand(jobsArguments(jobs))
 
   def runTestCommandAsAtTheConsole(): TestCommandResult =
-    // As at a user's console, Mill's ticker is on, so Mill puts its prefix on each line the test command writes.
+    // With the ticker on, Mill puts its prefix on each line the test command writes.
     fixtureBuild.runTestCommandWritingReport(jobsArguments(2) ++ Seq("--ticker", "true"))
 
   private def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)

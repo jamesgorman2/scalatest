@@ -22,7 +22,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private val testCommandTaskName: String = "org.scalatest.mill.TestCommandModule/test"
 
   private def isMillsTaskNameLine(prefix: String, line: String): Boolean =
-    // Mill names a task on stderr, after the task's prefix, when it starts, and with its duration when it ends.
+    // On stderr, after the task's prefix, Mill writes the task's name when it starts and the name with its duration
+    // when it ends.
     line.matches(Regex.quote(prefix + testCommandTaskName) + """( [0-9]+(\.[0-9]+)?(ms|s|m))?""")
 
   private def withSuites[A](moduleArguments: String*)(suites: String*)(test: FixtureBuild => A): A =

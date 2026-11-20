@@ -32,7 +32,10 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def addPlugin(): Unit =
     editBuild { build =>
-      require(!build.linesIterator.exists(isHeaderMvnDepsLine), s"the build's header already holds mvnDeps:\n$build")
+      require(
+        !build.linesIterator.exists(isHeaderMvnDepsLine),
+        s"the build already holds a header line //| mvnDeps:\n$build"
+      )
       s"${IntegrationEnvironment.pluginHeaderLine}\n$build"
     }
 
@@ -106,7 +109,7 @@ final class FixtureBuild(tester: IntegrationTester) {
   def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
 
   def compileBuildFile(): Unit = {
-    // Compiling the build here keeps compile messages out of a later invocation's output.
+    // `resolve _` compiles the build, so a later command's output holds no compile messages.
     val result = tester.eval(Seq("resolve", "_"))
     require(result.isSuccess, s"the build did not compile:\n${result.debugString}")
   }
