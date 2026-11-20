@@ -63,6 +63,6 @@ private[mill] object WorkerOutputCapture {
    * The charset a worker writes a piped stdout and stderr in: the platform's native encoding, which Mill's JVM names in
    * `native.encoding`, else that JVM's default charset.
    */
-  def workerCharset: Charset =
-    Option(System.getProperty("native.encoding")).map(Charset.forName).getOrElse(Charset.defaultCharset())
+  def workerCharset(systemProperty: String => Option[String]): Charset =
+    systemProperty("native.encoding").map(Charset.forName).getOrElse(Charset.defaultCharset())
 }

@@ -35,14 +35,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    *                    call as the worker starts, on whichever thread runs it.
    */
   def start(startWorker: (() => Unit) => Future[WorkerProcess]): Unit = {
-    started =
-      try {
-        Try(startWorker(() => startReading()))
-      } catch {
-        case fatal: Throwable =>
-          abandon()
-          throw fatal
-      }
+    started = WorkerRun.rethrowingAfter(abandon())(Try(startWorker(() => startReading())))
     started match {
       case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started)))(using ExecutionContext.parasitic)
       // A worker whose start threw may have started a process, as `end` assumes.
@@ -58,14 +51,9 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
    * @param awaitWorker returns once the worker has ended
    */
   def end(awaitWorker: Future[WorkerProcess] => Unit): Unit = {
-    val ended =
-      try {
-        started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
-      } catch {
-        case fatal: Throwable =>
-          abandon()
-          throw fatal
-      }
+    val ended = WorkerRun.rethrowingAfter(abandon()) {
+      started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
+    }
     // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as where Mill
     // cancels the task, can leave its process and those threads running, so its streams are left open until
     // `WorkerRun.endEach` stops capturing them.
@@ -142,13 +130,7 @@ private[mill] object WorkerRun {
    */
   def startEach[A](workers: Seq[A])(start: A => WorkerRun): Seq[WorkerRun] =
     workers.foldLeft(Vector.empty[WorkerRun]) { (started, worker) =>
-      try {
-        started :+ start(worker)
-      } catch {
-        case fatal: Throwable =>
-          started.foreach(_.abandon())
-          throw fatal
-      }
+      started :+ rethrowingAfter(started.foreach(_.abandon()))(start(worker))
     }
 
   /**
@@ -161,13 +143,7 @@ private[mill] object WorkerRun {
     try {
       workerRuns.tails.foreach {
         case workerRun +: notYetEnded =>
-          try {
-            workerRun.end(awaitWorker)
-          } catch {
-            case fatal: Throwable =>
-              notYetEnded.foreach(_.abandon())
-              throw fatal
-          }
+          rethrowingAfter(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
         case _ => ()
       }
     } finally {
@@ -178,7 +154,16 @@ private[mill] object WorkerRun {
   // which names neither.
   private def unboxed(throwable: Throwable): Throwable =
     throwable match {
-      case boxed: ExecutionException if boxed.getMessage == "Boxed Exception" && boxed.getCause != null => boxed.getCause
+      case boxed: ExecutionException if boxed.getMessage == "Boxed Exception" => Option(boxed.getCause).getOrElse(boxed)
       case other => other
+    }
+
+  private def rethrowingAfter[A](abandonWorkers: => Unit)(body: => A): A =
+    try {
+      body
+    } catch {
+      case throwable: Throwable =>
+        abandonWorkers
+        throw throwable
     }
 }

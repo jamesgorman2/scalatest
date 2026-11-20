@@ -1,8 +1,6 @@
 package org.scalatest.mill
 
-import java.io.FileInputStream
 import java.io.FileNotFoundException
-import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,7 +23,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
   private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
   private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
 
-  private final class Reading(eventLogFile: Path, open: Path => InputStream = path => new FileInputStream(path.toFile)) {
+  private final class Reading(eventLogFile: EventLogFile) {
     val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
     val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
     val runsAdded: AtomicInteger = new AtomicInteger(0)
@@ -33,7 +31,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     val processExited: AtomicBoolean = new AtomicBoolean(false)
     val processesWatched: mutable.Set[RunProcess] = mutable.Set.empty[RunProcess]
 
-    val reader: EventLogReader = new EventLogReader(eventLogFile, addRun, () => addProcessEndedBeforeAnyRun(), watch, 1.millis, open)
+    val reader: EventLogReader = new EventLogReader(eventLogFile, addRun, () => addProcessEndedBeforeAnyRun(), watch, 1.millis)
 
     private def addRun(readRun: RunFeed => Unit): Unit = {
       runsAdded.incrementAndGet()
@@ -67,15 +65,34 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
   }
 
   // Windows fails to open a file while another process holds it.
-  private def openingAfterFailures(failures: Int): Path => InputStream = {
+  private def openingAfterFailures(file: Path, failures: Int): EventLogFile = {
     val failed = new AtomicInteger(0)
-    path =>
-      if (failed.getAndIncrement() < failures) {
-        throw new FileNotFoundException(s"$path (The process cannot access the file because it is being used by another process)")
-      } else {
-        new FileInputStream(path.toFile)
-      }
+    val onDisk = EventLogFile.at(file)
+    new EventLogFile {
+      def exists: Boolean = onDisk.exists
+
+      def open(): EventLogInput =
+        if (failed.getAndIncrement() < failures) {
+          throw new FileNotFoundException(s"$file (The process cannot access the file because it is being used by another process)")
+        } else {
+          onDisk.open()
+        }
+    }
   }
+
+  private def inMemory(text: String): EventLogFile =
+    new EventLogFile {
+      def exists: Boolean = true
+
+      def open(): EventLogInput =
+        new EventLogInput {
+          private val unread = new AtomicBoolean(true)
+
+          def read(): Array[Byte] = if (unread.getAndSet(false)) text.getBytes(StandardCharsets.UTF_8) else Array.emptyByteArray
+
+          def close(): Unit = ()
+        }
+    }
 
   private def write(file: Path, text: String): Unit =
     Files.write(file, text.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
@@ -84,7 +101,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     "its worker started a process and ends with no event log file" should {
       "add no run, but add the worker's process as one that ended before any run existed in it" in {
         withEventLogFile { file =>
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
           reading.runsAdded.get shouldBe 0
@@ -96,7 +113,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     "its worker started no process and ends with no event log file" should {
       "add neither a run nor a process, and leave the consolidation unfailed" in {
         withEventLogFile { file =>
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           reading.stateAfterEnd(WorkerProcess.NotStarted) shouldBe ConsolidationState.Ended
           reading.runsAdded.get shouldBe 0
@@ -109,7 +126,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "add the run, with its every event, and end its event stream" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n$runEndedCompleted\n")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
@@ -120,11 +137,21 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "the event log file is given by the caller" should {
+      "read the run from that file" in {
+        val reading = new Reading(inMemory(s"$runStarted\n$runEndedCompleted\n"))
+        reading.processExited.set(true)
+        reading.reader.start()
+        reading.stateAfterEnd() shouldBe ConsolidationState.Ended
+        reading.output.toSeq.dropRight(1) shouldBe Seq("[core.test]")
+      }
+    }
+
     "the event log file cannot be opened at first" should {
       "keep trying to open it, then read the run" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n$runEndedCompleted\n")
-          val reading = new Reading(file, openingAfterFailures(3))
+          val reading = new Reading(openingAfterFailures(file, 3))
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
@@ -137,7 +164,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "fail with what opening it threw" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n$runEndedCompleted\n")
-          val reading = new Reading(file, openingAfterFailures(Int.MaxValue))
+          val reading = new Reading(openingAfterFailures(file, Int.MaxValue))
           reading.processExited.set(true)
           reading.reader.start()
           reading.reader.workerHasEnded(WorkerProcess.Started)
@@ -150,7 +177,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "keep reading events the run appends until the process exits" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           Thread.sleep(50)
           write(file, s"$runEndedCompleted\n")
@@ -164,7 +191,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "watch the process the event names" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n$runEndedCompleted\n")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd()
@@ -178,7 +205,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "end the run's event stream, so that the run does not finish" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
@@ -190,7 +217,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "add no event for it" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\n${runEndedCompleted.take(20)}")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
@@ -202,7 +229,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "make the reader throw, naming the line and why it cannot be decoded" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           val thrown = intercept[MalformedTestEventLogException](reading.stateAfterEnd())
           thrown.line shouldBe "not an event"
@@ -212,7 +239,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       "end the run's event stream there, though the process still runs" in {
         withEventLogFile { file =>
           write(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
-          val reading = new Reading(file)
+          val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           intercept[MalformedTestEventLogException](reading.stateAfterEnd())
           reading.consolidation.end()

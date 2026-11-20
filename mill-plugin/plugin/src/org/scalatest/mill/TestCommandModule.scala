@@ -1,5 +1,6 @@
 package org.scalatest.mill
 
+import java.time.Instant
 import mill.api.Discover
 import mill.api.Evaluator
 import mill.api.ExternalModule
@@ -18,7 +19,7 @@ object TestCommandModule extends ExternalModule {
    */
   def test(evaluator: Evaluator, arguments: mainargs.Leftover[String]): Task.Command[Unit] =
     Task.Command(exclusive = true) {
-      TestCommand.run(evaluator, arguments.value, Task.ctx())
+      TestCommand.run(evaluator, arguments.value, Task.ctx(), () => Instant.now(), sys.props.get)
     }
 
   lazy val millDiscover: Discover = Discover[this.type]

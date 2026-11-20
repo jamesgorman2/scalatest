@@ -1,5 +1,6 @@
 package org.scalatest.mill
 
+import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import org.scalatest.consolidation.CapturedLine
 import org.scalatest.matchers.should
@@ -70,6 +71,20 @@ final class WorkerOutputCaptureSpec extends AnyWordSpec with should.Matchers {
         capture.stopCapturing()
         stdout(capture, "after\n")
         linesOfRunAddedTo(capture) shouldBe empty
+      }
+    }
+  }
+
+  "A worker's charset" when {
+    "Mill's JVM names a native encoding" should {
+      "be that encoding" in {
+        WorkerOutputCapture.workerCharset(Map("native.encoding" -> "UTF-16LE").get) shouldBe StandardCharsets.UTF_16LE
+      }
+    }
+
+    "Mill's JVM names no native encoding" should {
+      "be that JVM's default charset" in {
+        WorkerOutputCapture.workerCharset(_ => None) shouldBe Charset.defaultCharset()
       }
     }
   }
