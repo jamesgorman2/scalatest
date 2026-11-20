@@ -1,5 +1,8 @@
 package org.scalatest.mill
 
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import mill.api.TaskCtx
 import mill.javalib.TestModuleUtil
@@ -38,24 +41,20 @@ private[mill] final class JvmTestModuleRun(
   def run(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
-    launcher().fold(
-      reason => {
-        consolidation.addRootFailure(s"Laying out the workers of ${label.value} failed: $reason")
-        consolidation.timeModule(label, None, None)
-      },
-      launcher => runWorkers(consolidation, launcher)
-    )
+    JvmTestModuleRun.layOutWorkers(consolidation, label)(launcher()).foreach(launcher => runWorkers(consolidation, launcher))
   }
 
   // Like Mill 1.3.1, the test command runs no discovery for a module that sets `testBatchFrameworkTasks`: each fork
   // group's worker is given the group's classes as `testForkGrouping` gives them.
-  private def launcher(): Either[String, WorkerLauncher] =
+  private def launcher(): Either[ForkGroupsShareProcessFolders, WorkerLauncher] = {
+    val filesystemIgnoresCase = () => JvmTestModuleRun.filesystemIgnoresCase(moduleFolder.toNIO)
     if (inputs.testBatchFrameworkTasks)
-      WorkerLayout.ofBatches(inputs.forkGroups, () => filesystemIgnoresCase()).map(new BatchLauncher(_))
+      WorkerLayout.ofBatches(inputs.forkGroups, filesystemIgnoresCase).map(new BatchLauncher(_))
     else
       WorkerLayout
-        .ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, () => filesystemIgnoresCase())
+        .ofQueue(inputs.forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, filesystemIgnoresCase)
         .map(new QueueLauncher(_))
+  }
 
   private def runWorkers(consolidation: Consolidation, launcher: WorkerLauncher): Unit = {
     val laidOutForkGroups = JvmTestModuleRun.layOutForkGroups(consolidation, label, launcher.layout.forkGroups)(launcher.layOut)
@@ -82,17 +81,6 @@ private[mill] final class JvmTestModuleRun(
         javaHome = inputs.javaHome
       )(using ctx)
       .toSet
-
-  private def filesystemIgnoresCase(): Either[String, Boolean] =
-    Try {
-      val probe = moduleFolder / "case-probe"
-      os.write(probe, "")
-      try {
-        os.exists(moduleFolder / "CASE-PROBE")
-      } finally {
-        os.remove(probe)
-      }
-    }.toEither.left.map(throwable => s"checking whether the filesystem ignores case failed: $throwable")
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
@@ -233,6 +221,52 @@ private[mill] object JvmTestModuleRun {
    * fork group's class list or, where the group holds no class, an empty queue and a claim folder.
    */
   type BatchSelector = Either[Seq[String], (Option[String], os.Path, os.Path)]
+
+  final class FilesystemCaseCheckFailure(cause: IOException)
+      extends Exception(s"checking whether the filesystem ignores case failed: $cause", cause)
+
+  /**
+   * Whether the filesystem holding `folder` ignores case, found by writing a probe file in `folder`.
+   *
+   * @throws FilesystemCaseCheckFailure where writing, finding or deleting the probe fails
+   */
+  def filesystemIgnoresCase(folder: Path): Boolean =
+    try {
+      val probe = Files.createFile(folder.resolve("case-probe"))
+      try {
+        Files.exists(folder.resolve("CASE-PROBE"))
+      } finally {
+        Files.delete(probe)
+      }
+    } catch {
+      case failure: IOException => throw new FilesystemCaseCheckFailure(failure)
+    }
+
+  /**
+   * Lays out a module's workers. Where two fork groups would share a `processFolder`, or checking whether the filesystem
+   * ignores case fails, a failure naming the module is attached to the consolidation's root, and the module is timed
+   * with no times.
+   *
+   * @return what laying out the workers gave, where it succeeded
+   */
+  def layOutWorkers[Launcher](consolidation: Consolidation, module: TestRunLabel)(
+      layOut: => Either[ForkGroupsShareProcessFolders, Launcher]
+  ): Option[Launcher] = {
+    val laidOut =
+      try {
+        layOut
+      } catch {
+        case failure: FilesystemCaseCheckFailure => Left(failure)
+      }
+    laidOut.fold(
+      failure => {
+        consolidation.addRootFailure(s"Laying out the workers of ${module.value} failed: ${failure.getMessage}")
+        consolidation.timeModule(module, None, None)
+        None
+      },
+      launcher => Some(launcher)
+    )
+  }
 
   /**
    * Lays out each fork group's files, in order, before any worker starts: its queue, or its batch worker's files. What

@@ -1,5 +1,6 @@
 package org.scalatest.mill
 
+import java.io.IOException
 import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.consolidation.Worker
@@ -19,12 +20,17 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       testParallelism: Boolean = false,
       jobs: Int = 4,
       filesystemIgnoresCase: Boolean = false
-  ): Either[String, WorkerLayout] =
-    WorkerLayout.ofQueue(forkGroups, discovered, testParallelism, jobs, () => Right(filesystemIgnoresCase))
+  ): Either[ForkGroupsShareProcessFolders, WorkerLayout] =
+    WorkerLayout.ofQueue(forkGroups, discovered, testParallelism, jobs, () => filesystemIgnoresCase)
 
-  private def workersOf(layout: Either[String, WorkerLayout]): Either[String, Seq[PlannedWorker]] = layout.map(_.forkGroups.flatMap(_.workers))
+  private def workersOf(layout: Either[ForkGroupsShareProcessFolders, WorkerLayout]): Either[ForkGroupsShareProcessFolders, Seq[PlannedWorker]] =
+    layout.map(_.forkGroups.flatMap(_.workers))
 
-  private def processFoldersOf(layout: Either[String, WorkerLayout]): Either[String, Seq[Seq[String]]] = workersOf(layout).map(_.map(_.processFolder))
+  private def processFoldersOf(layout: Either[ForkGroupsShareProcessFolders, WorkerLayout]): Either[ForkGroupsShareProcessFolders, Seq[Seq[String]]] =
+    workersOf(layout).map(_.map(_.processFolder))
+
+  private def sharing(positions: Seq[Int], processFolder: String*): ForkGroupsShareProcessFolders =
+    ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(positions.map(ForkGroup.at), processFolder)))
 
   "Laying out a module's queue" when {
     "test parallelism is off" when {
@@ -61,7 +67,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       "the module has ten fork groups" should {
         "pad each group's label and folder index to two digits" in {
           val groups = (0 until 10).map(index => Seq(s"samples.S$index", s"samples.T$index"))
-          val forkGroups = layoutOf(groups, groups.flatten.toSet).fold(fail(_), identity).forkGroups
+          val forkGroups = layoutOf(groups, groups.flatten.toSet).fold(failure => fail(failure.message), identity).forkGroups
           forkGroups.take(2).map(group => (group.label, group.folder)) shouldBe Seq(("00", Seq("group-00-samples.S0")), ("01", Seq("group-01-samples.S1")))
           forkGroups.last.folder shouldBe Seq("group-09-samples.S9")
         }
@@ -116,7 +122,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       "a fork group has ten workers" should {
         "pad each worker's index to two digits in its folder's name" in {
           val classes = (0 until 10).map(index => s"samples.S$index")
-          val workers = workersOf(layoutOf(Seq(classes), classes.toSet, testParallelism = true, jobs = 10)).fold(fail(_), identity)
+          val workers = workersOf(layoutOf(Seq(classes), classes.toSet, testParallelism = true, jobs = 10)).fold(failure => fail(failure.message), identity)
           workers.take(2).map(_.processFolder) shouldBe Seq(Seq("worker-00"), Seq("worker-01"))
           workers.last.worker shouldBe workerOf(0, 9)
           layoutOf(Seq(classes), classes.toSet, testParallelism = true, jobs = 10).map(_.forkGroups.map(_.workerIndexLength)) shouldBe Right(Seq(2))
@@ -160,15 +166,11 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "two fork groups each hold the same one class" should {
       "give no layout, naming the shared processFolder and the groups sharing it" in {
-        layoutOf(Seq(Seq("samples.A1"), Seq("samples.B1", "samples.B2"), Seq("samples.A1"))) shouldBe Left(
-          "fork groups 0 and 2 share the processFolder samples.A1"
-        )
+        layoutOf(Seq(Seq("samples.A1"), Seq("samples.B1", "samples.B2"), Seq("samples.A1"))) shouldBe Left(sharing(Seq(0, 2), "samples.A1"))
       }
 
       "under test parallelism, name the processFolder of the groups' first worker" in {
-        layoutOf(Seq(Seq("samples.A1"), Seq("samples.A1")), testParallelism = true) shouldBe Left(
-          "fork groups 0 and 1 share the processFolder samples.A1/worker-0"
-        )
+        layoutOf(Seq(Seq("samples.A1"), Seq("samples.A1")), testParallelism = true) shouldBe Left(sharing(Seq(0, 1), "samples.A1", "worker-0"))
       }
     }
 
@@ -176,7 +178,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       "the filesystem ignores case" should {
         "give no layout, naming the shared processFolder and the groups sharing it" in {
           layoutOf(Seq(Seq("samples.A1"), Seq("samples.a1")), Set("samples.A1", "samples.a1"), filesystemIgnoresCase = true) shouldBe Left(
-            "fork groups 0 and 1 share the processFolder samples.A1"
+            sharing(Seq(0, 1), "samples.A1")
           )
         }
       }
@@ -191,13 +193,14 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     }
 
     "checking whether the filesystem ignores case fails" when {
-      val failingCheck: () => Either[String, Boolean] = () => Left("checking whether the filesystem ignores case failed: disk full")
+      val checkFailure = new JvmTestModuleRun.FilesystemCaseCheckFailure(new IOException("disk full"))
+      val failingCheck: () => Boolean = () => throw checkFailure
 
       "two fork groups hold a discovered class" should {
-        "give no layout, giving why the check failed" in {
-          WorkerLayout.ofQueue(Seq(Seq("samples.B1"), Seq("samples.A1")), discovered, false, 4, failingCheck) shouldBe Left(
-            "checking whether the filesystem ignores case failed: disk full"
-          )
+        "throw what the check threw" in {
+          the[JvmTestModuleRun.FilesystemCaseCheckFailure] thrownBy {
+            WorkerLayout.ofQueue(Seq(Seq("samples.B1"), Seq("samples.A1")), discovered, false, 4, failingCheck)
+          } should be theSameInstanceAs checkFailure
         }
       }
 
@@ -220,7 +223,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
   "Laying out a module's batch workers" when {
     "the module has two fork groups" should {
       "give each group one worker, index 0, in the group's folder, with the group's whole class list" in {
-        WorkerLayout.ofBatches(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2")), () => Right(false)) shouldBe Right(
+        WorkerLayout.ofBatches(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2")), () => false) shouldBe Right(
           WorkerLayout(
             4,
             Seq(
@@ -234,7 +237,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "a fork group holds no class" should {
       "not run that group, and keep the position of every later group" in {
-        workersOf(WorkerLayout.ofBatches(Seq(Nil, Seq("samples.B1"), Seq("samples.A1")), () => Right(false))) shouldBe Right(
+        workersOf(WorkerLayout.ofBatches(Seq(Nil, Seq("samples.B1"), Seq("samples.A1")), () => false)) shouldBe Right(
           Seq(PlannedWorker(workerOf(1), Seq("samples.B1")), PlannedWorker(workerOf(2), Seq("samples.A1")))
         )
       }
@@ -242,7 +245,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "the module has no fork group" should {
       "give fork group 0 one worker with no class, in the module's folder" in {
-        WorkerLayout.ofBatches(Nil, () => Right(false)) shouldBe Right(
+        WorkerLayout.ofBatches(Nil, () => false) shouldBe Right(
           WorkerLayout(0, Seq(PlannedForkGroup(ForkGroup.at(0), "0", Nil, Nil, 1, Seq(PlannedWorker(workerOf(0), Nil)))))
         )
       }
@@ -250,10 +253,19 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "two fork groups each hold the same one class" should {
       "give no layout, naming the shared processFolder and the groups sharing it" in {
-        WorkerLayout.ofBatches(Seq(Seq("samples.A1"), Seq("samples.A1")), () => Right(false)) shouldBe Left(
-          "fork groups 0 and 1 share the processFolder samples.A1"
-        )
+        WorkerLayout.ofBatches(Seq(Seq("samples.A1"), Seq("samples.A1")), () => false) shouldBe Left(sharing(Seq(0, 1), "samples.A1"))
       }
+    }
+  }
+
+  "Fork groups that share processFolders" should {
+    "be described by the groups sharing each processFolder, and the folder" in {
+      ForkGroupsShareProcessFolders(
+        Seq(
+          SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), Seq("samples.A1")),
+          SharedProcessFolder(Seq(ForkGroup.at(2), ForkGroup.at(3), ForkGroup.at(4)), Seq("samples.B1", "worker-0"))
+        )
+      ).message shouldBe "fork groups 0 and 1 share the processFolder samples.A1; fork groups 2, 3 and 4 share the processFolder samples.B1/worker-0"
     }
   }
 

@@ -1,5 +1,7 @@
 package org.scalatest.mill
 
+import java.io.IOException
+import java.nio.file.Files
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ForkGroup
@@ -14,6 +16,74 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
   private def forkGroupAt(position: Int): PlannedForkGroup =
     PlannedForkGroup(ForkGroup.at(position), position.toString, Seq(s"group-$position"), Nil, 1, Nil)
+
+  private def outputOf(consolidate: Consolidation => Unit): Seq[String] = {
+    val output = mutable.ArrayBuffer.empty[String]
+    val consolidation = Consolidation.start(line => output += line, coloured = false)
+    consolidate(consolidation)
+    consolidation.end()
+    output.toSeq
+  }
+
+  "Laying out a module's workers" when {
+    "two fork groups would share a processFolder" should {
+      "attach the groups and the folder to the root, naming the module" in {
+        val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), Seq("samples.A1"))))
+        outputOf(consolidation => JvmTestModuleRun.layOutWorkers(consolidation, label)(Left(sharing))) should contain(
+          "    Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
+        )
+      }
+
+      "give nothing to launch" in {
+        val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), Seq("samples.A1"))))
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.layOutWorkers(consolidation, label)(Left(sharing)) shouldBe None
+      }
+    }
+
+    "checking whether the filesystem ignores case fails" should {
+      "attach why the check failed to the root, naming the module" in {
+        val checkFailure = new JvmTestModuleRun.FilesystemCaseCheckFailure(new IOException("disk full"))
+        outputOf(consolidation => JvmTestModuleRun.layOutWorkers(consolidation, label)(throw checkFailure)) should contain(
+          "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
+        )
+      }
+    }
+
+    "the workers are laid out" should {
+      "give what laying them out gave, attaching nothing to the root" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.layOutWorkers(consolidation, label)(Right("launcher")) shouldBe Some("launcher")
+        consolidation.end()
+        consolidation.state shouldBe ConsolidationState.Ended
+      }
+    }
+  }
+
+  "Checking whether the filesystem ignores case" when {
+    "the folder exists" should {
+      "give whether a file is found under its name in upper case, and leave the folder empty" in {
+        val folder = Files.createTempDirectory("case-check")
+        val ignoresCase = JvmTestModuleRun.filesystemIgnoresCase(folder)
+        val emptied = Files.list(folder).count() == 0
+        val file = Files.createFile(folder.resolve("file"))
+        val foundInUpperCase = Files.exists(folder.resolve("FILE"))
+        Files.delete(file)
+        Files.delete(folder)
+        (ignoresCase, emptied) shouldBe ((foundInUpperCase, true))
+      }
+    }
+
+    "the folder is missing" should {
+      "throw, naming the IOException the check met" in {
+        val folder = Files.createTempDirectory("case-check")
+        Files.delete(folder)
+        the[JvmTestModuleRun.FilesystemCaseCheckFailure] thrownBy {
+          JvmTestModuleRun.filesystemIgnoresCase(folder)
+        } should have message s"checking whether the filesystem ignores case failed: java.nio.file.NoSuchFileException: ${folder.resolve("case-probe")}"
+      }
+    }
+  }
 
   "Laying out a module's fork groups" when {
     "laying out the first of two fork groups throws" should {

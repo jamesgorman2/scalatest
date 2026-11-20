@@ -5,6 +5,7 @@ import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
+import scala.util.control.NoStackTrace
 
 /**
  * The fork groups and workers of a JVM test module that the test command starts: those Mill 1.3.1's `testForked` starts.
@@ -49,6 +50,28 @@ private[mill] final case class PlannedWorker(worker: Worker, processFolder: Seq[
     s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${module.value}"
 }
 
+/**
+ * Why a module's workers cannot be laid out: two or more fork groups would share a `processFolder`. Mill's `testForked`
+ * fails there too, as a `processFolder`'s second worker cannot start.
+ */
+private[mill] final case class ForkGroupsShareProcessFolders(sharing: Seq[SharedProcessFolder]) extends Exception with NoStackTrace {
+
+  override def getMessage: String = message
+
+  def message: String = sharing.map(_.message).mkString("; ")
+}
+
+/**
+ * @param processFolder the `processFolder` of the fork groups' first workers, as path segments under the module's folder
+ */
+private[mill] final case class SharedProcessFolder(forkGroups: Seq[ForkGroup], processFolder: Seq[String]) {
+
+  def message: String = {
+    val positions = forkGroups.map(_.position)
+    s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder ${processFolder.mkString("/")}"
+  }
+}
+
 private[mill] object WorkerLayout {
 
   /**
@@ -61,18 +84,17 @@ private[mill] object WorkerLayout {
    * Each group gets one worker. Where test parallelism is on, unless exactly one class is queued, it instead gets `jobs`
    * workers, capped at its class count and at least one, each in a folder of its own.
    *
-   * @param filesystemIgnoresCase whether the filesystem holding the `processFolder`s is case-insensitive, or why that is
-   *                              unknown. Asked only where two or more groups hold a discovered class.
-   * @return the layout, or why it cannot run: two fork groups would share a folder (Mill's `testForked` fails there too,
-   *         as a `processFolder`'s second worker cannot start), or `filesystemIgnoresCase` gave no answer.
+   * @param filesystemIgnoresCase whether the filesystem holding the `processFolder`s is case-insensitive. Asked only where
+   *                              two or more groups hold a discovered class; what it throws propagates.
+   * @return the layout, or the fork groups that would share a `processFolder`
    */
   def ofQueue(
       forkGroups: Seq[Seq[String]],
       discovered: Set[String],
       testParallelism: Boolean,
       jobs: Int,
-      filesystemIgnoresCase: () => Either[String, Boolean]
-  ): Either[String, WorkerLayout] = {
+      filesystemIgnoresCase: () => Boolean
+  ): Either[ForkGroupsShareProcessFolders, WorkerLayout] = {
     val discoveredForkGroups = forkGroups.map(_.filter(discovered))
     val workersPerGroup =
       if (testParallelism && discoveredForkGroups.map(_.size).sum != 1)
@@ -89,7 +111,7 @@ private[mill] object WorkerLayout {
    *
    * @return the layout, or why it cannot run, as [[ofQueue]] gives
    */
-  def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Either[String, Boolean]): Either[String, WorkerLayout] =
+  def ofBatches(forkGroups: Seq[Seq[String]], filesystemIgnoresCase: () => Boolean): Either[ForkGroupsShareProcessFolders, WorkerLayout] =
     of(forkGroups, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
 
   private enum WorkersPerGroup {
@@ -112,8 +134,8 @@ private[mill] object WorkerLayout {
   private def of(
       forkGroups: Seq[Seq[String]],
       workersPerGroup: WorkersPerGroup,
-      filesystemIgnoresCase: () => Either[String, Boolean]
-  ): Either[String, WorkerLayout] = {
+      filesystemIgnoresCase: () => Boolean
+  ): Either[ForkGroupsShareProcessFolders, WorkerLayout] = {
     val groupsToRun = forkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     val testClassCount = groupsToRun.map { case (classes, _) => classes.size }.sum
     def forkGroupOf(classes: Seq[String], position: Int, label: String, folder: Seq[String]): PlannedForkGroup = {
@@ -134,7 +156,7 @@ private[mill] object WorkerLayout {
           val label = padded(runIndex, labelLength)
           forkGroupOf(classes, position, label, Seq(groupFolderName(classes, label)))
         }
-        filesystemIgnoresCase().flatMap(ignoresCase => sharedFolders(queued, ignoresCase).toLeft(WorkerLayout(testClassCount, queued)))
+        sharedProcessFolders(queued, filesystemIgnoresCase()).toLeft(WorkerLayout(testClassCount, queued))
     }
   }
 
@@ -146,21 +168,15 @@ private[mill] object WorkerLayout {
       case multiple => s"group-$label-${multiple.head}"
     }
 
-  private def sharedFolders(forkGroups: Seq[PlannedForkGroup], filesystemIgnoresCase: Boolean): Option[String] = {
+  private def sharedProcessFolders(forkGroups: Seq[PlannedForkGroup], filesystemIgnoresCase: Boolean): Option[ForkGroupsShareProcessFolders] = {
     val folderOnDisk: String => String = if (filesystemIgnoresCase) _.toLowerCase(Locale.ROOT) else identity
-    val shared = forkGroups
+    val sharing = forkGroups
       .groupBy(_.folder.map(folderOnDisk))
       .values
       .filter(_.size > 1)
       .toSeq
       .sortBy(_.head.forkGroup.position)
-      .map(describeSharing)
-    Option.when(shared.nonEmpty)(shared.mkString("; "))
-  }
-
-  private def describeSharing(sharing: Seq[PlannedForkGroup]): String = {
-    val positions = sharing.map(_.forkGroup.position)
-    val processFolder = sharing.head.workers.head.processFolder.mkString("/")
-    s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder $processFolder"
+      .map(sharingGroups => SharedProcessFolder(sharingGroups.map(_.forkGroup), sharingGroups.head.workers.head.processFolder))
+    Option.when(sharing.nonEmpty)(ForkGroupsShareProcessFolders(sharing))
   }
 }
