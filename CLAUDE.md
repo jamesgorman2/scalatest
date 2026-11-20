@@ -44,3 +44,7 @@ Always run in the foreground to avoid idle/timeout issues.
 
 - Powershell - `test-all.ps1`
 - Bash - `test-all.sh`
+
+## BDD Gherkins
+
+`GherkinSpec` is not currently available for this repo, so use `AnyFeatureSpec` with `GivenWhenThen` instead.
