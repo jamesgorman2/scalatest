@@ -417,6 +417,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(
       organization := forkOrganization,
       moduleName := "scalatest-consolidation",
+      scalacOptions ++= List("-old-syntax", "-Werror", "-Wunused:all"),
       mimaFailOnNoPrevious := false,
       // Not a project dependency: the common test project is not published, so the POM must not name it.
       Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
