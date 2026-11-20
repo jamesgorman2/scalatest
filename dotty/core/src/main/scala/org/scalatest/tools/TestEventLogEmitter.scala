@@ -493,6 +493,19 @@ private[scalatest] object TestEventLogEmitter {
     }
   }
 
+  // This and endedIfThrownBy are inline, so that a stack trace printed from their body has as many frames as 3.2.20's.
+  inline def endedAfter[A](emitter: Option[TestEventLogEmitter])(inline body: A): A =
+    try body finally emitter.foreach(_.endWithoutRunEnded())
+
+  inline def endedIfThrownBy[A](emitter: Option[TestEventLogEmitter])(inline body: A): A = {
+    try body
+    catch {
+      case thrown: Throwable =>
+        emitter.foreach(_.endWithoutRunEnded())
+        throw thrown
+    }
+  }
+
   def builtTestMessage(message: => Event): Either[Throwable, (Event, EncodedEvent)] = {
     caughtOutsideLock {
       val built = message
