@@ -62,7 +62,6 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  // Windows fails to open a file while another process holds it.
   private def openingAfterFailures(file: Path, failures: Int): EventLogFile = {
     val failed = new AtomicInteger(0)
     val onDisk = EventLogFile.at(file)

@@ -79,9 +79,10 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       workerRun.end(_ => ())
     }
 
-    // `WorkerRun.end` turns a throw from its wait into a root failure, so the test thread waits first, failing the test
-    // if the worker never ends.
-    def awaitWorkerEnd(): Unit = workerEnd.foreach(Await.ready(_, workerEndTimeout))
+    def awaitWorkerEnd(): Unit =
+      // `WorkerRun.end` turns a throw from its wait into a root failure, so the test thread waits first, failing the
+      // test if the worker never ends.
+      workerEnd.foreach(Await.ready(_, workerEndTimeout))
 
     def awaitReaderEnd(): Unit = reader.awaitStreamEnd()
 

@@ -11,10 +11,6 @@ import mill.javalib.TestModule
 import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.InternalJvmWorkerApi
 
-/**
- * The values of a JVM test module's tasks that Mill's own `testForked` builds its `TestModuleUtil` from, and the
- * module's own ScalaTest arguments, `testArgsDefault`.
- */
 private[mill] final case class JvmTestModuleInputs(
     testArgs: Seq[String],
     useArgsFile: Boolean,
@@ -39,10 +35,6 @@ private[mill] final case class JvmTestModuleInputs(
     testBatchFrameworkTasks: Boolean
 ) {
 
-  /**
-   * Its workers log at the module's `testLogLevel` raised to at least `Info`, so Mill writes no `Running Test Class` line
-   * to their stderr.
-   */
   def testModuleUtil(arguments: Seq[String], ctx: TaskCtx): TestModuleUtil =
     new TestModuleUtil(
       useArgsFile,
@@ -62,6 +54,7 @@ private[mill] final case class JvmTestModuleInputs(
       testReportXml,
       javaHome,
       testParallelism,
+      // At `Info` or above, Mill writes no `Running Test Class` line to the workers' stderr.
       if (testLogLevel.level < TestReporter.LogLevel.Info.level) TestReporter.LogLevel.Info else testLogLevel,
       propagateEnv,
       jvmWorker,
@@ -108,8 +101,8 @@ private[mill] object JvmTestModuleInputs {
     }
   }
 
-  // `aheadOfTimeDiscoveredTestClassesIfNeeded` is protected, but compiles to a public method.
   private def discoveredClassesTask(module: TestModule): Task[Option[Seq[(String, Int)]]] =
+    // `aheadOfTimeDiscoveredTestClassesIfNeeded` is protected, but compiles to a public method.
     classOf[TestModule]
       .getMethod("aheadOfTimeDiscoveredTestClassesIfNeeded")
       .invoke(module)

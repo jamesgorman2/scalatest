@@ -6,14 +6,6 @@ import mill.api.daemon.internal.CompileProblemReporter
 import mill.api.daemon.internal.TestReporter
 import scala.concurrent.Future
 
-/**
- * The test command's `TaskCtx` for one worker, except that each async body forked through it, and each body given to
- * [[runOnThisThread]], first calls `workerStarting`, then runs with `os.Inherit` set to `capture`. A worker spawned in
- * that body sends its stdout and stderr to `capture` rather than to Mill's logging. Mill sets `os.Inherit` around
- * each async body it runs, so only a value set inside the body reaches the worker.
- *
- * @param workerStarting called as the worker starts, on the thread that runs it
- */
 private[mill] final class WorkerTaskCtx(ctx: TaskCtx, capture: WorkerOutputCapture, workerStarting: () => Unit) extends TaskCtx {
 
   private def capturing[T](body: => T): T =
@@ -23,7 +15,6 @@ private[mill] final class WorkerTaskCtx(ctx: TaskCtx, capture: WorkerOutputCaptu
       }
     }
 
-  /** Calls `workerStarting`, then runs `body`, which starts the worker on the calling thread. */
   def runOnThisThread[T](body: => T): T = {
     workerStarting()
     capturing(body)
@@ -39,6 +30,7 @@ private[mill] final class WorkerTaskCtx(ctx: TaskCtx, capture: WorkerOutputCaptu
     def async[T](dest: os.Path, key: String, message: String, priority: Int)(t: Logger => T)(using
         forkingCtx: TaskCtx
     ): Future[T] =
+      // Mill sets `os.Inherit` around each async body it runs, so only a value set inside the body reaches the worker.
       ctx.fork.async(dest, key, message, priority)(logger => runOnThisThread(t(logger)))(using forkingCtx)
   }
 

@@ -2,7 +2,6 @@ package org.scalatest.mill
 
 import java.io.ByteArrayOutputStream
 
-/** No line keeps its `\n`. Bytes after the last `\n` are held until a later `\n` or `takeRest`. */
 private[mill] final class LineSplitter {
 
   private val held = new ByteArrayOutputStream()

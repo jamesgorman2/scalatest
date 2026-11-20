@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-/** @param jsonOutputPath the path `-fJ` names, as given */
 private[mill] final case class TestCommandArguments(
     moduleSelectors: Seq[ModuleSelectorArgument],
     stdoutContent: StdoutContent,
