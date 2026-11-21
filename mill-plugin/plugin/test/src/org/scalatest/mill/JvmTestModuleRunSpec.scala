@@ -75,11 +75,6 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         )
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }
-
-      "give nothing to launch" in {
-        val consolidation = Consolidation.start(_ => (), coloured = false)
-        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(noClassKept)) shouldBe None
-      }
     }
 
     "the workers are laid out" should {

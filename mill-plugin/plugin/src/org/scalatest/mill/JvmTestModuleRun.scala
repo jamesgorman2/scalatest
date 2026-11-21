@@ -249,7 +249,7 @@ private[mill] object JvmTestModuleRun {
   ): Option[Launcher] =
     outcomeOfLayingOut.fold(
       failure => {
-        consolidation.addRootFailure(failure.rootFailureMessage(module))
+        consolidation.addRootFailure(failure.rootMessage(module))
         consolidation.timeModule(module, None, None)
         None
       },

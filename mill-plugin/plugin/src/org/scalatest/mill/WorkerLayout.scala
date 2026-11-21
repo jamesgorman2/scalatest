@@ -49,12 +49,12 @@ private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
 
   def message: String =
     this match {
-      case ClassGlobsKeepNoTestClass(classGlobs) => TestCommandFailure.NoTestMatchesClassGlobs(classGlobs).message
+      case ClassGlobsKeepNoTestClass(classGlobs) => ClassGlob.noTestMatchedMessage(classGlobs)
       case ForkGroupsShareProcessFolders(sharing) => sharing.map(_.message).mkString("; ")
       case FilesystemCaseNotChecked(cause) => s"checking whether the filesystem ignores case failed: $cause"
     }
 
-  def rootFailureMessage(module: ModuleName): String =
+  def rootMessage(module: ModuleName): String =
     this match {
       // Attached as Mill's `testOnly` words it.
       case ClassGlobsKeepNoTestClass(_) => message

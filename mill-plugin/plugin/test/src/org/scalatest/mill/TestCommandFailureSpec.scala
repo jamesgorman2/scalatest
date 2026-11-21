@@ -10,13 +10,6 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
   private val path = Paths.get("out", "report.json")
 
   "A test command failure's message" when {
-    "no test matches the class globs" should {
-      "be the message Mill's testOnly fails with, naming the class globs separated by spaces" in {
-        TestCommandFailure.NoTestMatchesClassGlobs(Seq(ClassGlob("samples.Gamma*"), ClassGlob("samples.Fast"))).message shouldBe
-          "Test selector does not match any test: samples.Gamma* samples.Fast\nRun discoveredTestClasses to see available tests"
-      }
-    }
-
     "-fJ has no path after it" should {
       "say -fJ takes a path" in {
         TestCommandFailure.JsonOutputPathMissing.message shouldBe "The test command's -fJ takes a path, but none follows it: -fJ"

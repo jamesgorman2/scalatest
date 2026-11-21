@@ -71,4 +71,11 @@ final class ClassGlobSpec extends AnyWordSpec with should.Matchers {
       }
     }
   }
+
+  "The message for class globs that match no test" should {
+    "be the message Mill's testOnly fails with, naming the class globs separated by spaces" in {
+      ClassGlob.noTestMatchedMessage(Seq(ClassGlob("samples.Gamma*"), ClassGlob("samples.Fast"))) shouldBe
+        "Test selector does not match any test: samples.Gamma* samples.Fast\nRun discoveredTestClasses to see available tests"
+    }
+  }
 }

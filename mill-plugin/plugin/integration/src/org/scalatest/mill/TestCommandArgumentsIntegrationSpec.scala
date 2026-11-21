@@ -6,6 +6,14 @@ import org.scalatest.matchers.should
 
 import scala.util.matching.Regex
 
+private enum FixtureTest(declaration: String) {
+  case Fast extends FixtureTest("""test("fast", Fast) """)
+  case Slow extends FixtureTest("""test("slow") """)
+
+  def sendingWorkingDirectoryIn(suiteSource: String): String =
+    suiteSource.replace(declaration + "{}", declaration + """{ info(System.getProperty("user.dir")) }""")
+}
+
 final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
@@ -68,13 +76,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private def infoMessages(json: JsonNode): Seq[String] =
     moduleNode(json).nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
 
-  private def sendWorkingDirectoryFrom(build: FixtureBuild, suite: String, tests: String*): Unit = {
+  private def makeSendWorkingDirectory(build: FixtureBuild, suite: String, tests: FixtureTest*): Unit = {
     val source = build.samples / s"$suite.scala"
-    val declarations = Map("fast" -> """test("fast", Fast) """, "slow" -> """test("slow") """)
-    os.write.over(
-      source,
-      tests.foldLeft(os.read(source))((text, test) => text.replace(declarations(test) + "{}", declarations(test) + """{ info(System.getProperty("user.dir")) }"""))
-    )
+    val rewritten = tests.foldLeft(os.read(source))((text, test) => test.sendingWorkingDirectoryIn(text))
+    os.write.over(source, rewritten)
   }
 
   private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) = {
@@ -137,7 +142,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
             """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2")) }""",
             s"def testBatchFrameworkTasks = $batch"
           )
-          Seq("Alpha1", "Alpha2", "Beta1").foreach(suite => sendWorkingDirectoryFrom(build, suite, "fast", "slow"))
+          Seq("Alpha1", "Alpha2", "Beta1").foreach(suite => makeSendWorkingDirectory(build, suite, FixtureTest.Fast, FixtureTest.Slow))
           val (result, json) = runWithClassGlobs(build, "samples.Alpha*")
 
           withClue(result.debugString) {
@@ -157,7 +162,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
       withMarkingSuites { build =>
         build.replaceInBuild("def testParallelism = false", "def testParallelism = true")
-        sendWorkingDirectoryFrom(build, "Alpha1", "fast")
+        makeSendWorkingDirectory(build, "Alpha1", FixtureTest.Fast)
         val (result, json) = runWithClassGlobs(build, "samples.Alpha1")
 
         withClue(result.debugString) {

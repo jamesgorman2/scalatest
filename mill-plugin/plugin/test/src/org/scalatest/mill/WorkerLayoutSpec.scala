@@ -348,13 +348,6 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  "Class globs that keep no class" should {
-    "be described as Mill's testOnly fails for want of a matching test" in {
-      ClassGlobsKeepNoTestClass(globs("samples.Gamma*", "samples.Fast")).message shouldBe
-        "Test selector does not match any test: samples.Gamma* samples.Fast\nRun discoveredTestClasses to see available tests"
-    }
-  }
-
   "Fork groups that share processFolders" should {
     "be described by the groups sharing each processFolder, and the folder" in {
       ForkGroupsShareProcessFolders(
