@@ -82,7 +82,11 @@ Its own components are:
 - Mill fixes the plugin's Scala version: Mill `1.3.1`, the release the plugin is built against, is built on Scala 3.9.0, while core and the library are built with Scala 3.3.8 (§ ScalaTest core). The plugin loads both into Mill's JVM.
 - The plugin's integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command warns on the console and in every file output…").
-- **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
+- **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event of a run's event stream (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
+  - On the JVM it keeps the results that Mill's test-runner subprocess call returns for each worker, which Mill reads from the worker's `out.json`. It uses them for two things only:
+    - it writes the module's JUnit XML report from them, as Mill's `testOnly` and `testForked` write it from the same results (`SPECIFICATION.md` R-047);
+    - where class globs are given, every worker has ended with results and no worker's results hold a test result, it attaches to the root the failure Mill's `testOnly` fails with (`SPECIFICATION.md` R-053a).
+  - Where class globs are given and keep no class, it starts no worker of the module and attaches that same failure to the root.
 - **Test manifest** — gives the library each of a module's processes' assigned test classes (`.docs/ubiquitous-language.md` **Assigned test classes**), and the classes left unclaimed in a fork group's queue. A class's nested suites, scopes and tests are known only from a suite the run constructed (§ APIs § The emitter and the Mill plugin, the `structure` event). The test command writes no file for it (`decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
   - On the JVM, for a module that does not set `testBatchFrameworkTasks`, it is the files of Mill's own test queue, which the test command lays out before it starts any worker (`research/mill-test-worker-args.md` § 1.2): each fork group's `test-classes/` queue, with one file for each class the test command's class globs keep, and each worker's `claim/` folder and `claim.log` in its `processFolder`. A fork group is known by its queue folder.
     - A class is either unclaimed in its group's queue or recorded in a worker's `claim.log`; a worker claimed each class its `claim.log` records. The test command compiles the manifest from these files once a worker has ended (§ APIs § The emitter and the Mill plugin).
@@ -219,7 +223,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
     - the library gives a run an outcome other than completed, whether from the run's `runEnded` event or by aborting the run with reason *process failed* (`SPECIFICATION.md` R-102), as when the caller ends the run's event stream without the `runEnded` event (**Add a run**);
     - the caller adds a process that ended before any run existed in it, or adds a module whose tests did not start;
     - the caller attaches a failure to the root.
-  - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-137 for it: the result of Mill's test-runner subprocess call plays no part.
+  - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-137 for it: the results of Mill's test-runner subprocess calls reach the state only as a failure the test command attaches to the root (§ Modules § Mill plugin, Test command).
 
 ## Data flow
 
@@ -232,11 +236,13 @@ The test command runs each selected module's tests under a task context it suppl
 It runs the tests:
 
 - on the JVM:
-  - For a module that does not set `testBatchFrameworkTasks`, it runs the module's test discovery itself without the runner argument (`decisions/architecture-running-tests.md` "The plugin runs a module's test discovery itself…"). It lays out Mill's test queue, then starts each worker Mill 1.3.1's `testForked` would start through `TestModuleUtil.runTestFuture`, and waits for every worker.
+  - For a module that does not set `testBatchFrameworkTasks`, it runs the module's test discovery itself without the runner argument (`decisions/architecture-running-tests.md` "The plugin runs a module's test discovery itself…"). Where class globs are given and keep no class the discovery finds, it starts no worker of the module. Otherwise it lays out Mill's test queue, then starts each worker Mill 1.3.1's `testOnly` or `testForked` would start through `TestModuleUtil.runTestFuture`, and waits for every worker (`SPECIFICATION.md` R-053a, R-053b).
     - Where `testParallelism` is on, unless exactly one test class is queued, each worker is forked through its own task context, as `testForked` does, and the workers run in parallel on Mill's pool.
     - Otherwise each worker runs on the command's thread, one after another.
-  - For a module that sets `testBatchFrameworkTasks`, it runs no discovery, as Mill 1.3.1 runs none. It starts one worker for each fork group that holds a class through `TestModuleUtil.callTestRunnerSubprocess`, gives each worker its group's class list as `testForkGrouping` gives it, less the classes the test command's class globs do not keep, and waits for every worker. A module whose fork groups hold no class runs fork group 0's worker on an empty queue (`SPECIFICATION.md` R-053b; `research/mill-plugin-conventions.md` § 5).
-    - Where more than one fork group holds a class, each worker is forked through its own task context, as `testForked` does, whatever the module's `testParallelism`.
+  - For a module that sets `testBatchFrameworkTasks`, it runs no discovery, as Mill 1.3.1 runs none. It gives each fork group's worker the group's class list as `testForkGrouping` gives it, less the classes the test command's class globs do not keep (`SPECIFICATION.md` R-053a, R-053b; `research/mill-plugin-conventions.md` § 5).
+    - It starts one worker for each fork group that holds a class the class globs keep, through `TestModuleUtil.callTestRunnerSubprocess`, and waits for every worker.
+    - Where no class globs are given and the module's fork groups hold no class, it runs fork group 0's worker on an empty queue. Where class globs are given and keep no class, it starts no worker of the module.
+    - Where more than one fork group holds a class the class globs keep, each worker is forked through its own task context, as `testForked` does, whatever the module's `testParallelism`.
     - Otherwise the one worker runs on the command's thread;
 - on Scala.js and Native, it evaluates the module's own Mill test task. In that evaluation only, it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher (`decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…").
 
@@ -244,7 +250,7 @@ Before it starts any of a module's test processes, the test command knows the mo
 
 - on the JVM:
   - for a module that does not set `testBatchFrameworkTasks`, as the queue it lays out for each fork group from its own discovery, which starts no test;
-  - for a module that sets `testBatchFrameworkTasks`, as each fork group's class list;
+  - for a module that sets `testBatchFrameworkTasks`, as the class list it gives each fork group's worker;
 - on Scala.js and Native, from test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
 
 All of this runs in one nested evaluation of the test command's own, with fail-fast off (`decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
@@ -301,7 +307,7 @@ flowchart LR
   - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it was assigned.
   - On the JVM the library still reports each class the dead worker was assigned that no run reported, from the test manifest (§ Modules § Mill plugin, Test manifest):
     - a queue worker claims one class at a time, so its one such class is the last one it claimed before it died;
-    - a batch worker was assigned its fork group's whole class list, so every class in that list that no run reported is such a class.
+    - a batch worker was assigned the class list the test command gave it, so every class in that list that no run reported is such a class.
   - Each class that no worker claimed stays in its fork group's queue, and the test command adds it with **Add a test class** (`SPECIFICATION.md` R-095a). A module that sets `testBatchFrameworkTasks` leaves no class in a queue.
 
 ## External systems

@@ -12,10 +12,11 @@ The test command takes several module selectors, resolves each to its test modul
 - A module whose tests cannot start, as when it fails to compile, has an outcome showing that error (R-098e), and fails the test command.
 - A module that does not test with this release of the fork fails the test command before any test starts (R-059). Until features 11–13, so does every Scala.js and Native module.
 - A failure under R-059 leaves no file at the `-fJ` path.
+- The class globs and framework arguments apply alike to every selected module. Each module in which the class globs select no test fails as a single module does under feature 4.
 
 Enables:
 
-- `SPECIFICATION.md` R-055 (several module selectors), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
+- `SPECIFICATION.md` R-055 (several module selectors; class globs and framework arguments applying alike to every selected test module), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
 - `JSON-LAYOUT.md` § Root and modules (`moduleSelectors` with several module selectors; several modules)
 - `ARCHITECTURE.md` § Modules § Mill plugin (Test command: resolves the module selectors), § APIs § The Mill plugin and the consolidation library (Start: module selectors; Add a module whose tests did not start), § Data flow (one nested evaluation with fail-fast off)
 

@@ -141,6 +141,10 @@ _Avoid_: Mill command, invocation
 **Task folder**:
 The folder Mill gives a task to write its files in.
 
+**Module folder**:
+The folder a test command owns for one test module, in Mill's output folder. Each file that Mill's `testOnly` or `testForked` would write in its task folder sits at the same relative path in the module folder instead.
+_Avoid_: Module's output folder, module dest
+
 **Supported Mill release**:
 A Mill release on which the Mill plugin's integration tests passed, as listed by the running release of this fork. Any other Mill release is unsupported, even within the same major version.
 _Avoid_: Compatible Mill version, Mill version range
