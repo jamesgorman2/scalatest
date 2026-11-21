@@ -227,7 +227,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "given, before the first --, a flag a framework argument may hold" should {
+    "given a framework argument's flag among the test command's own arguments" should {
       "reject it alone, naming it" in {
         for (flag <- AllowedFlag.values.map(_.text)) {
           rejection("core.test", flag, "--", "samples.Alpha1") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments(flag)
@@ -249,7 +249,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
         rejection("core.test", "-fJ", "-n", "samples.Fast") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n")
       }
 
-      "reject it ahead of a framework argument the test command does not pass on" in {
+      "name it, not a later framework argument the test command does not pass on" in {
         rejection("-n", "samples.Fast", "core.test", "--", "--", "-oD") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n")
       }
     }

@@ -19,7 +19,8 @@ object TestCommandModule extends ExternalModule {
    *   Optionally `--` follows, then the arguments `mill <module>.testOnly` takes: class globs and, after a second `--`,
    *   framework arguments, as in `core.test -fJ report.json -- samples.Alpha* -- -n samples.Fast`. A framework
    *   argument is ScalaTest's `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W` with its
-   *   values; the command fails on any other, and on any of these before the first `--` or, with no `--`, anywhere.
+   *   values. The command fails on any other framework argument, and on any of these flags given before the first `--`,
+   *   or anywhere if no `--` is given.
    */
   def test(evaluator: Evaluator, arguments: mainargs.Leftover[String]): Task.Command[Unit] =
     Task.Command(exclusive = true) {

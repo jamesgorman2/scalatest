@@ -60,7 +60,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   Feature("Framework arguments") {
 
     Scenario("With no -- after the test command's own arguments, every test runs") {
-      Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow, each of which creates a file in the markers folder as it runs")
+      Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow")
+      And("each test creates a file in the markers folder as it runs")
       When("the test command runs core.test, writing JSON output, with nothing after -fJ and its path")
       withMarkingSuites { build =>
         val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))()

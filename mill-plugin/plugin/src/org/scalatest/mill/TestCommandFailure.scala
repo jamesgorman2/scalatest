@@ -32,7 +32,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case FrameworkArgumentAmongOwnArguments(argument) =>
         s"The test command takes ScalaTest's $frameworkFlags only as framework arguments, after a second $separator, but was given among its own arguments: $argument"
       case FrameworkArgumentNotPassedOn(argument) =>
-        s"The test command takes as framework arguments only ScalaTest's $frameworkFlags, each with the values ScalaTest's runner takes with it, but was given: $argument"
+        s"The test command takes only ScalaTest's $frameworkFlags as framework arguments, each with the values ScalaTest's runner takes with it, but was given: $argument"
       case NoModuleSelector =>
         "The test command takes one module selector, but was given none"
       case SeveralModuleSelectors(selectors) =>

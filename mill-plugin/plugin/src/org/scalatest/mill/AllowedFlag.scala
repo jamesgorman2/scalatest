@@ -2,7 +2,7 @@ package org.scalatest.mill
 
 import org.scalatest.consolidation.ScalaTestArgument
 
-/** A ScalaTest flag that a module's own arguments keep and that a framework argument may hold. */
+/** A ScalaTest flag that the test command keeps from a module's `testArgsDefault` and accepts in a framework argument. */
 private[mill] enum AllowedFlag(val text: String) {
   case ConfigMapEntry extends AllowedFlag("-D")
   case IncludedTags extends AllowedFlag("-n")
