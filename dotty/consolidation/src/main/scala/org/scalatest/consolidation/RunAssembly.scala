@@ -317,10 +317,11 @@ private[consolidation] object RunAssembly {
     }
 
   def reportsTestResult(event: TestEventLogEvent): Boolean =
-    event match {
-      case TestEventLogEvent.ScalaTestEvent(_, _: (DecodedEvent.TestSucceeded | DecodedEvent.TestIgnored | DecodedEvent.TestPending)) => true
-      case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.NodeFailure) => true
-      case _ => false
+    reportsFailure(event) || {
+      event match {
+        case TestEventLogEvent.ScalaTestEvent(_, _: (DecodedEvent.TestSucceeded | DecodedEvent.TestIgnored | DecodedEvent.TestPending)) => true
+        case _ => false
+      }
     }
 
   def endsRunAbnormally(event: TestEventLogEvent): Boolean =

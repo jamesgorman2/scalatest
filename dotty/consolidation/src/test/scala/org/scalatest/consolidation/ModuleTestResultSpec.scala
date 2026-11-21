@@ -6,15 +6,27 @@ import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.time.Seconds
+import org.scalatest.time.Span
 
 final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with Eventually with ConsolidatedRuns with JsonOutputs {
 
   private val otherModule = ModuleName("api.test")
 
+  private val addsTest = """test "adds", label "- adds""""
+
+  private val calculatorSuiteStructure = structureOf("CalculatorSuite", addsTest)
+
   private def runOfCalculatorSuite(testEvents: String*): TestRunPart =
-    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", """test "adds", label "- adds"""", testEvents*)))
+    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", addsTest, testEvents*)))
+
+  private def runOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
+
+  private def runEventsOf(parts: TestRunPart*): Vector[RunEvent] = TestRunBuilder.build(parts*).events.map(built => RunEvent.of(built.event))
 
   private val runWithSucceededTest: TestRunPart = runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded""")
+
+  private val runWithNoSuite: TestRunPart = TestRunPart.Events(completedRunOf())
 
   Feature("Whether a module has a test result") {
 
@@ -58,15 +70,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the run is added")
       consolidation.addRunOf(
         TestRunPart.Events(
-          """
-          run started
-          structure
-            suite "CalculatorSuite", class "samples.CalculatorSuite"
-              test "adds", label "- adds"
-          suite "CalculatorSuite": SuiteStarting
-          suite "CalculatorSuite": SuiteAborted
-          run ended completed
-          """
+          completedRunOf(calculatorSuiteStructure, """suite "CalculatorSuite": SuiteStarting""", """suite "CalculatorSuite": SuiteAborted""")
         )
       )
 
@@ -74,12 +78,12 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.hasTestResult(module) shouldBe true
     }
 
-    Scenario("Runs whose event streams report no test's or suite's outcome give their module no test result") {
+    Scenario("Runs whose event streams report no test's outcome and no suite as aborted give their module no test result") {
       Given("a consolidation")
       val consolidation = startedWithColour()
 
       When("the module is given a run that reports no suite, and a run whose suite completes with only a scope in it")
-      consolidation.addRunOf(TestRunPart.Events(completedRunOf()))
+      consolidation.addRunOf(runWithNoSuite)
       consolidation.addRunOf(
         TestRunPart.Events(
           """
@@ -100,11 +104,29 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       consolidation.hasTestResult(module) shouldBe false
     }
 
+    for (
+      (order, runs) <- Vector(
+        "before" -> Vector(runWithNoSuite, runWithSucceededTest),
+        "after" -> Vector(runWithSucceededTest, runWithNoSuite)
+      )
+    ) {
+      Scenario(s"A module has a test result when a run with no test result is added $order its run that reports a test as succeeded") {
+        Given("a consolidation")
+        val consolidation = startedWithColour()
+
+        When(s"the module is given a run that reports no suite $order a run that reports the test `adds` as succeeded")
+        runs.foreach(run => consolidation.addRunOf(run))
+
+        Then("the module has a test result")
+        consolidation.hasTestResult(module) shouldBe true
+      }
+    }
+
     Scenario("A suite that the library reports as not run is no test result") {
       Given("a run of the module whose structure holds the suite `CalculatorSuite`, which then has no event")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
-      consolidation.addRunOf(TestRunPart.Events(completedRunOf(structureOf("CalculatorSuite", """test "adds", label "- adds""""))))
+      consolidation.addRunOf(TestRunPart.Events(completedRunOf(calculatorSuiteStructure)))
 
       Then("the module has no test result")
       consolidation.hasTestResult(module) shouldBe false
@@ -120,17 +142,13 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
       consolidation.addRunOf(
-        TestRunPart.Events(
-          """
-          run started
-          structure
-            suite "CalculatorSuite", class "samples.CalculatorSuite"
-              test "adds", label "- adds"
-          suite "CalculatorSuite": SuiteStarting
-          test "adds": TestStarting
-          run: RunAborted
-          run ended aborted
-          """
+        runOf(
+          "run started",
+          calculatorSuiteStructure,
+          """suite "CalculatorSuite": SuiteStarting""",
+          """test "adds": TestStarting""",
+          "run: RunAborted",
+          "run ended aborted"
         )
       )
 
@@ -142,38 +160,25 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       Vector(json.node(NodeKind.Suite, "CalculatorSuite"), json.node(NodeKind.Test, "adds")).map(_("outcome")) shouldBe Vector(text("aborted"), text("aborted"))
     }
 
-    Scenario("A module's test result is read while its run is still being fed") {
+    Scenario("A module has a test result as soon as its run reports a test's outcome, before the run's event stream ends") {
       Given("a run of the module being fed, which has started the test `adds`")
-      val untilTestStarts = TestRunPart.Events(
-        Vector(
-          "run started",
-          structureOf("CalculatorSuite", """test "adds", label "- adds""""),
-          """suite "CalculatorSuite": SuiteStarting""",
-          """test "adds": TestStarting"""
-        ).mkString("\n")
-      )
-      val fromTestOutcome = TestRunPart.Events(
-        """
-        test "adds": TestSucceeded
-        suite "CalculatorSuite": SuiteCompleted
-        run ended completed
-        """
-      )
-      val (eventsUntilTestStarts, eventsFromTestOutcome) =
-        TestRunBuilder.build(untilTestStarts, fromTestOutcome).events.map(built => RunEvent.of(built.event)).splitAt(TestRunBuilder.build(untilTestStarts).events.size)
+      val untilTestStarts = runOf("run started", calculatorSuiteStructure, """suite "CalculatorSuite": SuiteStarting""", """test "adds": TestStarting""")
+      val fromTestOutcome = runOf("""test "adds": TestSucceeded""", """suite "CalculatorSuite": SuiteCompleted""", "run ended completed")
+      val events = runEventsOf(untilTestStarts, fromTestOutcome)
+      val testOutcomeIndex = runEventsOf(untilTestStarts).size
       val consolidation = startedWithColour()
       consolidation.addRun(module) { feed =>
-        eventsUntilTestStarts.foreach(event => feed.add(event))
+        events.take(testOutcomeIndex).foreach(event => feed.add(event))
 
         Then("before the test's outcome is fed, the module has no test result")
         consolidation.hasTestResult(module) shouldBe false
 
         When("the run reports the test as succeeded")
-        feed.add(eventsFromTestOutcome.head)
+        feed.add(events(testOutcomeIndex))
 
         Then("the module has a test result before the run's event stream ends")
         consolidation.hasTestResult(module) shouldBe true
-        eventsFromTestOutcome.tail.foreach(event => feed.add(event))
+        events.drop(testOutcomeIndex + 1).foreach(event => feed.add(event))
       }
     }
 
@@ -189,7 +194,9 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
         reader.start()
 
         Then("the read waits for the consolidation's lock, which the consolidation holds while it writes that output")
-        eventually(reader.getState shouldBe Thread.State.BLOCKED)
+        eventually(timeout(Span(10, Seconds))) {
+          reader.getState shouldBe Thread.State.BLOCKED
+        }
         read shouldBe None
       }
 
