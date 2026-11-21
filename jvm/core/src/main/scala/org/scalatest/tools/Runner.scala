@@ -967,7 +967,7 @@ object Runner {
       case None => { // Run the test without a GUI
         val testEventLogEmitter = TestEventLogEmitter.startedIfGiven(testEventLogFile)
         val handOffToTestEventLog = TestEventLogEmitter.handOffTo(testEventLogEmitter)
-        try {
+        TestEventLogEmitter.endedAfter(testEventLogEmitter) {
           withClassLoaderAndDispatchReporter(
             runpathList,
             reporterConfigs,
@@ -1005,10 +1005,6 @@ object Runner {
               TestEventLogEmitter.startOfTopLevelSuiteFor(testEventLogEmitter)
             )
           }
-        }
-        finally {
-          // A run that ends with no event that closes it must not leave its test event log open.
-          testEventLogEmitter.foreach(_.endWithoutRunEnded())
         }
       }
     }
@@ -1165,13 +1161,15 @@ object Runner {
       }
     }
 
-    // The events SuiteRunner sends for a DiscoverySuite pass through no structure wrapper.
-    def testEventLogHandOffFor(suite: Suite): Event => Unit =
+    def testEventLogHandOffFor(suite: Suite): Event => Unit = {
+      // The events SuiteRunner sends for a DiscoverySuite pass through no structure wrapper.
       if (suite.isInstanceOf[DiscoverySuite]) handOffToTestEventLog else TestEventLogHandOff.none
+    }
 
-    // A DiscoverySuite is not a top-level suite and runs in no invocation context: the suites it nests are top-level, and it starts each.
-    def startOfTopLevelSuiteFor(suite: Suite): (Suite, Filter, Reporter) => SuiteStart =
+    def startOfTopLevelSuiteFor(suite: Suite): (Suite, Filter, Reporter) => SuiteStart = {
+      // The suites a DiscoverySuite nests are the top-level suites, and it starts each; it runs in no invocation context itself.
       if (suite.isInstanceOf[DiscoverySuite]) TestEventLogHandOff.startWithoutEventLog else startOfTopLevelSuite
+    }
 
     //
     // Generates SuiteConfigs for Suites found via discovery.

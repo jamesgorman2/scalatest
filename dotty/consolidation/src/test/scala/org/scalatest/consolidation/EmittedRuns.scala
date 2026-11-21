@@ -11,41 +11,41 @@ import sbt.testing.Logger
 import sbt.testing.Selector
 import sbt.testing.SubclassFingerprint
 import sbt.testing.SuiteSelector
+import sbt.testing.Task
 import sbt.testing.TaskDef
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 
-/** Runs a suite through `Framework`, outside Mill, writing the run's test event log, and consolidates that log. */
 private[consolidation] trait EmittedRuns { this: Assertions & ConsolidatedRuns & JsonOutputs =>
 
-  def eventLogOfFrameworkRun(suiteClassName: String, runnerArguments: Seq[String] = Nil): Vector[String] = {
+  private val ignoringEvents: EventHandler = _ => ()
+
+  def eventLogOfFrameworkRun(suiteClassName: String, runnerArguments: Seq[String] = Nil): Vector[RunEvent] = {
     val folder = Files.createTempDirectory("emitted-run")
     try {
       val eventLogFile = folder.resolve("events.log")
       val framework = new Framework
       val runner = framework.runner((RunnerArgument.forEventLogFile(eventLogFile) ++ runnerArguments).toArray, Array.empty, getClass.getClassLoader)
       try {
-        val fingerprint = framework.fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
-        val ignoringEvents: EventHandler = _ => ()
-        var tasks = runner.tasks(Array(new TaskDef(suiteClassName, fingerprint, true, Array[Selector](new SuiteSelector)))).toList
-        while (tasks.nonEmpty) {
-          tasks = tasks.head.execute(ignoringEvents, Array.empty[Logger]).toList ::: tasks.tail
-        }
+        val taskDef = framework.fingerprints
+          .collectFirst { case subclass: SubclassFingerprint => new TaskDef(suiteClassName, subclass, true, Array[Selector](new SuiteSelector)) }
+          .getOrElse(fail("the framework has no subclass fingerprint"))
+        executeAll(runner.tasks(Array(taskDef)).toList)
       } finally runner.done()
-      new String(Files.readAllBytes(eventLogFile), StandardCharsets.UTF_8).split('\n').toVector
+      new String(Files.readAllBytes(eventLogFile), StandardCharsets.UTF_8).split('\n').toVector.map(RunEvent.decode)
     } finally {
       val walk = Files.walk(folder)
       try walk.sorted(Comparator.reverseOrder[Path]()).iterator.asScala.foreach(Files.delete) finally walk.close()
     }
   }
 
-  /** The human-readable output's lines, with colour on, less the summary line. */
-  def colourMarkedTreeLinesFrom(eventLog: Vector[String]): Vector[String] = {
-    val output = new OutputSink
-    consolidateRun(Consolidation.start(output, coloured = true), eventLog.map(decoded))
-    output.linesWithoutSummaryLine.map(ConsolidatedRuns.withColoursMarked)
-  }
+  @tailrec
+  private def executeAll(tasks: List[Task]): Unit =
+    tasks match {
+      case task :: rest => executeAll(task.execute(ignoringEvents, Array.empty[Logger]).toList ::: rest)
+      case Nil => ()
+    }
 
-  def jsonOutputOfEventLog(eventLog: Vector[String]): JsonSink = jsonOutputOfRunEvents(eventLog.map(decoded))
-
-  private def decoded(line: String): RunEvent = RunEvent.decode(line).fold(reason => fail(s"$reason, in $line"), identity)
+  def colourMarkedTreeLinesFrom(eventLog: Vector[RunEvent]): Vector[String] =
+    colourMarkedOutputAfter(_.addRunOf(eventLog)).treeLines
 }

@@ -22,4 +22,16 @@ final class RunOutcomeSpec extends AnyWordSpec with Matchers {
       RunOutcome.reportedBy(RunStarting(ordinal, 1, ConfigMap.empty)) shouldBe None
     }
   }
+
+  "An outcome's word" should {
+    "be the word a runEnded event writes for it" in {
+      RunOutcome.values.toVector.map(_.word) shouldBe Vector("completed", "aborted", "stopped")
+    }
+    "map back to its outcome" in {
+      RunOutcome.values.toVector.map(outcome => RunOutcome.fromWord(outcome.word)) shouldBe RunOutcome.values.toVector.map(Some(_))
+    }
+    "give no outcome for an unknown word" in {
+      RunOutcome.fromWord("failed") shouldBe None
+    }
+  }
 }

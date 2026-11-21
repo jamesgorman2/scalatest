@@ -2,14 +2,33 @@
 # Runs every test suite the feature review needs, one build-tool session at a time, so that each
 # stage starts with a fresh JVM. A failing stage does not stop the stages after it.
 #
-# Usage: ./test-all.sh [path-to-sbt]
+# Usage: ./test-all.sh [--compat] [path-to-sbt]
+#
+# --compat also runs the Dotty compatibility test suites on the JVM, Scala.js and Scala Native.
 #
 # Logs go to test-all-logs/, one per stage, and test-all-logs/summary.txt lists each stage's exit code.
-# The script exits 1 if any stage failed.
+# The script exits 1 if any stage failed, and 2 on an unknown argument.
 
 set -u
 
-sbt="${1:-sbt}"
+usage() {
+  echo "Usage: ./test-all.sh [--compat] [path-to-sbt]" >&2
+  exit 2
+}
+
+sbt="sbt"
+sbt_given=0
+compat=0
+for arg in "$@"; do
+  case "$arg" in
+    --compat) compat=1 ;;
+    -*) echo "Unknown argument: $arg" >&2; usage ;;
+    *)
+      [ "$sbt_given" -eq 0 ] || { echo "Unexpected argument: $arg" >&2; usage; }
+      sbt="$arg"; sbt_given=1 ;;
+  esac
+done
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 logs="$root/test-all-logs"
 
@@ -41,6 +60,12 @@ run_stage scalactic-js "$sbt" scalacticTestDottyJS/test
 run_stage scalatest-js "$sbt" scalatestTestDottyJS/test
 run_stage scalactic-native "$sbt" scalacticTestDottyNative/test
 run_stage scalatest-native "$sbt" scalatestTestDottyNative/test
+
+if [ "$compat" -eq 1 ]; then
+  run_stage compatibility-jvm "$sbt" scalatestCompatibilityTestDotty/test
+  run_stage compatibility-js "$sbt" scalatestCompatibilityTestDottyJS/test
+  run_stage compatibility-native "$sbt" scalatestCompatibilityTestDottyNative/test
+fi
 
 # The plugin's Mill build resolves the fork from the local repository.
 if run_stage publish-local "$sbt" scalatestCompatible/publishLocal scalacticDotty/publishLocal scalatestDotty/publishLocal; then

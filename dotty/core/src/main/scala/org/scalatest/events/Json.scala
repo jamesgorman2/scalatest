@@ -27,31 +27,31 @@ private[scalatest] object JsonWriter {
     builder.toString
   }
 
-  /**
-   * Appends the value's text to `out` piece by piece, without building the whole text itself. Throws what `out` throws.
-   */
-  // Keeps what is still to write in a list, not on the call stack, so that deep nesting cannot overflow the stack.
   def write(value: JsonValue, out: Appendable): Unit = {
+    // Pending output is held in a list, not on the call stack, so that deep nesting cannot overflow the stack.
     var pending = List[Pending](Pending.Value(value))
     while (pending.nonEmpty) {
       val next = pending.head
       pending = pending.tail
       next match {
         case Pending.Punctuation(char) => out.append(char)
-        case Pending.Key(key) =>
+        case Pending.Key(key) => {
           appendString(out, key)
           out.append(':')
+        }
         case Pending.Value(JsonValue.Text(text)) => appendString(out, text)
         case Pending.Value(JsonValue.Integer(number)) => out.append(number.toString)
         case Pending.Value(JsonValue.Bool(flag)) => out.append(flag.toString)
-        case Pending.Value(JsonValue.Array(items)) =>
+        case Pending.Value(JsonValue.Array(items)) => {
           out.append('[')
           val members = items.map(item => List[Pending](Pending.Value(item)))
           pending = separated(members) ::: Pending.Punctuation(']') :: pending
-        case Pending.Value(JsonValue.Object(fields)) =>
+        }
+        case Pending.Value(JsonValue.Object(fields)) => {
           out.append('{')
           val members = fields.map { case (key, fieldValue) => List[Pending](Pending.Key(key), Pending.Value(fieldValue)) }
           pending = separated(members) ::: Pending.Punctuation('}') :: pending
+        }
       }
     }
   }
@@ -106,12 +106,16 @@ private[scalatest] object JsonWriter {
 
 private[scalatest] object JsonReader {
 
-  def read(text: String): Either[String, JsonValue] = {
+  def read(text: String): JsonValue = {
     val reader = new JsonReader(text)
-    for {
-      value <- reader.value()
-      _ <- reader.end()
-    } yield value
+    val value = reader.value()
+    reader.end()
+    value
+  }
+
+  private enum Step {
+    case Read(value: JsonValue)
+    case Opened
   }
 
   private sealed abstract class OpenContainer(val closing: Char) {
@@ -136,9 +140,11 @@ private[scalatest] object JsonReader {
     private val keys = mutable.Set.empty[String]
     private var keyOfNextValue = ""
 
-    def startField(key: String): Either[String, Unit] = {
+    def holds(key: String): Boolean = keys.contains(key)
+
+    def startField(key: String): Unit = {
       keyOfNextValue = key
-      if (keys.add(key)) Right(()) else Left(s"the key $key is repeated")
+      keys.add(key)
     }
 
     def add(value: JsonValue): Unit = fields += (keyOfNextValue -> value)
@@ -149,69 +155,68 @@ private[scalatest] object JsonReader {
 
 private final class JsonReader(text: String) {
 
-  import JsonReader.{OpenArray, OpenContainer, OpenObject}
+  import JsonReader.{OpenArray, OpenContainer, OpenObject, Step}
 
   private var position = 0
-  // Innermost first. Held here, not on the call stack, so that deep nesting cannot overflow the stack.
+  // Held here, not on the call stack, so that deep nesting cannot overflow the stack.
   private var open = List.empty[OpenContainer]
 
-  def end(): Either[String, Unit] = {
+  def end(): Unit = {
     skipWhitespace()
-    if (position == text.length) {
-      Right(())
-    } else {
-      Left(s"text follows the value at offset $position")
+    if (position != text.length) {
+      malformed(s"text follows the value at offset $position")
     }
   }
 
-  def value(): Either[String, JsonValue] = placed(valueStart())
+  def value(): JsonValue = placed(valueStart())
 
-  // A step is the value just read, or None where it opened a container.
   @tailrec
-  private def placed(step: Either[String, Option[JsonValue]]): Either[String, JsonValue] = {
+  private def placed(step: Step): JsonValue = {
     step match {
-      case Left(reason) => Left(reason)
-      case Right(None) => placed(firstMember())
-      case Right(Some(value)) =>
+      case Step.Opened => placed(firstMember())
+      case Step.Read(value) =>
         open match {
-          case Nil => Right(value)
-          case innermost :: _ =>
+          case Nil => value
+          case innermost :: _ => {
             innermost.add(value)
             placed(nextMember(innermost))
+          }
         }
     }
   }
 
-  private def valueStart(): Either[String, Option[JsonValue]] = {
+  private def malformed(reason: String): Nothing = throw new MalformedJsonException(text, reason)
+
+  private def valueStart(): Step = {
     skipWhitespace()
     if (position >= text.length) {
-      Left(s"the text ends where a value should start, at offset $position")
+      malformed(s"the text ends where a value should start, at offset $position")
     } else {
       text.charAt(position) match {
         case '{' => opened(new OpenObject)
         case '[' => opened(new OpenArray)
-        case '"' => string().map(read => Some(JsonValue.Text(read)))
+        case '"' => Step.Read(JsonValue.Text(string()))
         case 't' => literal("true", JsonValue.Bool(true))
         case 'f' => literal("false", JsonValue.Bool(false))
-        case char if char == '-' || isDigit(char) => integer()
-        case _ => Left(s"no value starts at offset $position")
+        case char if char == '-' || isDigit(char) => Step.Read(integer())
+        case _ => malformed(s"no value starts at offset $position")
       }
     }
   }
 
-  private def opened(container: OpenContainer): Either[String, Option[JsonValue]] = {
+  private def opened(container: OpenContainer): Step = {
     position += 1
     open = container :: open
-    Right(None)
+    Step.Opened
   }
 
-  private def firstMember(): Either[String, Option[JsonValue]] = {
+  private def firstMember(): Step = {
     val innermost = open.head
     skipWhitespace()
     if (at(innermost.closing)) close(innermost) else member(innermost)
   }
 
-  private def nextMember(innermost: OpenContainer): Either[String, Option[JsonValue]] = {
+  private def nextMember(innermost: OpenContainer): Step = {
     skipWhitespace()
     if (at(',')) {
       position += 1
@@ -219,22 +224,29 @@ private final class JsonReader(text: String) {
     } else if (at(innermost.closing)) {
       close(innermost)
     } else {
-      Left(s"neither ',' nor '${innermost.closing}' is at offset $position")
+      malformed(s"neither ',' nor '${innermost.closing}' is at offset $position")
     }
   }
 
-  private def member(innermost: OpenContainer): Either[String, Option[JsonValue]] = {
+  private def member(innermost: OpenContainer): Step = {
     skipWhitespace()
     innermost match {
       case _: OpenArray => valueStart()
-      case openObject: OpenObject => key().flatMap(openObject.startField).flatMap(_ => valueStart())
+      case openObject: OpenObject => {
+        val fieldKey = key()
+        if (openObject.holds(fieldKey)) {
+          malformed(s"the key $fieldKey is repeated")
+        }
+        openObject.startField(fieldKey)
+        valueStart()
+      }
     }
   }
 
-  private def close(innermost: OpenContainer): Either[String, Option[JsonValue]] = {
+  private def close(innermost: OpenContainer): Step = {
     position += 1
     open = open.tail
-    Right(Some(innermost.closed))
+    Step.Read(innermost.closed)
   }
 
   private def skipWhitespace(): Unit = {
@@ -247,16 +259,16 @@ private final class JsonReader(text: String) {
 
   private def at(char: Char): Boolean = position < text.length && text.charAt(position) == char
 
-  private def literal(word: String, value: JsonValue): Either[String, Option[JsonValue]] = {
+  private def literal(word: String, value: JsonValue): Step = {
     if (text.startsWith(word, position)) {
       position += word.length
-      Right(Some(value))
+      Step.Read(value)
     } else {
-      Left(s"no value starts at offset $position")
+      malformed(s"no value starts at offset $position")
     }
   }
 
-  private def integer(): Either[String, Option[JsonValue]] = {
+  private def integer(): JsonValue = {
     val start = position
     if (at('-')) {
       position += 1
@@ -267,78 +279,70 @@ private final class JsonReader(text: String) {
     }
     val digitCount = position - firstDigit
     if (digitCount == 0) {
-      Left(s"a number has no digits at offset $start")
+      malformed(s"a number has no digits at offset $start")
     } else if (digitCount > 1 && text.charAt(firstDigit) == '0') {
-      Left(s"a number has a leading zero at offset $start")
+      malformed(s"a number has a leading zero at offset $start")
     } else if (position < text.length && ".eE".indexOf(text.charAt(position).toInt) >= 0) {
-      Left(s"the number at offset $start is not an integer")
+      malformed(s"the number at offset $start is not an integer")
     } else {
-      text.substring(start, position).toLongOption
-        .map(number => Some(JsonValue.Integer(number)))
-        .toRight(s"the integer at offset $start does not fit a Long")
+      val digits = text.substring(start, position)
+      JsonValue.Integer(digits.toLongOption.getOrElse(malformed(s"the integer at offset $start does not fit a Long")))
     }
   }
 
-  private def string(): Either[String, String] = {
+  private def string(): String = {
     val start = position
     position += 1
     val builder = new StringBuilder
-    var failure: Option[String] = None
     var closed = false
-    while (failure.isEmpty && !closed) {
+    while (!closed) {
       if (position >= text.length) {
-        failure = Some(s"the string starting at offset $start is not closed")
-      } else {
-        val char = text.charAt(position)
-        position += 1
-        if (char == '"') {
-          closed = true
-        } else if (char == '\\') {
-          escapedChar() match {
-            case Right(escaped) => builder.append(escaped)
-            case Left(reason) => failure = Some(reason)
-          }
-        } else if (char < ' ') {
-          failure = Some(s"an unescaped control character is at offset ${position - 1}")
-        } else {
-          builder.append(char)
-        }
+        malformed(s"the string starting at offset $start is not closed")
       }
-    }
-    failure.toLeft(builder.toString)
-  }
-
-  private def escapedChar(): Either[String, Char] = {
-    if (position >= text.length) {
-      Left(s"the text ends inside an escape at offset $position")
-    } else {
       val char = text.charAt(position)
       position += 1
-      char match {
-        case '"' | '\\' | '/' => Right(char)
-        case 'b' => Right('\b')
-        case 'f' => Right('\f')
-        case 'n' => Right('\n')
-        case 'r' => Right('\r')
-        case 't' => Right('\t')
-        case 'u' => unicodeEscapedChar()
-        case _ => Left(s"an unknown escape is at offset ${position - 2}")
+      if (char == '"') {
+        closed = true
+      } else if (char == '\\') {
+        builder.append(escapedChar())
+      } else if (char < ' ') {
+        malformed(s"an unescaped control character is at offset ${position - 1}")
+      } else {
+        builder.append(char)
       }
     }
+    builder.toString
   }
 
-  private def unicodeEscapedChar(): Either[String, Char] = {
-    val digits = text.substring(position, math.min(position + 4, text.length)).map(hexDigit)
-    if (digits.length == 4 && digits.forall(_ >= 0)) {
-      position += 4
-      Right(digits.foldLeft(0)((codeUnit, digit) => codeUnit * 16 + digit).toChar)
-    } else {
-      Left(s"a \\u escape lacks four hexadecimal digits at offset $position")
+  private def escapedChar(): Char = {
+    if (position >= text.length) {
+      malformed(s"the text ends inside an escape at offset $position")
+    }
+    val char = text.charAt(position)
+    position += 1
+    char match {
+      case '"' | '\\' | '/' => char
+      case 'b' => '\b'
+      case 'f' => '\f'
+      case 'n' => '\n'
+      case 'r' => '\r'
+      case 't' => '\t'
+      case 'u' => unicodeEscapedChar()
+      case _ => malformed(s"an unknown escape is at offset ${position - 2}")
     }
   }
 
-  // Character.digit also accepts the digits of other scripts, which JSON does not.
+  private def unicodeEscapedChar(): Char = {
+    val digits = text.substring(position, math.min(position + 4, text.length)).map(hexDigit)
+    if (digits.length != 4 || digits.exists(_ < 0)) {
+      malformed(s"a \\u escape lacks four hexadecimal digits at offset $position")
+    }
+    position += 4
+    digits.foldLeft(0)((codeUnit, digit) => codeUnit * 16 + digit).toChar
+  }
+
   private def hexDigit(char: Char): Int = {
+    // Not Character.digit, which also accepts the digits of other scripts.
     if (char >= '0' && char <= '9') {
       char - '0'
     } else if (char >= 'a' && char <= 'f') {
@@ -350,19 +354,16 @@ private final class JsonReader(text: String) {
     }
   }
 
-  private def key(): Either[String, String] = {
+  private def key(): String = {
     if (!at('"')) {
-      Left(s"no key starts at offset $position")
-    } else {
-      string().flatMap { key =>
-        skipWhitespace()
-        if (at(':')) {
-          position += 1
-          Right(key)
-        } else {
-          Left(s"no ':' follows the key $key")
-        }
-      }
+      malformed(s"no key starts at offset $position")
     }
+    val fieldKey = string()
+    skipWhitespace()
+    if (!at(':')) {
+      malformed(s"no ':' follows the key $fieldKey")
+    }
+    position += 1
+    fieldKey
   }
 }

@@ -7,12 +7,12 @@ private[scalatest] final case class ProcessIdentity(pid: Long, startTime: Instan
 
 private[scalatest] object ProcessIdentity {
 
-  def current: Either[String, ProcessIdentity] = readThrough(Class.forName(_))
+  def current: ProcessIdentity = readThrough(Class.forName(_))
 
-  // Reads through reflection because ProcessHandle is absent on Java 8, which core still compiles on. Each method is
-  // looked up on the two public interfaces: the handle's runtime class is not accessible.
-  def readThrough(loadClass: String => Class[?]): Either[String, ProcessIdentity] = {
+  def readThrough(loadClass: String => Class[?]): ProcessIdentity = {
     try {
+      // Reads through reflection because ProcessHandle is absent on Java 8, which core still compiles on. Each method is
+      // looked up on the two public interfaces: the handle's runtime class is not accessible.
       val handleInterface = loadClass("java.lang.ProcessHandle")
       val infoInterface = loadClass("java.lang.ProcessHandle$Info")
       val handle = handleInterface.getMethod("current").invoke(null)
@@ -20,12 +20,12 @@ private[scalatest] object ProcessIdentity {
       val info = handleInterface.getMethod("info").invoke(handle)
       val startTime = infoInterface.getMethod("startInstant").invoke(info).asInstanceOf[Optional[Instant]]
       if (startTime.isPresent) {
-        Right(ProcessIdentity(pid, startTime.get))
+        ProcessIdentity(pid, startTime.get)
       } else {
-        Left("this process has no start time")
+        throw new IllegalStateException("this process has no start time")
       }
     } catch {
-      case _: ClassNotFoundException => Left("this JVM has no java.lang.ProcessHandle")
+      case absent: ClassNotFoundException => throw new IllegalStateException("this JVM has no java.lang.ProcessHandle", absent)
     }
   }
 }

@@ -124,7 +124,6 @@ class ConfigSetupFailsSpec(configMap: Map[String, Any]) extends AnyFunSpec with 
   }
 }
 
-// Has no registration tree.
 @DoNotDiscover
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigNamedTestSuite(configMap: Map[String, Any]) extends Suite {
@@ -134,7 +133,6 @@ class ConfigNamedTestSuite(configMap: Map[String, Any]) extends Suite {
   override protected def runTest(testName: String, args: Args): Status = SucceededStatus
 }
 
-// Runs test b even where the filter drops it, as it does where samples.Slow is excluded.
 @DoNotDiscover
 class RunsADroppedTestSuite extends AnyFunSuite {
 
@@ -203,8 +201,6 @@ object ReplacesARanTestNestingSuitesSuite {
   val ranA: AtomicBoolean = new AtomicBoolean
 }
 
-// Each test runs in an instance of its own. An instance built after test a has run registers test c in a's place, so
-// the instance that runs b registers c and b. A run of the whole suite forgets that a ran once the run completes.
 @DoNotDiscover
 class ReplacesARanTestNestingSuitesSuite extends AnyFunSuite with OneInstancePerTest {
 

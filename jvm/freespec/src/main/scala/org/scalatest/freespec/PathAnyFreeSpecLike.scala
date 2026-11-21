@@ -53,7 +53,7 @@ trait PathAnyFreeSpecLike extends org.scalatest.Suite with OneInstancePerTest wi
   import engine._
 
   private[scalatest] override def scopesAndTestsOfRegistrationTree: Option[List[org.scalatest.RegisteredNode]] = {
-    registeredForStructure(ensureTestResultsRegistered(thisSuite))
+    registerAheadOfFirstUse(ensureTestResultsRegistered(thisSuite))
     Some(engine.registeredNodes(true))
   }
 

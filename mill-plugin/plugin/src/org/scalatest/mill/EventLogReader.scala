@@ -1,145 +1,129 @@
 package org.scalatest.mill
 
-import java.io.FileInputStream
 import java.io.FileNotFoundException
-import java.io.InputStream
-import java.nio.file.Files
-import java.nio.file.Path
 import org.scalatest.consolidation.RunEvent
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.RunProcess
+import scala.annotation.tailrec
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
-/**
- * Reads one worker's test event log on a thread of its own, while the worker runs.
- *
- * Once the event log file appears, it adds the run and feeds it each event the file's whole lines decode to. It
- * watches the run's process, named by the `runStarted` event, and once that process has exited reads to the file's
- * end and ends the run's event stream. A line that cannot be decoded ends the stream there. If the worker ends before
- * the file appears, no run existed in it, and the reader adds the worker as a process that ended before any run.
- */
 private[mill] final class EventLogReader(
-    eventLogFile: Path,
-    addRun: () => RunFeed,
+    eventLogFile: EventLogFile,
+    addRun: (RunFeed => Unit) => Unit,
     addProcessEndedBeforeAnyRun: () => Unit,
     hasExited: RunProcess => Boolean,
-    pollInterval: FiniteDuration,
-    open: Path => InputStream = path => new FileInputStream(path.toFile)
+    pollInterval: FiniteDuration
 ) {
 
-  @volatile private var workerEnded: Boolean = false
+  @volatile private var endedWorkerProcess: Option[WorkerProcess] = None
   @volatile private var failure: Option[Throwable] = None
-  private val thread: Thread = new Thread(() => readCapturingFailure(), s"scalatest event log reader: $eventLogFile")
+  private val thread: Thread = new Thread(() => readCapturingFailure(), EventLogReader.threadName(eventLogFile))
   thread.setDaemon(true)
 
   def start(): Unit = thread.start()
 
-  /**
-   * Call it once the worker has ended: until then, a missing event log file may yet appear.
-   *
-   * @throws Throwable what reading threw
-   */
+  def workerHasEnded(process: WorkerProcess): Unit =
+    synchronized {
+      if (endedWorkerProcess.isEmpty) {
+        endedWorkerProcess = Some(process)
+      }
+    }
+
   def awaitStreamEnd(): Unit = {
-    workerEnded = true
     thread.join()
     failure.foreach(throwable => throw throwable)
   }
 
   private def readCapturingFailure(): Unit =
     try {
-      if (awaitEventLogFile()) {
-        val feed = addRun()
-        try {
-          readRun(feed)
-        } finally {
-          feed.endEventStream()
-        }
-      } else {
-        addProcessEndedBeforeAnyRun()
+      awaitEventLogFile() match {
+        case EventLogReader.EventLogFileArrival.Appeared =>
+          addRun(readRun)
+        case EventLogReader.EventLogFileArrival.WillNotAppear =>
+          if (endedWorkerProcess.contains(WorkerProcess.Started)) {
+            addProcessEndedBeforeAnyRun()
+          }
       }
     } catch {
       case throwable: Throwable => failure = Some(throwable)
     }
 
-  private def awaitEventLogFile(): Boolean = {
-    var appeared = false
-    var noRun = false
-    while (!appeared && !noRun) {
-      val ended = workerEnded
-      appeared = Files.exists(eventLogFile)
-      noRun = !appeared && ended
-      if (!appeared && !noRun) {
-        Thread.sleep(pollInterval.toMillis)
-      }
+  @tailrec
+  private def awaitEventLogFile(): EventLogReader.EventLogFileArrival = {
+    val ended = endedWorkerProcess.isDefined
+    if (eventLogFile.exists) {
+      EventLogReader.EventLogFileArrival.Appeared
+    } else if (ended) {
+      EventLogReader.EventLogFileArrival.WillNotAppear
+    } else {
+      Thread.sleep(pollInterval.toMillis)
+      awaitEventLogFile()
     }
-    appeared
   }
 
   private def readRun(feed: RunFeed): Unit = {
-    val input = openOnceReadable()
+    val input = openOnceReadable(failedOpens = 0)
     try {
-      new RunReading(feed, input).readUntilStreamEnds()
+      new RunReading(feed, input).readUntilProcessExits(process = None)
     } finally {
       input.close()
     }
   }
 
-  // On Windows, opening the file just after the emitter moves it into place can fail for a moment with a sharing
-  // violation, which Java reports as a `FileNotFoundException`.
-  private def openOnceReadable(): InputStream = {
-    var input: Option[InputStream] = None
-    var failedOpens = 0
-    while (input.isEmpty) {
-      try {
-        input = Some(open(eventLogFile))
-      } catch {
-        case _: FileNotFoundException if failedOpens < EventLogReader.retriedOpens =>
-          failedOpens += 1
-          Thread.sleep(pollInterval.toMillis)
-      }
+  @tailrec
+  private def openOnceReadable(failedOpens: Int): EventLogInput =
+    Try(eventLogFile.open()) match {
+      case Success(input) => input
+      // On Windows, opening the file just after the emitter moves it into place can fail for a moment with a sharing
+      // violation, which Java reports as a `FileNotFoundException`.
+      case Failure(_: FileNotFoundException) if failedOpens < EventLogReader.retriedOpens =>
+        Thread.sleep(pollInterval.toMillis)
+        openOnceReadable(failedOpens + 1)
+      case Failure(throwable) => throw throwable
     }
-    input.get
-  }
 
-  private final class RunReading(feed: RunFeed, input: InputStream) {
+  private final class RunReading(feed: RunFeed, input: EventLogInput) {
 
     private val lines = new EventLogLines
-    private val buffer = new Array[Byte](64 * 1024)
-    private var process: Option[RunProcess] = None
-    private var undecodable: Boolean = false
 
-    def readUntilStreamEnds(): Unit = {
-      var ended = false
-      while (!ended) {
-        val exitedBeforeRead = process.exists(hasExited)
-        readToEnd()
-        ended = undecodable || exitedBeforeRead
-        if (!ended) {
-          Thread.sleep(pollInterval.toMillis)
-        }
+    @tailrec
+    def readUntilProcessExits(process: Option[RunProcess]): Unit = {
+      val exitedBeforeRead = process.exists(hasExited)
+      val processAfterRead = readToEnd(process)
+      if (!exitedBeforeRead) {
+        Thread.sleep(pollInterval.toMillis)
+        readUntilProcessExits(processAfterRead)
       }
     }
 
-    private def readToEnd(): Unit = {
-      var read = input.read(buffer)
-      while (read >= 0 && !undecodable) {
-        lines.append(buffer, read).iterator.takeWhile(_ => !undecodable).foreach(add)
-        read = if (undecodable) -1 else input.read(buffer)
-      }
+    @tailrec
+    private def readToEnd(process: Option[RunProcess]): Option[RunProcess] = {
+      val bytes = input.readAvailable()
+      if (bytes.isEmpty)
+        process
+      else
+        readToEnd(lines.append(bytes, bytes.length).foldLeft(process)(add))
     }
 
-    private def add(line: String): Unit =
-      RunEvent.decode(line) match {
-        case Right(event) =>
-          feed.add(event)
-          process = process.orElse(event.runProcess)
-        case Left(_) =>
-          undecodable = true
-      }
+    private def add(process: Option[RunProcess], line: String): Option[RunProcess] = {
+      val event = RunEvent.decode(line)
+      feed.add(event)
+      process.orElse(event.runProcess)
+    }
   }
 }
 
 private[mill] object EventLogReader {
 
+  def threadName(eventLogFile: EventLogFile): String = s"scalatest event log reader: ${eventLogFile.name}"
+
   private val retriedOpens: Int = 500
+
+  private enum EventLogFileArrival {
+    case Appeared
+    case WillNotAppear
+  }
 }

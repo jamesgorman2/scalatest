@@ -27,7 +27,7 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
 
   private final class RecordingReporterOfSuite {
     private var asked = Vector.empty[(Suite, Filter, Reporter)]
-    val handedOut = new RecordingReporter
+    val handedOut: RecordingReporter = new RecordingReporter
     def askedFor: Vector[(Suite, Filter, Reporter)] = synchronized(asked)
     val function: (Suite, Filter, Reporter) => SuiteStart = (suite, filter, reporter) => {
       synchronized { asked :+= ((suite, filter, reporter)) }
@@ -43,9 +43,9 @@ final class TopLevelSuiteReporterSpec extends AnyWordSpec with Matchers {
     stopper
   }
 
-  // Suite.runNestedSuites asks once before it runs a nested suite, and again as it starts that suite.
   private def stopperStoppedOnceAsked: Stopper = new Stopper {
     private val timesAsked = new AtomicInteger
+    // Suite.runNestedSuites asks once before it runs a nested suite, and again as it starts that suite.
     def stopRequested: Boolean = timesAsked.incrementAndGet() > 1
     def requestStop(): Unit = ()
   }

@@ -21,7 +21,7 @@ Terms are defined in `.docs/ubiquitous-language.md`. R-numbers are those of `SPE
 - A run in a forked JVM is a run node (§ Run nodes), which is a child of the run's module (R-096a).
 - Any other run has no node and is written as part of its module (R-135). The top-level suites of a run that has no node are children of the run's module. The module records the state that a run node would record for that run (§ Run nodes).
 - A suite scheduled to run that has no events is written once, as a child of its module and inside no run node, aborted with reason *not run* (R-095a; § Nodes).
-- A module's children are its run nodes, the top-level suites of a run that has no node, and the suites scheduled to run that have no events.
+- A module's children are its run nodes, the top-level suites of a run that has no node, and the suites scheduled to run that have no events. The run nodes come first, in ascending order of `number`, compared as numbers.
 - The suites among a module's children, and the top-level suites in a run node, appear in ascending order by name. Top-level suites that share a name appear in the order they started, followed by those that never started.
 - Names are compared as Java's `String.compareTo` compares them.
 - No module selector is a node.
@@ -144,12 +144,16 @@ What an `output` holds:
 
 ## Run nodes
 
-A run node records one run's own state, including how the run ended (R-074a). Every run in a forked JVM has a run node (§ Tree), including a run with no suites and a run given no task. A run node has no `name`, `label`, `suiteId`, `location` or `threadName` key. A run node's keys, in order: `kind`, `number`, `testCount`, `configMap`, `discovery`, `outcome`, `reason`, `message`, `throwable`, `startedAt`, `endedAt`, `duration`, `summary`, `contents`, `output`.
+A run node records one run's own state, including how the run ended (R-074a). Every run in a forked JVM has a run node (§ Tree), including a run with no suites and a run given no task. A run node has no `name`, `label`, `suiteId`, `location` or `threadName` key. A run node's keys, in order: `kind`, `number`, `forkGroup`, `testCount`, `configMap`, `discovery`, `outcome`, `reason`, `message`, `throwable`, `startedAt`, `endedAt`, `duration`, `summary`, `contents`, `output`.
 
 No suite names its run. A suite in a run node belongs to that node's run. A top-level suite that has events and is a child of a module belongs to that module's run that has no node.
 
 - `kind` — `run`.
-- `number` — the run's identifier, unique within its module: the module's runs are numbered from 1 in the order they are added to the consolidation. Always present.
+- `number` — the run's identifier, unique within its module. Always present. The module's runs are numbered from 1.
+  - Runs given a worker are numbered in ascending order of `forkGroup`, then of worker index. The worker index is the index of the run's worker within its fork group, which the consolidation library's caller gives and the JSON output does not record.
+  - A run given no worker is numbered before every run given one.
+  - Runs given the same fork group and worker index, and runs given no worker, are numbered in the order the caller adds them.
+- `forkGroup` — the 0-based position of the run's fork group among the groups the module's `testForkGrouping` gives, counting every group it gives. Absent where the consolidation library's caller gives the run no fork group.
 - `testCount` — the expected test count of the run's `RunStarting`; absent where that count is 0, as it is under a build tool's `Framework`.
 - `configMap` — `RunStarting`'s config map, as an object of each value's `toString`.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s `timeStamp` and `DiscoveryCompleted`'s `duration`; absent unless the run reported them.
@@ -171,5 +175,4 @@ This document states what the following contain; it does not yet name their keys
 - the root: whether the build tool's running version is a supported Mill release (R-093);
 - a module: its outcome and failure where the module has an error (R-098e), and the state of a run that has no node (R-135);
 - a process that ended before any run existed: how its module records the process, beyond the output § Tree writes on the module (R-076);
-- where a module's run nodes appear among the module's children, and the order of those run nodes;
 - whether the `name` of a suite scheduled to run that has no events is its simple or its fully qualified class name (R-095a).

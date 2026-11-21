@@ -1,96 +1,93 @@
 package org.scalatest.mill
 
-import ch.epfl.scala.bsp4j.JvmTestEnvironmentParams
-import ch.epfl.scala.bsp4j.ScalaTestClassesParams
-import ch.epfl.scala.bsp4j.TestParams
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import scala.annotation.nowarn
-import scala.jdk.CollectionConverters.*
 
 final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
-  private val requests: Seq[String] = Seq(
-    "workspace/buildTargets",
-    "buildTarget/scalaTestClasses for core.test",
-    "buildTarget/jvmTestEnvironment for core.test",
-    "buildTarget/test for core.test"
+  private val answeredRequests: Seq[(String, String)] = Seq(
+    "workspace/buildTargets" -> "lists the build's targets",
+    "buildTarget/scalaTestClasses for core.test" -> "lists core.test's ScalaTest classes",
+    "buildTarget/jvmTestEnvironment for core.test" -> "gives core.test's JVM test environment"
   )
 
+  private val testRequest: String = "buildTarget/test for core.test"
+
+  private val requests: Seq[String] = answeredRequests.map { case (request, _) => request } :+ testRequest
+
   private lazy val sessions: BuildComparison[BspSessionRecord] =
-    withTester("mill-own-tasks", daemonMode = true) { tester =>
-      val withoutPlugin = recordSession(tester, "without-plugin")
-      addPlugin(tester)
-      BuildComparison(withoutPlugin, recordSession(tester, "with-plugin"))
+    withFixtureBuild(FixtureName.millOwnTasks, daemonMode = true) { build =>
+      val withoutPlugin = recordSession(build, "without-plugin")
+      build.addPlugin()
+      BuildComparison(withoutPlugin, recordSession(build, "with-plugin"))
     }
 
-  // BSP deprecates buildTarget/scalaTestClasses, but Metals and IntelliJ still send it, and Mill still serves it.
-  @nowarn("cat=deprecation")
-  private def recordSession(tester: IntegrationTester, build: String): BspSessionRecord = {
-    MillBuild.removeModuleOutput(tester)
-    val stderrLog = tester.workspacePath / os.up / s"${tester.workspacePath.last}-bsp-$build.log"
+  private def recordSession(build: FixtureBuild, pluginState: String): BspSessionRecord = {
+    build.removeModuleOutput()
     try {
-      val (responses, notifications) = BspClientSession.withSession(tester, millExecutable, stderrLog) { session =>
-        val (targets, buildTargets) = session.exchange(_.workspaceBuildTargets())
-        val coreTest = BspClientSession.targetsNamed("core.test", targets.toSeq.flatMap(_.getTargets.asScala))
-        withClue(buildTargets) {
-          coreTest.asScala should not be empty
-        }
-        val (_, scalaTestClasses) = session.exchange(_.buildTargetScalaTestClasses(new ScalaTestClassesParams(coreTest)))
-        val (_, jvmTestEnvironment) = session.exchange(_.buildTargetJvmTestEnvironment(new JvmTestEnvironmentParams(coreTest)))
-        val (_, test) = session.exchange(_.buildTargetTest(new TestParams(coreTest)))
-        requests.zip(Seq(buildTargets, scalaTestClasses, jvmTestEnvironment, test)).toMap
+      val recorded = build.resultWithBspNotifications(build.workspace / s"bsp-$pluginState.log") { session =>
+        val buildTargets = session.buildTargets()
+        val coreTest = buildTargets.result
+          .map(_.named("core.test"))
+          .filterNot(_.isEmpty)
+          .getOrElse(fail(s"no build target is named core.test in ${buildTargets.recorded}"))
+        val scalaTestClasses = session.scalaTestClasses(coreTest)
+        val jvmTestEnvironment = session.jvmTestEnvironment(coreTest)
+        val test = session.test(coreTest)
+        requests.zip(Seq(buildTargets.recorded, scalaTestClasses, jvmTestEnvironment, test)).toMap
       }
-      BspSessionRecord(responses, notifications)
+      BspSessionRecord(recorded.result, recorded.notifications)
     } finally {
-      tester.removeProcessIdFile()
+      build.removeProcessIdFile()
     }
   }
 
   Feature("In a build that adds the plugin, Mill's BSP server answers an IDE's requests as it does without it") {
 
-    requests.filterNot(_ == testRequest).foreach { request =>
-      Scenario(request) {
-        givenTheFixture()
-        When("the session runs in a build that adds the plugin, and in the same build without it")
+    answeredRequests.foreach { case (request, answer) =>
+      Scenario(s"The server $answer the same with the plugin as without it") {
+        givenTheSession()
+        val compared = whenTheSessionRunsWithAndWithoutThePlugin()
         Then(s"the client receives the same response to $request under both, apart from durations, timestamps and task IDs")
-        sameResponses(request)
+        shouldGiveTheSameResponses(compared, request)
       }
     }
 
-    Scenario(s"$testRequest, which Mill 1.3.1 fails with or without the plugin") {
-      givenTheFixture()
-      When("the session runs in a build that adds the plugin, and in the same build without it")
+    Scenario("The server fails a request to run core.test's tests with the same error whether or not the build adds the plugin") {
+      givenTheSession()
+      val compared = whenTheSessionRunsWithAndWithoutThePlugin()
       Then(s"the client receives an error in response to $testRequest, and the same one under both")
-      sessions.withoutPlugin.responses(testRequest) should startWith("error ")
-      sameResponses(testRequest)
+      compared.withoutPlugin.responses(testRequest) should startWith("error ")
+      shouldGiveTheSameResponses(compared, testRequest)
     }
 
-    Scenario("the notifications of a session that sends every request") {
-      givenTheFixture()
-      When("the session runs in a build that adds the plugin, and in the same build without it")
-      withClue(sessions.describe(_.describe)) {
+    Scenario("The server sends the same notifications with the plugin as without it, none holding the module's line") {
+      givenTheSession()
+      val compared = whenTheSessionRunsWithAndWithoutThePlugin()
+      withClue(compared.describe(_.describe)) {
         Then("the client receives the same notifications in the session under both, apart from durations, timestamps and task IDs")
-        sessions.withoutPlugin.notifications should not be empty
-        sessions.withPlugin.notifications shouldBe sessions.withoutPlugin.notifications
+        compared.withoutPlugin.notifications should not be empty
+        compared.withPlugin.notifications shouldBe compared.withoutPlugin.notifications
 
         And("no notification under either holds [core.test]")
-        all(sessions.withoutPlugin.notifications ++ sessions.withPlugin.notifications) should not include "[core.test]"
+        all(compared.withoutPlugin.notifications ++ compared.withPlugin.notifications) should not include "[core.test]"
       }
     }
   }
 
-  private def givenTheFixture(): Unit = {
+  private def givenTheSession(): Unit = {
     Given("a BSP client holds one session with Mill's BSP server, from initialization until the server closes the connection")
     And("in that session the client sends each of workspace/buildTargets, buildTarget/scalaTestClasses for core.test, buildTarget/jvmTestEnvironment for core.test and buildTarget/test for core.test")
   }
 
-  private def testRequest: String = requests.last
+  private def whenTheSessionRunsWithAndWithoutThePlugin(): BuildComparison[BspSessionRecord] = {
+    When("the session runs in a build that adds the plugin, and in the same build without it")
+    sessions
+  }
 
-  private def sameResponses(request: String): Unit =
-    withClue(sessions.describe(_.describe)) {
-      sessions.withPlugin.responses(request) shouldBe sessions.withoutPlugin.responses(request)
+  private def shouldGiveTheSameResponses(compared: BuildComparison[BspSessionRecord], request: String): Unit =
+    withClue(compared.describe(_.describe)) {
+      compared.withPlugin.responses(request) shouldBe compared.withoutPlugin.responses(request)
     }
 }

@@ -1,136 +1,115 @@
 package org.scalatest.mill
 
-import java.io.FileInputStream
-import java.io.FileNotFoundException
-import java.io.InputStream
-import java.nio.charset.StandardCharsets
+import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.Path
-import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
-import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.consolidation.ForkGroup
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.matchers.should
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
+import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.wordspec.AnyWordSpec
-import scala.collection.mutable
-import scala.concurrent.duration.DurationInt
+import scala.util.Using
 
 final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
-  private val label: TestRunLabel = TestRunLabel("core.test")
-  private val runStarted: String = """{"item":"runStarted","pid":4242,"startTime":"2026-11-14T01:02:03.456Z"}"""
-  private val runEndedCompleted: String = """{"item":"runEnded","outcome":"completed"}"""
+  private val module: ModuleName = ModuleName("core.test")
 
-  private final class WorkerRun(eventLogFile: Path, open: Path => InputStream) {
-    val output: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
-    val consolidation: Consolidation = Consolidation.start(line => output += line, coloured = false)
-    val capture: WorkerOutputCapture = new WorkerOutputCapture(StandardCharsets.UTF_8)
-    val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
-    private val reader = new EventLogReader(
-      eventLogFile,
-      () => {
-        val feed = consolidation.addRun(label)
-        capture.addTo(feed.add)
-        feed
-      },
-      () => {
-        processesEndedBeforeAnyRun.incrementAndGet()
-        consolidation.addProcessEndedBeforeAnyRun()
-      },
-      hasExited = _ => true,
-      pollInterval = 1.millis,
-      open = open
-    )
+  private def forkGroupAt(position: Int): PlannedForkGroup =
+    PlannedForkGroup(ForkGroup.at(position), ForkGroupLabel.of(position, 2), PathUnderModule(s"group-$position"), Nil, Nil)
 
-    def run(startWorker: => Unit): Unit = {
-      runWorker(startWorker)
-      consolidation.end()
-    }
+  private def layOutAllButTheFirst(forkGroup: PlannedForkGroup): String =
+    if (forkGroup == forkGroupAt(0))
+      throw new IllegalStateException("disk full")
+    else
+      s"queue of ${forkGroup.folder.render}"
 
-    def runWorker(startWorker: => Unit): Unit =
-      JvmTestModuleRun.runWorker(consolidation, label, reader, capture)(startWorker)
-
-    def outputWithoutSummaryLine: Seq[String] = output.toSeq.dropRight(1)
+  private def outputOf(consolidate: Consolidation => Unit): Seq[String] = {
+    val consolidationUnderTest = new ConsolidationUnderTest
+    consolidate(consolidationUnderTest.consolidation)
+    consolidationUnderTest.consolidation.end()
+    consolidationUnderTest.output
   }
 
-  private def withEventLogFile[A](test: Path => A): A = {
-    val folder = Files.createTempDirectory("jvm-test-module-run")
-    try {
-      test(folder.resolve(JvmTestModuleRun.eventLogFileName))
-    } finally {
-      Files.walk(folder).sorted(java.util.Comparator.reverseOrder()).forEach(path => Files.delete(path))
+  "Handling the outcome of laying out a module's workers" when {
+    "two fork groups would share a processFolder" should {
+      val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
+
+      "attach the groups and the folder to the root, naming the module" in {
+        outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(sharing))) should contain(
+          "    Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
+        )
+      }
+
+      "give nothing to launch" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(sharing)) shouldBe None
+      }
+    }
+
+    "checking whether the filesystem ignores case fails" should {
+      "attach why the check failed to the root, naming the module" in {
+        val notChecked = FilesystemCaseNotChecked(new IOException("disk full"))
+        outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(notChecked))) should contain(
+          "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
+        )
+      }
+    }
+
+    "the workers are laid out" should {
+      "give the launcher, attaching nothing to the root" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Right("launcher")) shouldBe Some("launcher")
+        consolidation.end()
+        consolidation.state shouldBe ConsolidationState.Ended
+      }
     }
   }
 
-  private def writeCompletedRun(file: Path): Unit =
-    Files.write(file, s"$runStarted\n$runEndedCompleted\n".getBytes(StandardCharsets.UTF_8))
-
-  private val sharingViolation: Path => InputStream =
-    path => throw new FileNotFoundException(s"$path (The process cannot access the file because it is being used by another process)")
-
-  "Running a worker" when {
-    "its event log file never becomes readable" should {
-      "attach what reading threw to the root, end the run's event stream and fail the consolidation" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val workerRun = new WorkerRun(file, sharingViolation)
-          workerRun.run(())
-          workerRun.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            s"    Reading the event log of core.test failed: java.io.FileNotFoundException: $file (The process cannot access the file because it is being used by another process)"
-          )
-          workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
+  "Checking whether the filesystem ignores case" when {
+    "the folder exists" should {
+      "give whether a file is found under its name in upper case, and leave the folder empty" in {
+        TemporaryFolder.within("case-check") { folder =>
+          val ignoresCase = JvmTestModuleRun.filesystemIgnoresCase(folder)
+          val emptied = Using.resource(Files.list(folder))(_.count() == 0)
+          Files.createFile(folder.resolve("file"))
+          val foundInUpperCase = Files.exists(folder.resolve("FILE"))
+          (ignoresCase, emptied) shouldBe ((Right(foundInUpperCase), true))
         }
       }
     }
 
-    "starting the worker throws after the worker wrote an unterminated line" should {
-      "end the capture streams, attach what starting threw to the root and fail the consolidation" in {
-        withEventLogFile { file =>
-          writeCompletedRun(file)
-          val workerRun = new WorkerRun(file, path => new FileInputStream(path.toFile))
-          workerRun.run {
-            val bytes = "partial".getBytes(StandardCharsets.UTF_8)
-            workerRun.capture.stdout(bytes, bytes.length)
-            throw new IllegalStateException("testargs already exists")
-          }
-          workerRun.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "    Run 1:",
-            "      [stdout] partial",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
+    "the folder is missing" should {
+      "give the failure, naming the IOException that caused it" in {
+        TemporaryFolder.within("case-check") { parent =>
+          val folder = parent.resolve("missing")
+          JvmTestModuleRun.filesystemIgnoresCase(folder).left.map(_.message) shouldBe Left(
+            s"checking whether the filesystem ignores case failed: java.nio.file.NoSuchFileException: ${folder.resolve("case-probe")}"
           )
-          workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
       }
     }
+  }
 
-    "starting the worker throws before its event log exists" should {
-      "attach what starting threw to the root and fail the consolidation" in {
-        withEventLogFile { file =>
-          val workerRun = new WorkerRun(file, path => new FileInputStream(path.toFile))
-          workerRun.run(throw new IllegalStateException("testargs already exists"))
-          workerRun.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting the worker of core.test failed: java.lang.IllegalStateException: testargs already exists"
-          )
-          workerRun.consolidation.state shouldBe ConsolidationState.EndedFailed
-        }
+  "Laying out a module's fork groups" when {
+    "laying out the first of two fork groups throws" should {
+      "attach what it threw to the root, naming the first fork group, and fail the consolidation" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        JvmTestModuleRun.layOutForkGroups(consolidation, module, Seq(forkGroupAt(0), forkGroupAt(1)))(layOutAllButTheFirst)
+        consolidation.end()
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
+          "Consolidated tests:",
+          "  *** CONSOLIDATED TESTS ABORTED ***",
+          "    Laying out fork group 0 of core.test failed: java.lang.IllegalStateException: disk full"
+        )
+        consolidation.state shouldBe ConsolidationState.EndedFailed
       }
-    }
 
-    "starting the worker throws a fatal error before its event log exists" should {
-      "rethrow it once the reader has added the worker as a process that ended before any run" in {
-        withEventLogFile { file =>
-          val workerRun = new WorkerRun(file, path => new FileInputStream(path.toFile))
-          a[StackOverflowError] should be thrownBy workerRun.runWorker(throw new StackOverflowError("worker"))
-          workerRun.processesEndedBeforeAnyRun.get shouldBe 1
-        }
+      "keep only the second fork group, with what laying it out returned" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.layOutForkGroups(consolidation, module, Seq(forkGroupAt(0), forkGroupAt(1)))(layOutAllButTheFirst) shouldBe Seq(forkGroupAt(1) -> "queue of group-1")
       }
     }
   }

@@ -2,26 +2,23 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableMessageSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
   private def eventLogWithMessages(info: String): String =
-    s"""
-    run started
-    structure
-      suite "StackFunSuite", class "samples.StackFunSuite"
-        test "is empty", label "- is empty"
-    suite "StackFunSuite": SuiteStarting
-    test "is empty": TestStarting
-    $info
-    test "is empty": NoteProvided(message: "a note")
-    test "is empty": AlertProvided(message: "an alert")
-    test "is empty": MarkupProvided(text: "*markup*")
-    test "is empty": TestSucceeded
-    suite "StackFunSuite": SuiteCompleted
-    run ended completed
-    """
+    completedRunOf(
+      eventLogOfSuite(
+        "StackFunSuite",
+        """test "is empty", label "- is empty"""",
+        """test "is empty": TestStarting""",
+        info,
+        """test "is empty": NoteProvided(message: "a note")""",
+        """test "is empty": AlertProvided(message: "an alert")""",
+        """test "is empty": MarkupProvided(text: "*markup*")""",
+        """test "is empty": TestSucceeded"""
+      )
+    )
 
   Feature("Messages sit under the node they attach to, each marked with its kind") {
 

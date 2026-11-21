@@ -11,10 +11,6 @@ import mill.javalib.TestModule
 import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.InternalJvmWorkerApi
 
-/**
- * The values of a JVM test module's tasks that Mill's own `testForked` builds its `TestModuleUtil` from, and the
- * module's own ScalaTest arguments, `testArgsDefault`.
- */
 private[mill] final case class JvmTestModuleInputs(
     testArgs: Seq[String],
     useArgsFile: Boolean,
@@ -35,13 +31,10 @@ private[mill] final case class JvmTestModuleInputs(
     testLogLevel: TestReporter.LogLevel,
     propagateEnv: Boolean,
     jvmWorker: InternalJvmWorkerApi,
-    discoveredClasses: Option[Seq[(String, Int)]]
+    discoveredClasses: Option[Seq[(String, Int)]],
+    testBatchFrameworkTasks: Boolean
 ) {
 
-  /**
-   * Its workers log at the module's `testLogLevel` raised to at least `Info`, so Mill writes no `Running Test Class` line
-   * to their stderr.
-   */
   def testModuleUtil(arguments: Seq[String], ctx: TaskCtx): TestModuleUtil =
     new TestModuleUtil(
       useArgsFile,
@@ -61,20 +54,22 @@ private[mill] final case class JvmTestModuleInputs(
       testReportXml,
       javaHome,
       testParallelism,
+      // At `Info` or above, Mill writes no `Running Test Class` line to the workers' stderr.
       if (testLogLevel.level < TestReporter.LogLevel.Info.level) TestReporter.LogLevel.Info else testLogLevel,
       propagateEnv,
       jvmWorker,
-      discoveredClasses
+      discoveredClasses,
+      testBatchFrameworkTasks
     )(using ctx)
 }
 
 private[mill] object JvmTestModuleInputs {
 
-  def evaluate(evaluator: Evaluator, module: TestModule, logger: Logger): Either[String, JvmTestModuleInputs] =
+  def evaluate(evaluator: Evaluator, module: TestModule, logger: Logger): Either[TestCommandFailure, JvmTestModuleInputs] =
     evaluator.execute(Seq(task(module)), logger = logger).values match {
       case Result.Success(Seq(inputs)) => Right(inputs)
-      case Result.Success(values) => Left(s"Evaluating ${module.moduleSegments.render} gave ${values.size} values")
-      case failure: Result.Failure => Left(failure.error)
+      case Result.Success(values) => throw new IllegalStateException(s"Evaluating ${module.moduleSegments.render} gave ${values.size} values")
+      case failure: Result.Failure => Left(TestCommandFailure.ModuleInputsNotEvaluated(failure.error))
     }
 
   private def task(module: TestModule): Task[JvmTestModuleInputs] = {
@@ -100,13 +95,14 @@ private[mill] object JvmTestModuleInputs {
         module.testLogLevel(),
         module.propagateEnv(),
         module.jvmWorker().internalWorker(),
-        discoveredClasses()
+        discoveredClasses(),
+        module.testBatchFrameworkTasks()
       )
     }
   }
 
-  // `aheadOfTimeDiscoveredTestClassesIfNeeded` is protected, but compiles to a public method.
   private def discoveredClassesTask(module: TestModule): Task[Option[Seq[(String, Int)]]] =
+    // `aheadOfTimeDiscoveredTestClassesIfNeeded` is protected, but compiles to a public method.
     classOf[TestModule]
       .getMethod("aheadOfTimeDiscoveredTestClassesIfNeeded")
       .invoke(module)

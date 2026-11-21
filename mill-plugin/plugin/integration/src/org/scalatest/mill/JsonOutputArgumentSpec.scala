@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -9,7 +8,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   private val leftOver: String = "left over"
 
-  private def other(tester: IntegrationTester): os.Path = tester.workspacePath / "other.json"
+  private def other(build: FixtureBuild): os.Path = build.workspace / "other.json"
 
   private def shouldHoldTheHumanReadableOutput(result: TestCommandResult): Unit =
     withClue(result.debugString) {
@@ -21,16 +20,6 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       result.treeLines shouldBe empty
       result.summaryLine shouldBe empty
     }
-
-  private def shouldName(result: TestCommandResult, named: String): Unit =
-    withClue(result.debugString) {
-      (result.eval.out + result.eval.err) should include(named)
-    }
-
-  private def addModule(tester: IntegrationTester, module: String): Unit = {
-    val buildFile = tester.workspacePath / "build.mill"
-    os.write.append(buildFile, s"\n$module\n")
-  }
 
   Feature("The -fJ argument") {
 
@@ -45,13 +34,13 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       Scenario(s"core.test ${arguments.mkString(" ")} writes the JSON output, and -o keeps its meaning beside it") {
         Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout and succeeds")
         When(s"the test command is invoked as mill scalatest/test core.test ${arguments.mkString(" ")}")
-        withJsonOutputFixture("CalculatorSuite") { tester =>
-          val result = runTestCommand(tester, ("core.test" +: arguments.map(_.replace("<report>", report(tester).toString)))*)
+        withJsonOutputFixture("CalculatorSuite") { build =>
+          val result = build.runTestCommand(("core.test" +: arguments.map(_.replace("<report>", build.jsonOutputFile.toString)))*)
 
           Then("the file at <report> holds a JSON object whose kind is root, holding the test adds two numbers, succeeded")
-          val json = jsonOutput(report(tester))
-          json("kind").str shouldBe "root"
-          testOutcome(json, "adds two numbers") shouldBe Some("succeeded")
+          val json = build.jsonOutput
+          json.kind shouldBe NodeKind.Root
+          json.testOutcome("adds two numbers") shouldBe Some("succeeded")
 
           if (humanReadable) {
             And("the console holds the human-readable output, whose lines include - adds two numbers")
@@ -60,7 +49,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
             And("the console holds no line of human-readable output, and no line holding dividing now")
             shouldHoldNoHumanReadableOutput(result)
             withClue(result.debugString) {
-              (result.stdoutLines ++ result.stderrLines).filter(_.contains("dividing now")) shouldBe empty
+              result.consoleLines.filter(_.contains("dividing now")) shouldBe empty
             }
           }
 
@@ -70,14 +59,14 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
       }
     }
 
-    Scenario("The module selector follows the path") {
+    Scenario("The module selector may follow the path, and the root still records the selector") {
       Given("CalculatorSuite")
       When("the test command is invoked as mill scalatest/test -fJ <report> core.test")
-      withJsonOutputFixture("CalculatorSuite") { tester =>
-        val result = runTestCommand(tester, "-fJ", report(tester).toString, "core.test")
+      withJsonOutputFixture("CalculatorSuite") { build =>
+        val result = build.runTestCommand("-fJ", build.jsonOutputFile.toString, "core.test")
 
         Then("the root of the JSON output records the module selector core.test, resolved to core.test")
-        jsonOutput(report(tester))("moduleSelectors") shouldBe ujson.Arr(ujson.Obj("selector" -> "core.test", "modules" -> ujson.Arr("core.test")))
+        build.jsonOutput("moduleSelectors") shouldBe ujson.Arr(ujson.Obj("selector" -> "core.test", "modules" -> ujson.Arr("core.test")))
 
         And("the test command succeeds")
         shouldSucceed(result)
@@ -85,29 +74,29 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
     }
 
     Scenario("The JSON output replaces a file from an earlier test command") {
-      Given("CalculatorSuite, and the file at <report> holding the text left over")
-      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputFixture("CalculatorSuite") { tester =>
-        os.write(report(tester), leftOver)
-        runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
+      withJsonOutputFixture("CalculatorSuite") { build =>
+        Given("CalculatorSuite, and the file at <report> holding the text left over")
+        os.write(build.jsonOutputFile, leftOver)
+        When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
+        build.runTestCommandWritingJsonOutput()
 
         Then("the file at <report> holds one JSON object, whose kind is root, and nothing else")
-        jsonOutput(report(tester))("kind").str shouldBe "root"
+        build.jsonOutput.kind shouldBe NodeKind.Root
       }
     }
 
     Scenario("No file is at the path while the run executes") {
-      Given("ProbeSuite, whose test finds no report succeeds only where nothing exists at the path its config map gives under report")
-      And("the file at <report> holds the text left over, and the module's testArgsDefault is -Dreport=<report>")
-      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputFixture("ProbeSuite") { tester =>
-        os.write(report(tester), leftOver)
-        setModuleArguments(tester, Seq(s"-Dreport=${report(tester).toString.replace('\\', '/')}"))
-        val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
+      withJsonOutputFixture("ProbeSuite") { build =>
+        Given("ProbeSuite, whose test finds no report succeeds only where nothing exists at the path its config map gives under report")
+        And("the file at <report> holds the text left over, and the module's testArgsDefault is -Dreport=<report>")
+        os.write(build.jsonOutputFile, leftOver)
+        build.setModuleArguments(Seq(s"-Dreport=${build.jsonOutputFile.toString.replace('\\', '/')}"))
+        When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
+        val result = build.runTestCommandWritingJsonOutput()
 
         Then("the JSON output holds the test finds no report, succeeded")
         withClue(result.debugString) {
-          testOutcome(jsonOutput(report(tester)), "finds no report") shouldBe Some("succeeded")
+          build.jsonOutput.testOutcome("finds no report") shouldBe Some("succeeded")
         }
       }
     }
@@ -115,16 +104,14 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
     Scenario("The JSON output is written when a test fails, and the test command still fails") {
       Given("FailSuite, whose test subtracts fails")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputFixture("FailSuite") { tester =>
-        val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
+      withJsonOutputFixture("FailSuite") { build =>
+        val result = build.runTestCommandWritingJsonOutput()
 
         Then("the JSON output holds the test subtracts, failed")
-        testOutcome(jsonOutput(report(tester)), "subtracts") shouldBe Some("failed")
+        build.jsonOutput.testOutcome("subtracts") shouldBe Some("failed")
 
         And("the test command fails")
-        withClue(result.debugString) {
-          result.succeeded shouldBe false
-        }
+        shouldFail(result)
       }
     }
   }
@@ -146,23 +133,23 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     for ((arguments, rejected) <- rejectedArguments) {
       Scenario(s"core.test ${arguments.mkString(" ")} fails the test command, naming $rejected, and leaves every file untouched") {
-        Given("CalculatorSuite, and the file at <report> holding the text left over")
-        When(s"the test command is invoked as mill scalatest/test core.test ${arguments.mkString(" ")}")
-        withJsonOutputFixture("CalculatorSuite") { tester =>
-          os.write(report(tester), leftOver)
-          val invoked = arguments.map(_.replace("<report>", report(tester).toString).replace("<other>", other(tester).toString))
-          val result = runTestCommand(tester, ("core.test" +: invoked)*)
+        withJsonOutputFixture("CalculatorSuite") { build =>
+          Given("CalculatorSuite, and the file at <report> holding the text left over")
+          os.write(build.jsonOutputFile, leftOver)
+          When(s"the test command is invoked as mill scalatest/test core.test ${arguments.mkString(" ")}")
+          val invoked = arguments.map(_.replace("<report>", build.jsonOutputFile.toString).replace("<other>", other(build).toString))
+          val result = build.runTestCommand(("core.test" +: invoked)*)
 
           Then(s"the test command fails before any test starts, and its failure names $rejected")
-          shouldFailBeforeAnyTestStarts(tester, result)
-          shouldName(result, s": $rejected")
+          shouldFailBeforeAnyTestStarts(build, result)
+          shouldWriteToTheConsole(result, s": $rejected")
 
           And("the console holds no line of human-readable output")
           shouldHoldNoHumanReadableOutput(result)
 
           And("the file at <report> holds the text left over, and nothing exists at <other>")
-          os.read(report(tester)) shouldBe leftOver
-          os.exists(other(tester)) shouldBe false
+          os.read(build.jsonOutputFile) shouldBe leftOver
+          os.exists(other(build)) shouldBe false
         }
       }
     }
@@ -189,78 +176,76 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
 
     for ((selector, otherModule, module) <- selectorsFailingAfterTheDelete) {
       Scenario(s"$selector, failing before any test starts, leaves no file at the path") {
-        Given(s"CalculatorSuite, and the build also has $otherModule")
-        And("the file at <report> holds the text left over")
-        When(s"the test command is invoked as mill scalatest/test $selector -fJ <report>")
-        withJsonOutputFixture("CalculatorSuite") { tester =>
-          module.foreach(addModule(tester, _))
-          os.write(report(tester), leftOver)
-          val result = runTestCommand(tester, selector, "-fJ", report(tester).toString)
+        withJsonOutputFixture("CalculatorSuite") { build =>
+          Given(s"CalculatorSuite, and the build also has $otherModule")
+          And("the file at <report> holds the text left over")
+          module.foreach(build.appendToBuild)
+          os.write(build.jsonOutputFile, leftOver)
+          When(s"the test command is invoked as mill scalatest/test $selector -fJ <report>")
+          val result = build.runTestCommand(selector, "-fJ", build.jsonOutputFile.toString)
 
           Then("the test command fails before any test starts")
-          shouldFailBeforeAnyTestStarts(tester, result)
+          shouldFailBeforeAnyTestStarts(build, result)
 
           And("the console holds no line of human-readable output")
           shouldHoldNoHumanReadableOutput(result)
 
           And("nothing exists at <report>")
-          os.exists(report(tester)) shouldBe false
+          os.exists(build.jsonOutputFile) shouldBe false
         }
       }
     }
 
     Scenario("A folder at the path fails the test command before any test starts, naming the path, and is kept") {
-      Given("CalculatorSuite, and a folder at <report> holding the file keep.txt")
-      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputFixture("CalculatorSuite") { tester =>
-        os.write(report(tester) / "keep.txt", "kept", createFolders = true)
-        val result = runTestCommand(tester, "core.test", "-fJ", report(tester).toString)
+      withJsonOutputFixture("CalculatorSuite") { build =>
+        Given("CalculatorSuite, and a folder at <report> holding the file keep.txt")
+        os.write(build.jsonOutputFile / "keep.txt", "kept", createFolders = true)
+        When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
+        val result = build.runTestCommandWritingJsonOutput()
 
         Then("the test command fails before any test starts, and its failure names <report>")
-        shouldFailBeforeAnyTestStarts(tester, result)
-        shouldName(result, report(tester).toString)
+        shouldFailBeforeAnyTestStarts(build, result)
+        shouldWriteToTheConsole(result, build.jsonOutputFile.toString)
 
         And("the console holds no line of human-readable output")
         shouldHoldNoHumanReadableOutput(result)
 
         And("the folder at <report> still holds the file keep.txt")
-        os.read(report(tester) / "keep.txt") shouldBe "kept"
+        os.read(build.jsonOutputFile / "keep.txt") shouldBe "kept"
       }
     }
 
     Scenario("A path inside a regular file fails the test command after the runs end, naming the path, and the human-readable output is still written") {
-      Given("CalculatorSuite, and a regular file at <blocker>")
-      When("the test command is invoked as mill scalatest/test core.test -fJ <blocker>/report.json")
-      withJsonOutputFixture("CalculatorSuite") { tester =>
-        val blocker = tester.workspacePath / "blocker"
+      withJsonOutputFixture("CalculatorSuite") { build =>
+        Given("CalculatorSuite, and a regular file at <blocker>")
+        val blocker = build.workspace / "blocker"
         os.write(blocker, "a file")
-        val result = runTestCommand(tester, "core.test", "-fJ", s"$blocker/report.json")
+        When("the test command is invoked as mill scalatest/test core.test -fJ <blocker>/report.json")
+        val result = build.runTestCommand("core.test", "-fJ", s"$blocker/report.json")
 
         Then("the console holds the human-readable output, whose lines include - adds two numbers")
         shouldHoldTheHumanReadableOutput(result)
 
         And("the test command fails, and its failure names <blocker>/report.json")
-        withClue(result.debugString) {
-          result.succeeded shouldBe false
-        }
-        shouldName(result, (blocker / "report.json").toString)
+        shouldFail(result)
+        shouldWriteToTheConsole(result, (blocker / "report.json").toString)
       }
     }
 
-    Scenario("A relative path with a folder in it") {
+    Scenario("The JSON output at a relative path with a folder in it is written below the workspace root") {
       Given("CalculatorSuite")
       When("the test command is invoked as mill scalatest/test core.test -fJ reports/report.json")
-      withJsonOutputFixture("CalculatorSuite") { tester =>
-        val result = runTestCommand(tester, "core.test", "-fJ", "reports/report.json")
+      withJsonOutputFixture("CalculatorSuite") { build =>
+        val result = build.runTestCommand("core.test", "-fJ", "reports/report.json")
 
         Then("the file reports/report.json below the workspace root holds a JSON object whose kind is root")
         withClue(result.debugString) {
-          os.exists(tester.workspacePath / "reports" / "report.json") shouldBe true
-          jsonOutput(tester.workspacePath / "reports" / "report.json")("kind").str shouldBe "root"
+          os.exists(build.workspace / "reports" / "report.json") shouldBe true
+          JsonNode.read(build.workspace / "reports" / "report.json").kind shouldBe NodeKind.Root
         }
 
         And("no other file named report.json exists below the workspace root")
-        os.walk(tester.workspacePath).filter(_.last == "report.json") shouldBe Seq(tester.workspacePath / "reports" / "report.json")
+        os.walk(build.workspace).filter(_.last == "report.json") shouldBe Seq(build.workspace / "reports" / "report.json")
 
         And("the test command succeeds")
         shouldSucceed(result)
@@ -270,13 +255,13 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
     Scenario("The test command creates the file's missing parent folders") {
       Given("CalculatorSuite, and nothing at <missing>")
       When("the test command is invoked as mill scalatest/test core.test -fJ <missing>/nested/report.json")
-      withJsonOutputFixture("CalculatorSuite") { tester =>
-        val nested = tester.workspacePath / "missing" / "nested" / "report.json"
-        val result = runTestCommand(tester, "core.test", "-fJ", nested.toString)
+      withJsonOutputFixture("CalculatorSuite") { build =>
+        val nested = build.workspace / "missing" / "nested" / "report.json"
+        val result = build.runTestCommand("core.test", "-fJ", nested.toString)
 
         Then("the file at <missing>/nested/report.json holds a JSON object whose kind is root")
         withClue(result.debugString) {
-          jsonOutput(nested)("kind").str shouldBe "root"
+          JsonNode.read(nested).kind shouldBe NodeKind.Root
         }
 
         And("the test command succeeds")

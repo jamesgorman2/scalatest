@@ -56,7 +56,6 @@ final class DispatchReporterHandOffSpec extends AnyWordSpec with Matchers with E
     def received: Vector[Event] = events.asScala.toVector
   }
 
-  // A DispatchReporter whose dispatcher has died never finishes disposing, so a test that would hang fails instead.
   private def disposedWithinTimeLimit(dispatch: DispatchReporter): Unit = {
     val disposing = new Thread(() => dispatch.dispatchDisposeAndWaitUntilDone(), "disposes a DispatchReporter")
     disposing.setDaemon(true)

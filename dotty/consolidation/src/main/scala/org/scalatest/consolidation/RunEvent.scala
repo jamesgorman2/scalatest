@@ -2,13 +2,14 @@ package org.scalatest.consolidation
 
 import java.time.Instant
 import java.time.format.DateTimeParseException
+import org.scalatest.events.MalformedTestEventLogException
 import org.scalatest.events.TestEventLogDecoder
+import org.scalatest.events.TestEventLogEncoder
 import org.scalatest.events.TestEventLogEvent
 
 /** One event of a run's test event log, as [[RunEvent.decode]] returns it. Only the run's process can be read from it. */
 opaque type RunEvent = DecodedRunEvent
 
-/** A decoded event, with the process its `runStarted` event names, whose start time is parsed once, on decoding. */
 private[scalatest] final case class DecodedRunEvent(event: TestEventLogEvent, runProcess: Option[RunProcess])
 
 opaque type Pid = Long
@@ -30,24 +31,33 @@ object RunEvent {
   /**
    * Decodes one whole line of a run's test event log, given without its line end.
    *
-   * @return the event the line holds, or why it cannot be decoded
+   * @throws org.scalatest.events.MalformedTestEventLogException if the line cannot be decoded; its message names the line and why
    */
-  def decode(line: String): Either[String, RunEvent] = TestEventLogDecoder.decode(line).flatMap(of)
+  def decode(line: String): RunEvent = {
+    val event = TestEventLogDecoder.decode(line)
+    try {
+      of(event)
+    } catch {
+      case malformed: MalformedTestEventLogException => throw new MalformedTestEventLogException(line, malformed.reason)
+    }
+  }
 
-  /** The event, or why it cannot be one: a `runStarted` event whose start time is not an instant. */
-  private[scalatest] def of(event: TestEventLogEvent): Either[String, RunEvent] =
+  private[scalatest] def of(event: TestEventLogEvent): RunEvent =
     event match {
       case TestEventLogEvent.RunStarted(pid, startTime) =>
-        parsedStartTime(startTime).map(instant => DecodedRunEvent(event, Some(RunProcess(Pid(pid), instant))))
+        DecodedRunEvent(event, Some(RunProcess(Pid(pid), startInstant(pid, startTime))))
       case _ =>
-        Right(DecodedRunEvent(event, None))
+        DecodedRunEvent(event, None)
     }
 
-  private def parsedStartTime(startTime: String): Either[String, Instant] =
+  private def startInstant(pid: Long, startTime: String): Instant =
     try {
-      Right(Instant.parse(startTime))
+      Instant.parse(startTime)
     } catch {
-      case _: DateTimeParseException => Left(s"the run's start time is not an instant: $startTime")
+      case _: DateTimeParseException => {
+        val line = TestEventLogEncoder.runStarted(pid, startTime).stripSuffix("\n")
+        throw new MalformedTestEventLogException(line, s"the run's start time is not an instant: $startTime")
+      }
     }
 
   extension (event: RunEvent) {

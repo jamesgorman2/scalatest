@@ -40,11 +40,11 @@ object CompileMacro {
 
       errors match {
         case Error(msg, _, _, ErrorKind.Typer) :: _ => '{
-          val messageExpr = Resources.expectedNoErrorButGotTypeError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedNoErrorButGotTypeError(${ org.scalactic.CompilerText.withPlatformLineSeparators(msg) }, ${ Expr(code) })
           throw new TestFailedException((_: StackDepthException) => Some(messageExpr), None, $pos)
         }
         case Error(msg, _, _, ErrorKind.Parser) :: _ => '{
-          val messageExpr = Resources.expectedNoErrorButGotParseError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedNoErrorButGotParseError(${ org.scalactic.CompilerText.withPlatformLineSeparators(msg) }, ${ Expr(code) })
           throw new TestFailedException((_: StackDepthException) => Some(messageExpr), None, $pos)
         }
         case Nil => '{ Succeeded }
@@ -123,7 +123,7 @@ object CompileMacro {
       errors match {
         case Error(_, _, _, ErrorKind.Typer) :: _ => '{ Succeeded }
         case Error(msg, _, _, ErrorKind.Parser) :: _ => '{
-          val messageExpr = Resources.expectedTypeErrorButGotParseError(${ org.scalactic.CompilerText.withLineSeparator(msg) }, ${ Expr(code) })
+          val messageExpr = Resources.expectedTypeErrorButGotParseError(${ org.scalactic.CompilerText.withPlatformLineSeparators(msg) }, ${ Expr(code) })
           throw new TestFailedException((_: StackDepthException) => Some(messageExpr), None, $pos)
         }
         case Nil => '{

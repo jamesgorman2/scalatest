@@ -26,7 +26,7 @@ private[tools] object TemporaryEventLog {
     text.split('\n').toVector
   }
 
-  def decoded(eventLogFile: Path): Vector[Either[String, TestEventLogEvent]] =
+  def decoded(eventLogFile: Path): Vector[TestEventLogEvent] =
     lines(eventLogFile).map(TestEventLogDecoder.decode)
 
   def namesIn(folder: Path): Set[String] = {

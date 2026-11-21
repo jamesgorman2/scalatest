@@ -1,18 +1,7 @@
 package org.scalatest.events
 
-/**
- * Compares the events of a test event log with those a criterion gives, built by `TestRunBuilder`.
- *
- * Each event is compared only on what its criterion writes:
- *
- *  - a `structure` event on its whole tree;
- *  - a ScalaTest event on its node, its own execution, the execution of each ancestor it marks, its class, and the
- *    fields and throwable parts it writes.
- *
- * The log's node IDs need not be the built ones. Each built node is taken to be the log's node at its place in a
- * matching `structure` event, and must stay that node in every later event. An ancestor's execution is read from the
- * ancestor's place in the event's execution path, under the latest `structure` before the event on each side.
- */
+import NotationText.quoted
+
 private[scalatest] object EventLogComparison {
 
   def mismatchWhenIs(log: Seq[TestEventLogEvent], expected: Seq[BuiltEvent]): Option[String] = {
@@ -34,8 +23,6 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  // Each expected event is matched with the first matching event of the log after the one matched with its
-  // predecessor.
   def mismatchWhenHoldsInOrder(log: Seq[TestEventLogEvent], expected: Seq[BuiltEvent]): Option[String] = {
     val logged = log.toVector
     var nodes = MatchedNodes.none
@@ -163,19 +150,10 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  private def quoted(text: String): String = {
-    val escaped = text.flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case other => other.toString
-    }
-    "\"" + escaped + "\""
-  }
-
   private def inNotation(node: StructureNode): String = {
     node match {
       case StructureNode.Suite(_, _, position, name, suiteId, className) =>
-        s"suite ${quoted(name)}, class ${quoted(className)}, id ${quoted(suiteId)}, ${position.fold("no position")("position " + _)}"
+        s"suite ${quoted(name)}, class ${quoted(className.value)}, id ${quoted(suiteId.value)}, ${position.fold("no position")("position " + _)}"
       case StructureNode.Scope(_, _, position, name, label) => s"scope ${quoted(name)}, label ${quoted(label)}, position $position"
       case StructureNode.Test(_, _, position, name, label, ignored) =>
         s"test ${quoted(name)}, label ${quoted(label)}, position $position${if (ignored) ", ignored" else ""}"
@@ -234,7 +212,6 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  // Each side's ancestors come from its own structures: the log can hold a further structure that moves the node.
   private def markedAncestorExecutionMismatch(
     nodes: MatchedNodes,
     latestNodes: LatestNodes,
@@ -242,9 +219,10 @@ private[scalatest] object EventLogComparison {
     expected: NodeExecution,
     logged: NodeExecution
   ): Option[String] = {
+    // From the log's own structures, not the built ones: a further structure in the log can move the node.
     val loggedAncestors = ancestorsTopDown(logged.node, latestNodes.logged)
     ancestorsTopDown(expected.node, latestNodes.built).zip(expected.executionPath).iterator.collect {
-      case (ancestor, expectedExecution) if written.markedAncestors.contains(ancestor) =>
+      case (ancestor, expectedExecution) if written.markedAncestors.contains(ancestor) => {
         val name = nodeDescription(ancestor, latestNodes.built)
         nodes.loggedNode(ancestor).map(loggedAncestors.indexOf).filter(_ >= 0) match {
           case None => Some(s"it is not under $name")
@@ -255,6 +233,7 @@ private[scalatest] object EventLogComparison {
               case None => Some(s"its execution path has no execution of $name")
             }
         }
+      }
     }.collectFirst { case Some(mismatch) => mismatch }
   }
 
@@ -274,8 +253,6 @@ private[scalatest] object EventLogComparison {
     }
   }
 
-  // Recurses once for each cause and each nested list of suppressed throwables the criterion writes, never along
-  // the logged throwable's own links, which can form a cycle.
   private def writtenThrowableMismatch(written: WrittenThrowable, logged: DecodedThrowable, name: String): Option[String] = {
     def differing[A](part: String, expected: A, found: A): Option[String] =
       if (expected == found) None else Some(s"$name's $part is $found, not $expected")
@@ -306,6 +283,8 @@ private[scalatest] object EventLogComparison {
     def frames: Option[String] =
       written.frames.flatMap(texts => differing("stack trace", texts.map(EventNotation.frame), logged.stackTrace.toVector))
 
+    // suppressed and cause recurse on what the criterion writes,
+    // never on the logged throwable's links, which can cycle.
     def suppressed: Option[String] = {
       written.suppressed.flatMap { expected =>
         if (expected.size != logged.suppressed.size) {

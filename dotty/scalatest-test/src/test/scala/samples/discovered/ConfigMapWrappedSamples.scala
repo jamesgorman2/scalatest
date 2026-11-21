@@ -4,7 +4,7 @@ import org.scalatest.ConfigMapWrapperSuite
 import org.scalatest.WrapWith
 import org.scalatest.funspec.AnyFunSpec
 
-// Discoverable, as the other samples of this package are: a test copies these class files to a runpath of its own for discovery to find.
+// Not @DoNotDiscover: a test copies this package's class files to a runpath of its own for discovery to find.
 
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigSpec(configMap: Map[String, Any]) extends AnyFunSpec {
@@ -16,12 +16,11 @@ class ConfigSpec(configMap: Map[String, Any]) extends AnyFunSpec {
   }
 }
 
-// Its constructor throws, given a config map without db, only on a thread in the thread group a test names, so that
-// discovery elsewhere constructs it.
 @WrapWith(classOf[ConfigMapWrapperSuite])
 class ConfigWithoutDbFailsSpec(configMap: Map[String, Any]) extends AnyFunSpec {
 
-  if (!configMap.contains("db") && Thread.currentThread.getThreadGroup.getName == BrokenCtorSpec.threadGroupItsConstructorThrowsIn) {
+  // Throws only in the thread group a test names: other runs discover this suite too, and must construct it.
+  if (!configMap.contains("db") && Thread.currentThread.getThreadGroup.getName == ThrowingConstructorSpec.threadGroupItsConstructorThrowsIn) {
     throw new IllegalStateException("no db")
   }
 

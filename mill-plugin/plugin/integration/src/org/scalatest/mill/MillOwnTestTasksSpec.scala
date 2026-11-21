@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -17,17 +16,17 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
   )
 
   private lazy val runs: Map[Seq[String], BuildComparison[MillConsole]] =
-    withTester("mill-own-tasks") { tester =>
-      val withoutPlugin = tasks.map(task => task -> runAlone(tester, task)).toMap
-      addPlugin(tester)
-      val withPlugin = tasks.map(task => task -> runAlone(tester, task)).toMap
+    withFixtureBuild(FixtureName.millOwnTasks) { build =>
+      val withoutPlugin = tasks.map(task => task -> runAlone(build, task)).toMap
+      build.addPlugin()
+      val withPlugin = tasks.map(task => task -> runAlone(build, task)).toMap
       tasks.map(task => task -> BuildComparison(withoutPlugin(task), withPlugin(task))).toMap
     }
 
-  private def runAlone(tester: IntegrationTester, task: Seq[String]): MillConsole = {
-    MillBuild.compileBuild(tester)
-    MillBuild.removeModuleOutput(tester)
-    MillConsole(tester.eval(task))
+  private def runAlone(build: FixtureBuild, task: Seq[String]): MillConsole = {
+    build.compileBuildFile()
+    build.removeModuleOutput()
+    MillConsole(build.eval(task))
   }
 
   Feature("In a build that adds the plugin, Mill's test tasks behave as they do without it") {
@@ -35,7 +34,7 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
     tasks.foreach { task =>
       val command = s"mill ${task.mkString(" ")}"
 
-      Scenario(s"`$command`") {
+      Scenario(s"`$command` gives the same result and console output with the plugin as without it") {
         Given("core.test holds CalculatorSuite, whose test writes dividing now to stdout, and StackFlatSpec, whose test fails")
         When(s"`$command` runs in a build that adds the plugin, and in the same build without it")
         val run = runs(task)

@@ -203,7 +203,7 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
     }  
 
   private def registerBranchNamed(nameInSource: String, description: String, childPrefix: Option[String], verb: String, pos: source.Position, fun: () => Unit): Unit =
-    registerBranch(description, childPrefix, verb, pos, () => { engine.nameCurrentScope(nameInSource); fun() })
+    registerBranch(description, childPrefix, verb, pos, () => { engine.nameScopeBeingRegistered(nameInSource); fun() })
 
   private def registerBranch(description: String, childPrefix: Option[String], verb: String, pos: source.Position, fun: () => Unit): Unit = {
     def registrationClosedMessageFun: String =
@@ -251,8 +251,7 @@ trait FixtureAsyncWordSpecLike extends org.scalatest.FixtureAsyncTestSuite with 
                 }
 
               try {
-                // The scope is registered with the previous scope's text, so it takes the name the suite's source gave that scope.
-                registerNestedBranch(descriptionText, childPrefix, { last.nameInSource.foreach(name => engine.nameCurrentScope(name)); fun() }, registrationClosedMessageFun, None, pos)
+                registerNestedBranch(descriptionText, childPrefix, { last.nameInSource.foreach(name => engine.nameScopeBeingRegistered(name)); fun() }, registrationClosedMessageFun, None, pos)
               }
               catch {
                 case e: TestFailedException => rethrowIfCauseIsNAEOrDTNE(e, pos)

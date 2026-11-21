@@ -13,24 +13,24 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
   // Criteria that read the same run share one test command.
   private lazy val sqrtPropSpecRun: TestCommandResult =
-    withTester("without-plugin-scala-3.3") { tester =>
-      addPlugin(tester)
-      runTestCommand(tester, "core.test")
+    withFixtureBuild(FixtureName.withoutPluginOnScala("3.3")) { build =>
+      build.addPlugin()
+      build.runTestCommand("core.test")
     }
 
   private lazy val brokenConstructorRun: TestCommandResult =
-    withTester("broken-constructor") { tester =>
-      runTestCommandWithColour(tester, "core.test")
+    withFixtureBuild(FixtureName.brokenConstructor) { build =>
+      build.runTestCommandWithColour("core.test")
     }
 
-  Feature("The human-readable output is the module's test run label, with its suites under it") {
+  Feature("The human-readable output is the module's line, with its suites under it") {
 
-    Scenario("A module's label heads its suites") {
+    Scenario("A module's line heads its suites") {
       Given("core.test, at Mill's default testLogLevel, holds SqrtPropSpec, whose one property succeeds")
       When("the test command runs core.test")
       val result = sqrtPropSpecRun
 
-      Then("the human-readable output is the label, with the suite and its property under it")
+      Then("the human-readable output is the module's line, with the suite and its property under it")
       withClue(result.debugString) {
         result.treeLines shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
       }
@@ -42,9 +42,9 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       And("the run writes nothing to stdout or stderr, sends no message outside a suite, and completes")
       And("Mill colours its console output")
       When("the test command runs core.test, with Mill's ticker on as by default")
-      val result = withTester("without-plugin-scala-3.3") { tester =>
-        addPlugin(tester)
-        runTestCommandWithTicker(tester, "core.test")
+      val result = withFixtureBuild(FixtureName.withoutPluginOnScala("3.3")) { build =>
+        build.addPlugin()
+        build.runTestCommandWithTicker("core.test")
       }
 
       Then("each line of the human-readable output on stdout begins with the prefix Mill puts on every line the test command's own task writes, ahead of the line's indentation")
@@ -57,8 +57,8 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
       And("the last line of the human-readable output on stdout, with every ANSI escape sequence removed, is that prefix followed by the summary line")
       withClue(result.debugString) {
-        result.prefixedHumanReadableLines.last shouldBe
-          prefixes.head.get + "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+        Some(result.prefixedHumanReadableLines.last) shouldBe
+          prefixes.head.map(_ + "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0")
       }
 
       And("in that line 0 aborted and failed 0 are red, succeeded 1 is green, canceled 0, ignored 0 and pending 0 are yellow, and every other character after the prefix is cyan")
@@ -76,8 +76,8 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("The scopes and tests of each style show the labels ScalaTest 3.2.20 prints for them") {
       Given("one suite of each Any style, AsyncFeatureSpec and RefSpec, each with one test that succeeds")
       When("the test command runs core.test")
-      val result = withTester("styles") { tester =>
-        runTestCommand(tester, "core.test")
+      val result = withFixtureBuild(FixtureName.styles) { build =>
+        build.runTestCommand("core.test")
       }
 
       Then("each suite's lines are its name line and its scopes' and test's labels")
@@ -97,7 +97,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("A suite whose constructor throws is aborted, and the module's other suites still run") {
 
-    Scenario("A suite's constructor throws") {
+    Scenario("A suite whose constructor throws is shown aborted with its exception, and the other suite still runs") {
       Given("suite BrokenCtorSpec, class samples.BrokenCtorSpec, an AnyFunSuite whose constructor throws IllegalStateException(\"no config\")")
       And("suite SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
       And("Mill colours its console output")
@@ -126,9 +126,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       val result = sqrtPropSpecRun
 
       Then("the test command succeeds")
-      withClue(result.debugString) {
-        result.succeeded shouldBe true
-      }
+      shouldSucceed(result)
 
       And("the human-readable output is the module's line with the suite and its property under it, with no root's line and no run's line")
       withClue(result.debugString) {
@@ -142,7 +140,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       val result = brokenConstructorRun
 
       Then("no line on the console holds ScalaTest's summary or Mill's list of failed tests")
-      val console = result.eval.out + result.eval.err
+      val console = result.consoleText
       withClue(result.debugString) {
         Seq("Run completed in", "Tests: succeeded", "*** 1 SUITE ABORTED ***", "tests failed:")
           .filter(console.contains) shouldBe empty

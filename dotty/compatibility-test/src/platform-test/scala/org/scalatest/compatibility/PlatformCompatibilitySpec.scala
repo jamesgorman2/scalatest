@@ -8,20 +8,20 @@ import org.scalatest.tags.Slow
 @Slow
 final class PlatformCompatibilitySpec extends AnyFeatureSpec with GivenWhenThen with Matchers {
 
-  private val runs = PlatformRuns.load()
+  private lazy val runs: PlatformRuns = PlatformRuns.load()
 
   private val runnerArgumentLists: List[List[String]] =
     Nil :: List("", "DSIV", "FTK", "GW", "DU", "J", "NCXEHLOPQRM").map(characters => List("-o" + characters))
 
   private val statusesOfTheFixture = List("Success", "Failure", "Ignored", "Pending", "Canceled", "Error")
 
-  Feature(s"Compatibility with ScalaTest 3.2.20 on ${runs.platform}") {
+  Feature(s"Compatibility with ScalaTest 3.2.20 on ${CompatibilityPlatform.name}") {
     runnerArgumentLists.foreach { arguments =>
       val withArguments = if (arguments.isEmpty) "no runner arguments" else "the runner arguments " + arguments.mkString(" ")
 
-      Scenario(s"Framework given $withArguments sends its event handler and loggers what 3.2.20 sends them") {
-        Given(s"a set of suites holding at least one suite of each style the build for ${runs.platform} ships, compiled once against ScalaTest 3.2.20 for ${runs.platform}")
-        When(s"Framework runs it as linked with 3.2.20 and as linked with this fork, given $withArguments")
+      Scenario(s"A build tool given $withArguments sends its event handler and loggers what 3.2.20 sends them") {
+        Given(s"a set of suites, compiled once against ScalaTest 3.2.20 for ${CompatibilityPlatform.name}, holding at least one suite of each style that build ships")
+        When(s"a build tool runs it as linked with 3.2.20 and as linked with this fork, given $withArguments")
         val output = runs.ofFixture(arguments)
 
         Then("each run ends normally")

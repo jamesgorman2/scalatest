@@ -6,30 +6,24 @@ import org.scalatest.matchers.should
 
 final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
-  private def jsonOutputOfRow(row: String, rowSuite: String, otherSuite: Option[String] = None)(assertions: ujson.Value => Unit): Unit = {
-    otherSuite match {
-      case None => Given(s"the module holds the one suite RowSuite, $rowSuite")
-      case Some(other) => Given(s"the module holds two suites: RowSuite, $rowSuite, and $other")
-    }
-    When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-    withJsonOutputRow(row) { tester =>
-      assertions(jsonOutputOfTestCommand(tester))
+  private def jsonOutputOfRow(row: String, rowSuite: String, otherSuite: Option[String] = None)(assertions: JsonNode => Unit): Unit = {
+    withJsonOutputRow(row) { build =>
+      otherSuite match {
+        case None => Given(s"the module holds the one suite RowSuite, $rowSuite")
+        case Some(other) => Given(s"the module holds two suites: RowSuite, $rowSuite, and $other")
+      }
+      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
+      assertions(build.jsonOutputOfTestCommand())
     }
   }
 
-  private def startedAt(node: ujson.Value): Long = node("startedAt").num.toLong
-
-  private def endedAt(node: ujson.Value): Long = node("endedAt").num.toLong
-
-  private def names(nodes: Seq[ujson.Value]): Seq[(String, String)] = nodes.map(found => (found("kind").str, found("name").str))
-
   Feature("Suites, scopes and tests in the JSON output") {
 
-    Scenario("A failed assertion") {
+    Scenario("A failed assertion fails its test, with the assertion's message and location") {
       jsonOutputOfRow("failed-assertion", "an AnyFunSuite whose test adds, at line 7, asserts that 2 equals 3") { json =>
         Then("test adds is failed with message 2 did not equal 3, and its throwable is a TestFailedException with that message, located at line 7")
         shouldHold(
-          node(json, "test", "adds"),
+          json.node(NodeKind.Test, "adds"),
           """
           {
             "outcome": "failed",
@@ -46,9 +40,9 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A canceled test") {
+    Scenario("A canceled test is canceled, with the cancel's message") {
       jsonOutputOfRow("canceled-test", "an AnyFunSuite whose test adds cancels with the message no database") { json =>
-        val test = node(json, "test", "adds")
+        val test = json.node(NodeKind.Test, "adds")
         Then("test adds is canceled, with the cancel's message")
         shouldHold(test, """{ "outcome": "canceled", "message": "no database" }""")
         And("its throwable is a TestCanceledException")
@@ -56,9 +50,9 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("An ignored test") {
+    Scenario("An ignored test is ignored, with an end time but no start time") {
       jsonOutputOfRow("ignored-test", "an AnyFunSuite whose test adds is registered with ignore") { json =>
-        val test = node(json, "test", "adds")
+        val test = json.node(NodeKind.Test, "adds")
         Then("test adds is ignored, with an end time and a thread")
         shouldHold(test, """{ "outcome": "ignored", "endedAt": <time>, "threadName": <thread> }""")
         And("it has no start time and no duration")
@@ -66,76 +60,76 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A pending test") {
+    Scenario("A pending test's outcome is pending") {
       jsonOutputOfRow("pending-test", "an AnyFunSuite whose test adds is pending") { json =>
         Then("test adds is pending")
-        shouldHold(node(json, "test", "adds"), """{ "outcome": "pending" }""")
+        shouldHold(json.node(NodeKind.Test, "adds"), """{ "outcome": "pending" }""")
       }
     }
 
-    Scenario("A scope") {
+    Scenario("A scope is written with its label, location and times but no outcome, and holds its test") {
       jsonOutputOfRow("scope", "an AnyFunSpec whose describe A Stack, at line 6, holds the test pops") { json =>
-        val suite = node(json, "suite", "RowSuite")
+        val suite = json.node(NodeKind.Suite, "RowSuite")
         Then("the suite's contents is one scope, A Stack, with its label, location and times, and no outcome or thread")
-        names(contents(suite)) shouldBe Seq("scope" -> "A Stack")
-        val scope = contents(suite).head
+        suite.kindsAndNamesOfContents shouldBe Seq(NodeKind.Scope -> "A Stack")
+        val scope = suite.contents.head
         shouldHold(
           scope,
           """{ "name": "A Stack", "label": "A Stack", "location": <line 6 of RowSuite.scala>, "startedAt": <time>, "endedAt": <time>, "duration": <ms> }"""
         )
         shouldHaveNoKeys(scope, "outcome", "threadName")
         And("the scope's duration is its end time less its start time")
-        scope("duration").num.toLong shouldBe endedAt(scope) - startedAt(scope)
+        scope.duration shouldBe scope.endedAt - scope.startedAt
         And("the scope's contents is one test, pops")
-        contents(scope) should have size 1
-        shouldHold(contents(scope).head, """{ "kind": "test", "name": "pops", "label": "- pops" }""")
+        scope.contents should have size 1
+        shouldHold(scope.contents.head, """{ "kind": "test", "name": "pops", "label": "- pops" }""")
       }
     }
 
-    Scenario("A pending scope") {
+    Scenario("A pending scope's outcome is pending") {
       jsonOutputOfRow("pending-scope", "an AnyFunSpec whose describe A Queue is pending") { json =>
         Then("scope A Queue is pending")
-        shouldHold(node(json, "scope", "A Queue"), """{ "outcome": "pending" }""")
+        shouldHold(json.node(NodeKind.Scope, "A Queue"), """{ "outcome": "pending" }""")
       }
     }
 
-    Scenario("A suite aborted before its tests run") {
+    Scenario("A suite aborted before its tests run is aborted, and its tests are aborted as not run") {
       jsonOutputOfRow("aborted-suite", "an AnyFunSuite with BeforeAndAfterAll, whose beforeAll throws IllegalStateException(\"no fixture\"), and whose one test is adds") { json =>
         Then("suite RowSuite is aborted, with the thrown exception as its throwable")
-        val suite = node(json, "suite", "RowSuite")
+        val suite = json.node(NodeKind.Suite, "RowSuite")
         shouldHold(suite, """{ "outcome": "aborted" }""")
         shouldHold(suite("throwable"), """{ "className": "java.lang.IllegalStateException", "message": "no fixture", "stackTrace": <frames> }""")
         And("test adds is aborted as not run, with no start time, message or throwable")
-        val test = node(json, "test", "adds")
+        val test = json.node(NodeKind.Test, "adds")
         shouldHold(test, """{ "outcome": "aborted", "reason": "notRun" }""")
         shouldHaveNoKeys(test, "startedAt", "message", "throwable")
       }
     }
 
-    Scenario("A nested suite") {
+    Scenario("A nested suite is held by the suite that nests it") {
       jsonOutputOfRow("nested-suite", "a Suites nesting InnerSuite", Some("InnerSuite, an AnyFunSuite annotated @DoNotDiscover, whose one test adds succeeds")) { json =>
         Then("the run's contents is RowSuite, whose contents is InnerSuite, whose contents is test adds")
-        val run = node(json, "run")
-        names(contents(run)) shouldBe Seq("suite" -> "RowSuite")
-        names(contents(contents(run).head)) shouldBe Seq("suite" -> "InnerSuite")
-        names(contents(contents(contents(run).head).head)) shouldBe Seq("test" -> "adds")
+        val run = json.node(NodeKind.Run)
+        run.kindsAndNamesOfContents shouldBe Seq(NodeKind.Suite -> "RowSuite")
+        run.contents.head.kindsAndNamesOfContents shouldBe Seq(NodeKind.Suite -> "InnerSuite")
+        run.contents.head.contents.head.kindsAndNamesOfContents shouldBe Seq(NodeKind.Test -> "adds")
       }
     }
 
-    Scenario("A test run twice") {
+    Scenario("A test run twice is held twice, in the order it ran") {
       jsonOutputOfRow("test-run-twice", "an AnyFunSuite whose runTest runs each test twice, and whose one test adds succeeds") { json =>
         Then("the suite's contents is two tests adds, both succeeded, the first started no later than the second")
-        val tests = contents(node(json, "suite", "RowSuite"))
+        val tests = json.node(NodeKind.Suite, "RowSuite").contents
         tests should have size 2
         tests.foreach(test => shouldHold(test, """{ "name": "adds", "outcome": "succeeded" }"""))
-        startedAt(tests(0)) should be <= startedAt(tests(1))
+        tests(0).startedAt should be <= tests(1).startedAt
       }
     }
 
-    Scenario("Messages") {
+    Scenario("A test's messages are its output, in the order sent") {
       jsonOutputOfRow("messages", "an AnyFunSuite whose test talks sends info one, note two, alert three and markup four") { json =>
         Then("test talks's output is the four messages in order, each with its time and none with a thread")
-        val output = node(json, "test", "talks")("output").arr.toSeq
+        val output = json.node(NodeKind.Test, "talks").output
         val messages = Seq("info" -> "one", "note" -> "two", "alert" -> "three", "markup" -> "four")
         output should have size messages.size
         output.zip(messages).foreach { case (item, (kind, message)) =>
@@ -145,22 +139,22 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A message from another thread") {
+    Scenario("A message sent from another thread records that thread") {
       jsonOutputOfRow("message-from-another-thread", "an AnyFunSuite whose test talks calls info(\"away\") on another thread and waits for it") { json =>
         Then("test talks's output is the message, with a thread other than the test's")
-        val test = node(json, "test", "talks")
-        val output = test("output").arr.toSeq
+        val test = json.node(NodeKind.Test, "talks")
+        val output = test.output
         output should have size 1
         shouldHold(output.head, """{ "kind": "info", "message": "away", "threadName": <thread> }""")
         output.head("threadName") should not be test("threadName")
       }
     }
 
-    Scenario("A throwable with a cause and a suppressed throwable") {
+    Scenario("A throwable holds its cause and its suppressed throwable") {
       jsonOutputOfRow("throwable-with-cause-and-suppressed", "an AnyFunSuite whose test throws an exception outer, caused by inner, suppressing closing") { json =>
         Then("test throws is failed, with the exception, its cause and the suppressed exception as its throwable")
         shouldHold(
-          node(json, "test", "throws"),
+          json.node(NodeKind.Test, "throws"),
           """
           {
             "outcome": "failed",
@@ -175,11 +169,11 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A cycle of causes") {
+    Scenario("A cycle of causes ends with a reference to the first throwable") {
       jsonOutputOfRow("throwable-cause-cycle", "an AnyFunSuite whose test loops throws b, caused by a, which is caused by b") { json =>
         Then("test loops's throwable ends the cycle with a reference to the first throwable")
         shouldHold(
-          node(json, "test", "loops"),
+          json.node(NodeKind.Test, "loops"),
           """
           {
             "throwable": {
@@ -192,9 +186,9 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("A throwable with no message") {
+    Scenario("A throwable with no message has none, and each of its frames names a class and method") {
       jsonOutputOfRow("throwable-without-message", "an AnyFunSuite whose test throws a RuntimeException with no message") { json =>
-        val throwable = node(json, "test", "throws")("throwable")
+        val throwable = json.node(NodeKind.Test, "throws")("throwable")
         Then("the throwable has no message")
         shouldHaveNoKeys(throwable, "message")
         And("each frame of its stack trace holds a class and method name, and none holds isNative false")
@@ -205,17 +199,17 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with s
       }
     }
 
-    Scenario("Top-level suites ordered by name") {
+    Scenario("Top-level suites are ordered by name") {
       jsonOutputOfRow("suites-ordered-by-name", "an AnyFunSuite named ZebraSuite", Some("ZSuite, an AnyFunSuite named AlphaSuite")) { json =>
         Then("the run's contents is AlphaSuite then ZebraSuite")
-        names(contents(node(json, "run"))) shouldBe Seq("suite" -> "AlphaSuite", "suite" -> "ZebraSuite")
+        json.node(NodeKind.Run).kindsAndNamesOfContents shouldBe Seq(NodeKind.Suite -> "AlphaSuite", NodeKind.Suite -> "ZebraSuite")
       }
     }
 
-    Scenario("Tests in declared order") {
+    Scenario("Tests are in the order their suite declares them") {
       jsonOutputOfRow("tests-in-declared-order", "an AnyFunSuite whose tests subtracts and adds are registered in that order") { json =>
         Then("the suite's contents is test subtracts then test adds")
-        names(contents(node(json, "suite", "RowSuite"))) shouldBe Seq("test" -> "subtracts", "test" -> "adds")
+        json.node(NodeKind.Suite, "RowSuite").kindsAndNamesOfContents shouldBe Seq(NodeKind.Test -> "subtracts", NodeKind.Test -> "adds")
       }
     }
   }

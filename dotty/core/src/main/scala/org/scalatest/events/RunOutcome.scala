@@ -1,12 +1,16 @@
 package org.scalatest.events
 
-private[scalatest] enum RunOutcome {
-  case Completed
-  case Aborted
-  case Stopped
+private[scalatest] enum RunOutcome(val word: String) {
+  case Completed extends RunOutcome("completed")
+  case Aborted extends RunOutcome("aborted")
+  case Stopped extends RunOutcome("stopped")
+
+  def isAbnormal: Boolean = this != Completed
 }
 
 private[scalatest] object RunOutcome {
+
+  def fromWord(word: String): Option[RunOutcome] = values.find(_.word == word)
 
   def reportedBy(event: Event): Option[RunOutcome] =
     event match {

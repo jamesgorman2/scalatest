@@ -1,14 +1,13 @@
 package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
-import org.scalatest.events.DecodedEvent
+import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.JsonValue
-import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
+final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   private def jsonOutputOf(eventLog: String): JsonSink = jsonOutputOfRun(TestRunPart.Events(eventLog))
 
@@ -19,18 +18,11 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
     rowSuiteOf(testName, ("TestStarting" +: eventLinesOfTest).map(line => s"""test "$testName": $line"""))
 
   private def rowSuiteOf(testName: String, eventLinesBetweenSuiteStartAndCompletion: Seq[String]): String =
-    s"""
-    run started
-    run: RunStarting
-    structure
-      suite "RowSuite", class "samples.RowSuite"
-        test "$testName", label "- $testName"
-    suite "RowSuite": SuiteStarting
-    ${eventLinesBetweenSuiteStartAndCompletion.mkString("\n    ")}
-    suite "RowSuite": SuiteCompleted
-    run: RunCompleted
-    run ended completed
-    """
+    completedRunOf(
+      "run: RunStarting",
+      eventLogOfSuite("RowSuite", s"""test "$testName", label "- $testName"""", eventLinesBetweenSuiteStartAndCompletion*),
+      "run: RunCompleted"
+    )
 
   private def namesOf(nodes: JsonValue): Vector[JsonValue] = nodes.items.map(_("name"))
 
@@ -55,7 +47,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome failed and the message")
       adds("outcome") shouldBe text("failed")
@@ -78,7 +70,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome canceled, the message, and a TestCanceledException")
       adds("outcome") shouldBe text("canceled")
@@ -103,7 +95,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
         """
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome ignored, an endedAt and a threadName, with no startedAt and no duration")
       adds("outcome") shouldBe text("ignored")
@@ -120,7 +112,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome pending")
       adds("outcome") shouldBe text("pending")
@@ -147,7 +139,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
         """
 
       When("the library writes the JSON output")
-      val rowSuite = jsonOutputOf(eventLog).node("suite", "RowSuite")
+      val rowSuite = jsonOutputOf(eventLog).node(NodeKind.Suite, "RowSuite")
 
       Then("suite RowSuite's contents is scope A Stack, with its label, location and times, a duration of endedAt less startedAt, and no outcome or thread")
       val scope = rowSuite("contents").only
@@ -184,7 +176,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
         """
 
       When("the library writes the JSON output")
-      val scope = jsonOutputOf(eventLog).node("scope", "A Queue")
+      val scope = jsonOutputOf(eventLog).node(NodeKind.Scope, "A Queue")
 
       Then("scope A Queue holds the outcome pending")
       scope("outcome") shouldBe text("pending")
@@ -209,14 +201,14 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       val json = jsonOutputOf(eventLog)
 
       Then("suite RowSuite holds the outcome aborted, and the IllegalStateException with its message and stack trace")
-      val rowSuite = json.node("suite", "RowSuite")
+      val rowSuite = json.node(NodeKind.Suite, "RowSuite")
       rowSuite("outcome") shouldBe text("aborted")
       rowSuite("throwable")("className") shouldBe text("java.lang.IllegalStateException")
       rowSuite("throwable")("message") shouldBe text("no fixture")
       rowSuite("throwable")("stackTrace").items should not be empty
 
       And("test adds holds the outcome aborted and the reason notRun, with no startedAt, message or throwable")
-      val adds = json.node("test", "adds")
+      val adds = json.node(NodeKind.Test, "adds")
       adds("outcome") shouldBe text("aborted")
       adds("reason") shouldBe text("notRun")
       adds.keys should contain noneOf ("startedAt", "message", "throwable")
@@ -234,7 +226,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val output = jsonOutputOf(eventLog).node("test", "talks")("output").items
+      val output = jsonOutputOf(eventLog).node(NodeKind.Test, "talks")("output").items
 
       Then("test talks's output is the four messages in order, each with its kind, message and time, and none with a threadName")
       output shouldBe Vector(
@@ -250,7 +242,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       val eventLog = rowSuiteWithTest("talks", """InfoProvided(message: "away", threadName: "pool-2")""", "TestSucceeded")
 
       When("the library writes the JSON output")
-      val talks = jsonOutputOf(eventLog).node("test", "talks")
+      val talks = jsonOutputOf(eventLog).node(NodeKind.Test, "talks")
 
       Then("test talks's output is one info holding the message and thread pool-2, which is not the test's thread")
       val info = talks("output").only
@@ -268,7 +260,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val throws = jsonOutputOf(eventLog).node("test", "throws")
+      val throws = jsonOutputOf(eventLog).node(NodeKind.Test, "throws")
 
       Then("test throws holds the outcome failed and, in full, the throwable with its cause numbered 2 and its suppressed throwable numbered 3")
       throws("outcome") shouldBe text("failed")
@@ -286,18 +278,20 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
 
     Scenario("A throwable whose cause chain loops back to it ends the loop with a ref") {
       Given("a run of suite RowSuite whose test `loops` throws RuntimeException `b`, caused by RuntimeException `a`, whose cause is `b`")
-      val events = eventsOf(
+      val built = eventsOf(
         rowSuiteWithTest(
           "loops",
           """TestFailed(throwable: java.lang.RuntimeException "b" frames ["samples.RowSuite.loops(RowSuite.scala:9)"] caused by java.lang.RuntimeException "a" frames ["samples.RowSuite.loops(RowSuite.scala:8)"])"""
         )
       )
-      val b = events.collectFirst { case TestEventLogEvent.ScalaTestEvent(_, failed: DecodedEvent.TestFailed) => failed.throwable.get }.get
-      val a = b.cause.get
-      a.link(Some(b), Vector.empty)
+      val events = LinkedThrowables.withFailuresRelinked(built) { b =>
+        lazy val loopedB: DecodedThrowable = LinkedThrowables.relinked(b, Some(loopedA))
+        lazy val loopedA: DecodedThrowable = LinkedThrowables.relinked(b.cause.get, Some(loopedB))
+        loopedB
+      }
 
       When("the library writes the JSON output")
-      val loops = jsonOutputOfEvents(events).node("test", "loops")
+      val loops = jsonOutputOfRun(events.map(RunEvent.of)).node(NodeKind.Test, "loops")
 
       Then("test loops holds, in full, b, then a as its cause, then a ref to b as a's cause")
       withoutStackTraces(loops("throwable")) shouldBe objectOf(
@@ -323,7 +317,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val throwable = jsonOutputOf(eventLog).node("test", "throws")("throwable")
+      val throwable = jsonOutputOf(eventLog).node(NodeKind.Test, "throws")("throwable")
 
       Then("the throwable has no message key")
       throwable.keys should not contain "message"
@@ -379,7 +373,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val tests = jsonOutputOf(eventLog).node("suite", "RowSuite")("contents").items
+      val tests = jsonOutputOf(eventLog).node(NodeKind.Suite, "RowSuite")("contents").items
 
       Then("suite RowSuite's contents is two succeeded tests named adds, the first started no later than the second")
       tests.map(_("name")) shouldBe Vector(text("adds"), text("adds"))
@@ -439,7 +433,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
         """
 
       When("the library writes the JSON output")
-      val rowSuite = jsonOutputOf(eventLog).node("suite", "RowSuite")
+      val rowSuite = jsonOutputOf(eventLog).node(NodeKind.Suite, "RowSuite")
 
       Then("suite RowSuite's contents is test subtracts then test adds")
       namesOf(rowSuite("contents")) shouldBe Vector(text("subtracts"), text("adds"))
@@ -470,7 +464,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
 
       Then("each node holds only keys of the layout, none of which identifies it")
       val layoutKeys = Set("kind", "name", "label", "suiteId", "location", "outcome", "reason", "message", "throwable", "startedAt", "endedAt", "duration", "threadName", "contents", "output")
-      Vector(json.node("suite", "RowSuite"), json.node("scope", "A Stack"), json.node("test", "pops")).foreach { found =>
+      Vector(json.node(NodeKind.Suite, "RowSuite"), json.node(NodeKind.Scope, "A Stack"), json.node(NodeKind.Test, "pops")).foreach { found =>
         found.keys.toSet.diff(layoutKeys) shouldBe empty
       }
     }
@@ -508,7 +502,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome aborted, the SuiteAborted's message and its time as endedAt, with no reason")
       adds("outcome") shouldBe text("aborted")
@@ -525,7 +519,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome aborted, the SuiteAborted's message, and both times")
       adds("outcome") shouldBe text("aborted")
@@ -543,7 +537,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome aborted, and the SuiteAborted's message, end time and duration")
       adds("outcome") shouldBe text("aborted")
@@ -561,7 +555,7 @@ final class JsonOutputNodesSpec extends AnyFeatureSpec with GivenWhenThen with M
       )
 
       When("the library writes the JSON output")
-      val adds = jsonOutputOf(eventLog).node("test", "adds")
+      val adds = jsonOutputOf(eventLog).node(NodeKind.Test, "adds")
 
       Then("test adds holds the outcome aborted, and the SuiteAborted's message, end time and duration")
       adds("outcome") shouldBe text("aborted")

@@ -175,22 +175,22 @@ class SetupSuite extends AnyFunSuite with BeforeAndAfterAll {
   }
 }
 
-// Sends no event for the nested suite it runs.
+private def runWithoutSuiteEvents(nested: Suite, args: Args): Status = nested.run(None, args)
+
 @DoNotDiscover
 class RunsItsFirstNestedSuiteTwice extends Suites(new Inner1Suite, new Inner2Suite) {
 
   override protected def runNestedSuites(args: Args): Status = {
     val first = nestedSuites.head
-    val runs = List(first.run(None, args), first.run(None, args))
+    val runs = List(runWithoutSuiteEvents(first, args), runWithoutSuiteEvents(first, args))
     new CompositeStatus(runs.toSet)
   }
 }
 
-// Sends no event for the nested suites it runs.
 @DoNotDiscover
 class RunsItsNestedSuites extends Suites(new Inner1Suite, new Inner2Suite) {
 
-  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.map(_.run(None, args)).toSet)
+  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.map(runWithoutSuiteEvents(_, args)).toSet)
 }
 
 @DoNotDiscover
@@ -201,11 +201,10 @@ class ModeSuite(mode: String) extends AnyFunSuite {
   }
 }
 
-// Its nested suites share a suite ID. It sends no event for them.
 @DoNotDiscover
 class PairSuites extends Suites(new ModeSuite("fast"), new ModeSuite("slow")) {
 
-  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.reverse.map(_.run(None, args)).toSet)
+  override protected def runNestedSuites(args: Args): Status = new CompositeStatus(nestedSuites.reverse.map(runWithoutSuiteEvents(_, args)).toSet)
 }
 
 @DoNotDiscover

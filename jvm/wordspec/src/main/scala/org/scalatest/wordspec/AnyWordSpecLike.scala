@@ -206,7 +206,7 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
     }
 
   private def registerBranchNamed(nameInSource: String, description: String, childPrefix: Option[String], verb: String, methodName:String, stackDepth: Int, adjustment: Int, pos: source.Position, fun: () => Unit): Unit =
-    registerBranch(description, childPrefix, verb, methodName, stackDepth, adjustment, pos, () => { engine.nameCurrentScope(nameInSource); fun() })
+    registerBranch(description, childPrefix, verb, methodName, stackDepth, adjustment, pos, () => { engine.nameScopeBeingRegistered(nameInSource); fun() })
 
   private def registerBranch(description: String, childPrefix: Option[String], verb: String, methodName:String, stackDepth: Int, adjustment: Int, pos: source.Position, fun: () => Unit): Unit = {
 
@@ -255,8 +255,7 @@ trait AnyWordSpecLike extends TestSuite with TestRegistration with ShouldVerb wi
                   case "can" => Resources.canCannotAppearInsideAnIn
                 }
               try {
-                // The scope is registered with the previous scope's text, so it takes the name the suite's source gave that scope.
-                registerNestedBranch(descriptionText, childPrefix, { last.nameInSource.foreach(name => engine.nameCurrentScope(name)); fun() }, registrationClosedMessageFun, "AnyWordSpecLike.scala", methodName, stackDepth, adjustment, None, Some(pos))
+                registerNestedBranch(descriptionText, childPrefix, { last.nameInSource.foreach(name => engine.nameScopeBeingRegistered(name)); fun() }, registrationClosedMessageFun, "AnyWordSpecLike.scala", methodName, stackDepth, adjustment, None, Some(pos))
               }
               catch {
                 case e: TestFailedException => rethrowIfCauseIsNAEOrDTNE(e, pos)

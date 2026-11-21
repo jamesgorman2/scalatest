@@ -4,9 +4,9 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
+final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   private val textJsonMustEscape = "tab\t quote\" slash\\ bell\u0007 é 😀 lone\uD800 end"
 
@@ -36,13 +36,13 @@ final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen wit
       }
 
       When("the library writes the JSON output")
-      val json = jsonOutputOfEvents(events)
+      val json = jsonOutputOfRun(events.map(RunEvent.of))
 
       Then("it holds the lone surrogate as a \\u escape, in either case")
       json.text.toLowerCase should include("\\ud800")
 
       And("the message of test escapes's one output item is that string")
-      json.node("test", "escapes")("output").only("message") shouldBe text(textJsonMustEscape)
+      json.node(NodeKind.Test, "escapes")("output").only("message") shouldBe text(textJsonMustEscape)
     }
   }
 }

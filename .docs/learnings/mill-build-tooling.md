@@ -130,3 +130,61 @@ Under Mill's `testForked`, several test classes run in each worker JVM, and the 
 
 Count tests as the distinct `<testcase>` names in that report, and read failures, errors and skips from it. Never sum the summary lines.
 </learning>
+
+<learning>
+date: 2026-11-19
+---
+In Mill 1.3.1, `mill.javalib.TestModuleUtil.runTestFuture(filteredClassCount, groupCount, groupFolder, testClassQueueFolder, groupName, maxProcessLength, paddedGroupIndex, processIndex)` is public, on the `@experimental` class, and starts one worker of Mill's own test queue:
+
+- it chooses the worker's `processFolder` (`groupFolder / worker-<i>` where `testParallelism` is on and `filteredClassCount != 1`, else `groupFolder`), claims the worker's first class and calls `callTestRunnerSubprocess` on the same instance;
+- in that parallel case it forks through `Task.fork.async` of the instance's constructor `TaskCtx`, with Mill's priorities; otherwise it runs the worker synchronously on the calling thread and returns a completed future;
+- the future's third element is `None` where a worker other than index 0 found the queue empty and started no JVM.
+
+A plugin that needs per-worker framework arguments or a per-worker `TaskCtx` can build one `TestModuleUtil` per worker and call `runTestFuture` on each, rather than copying Mill's scheduler. Lay out each group's queue with `prepareTestClassesFolder` first. `waitForFutures` and result handling are `private[mill]`: await every future yourself, and do not treat a worker that started no JVM as a process that died.
+</learning>
+
+<learning>
+date: 2026-11-19
+---
+In Mill 1.3.1, a test module that sets `testBatchFrameworkTasks` runs through the `private` `TestModuleUtil.runTestBatchScheduler`, not through the test queue. It differs from the test queue as follows:
+
+- it runs no `ZincOp.GetTestTasks` discovery: each fork group's worker is given the group's classes exactly as `testForkGrouping` gives them, including classes that do not exist;
+- each fork group holding a class gets one worker, in the group's folder (no `worker-<i>` folder), with `Left(classList)` as the selector;
+- the workers are forked through `Task.fork.async(groupFolder, groupLabel, "", priority = -1)` whenever more than one group holds a class, whatever `testParallelism` says; a single group runs on the calling thread;
+- where no group holds a class, fork group 0 runs with an empty `test-classes` queue and `claim` folder (`Right((None, queue, claimFolder))`), because `Left(Nil)` would select every class;
+- it writes `result.log` as `(0L, 0L)` before starting each worker.
+
+A plugin that must start the same processes calls the public `callTestRunnerSubprocess` itself and reproduces these rules; it cannot reuse `runTestFuture`, which always drives the queue.
+</learning>
+
+<learning>
+date: 2026-11-19
+---
+In Mill 1.3.1, a test worker's process folder is:
+
+- `<task>.dest` with one fork group, or `<task>.dest/<group folder>` with several;
+- plus `worker-<i>` where `testParallelism` is on and the module selects anything other than exactly one test class in total (zero classes included);
+- never `worker-<i>` under `testBatchFrameworkTasks`.
+
+Where `testSandboxWorkingDir` is true (the default), the worker JVM starts in `<process folder>/sandbox`.
+
+A testkit `IntegrationTester` defaults `baseWorkspacePath` to `os.pwd`. Unless `MILL_TEST_SHARED_OUTPUT_DIR` is set, it puts each test build's workspace in a new `baseWorkspacePath/run-<n>` folder. With both defaults, an integration test run by an outer build's `testForked` gets the workspace `<outer process folder>/sandbox/run-<n>`. The test build's own workers run under that workspace's `out` folder by the same rules.
+
+A path taken from the test build's processes, such as `user.dir`, can therefore hold a `worker-<i>` segment from the outer build, the test build, both or neither. Reading the first or last `worker-<i>` segment of the whole path can silently report the outer worker. Read the segment only from the part of the path after the test build's workspace path; if there is none, the worker ran in its group folder.
+</learning>
+
+<learning>
+date: 2026-11-19
+---
+Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform. It may run a fork group's classes in one worker or split them across several, so which worker runs which class varies. On Windows it also sometimes runs one test class in two workers; both write a `CLAIM` for it in their `claim.log`. This race rarely shows when a scenario runs alone.
+
+An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue. Mill's default is `testParallelism = true`, so set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
+</learning>
+
+<learning>
+date: 2026-11-20
+---
+In Mill 1.3.1, `<module>.testForked <fully qualified class>` does not narrow the run: `testForked`'s arguments go to the test framework, and every discovered class still runs. To run only some classes, use `<module>.testOnly <class> [<class> ...]`.
+
+`testOnly` writes its report to `out/<module>/testOnly.dest/test-report.xml`, not `testForked.dest`, so read results from there after a narrowed run.
+</learning>

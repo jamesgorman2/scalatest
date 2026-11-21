@@ -42,22 +42,17 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
     )
 
     for ((what, arguments, rejection) <- selectorsThatFail) {
-      Scenario(s"Given ${arguments.mkString(" ")}: $what") {
-        withTester("module-selectors") { tester =>
+      Scenario(s"The test command given ${arguments.mkString(" ")}, $what, fails before any test starts") {
+        withFixtureBuild(FixtureName.moduleSelectors) { build =>
           Given("JVM test modules core.test and util.test, and Scala.js test module coreJS.test, each holding AddSuite")
           When(s"the test command is given ${arguments.mkString(" ")}")
-          val result = runTestCommand(tester, arguments*)
+          val result = build.runTestCommand(arguments*)
 
           Then("the test command fails before any test starts")
-          withClue(result.debugString) {
-            result.succeeded shouldBe false
-            anyTestWorkerStarted(tester) shouldBe false
-          }
+          shouldFailBeforeAnyTestStarts(build, result)
 
           And(s"the console holds the test command's rejection: $rejection")
-          withClue(result.debugString) {
-            (result.eval.out + result.eval.err) should include(rejection)
-          }
+          shouldWriteToTheConsole(result, rejection)
 
           And("the console holds no line of human-readable output")
           result.treeLines shouldBe empty
@@ -65,55 +60,23 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("Given core.test: one resolving to one JVM test module") {
-      withTester("module-selectors") { tester =>
+    Scenario("The test command given core.test, one resolving to one JVM test module, runs it") {
+      withFixtureBuild(FixtureName.moduleSelectors) { build =>
         Given("JVM test modules core.test and util.test, and Scala.js test module coreJS.test, each holding AddSuite")
         When("the test command is given core.test")
-        val result = runTestCommand(tester, "core.test")
+        val result = build.runTestCommand("core.test")
 
         Then("the test command succeeds, having started a test worker")
         withClue(result.debugString) {
           result.succeeded shouldBe true
-          anyTestWorkerStarted(tester) shouldBe true
+          build.anyTestWorkerStarted shouldBe true
         }
 
-        And("the human-readable output is core.test's label, with AddSuite under it")
+        And("the human-readable output is core.test's line, with AddSuite under it")
         withClue(result.debugString) {
           result.treeLines.headOption shouldBe Some("[core.test]")
           result.treeLines.map(_.trim) should contain("AddSuite:")
         }
-      }
-    }
-  }
-
-  Feature("The test command fails on a module whose test classes Mill groups into more than one fork group") {
-
-    Scenario("Given core.test, whose two suites are each in a fork group of their own") {
-      withTester("module-selectors") { tester =>
-        Given("JVM test module core.test, holding AddSuite and SecondAddSuite, whose testForkGrouping puts each test class in a group of its own")
-        val samples = tester.workspacePath / "core" / "test" / "src" / "samples"
-        os.write(samples / "SecondAddSuite.scala", os.read(samples / "AddSuite.scala").replace("AddSuite", "SecondAddSuite"))
-        val buildFile = tester.workspacePath / "build.mill"
-        val mvnDeps = """    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")"""
-        val forkGrouping = "    def testForkGrouping = Task { discoveredTestClasses().map(Seq(_)) }"
-        val build = os.read(buildFile)
-        os.write.over(buildFile, build.patch(build.indexOf(mvnDeps) + mvnDeps.length, s"\n$forkGrouping", 0))
-        When("the test command is given core.test")
-        val result = runTestCommand(tester, "core.test")
-
-        Then("the test command fails before any test starts")
-        withClue(result.debugString) {
-          result.succeeded shouldBe false
-          anyTestWorkerStarted(tester) shouldBe false
-        }
-
-        And("the console names the module and its number of fork groups")
-        withClue(result.debugString) {
-          (result.eval.out + result.eval.err) should include("core.test has 2 fork groups, but the test command runs one")
-        }
-
-        And("the console holds no line of human-readable output")
-        result.treeLines shouldBe empty
       }
     }
   }

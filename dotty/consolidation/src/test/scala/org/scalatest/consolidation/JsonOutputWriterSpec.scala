@@ -13,10 +13,10 @@ import org.scalatest.events.LineInFile
 import org.scalatest.events.SeeStackDepthException
 import org.scalatest.events.Summary
 import org.scalatest.events.TestRunPart
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with ConsolidatedRuns with JsonOutputs {
+final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   private val completedRun = TestRunPart.Events(
     """
@@ -29,19 +29,17 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
   private def runNodeFedWith(events: DecodedEvent*): JsonValue = runNodeOf(feed => events.foreach(event => feed.add(runEvent(event))))
 
-  private def runNodeOf(feedAfterRunStarted: RunFeed => Unit): JsonValue = {
-    val json = new JsonSink
-    val consolidation = startedWithoutMill(json)
-    val feed = addRun(consolidation, TestRunPart.Events("run started"))
-    feedAfterRunStarted(feed)
-    feed.endEventStream()
-    consolidation.end()
-    json.runNode
-  }
+  private def runNodeOf(feedAfterRunStarted: RunFeed => Unit): JsonValue =
+    jsonOutputAfter { consolidation =>
+      consolidation.addRun(module) { feed =>
+        feed.addAll(TestRunPart.Events("run started"))
+        feedAfterRunStarted(feed)
+      }
+    }.runNode
 
-  private def endedWithOneRun(consolidation: Consolidation, endedAt: Option[Instant] = None): Unit = {
-    addRun(consolidation, completedRun).endEventStream()
-    consolidation.end(endedAt)
+  private def endedWithOneRun(consolidation: Consolidation): Unit = {
+    consolidation.addRunOf(completedRun)
+    consolidation.end()
   }
 
   "A consolidation" when {
@@ -49,7 +47,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     "started with no JSON sink" should {
       "write the same human-readable output as one started with a JSON sink" in {
         val withoutJson = new OutputSink
-        endedWithOneRun(Consolidation.start(withoutJson, coloured = true))
+        endedWithOneRun(startedWithColour(withoutJson))
         val withJson = new OutputSink
         endedWithOneRun(Consolidation.start(withJson, coloured = true, jsonOutput = Some(new JsonSink)))
         withoutJson.lines shouldBe withJson.lines
@@ -60,14 +58,12 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
       "write nothing to it before it ends" in {
         val json = new JsonSink
         val consolidation = startedWithoutMill(json)
-        addRun(consolidation, completedRun).endEventStream()
+        consolidation.addRunOf(completedRun)
         json.texts shouldBe empty
       }
 
       "write the JSON output to it once when it ends" in {
-        val json = new JsonSink
-        endedWithOneRun(startedWithoutMill(json))
-        json.texts should have size 1
+        jsonOutputAfter(_.addRunOf(completedRun)).texts should have size 1
       }
 
       "give it the JSON output after writing the whole human-readable output" in {
@@ -82,13 +78,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   "The JSON output's root" when {
 
     "given a build tool, module selectors, both of its times, a failure and output" should {
-      "hold them, with its outcome and duration, in the layout's key order" in {
+      "hold them, with its outcome and duration, in a fixed order" in {
         val json = new JsonSink
         val consolidation = Consolidation.start(
           new OutputSink,
           coloured = false,
           jsonOutput = Some(json),
-          moduleSelectors = Vector(ModuleSelector("__.test", Vector(TestRunLabel("app.test"), moduleLabel)), moduleSelectedAsItself),
+          moduleSelectors = Vector(ModuleSelector("__.test", Vector(ModuleName("app.test"), module)), moduleSelectedAsItself),
           buildTool = Some(BuildTool("Mill", "1.3.1")),
           startedAt = Some(Instant.ofEpochMilli(1000L))
         )
@@ -133,21 +129,18 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "given no failure and no output" should {
       "have no outcome, failures or output" in {
-        val json = new JsonSink
-        endedWithOneRun(startedWithoutMill(json))
-        json.root.keys should contain noneOf ("outcome", "failures", "output")
+        jsonOutputOfRun(completedRun).root.keys should contain noneOf ("outcome", "failures", "output")
       }
     }
 
     "given failures and output, interleaved" should {
       "hold each in the order it was attached" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        consolidation.addRootFailure("first failure")
-        consolidation.addRootOutput(CapturedLine.Stderr("warn: slow discovery\n"))
-        consolidation.addRootOutput(CapturedLine.Stdout("discovering tests\r\n"))
-        consolidation.addRootFailure("second failure")
-        consolidation.end()
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.addRootFailure("first failure")
+          consolidation.addRootOutput(CapturedLine.Stderr("warn: slow discovery\n"))
+          consolidation.addRootOutput(CapturedLine.Stdout("discovering tests\r\n"))
+          consolidation.addRootFailure("second failure")
+        }
         json.root("failures") shouldBe arrayOf(objectOf("message" -> text("first failure")), objectOf("message" -> text("second failure")))
         json.root("output") shouldBe arrayOf(
           objectOf("kind" -> text("stdio"), "stream" -> text("stderr"), "text" -> text("warn: slow discovery\n")),
@@ -158,13 +151,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "given runs of two modules" should {
       "hold the modules in ascending order by name" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        Vector("core.test", "app.test").foreach { module =>
-          val feed = consolidation.addRun(TestRunLabel(module))
-          feed.endEventStream()
-        }
-        consolidation.end()
+        val json = jsonOutputAfter(consolidation => Vector("core.test", "app.test").foreach(module => consolidation.addRun(ModuleName(module))(_ => ())))
         json.root("contents").items.map(_("name")) shouldBe Vector(text("app.test"), text("core.test"))
       }
     }
@@ -174,10 +161,10 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "timed with both of its times" should {
       "hold them and its duration, then its run nodes" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
-        endedWithOneRun(consolidation)
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
+          consolidation.addRunOf(completedRun)
+        }
         json.module.keys shouldBe Vector("kind", "name", "startedAt", "endedAt", "duration", "contents")
         json.module("kind") shouldBe text("module")
         json.module("name") shouldBe text("core.test")
@@ -189,31 +176,27 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "timed with only its end time" should {
       "have no duration" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        consolidation.timeModule(moduleLabel, None, Some(Instant.ofEpochMilli(2750L)))
-        endedWithOneRun(consolidation)
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.timeModule(module, None, Some(Instant.ofEpochMilli(2750L)))
+          consolidation.addRunOf(completedRun)
+        }
         json.module.keys shouldBe Vector("kind", "name", "endedAt", "contents")
       }
     }
 
     "timed with no run" should {
       "be written with no run node" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
-        consolidation.end()
+        val json = jsonOutputAfter(_.timeModule(module, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L))))
         json.module("contents") shouldBe arrayOf()
       }
     }
 
-    "given two runs" should {
+    "given two runs with no worker" should {
       "hold their run nodes numbered from 1 in the order they were added" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        addRun(consolidation, completedRun).endEventStream()
-        addRun(consolidation, completedRun).endEventStream()
-        consolidation.end()
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.addRunOf(completedRun)
+          consolidation.addRunOf(completedRun)
+        }
         json.module("contents").items.map(_("number")) shouldBe Vector(integer(1L), integer(2L))
       }
     }
@@ -222,7 +205,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   "A run node of the JSON output" when {
 
     "its run reported every run-level event and a captured line" should {
-      "hold each value in the layout's key order" in {
+      "hold its values in a fixed order" in {
         val summary = Summary(1, 2, 3, 4, 5, 6, 7, 8)
         val runNode = runNodeOf { feed =>
           Vector(
@@ -335,21 +318,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
   }
 
-  private def jsonOutputOfRowSuite(structure: Seq[String], events: String*): JsonSink =
-    jsonOutputOfRun(
-      TestRunPart.Events(
-        s"""
-        run started
-        run: RunStarting
-        structure
-          suite "RowSuite", class "samples.RowSuite"
-            ${structure.mkString("\n            ")}
-        ${events.mkString("\n        ")}
-        run: RunCompleted
-        run ended completed
-        """
-      )
-    )
+  private def jsonOutputOfRowSuite(nodes: Seq[String], events: String*): JsonSink =
+    jsonOutputOfRun(TestRunPart.Events(completedRunOf(("run: RunStarting" +: structureOf("RowSuite", nodes.mkString("\n")) +: events :+ "run: RunCompleted")*)))
 
   private val testAdds = Seq("""test "adds", label "- adds"""")
 
@@ -358,7 +328,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   "A test node in the JSON output" when {
 
     "it started and succeeded" should {
-      "hold each value in the layout's key order" in {
+      "hold its values in a fixed order" in {
         val json = jsonOutputOfRowSuite(
           testAdds,
           """suite "RowSuite": SuiteStarting""",
@@ -366,7 +336,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestSucceeded(duration: 8, threadName: "pool-2", timeStamp: 110)""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds") shouldBe objectOf(
+        json.node(NodeKind.Test, "adds") shouldBe objectOf(
           "kind" -> text("test"),
           "name" -> text("adds"),
           "label" -> text("- adds"),
@@ -382,7 +352,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
 
     "it failed" should {
-      "hold its outcome and then its message, each value in the layout's key order" in {
+      "hold its values in a fixed order, its outcome before its message" in {
         val json = jsonOutputOfRowSuite(
           testAdds,
           """suite "RowSuite": SuiteStarting""",
@@ -390,19 +360,19 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestFailed(message: "2 did not equal 3", duration: 8, timeStamp: 110)""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds").keys shouldBe
+        json.node(NodeKind.Test, "adds").keys shouldBe
           Vector("kind", "name", "label", "location", "outcome", "message", "startedAt", "endedAt", "duration", "threadName", "contents")
       }
     }
 
     "it never started in a suite that aborted" should {
-      "hold its outcome and then its reason, each value in the layout's key order" in {
+      "hold its values in a fixed order, its outcome before its reason" in {
         val json = jsonOutputOfRowSuite(
           testAdds,
           """suite "RowSuite": SuiteStarting""",
           """suite "RowSuite": SuiteAborted(message: "no fixture")"""
         )
-        json.node("test", "adds").keys shouldBe Vector("kind", "name", "label", "outcome", "reason", "contents")
+        json.node(NodeKind.Test, "adds").keys shouldBe Vector("kind", "name", "label", "outcome", "reason", "contents")
       }
     }
 
@@ -415,8 +385,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestSucceeded(timeStamp: 110)""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds").keys should contain allOf ("startedAt", "endedAt")
-        json.node("test", "adds").keys should not contain "duration"
+        json.node(NodeKind.Test, "adds").keys should contain allOf ("startedAt", "endedAt")
+        json.node(NodeKind.Test, "adds").keys should not contain "duration"
       }
     }
 
@@ -429,7 +399,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestFailed(location: TopOfMethod("samples.RowSuite", "def adds(): Unit"))""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds")("location") shouldBe objectOf("className" -> text("samples.RowSuite"), "methodId" -> text("def adds(): Unit"))
+        json.node(NodeKind.Test, "adds")("location") shouldBe objectOf("className" -> text("samples.RowSuite"), "methodId" -> text("def adds(): Unit"))
       }
     }
 
@@ -442,7 +412,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestFailed(location: SeeStackDepthException)""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds").keys should not contain "location"
+        json.node(NodeKind.Test, "adds").keys should not contain "location"
       }
     }
 
@@ -455,7 +425,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestSucceeded""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds")("location") shouldBe objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
+        json.node(NodeKind.Test, "adds")("location") shouldBe objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
       }
     }
 
@@ -468,7 +438,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestSucceeded""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds")("location") shouldBe objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
+        json.node(NodeKind.Test, "adds")("location") shouldBe objectOf("fileName" -> text("RowSuite.scala"), "lineNumber" -> integer(7L))
       }
     }
 
@@ -481,8 +451,8 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestCanceled(message: "no database")""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds")("outcome") shouldBe text("canceled")
-        json.node("test", "adds")("message") shouldBe text("no database")
+        json.node(NodeKind.Test, "adds")("outcome") shouldBe text("canceled")
+        json.node(NodeKind.Test, "adds")("message") shouldBe text("no database")
       }
     }
 
@@ -503,12 +473,12 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
             """
           )
         )
-        val adds = json.node("test", "adds")
+        val adds = json.node(NodeKind.Test, "adds")
         adds("outcome") shouldBe text("aborted")
         adds("endedAt") shouldBe integer(175L)
         adds("duration") shouldBe integer(75L)
         adds.keys should not contain "message"
-        json.node("suite", "RowSuite")("endedAt") shouldBe integer(175L)
+        json.node(NodeKind.Suite, "RowSuite")("endedAt") shouldBe integer(175L)
       }
     }
   }
@@ -524,12 +494,12 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """scope "A Queue": ScopePending(timeStamp: 104)""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        val scope = json.node("scope", "A Queue")
+        val scope = json.node(NodeKind.Scope, "A Queue")
         scope("endedAt") shouldBe integer(104L)
         scope("duration") shouldBe integer(4L)
       }
 
-      "hold each value in the layout's key order" in {
+      "hold its values in a fixed order" in {
         val json = jsonOutputOfRowSuite(
           Seq("""scope "A Queue", label "A Queue""""),
           """suite "RowSuite": SuiteStarting""",
@@ -537,7 +507,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """scope "A Queue": ScopePending(timeStamp: 104)""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("scope", "A Queue").keys shouldBe Vector("kind", "name", "label", "location", "outcome", "startedAt", "endedAt", "duration", "contents")
+        json.node(NodeKind.Scope, "A Queue").keys shouldBe Vector("kind", "name", "label", "location", "outcome", "startedAt", "endedAt", "duration", "contents")
       }
     }
 
@@ -550,7 +520,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """scope "A Queue": ScopeClosed(location: LineInFile(6, "RowSuite.scala", None))""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("scope", "A Queue").keys should not contain "location"
+        json.node(NodeKind.Scope, "A Queue").keys should not contain "location"
       }
     }
   }
@@ -558,7 +528,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   "A suite node in the JSON output" when {
 
     "it completed, and its tests' locations share one file" should {
-      "hold each value in the layout's key order, with that file in its location" in {
+      "hold its values in a fixed order, with that file in its location" in {
         val json = jsonOutputOfRowSuite(
           testsAddsAndSubtracts,
           """suite "RowSuite": SuiteStarting(location: TopOfClass("samples.RowSuite"), threadName: "pool-1", timeStamp: 100)""",
@@ -568,7 +538,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "subtracts": TestSucceeded""",
           """suite "RowSuite": SuiteCompleted(duration: 30, threadName: "pool-2", timeStamp: 140)"""
         )
-        val suite = json.node("suite", "RowSuite")
+        val suite = json.node(NodeKind.Suite, "RowSuite")
         suite.keys shouldBe Vector("kind", "name", "suiteId", "location", "startedAt", "endedAt", "duration", "threadName", "contents")
         suite("kind") shouldBe text("suite")
         suite("suiteId") shouldBe text("samples.RowSuite")
@@ -581,13 +551,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
 
     "it aborted" should {
-      "hold its outcome and then its message, each value in the layout's key order" in {
+      "hold its values in a fixed order, its outcome before its message" in {
         val json = jsonOutputOfRowSuite(
           testAdds,
           """suite "RowSuite": SuiteStarting(threadName: "pool-1", timeStamp: 100)""",
           """suite "RowSuite": SuiteAborted(message: "no fixture", duration: 5, timeStamp: 105)"""
         )
-        json.node("suite", "RowSuite").keys shouldBe
+        json.node(NodeKind.Suite, "RowSuite").keys shouldBe
           Vector("kind", "name", "suiteId", "location", "outcome", "message", "startedAt", "endedAt", "duration", "threadName", "contents")
       }
     }
@@ -603,7 +573,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "subtracts": TestSucceeded(duration: 9, timeStamp: 129)""",
           """suite "RowSuite": SuiteCompleted(timeStamp: 140)"""
         )
-        val suite = json.node("suite", "RowSuite")
+        val suite = json.node(NodeKind.Suite, "RowSuite")
         suite("contents").items.map(_("duration")) shouldBe Vector(integer(8L), integer(9L))
         suite.keys should contain allOf ("startedAt", "endedAt")
         suite.keys should not contain "duration"
@@ -621,13 +591,13 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "subtracts": TestSucceeded""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("suite", "RowSuite")("location") shouldBe objectOf("className" -> text("samples.RowSuite"))
+        json.node(NodeKind.Suite, "RowSuite")("location") shouldBe objectOf("className" -> text("samples.RowSuite"))
       }
     }
 
     "it never started" should {
       "be aborted with reason notRun, with no times or thread" in {
-        val suite = jsonOutputOfRowSuite(testAdds).node("suite", "RowSuite")
+        val suite = jsonOutputOfRowSuite(testAdds).node(NodeKind.Suite, "RowSuite")
         suite("outcome") shouldBe text("aborted")
         suite("reason") shouldBe text("notRun")
         suite.keys should contain noneOf ("startedAt", "endedAt", "duration", "threadName")
@@ -636,7 +606,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "it started and its run completed with neither its SuiteCompleted nor a RunAborted" should {
       "be aborted with no end time, duration or message" in {
-        val suite = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting(timeStamp: 100)""").node("suite", "RowSuite")
+        val suite = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting(timeStamp: 100)""").node(NodeKind.Suite, "RowSuite")
         suite("outcome") shouldBe text("aborted")
         suite.keys should contain noneOf ("endedAt", "duration", "message")
       }
@@ -672,13 +642,14 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     }
   }
 
-  private def throwable(className: String, message: Option[String] = None, frames: Vector[DecodedStackFrame] = Vector.empty): DecodedThrowable =
-    new DecodedThrowable(className, message, None, false, frames)
-
-  private def linked(throwable: DecodedThrowable, cause: Option[DecodedThrowable] = None, suppressed: Vector[DecodedThrowable] = Vector.empty): DecodedThrowable = {
-    throwable.link(cause, suppressed)
-    throwable
-  }
+  private def throwable(
+    className: String,
+    message: Option[String] = None,
+    frames: Vector[DecodedStackFrame] = Vector.empty,
+    cause: => Option[DecodedThrowable] = None,
+    suppressed: Vector[DecodedThrowable] = Vector.empty
+  ): DecodedThrowable =
+    new DecodedThrowable(className, message, None, false, frames, cause, suppressed)
 
   private def stackDepthException(stackDepth: DecodedStackDepth): DecodedThrowable =
     new DecodedThrowable("org.scalatest.exceptions.TestFailedException", Some("failed"), Some(stackDepth), false, Vector.empty)
@@ -691,7 +662,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
   "A message in the JSON output" when {
 
     "it carries a location and a throwable" should {
-      "hold each value in the layout's key order" in {
+      "hold its values in a fixed order" in {
         val info = DecodedEvent.InfoProvided("checked", Some(throwable("java.lang.IllegalStateException")), Some(LineInFile(9, "RowSuite.scala", None)), "pool-1", 120L)
         runNodeFedWith(info)("output").only shouldBe objectOf(
           "kind" -> text("info"),
@@ -726,7 +697,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """scope "A Stack": ScopeClosed(threadName: "main")""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("scope", "A Stack")("output").only("threadName") shouldBe text("main")
+        json.node(NodeKind.Scope, "A Stack")("output").only("threadName") shouldBe text("main")
       }
     }
 
@@ -738,7 +709,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """suite "RowSuite": InfoProvided(message: "in suite", threadName: "main")""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("suite", "RowSuite")("output").only.keys should not contain "threadName"
+        json.node(NodeKind.Suite, "RowSuite")("output").only.keys should not contain "threadName"
       }
     }
   }
@@ -755,14 +726,14 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestSucceeded""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds").keys.takeRight(2) shouldBe Vector("contents", "output")
+        json.node(NodeKind.Test, "adds").keys.takeRight(2) shouldBe Vector("contents", "output")
       }
     }
 
     "it has no message" should {
       "have no output" in {
         val json = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting""", """test "adds": TestStarting""", """test "adds": TestSucceeded""", """suite "RowSuite": SuiteCompleted""")
-        json.node("test", "adds").keys should not contain "output"
+        json.node(NodeKind.Test, "adds").keys should not contain "output"
       }
     }
 
@@ -775,7 +746,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": TestFailed(message: "failed", throwable: java.lang.IllegalStateException "failed")""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds").keys.dropWhile(_ != "message").take(2) shouldBe Vector("message", "throwable")
+        json.node(NodeKind.Test, "adds").keys.dropWhile(_ != "message").take(2) shouldBe Vector("message", "throwable")
       }
     }
 
@@ -789,7 +760,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
           """test "adds": SuiteAborted(message: "no teardown", throwable: java.lang.IllegalStateException "no teardown")""",
           """suite "RowSuite": SuiteCompleted"""
         )
-        json.node("test", "adds")("throwable")("message") shouldBe text("no teardown")
+        json.node(NodeKind.Test, "adds")("throwable")("message") shouldBe text("no teardown")
       }
     }
   }
@@ -855,9 +826,9 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     "its cause has a cause, and it has two suppressed throwables" should {
       "number them depth-first, the whole cause chain before the suppressed throwables" in {
         val record = recordOf(
-          linked(
-            throwable("Outer"),
-            cause = Some(linked(throwable("Cause"), cause = Some(throwable("RootCause")))),
+          throwable(
+            "Outer",
+            cause = Some(throwable("Cause", cause = Some(throwable("RootCause")))),
             suppressed = Vector(throwable("FirstSuppressed"), throwable("SecondSuppressed"))
           )
         )
@@ -871,7 +842,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
     "one throwable is both its cause and its suppressed throwable" should {
       "record it as the cause and refer to it as the suppressed throwable" in {
         val shared = throwable("Shared")
-        val record = recordOf(linked(throwable("Outer"), cause = Some(shared), suppressed = Vector(shared)))
+        val record = recordOf(throwable("Outer", cause = Some(shared), suppressed = Vector(shared)))
         record("cause")("id") shouldBe integer(2L)
         record("suppressed") shouldBe arrayOf(objectOf("ref" -> integer(2L)))
       }
@@ -879,22 +850,22 @@ final class JsonOutputWriterSpec extends AnyWordSpec with Matchers with Consolid
 
     "two throwables are alike but not the same object" should {
       "record each in full" in {
-        val record = recordOf(linked(throwable("Outer"), cause = Some(throwable("Same", Some("same"))), suppressed = Vector(throwable("Same", Some("same")))))
+        val record = recordOf(throwable("Outer", cause = Some(throwable("Same", Some("same"))), suppressed = Vector(throwable("Same", Some("same")))))
         record("suppressed").only("id") shouldBe integer(3L)
       }
     }
 
     "it is its own cause" should {
       "refer to itself as its cause" in {
-        val itself = throwable("Itself")
-        recordOf(linked(itself, cause = Some(itself)))("cause") shouldBe objectOf("ref" -> integer(1L))
+        lazy val itself: DecodedThrowable = throwable("Itself", cause = Some(itself))
+        recordOf(itself)("cause") shouldBe objectOf("ref" -> integer(1L))
       }
     }
 
     "its cause chain is too long to recurse over" should {
       "record every throwable of the chain" in {
         val chainLength = 100000
-        val outermost = (1 until chainLength).foldLeft(throwable("Innermost"))((cause, _) => linked(throwable("Outer"), cause = Some(cause)))
+        val outermost = (1 until chainLength).foldLeft(throwable("Innermost"))((cause, _) => throwable("Outer", cause = Some(cause)))
         val ids = Iterator.iterate(Option(recordOf(outermost)))(_.flatMap(_.get("cause"))).takeWhile(_.nonEmpty).flatten.map(_("id")).toVector
         ids.size shouldBe chainLength
         ids.last shouldBe integer(chainLength.toLong)

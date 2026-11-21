@@ -417,6 +417,7 @@ trait DottyBuild { this: BuildCommons =>
     .settings(
       organization := forkOrganization,
       moduleName := "scalatest-consolidation",
+      scalacOptions ++= List("-old-syntax", "-Werror", "-Wunused:all"),
       mimaFailOnNoPrevious := false,
       // Not a project dependency: the common test project is not published, so the POM must not name it.
       Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
@@ -1468,6 +1469,7 @@ trait DottyBuild { this: BuildCommons =>
       // ScalaTest 3.2.20 asks for the Scala 3.1 library, which code compiled by Scala 3.3 cannot link against.
       dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       CompatibilityFixture / unmanagedSourceDirectories += (CompatibilityFixture / sourceDirectory).value / "scala-jvm",
+      CompatibilityFixture / unmanagedSources += notationTextSource.value,
       Test / unmanagedSourceDirectories ++= Seq(sourceDirectory.value / "normalisation" / "scala", sourceDirectory.value / "comparison" / "scala"),
       // ScalaTest leaves the test interface to the build tool, so the fixture configuration takes sbt's own.
       CompatibilityFixture / unmanagedJars += Attributed.blank(testInterfaceJar),
@@ -1485,14 +1487,17 @@ trait DottyBuild { this: BuildCommons =>
       }.taskValue,
       Test / logBuffered := false,
       noPublishSettings,
-    ).dependsOn(scalatestDotty % "test")
+    ).dependsOn(scalatestDotty % "test", commonTestDotty % "test")
+
+  private def notationTextSource: Def.Initialize[File] = {
+    // The fixture compiles against 3.2.20 alone, so it takes the notation's quoting as a source file rather than from the
+    // fork's common-test project.
+    Def.setting((commonTestDotty / baseDirectory).value / "src" / "main" / "scala" / "org" / "scalatest" / "events" / "NotationText.scala")
+  }
 
   private def testInterfaceJar: File =
     new File(classOf[sbt.testing.Framework].getProtectionDomain.getCodeSource.getLocation.toURI)
 
-  // The fixture for Scala.js and Native compiles once against 3.2.20's artefacts for the platform, in a project that
-  // links it with 3.2.20. A second project links the same compiled classes with the fork, and a JVM test project runs
-  // and compares the two programs.
   private def compatibilityFixtureSettings(platformDirectory: String): Seq[Setting[_]] =
     Seq(
       libraryDependencies += upstreamScalatestOrganization %%% "scalatest" % previousReleaseVersion,
@@ -1505,6 +1510,7 @@ trait DottyBuild { this: BuildCommons =>
           sources / "normalisation" / "scala"
         )
       },
+      Compile / unmanagedSources += notationTextSource.value,
       Compile / mainClass := Some("compatibility.recorders.PlatformLauncher")
     ) ++ noPublishSettings
 
@@ -1525,9 +1531,21 @@ trait DottyBuild { this: BuildCommons =>
         val sources = (scalatestCompatibilityTestDotty / sourceDirectory).value
         Seq(sources / "comparison" / "scala", sources / "platform-test" / "scala")
       },
+      Test / sourceGenerators += Def.task {
+        val source = (Test / sourceManaged).value / "org" / "scalatest" / "compatibility" / "CompatibilityPlatform.scala"
+        IO.write(
+          source,
+          s"""package org.scalatest.compatibility
+             |
+             |object CompatibilityPlatform {
+             |  val name: String = "$platform"
+             |}
+             |""".stripMargin
+        )
+        Seq(source)
+      }.taskValue,
       Test / resourceGenerators += Def.task {
         val properties = new java.util.Properties
-        properties.setProperty("platform", platform)
         properties.setProperty("launcher", launcher)
         properties.setProperty("upstreamProgram", upstreamProgram.value.getAbsolutePath)
         properties.setProperty("forkProgram", forkProgram.value.getAbsolutePath)

@@ -14,7 +14,7 @@ private[events] final case class NodeReference(kind: NodeKind, name: String, ord
 }
 
 private[events] enum WrittenNode {
-  case Suite(name: String, ordinalAmongSameName: Option[Int], className: String, suiteId: Option[String])
+  case Suite(name: String, ordinalAmongSameName: Option[Int], className: TestClassName, suiteId: SuiteId)
   case Scope(name: String, label: String)
   case Test(name: String, label: String, testName: Option[String], ignored: Boolean)
 }
@@ -144,7 +144,8 @@ private[events] object EventNotation {
         val ordinal = if (cursor.accepts(" #")) Some(cursor.positiveInt()) else None
         cursor.expect(", class ")
         val className = cursor.quoted()
-        WrittenNode.Suite(name, ordinal, className, if (cursor.accepts(", id ")) Some(cursor.quoted()) else None)
+        val suiteId = if (cursor.accepts(", id ")) cursor.quoted() else className
+        WrittenNode.Suite(name, ordinal, TestClassName(className), SuiteId(suiteId))
       } else if (cursor.accepts("scope ")) {
         val name = cursor.quoted()
         cursor.expect(", label ")
@@ -173,14 +174,8 @@ private[events] object EventNotation {
     }
   }
 
-  private def outcome(how: String): RunOutcome = {
-    how match {
-      case "completed" => RunOutcome.Completed
-      case "aborted" => RunOutcome.Aborted
-      case "stopped" => RunOutcome.Stopped
-      case other => throw new NotationError(s"a run ends completed, aborted or stopped, not '$other'")
-    }
-  }
+  private def outcome(how: String): RunOutcome =
+    RunOutcome.fromWord(how).getOrElse(throw new NotationError(s"a run ends completed, aborted or stopped, not '$how'"))
 
   private def event(text: String): NotationLine = {
     val cursor = new LineCursor(text)
@@ -223,9 +218,10 @@ private[events] object EventNotation {
   private def fieldValue(name: String, cursor: LineCursor): FieldValue = {
     name match {
       case "message" | "text" | "threadName" => FieldValue.Text(cursor.quoted())
-      case "analysis" =>
+      case "analysis" => {
         cursor.expect("[")
         FieldValue.Texts(list(cursor)(_.quoted()))
+      }
       case "duration" | "timeStamp" | "testCount" => FieldValue.Number(cursor.number())
       case "location" => FieldValue.Place(location(cursor))
       case "throwable" => FieldValue.Thrown(throwable(cursor))
@@ -281,7 +277,6 @@ private[events] object EventNotation {
     }
   }
 
-  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   private def throwable(cursor: LineCursor): WrittenThrowable = {
     val className = cursor.word("a throwable's class name")(part => part.isLetterOrDigit || part == '.' || part == '$' || part == '_')
     val message = {
@@ -415,16 +410,18 @@ private final class LineCursor(line: String) {
       case 't' => '\t'
       case '"' => '"'
       case '\\' => '\\'
-      case 'u' =>
+      case 'u' => {
         val digits = line.substring(position, math.min(position + 4, line.length))
         if (digits.length < 4 || !digits.forall(digit => Character.digit(digit, 16) >= 0)) {
           fail("expected 4 hexadecimal digits")
         }
         position += 4
         Integer.parseInt(digits, 16).toChar
-      case other =>
+      }
+      case other => {
         position -= 1
         fail(s"the notation has no escape '\\$other'")
+      }
     }
   }
 }

@@ -12,6 +12,7 @@ import org.scalatest.exceptions.StackDepthException
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.tools.StackFrames.frames
+import org.scalatest.tools.StackFrames.lineNumberOfFrame
 import org.scalatest.tools.StackFrames.withFrames
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -20,7 +21,6 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
   private def testFailedException(message: Option[String], cause: Option[Throwable], position: Position): TestFailedException =
     new TestFailedException((_: StackDepthException) => message, cause, Left(position), None, Vector.empty)
 
-  // The stack depth is past the last frame, so no frame gives a file name and line number.
   private def failureWithoutFileNameAndLineNumber: TestFailedException =
     withFrames(
       new TestFailedException((_: StackDepthException) => Some("the stack was empty"), None, Right((_: StackDepthException) => 7), None, Vector.empty),
@@ -55,9 +55,7 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
     isPropertyCheckFailure: Boolean = false,
     cause: Option[DecodedThrowable] = None
   ): DecodedThrowable = {
-    val throwable = new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, decodedFrames(frameCount))
-    throwable.link(cause, Vector.empty)
-    throwable
+    new DecodedThrowable(className, message, stackDepth, isPropertyCheckFailure, decodedFrames(frameCount), cause)
   }
 
   private def errorLines(
@@ -98,7 +96,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
       cause.cause shouldBe None
     }
     "hold a StackDepth exception's file name, pathname and line number, and the failed code's stack depth" in {
-      val failure = withFrames(testFailedException(Some("failed"), None, Position("Stack.scala", "/src/Stack.scala", 12)), "Stack", 4)
+      val position = Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(2))
+      val failure = withFrames(testFailedException(Some("failed"), None, position), "Stack", 4)
       val stackDepth = ThrowableView.of(failure).stackDepth.get
       stackDepth.fileNameAndLineNumber shouldBe Some("Stack.scala:12")
       stackDepth.filePathnameAndLineNumber shouldBe Some("/src/Stack.scala:12")
@@ -185,7 +184,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
     }
     "end the cause chain before a StackDepth exception where no stack trace is presented" in {
       val innermost = withFrames(new IllegalArgumentException("root cause"), "Stack", 1)
-      val inner = withFrames(testFailedException(Some("the helper failed"), Some(innermost), Position("Stack.scala", "/src/Stack.scala", 11)), "Stack", 2)
+      val position = Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(1))
+      val inner = withFrames(testFailedException(Some("the helper failed"), Some(innermost), position), "Stack", 2)
       val failure = withFrames(new IllegalStateException("boom", inner), "Stack", 2)
       errorLines("the message", Some(ThrowableView.of(failure))) shouldBe Vector(
         "    - should pop *** FAILED ***",
@@ -259,8 +259,8 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
         ("org.scalatest.exceptions.TestFailedException:" +: decodedFrames(10).map("at " + _.text) :+ "...")
     }
     "stop at a decoded throwable that is its own cause" in {
-      val failure = new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, decodedFrames(1))
-      failure.link(Some(failure), Vector.empty)
+      lazy val failure: DecodedThrowable =
+        new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, decodedFrames(1), Some(failure))
       StringReporter.stackTraceLines(Some(failure), presentShortStackTraces = false, presentFullStackTraces = true) shouldBe
         List("java.lang.IllegalStateException: boom", "at Stack.method0(Stack.scala:10)")
     }
@@ -289,16 +289,16 @@ final class ThrowableViewSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  "Reporter.messageOrThrowablesDetailMessage" should {
-    "give the trimmed message where it is not blank" in {
+  "The message a reporter shows for an event" should {
+    "be the event's trimmed message where it is not blank" in {
       val throwable = decoded("java.lang.IllegalStateException", Some("boom"), 0)
       Reporter.messageOrThrowablesDetailMessage("  the message  ", Some(throwable)) shouldBe "the message"
     }
-    "give the throwable's trimmed message where the message is blank" in {
+    "be the throwable's trimmed message where the event's message is blank" in {
       val throwable = decoded("java.lang.IllegalStateException", Some("  boom  "), 0)
       Reporter.messageOrThrowablesDetailMessage("  ", Some(throwable)) shouldBe "boom"
     }
-    "give an empty message where the message is blank and there is no throwable" in {
+    "be empty where the event's message is blank and there is no throwable" in {
       Reporter.messageOrThrowablesDetailMessage("  ", None) shouldBe ""
     }
   }

@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Args
 import org.scalatest.DistributedTestSorter
 import org.scalatest.Distributor
-import org.scalatest.Filter
 import org.scalatest.InvocationContext
 import org.scalatest.Reporter
 import org.scalatest.ScalaTestStatefulStatus
@@ -25,6 +24,7 @@ import org.scalatest.events.Event
 import org.scalatest.events.Ordinal
 import org.scalatest.funspec.AsyncFunSpec
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.samples.AsyncSuiteRecordingItsNodeAsTestsAreCounted
 import org.scalatest.samples.MarkupDocSpec
@@ -50,11 +50,11 @@ import scala.concurrent.Promise
 final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with TestEventLogRuns with EventLogRecording {
 
   private class Probe extends AnyFunSuite {
-    @volatile var registrationInRun = Option.empty[SuiteRegistration]
-    @volatile var registrationInTest = Option.empty[SuiteRegistration]
-    @volatile var testRunsInATest = false
-    @volatile var runIsGivenAStructureWrapper = false
-    @volatile var testIsGivenAStructureWrapper = false
+    @volatile var registrationInRun: Option[SuiteRegistration] = None
+    @volatile var registrationInTest: Option[SuiteRegistration] = None
+    @volatile var testRunsInATest: Boolean = false
+    @volatile var runIsGivenAStructureWrapper: Boolean = false
+    @volatile var testIsGivenAStructureWrapper: Boolean = false
 
     override def run(testName: Option[String], args: Args): Status = {
       registrationInRun = Some(SuiteRegistration.inContext(this))
@@ -81,8 +81,8 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   private final class AsyncProbe(mayComplete: Promise[Unit]) extends AsyncFunSpec {
-    @volatile var registrationInRun = Option.empty[SuiteRegistration]
-    @volatile var testIsGivenAStructureWrapper = false
+    @volatile var registrationInRun: Option[SuiteRegistration] = None
+    @volatile var testIsGivenAStructureWrapper: Boolean = false
 
     implicit override def executionContext: ExecutionContext = ExecutionContext.global
 
@@ -139,7 +139,6 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
     }
   }
 
-  // So that an event that reaches it reaches no wrapper after it.
   private val sortingNoEventOn: DistributedTestSorter = new DistributedTestSorter {
     def distributingTest(testName: String): Unit = ()
     def apply(testName: String, event: Event): Unit = ()
@@ -367,16 +366,15 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   "A suite whose scope's events a TestSortingReporter holds back until its test completes" should {
-    // Each event handed off is named by the text of its scope or test: "s" or "t".
     def scopeAndItsTest(suite: Suite, eventsInOrderHandedOff: List[(String, String)]): List[String] = {
       val top = NodePath.topLevel(suite.getClass.getName)
-      val s = top.scope("s")
-      val t = top.test("s t")
-      val nodes = Map("s" -> (s, List(1, 1)), "t" -> (t, List(1, 1, 1)))
+      val scopeS = top.scope("s")
+      val testT = top.test("s t")
+      val nodes = Map("s" -> (scopeS, List(1, 1)), "t" -> (testT, List(1, 1, 1)))
       TestEventLogLine.structure(
         TestEventLogLine.topLevelSuite(suite.suiteName, suite.getClass.getName),
-        TestEventLogLine.scope(s, 0, "s", "s"),
-        TestEventLogLine.test(t, s, 0, "t", "- t")
+        TestEventLogLine.scope(scopeS, 0, "s", "s"),
+        TestEventLogLine.test(testT, scopeS, 0, "t", "- t")
       ) :: eventsInOrderHandedOff.map { (node, eventName) =>
         val (path, executions) = nodes(node)
         TestEventLogLine.nodeEvent(path, executions, eventName)
@@ -418,7 +416,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       "mixes in RandomTestOrder" -> (() => new SendsFromRunTestsRandomOrderSuite),
       "is of an async style" -> (() => new SendsFromRunTestsAsyncSuite)
     ).foreach { (kind, sample) =>
-      s"hand off, assigned to that test, a message sent through the reporter its runTests is given, where it $kind" in {
+      s"hand off, assigned to that test, a message sent through the reporter it runs its tests with, where it $kind" in {
         val suite = sample()
         val lines = eventLogLinesRunningAsTopLevelSuite(suite)(wrapper => suite.run(Some("t"), Args(wrapper, distributedTestSorter = Some(sortingNoEventOn))))
         val top = NodePath.topLevel(suite.getClass.getName)
@@ -504,7 +502,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       val suite = new MarkupDocSpec
       val started = new StartedTopLevelSuite(anEmitter, suite)
       try {
-        // Sent to a reporter that is no structure wrapper, so the emitter keeps the handed-off markup until the registration is removed.
+        // No structure wrapper receives the markup, so the emitter holds it until the registration is removed.
         started.runningInItsContext(suite.run(None, Args(passingNoEventOn)))
         anEmitter.handedOffEventCount shouldBe 1
       } finally {
@@ -717,7 +715,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   private final class CountingSuiteIdReads(thrown: Option[RuntimeException] = None) extends AnyFunSuite {
-    val reads = new AtomicInteger
+    val reads: AtomicInteger = new AtomicInteger
 
     override def suiteId: String = {
       reads.incrementAndGet()
@@ -727,7 +725,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   private final class CountingSuiteNameReads(thrown: Option[RuntimeException] = None) extends AnyFunSuite {
-    val reads = new AtomicInteger
+    val reads: AtomicInteger = new AtomicInteger
 
     override def suiteName: String = {
       reads.incrementAndGet()
@@ -737,8 +735,8 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
   }
 
   private final class HoldingSuiteIdReads(nested: Suite) extends Suite {
-    val isBeingRead = new CountDownLatch(1)
-    val mayBeRead = new CountDownLatch(1)
+    val isBeingRead: CountDownLatch = new CountDownLatch(1)
+    val mayBeRead: CountDownLatch = new CountDownLatch(1)
     @volatile private var holds = false
 
     def holdReads(): Unit = holds = true
@@ -766,9 +764,12 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       org.scalatest.SucceededStatus
     }
   }
+}
 
-  "A suite Framework runs" should {
-    "run its test in the context of its registration with the runner argument" in {
+final class SuiteRegistrationUnderABuildToolSpec extends AnyFreeSpec with Matchers with TestEventLogRuns {
+
+  "A suite run by a build tool" - {
+    "runs its test in the context of its registration, when given the runner argument" in {
       thisProcess
       TemporaryEventLog.in { eventLogFile =>
         val ran = RegistrationProbeSuite.instancesRunIn {
@@ -778,7 +779,7 @@ final class SuiteRegistrationSitesSpec extends AnyWordSpec with Matchers with Te
       }
     }
 
-    "find no registration while it runs without the runner argument" in {
+    "finds no registration while it runs without the runner argument" in {
       val ran = RegistrationProbeSuite.instancesRunIn(launched(Launch.ByFramework, classOf[RegistrationProbeSuite].getName, Nil))
       ran.map((_, registrationAsItRan) => registrationAsItRan) shouldBe Vector(SuiteRegistration.none)
     }

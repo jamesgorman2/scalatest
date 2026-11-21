@@ -8,10 +8,10 @@ import java.nio.charset.StandardCharsets
 import org.scalatest.events.JsonReader
 import org.scalatest.events.JsonValue
 import org.scalatest.events.JsonWriter
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class JsonEncodingSpec extends AnyWordSpec with Matchers {
+final class JsonEncodingSpec extends AnyWordSpec with should.Matchers {
 
   private val textJsonMustEscape = "tab\t quote\" slash\\ bell\u0007 é 😀 lone\uD800 end"
 
@@ -59,7 +59,7 @@ final class JsonEncodingSpec extends AnyWordSpec with Matchers {
 
       "write text that decodes to the string it was given" in {
         val decoded = strictlyDecodedUtf8(strictlyEncodedUtf8(encoded(textJsonMustEscape)))
-        JsonReader.read(decoded) shouldBe Right(JsonValue.Text(textJsonMustEscape))
+        JsonReader.read(decoded) shouldBe JsonValue.Text(textJsonMustEscape)
       }
     }
 

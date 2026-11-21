@@ -4,9 +4,9 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
+final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   Feature("Runs and the root fed directly to the consolidation library") {
 
@@ -88,12 +88,12 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
       val json = jsonOutputOfRun(TestRunPart.Events(eventLog))
 
       Then("suite S holds the outcome aborted and the message boom")
-      val suite = json.node("suite", "S")
+      val suite = json.node(NodeKind.Suite, "S")
       suite("outcome") shouldBe text("aborted")
       suite("message") shouldBe text("boom")
 
       And("test t is aborted with no message, has a startedAt, ends at the SuiteAborted's time, and has a duration of endedAt less startedAt")
-      val test = json.node("test", "t")
+      val test = json.node(NodeKind.Test, "t")
       test("outcome") shouldBe text("aborted")
       test("startedAt") shouldBe integer(110L)
       test("endedAt") shouldBe integer(150L)
@@ -119,7 +119,7 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
         """
 
       When("the library writes the JSON output")
-      val scope = jsonOutputOfRun(TestRunPart.Events(eventLog)).node("scope", "A")
+      val scope = jsonOutputOfRun(TestRunPart.Events(eventLog)).node(NodeKind.Scope, "A")
 
       Then("scope A holds the outcome aborted, with no message")
       scope("outcome") shouldBe text("aborted")
@@ -128,15 +128,12 @@ final class JsonOutputFedDirectlySpec extends AnyFeatureSpec with GivenWhenThen 
 
     Scenario("Output and failures attached to the root are written on the root: discovery fails") {
       Given("the library is fed no run")
-      val json = new JsonSink
-      val consolidation = startedWithoutMill(json)
-
       And("the root is given the stderr line `discovering\\n` as output and `Discovery failed` as a failure")
-      consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
-      consolidation.addRootFailure("Discovery failed")
-
       When("the library writes the JSON output")
-      consolidation.end()
+      val json = jsonOutputAfter { consolidation =>
+        consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
+        consolidation.addRootFailure("Discovery failed")
+      }
 
       Then("the root holds, in order, its outcome, failures and output")
       val root = json.root

@@ -44,3 +44,11 @@ Always run in the foreground to avoid idle/timeout issues.
 
 - Powershell - `test-all.ps1`
 - Bash - `test-all.sh`
+
+Pass `--compat` to either script to also run the Dotty compatibility test suites.
+
+This should be run in the foreground.
+
+## BDD Gherkins
+
+`GherkinSpec` is not currently available for this repo, so use `AnyFeatureSpec` with `GivenWhenThen` instead.

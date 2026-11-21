@@ -17,9 +17,8 @@ package org.scalactic
 
 import scala.quoted._
 
-/** Text the compiler wrote, which separates lines with "\n", as code giving it with the separator of the platform it runs on. */
 private[org] object CompilerText {
-  def withLineSeparator(text: String)(using Quotes): Expr[String] = {
+  def withPlatformLineSeparators(text: String)(using Quotes): Expr[String] = {
     val lines = text.replace("\r\n", "\n")
     if (lines.indexOf('\n') < 0) Expr(lines)
     else '{ ${Expr(lines)}.replace("\n", Prettifier.lineSeparator) }

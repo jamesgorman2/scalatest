@@ -30,8 +30,8 @@ import sbt.testing.TaskDef
 import scala.jdk.CollectionConverters.*
 
 private[tools] enum Launch(val named: String) {
-  case ByFramework extends Launch("Framework")
-  case ByRunner extends Launch("Runner.run")
+  case ByFramework extends Launch("a build tool")
+  case ByRunner extends Launch("the command-line runner")
 }
 
 private[tools] final class RecordingLogger extends Logger {
@@ -46,11 +46,9 @@ private[tools] final class RecordingLogger extends Logger {
   def trace(throwable: Throwable): Unit = record(String.valueOf(throwable))
 }
 
-/**
- * Records into the recording that is current when the run constructs it, so a run that outlives its recording,
- * having timed out, cannot write into a later one.
- */
 final class RunRecordingReporter extends Reporter {
+  // The recording current when the run constructs this reporter, so a run that times out and outlives its recording
+  // cannot write into a later one.
   private val recording = RunRecordingReporter.current.get
   def apply(event: Event): Unit = recording.add(event)
 }
@@ -59,11 +57,9 @@ object RunRecordingReporter {
 
   private val current = new AtomicReference(new ConcurrentLinkedQueue[Event])
 
-  /**
-   * Every run given a `RunRecordingReporter` must be launched here: specs run in parallel, and a run launched elsewhere
-   * would record into the recording of whichever caller holds the lock.
-   */
   def eventsReportedIn(launch: => Unit): Vector[Event] = synchronized {
+    // Specs run in parallel, so every run given a RunRecordingReporter must be launched here: one launched elsewhere
+    // records into whichever caller's recording is current.
     val recording = new ConcurrentLinkedQueue[Event]
     current.set(recording)
     launch
@@ -83,32 +79,30 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected val runTimeLimitSeconds = 120L
 
   protected def built(notation: String): Vector[BuiltEvent] =
-    TestRunBuilder.build(TestRunPart.Events(notation)).fold(reason => fail(reason), _.events)
+    TestRunBuilder.build(TestRunPart.Events(notation)).events
 
-  protected def decodedOrFail(lines: Seq[String]): Vector[TestEventLogEvent] =
-    lines.toVector.map(line => TestEventLogDecoder.decode(line).fold(reason => fail(s"$reason, in $line"), identity))
+  protected def decoded(lines: Seq[String]): Vector[TestEventLogEvent] = lines.toVector.map(TestEventLogDecoder.decode)
 
-  protected def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decodedOrFail(TemporaryEventLog.lines(eventLogFile))
+  protected def eventLogOf(eventLogFile: Path): Vector[TestEventLogEvent] = decoded(TemporaryEventLog.lines(eventLogFile))
 
   protected def classNamesGivenTo(suiteName: String, events: Seq[TestEventLogEvent]): Vector[String] =
     events.toVector
       .collect { case TestEventLogEvent.Structure(nodes) => nodes }
-      .flatMap(_.collect { case suite: StructureNode.Suite if suite.name == suiteName => suite.className })
+      .flatMap(_.collect { case suite: StructureNode.Suite if suite.name == suiteName => suite.className.value })
 
   protected def thisProcess: ProcessIdentity = {
-    val current = ProcessIdentity.current
-    assume(current.isRight, s"an emitter needs its process's identity: ${current.left.getOrElse("")}")
-    current.fold(reason => fail(reason), identity)
+    try {
+      ProcessIdentity.current
+    } catch {
+      case unreadable: IllegalStateException => cancel(s"an emitter needs this process's PID and start time: ${unreadable.getMessage}")
+    }
   }
 
   protected def runnerArgument(eventLogFile: Path): List[String] = TestEventLogArgument.forFile(eventLogFile.toString)
 
-  // Runner.run blocks while a graphic reporter's window is open, so a run that wrongly opens one fails at the time limit.
-  // Runner.run renames its thread, so a sample that must tell that thread apart is given the name of its thread group.
-  // A run that times out is left running: Runner.run constructs its reporters before it runs a suite, so a recording
-  // reporter it was given still records into the recording that has ended.
   protected def runnerRun(arguments: Seq[String], threadGroupName: Option[String] = None): Boolean = {
     val outcome = new AtomicReference[Option[Either[Throwable, Boolean]]](None)
+    // Runner.run renames its thread, so a sample that must tell that thread apart reads the name of its thread group.
     val threadGroup = threadGroupName.map { name =>
       val group = new ThreadGroup(name)
       group.setDaemon(true)
@@ -121,6 +115,8 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
       },
       "runs Runner.run"
     )
+    // A run that times out is left running. It constructed its reporters before it ran a suite, so a RunRecordingReporter
+    // it was given records only into the recording that has ended.
     run.setDaemon(true)
     run.start()
     run.join(TimeUnit.SECONDS.toMillis(runTimeLimitSeconds))
@@ -129,6 +125,7 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
       case Some(Left(thrown)) => throw thrown
       case None =>
         run.interrupt()
+        // Runner.run blocks while a graphic reporter's window is open.
         java.awt.Window.getWindows.foreach(_.dispose())
         fail(s"Runner.run did not return within $runTimeLimitSeconds seconds")
     }
@@ -142,12 +139,9 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected def frameworkRunner(arguments: Seq[String], remoteArguments: Seq[String] = Nil): SbtRunner =
     new Framework().runner(arguments.toArray, remoteArguments.toArray, getClass.getClassLoader)
 
-  /**
-   * Framework, given a suite by name, runs none of the tests of the suites it nests, unless the task also selects
-   * those suites by their suite IDs.
-   */
   protected def execute(runner: SbtRunner, suiteClassName: String, eventHandler: EventHandler, logger: Logger, nestedSuiteIds: Seq[String]): Unit = {
     val fingerprint = new Framework().fingerprints.collectFirst { case subclass: SubclassFingerprint => subclass }.get
+    // Framework, given a suite by name, runs none of the tests of the suites it nests unless the task also selects their suite IDs.
     val selectors = Array[Selector](new SuiteSelector) ++ nestedSuiteIds.map(suiteId => new NestedSuiteSelector(suiteId))
     var tasks = runner.tasks(Array(new TaskDef(suiteClassName, fingerprint, true, selectors))).toList
     while (tasks.nonEmpty) {
@@ -160,7 +154,6 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
 
   protected def execute(runner: SbtRunner, suiteClassName: String, logger: Logger): Unit = execute(runner, suiteClassName, logger, Nil)
 
-  /** `nestedSuiteIds` apply under Framework only. */
   protected def launched(launch: Launch, suiteClassName: String, arguments: Seq[String], nestedSuiteIds: Seq[String] = Nil): Unit = {
     launch match {
       case Launch.ByFramework =>
@@ -183,22 +176,20 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
     )
   }
 
-  // Recurses once for each class loader between this class's and the JVM's own.
-  private def classpathOf(loader: ClassLoader): List[URL] = {
+  private def classpathOf(loader: Option[ClassLoader]): List[URL] = {
     loader match {
-      case null => Nil
-      case ofUrls: URLClassLoader => ofUrls.getURLs.toList ::: classpathOf(ofUrls.getParent)
-      case other => classpathOf(other.getParent)
+      case None => Nil
+      case Some(ofUrls: URLClassLoader) => ofUrls.getURLs.toList ::: classpathOf(Option(ofUrls.getParent))
+      case Some(other) => classpathOf(Option(other.getParent))
     }
   }
 
   protected def outputOfFrameworkRunInItsOwnJvm(suiteClassName: String, arguments: Seq[String], folder: Path): JvmOutput =
     outputOfItsOwnJvm(FrameworkRunInItsOwnJvm.getClass.getName.stripSuffix("$"), suiteClassName +: arguments, folder)
 
-  /** The JVM runs on this JVM's classpath, and writes its stdout and stderr to files in `folder`. */
   protected def outputOfItsOwnJvm(mainClassName: String, arguments: Seq[String], folder: Path): JvmOutput = {
     val classpath =
-      (classpathOf(getClass.getClassLoader).map(url => Paths.get(url.toURI).toString) ++
+      (classpathOf(Option(getClass.getClassLoader)).map(url => Paths.get(url.toURI).toString) ++
         System.getProperty("java.class.path").split(File.pathSeparator)).distinct.mkString(File.pathSeparator)
     val java = Paths.get(System.getProperty("java.home"), "bin", "java").toString
     val stdout = folder.resolve("stdout.txt")
@@ -223,8 +214,8 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected def withRunpathOfOneSuite[A](folder: Path)(body: String => A): A =
     withRunpathOf(folder, List("samples/discovered/OneTestSpec.class"))(body)
 
-  // Discovery reads every class of a runpath, so the suites are given a runpath that holds nothing but their class files.
   protected def withRunpathOf[A](folder: Path, classFiles: Seq[String])(body: String => A): A = {
+    // Discovery reads every class of a runpath, so the runpath holds nothing but the given class files.
     classFiles.foreach { classFile =>
       val copy = folder.resolve(classFile)
       Files.createDirectories(copy.getParent)

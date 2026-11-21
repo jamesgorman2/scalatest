@@ -301,7 +301,6 @@ trait AnyFunSpecLike extends TestSuite with TestRegistration with Informing with
   protected class TheyWord {
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(specText: String, testTags: Tag*)(testFun: => Any, pos: source.Position): Unit = applyImpl(specText, testTags: _*)(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(specText: String, testTags: Tag*)(testFun: => Any /* Assertion */, pos: source.Position): Unit = {

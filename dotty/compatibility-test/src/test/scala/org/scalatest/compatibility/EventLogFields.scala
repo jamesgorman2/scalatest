@@ -4,17 +4,14 @@ import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodePlace
+import org.scalatest.events.NotationText.quoted
 import org.scalatest.events.TestEventLogEvent
 
 import java.util.IdentityHashMap
 
-/**
- * Writes an event of a test event log as `compatibility.recorders.EventFieldsRecordingReporter` writes the events it
- * receives: the node it is assigned to, named by its suite's ID and its test's name, then each field the event log
- * keeps of it.
- */
 object EventLogFields {
 
+  // Must write an event as compatibility.recorders.EventFieldsRecordingReporter writes the events it receives.
   def of(logged: TestEventLogEvent.ScalaTestEvent, withTimeStamp: Boolean): String = {
     val event = logged.event
     val fields = event.productElementNames
@@ -23,8 +20,7 @@ object EventLogFields {
     node(logged.execution) + " " + event.productPrefix + fields.mkString("(", ", ", ")")
   }
 
-  // Reads the quoted suite ID from an event `of` wrote, or `run` for an event assigned to the run.
-  def quotedSuiteIdOf(written: String): String =
+  def quotedSuiteIdOrRun(written: String): String =
     if (written.startsWith("run ")) {
       "run"
     } else {
@@ -41,8 +37,8 @@ object EventLogFields {
       val places = assigned.node.places
       val suiteId = places.collect { case NodePlace.Suite(id, _) => id }.last
       places.last match {
-        case NodePlace.Test(name) => "test " + quoted(suiteId) + " " + quoted(name)
-        case _ => "suite " + quoted(suiteId)
+        case NodePlace.Test(testName) => "test " + quoted(suiteId.value) + " " + quoted(testName.value)
+        case _ => "suite " + quoted(suiteId.value)
       }
     }
 
@@ -59,17 +55,6 @@ object EventLogFields {
       case items: Iterable[?] => items.map(rendered).mkString("[", ", ", "]")
       case other => String.valueOf(other)
     }
-
-  private def quoted(text: String): String =
-    text.flatMap {
-      case '"' => "\\\""
-      case '\\' => "\\\\"
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case char if char < ' ' || Character.isSurrogate(char) => f"\\u${char.toInt}%04x"
-      case char => char.toString
-    }.mkString("\"", "", "\"")
 
   private final class Throwables {
 
@@ -106,23 +91,11 @@ object EventLogFields {
   }
 }
 
-/**
- * How far the recording shows the order in which the emitter received its events: across the whole run, or only
- * within each suite. It is only within each suite where the recording reporter sits behind `Framework`'s
- * `SuiteSortingReporter`. That reporter holds back a nested suite's events until the suite enclosing it completes,
- * though it keeps the order in which suites start.
- */
 enum EmitterOrder {
   case AcrossTheRun
   case WithinEachSuite
 }
 
-/**
- * Checks that a test event log holds every event the emitter received, and every event recorded in one, with the
- * fields `compatibility.recorders.EventFieldsRecordingReporter` recorded of it in the same run. The events received
- * must be in the event log in the emitter's order, as far as the recording shows it; a recorded event may be
- * anywhere in it.
- */
 object EventLogCoverage {
 
   private val receivedPrefix = "received "
@@ -138,7 +111,7 @@ object EventLogCoverage {
     def orderedWith(event: String): String =
       order match {
         case EmitterOrder.AcrossTheRun => ""
-        case EmitterOrder.WithinEachSuite => EventLogFields.quotedSuiteIdOf(event)
+        case EmitterOrder.WithinEachSuite => EventLogFields.quotedSuiteIdOrRun(event)
       }
 
     val missingReceived = recording.filter(_.startsWith(receivedPrefix)).map(_.stripPrefix(receivedPrefix)).flatMap { event =>
@@ -170,11 +143,11 @@ object EventLogCoverage {
     recording
       .filter(_.startsWith(receivedPrefix))
       .map(_.stripPrefix(receivedPrefix))
-      .filter(event => event.startsWith(s"suite ${EventLogFields.quotedSuiteIdOf(event)} SuiteStarting("))
-      .map(EventLogFields.quotedSuiteIdOf)
+      .filter(event => event.startsWith(s"suite ${EventLogFields.quotedSuiteIdOrRun(event)} SuiteStarting("))
+      .map(EventLogFields.quotedSuiteIdOrRun)
 
   def suitesStartedAsLogged(eventLog: Seq[TestEventLogEvent.ScalaTestEvent]): Seq[String] =
     eventLog
       .filter(_.event.isInstanceOf[DecodedEvent.SuiteStarting])
-      .map(logged => EventLogFields.quotedSuiteIdOf(EventLogFields.of(logged, withTimeStamp = false)))
+      .map(logged => EventLogFields.quotedSuiteIdOrRun(EventLogFields.of(logged, withTimeStamp = false)))
 }

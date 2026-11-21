@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -10,13 +9,7 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
   private val fixtureSuiteFolders: Seq[os.Path] =
     sys.env("COMPATIBILITY_FIXTURE_SUITES").split(java.io.File.pathSeparatorChar).toSeq.map(os.Path(_))
 
-  private def addFixtureSuites(tester: IntegrationTester): Unit =
-    for {
-      folder <- fixtureSuiteFolders
-      source <- os.list(folder)
-    } {
-      os.copy(source, tester.workspacePath / "core" / "test" / "src" / "compatibility" / "fixture" / source.last, createFolders = true)
-    }
+  private def fixtureSuites: Seq[os.Path] = fixtureSuiteFolders.flatMap(os.list(_))
 
   private val expectedOutput: String =
     """[core.test]
@@ -263,13 +256,13 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
 
   Feature("Every suite, scope, test, failure and line of captured output a run holds is shown, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution") {
 
-    Scenario("The compatibility fixture") {
-      withTester("compatibility-fixture") { tester =>
+    Scenario("The compatibility fixture is shown in full, apart from the nodes below each collapsed subtree's root") {
+      withFixtureBuild(FixtureName.compatibilityFixture) { build =>
         Given("core.test's suites are the compatibility fixture")
-        addFixtureSuites(tester)
+        fixtureSuites.foreach(source => os.copy(source, build.testSources / "compatibility" / "fixture" / source.last, createFolders = true))
 
         When("the test command runs core.test")
-        val result = TestCommandResult(tester.eval(Seq("scalatest/test", "core.test")))
+        val result = build.runTestCommand("core.test")
 
         Then("the human-readable output shows every suite, scope and test, apart from every node below the root of a collapsed subtree, a subtree whose root is aborted and in which no other node has an execution, every failure with its message, and every line the fixture wrote to stdout or stderr")
         withClue(result.debugString) {
@@ -280,10 +273,6 @@ final class CompatibilityFixtureSpec extends AnyFeatureSpec with GivenWhenThen w
   }
 }
 
-/**
- * Replaces each run of a throwable's stack-frame lines with one line `at …`, keeping its indentation. The frames name the
- * fork's own internals, and an asynchronous test's frames depend on the thread it completes on.
- */
 object StackFrames {
 
   private val frame = """\s*at \S.*""".r
@@ -293,16 +282,14 @@ object StackFrames {
       if (!frame.matches(line)) {
         line :: following
       } else {
+        // Frames are not compared: they name ScalaTest's internals, and an asynchronous test's frames depend on the
+        // thread the test completes on.
         val placeholder = line.takeWhile(_ == ' ') + "at …"
         if (following.headOption.contains(placeholder)) following else placeholder :: following
       }
     }
 }
 
-/**
- * Puts each run of captured lines in stream order, stdout's before stderr's, keeping each stream's own order. The worker's
- * stdout and stderr are read on threads of their own, so the order between the two streams varies from run to run.
- */
 object CapturedLines {
 
   private def stream(line: String): Option[String] = Seq("[stdout] ", "[stderr] ").find(line.trim.startsWith)
@@ -315,5 +302,7 @@ object CapturedLines {
           case _ => List(line) :: groups
         }
       }
+      // The worker's stdout and stderr are read on separate threads, so the order between the two streams varies from run
+      // to run.
       .flatMap(group => if (stream(group.head).isDefined) group.sortBy(line => stream(line).contains("[stderr] ")) else group)
 }

@@ -11,6 +11,13 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
 
+  private val waitLimitSeconds = 10L
+
+  private def joined(thread: Thread): Boolean = {
+    thread.join(TimeUnit.SECONDS.toMillis(waitLimitSeconds))
+    !thread.isAlive
+  }
+
   private val noEventReporter: Reporter = new Reporter {
     def apply(event: Event): Unit = ()
   }
@@ -22,7 +29,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
     (message, _, _, _, _, _) => MarkupProvided(new Ordinal(1), message, None)
 
   private final class MessageKeepingHandOff {
-    @volatile var messages = Vector.empty[String]
+    @volatile var messages: Vector[String] = Vector.empty
     val handOff: MessageRecorder.MessageHandOff = (message, _, _) => () => messages :+= message
   }
 
@@ -56,17 +63,16 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
       })
       val caller = new Thread(() => informer("called"))
       caller.start()
-      handOffStarted.await(10, TimeUnit.SECONDS) shouldBe true
+      handOffStarted.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
 
       @volatile var taken = Option.empty[Vector[String]]
       val closer = new Thread(() => taken = Some(recorder.recordedEvents(false, false).toVector.collect { case info: InfoProvided => info.message }))
       closer.start()
       closer.join(200)
-      taken shouldBe None
+      (closer.isAlive, taken) shouldBe ((true, None))
 
       handOffMayFinish.countDown()
-      closer.join(10000)
-      caller.join(10000)
+      (joined(closer), joined(caller)) shouldBe ((true, true))
       taken shouldBe Some(Vector("called"))
       handedOff shouldBe Vector("called")
     }
@@ -85,7 +91,7 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
       }
       val slowCaller = new Thread(() => MessageRecordingInformer(recorder, infoOf, handOff)("slow to prepare"))
       slowCaller.start()
-      preparingStarted.await(10, TimeUnit.SECONDS) shouldBe true
+      preparingStarted.await(waitLimitSeconds, TimeUnit.SECONDS) shouldBe true
 
       @volatile var taken = Option.empty[Vector[String]]
       val otherThread = new Thread(() => {
@@ -93,11 +99,11 @@ final class MessageRecordingInformerSpec extends AnyWordSpec with Matchers {
         taken = Some(recorder.recordedEvents(false, false).toVector.collect { case markup: MarkupProvided => markup.text })
       })
       otherThread.start()
-      otherThread.join(10000)
+      joined(otherThread) shouldBe true
       taken shouldBe Some(Vector("from another thread"))
 
       preparingMayFinish.countDown()
-      slowCaller.join(10000)
+      joined(slowCaller) shouldBe true
       handedOff shouldBe Vector("from another thread")
     }
   }

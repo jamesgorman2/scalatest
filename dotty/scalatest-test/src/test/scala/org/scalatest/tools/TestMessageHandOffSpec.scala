@@ -1,15 +1,16 @@
 package org.scalatest.tools
 
+import org.scalactic.NameUtil
 import org.scalatest.EventOrigin
 import org.scalatest.PathMessageCalls
 import org.scalatest.PathMessageRecordingAlerter
 import org.scalatest.PathMessageRecordingDocumenter
 import org.scalatest.PathMessageRecordingInformer
 import org.scalatest.PathMessageRecordingNotifier
+import org.scalatest.PathMessageReplay
 import org.scalatest.Reporter
 import org.scalatest.Suite
 import org.scalatest.SuiteRegistration
-import org.scalatest.Tracker
 import org.scalatest.events.AlertProvided
 import org.scalatest.events.Event
 import org.scalatest.events.InfoProvided
@@ -27,15 +28,10 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
 
   private val ordinal = new Ordinal(1)
   private val timeStamp = 1700000000000L
-  private val suiteName = "OneTestSpec"
-  private val suiteId = "samples.OneTestSpec"
+  private val suiteId = classOf[OneTestSpec].getName
+  private val suiteName = NameUtil.parseSimpleName(suiteId)
 
-  // Its names are those the events this spec builds carry.
   private final class OneTestSpec extends AnyFunSpec {
-    override def suiteName: String = TestMessageHandOffSpec.this.suiteName
-
-    override def suiteId: String = TestMessageHandOffSpec.this.suiteId
-
     it("t") {}
   }
 
@@ -212,12 +208,12 @@ final class TestMessageHandOffSpec extends AnyWordSpec with Matchers with EventL
       override def handOffMessage(message: => Event): Unit = received :+= message
     }
 
-    def callOf(message: String, kind: String): (Suite, Reporter, Tracker, String, Int, Boolean) => Event = {
-      (_, _, tracker, _, _, _) =>
+    def callOf(message: String, kind: String): PathMessageReplay => Event = {
+      replay =>
         kind match {
-          case "info" => InfoProvided(tracker.nextOrdinal(), message, None)
-          case "note" => NoteProvided(tracker.nextOrdinal(), message, None)
-          case _ => MarkupProvided(tracker.nextOrdinal(), message, None)
+          case "info" => InfoProvided(replay.tracker.nextOrdinal(), message, None)
+          case "note" => NoteProvided(replay.tracker.nextOrdinal(), message, None)
+          case _ => MarkupProvided(replay.tracker.nextOrdinal(), message, None)
         }
     }
 

@@ -408,7 +408,6 @@ class Framework extends SbtFramework {
     startOfTopLevelSuite: (Suite, Filter, Reporter) => SuiteStart
   ) extends Task {
 
-    // The constructor of 3.2.20, which the binary compatibility check requires.
     def this(
       taskDefinition: TaskDef,
       loader: ClassLoader,
@@ -436,6 +435,7 @@ class Framework extends SbtFramework {
       configSet: Set[ReporterConfigParam],
       execService: ExecutorService
     ) =
+      // The constructor of 3.2.20, which the binary compatibility check requires.
       this(
         taskDefinition,
         loader,
@@ -518,9 +518,9 @@ class Framework extends SbtFramework {
             case t: Throwable => new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, t)
           }
 
-        // A ConfigMapWrapperSuite constructs its wrapped class on first use. This forces that use before the suite can
-        // start, through an accessor no suite can override. What the constructor throws reaches the build tool, as in
-        // ScalaTest 3.2.20, and only the event log records the suite as aborted.
+        // A ConfigMapWrapperSuite constructs its wrapped class on first use. instanceWithEmptyConfigMap, which no suite
+        // can override, makes that use before the suite can start. What the wrapped class's constructor throws reaches
+        // the build tool, as in ScalaTest 3.2.20, and only the event log records the suite as aborted.
         suite match {
           case wrapper: ConfigMapWrapperSuite =>
             try wrapper.instanceWithEmptyConfigMap
@@ -598,17 +598,14 @@ class Framework extends SbtFramework {
          throw new IllegalArgumentException("Class " + taskDefinition.fullyQualifiedName + " is neither accessible org.scalatest.Suite nor runnable.")
     }
 
-    /**
-     * Gives the test event log the structure of a suite that threw before it could start, and the `SuiteStarting`
-     * and `SuiteAborted` `runSuite` would send for it as a `DeferredAbortedSuite`. No reporter receives them, and
-     * they take no ordinal from the run's tracker, so the run's reporters receive what ScalaTest 3.2.20 sends them.
-     */
     private def handOffAbortOfSuiteThatCannotStart(thrown: Throwable): Unit = {
       val aborted = new DeferredAbortedSuite(suiteClass.getName, suiteClass.getName, thrown)
+      // The run's reporters receive neither this suite's SuiteStarting nor its SuiteAborted, as in ScalaTest 3.2.20.
       val passingNoEventOn: Reporter = (_: Event) => ()
       val start = startOfTopLevelSuite(aborted, Filter.default, passingNoEventOn)
       val report = start.reporter
       if (report ne passingNoEventOn) {
+        // A tracker of its own, so that the events take no ordinal from the run's.
         val tracker = new Tracker
         val suiteClassName = getSuiteClassName(aborted)
         val message =
@@ -616,7 +613,6 @@ class Framework extends SbtFramework {
             thrown.getClass.getName + " encountered when attempting to run suite " + aborted.suiteId
           else
             thrown.getMessage
-        // Run as the suite's own run, which ends once both events are handed off.
         start.run {
           report(SuiteStarting(tracker.nextOrdinal(), aborted.suiteName, aborted.suiteId, Some(suiteClassName), formatterForSuiteStarting(aborted), Some(TopOfClass(suiteClassName))))
           report(SuiteAborted(tracker.nextOrdinal(), message, aborted.suiteName, aborted.suiteId, Some(aborted.suiteName), Some(thrown), Some(0L), formatterForSuiteAborted(aborted, message), Some(SeeStackDepthException)))
@@ -872,7 +868,7 @@ class Framework extends SbtFramework {
       } yield task
 
     def done = {
-      if (!isDone.getAndSet(true)) try {
+      if (!isDone.getAndSet(true)) TestEventLogEmitter.endedAfter(testEventLogEmitter) {
 
         // Wait until all status is completed
         statusList.asScala.foreach { s =>
@@ -915,10 +911,6 @@ class Framework extends SbtFramework {
             presentReminderWithoutCanceledTests,
             presentFilePathname
           ).map(_.toPossiblyColoredText(presentInColor)).mkString(org.scalactic.Prettifier.lineSeparator)
-      }
-      finally {
-        // A done that throws before it sends RunCompleted must not leave the run's test event log open.
-        testEventLogEmitter.foreach(_.endWithoutRunEnded())
       }
       else
         throw new IllegalStateException("done method is called twice")
@@ -1252,7 +1244,7 @@ class Framework extends SbtFramework {
       throw new IllegalArgumentException("-P without specifying <numthreads> is not supported when running ScalaTest from sbt, please use sbt parallel configuration instead.")
 
     val testEventLogEmitter = TestEventLogEmitter.startedIfGiven(testEventLogFile)
-    try {
+    TestEventLogEmitter.endedIfThrownBy(testEventLogEmitter) {
       new ScalaTestRunner(
         args,
         testClassLoader,
@@ -1283,12 +1275,6 @@ class Framework extends SbtFramework {
         testSortingReporterTimeout,
         testEventLogEmitter
       )
-    }
-    catch {
-      // A runner that fails at construction ends no run, and must not leave its test event log open.
-      case e: Throwable =>
-        testEventLogEmitter.foreach(_.endWithoutRunEnded())
-        throw e
     }
   }
 

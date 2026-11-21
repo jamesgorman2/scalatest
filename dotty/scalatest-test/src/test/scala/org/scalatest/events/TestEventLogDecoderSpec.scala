@@ -7,9 +7,9 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
   private val timeStamp = 1700000000000L
   private val summary = Summary(1, 2, 3, 4, 5, 6, 7, 8)
-  private val stackSpec = NodeId(Vector(NodePlace.Suite("example.StackSpec", 0)))
+  private val stackSpec = NodeId(Vector(NodePlace.Suite(SuiteId("example.StackSpec"), 0)))
   private val aStack = NodeId(stackSpec.places :+ NodePlace.Scope("A stack", 0))
-  private val pop = NodeId(stackSpec.places :+ NodePlace.Test("A stack should pop"))
+  private val pop = NodeId(stackSpec.places :+ NodePlace.Test(TestName("A stack should pop")))
   private val stackSpecText = """[{"suiteId":"example.StackSpec","index":0}]"""
   private val aStackText = """[{"suiteId":"example.StackSpec","index":0},{"scope":"A stack","index":0}]"""
   private val popText = """[{"suiteId":"example.StackSpec","index":0},{"test":"A stack should pop"}]"""
@@ -61,11 +61,11 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
   private def boom: Option[DecodedThrowable] =
     Some(new DecodedThrowable("java.lang.IllegalStateException", Some("boom"), None, false, Vector.empty))
 
-  // A DecodedThrowable has no structural equality.
   private def comparable(event: TestEventLogEvent): Any = {
     event match {
       case TestEventLogEvent.ScalaTestEvent(execution, decoded) =>
         val fields = decoded.productIterator.map {
+          // A DecodedThrowable has no structural equality.
           case Some(throwable: DecodedThrowable) => Some((throwable.className, throwable.message))
           case other => other
         }
@@ -76,15 +76,27 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
   private def throwableIn(line: String): DecodedThrowable = {
     TestEventLogDecoder.decode(line) match {
-      case Right(TestEventLogEvent.ScalaTestEvent(_, DecodedEvent.SuiteAborted(_, Some(throwable), _, _, _, _))) => throwable
+      case TestEventLogEvent.ScalaTestEvent(_, DecodedEvent.SuiteAborted(_, Some(throwable), _, _, _, _)) => throwable
       case other => fail(s"the line did not decode to a SuiteAborted with a throwable: $other")
     }
   }
 
   private def infoMessageIn(line: String): String = {
     TestEventLogDecoder.decode(line) match {
-      case Right(TestEventLogEvent.ScalaTestEvent(_, DecodedEvent.InfoProvided(message, _, _, _, _))) => message
+      case TestEventLogEvent.ScalaTestEvent(_, DecodedEvent.InfoProvided(message, _, _, _, _)) => message
       case other => fail(s"the line did not decode to an InfoProvided: $other")
+    }
+  }
+
+  private def whyUndecodable(line: String): String =
+    intercept[MalformedTestEventLogException](TestEventLogDecoder.decode(line)).reason
+
+  private def isDecodable(line: String): Boolean = {
+    try {
+      TestEventLogDecoder.decode(line)
+      true
+    } catch {
+      case _: MalformedTestEventLogException => false
     }
   }
 
@@ -96,26 +108,24 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
     "reading the runStarted event" should {
       "yield its PID and start time" in {
         TestEventLogDecoder.decode(runStartedLine) shouldBe
-          Right(TestEventLogEvent.RunStarted(4242L, "2026-11-13T02:54:37.123456Z"))
+          TestEventLogEvent.RunStarted(4242L, "2026-11-13T02:54:37.123456Z")
       }
     }
 
     "reading a structure event" should {
       "yield a top-level suite without parent or position, then its nodes in the order written" in {
-        TestEventLogDecoder.decode(structureLine) shouldBe Right(
-          TestEventLogEvent.Structure(
-            Vector(
-              StructureNode.Suite(stackSpec, None, None, "StackSpec", "example.StackSpec", "example.StackSpec"),
-              StructureNode.Scope(aStack, stackSpec, 0, "A stack", "A stack"),
-              StructureNode.Test(pop, aStack, 0, "pop", "- should pop"),
-              StructureNode.Suite(
-                NodeId(stackSpec.places :+ NodePlace.Suite("example.QueueSpec", 0)),
-                Some(stackSpec),
-                Some(1),
-                "QueueSpec",
-                "example.QueueSpec",
-                "example.QueueSpec"
-              )
+        TestEventLogDecoder.decode(structureLine) shouldBe TestEventLogEvent.Structure(
+          Vector(
+            StructureNode.Suite(stackSpec, None, None, "StackSpec", SuiteId("example.StackSpec"), TestClassName("example.StackSpec")),
+            StructureNode.Scope(aStack, stackSpec, 0, "A stack", "A stack"),
+            StructureNode.Test(pop, aStack, 0, "pop", "- should pop"),
+            StructureNode.Suite(
+              NodeId(stackSpec.places :+ NodePlace.Suite(SuiteId("example.QueueSpec"), 0)),
+              Some(stackSpec),
+              Some(1),
+              "QueueSpec",
+              SuiteId("example.QueueSpec"),
+              TestClassName("example.QueueSpec")
             )
           )
         )
@@ -124,12 +134,12 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         val line =
           s"""{"item":"structure","nodes":[{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop","ignored":true}]}"""
         TestEventLogDecoder.decode(line) shouldBe
-          Right(TestEventLogEvent.Structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = true))))
+          TestEventLogEvent.Structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = true)))
       }
       "yield a test without ignored as not ignored" in {
         val line = s"""{"item":"structure","nodes":[{"id":$popText,"kind":"test","parent":$aStackText,"position":0,"name":"pop","label":"- should pop"}]}"""
         TestEventLogDecoder.decode(line) shouldBe
-          Right(TestEventLogEvent.Structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = false))))
+          TestEventLogEvent.Structure(Vector(StructureNode.Test(pop, aStack, 0, "pop", "- should pop", ignored = false)))
       }
       "yield each place of a node path below the places above it, with a scope's or suite's index" in {
         val secondHelperText =
@@ -142,13 +152,11 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
             """{"suiteId":"example.HelperSpec","index":1},{"scope":"A helper","index":2}],""" +
             s""""kind":"scope","parent":$secondHelperText,"position":0,"name":"A helper","label":"A helper"}""" +
             """]}"""
-        val secondHelper = NodeId(pop.places :+ NodePlace.Suite("example.HelperSpec", 1))
-        TestEventLogDecoder.decode(line) shouldBe Right(
-          TestEventLogEvent.Structure(
-            Vector(
-              StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", "example.HelperSpec", "example.HelperSpec"),
-              StructureNode.Scope(NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2)), secondHelper, 0, "A helper", "A helper")
-            )
+        val secondHelper = NodeId(pop.places :+ NodePlace.Suite(SuiteId("example.HelperSpec"), 1))
+        TestEventLogDecoder.decode(line) shouldBe TestEventLogEvent.Structure(
+          Vector(
+            StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", SuiteId("example.HelperSpec"), TestClassName("example.HelperSpec")),
+            StructureNode.Scope(NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2)), secondHelper, 0, "A helper", "A helper")
           )
         )
       }
@@ -156,15 +164,15 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
 
     "reading the runEnded event" should {
       "yield a completed run" in {
-        TestEventLogDecoder.decode(runEndedLine) shouldBe Right(TestEventLogEvent.RunEnded(RunOutcome.Completed))
+        TestEventLogDecoder.decode(runEndedLine) shouldBe TestEventLogEvent.RunEnded(RunOutcome.Completed)
       }
       "yield an aborted run" in {
         TestEventLogDecoder.decode("""{"item":"runEnded","outcome":"aborted"}""") shouldBe
-          Right(TestEventLogEvent.RunEnded(RunOutcome.Aborted))
+          TestEventLogEvent.RunEnded(RunOutcome.Aborted)
       }
       "yield a stopped run" in {
         TestEventLogDecoder.decode("""{"item":"runEnded","outcome":"stopped"}""") shouldBe
-          Right(TestEventLogEvent.RunEnded(RunOutcome.Stopped))
+          TestEventLogEvent.RunEnded(RunOutcome.Stopped)
       }
     }
 
@@ -173,18 +181,16 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       "yield no node or executions for an event assigned to the run" in {
         TestEventLogDecoder.decode(
           """{"item":"event","event":"DiscoveryStarting","threadName":"main","timeStamp":1700000000000}"""
-        ) shouldBe Right(TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryStarting("main", timeStamp)))
+        ) shouldBe TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryStarting("main", timeStamp))
       }
 
       "yield an absent value for an omitted key and an empty sequence for an omitted array" in {
         TestEventLogDecoder.decode(
           testEventText + """"TestFailed","message":"1 did not equal 2",""" +
             """"threadName":"main","timeStamp":1700000000000}"""
-        ) shouldBe Right(
-          TestEventLogEvent.ScalaTestEvent(
-            testExecution,
-            DecodedEvent.TestFailed("1 did not equal 2", Vector.empty, None, None, None, "main", timeStamp)
-          )
+        ) shouldBe TestEventLogEvent.ScalaTestEvent(
+          testExecution,
+          DecodedEvent.TestFailed("1 did not equal 2", Vector.empty, None, None, None, "main", timeStamp)
         )
       }
 
@@ -192,11 +198,9 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         TestEventLogDecoder.decode(
           """{"item":"event","event":"RunStarting","testCount":3,""" +
             """"configMap":{"Beta":"text","alpha":"List(a, b)","zeta":"1"},"threadName":"main","timeStamp":1700000000000}"""
-        ) shouldBe Right(
-          TestEventLogEvent.ScalaTestEvent(
-            None,
-            DecodedEvent.RunStarting(3, Map("Beta" -> "text", "alpha" -> "List(a, b)", "zeta" -> "1"), None, "main", timeStamp)
-          )
+        ) shouldBe TestEventLogEvent.ScalaTestEvent(
+          None,
+          DecodedEvent.RunStarting(3, Map("Beta" -> "text", "alpha" -> "List(a, b)", "zeta" -> "1"), None, "main", timeStamp)
         )
       }
 
@@ -288,7 +292,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
           case other => other.productPrefix
         }
         s"yield a $eventName with its node, its executions and every field the format keeps" in {
-          TestEventLogDecoder.decode(line).map(comparable) shouldBe Right(comparable(expectedEvent))
+          comparable(TestEventLogDecoder.decode(line)) shouldBe comparable(expectedEvent)
         }
       }
     }
@@ -311,13 +315,13 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       "yield one a Double cannot hold exactly" in {
         TestEventLogDecoder.decode(
           """{"item":"event","event":"DiscoveryStarting","threadName":"main","timeStamp":9007199254740993}"""
-        ) shouldBe Right(TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryStarting("main", 9007199254740993L)))
+        ) shouldBe TestEventLogEvent.ScalaTestEvent(None, DecodedEvent.DiscoveryStarting("main", 9007199254740993L))
       }
       "yield the largest and the smallest Long" in {
         TestEventLogDecoder.decode("""{"item":"runStarted","pid":9223372036854775807,"startTime":"1970-01-01T00:00:00Z"}""") shouldBe
-          Right(TestEventLogEvent.RunStarted(Long.MaxValue, "1970-01-01T00:00:00Z"))
+          TestEventLogEvent.RunStarted(Long.MaxValue, "1970-01-01T00:00:00Z")
         TestEventLogDecoder.decode("""{"item":"runStarted","pid":-9223372036854775808,"startTime":"1970-01-01T00:00:00Z"}""") shouldBe
-          Right(TestEventLogEvent.RunStarted(Long.MinValue, "1970-01-01T00:00:00Z"))
+          TestEventLogEvent.RunStarted(Long.MinValue, "1970-01-01T00:00:00Z")
       }
     }
 
@@ -450,7 +454,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       linesAndUnknownKeys.foreach { case (line, (key, description)) =>
         s"report the unknown key $key of $description" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(s"unknown key $key")
+          whyUndecodable(line) shouldBe s"unknown key $key"
         }
       }
     }
@@ -498,64 +502,72 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       linesAndMissingKeys.foreach { case (line, (key, description)) =>
         s"report the missing key $key of $description" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(s"missing key $key")
+          whyUndecodable(line) shouldBe s"missing key $key"
         }
       }
     }
 
     "given a line holding a value the format does not give" should {
       "report an unknown item" in {
-        TestEventLogDecoder.decode("""{"item":"progress","pid":1}""") shouldBe Left("unknown item progress")
+        whyUndecodable("""{"item":"progress","pid":1}""") shouldBe "unknown item progress"
       }
       "report an unknown event" in {
-        TestEventLogDecoder.decode("""{"item":"event","event":"TestExploded","threadName":"main","timeStamp":1}""") shouldBe
-          Left("unknown event TestExploded")
+        whyUndecodable("""{"item":"event","event":"TestExploded","threadName":"main","timeStamp":1}""") shouldBe
+          "unknown event TestExploded"
       }
       "report an unknown kind of node" in {
-        TestEventLogDecoder.decode(s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"group","name":"g"}]}""") shouldBe
-          Left("unknown kind group")
+        whyUndecodable(s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"group","name":"g"}]}""") shouldBe
+          "unknown kind group"
       }
       "report a place holding none of the keys of a suite's, a scope's or a test's place" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           """{"item":"structure","nodes":[{"id":[{"index":0}],"kind":"suite","name":"S","suiteId":"s","className":"c"}]}"""
-        ) shouldBe Left("a place holds none of the keys suiteId, scope and test")
+        ) shouldBe "a place holds none of the keys suiteId, scope and test"
       }
       "report an unknown kind of location" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           """{"item":"event","event":"RunCompleted","location":{"kind":"Somewhere"},"threadName":"main","timeStamp":1}"""
-        ) shouldBe Left("unknown kind Somewhere")
+        ) shouldBe "unknown kind Somewhere"
       }
       "report an unknown outcome" in {
-        TestEventLogDecoder.decode("""{"item":"runEnded","outcome":"paused"}""") shouldBe Left("unknown outcome paused")
+        whyUndecodable("""{"item":"runEnded","outcome":"paused"}""") shouldBe "unknown outcome paused"
       }
       "report a test whose ignored is false, which the format never writes" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           s"""{"item":"structure","nodes":[{"id":$aTest,"kind":"test","parent":$aSuite,"position":0,"name":"t","label":"- t","ignored":false}]}"""
-        ) shouldBe Left("ignored is not true")
+        ) shouldBe "ignored is not true"
       }
       "report a nested suite whose parent is not its id without the last place" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"suiteId":"n","index":0}],"kind":"suite","parent":$aTest,"name":"N","suiteId":"n","className":"c"}]}"""
-        ) shouldBe Left("parent is not the node's id without its last place")
+        ) shouldBe "parent is not the node's id without its last place"
       }
       "report a top-level suite that has a parent" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           s"""{"item":"structure","nodes":[{"id":$aSuite,"kind":"suite","parent":$aSuite,"name":"S","suiteId":"s","className":"c"}]}"""
-        ) shouldBe Left("parent is not the node's id without its last place")
+        ) shouldBe "parent is not the node's id without its last place"
       }
       "report a scope whose parent is not its id without the last place" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           s"""{"item":"structure","nodes":[{"id":[{"suiteId":"s","index":0},{"scope":"t","index":0}],"kind":"scope","parent":$aTest,"position":0,"name":"t","label":"t"}]}"""
-        ) shouldBe Left("parent is not the node's id without its last place")
+        ) shouldBe "parent is not the node's id without its last place"
       }
       "report a throwable whose propertyCheck is false, which the format never writes" in {
-        TestEventLogDecoder.decode(suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":false}""")) shouldBe
-          Left("propertyCheck is not true")
+        whyUndecodable(suiteAbortedLine("""{"id":1,"className":"c","propertyCheck":false}""")) shouldBe
+          "propertyCheck is not true"
       }
       "report a stack frame whose isNative is false, which the format never writes" in {
-        TestEventLogDecoder.decode(
+        whyUndecodable(
           suiteAbortedLine("""{"id":1,"className":"c","stackTrace":[{"className":"c","methodName":"m","isNative":false,"text":"c.m"}]}""")
-        ) shouldBe Left("isNative is not true")
+        ) shouldBe "isNative is not true"
+      }
+    }
+
+    "given a line it cannot decode" should {
+      "throw an IllegalStateException whose message holds the reason and the line" in {
+        val line = """{"item":"progress","pid":1}"""
+        val thrown = the[IllegalStateException] thrownBy TestEventLogDecoder.decode(line)
+        thrown.getMessage shouldBe s"unknown item progress, in $line"
       }
     }
 
@@ -593,7 +605,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(reason)
+          whyUndecodable(line) shouldBe reason
         }
       }
     }
@@ -666,7 +678,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(reason)
+          whyUndecodable(line) shouldBe reason
         }
       }
     }
@@ -744,7 +756,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(reason)
+          whyUndecodable(line) shouldBe reason
         }
       }
     }
@@ -769,7 +781,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(reason)
+          whyUndecodable(line) shouldBe reason
         }
       }
     }
@@ -805,7 +817,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       )
       descriptionsLinesAndReasons.foreach { case (description, line, reason) =>
         s"report that $description cannot be decoded" in {
-          TestEventLogDecoder.decode(line) shouldBe Left(reason)
+          whyUndecodable(line) shouldBe reason
         }
       }
     }
@@ -814,13 +826,12 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       "yield the event of each whole line and no event from the torn line" in {
         val tornLine = throwableWithCauseAndSuppressedLine.take(throwableWithCauseAndSuppressedLine.length / 2)
         val text = runStartedLine + "\n" + structureLine + "\n" + tornLine
-        val decoded = text.split('\n').toVector.map(TestEventLogDecoder.decode)
-        decoded.map(_.isRight) shouldBe Vector(true, true, false)
+        text.split('\n').toVector.map(isDecodable) shouldBe Vector(true, true, false)
       }
       "yield no event from a line torn after any of its characters" in {
         val wholeLines = Seq(runStartedLine, structureLine, throwableWithCauseAndSuppressedLine, runEndedLine)
         val tornLines = wholeLines.flatMap(line => (0 until line.length).map(line.take))
-        tornLines.filter(tornLine => TestEventLogDecoder.decode(tornLine).isRight) shouldBe Seq.empty
+        tornLines.filter(isDecodable) shouldBe Seq.empty
       }
     }
   }

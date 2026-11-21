@@ -1015,13 +1015,6 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     val report = wrapReporterIfNecessary(thisSuite, reporter)
     val newArgs = args.copy(reporter = report)
 
-    // Read in the order 3.2.20 passes them to the filter.
-    def tagsAndSuiteId: (Map[String, Set[String]], String) = {
-      val theTags = tags
-      val theSuiteId = suiteId
-      (theTags, theSuiteId)
-    }
-
     val statusBuffer = new ListBuffer[Status]()
 
     // If a testName is passed to run, just run that, else run the tests returned
@@ -1029,9 +1022,7 @@ trait Suite extends Assertions with Serializable { thisSuite =>
     testName match {
 
       case Some(tn) =>
-        val (theTags, theSuiteId) = tagsAndSuiteId
-        registration.suiteIdRead(theSuiteId)
-        val (filterTest, ignoreTest) = filter(tn, theTags, theSuiteId)
+        val (filterTest, ignoreTest) = registration.filtered(filter, tn, thisSuite)
         if (!filterTest) {
           if (ignoreTest)
             reportTestIgnored(thisSuite, report, tracker, tn, tn, getEscapedIndentedTextForTest(tn, 1, true), Some(getTopOfMethod(thisSuite, tn)), registration.startTestExecution(tn))
@@ -1040,9 +1031,10 @@ trait Suite extends Assertions with Serializable { thisSuite =>
         }
 
       case None =>
-        val (theTags, theSuiteId) = tagsAndSuiteId
+        val theTags = tags
+        val theSuiteId = suiteId
         val keptTests = filter(theTestNames, theTags, theSuiteId)
-        // Kept before the suite ID is, so that a suite no structure holds has its tests in its first structure.
+        // Ahead of suiteIdRead, which can fix the suite's node, so that the first structure written for it holds these tests.
         registration.updateStructureFromTestNames(keptTests)
         registration.suiteIdRead(theSuiteId)
         for ((tn, ignoreTest) <- keptTests) {
@@ -1193,12 +1185,9 @@ trait Suite extends Assertions with Serializable { thisSuite =>
 
         val suiteStartTime = System.currentTimeMillis
 
-        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
-        val ordinal = tracker.nextOrdinal()
-        val nestedSuiteName = nestedSuite.suiteName
-        val nestedSuiteId = nestedSuite.suiteId
-        start.namesRead(nestedSuiteName, nestedSuiteId)
-        start.report(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner))
+        start.report(SuiteStart.suiteStartingReadInOrderOf3_2_20(start, nestedSuite, tracker) { (ordinal, nestedSuiteName, nestedSuiteId) =>
+          SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suiteClassName)), nestedSuite.rerunner)
+        })
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker
@@ -1253,9 +1242,9 @@ trait Suite extends Assertions with Serializable { thisSuite =>
           }
         case Some(distribute) =>
           for (nestedSuite <- nestedSuitesArray) {
-            // The distributor runs the nested suite in the context it is handed the suite in.
             val start = SuiteStart.ofNestedSuite(nestedSuite, reporter)
             val nestedArgs = args.copy(reporter = start.reporter, tracker = tracker.nextTracker())
+            // Distributed in the nested suite's context, which ConcurrentDistributor carries to the suite's thread.
             statusBuffer += start.run(distributeNestedSuite(distribute, nestedSuite, nestedArgs))
           }
       }
@@ -1337,17 +1326,11 @@ trait Suite extends Assertions with Serializable { thisSuite =>
   // MOVE IT
   private[scalatest] def createCatchReporter(reporter: Reporter): Reporter = new WrapperCatchReporter(reporter)
 
-  // A style trait that keeps a registration tree overrides this.
   private[scalatest] def scopesAndTestsOfRegistrationTree: Option[List[RegisteredNode]] = None
 
-  /**
-   * `reporter` is the one this suite would give the nested suite. A suite whose nested suites are top-level suites of a
-   * run that writes a test event log overrides this.
-   */
-  private[scalatest] def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporter: Reporter): SuiteStart =
-    SuiteStart.ofNestedSuite(nestedSuite, reporter)
+  private[scalatest] def startOfNestedSuite(nestedSuite: Suite, filter: Filter, reporterForNestedSuite: Reporter): SuiteStart =
+    SuiteStart.ofNestedSuite(nestedSuite, reporterForNestedSuite)
 
-  // A suite whose nested suites are top-level suites of a run that writes a test event log overrides this.
   private[scalatest] def distributeNestedSuite(distribute: Distributor, nestedSuite: Suite, args: Args): Status =
     distribute(nestedSuite, args)
   
@@ -2162,7 +2145,6 @@ used for test events like succeeded/failed, etc.
   def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite): Map[String, Set[String]] =
     autoTagClassAnnotations(tags, theSuite, theSuite.testNames)
 
-  /** Applies the suite class's tag annotations to `testNames`, which are read only where the class has such an annotation. */
   def autoTagClassAnnotations(tags: Map[String, Set[String]], theSuite: Suite, testNames: => Iterable[String]): Map[String, Set[String]] = {
     // SKIP-SCALATESTJS,NATIVE-START
     val suiteTags = for {

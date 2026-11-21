@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, on a reporter a run constructs from its class name, on which of an error event's message and throwable lines a reporter prints, or on a reporter's output on Scala.js or Native; and before changing a style trait's private registration members.
+description: Where upstream ScalaTest 3.2.20's styles, runners and reporters behave otherwise than their names suggest. Read before relying on how ScalaTest registers, runs, orders or reports tests, changing its style traits, or refactoring code a stack-trace test covers.
 ---
 
 <learning>
@@ -163,4 +163,12 @@ date: 2026-11-18
 For an error event that carries an `IndentedText` formatter, in output that is not unformatted, `StringReporter.stringsToPrintOnError` prints the event's explicit `message` on its own line only where the event's throwable is a `StackDepth` (with the failed code's file and line appended) or a `PropertyCheckFailedException`. With any other throwable, it prints no line for the message, even one that differs from the throwable's, and shows only the throwable's `<class name>: <throwable message>` line and frames. With no throwable, it prints no message line at all. Without an `IndentedText` formatter, or in unformatted output, the message goes in the first line instead, whatever the throwable. ScalaTest formats `TestFailed`, `TestCanceled` and `SuiteAborted` but sends `RunAborted` without a formatter, so a run's abort always shows its message after `*** RUN ABORTED ***`.
 
 A `TestFailed`, `TestCanceled` or `SuiteAborted` carrying both a message and, say, a `RuntimeException` therefore loses the message in output that reproduces 3.2.20's. Write expected output from the throwable's kind, not from the event's `message`.
+</learning>
+
+<learning>
+date: 2026-11-21
+---
+The JDK's `Throwable.printStackTrace`, which Runner uses for an exception it cannot handle, ends a cause's frames with `... N more`, where `N` counts the frames it shares with the enclosing trace. Moving code out of a Scala 3 call site into an ordinary method that takes a by-name body adds frames between the caller and that body: the helper's own, and the by-name closure's lifted body method (`…$$anonfun$N`). `N` then changes, and output compared with ScalaTest 3.2.20's no longer matches.
+
+Where a helper wraps code that may throw into a reported trace, write it as an `inline def` with an `inline` by-name parameter (`inline body: => A`): Scala 3 expands both at the call site, so no frame is added. On Scala 2 sources, keep such code at the call site. Compare printed traces against 3.2.20's after any such extraction.
 </learning>

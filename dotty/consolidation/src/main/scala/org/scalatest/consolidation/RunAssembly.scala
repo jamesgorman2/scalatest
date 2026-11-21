@@ -1,43 +1,110 @@
 package org.scalatest.consolidation
 
+import java.time.Duration
+import java.time.Instant
 import scala.collection.immutable.SortedMap
-import scala.collection.mutable
 import org.scalatest.events.DecodedEvent
-import org.scalatest.events.NodeExecution
+import org.scalatest.events.JsonValue
+import org.scalatest.events.Location
 import org.scalatest.events.NodeId
-import org.scalatest.events.NodePlace
 import org.scalatest.events.RunOutcome
+import org.scalatest.events.SeeStackDepthException
 import org.scalatest.events.StructureNode
 import org.scalatest.events.Summary
+import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestEventLogEvent
 
-/** What attributes a test with no execution to a test that ran: the suite ID of the nearest suite above it, and its test name. */
-private[consolidation] final case class AttributionKey(suiteId: String, testName: String)
+private[consolidation] final case class ExecutionOfNode(node: NodeId, index: ExecutionIndex)
 
-private[consolidation] final case class ExecutionOfNode(node: NodeId, index: Int)
+private[consolidation] final case class RecordedExecutions(byNode: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]]) {
 
-/** An `info`, `note`, `alert` or `markup` message, with the executions of its node's children that had started in its execution when it arrived. */
-private[consolidation] final case class ReceivedMessage(event: DecodedEvent, childrenStarted: Set[ExecutionOfNode])
+  def nodes: Iterator[NodeId] = byNode.keysIterator
 
-/**
- * @param parent the execution of the node's parent that this one ran in, as the first execution path naming it gives
- */
+  def contains(id: NodeId): Boolean = byNode.contains(id)
+
+  def contains(execution: ExecutionOfNode): Boolean = byNode.get(execution.node).exists(_.contains(execution.index))
+
+  def of(id: NodeId): Vector[RecordedExecution] = byNode.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
+
+  def get(execution: ExecutionOfNode): Option[RecordedExecution] = byNode.get(execution.node).flatMap(_.get(execution.index))
+
+  def apply(execution: ExecutionOfNode): RecordedExecution = byNode(execution.node)(execution.index)
+
+  def updated(execution: ExecutionOfNode, recorded: RecordedExecution): RecordedExecutions = {
+    val executionsOfNode = byNode.getOrElse(execution.node, SortedMap.empty[ExecutionIndex, RecordedExecution])
+    RecordedExecutions(byNode.updated(execution.node, executionsOfNode.updated(execution.index, recorded)))
+  }
+}
+
+private[consolidation] object RecordedExecutions {
+
+  val none: RecordedExecutions = RecordedExecutions(Map.empty)
+}
+
+private[consolidation] final case class ReceivedMessage(message: ProvidedMessage, childrenStarted: Set[ExecutionOfNode]) {
+
+  def placedAmong(children: Vector[AssembledNode]): PlacedMessage =
+    PlacedMessage(message, children.lastIndexWhere(hadStarted) + 1)
+
+  private def hadStarted(child: AssembledNode): Boolean =
+    child.execution.index.exists(index => childrenStarted.contains(ExecutionOfNode(child.node.id, index)))
+}
+
 private[consolidation] final case class RecordedExecution(
-  index: Int,
-  startOrder: Int,
+  index: ExecutionIndex,
+  startOrder: StartOrder,
   parent: Option[ExecutionOfNode],
-  events: Vector[DecodedEvent],
+  events: Vector[DecodedEvent.NodeOpening | DecodedEvent.NodeClosing],
   messages: Vector[ReceivedMessage]
 ) {
 
-  def added(event: DecodedEvent): RecordedExecution = copy(events = events :+ event)
+  def added(event: DecodedEvent.NodeOpening | DecodedEvent.NodeClosing): RecordedExecution = copy(events = events :+ event)
 
   def added(message: ReceivedMessage): RecordedExecution = copy(messages = messages :+ message)
 
   def holds(isOfKind: DecodedEvent => Boolean): Boolean = events.exists(isOfKind)
+
+  def suiteAborted: Option[DecodedEvent.SuiteAborted] = events.collectFirst { case aborted: DecodedEvent.SuiteAborted => aborted }
+
+  def closingEvent: Option[DecodedEvent.NodeClosing] =
+    // The `SuiteAborted` of the `DistributedTestRunnerSuite` that ran a test ends that test even when the test's own
+    // closing event came first, as when the suite's `afterEach` throws after the test succeeded.
+    suiteAborted.orElse(events.collectFirst { case closing: DecodedEvent.NodeClosing => closing })
+
+  def opening: Option[NodeEvent] = events.collectFirst { case opening: DecodedEvent.NodeOpening => NodeEvent.of(opening) }
+
+  def closing: Option[NodeEvent] = closingEvent.map(NodeEvent.of)
+
+  def failureEnding: Option[FailureEnding] = closingEvent.collect { case failure: DecodedEvent.NodeFailure => FailureEnding.of(failure) }
+
+  def suiteOutcome(runFinished: Boolean, runEndedAbnormally: Boolean): Option[NodeOutcome] = {
+    val completed = holds(_.isInstanceOf[DecodedEvent.SuiteCompleted])
+    // A suite run by a test sends no `SuiteStarting`, so it is not marked aborted when its run ends normally.
+    val opened = holds(_.isInstanceOf[DecodedEvent.SuiteStarting])
+    if (suiteAborted.nonEmpty) Some(NodeOutcome.Aborted)
+    else NodeOutcome.abortedWhere(!completed && (runEndedAbnormally || (runFinished && opened)))
+  }
+
+  def scopeOutcome(abortedWhereOpen: Boolean): Option[NodeOutcome] =
+    if (holds(_.isInstanceOf[DecodedEvent.ScopePending]))
+      Some(NodeOutcome.Pending)
+    else if (holds(_.isInstanceOf[DecodedEvent.ScopeClosed]))
+      None
+    else
+      NodeOutcome.abortedWhere(abortedWhereOpen)
+
+  def testOutcome(abortedWhereOpen: Boolean): Option[NodeOutcome] =
+    closingEvent.collect {
+      case _: DecodedEvent.TestSucceeded => NodeOutcome.Succeeded
+      case _: DecodedEvent.TestFailed => NodeOutcome.Failed
+      case _: DecodedEvent.TestIgnored => NodeOutcome.Ignored
+      case _: DecodedEvent.TestPending => NodeOutcome.Pending
+      case _: DecodedEvent.TestCanceled => NodeOutcome.Canceled
+      case _: DecodedEvent.SuiteAborted => NodeOutcome.Aborted
+    }.orElse(NodeOutcome.abortedWhere(abortedWhereOpen))
 }
 
-/** The outcome a node's events give it. A scope that opened and closed, and a suite that did not abort, have none. */
 private[consolidation] enum NodeOutcome {
   case Succeeded
   case Failed
@@ -50,532 +117,214 @@ private[consolidation] enum NodeOutcome {
   def isAbortedOrNotRun: Boolean = this == Aborted || this == NotRun
 }
 
-/**
- * A node's children in two groups.
- *
- * @param inDeclaredOrder its scopes, tests and suites with a declared position, each further run of such a suite
- *                        directly after it
- * @param unplacedSuites suites without a declared position that share no suite ID with a placed sibling; assembly
- *                       orders their executions by name, then start order
- */
+private[consolidation] object NodeOutcome {
+
+  def abortedWhere(aborted: Boolean): Option[NodeOutcome] = Option.when(aborted)(Aborted)
+}
+
 private[consolidation] final case class OrderedChildren(inDeclaredOrder: Vector[StructureNode], unplacedSuites: Vector[StructureNode])
 
-/** A message of a suite, scope or test, placed after the first `childrenBefore` of the children shown under its execution. */
-private[consolidation] final case class PlacedMessage(event: DecodedEvent, childrenBefore: Int)
+private[consolidation] final case class PlacedMessage(message: ProvidedMessage, childrenBefore: Int)
 
-/**
- * @param index absent where the node has no execution
- * @param ending the `TestFailed`, `TestCanceled` or `SuiteAborted` whose lines sit under the execution's line
- * @param opening the execution's first `SuiteStarting`, `ScopeOpened` or `TestStarting`
- * @param closing the execution's `SuiteAborted`, else its first event that ends it
- * @param abortedAt for an aborted execution with no closing event of its own, the time of the nearest enclosing aborted
- *                  suite's `SuiteAborted`, else of the run's `RunAborted`
- * @param children the nodes shown under this execution, in order: a suite, scope or test once for each of its
- *                 executions that ran in this one
- */
 private[consolidation] final case class AssembledExecution(
-  index: Option[Int],
+  index: Option[ExecutionIndex],
   outcome: Option[NodeOutcome],
-  ending: Option[DecodedEvent],
+  ending: Option[FailureEnding],
   opening: Option[NodeEvent],
   closing: Option[NodeEvent],
-  abortedAt: Option[Long],
+  abortedAt: Option[Instant],
   messages: Vector[PlacedMessage],
   children: Vector[AssembledNode]
 ) {
 
   def started: Boolean = index.nonEmpty || children.exists(_.started)
 
-  // A collapsed execution shows the nodes below it only as a count.
   def isCollapsed: Boolean =
     outcome.exists(_.isAbortedOrNotRun) && !children.exists(_.started)
 
-  def descendants: Vector[AssembledNode] = children.flatMap(child => child +: child.descendants)
+  def descendants: Vector[AssembledNode] = children.flatMap(_.withDescendants)
+
+  def ownScopesAndTests: Vector[AssembledNode] =
+    children.filter(_.kind.isScopeOrTest).flatMap(child => child +: child.execution.ownScopesAndTests)
 }
 
-/** A node of a run's test structure as the human-readable output shows it, once for each of its executions. */
 private[consolidation] final case class AssembledNode(node: StructureNode, execution: AssembledExecution) {
 
   def name: String = node.name
 
+  def kind: NodeKind = NodeKind.of(node)
+
+  def label: Option[String] =
+    node match {
+      case _: StructureNode.Suite => None
+      case scope: StructureNode.Scope => Some(scope.label)
+      case test: StructureNode.Test => Some(test.label)
+    }
+
+  def suiteId: Option[SuiteId] =
+    node match {
+      case suite: StructureNode.Suite => Some(suite.suiteId)
+      case _ => None
+    }
+
   def started: Boolean = execution.started
 
   def descendants: Vector[AssembledNode] = execution.descendants
+
+  def withDescendants: Vector[AssembledNode] = this +: descendants
+
+  def startedAt: Option[Instant] = execution.opening.map(_.at)
+
+  def endedAt: Option[Instant] = execution.closing.map(_.at).orElse(execution.abortedAt)
+
+  def duration: Option[Duration] = {
+    val measured = for (started <- startedAt; ended <- endedAt) yield Duration.between(started, ended)
+    kind match {
+      // A scope's closing event carries no duration.
+      case NodeKind.Scope => measured
+      case _ => execution.closing.fold(measured)(_.duration)
+    }
+  }
+
+  def threadName: Option[String] =
+    kind match {
+      case NodeKind.Scope => None
+      case _ => execution.opening.orElse(execution.closing).map(_.threadName)
+    }
+
+  def eventLocation: Option[Location] = {
+    val events = kind match {
+      case NodeKind.Scope => execution.opening.toVector
+      case _ => (execution.opening ++ execution.closing).toVector
+    }
+    events.flatMap(_.location).find(_ != SeeStackDepthException)
+  }
 }
 
-/** What the run's closing event, its first `RunCompleted`, `RunStopped` or `RunAborted`, reports. */
-private[consolidation] final case class RunClosing(timeStamp: Long, duration: Option[Long], summary: Option[Summary])
+private[consolidation] final case class RunClosing(at: Instant, duration: Option[Duration], summary: Option[Summary])
 
-private[consolidation] final case class RunDiscovery(startedAt: Long, duration: Option[Long])
+private[consolidation] object RunClosing {
 
-/** A message attached to a run rather than to a node, or a line captured from the run's processes. */
+  def of(event: DecodedEvent.RunClosing): RunClosing = {
+    val summary = event match {
+      case completed: DecodedEvent.RunCompleted => completed.summary
+      case stopped: DecodedEvent.RunStopped => stopped.summary
+      case aborted: DecodedEvent.RunAborted => aborted.summary
+    }
+    RunClosing(Instant.ofEpochMilli(event.timeStamp), event.duration.map(Duration.ofMillis), summary)
+  }
+}
+
+private[consolidation] final case class RunDiscovery(startedAt: Instant, duration: Option[Duration]) {
+
+  def toJson: JsonValue =
+    JsonOutputWriter.objectOf(
+      Vector(
+        "startedAt" -> Some(JsonOutputWriter.epochMillis(startedAt)),
+        "duration" -> duration.map(JsonOutputWriter.millis)
+      )
+    )
+}
+
+private[consolidation] object RunDiscovery {
+
+  def of(started: DecodedEvent.DiscoveryStarting, completed: DecodedEvent.DiscoveryCompleted): RunDiscovery =
+    RunDiscovery(Instant.ofEpochMilli(started.timeStamp), completed.duration.map(Duration.ofMillis))
+}
+
 private[consolidation] enum RunOutput {
-  case Message(event: DecodedEvent)
+  case Message(message: ProvidedMessage)
   case Captured(line: CapturedLine)
 }
 
-/**
- * Builds one run's test structure from its event stream as the stream arrives. It keeps each node's structure by
- * node path, and the node's executions separately, by execution index.
- *
- * @param number the run's place, from 1, among its module's runs in the order they were added
- */
-private[consolidation] final class RunAssembly(val label: TestRunLabel, val number: Int) {
+private[consolidation] final case class AssembledEventStream(
+  starting: Option[DecodedEvent.RunStarting],
+  discovery: Option[RunDiscovery],
+  closing: Option[RunClosing],
+  outcome: Option[RunOutcome],
+  abort: Option[DecodedEvent.RunAborted],
+  suiteClasses: Set[TestClassName],
+  topLevelSuites: Vector[AssembledNode]
+) {
 
-  private val structure = mutable.LinkedHashMap.empty[NodeId, StructureNode]
-  private val childIds = mutable.Map.empty[NodeId, mutable.Set[NodeId]]
-  private val latestScopesAndTests = mutable.Map.empty[NodeId, Set[NodeId]]
-  private val firstScopeOrTestPosition = mutable.Map.empty[NodeId, Int]
-  private val executions = mutable.Map.empty[NodeId, SortedMap[Int, RecordedExecution]]
-  private var executionsStarted = 0
-  private var received = Vector.empty[RunOutput]
-  private var starting = Option.empty[DecodedEvent.RunStarting]
-  private var discoveryStart = Option.empty[DecodedEvent.DiscoveryStarting]
-  private var discoveryEnd = Option.empty[DecodedEvent.DiscoveryCompleted]
-  private var closingEvent = Option.empty[RunClosing]
-  private var abort = Option.empty[DecodedEvent.RunAborted]
-  private var ending = Option.empty[RunOutcome]
-  private var eventStreamOpen = true
-  private var assembledTree = Vector.empty[AssembledNode]
+  def startedAt: Option[Instant] = starting.map(started => Instant.ofEpochMilli(started.timeStamp))
 
-  def isEventStreamOpen: Boolean = eventStreamOpen
+  def endedAbnormally: Boolean = outcome.exists(_.isAbnormal)
 
-  /** How the run ended, from its `runEnded` event alone: absent until that event arrives. */
-  def outcome: Option[RunOutcome] = ending
+  def failsTestCommand: Boolean =
+    outcome.isEmpty || topLevelSuites.exists(_.withDescendants.exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
+}
 
-  /** The run's first `RunAborted`, whose message and throwable explain an aborted run's end. */
-  def runAborted: Option[DecodedEvent.RunAborted] = abort
+private[consolidation] final case class AssembledRun(
+  module: ModuleName,
+  worker: Option[Worker],
+  eventStream: AssembledEventStream,
+  output: Vector[RunOutput],
+  assignedTestClasses: Vector[TestClassName]
+) {
 
-  /** The run's first `RunStarting`. */
-  def runStarting: Option[DecodedEvent.RunStarting] = starting
+  def ranNoneOfItsAssignedTestClasses: Boolean =
+    assignedTestClasses.nonEmpty && !assignedTestClasses.exists(eventStream.suiteClasses.contains)
+}
 
-  /** From the run's first `DiscoveryStarting` and first `DiscoveryCompleted`, where it reported both. */
-  def discovery: Option[RunDiscovery] =
-    for (started <- discoveryStart; completed <- discoveryEnd) yield RunDiscovery(started.timeStamp, completed.duration)
+private[consolidation] object AssembledRun {
 
-  def closing: Option[RunClosing] = closingEvent
+  val numberingOrder: Ordering[Option[Worker]] =
+    Ordering.Option(Ordering.by[Worker, (Int, Int)](worker => (worker.forkGroup.position, worker.index.value)))
+}
 
-  def output: Vector[RunOutput] = received
+private[consolidation] final case class RunAssembly private (
+  module: ModuleName,
+  worker: Option[Worker],
+  assembleTopLevelSuites: RecordedRun => Vector[AssembledNode],
+  recorded: RecordedRun,
+  output: Vector[RunOutput],
+  assignedTestClasses: Vector[TestClassName]
+) {
 
-  def add(event: TestEventLogEvent): Unit = {
-    require(eventStreamOpen, s"the event stream of a run under ${label.value} has ended")
-    event match {
-      case TestEventLogEvent.Structure(nodes) =>
-        addStructure(nodes)
-      case TestEventLogEvent.ScalaTestEvent(Some(nodeExecution), decoded) =>
-        addToExecution(nodeExecution, decoded)
-      case TestEventLogEvent.ScalaTestEvent(None, decoded) =>
-        addToRun(decoded)
-      case TestEventLogEvent.RunEnded(runOutcome) =>
-        ending = Some(runOutcome)
-      case _: TestEventLogEvent.RunStarted =>
-        ()
-    }
-  }
+  def added(event: TestEventLogEvent): RunAssembly =
+    copy(recorded = recorded.added(event), output = output ++ RunAssembly.runMessageOf(event))
 
-  def add(line: CapturedLine): Unit = received :+= RunOutput.Captured(line)
+  def added(line: CapturedLine): RunAssembly = copy(output = output :+ RunOutput.Captured(line))
 
-  /** Ends the event stream and assembles the run's tree, which every later reader of the tree shares. */
-  def endEventStream(): Unit =
-    if (eventStreamOpen) {
-      eventStreamOpen = false
-      assembledTree = new TreeAssembler().topLevelSuites
-    }
+  def withAssigned(classes: Iterable[TestClassName]): RunAssembly = copy(assignedTestClasses = assignedTestClasses ++ classes)
 
-  /**
-   * The run's top-level suites, once for each execution, by name and then by the order the executions started. Attributed
-   * nodes are left out. Attribution needs the whole event stream, so this requires it to have ended.
-   */
-  def topLevelSuites: Vector[AssembledNode] = {
-    require(!eventStreamOpen, s"the event stream of a run under ${label.value} has not ended")
-    assembledTree
-  }
+  def assembledWholeEventStream: AssembledEventStream =
+    AssembledEventStream(
+      recorded.starting,
+      recorded.discovery,
+      recorded.closing,
+      recorded.outcome,
+      recorded.abort,
+      recorded.suiteClasses,
+      assembleTopLevelSuites(recorded)
+    )
 
-  /**
-   * Whether any suite, scope or test execution in the assembled tree is aborted or not run.
-   * Attributed nodes are not in the tree, so they never count. Requires the event stream to have ended.
-   */
-  def holdsAbortedOrNotRunNode: Boolean =
-    topLevelSuites.exists(suite => (suite +: suite.descendants).exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
-
-  /**
-   * Assembles the run's tree from its whole event stream, once. It works out once per node whether the node started
-   * and which tests are below it.
-   */
-  private final class TreeAssembler {
-
-    private val runFinished = ending.nonEmpty
-    private val runEndedAbnormally = RunAssembly.isAbnormal(ending)
-    private val childrenByParent = structure.values.toVector.groupBy(_.parentId)
-    private val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
-    private val keysOfTestsThatRan = executions.keysIterator.flatMap(RunAssembly.attributionKeyOf).toSet
-    private val startedById = mutable.HashMap.empty[NodeId, Boolean]
-    private val testsBelowById = mutable.HashMap.empty[NodeId, Vector[NodeId]]
-    private val shownChildrenById = mutable.HashMap.empty[NodeId, OrderedChildren]
-
-    def topLevelSuites: Vector[AssembledNode] =
-      inNameAndStartOrder(
-        childrenByParent.getOrElse(None, Vector.empty).filterNot(isAttributed).flatMap(suite => assembledNodes(suite, executionIndexesOf(suite.id), abortedSuiteAround = None))
-      )
-
-    private def childrenOf(id: NodeId): Vector[StructureNode] = childrenByParent.getOrElse(Some(id), Vector.empty)
-
-    private def started(id: NodeId): Boolean =
-      startedById.getOrElseUpdate(id, executions.contains(id) || childrenOf(id).exists(child => started(child.id)))
-
-    private def testsBelow(id: NodeId): Vector[NodeId] =
-      testsBelowById.getOrElseUpdate(id, {
-        childrenOf(id).flatMap {
-          case test: StructureNode.Test => Vector(test.id)
-          case suiteOrScope => testsBelow(suiteOrScope.id)
-        }
-      })
-
-    private def isAttributedTest(id: NodeId): Boolean =
-      !executions.contains(id) && RunAssembly.attributionKeyOf(id).exists(keysOfTestsThatRan)
-
-    private def isAttributed(node: StructureNode): Boolean =
-      node match {
-        case test: StructureNode.Test => isAttributedTest(test.id)
-        case suiteOrScope =>
-          val id = suiteOrScope.id
-          val tests = testsBelow(id)
-          !started(id) && tests.nonEmpty && tests.forall(isAttributedTest)
-      }
-
-    private def shownChildrenOf(id: NodeId): OrderedChildren =
-      shownChildrenById.getOrElseUpdate(id, orderedChildren(id, childrenOf(id).filterNot(isAttributed)))
-
-    // A node's scopes and tests by declared position; at a shared position, one the latest structure drops follows
-    // one it holds. A suite's nested suites sit before or after them, as the emitter's numbering placed them. A suite a
-    // later structure added that shares a suite ID with a placed sibling sits directly after the last sibling with that
-    // suite ID, in the order such suites arrived.
-    private def orderedChildren(parent: NodeId, children: Vector[StructureNode]): OrderedChildren = {
-      val scopesAndTests = children.filter(RunAssembly.isScopeOrTest).sortBy(child => (RunAssembly.declaredPositionOf(child), isDropped(child)))
-      val suites = children.collect { case suite: StructureNode.Suite => suite }
-      val (placedSuites, suitesWithoutPosition) = suites.partition(_.position.nonEmpty)
-      val (furtherRunsOfPlacedSuites, otherSuites) = suitesWithoutPosition.partition(suite => placedSuites.exists(_.suiteId == suite.suiteId))
-      val firstScopeOrTest = firstScopeOrTestPosition.get(parent)
-      val (suitesBefore, suitesAfter) =
-        placedSuites.sortBy(_.position).partition(suite => firstScopeOrTest.exists(first => suite.position.exists(_ < first)))
-      OrderedChildren(furtherRunsOfPlacedSuites.foldLeft(suitesBefore ++ scopesAndTests ++ suitesAfter)(RunAssembly.withAddedSuite), otherSuites)
-    }
-
-    private def isDropped(node: StructureNode): Boolean =
-      RunAssembly.isScopeOrTest(node) &&
-        !suiteOf(node).exists(suite => latestScopesAndTests.getOrElse(suite, Set.empty).contains(node.id))
-
-    private def suiteOf(node: StructureNode): Option[NodeId] =
-      node match {
-        case suite: StructureNode.Suite => Some(suite.id)
-        case scopeOrTest => scopeOrTest.parentId.flatMap(structure.get).flatMap(suiteOf)
-      }
-
-    private def executionIndexesOf(id: NodeId): Vector[Option[Int]] = {
-      val indexes = executionsOf(id).map(_.index)
-      if (indexes.isEmpty) Vector(None) else indexes.map(Some(_))
-    }
-
-    private def executionOf(id: NodeId, index: Option[Int]): Option[RecordedExecution] =
-      index.flatMap(executionIndex => executions.get(id).flatMap(_.get(executionIndex)))
-
-    // An execution sits under the parent execution its path names. A node with no execution, and an execution whose
-    // path names no execution of the node's latest parent, sit under the parent's latest.
-    private def parentIndexOf(id: NodeId, index: Option[Int], parent: NodeId, parentsLatest: Option[Int]): Option[Int] =
-      executionOf(id, index)
-        .flatMap(_.parent)
-        .filter(named => named.node == parent && executions.get(parent).exists(_.contains(named.index)))
-        .map(_.index)
-        .orElse(parentsLatest)
-
-    private def assembledNodes(node: StructureNode, indexes: Vector[Option[Int]], abortedSuiteAround: Option[DecodedEvent.SuiteAborted]): Vector[AssembledNode] =
-      indexes.map(index => AssembledNode(node, assembledExecution(node, index, abortedSuiteAround)))
-
-    // A suite with no execution follows the executions of its name, in the order the structures first named those
-    // suites.
-    private def inNameAndStartOrder(suites: Vector[AssembledNode]): Vector[AssembledNode] =
-      suites.sortBy { suite =>
-        val id = suite.node.id
-        val startOrder = executionOf(id, suite.execution.index).map(_.startOrder)
-        (suite.name, startOrder.fold((1, orderFirstHeld(id)))((0, _)))
-      }
-
-    private def assembledUnder(
-      child: StructureNode,
-      parent: NodeId,
-      parentIndex: Option[Int],
-      parentsLatest: Option[Int],
-      abortedSuiteAround: Option[DecodedEvent.SuiteAborted]
-    ): Vector[AssembledNode] = {
-      val id = child.id
-      val indexesHere = executionIndexesOf(id).filter(index => parentIndexOf(id, index, parent, parentsLatest) == parentIndex)
-      assembledNodes(child, indexesHere, abortedSuiteAround)
-    }
-
-    private def assembledExecution(node: StructureNode, index: Option[Int], abortedSuiteAround: Option[DecodedEvent.SuiteAborted]): AssembledExecution = {
-      val id = node.id
-      val execution = executionOf(id, index)
-      val abortedSuiteHere = RunAssembly.suiteAbortOf(node, execution).orElse(abortedSuiteAround)
-      val latest = executionIndexesOf(id).last
-      val shownChildren = shownChildrenOf(id)
-      def assembled(children: Vector[StructureNode]): Vector[AssembledNode] =
-        children.flatMap(assembledUnder(_, id, index, latest, abortedSuiteHere))
-      val children = assembled(shownChildren.inDeclaredOrder) ++ inNameAndStartOrder(assembled(shownChildren.unplacedSuites))
-      val executionStarted = execution.nonEmpty || children.exists(_.started)
-      val outcome = RunAssembly.outcomeOf(
-        node,
-        execution,
-        openScopeOrTestAborted = abortedSuiteHere.nonEmpty || runEndedAbnormally,
-        runFinished = runFinished,
-        runEndedAbnormally = runEndedAbnormally,
-        started = executionStarted
-      )
-      val closing = execution.flatMap(RunAssembly.closingEventOf).flatMap(NodeEvent.closingOf)
-      AssembledExecution(
-        index,
-        outcome,
-        execution.flatMap(RunAssembly.endingOf),
-        execution.flatMap(_.events.iterator.flatMap(NodeEvent.openingOf).nextOption()),
-        closing,
-        Option.when(outcome.contains(NodeOutcome.Aborted) && closing.isEmpty)(abortTime(abortedSuiteAround)).flatten,
-        execution.fold(Vector.empty[PlacedMessage])(_.messages.map(RunAssembly.placed(_, children))),
-        children
-      )
-    }
-
-    private def abortTime(abortedSuiteAround: Option[DecodedEvent.SuiteAborted]): Option[Long] =
-      abortedSuiteAround.map(_.timeStamp).orElse(abort.map(_.timeStamp))
-  }
-
-  // A further structure holds its suites' scopes and tests whole. A scope or test it drops keeps the parent, position
-  // and label it last had. The emitter numbers a suite's scopes and tests from the same first position in every
-  // structure, so the first structure holding any of them gives that position.
-  private def addStructure(nodes: IndexedSeq[StructureNode]): Unit = {
-    val suites = nodes.collect { case suite: StructureNode.Suite => suite.id }
-    nodes.foreach(addToStructure)
-    val suiteOfNode = nodes.foldLeft(Map.empty[NodeId, NodeId]) { (suites, node) =>
-      node match {
-        case suite: StructureNode.Suite => suites.updated(suite.id, suite.id)
-        case scopeOrTest => scopeOrTest.parentId.flatMap(suites.get).fold(suites)(suites.updated(scopeOrTest.id, _))
-      }
-    }
-    val scopesAndTests = nodes.filter(RunAssembly.isScopeOrTest)
-    val positionsByParent = scopesAndTests.groupMap(_.parentId)(RunAssembly.declaredPositionOf)
-    val scopesAndTestsBySuite = scopesAndTests.groupMap(node => suiteOfNode.get(node.id))(_.id)
-    suites.filterNot(firstScopeOrTestPosition.contains).foreach { suite =>
-      positionsByParent.get(Some(suite)).flatMap(_.minOption).foreach(firstScopeOrTestPosition(suite) = _)
-    }
-    suites.foreach { suite =>
-      latestScopesAndTests(suite) = scopesAndTestsBySuite.getOrElse(Some(suite), Vector.empty).toSet
-    }
-  }
-
-  private def addToStructure(node: StructureNode): Unit = {
-    val id = node.id
-    structure.get(id).flatMap(_.parentId).foreach(previousParent => childIds.get(previousParent).foreach(_ -= id))
-    structure(id) = node
-    node.parentId.foreach(parent => childIds.getOrElseUpdate(parent, mutable.Set.empty) += id)
-  }
-
-  private def executionsOf(id: NodeId): Vector[RecordedExecution] = executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
-
-  // An event assigned to the run rather than to a node is handled by kind:
-  // - a run or discovery event records the run's own state; only the first of each kind is kept;
-  // - a message is added to the run's output;
-  // - any other event, such as a `DiscoverySuite`'s events (which the emitter assigns to the run), is dropped.
-  private def addToRun(event: DecodedEvent): Unit =
-    event match {
-      case started: DecodedEvent.RunStarting =>
-        if (starting.isEmpty) starting = Some(started)
-      case started: DecodedEvent.DiscoveryStarting =>
-        if (discoveryStart.isEmpty) discoveryStart = Some(started)
-      case completed: DecodedEvent.DiscoveryCompleted =>
-        if (discoveryEnd.isEmpty) discoveryEnd = Some(completed)
-      case completed: DecodedEvent.RunCompleted =>
-        close(RunClosing(completed.timeStamp, completed.duration, completed.summary))
-      case stopped: DecodedEvent.RunStopped =>
-        close(RunClosing(stopped.timeStamp, stopped.duration, stopped.summary))
-      case aborted: DecodedEvent.RunAborted =>
-        if (abort.isEmpty) abort = Some(aborted)
-        close(RunClosing(aborted.timeStamp, aborted.duration, aborted.summary))
-      case message if RunAssembly.isMessage(message) =>
-        received :+= RunOutput.Message(message)
-      case _ =>
-        ()
-    }
-
-  private def close(closed: RunClosing): Unit = if (closingEvent.isEmpty) closingEvent = Some(closed)
-
-  private def addToExecution(nodeExecution: NodeExecution, event: DecodedEvent): Unit = {
-    recordExecutionPath(nodeExecution)
-    val node = nodeExecution.node
-    val index = nodeExecution.executionIndex
-    val execution = executions(node)(index)
-    val updated =
-      if (RunAssembly.isMessage(event)) execution.added(ReceivedMessage(event, childrenStarted(node, index)))
-      else execution.added(event)
-    executions(node) = executions(node).updated(index, updated)
-  }
-
-  // Reads the execution path against the latest structure:
-  // - its last index is the node's own; each earlier index belongs to the parent, then the grandparent, and so on,
-  //   counting each scope between a test and its suite;
-  // - an execution keeps the parent execution it first had;
-  // - start order runs top down, so a parent's start precedes its child's.
-  private def recordExecutionPath(nodeExecution: NodeExecution): Unit = {
-    val nodesUp = Iterator.unfold(Option(nodeExecution.node))(_.map(node => (node, structure.get(node).flatMap(_.parentId)))).toVector
-    val executionsUp = nodesUp.zip(nodeExecution.executionPath.reverse).map((node, index) => ExecutionOfNode(node, index))
-    executionsUp.indices.reverse.foreach { position =>
-      val execution = executionsUp(position)
-      val nodeExecutions = executions.getOrElse(execution.node, SortedMap.empty[Int, RecordedExecution])
-      if (!nodeExecutions.contains(execution.index)) {
-        executionsStarted += 1
-        val recorded = RecordedExecution(execution.index, executionsStarted, executionsUp.lift(position + 1), Vector.empty, Vector.empty)
-        executions(execution.node) = nodeExecutions.updated(execution.index, recorded)
-      }
-    }
-  }
-
-  private def childrenStarted(parent: NodeId, parentExecution: Int): Set[ExecutionOfNode] =
-    childIds.get(parent).fold(Set.empty[ExecutionOfNode]) { children =>
-      children.iterator.flatMap { child =>
-        executionsOf(child)
-          .filter(_.parent.contains(ExecutionOfNode(parent, parentExecution)))
-          .map(execution => ExecutionOfNode(child, execution.index))
-      }.toSet
-    }
+  def assembled(eventStream: AssembledEventStream): AssembledRun = AssembledRun(module, worker, eventStream, output, assignedTestClasses)
 }
 
 private[consolidation] object RunAssembly {
 
+  def apply(module: ModuleName, worker: Option[Worker]): RunAssembly = apply(module, worker, TreeAssembler.topLevelSuitesOf)
+
+  def apply(module: ModuleName, worker: Option[Worker], assembleTopLevelSuites: RecordedRun => Vector[AssembledNode]): RunAssembly =
+    new RunAssembly(module, worker, assembleTopLevelSuites, RecordedRun.empty, Vector.empty, Vector.empty)
+
   def reportsFailure(event: TestEventLogEvent): Boolean =
     event match {
-      case TestEventLogEvent.ScalaTestEvent(_, decoded) => isFailureEnding(decoded)
+      case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.NodeFailure) => true
       case _ => false
     }
 
-  def endsOtherThanCompleted(event: TestEventLogEvent): Boolean =
+  def endsRunAbnormally(event: TestEventLogEvent): Boolean =
     event match {
-      case TestEventLogEvent.RunEnded(outcome) => isAbnormal(Some(outcome))
+      case TestEventLogEvent.RunEnded(outcome) => outcome.isAbnormal
       case _ => false
     }
 
-  private def isAbnormal(outcome: Option[RunOutcome]): Boolean = outcome.exists(_ != RunOutcome.Completed)
-
-  private def isMessage(event: DecodedEvent): Boolean =
+  private def runMessageOf(event: TestEventLogEvent): Option[RunOutput] =
     event match {
-      case _: DecodedEvent.InfoProvided | _: DecodedEvent.NoteProvided | _: DecodedEvent.AlertProvided | _: DecodedEvent.MarkupProvided => true
-      case _ => false
-    }
-
-  private def isScopeOrTest(node: StructureNode): Boolean = !node.isInstanceOf[StructureNode.Suite]
-
-  // The place before a test's is its suite's, which gives the suite ID.
-  private def attributionKeyOf(id: NodeId): Option[AttributionKey] =
-    id.places.takeRight(2) match {
-      case Vector(NodePlace.Suite(suiteId, _), NodePlace.Test(testName)) => Some(AttributionKey(suiteId, testName))
+      case TestEventLogEvent.ScalaTestEvent(None, message: DecodedEvent.Message) => Some(RunOutput.Message(ProvidedMessage.of(message)))
       case _ => None
     }
-
-  private def withAddedSuite(siblings: Vector[StructureNode], added: StructureNode.Suite): Vector[StructureNode] = {
-    val lastSharingSuiteId = siblings.lastIndexWhere {
-      case sibling: StructureNode.Suite => sibling.suiteId == added.suiteId
-      case _ => false
-    }
-    if (lastSharingSuiteId < 0) siblings :+ added else siblings.patch(lastSharingSuiteId + 1, Vector(added), 0)
-  }
-
-  private def declaredPositionOf(node: StructureNode): Int =
-    node match {
-      case suite: StructureNode.Suite => suite.position.getOrElse(Int.MaxValue)
-      case scope: StructureNode.Scope => scope.position
-      case test: StructureNode.Test => test.position
-    }
-
-  // A message sits after the last of the children shown under its execution that had started when it arrived.
-  private def placed(message: ReceivedMessage, children: Vector[AssembledNode]): PlacedMessage =
-    PlacedMessage(message.event, children.lastIndexWhere(hadStarted(message, _)) + 1)
-
-  private def hadStarted(message: ReceivedMessage, child: AssembledNode): Boolean =
-    child.execution.index.exists(index => message.childrenStarted.contains(ExecutionOfNode(child.node.id, index)))
-
-  private def suiteAbortOf(node: StructureNode, execution: Option[RecordedExecution]): Option[DecodedEvent.SuiteAborted] =
-    if (node.isInstanceOf[StructureNode.Suite]) execution.flatMap(_.events.collectFirst { case aborted: DecodedEvent.SuiteAborted => aborted })
-    else None
-
-  // A `DistributedTestRunnerSuite`'s `SuiteAborted` ends the test it ran even where the test's own closing event came
-  // first, as when the suite's `afterEach` throws after the test succeeded.
-  private def closingEventOf(execution: RecordedExecution): Option[DecodedEvent] =
-    execution.events
-      .collectFirst { case aborted: DecodedEvent.SuiteAborted => aborted }
-      .orElse(execution.events.find(event => NodeEvent.closingOf(event).nonEmpty))
-
-  private def endingOf(execution: RecordedExecution): Option[DecodedEvent] = closingEventOf(execution).filter(isFailureEnding)
-
-  private def isFailureEnding(event: DecodedEvent): Boolean =
-    event match {
-      case _: DecodedEvent.TestFailed | _: DecodedEvent.TestCanceled | _: DecodedEvent.SuiteAborted => true
-      case _ => false
-    }
-
-  // Marks as aborted:
-  // - a test whose own execution holds the `SuiteAborted` of the `DistributedTestRunnerSuite` that ran it;
-  // - a scope or test still open when its suite aborted, or when its run aborted or stopped;
-  // - a suite still open when its run aborted or stopped;
-  // - a suite, scope or test with a start event and no closing event, in a run that ended.
-  // A suite run by a test sends no start event, so the last case never marks it aborted.
-  private def outcomeOf(
-    node: StructureNode,
-    execution: Option[RecordedExecution],
-    openScopeOrTestAborted: Boolean,
-    runFinished: Boolean,
-    runEndedAbnormally: Boolean,
-    started: Boolean
-  ): Option[NodeOutcome] =
-    (node, execution) match {
-      case (_: StructureNode.Suite, _) =>
-        suiteOutcome(node, execution, runFinished = runFinished, runEndedAbnormally = runEndedAbnormally, started = started)
-      case (test: StructureNode.Test, None) => Some(if (test.ignored) NodeOutcome.Ignored else NodeOutcome.NotRun)
-      case (_, None) => Some(NodeOutcome.NotRun)
-      case (_: StructureNode.Scope, Some(execution)) =>
-        scopeOutcome(execution, openScopeOrTestAborted = openScopeOrTestAborted || (runFinished && execution.holds(_.isInstanceOf[DecodedEvent.ScopeOpened])))
-      case (_: StructureNode.Test, Some(execution)) =>
-        testOutcome(execution, openScopeOrTestAborted = openScopeOrTestAborted || (runFinished && execution.holds(_.isInstanceOf[DecodedEvent.TestStarting])))
-    }
-
-  private def suiteOutcome(
-    node: StructureNode,
-    execution: Option[RecordedExecution],
-    runFinished: Boolean,
-    runEndedAbnormally: Boolean,
-    started: Boolean
-  ): Option[NodeOutcome] = {
-    val completed = execution.exists(_.holds(_.isInstanceOf[DecodedEvent.SuiteCompleted]))
-    val opened = execution.exists(_.holds(_.isInstanceOf[DecodedEvent.SuiteStarting]))
-    if (!started) Some(NodeOutcome.NotRun)
-    else if (suiteAbortOf(node, execution).nonEmpty) Some(NodeOutcome.Aborted)
-    else if (!completed && (runEndedAbnormally || (runFinished && opened))) Some(NodeOutcome.Aborted)
-    else None
-  }
-
-  private def scopeOutcome(execution: RecordedExecution, openScopeOrTestAborted: Boolean): Option[NodeOutcome] =
-    if (execution.holds(_.isInstanceOf[DecodedEvent.ScopePending]))
-      Some(NodeOutcome.Pending)
-    else if (execution.holds(_.isInstanceOf[DecodedEvent.ScopeClosed]))
-      None
-    else
-      abortedWhereOpen(openScopeOrTestAborted)
-
-  private def testOutcome(execution: RecordedExecution, openScopeOrTestAborted: Boolean): Option[NodeOutcome] =
-    closingEventOf(execution).collect {
-      case _: DecodedEvent.TestSucceeded => NodeOutcome.Succeeded
-      case _: DecodedEvent.TestFailed => NodeOutcome.Failed
-      case _: DecodedEvent.TestIgnored => NodeOutcome.Ignored
-      case _: DecodedEvent.TestPending => NodeOutcome.Pending
-      case _: DecodedEvent.TestCanceled => NodeOutcome.Canceled
-      case _: DecodedEvent.SuiteAborted => NodeOutcome.Aborted
-    }.orElse(abortedWhereOpen(openScopeOrTestAborted))
-
-  private def abortedWhereOpen(openScopeOrTestAborted: Boolean): Option[NodeOutcome] =
-    if (openScopeOrTestAborted) Some(NodeOutcome.Aborted) else None
 }

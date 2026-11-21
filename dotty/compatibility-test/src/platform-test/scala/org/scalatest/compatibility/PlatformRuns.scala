@@ -11,11 +11,7 @@ import scala.jdk.CollectionConverters.*
 
 final case class PlatformRunOutput(exitCode: Int, stdout: Seq[String], stderr: Seq[String])
 
-/**
- * Runs the fixture's program for Scala.js or Native, once as linked with ScalaTest 3.2.20 and once as linked with this
- * fork, each in a process of its own. A program for Scala.js is run by `node`.
- */
-final class PlatformRuns(val platform: String, launcher: Seq[String], programs: Compared[Path], runsDirectory: Path) {
+final class PlatformRuns(launcher: Seq[String], programs: Compared[Path], runsDirectory: Path) {
 
   private val runCount = new AtomicInteger
 
@@ -54,7 +50,6 @@ object PlatformRuns {
     val resource = getClass.getResourceAsStream("/compatibility-platform.properties")
     try properties.load(resource) finally resource.close()
     new PlatformRuns(
-      properties.getProperty("platform"),
       properties.getProperty("launcher").split(' ').filter(_.nonEmpty).toList,
       Compared(Paths.get(properties.getProperty("upstreamProgram")), Paths.get(properties.getProperty("forkProgram"))),
       Paths.get(properties.getProperty("runsDirectory"))

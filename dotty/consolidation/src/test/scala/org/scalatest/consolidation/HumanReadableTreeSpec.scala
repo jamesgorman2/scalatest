@@ -2,9 +2,9 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
   Feature("The tree of the consolidation library's human-readable output") {
 
@@ -35,7 +35,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the library consolidates it")
       val output = colourMarkedTreeFrom(eventLog)
 
-      Then("each nested suite and its test sit under the suite that nests it, under the test run label")
+      Then("each nested suite and its test sit under the suite that nests it, and every suite sits under the module's line")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}OuterSuites:{reset}

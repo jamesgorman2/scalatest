@@ -62,12 +62,9 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
 
         val suiteStartTime = System.currentTimeMillis
 
-        // Read in the order 3.2.20 reads them building the event, so that the start keeps the names it read.
-        val ordinal = tracker.nextOrdinal()
-        val nestedSuiteName = nestedSuite.suiteName
-        val nestedSuiteId = nestedSuite.suiteId
-        start.namesRead(nestedSuiteName, nestedSuiteId)
-        start.report(SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner))
+        start.report(SuiteStart.suiteStartingReadInOrderOf3_2_20(start, nestedSuite, tracker) { (ordinal, nestedSuiteName, nestedSuiteId) =>
+          SuiteStarting(ordinal, nestedSuiteName, nestedSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(nestedSuite.getClass.getName)), nestedSuite.rerunner)
+        })
 
         try { // TODO: pass runArgs down and that will get the chosenStyles passed down
           // Same thread, so OK to send same tracker

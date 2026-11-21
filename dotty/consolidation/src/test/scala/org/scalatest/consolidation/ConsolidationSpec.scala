@@ -1,29 +1,21 @@
 package org.scalatest.consolidation
 
 import java.time.Instant
+import scala.collection.mutable
+import org.scalatest.events.MalformedTestEventLogException
+import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestRunPart
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-final class ConsolidationSpec extends AnyWordSpec with Matchers with ConsolidatedRuns with JsonOutputs {
+final class ConsolidationSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
-  private def suiteWithTest(testEvents: String): TestRunPart =
-    TestRunPart.Events(
-      Vector(
-        "run started",
-        "structure",
-        "  suite \"CalculatorSuite\", class \"samples.CalculatorSuite\"",
-        "    test \"adds\", label \"- adds\"",
-        "suite \"CalculatorSuite\": SuiteStarting",
-        testEvents,
-        "suite \"CalculatorSuite\": SuiteCompleted",
-        "run ended completed"
-      ).mkString("\n")
-    )
+  private def runOfCalculatorSuite(testEvents: String*): TestRunPart =
+    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", """test "adds", label "- adds"""", testEvents*)))
 
-  private def stateAfterRunOf(testEvents: String): ConsolidationState = {
-    val consolidation = Consolidation.start(new OutputSink, coloured = true)
-    addRun(consolidation, suiteWithTest(testEvents))
+  private def stateAfterRunOf(testEvents: String*): ConsolidationState = {
+    val consolidation = startedWithColour()
+    consolidation.addRunOf(runOfCalculatorSuite(testEvents*))
     consolidation.state
   }
 
@@ -31,22 +23,38 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "started" should {
       "be open" in {
-        Consolidation.start(new OutputSink, coloured = true).state shouldBe ConsolidationState.Open
+        startedWithColour().state shouldBe ConsolidationState.Open
+      }
+    }
+
+    "given a run" should {
+      "make the run with the factory it was given, passing the run's module and worker" in {
+        var made = Vector.empty[(ModuleName, Option[Worker])]
+        val consolidation = new Consolidation(
+          new OutputSink,
+          coloured = false,
+          jsonOutput = None,
+          moduleSelectors = Vector.empty,
+          buildTool = None,
+          startedAt = None,
+          newRun = (runModule, worker) => {
+            made :+= (runModule -> worker)
+            RunAssembly(runModule, worker)
+          }
+        )
+        consolidation.addRun(module, Some(workerAt(1, 2)))(_ => ())
+        made shouldBe Vector(module -> Some(workerAt(1, 2)))
       }
     }
 
     "given a run whose events report no failure" should {
       "stay open" in {
-        stateAfterRunOf(
-          """test "adds": TestStarting
-            |test "adds": TestSucceeded""".stripMargin
-        ) shouldBe ConsolidationState.Open
+        stateAfterRunOf("""test "adds": TestStarting""", """test "adds": TestSucceeded""") shouldBe ConsolidationState.Open
       }
 
       "stay open where a test is ignored or pending" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
-        addRun(
-          consolidation,
+        val consolidation = startedWithColour()
+        consolidation.addRunOf(
           TestRunPart.Events(
             """
             run started
@@ -71,27 +79,20 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "given a run with a test that failed" should {
       "be open and failed" in {
-        stateAfterRunOf(
-          """test "adds": TestStarting
-            |test "adds": TestFailed""".stripMargin
-        ) shouldBe ConsolidationState.OpenFailed
+        stateAfterRunOf("""test "adds": TestStarting""", """test "adds": TestFailed""") shouldBe ConsolidationState.OpenFailed
       }
     }
 
     "given a run with a test that was cancelled" should {
       "be open and failed" in {
-        stateAfterRunOf(
-          """test "adds": TestStarting
-            |test "adds": TestCanceled""".stripMargin
-        ) shouldBe ConsolidationState.OpenFailed
+        stateAfterRunOf("""test "adds": TestStarting""", """test "adds": TestCanceled""") shouldBe ConsolidationState.OpenFailed
       }
     }
 
     "given a run with a suite that aborted" should {
       "be open and failed" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
-        addRun(
-          consolidation,
+        val consolidation = startedWithColour()
+        consolidation.addRunOf(
           TestRunPart.Events(
             """
             run started
@@ -109,7 +110,7 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "given a process that ended before any run existed in it" should {
       "be open and failed" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        val consolidation = startedWithColour()
         consolidation.addProcessEndedBeforeAnyRun()
         consolidation.state shouldBe ConsolidationState.OpenFailed
       }
@@ -117,14 +118,8 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "ended with nothing failed" should {
       "be ended" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
-        addRun(
-          consolidation,
-          suiteWithTest(
-            """test "adds": TestStarting
-              |test "adds": TestSucceeded""".stripMargin
-          )
-        ).endEventStream()
+        val consolidation = startedWithColour()
+        consolidation.addRunOf(runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded"""))
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
       }
@@ -132,39 +127,70 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "ended after a failure" should {
       "be ended and failed" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        val consolidation = startedWithColour()
         consolidation.addProcessEndedBeforeAnyRun()
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }
+      "give that state as it ends" in {
+        val consolidation = startedWithColour()
+        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.end() shouldBe ConsolidationState.EndedFailed
+      }
     }
 
-    "ended while a run's event stream is open" should {
+    "ended twice" should {
+      "be refused" in {
+        val consolidation = startedWithColour()
+        consolidation.end()
+        an[IllegalStateException] should be thrownBy consolidation.end()
+      }
+    }
+
+    "ended while a run's event stream is being fed" should {
       "be refused, writing nothing" in {
         val output = new OutputSink
-        val consolidation = Consolidation.start(output, coloured = true)
-        addRun(consolidation, suiteWithTest(""))
-        an[IllegalArgumentException] should be thrownBy consolidation.end()
+        val consolidation = startedWithColour(output)
+        consolidation.addRun(module) { feed =>
+          feed.addAll(runOfCalculatorSuite())
+          an[IllegalStateException] should be thrownBy consolidation.end()
+          consolidation.state shouldBe ConsolidationState.Open
+        }
         output.lines shouldBe empty
-        consolidation.state shouldBe ConsolidationState.Open
       }
     }
 
     "given a run after it has ended" should {
       "be refused" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        val consolidation = startedWithColour()
         consolidation.end()
-        an[IllegalArgumentException] should be thrownBy consolidation.addRun(moduleLabel)
+        an[IllegalStateException] should be thrownBy consolidation.addRun(module)(_ => ())
+      }
+    }
+
+    "given a run whose feeding throws" should {
+      "end the run's event stream, then rethrow" in {
+        val consolidation = startedWithColour()
+        val failure = new RuntimeException("reading failed")
+        val thrown = intercept[RuntimeException] {
+          consolidation.addRun(module) { feed =>
+            feed.addAll(TestRunPart.Events("run started"))
+            throw failure
+          }
+        }
+        thrown shouldBe failure
+        consolidation.state shouldBe ConsolidationState.OpenFailed
+        consolidation.end()
+        consolidation.state shouldBe ConsolidationState.EndedFailed
       }
     }
 
     "given a module's times twice" should {
       "hold only the later times" in {
-        val json = new JsonSink
-        val consolidation = startedWithoutMill(json)
-        consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(1000L)), Some(Instant.ofEpochMilli(2000L)))
-        consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(3000L)), None)
-        consolidation.end()
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(1000L)), Some(Instant.ofEpochMilli(2000L)))
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(3000L)), None)
+        }
         json.module.get("startedAt") shouldBe Some(integer(3000L))
         json.module.get("endedAt") shouldBe None
       }
@@ -172,41 +198,47 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "given a module's times after it has ended" should {
       "be refused" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
+        val consolidation = startedWithColour()
         consolidation.end()
-        an[IllegalArgumentException] should be thrownBy consolidation.timeModule(moduleLabel, None, None)
+        an[IllegalStateException] should be thrownBy consolidation.timeModule(module, None, None)
       }
     }
 
     "given an event after the run's event stream has ended" should {
       "be refused" in {
-        val consolidation = Consolidation.start(new OutputSink, coloured = true)
-        val feed = consolidation.addRun(moduleLabel)
-        feed.endEventStream()
-        an[IllegalArgumentException] should be thrownBy feed.add("run ended completed".toRunEvent)
+        val consolidation = startedWithColour()
+        val feeds = mutable.ArrayBuffer.empty[RunFeed]
+        consolidation.addRun(module)(feed => feeds += feed)
+        an[IllegalStateException] should be thrownBy feeds.head.add("run ended completed".toRunEvent)
+      }
+    }
+
+    "given a captured line after the run's event stream has ended" should {
+      "show the line under the run" in {
+        val output = new OutputSink
+        val consolidation = Consolidation.start(output, coloured = false)
+        val feeds = mutable.ArrayBuffer.empty[RunFeed]
+        consolidation.addRun(module)(feed => feeds += feed)
+        feeds.head.add(CapturedLine.Stdout("late"))
+        consolidation.end()
+        output.linesWithoutSummaryLine shouldBe Vector("[core.test]", "  Run 1:", "    [stdout] late")
       }
     }
 
     "ended with colour off" should {
       "write the same text as with colour on, without ANSI escape sequences" in {
-        def outputLines(coloured: Boolean): Vector[String] = {
+        def consolidatedOutput(coloured: Boolean): OutputSink = {
           val output = new OutputSink
           val consolidation = Consolidation.start(output, coloured)
-          addRun(
-            consolidation,
-            suiteWithTest(
-              """test "adds": TestStarting
-                |test "adds": TestFailed""".stripMargin
-            )
-          ).endEventStream()
+          consolidation.addRunOf(runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestFailed"""))
           consolidation.end()
-          output.lines
+          output
         }
 
-        val uncoloured = outputLines(coloured = false)
-        uncoloured.mkString should not include "\u001b"
-        uncoloured shouldBe outputLines(coloured = true).map(_.replaceAll("\u001b\\[[0-9;]*m", ""))
-        uncoloured.dropRight(1) shouldBe Vector("[core.test]", "  CalculatorSuite:", "    - adds *** FAILED ***")
+        val uncoloured = consolidatedOutput(coloured = false)
+        uncoloured.lines.mkString should not include "\u001b"
+        uncoloured.lines shouldBe consolidatedOutput(coloured = true).lines.map(_.replaceAll("\u001b\\[[0-9;]*m", ""))
+        uncoloured.linesWithoutSummaryLine shouldBe Vector("[core.test]", "  CalculatorSuite:", "    - adds *** FAILED ***")
       }
     }
   }
@@ -215,28 +247,38 @@ final class ConsolidationSpec extends AnyWordSpec with Matchers with Consolidate
 
     "it holds the run's start" should {
       "be decoded to an event naming the run's process" in {
-        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}""").map(_.runProcess) shouldBe
-          Right(Some(RunProcess(Pid(4242L), Instant.parse("2026-01-02T03:04:05.678Z"))))
+        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"2026-01-02T03:04:05.678Z"}""").runProcess shouldBe
+          Some(RunProcess(Pid(4242L), Instant.parse("2026-01-02T03:04:05.678Z")))
       }
     }
 
     "it holds the run's start with a start time that is not an instant" should {
-      "not be decoded" in {
-        RunEvent.decode("""{"item":"runStarted","pid":4242,"startTime":"yesterday"}""") shouldBe
-          Left("the run's start time is not an instant: yesterday")
+      "throw, naming the start time and the line as it was given" in {
+        val line = """{ "item": "runStarted", "pid": 4242, "startTime": "yesterday" }"""
+        val thrown = intercept[MalformedTestEventLogException](RunEvent.decode(line))
+        thrown.reason shouldBe "the run's start time is not an instant: yesterday"
+        thrown.line shouldBe line
       }
     }
 
     "it holds another event" should {
       "be decoded to an event naming no process" in {
-        RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").map(_.runProcess) shouldBe Right(None)
+        RunEvent.decode("""{"item":"runEnded","outcome":"completed"}""").runProcess shouldBe None
       }
     }
 
     "it is not an event" should {
-      "not be decoded" in {
-        RunEvent.decode("not an event").isLeft shouldBe true
+      "throw, naming the line" in {
+        intercept[MalformedTestEventLogException](RunEvent.decode("not an event")).line shouldBe "not an event"
       }
+    }
+  }
+
+  "A run's start event whose start time is not an instant" should {
+    "throw, naming the start time and the event's line, instead of becoming a run event" in {
+      val thrown = intercept[MalformedTestEventLogException](RunEvent.of(TestEventLogEvent.RunStarted(4242L, "yesterday")))
+      thrown.reason shouldBe "the run's start time is not an instant: yesterday"
+      thrown.line shouldBe """{"item":"runStarted","pid":4242,"startTime":"yesterday"}"""
     }
   }
 }

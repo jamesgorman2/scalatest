@@ -22,7 +22,6 @@ private[tools] trait EventLogRecording { this: Matchers =>
 
   protected val waitLimitSeconds = 30L
 
-  // Each write takes long enough that writes made without a common lock overlap.
   protected final class RecordingEventLog extends OutputStream {
     private val writesUnderWay = new AtomicInteger
     private val overlapped = new AtomicBoolean
@@ -40,6 +39,7 @@ private[tools] trait EventLogRecording { this: Matchers =>
         overlapped.set(true)
       }
       try {
+        // Long enough that writes made without a common lock overlap.
         Thread.sleep(1)
         recorded.add(new String(bytes, offset, length, StandardCharsets.UTF_8))
       } finally {
@@ -50,7 +50,6 @@ private[tools] trait EventLogRecording { this: Matchers =>
     override def close(): Unit = closed.set(true)
   }
 
-  /** Its run lasts until `complete` is called, which removes its registration. */
   protected final class StartedTopLevelSuite(emitter: TestEventLogEmitter, suite: Suite, reporter: Reporter = EventLogRecording.passingNoEventOn) {
     private val runOfSuite = new ScalaTestStatefulStatus
     private val start = emitter.startOfTopLevelSuite(suite, Filter.default, reporter)
@@ -73,8 +72,8 @@ private[tools] trait EventLogRecording { this: Matchers =>
 
   protected final class RecordingReporter extends Reporter {
     private var received = Vector.empty[Event]
-    def events: Vector[Event] = received
-    def apply(event: Event): Unit = received :+= event
+    def events: Vector[Event] = synchronized(received)
+    def apply(event: Event): Unit = synchronized { received :+= event }
   }
 
   protected def joined(thread: Thread): Boolean = {
@@ -82,7 +81,6 @@ private[tools] trait EventLogRecording { this: Matchers =>
     !thread.isAlive
   }
 
-  /** Fails unless each event was written as one whole line, in one write that overlaps no other. */
   protected def wholeLinesWrittenByThreadsAtOnce(threadCount: Int)(handOffOfThread: (TestEventLogEmitter, Int) => Unit): Vector[TestEventLogEvent] = {
     val eventLog = new RecordingEventLog
     val emitter = TestEventLogEmitter.appendingTo(eventLog)
@@ -100,9 +98,7 @@ private[tools] trait EventLogRecording { this: Matchers =>
     val writes = eventLog.writes
     eventLog.hadOverlappingWrites shouldBe false
     writes.filterNot(write => write.indexOf('\n') == write.length - 1) shouldBe Vector.empty
-    val decoded = writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
-    decoded.filter(_.isLeft) shouldBe Vector.empty
-    decoded.collect { case Right(event) => event }
+    writes.map(write => TestEventLogDecoder.decode(write.stripSuffix("\n")))
   }
 }
 

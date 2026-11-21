@@ -13,9 +13,9 @@ import org.scalatest.events.DecodedThrowable
 import org.scalatest.events.JsonValue
 import org.scalatest.events.Summary
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns with JsonOutputs {
+final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
   private val millPluginDirectory: Path = {
     val properties = new Properties
@@ -38,9 +38,9 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
     (fromBullets ++ fromLists ++ fromShapes).map(_.group(1)).toSet
   }
 
-  // A config map's keys are the run's own, not the format's.
   private def keysOf(value: JsonValue): Set[String] =
     value match {
+      // A config map's keys are the run's own, not the format's.
       case JsonValue.Object(fields) => fields.flatMap((key, field) => if (key == "configMap") Set(key) else keysOf(field) + key).toSet
       case JsonValue.Array(items) => items.flatMap(keysOf).toSet
       case _ => Set.empty
@@ -56,13 +56,13 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       buildTool = Some(BuildTool("Mill", "1.3.1")),
       startedAt = Some(Instant.ofEpochMilli(1000L))
     )
-    consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(1100L)), Some(Instant.ofEpochMilli(1900L)))
+    consolidation.timeModule(module, Some(Instant.ofEpochMilli(1100L)), Some(Instant.ofEpochMilli(1900L)))
     consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
     consolidation.addRootFailure("discovery failed")
-    val feed = consolidation.addRun(moduleLabel)
-    runEventsWithEveryKey.foreach(event => feed.add(event))
-    feed.add(CapturedLine.Stdout("dividing\n"))
-    feed.endEventStream()
+    consolidation.addRun(module) { feed =>
+      runEventsWithEveryKey.foreach(event => feed.add(event))
+      feed.add(CapturedLine.Stdout("dividing\n"))
+    }
     consolidation.end(Some(Instant.ofEpochMilli(2000L)))
     json.root
   }
@@ -88,7 +88,7 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       run: InfoProvided(message: "outside any suite", location: LineInFile(3, "RowSuite.scala", None))
       run ended aborted
       """
-    ).map(event => RunEvent.of(event).fold(fail(_), identity))
+    ).map(RunEvent.of)
     val shared = new DecodedThrowable("java.io.IOException", None, None, false, Vector.empty)
     val thrown = new DecodedThrowable(
       "java.lang.IllegalStateException",
@@ -98,9 +98,10 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       Vector(
         DecodedStackFrame("samples.Row", "add", Some("Row.scala"), Some(3), false, "samples.Row.add(Row.scala:3)"),
         DecodedStackFrame("java.lang.Thread", "sleep", None, Some(-2), true, "java.lang.Thread.sleep(Native Method)")
-      )
+      ),
+      Some(shared),
+      Vector(shared)
     )
-    thrown.link(Some(shared), Vector(shared))
     val runLevelEvents = Vector(
       DecodedEvent.RunStarting(3, Map("zone" -> "UTC"), None, "main", 100L),
       DecodedEvent.DiscoveryStarting("main", 110L),

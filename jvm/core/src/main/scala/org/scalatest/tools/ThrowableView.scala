@@ -3,25 +3,16 @@ package org.scalatest.tools
 import org.scalatest.exceptions.PropertyCheckFailedException
 import org.scalatest.exceptions.StackDepth
 
-/**
- * What <code>StringReporter</code>'s formatting reads of a throwable, so that it can format one that is no longer a
- * live <code>Throwable</code>.
- *
- * Two views of one throwable must be equal, and views of different throwables unequal: the formatting stops at a
- * throwable its cause chain has already shown.
- */
 private[scalatest] trait ThrowableView {
 
   def className: String
 
   def message: Option[String]
 
-  /** Defined only for a <code>StackDepth</code>. */
   def stackDepth: Option[StackDepthView]
 
   def isPropertyCheckFailure: Boolean
 
-  /** Each stack frame as <code>StackTraceElement.toString</code> gives it. */
   def frames: IndexedSeq[String]
 
   def cause: Option[ThrowableView]
@@ -33,7 +24,6 @@ private[scalatest] trait StackDepthView {
 
   def filePathnameAndLineNumber: Option[String]
 
-  /** The index of the failed code's frame, where it is known. */
   def failedCodeStackDepth: Option[Int]
 }
 
@@ -59,6 +49,8 @@ private[scalatest] object ThrowableView {
 
     def cause: Option[ThrowableView] = Option(throwable.getCause).map(of)
 
+    // Equal only to a view of the same throwable, so that StringReporter stops a cause chain at a throwable it has
+    // already shown.
     override def equals(other: Any): Boolean =
       other match {
         case live: LiveThrowable => live.throwable eq throwable

@@ -3,9 +3,9 @@ package org.scalatest.consolidation
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
   private val completedRun = TestRunPart.Events(
     """
@@ -26,20 +26,22 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
     Scenario("A completed run whose event stream is held open") {
       Given("an event log of a completed run")
       val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
+      val consolidation = startedWithColour(output)
 
       When("every event has been fed and the event stream is held open")
-      addRun(consolidation, completedRun)
+      consolidation.addRun(module) { feed =>
+        feed.addAll(completedRun)
 
-      Then("the library has written no human-readable output")
-      output.lines shouldBe empty
+        Then("the library has written no human-readable output")
+        output.lines shouldBe empty
+      }
     }
 
     Scenario("A completed run whose event stream has ended") {
       Given("an event log of a completed run, every event fed and the event stream ended")
       val output = new OutputSink
-      val consolidation = Consolidation.start(output, coloured = true)
-      addRun(consolidation, completedRun).endEventStream()
+      val consolidation = startedWithColour(output)
+      consolidation.addRunOf(completedRun)
       output.lines shouldBe empty
 
       When("the caller ends the consolidation")

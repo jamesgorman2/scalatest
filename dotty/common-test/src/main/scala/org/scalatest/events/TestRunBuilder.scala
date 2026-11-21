@@ -30,14 +30,6 @@ private[scalatest] final case class BuiltRun(items: Vector[BuiltRunItem]) {
   def events: Vector[BuiltEvent] = items.collect { case BuiltRunItem.Event(built) => built }
 }
 
-/**
- * Builds a run from the event notation the acceptance criteria use, in the form the test event log's decoder
- * yields it.
- *
- * A run is given as its parts in order: blocks of events in the notation, and captured lines where they are fed.
- * Each event is built as a `Given` gives it, with a default for every field it does not write. It also carries the
- * parts the notation writes, which are all `EventLogComparison` compares.
- */
 private[scalatest] object TestRunBuilder {
 
   val defaultPid: Long = 1L
@@ -45,27 +37,32 @@ private[scalatest] object TestRunBuilder {
   val defaultThreadName: String = "main"
   val defaultTimeStamp: Long = 0L
 
-  def build(parts: TestRunPart*): Either[String, BuiltRun] = {
+  def build(parts: TestRunPart*): BuiltRun = {
     val run = new RunUnderConstruction
-    try {
-      Right(
-        BuiltRun(
-          parts.toVector.flatMap {
-            case TestRunPart.Events(notation) => EventNotation.parse(notation).map(line => BuiltRunItem.Event(run.built(line)))
-            case TestRunPart.CapturedLine(stream, line) => Vector(BuiltRunItem.CapturedLine(stream, line))
-          }
-        )
-      )
-    } catch {
-      case error: NotationError => Left(error.getMessage)
-    }
+    BuiltRun(
+      parts.toVector.flatMap {
+        case TestRunPart.Events(notation) => EventNotation.parse(notation).map(line => BuiltRunItem.Event(run.built(line)))
+        case TestRunPart.CapturedLine(stream, line) => Vector(BuiltRunItem.CapturedLine(stream, line))
+      }
+    )
   }
 }
 
-private final class HeldNode(val id: NodeId, val kind: NodeKind, var name: String, var parent: Option[NodeId]) {
+private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: String, firstParent: Option[NodeId]) {
 
+  private var latestName = firstName
+  private var latestParent = firstParent
   private var executions = Set.empty[Int]
   private var endedExecutions = Set.empty[Int]
+
+  def name: String = latestName
+
+  def parent: Option[NodeId] = latestParent
+
+  def heldAgain(name: String, parent: Option[NodeId]): Unit = {
+    latestName = name
+    latestParent = parent
+  }
 
   def record(execution: Int, endsIt: Boolean): Unit = {
     executions += execution
@@ -77,9 +74,13 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, var name: Strin
   def defaultExecution: Int = (executions -- endedExecutions).maxOption.orElse(executions.maxOption).getOrElse(1)
 }
 
-// A further structure positions the suite's scopes and tests from where its first structure positioned them.
-private final class HeldSuite(val id: NodeId, val suiteId: String, val className: String, val parent: Option[NodeId], val position: Option[Int]) {
-  var firstPositionOfScopesAndTests: Int = 0
+private final class HeldSuite(val id: NodeId, val suiteId: SuiteId, val className: TestClassName, val parent: Option[NodeId], val position: Option[Int]) {
+
+  private var positionOfFirstScopeOrTest = 0
+
+  def firstPositionOfScopesAndTests: Int = positionOfFirstScopeOrTest
+
+  def placeScopesAndTestsFrom(position: Int): Unit = positionOfFirstScopeOrTest = position
 }
 
 private final class OpenTreeNode(
@@ -106,7 +107,6 @@ private final class OpenTreeNode(
     position
   }
 
-  /** The position of the node's first scope or test; where it has none, the position after its nested suites. */
   def firstPositionOfScopesAndTests: Int = positionOfFirstScopeOrTest.getOrElse(positionOfNextChild)
 
   def nextIndexOfScopeNamed(name: String): Int = {
@@ -137,13 +137,12 @@ private final class RunUnderConstruction {
 
   private def hold(id: NodeId, kind: NodeKind, name: String, parent: Option[NodeId]): Unit = {
     nodes.get(id) match {
-      case Some(held) =>
-        held.name = name
-        held.parent = parent
-      case None =>
+      case Some(held) => held.heldAgain(name, parent)
+      case None => {
         val held = new HeldNode(id, kind, name, parent)
         nodes(id) = held
         nodesInOrderFirstHeld += held
+      }
     }
   }
 
@@ -165,20 +164,19 @@ private final class RunUnderConstruction {
     suitesUnder.getOrElseUpdate(parent, mutable.ArrayBuffer.empty)
 
   private def newSuite(written: WrittenNode.Suite, parent: Option[NodeId], position: Option[Int], text: String): HeldSuite = {
-    val suiteId = written.suiteId.getOrElse(written.className)
     val ordinalItTakes = sharingName(NodeKind.Suite, written.name).size + 1
     written.ordinalAmongSameName.filter(_ != ordinalItTakes).foreach { ordinal =>
       fail(s"a suite new to the event log is #$ordinalItTakes among the suites that share its name, not #$ordinal: '$text'")
     }
     val siblings = suitesUnderParent(parent)
-    val place = NodePlace.Suite(suiteId, siblings.count(_.suiteId == suiteId))
-    val added = new HeldSuite(NodeId(parent.fold(Vector.empty[NodePlace])(_.places) :+ place), suiteId, written.className, parent, position)
+    val index = siblings.count(_.suiteId == written.suiteId)
+    val id = parent.fold(NodeId.topLevelSuite(written.suiteId, index))(NodeId.nestedSuite(_, written.suiteId, index))
+    val added = new HeldSuite(id, written.suiteId, written.className, parent, position)
     siblings += added
     hold(added.id, NodeKind.Suite, written.name, parent)
     added
   }
 
-  /** The structure's suite, and whether an earlier structure held it. */
   private final case class StructureRoot(suite: HeldSuite, isFurther: Boolean)
 
   private def structureRootOf(block: NotationLine.Structure): StructureRoot = {
@@ -186,28 +184,28 @@ private final class RunUnderConstruction {
       case Some(TreeLine(1, suite: WrittenNode.Suite, text)) => (suite, text)
       case _ => fail(s"a structure starts with its suite, indented 2 spaces:\n${block.text}")
     }
-    val suiteId = written.suiteId.getOrElse(written.className)
     val parent = block.under.map(reference => nodeNamed(reference).id)
     val siblings = suitesUnderParent(parent)
     val earlier = written.ordinalAmongSameName match {
       case Some(ordinal) =>
         sharingName(NodeKind.Suite, written.name).lift(ordinal - 1).map { named =>
-          siblings.find(sibling => sibling.id == named.id && sibling.suiteId == suiteId).getOrElse {
-            fail(s"suite \"${written.name}\" #$ordinal is not a suite of suite ID $suiteId under the structure's parent: '$text'")
+          siblings.find(sibling => sibling.id == named.id && sibling.suiteId == written.suiteId).getOrElse {
+            fail(s"suite \"${written.name}\" #$ordinal is not a suite of suite ID ${written.suiteId.value} under the structure's parent: '$text'")
           }
         }
-      case None => siblings.find(_.suiteId == suiteId)
+      case None => siblings.find(_.suiteId == written.suiteId)
     }
     earlier match {
-      case Some(suite) =>
+      case Some(suite) => {
         if (suite.className != written.className) {
-          fail(s"a further structure keeps its suite's class, ${suite.className}:\n${block.text}")
+          fail(s"a further structure keeps its suite's class, ${suite.className.value}:\n${block.text}")
         }
         block.tree.tail.collectFirst { case TreeLine(_, _: WrittenNode.Suite, nested) => nested }.foreach { nested =>
           fail(s"a further structure holds its suite's scopes and tests only, not '$nested'")
         }
         hold(suite.id, NodeKind.Suite, written.name, suite.parent)
         StructureRoot(suite, isFurther = true)
+      }
       case None => StructureRoot(newSuite(written, parent, None, text), isFurther = false)
     }
   }
@@ -217,7 +215,7 @@ private final class RunUnderConstruction {
     val root = structureRoot.suite
     val built = Vector.newBuilder[StructureNode]
     built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, root.className)
-    val testNames = mutable.Set.empty[(NodeId, String)]
+    val testNames = mutable.Set.empty[(NodeId, TestName)]
     val openRoot = new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty, if (structureRoot.isFurther) root.firstPositionOfScopesAndTests else 0)
     val suitesFirstHeld = mutable.ArrayBuffer.empty[(HeldSuite, OpenTreeNode)]
     if (!structureRoot.isFurther) {
@@ -230,7 +228,7 @@ private final class RunUnderConstruction {
         fail(s"'${line.text}' is not indented 2 spaces under a suite or scope of its structure")
       }
       line.node match {
-        case written: WrittenNode.Suite =>
+        case written: WrittenNode.Suite => {
           if (above.kind != NodeKind.Suite) {
             fail(s"a suite is nested in a suite, not in a scope: '${line.text}'")
           }
@@ -239,26 +237,28 @@ private final class RunUnderConstruction {
           val openNested = new OpenTreeNode(line.depth, nested.id, NodeKind.Suite, nested.id, Vector.empty)
           suitesFirstHeld += nested -> openNested
           open = openNested :: open
-        case WrittenNode.Scope(name, label) =>
-          val id = NodeId(above.id.places :+ NodePlace.Scope(name, above.nextIndexOfScopeNamed(name)))
+        }
+        case WrittenNode.Scope(name, label) => {
+          val id = NodeId.scope(above.id, name, above.nextIndexOfScopeNamed(name))
           hold(id, NodeKind.Scope, name, Some(above.id))
           built += StructureNode.Scope(id, above.id, above.nextScopeOrTestPosition(), name, label)
           open = new OpenTreeNode(line.depth, id, NodeKind.Scope, above.suite, above.scopeNames :+ name) :: open
-        case WrittenNode.Test(name, label, writtenTestName, ignored) =>
-          val testName = writtenTestName.getOrElse((above.scopeNames :+ name).mkString(" "))
+        }
+        case WrittenNode.Test(name, label, writtenTestName, ignored) => {
+          val testName = TestName(writtenTestName.getOrElse((above.scopeNames :+ name).mkString(" ")))
           if (!testNames.add((above.suite, testName))) {
-            fail(s"two tests of one suite have the test name \"$testName\": give '${line.text}' its own test name")
+            fail(s"two tests of one suite have the test name \"${testName.value}\": give '${line.text}' its own test name")
           }
-          val id = NodeId(above.suite.places :+ NodePlace.Test(testName))
+          val id = NodeId.test(above.suite, testName)
           hold(id, NodeKind.Test, name, Some(above.id))
           built += StructureNode.Test(id, above.id, above.nextScopeOrTestPosition(), name, label, ignored)
+        }
       }
     }
-    suitesFirstHeld.foreach { (suite, openSuite) => suite.firstPositionOfScopesAndTests = openSuite.firstPositionOfScopesAndTests }
+    suitesFirstHeld.foreach { (suite, openSuite) => suite.placeScopesAndTestsFrom(openSuite.firstPositionOfScopesAndTests) }
     built.result()
   }
 
-  // A test's scopes are those of the latest structure that holds it.
   private def ancestorsTopDown(node: HeldNode): Vector[HeldNode] =
     Iterator.unfold(node.parent)(parent => parent.map(nodes).map(held => (held, held.parent))).toVector.reverse
 
@@ -266,12 +266,13 @@ private final class RunUnderConstruction {
     val fields = new WrittenFields(line)
     val decoded = fields.decodedEvent
     val (execution, markedAncestors) = line.node match {
-      case None =>
+      case None => {
         if (line.execution.nonEmpty || line.ancestorExecutions.nonEmpty) {
           fail(s"an event assigned to the run has no execution: '${line.text}'")
         }
         (None, Set.empty[NodeId])
-      case Some(reference) =>
+      }
+      case Some(reference) => {
         val node = nodeNamed(reference)
         val ancestors = ancestorsTopDown(node)
         val marked = line.ancestorExecutions.map { marker =>
@@ -291,6 +292,7 @@ private final class RunUnderConstruction {
         marked.foreach { case (ancestor, ancestorExecution) => ancestor.record(ancestorExecution, endsIt = false) }
         node.record(ownExecution, RunUnderConstruction.eventsEndingAnExecution.contains(line.className))
         (Some(NodeExecution(node.id, executionPath :+ ownExecution)), markedExecutions.keySet)
+      }
     }
     BuiltEvent(
       line.text,
@@ -379,7 +381,6 @@ private final class WrittenFields(line: NotationLine.Event) {
 
 private object WrittenFields {
 
-  // Recurses once for each cause and each nested list of suppressed throwables a test writes on one line.
   def decodedThrowable(written: WrittenThrowable): DecodedThrowable = {
     val message = written.message match {
       case WrittenMessage.Text(value) => Some(value)
@@ -387,8 +388,8 @@ private object WrittenFields {
     }
     val stackDepth = written.stackDepth.map(depth => DecodedStackDepth(depth.fileName, depth.filePathname, depth.lineNumber))
     val frames = written.frames.getOrElse(Vector.empty).map(EventNotation.frame)
-    val decoded = new DecodedThrowable(written.className, message, stackDepth, written.isPropertyCheckFailure, frames)
-    decoded.link(written.cause.map(decodedThrowable), written.suppressed.getOrElse(Vector.empty).map(decodedThrowable))
-    decoded
+    val cause = written.cause.map(decodedThrowable)
+    val suppressed = written.suppressed.getOrElse(Vector.empty).map(decodedThrowable)
+    new DecodedThrowable(written.className, message, stackDepth, written.isPropertyCheckFailure, frames, cause, suppressed)
   }
 }

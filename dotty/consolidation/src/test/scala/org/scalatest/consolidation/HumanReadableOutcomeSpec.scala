@@ -2,21 +2,12 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should
 
-final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with Matchers with ConsolidatedRuns {
+final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns {
 
-  private def eventLogOf(nodeLine: String, nodeEvents: String): String =
-    s"""
-    run started
-    structure
-      suite "OutcomeSpec", class "samples.OutcomeSpec"
-        $nodeLine
-    suite "OutcomeSpec": SuiteStarting
-    $nodeEvents
-    suite "OutcomeSpec": SuiteCompleted
-    run ended completed
-    """
+  private def eventLogOf(nodes: String, nodeEvents: String*): String =
+    completedRunOf(eventLogOfSuite("OutcomeSpec", nodes, nodeEvents*))
 
   private def outputWithNodeLine(nodeLine: String): String =
     s"""{cyan}[core.test]{reset}
@@ -29,8 +20,8 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       Given("an event log of a test that succeeded")
       val eventLog = eventLogOf(
         """test "adds", label "- adds"""",
-        """test "adds": TestStarting
-          |    test "adds": TestSucceeded""".stripMargin
+        """test "adds": TestStarting""",
+        """test "adds": TestSucceeded"""
       )
 
       When("the library consolidates it")
@@ -42,8 +33,8 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       Given("an event log of a test that failed")
       val eventLog = eventLogOf(
         """test "adds", label "- adds"""",
-        """test "adds": TestStarting
-          |    test "adds": TestFailed""".stripMargin
+        """test "adds": TestStarting""",
+        """test "adds": TestFailed"""
       )
 
       When("the library consolidates it")
@@ -67,8 +58,8 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       Given("an event log of a pending test")
       val eventLog = eventLogOf(
         """test "adds", label "- adds"""",
-        """test "adds": TestStarting
-          |    test "adds": TestPending""".stripMargin
+        """test "adds": TestStarting""",
+        """test "adds": TestPending"""
       )
 
       When("the library consolidates it")
@@ -80,8 +71,8 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       Given("an event log of a cancelled test")
       val eventLog = eventLogOf(
         """test "adds", label "- adds"""",
-        """test "adds": TestStarting
-          |    test "adds": TestCanceled""".stripMargin
+        """test "adds": TestStarting""",
+        """test "adds": TestCanceled"""
       )
 
       When("the library consolidates it")
@@ -92,12 +83,14 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
     Scenario("A scope with no outcome shows its label alone, in green") {
       Given("an event log of a scope that opened and closed around a test")
       val eventLog = eventLogOf(
-        """scope "A calculator", label "A calculator"
-          |          test "adds", label "- adds"""".stripMargin,
-        """scope "A calculator": ScopeOpened
-          |    test "adds": TestStarting
-          |    test "adds": TestSucceeded
-          |    scope "A calculator": ScopeClosed""".stripMargin
+        """
+        scope "A calculator", label "A calculator"
+          test "adds", label "- adds"
+        """,
+        """scope "A calculator": ScopeOpened""",
+        """test "adds": TestStarting""",
+        """test "adds": TestSucceeded""",
+        """scope "A calculator": ScopeClosed"""
       )
 
       When("the library consolidates it")
@@ -246,8 +239,8 @@ final class HumanReadableOutcomeSpec extends AnyFeatureSpec with GivenWhenThen w
       Given("an event log of a succeeding test whose label holds two lines")
       val eventLog = eventLogOf(
         """test "adds", label "- adds\nand carries"""",
-        """test "adds": TestStarting
-          |    test "adds": TestSucceeded""".stripMargin
+        """test "adds": TestStarting""",
+        """test "adds": TestSucceeded"""
       )
 
       When("the library consolidates it")

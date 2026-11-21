@@ -9,17 +9,17 @@ final class AddingThePluginSpec extends AnyFeatureSpec with GivenWhenThen with s
   Feature("The test command runs a module whose definition names nothing from the plugin") {
 
     for (scala <- Seq("3.3", "3.9")) {
-      Scenario(s"The plugin is added by its header line to a build on Scala $scala") {
-        withTester(s"without-plugin-scala-$scala") { tester =>
+      Scenario(s"Adding the plugin's header line alone lets the test command run a module built with Scala $scala") {
+        withFixtureBuild(FixtureName.withoutPluginOnScala(scala)) { build =>
           Given(s"the build does not add the plugin, its build.mill header has no mvnDeps, and the module is built with Scala $scala")
           And("the module is at Mill's default testLogLevel")
           And("its one suite is SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
           And("the run writes nothing to stdout or stderr, sends no message outside a suite, and completes")
-          os.read.lines(tester.workspacePath / "build.mill").filter(_.startsWith("//|")) shouldBe empty
+          build.buildText.linesIterator.filter(_.startsWith("//|")).toSeq shouldBe empty
 
           When("a header line //| mvnDeps: holding the one entry com.edc::scalatest-mill, at the release of this fork that core.test tests with, is added to its build.mill, with nothing else in the build changed, and the test command runs the module")
-          addPlugin(tester)
-          val result = runTestCommand(tester, "core.test")
+          build.addPlugin()
+          val result = build.runTestCommand("core.test")
 
           Then("the human-readable output is SqrtPropSpec's")
           withClue(result.debugString) {

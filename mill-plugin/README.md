@@ -8,6 +8,12 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
+- The module's tests run in the workers Mill's `testForked` starts for each fork group that holds a test class.
+  - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
+    - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the group's test class count. The group's workers run in parallel.
+    - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
+  - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's whole class list as `testForkGrouping` gives it, whatever the module's `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
+  - A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
 
@@ -96,14 +102,42 @@ The test command fails before any test starts when:
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector, or more than one;
 - the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;
-- the module has more than one fork group;
 - the module's own ScalaTest arguments hold a flag ScalaTest's runner does not recognise.
 
 It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
-- the test worker dies;
+- a test worker dies;
+- laying out a fork group's files fails, or starting or running a test worker fails;
+- the test command fails to capture a test worker's output, which goes to Mill's console instead;
+- a test worker's test event log cannot be read, or holds a line that cannot be decoded;
+- two of the module's fork groups would share a `processFolder`, as where each holds only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test runs;
+- two or more of the module's fork groups hold a test class, and the test command cannot tell whether the filesystem is case-insensitive. No test runs;
 - the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
-Under the test command, ScalaTest prints no end-of-run summary. Mill's own test tasks still print it.
+Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
+
+## Runs in the human-readable output
+
+A run's number is its `number` in [JSON.md](JSON.md) § Run node. The human-readable output shows a run's line, `Run <n>:`, only where the run:
+
+- aborted or stopped;
+- has output of its own: its worker's stdout or stderr, or a message sent outside any suite.
+
+The output is laid out as:
+
+- The suites of every run whose line is not shown form one list directly under the module's line, ordered by name. A suite that ran in several runs appears once for each, in order of the runs' numbers.
+- Each run whose line is shown follows that list, in order of number, so `Run 10:` follows `Run 2:`. It holds its own suites, then its output, then `*** RUN ABORTED ***` or `*** RUN STOPPED ***` where the run aborted or stopped.
+
+For example, fork group 0 runs `Zeta`, whose test writes `hello` to stdout, and fork group 1 runs `Alpha`. Run 1 has output of its own, so its line is shown. Run 2's line is not. The output, without its summary line, is:
+
+```
+[core.test]
+  Alpha:
+    - t
+  Run 1:
+    Zeta:
+      - t
+    [stdout] hello
+```

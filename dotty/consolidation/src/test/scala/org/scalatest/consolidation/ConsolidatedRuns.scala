@@ -9,18 +9,41 @@ import org.scalatest.events.TestRunPart
 
 private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
-  val moduleLabel: TestRunLabel = TestRunLabel("core.test")
+  val module: ModuleName = ModuleName("core.test")
 
   extension (literal: String) {
 
-    // A CRLF checkout gives the literal CRLF line endings; the output's are LF.
-    def stripExpectedMargin: String = literal.stripMargin.replace("\r\n", "\n")
+    def stripExpectedMargin: String =
+      literal.stripMargin
+        // A CRLF checkout gives the literal CRLF line endings; the output's are LF.
+        .replace("\r\n", "\n")
 
     def toRunEvent: RunEvent =
-      TestRunBuilder.build(TestRunPart.Events(literal)).map(_.items) match {
-        case Right(Vector(BuiltRunItem.Event(built))) => RunEvent.of(built.event).fold(fail(_), identity)
-        case Right(items) => fail(s"expected one event, but the notation built $items")
-        case Left(reason) => fail(reason)
+      TestRunBuilder.build(TestRunPart.Events(literal)).items match {
+        case Vector(BuiltRunItem.Event(built)) => RunEvent.of(built.event)
+        case items => fail(s"expected one event, but the notation built $items")
+      }
+
+    def interleavingsWith(lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
+      ConsolidatedRuns.interleavings(ConsolidatedRuns.eventNotationsOf(literal).map(TestRunPart.Events(_)), lines)
+  }
+
+  extension (consolidation: Consolidation) {
+
+    def addRunOf(parts: TestRunPart*): EndedRun = consolidation.addRun(module)(feed => feed.addAll(parts*))
+
+    def addRunOf(events: Vector[RunEvent]): EndedRun = consolidation.addRun(module)(feed => events.foreach(event => feed.add(event)))
+
+    def addRunIn(worker: Worker, parts: TestRunPart*): EndedRun = consolidation.addRun(module, Some(worker))(feed => feed.addAll(parts*))
+  }
+
+  extension (feed: RunFeed) {
+
+    def addAll(parts: TestRunPart*): Unit =
+      TestRunBuilder.build(parts*).items.foreach {
+        case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
+        case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
+        case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
       }
   }
 
@@ -32,7 +55,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
     def lines: Vector[String] = synchronized(received.toVector)
 
-    def linesWithoutSummaryLine: Vector[String] = lines.dropRight(1)
+    def linesWithoutSummaryLine: Vector[String] = colourMarkedOutput.treeLines
 
     def colourMarkedTree: String = colourMarkedOutput.tree
 
@@ -41,38 +64,53 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   final case class ColourMarkedOutput(lines: Vector[String]) {
 
-    def tree: String = lines.dropRight(1).mkString("\n")
+    def treeLines: Vector[String] = lines.dropRight(1)
+
+    def tree: String = treeLines.mkString("\n")
 
     def summaryLine: String = lines.lastOption.getOrElse(fail("the human-readable output has no line"))
 
     def plainSummaryLine: String = summaryLine.replaceAll("\\{(reset|red|green|yellow|cyan)\\}", "")
   }
 
-  def addRun(consolidation: Consolidation, parts: TestRunPart*): RunFeed = {
-    val feed = consolidation.addRun(moduleLabel)
-    TestRunBuilder.build(parts*) match {
-      case Right(run) =>
-        run.items.foreach {
-          case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event).fold(fail(_), identity))
-          case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
-          case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
-        }
-      case Left(reason) => fail(reason)
-    }
-    feed
-  }
+  val runStarts: TestRunPart = TestRunPart.Events("run started\nrun: RunStarting")
 
-  /** Feeds the events to one run of module `core.test`, then ends the consolidation. */
-  def consolidateRun(consolidation: Consolidation, events: Vector[RunEvent]): Unit = {
-    val feed = consolidation.addRun(moduleLabel)
-    events.foreach(event => feed.add(event))
-    feed.endEventStream()
+  val runEndsCompleted: TestRunPart = TestRunPart.Events("run: RunCompleted\nrun ended completed")
+
+  def completedRunOf(events: String*): String = ("run started" +: events :+ "run ended completed").mkString("\n")
+
+  def eventLogOfSuite(suite: String, nodes: String, events: String*): String =
+    (structureOf(suite, nodes) +: s"""suite "$suite": SuiteStarting""" +: events.flatMap(ConsolidatedRuns.eventLinesOf) :+ s"""suite "$suite": SuiteCompleted""")
+      .mkString("\n")
+
+  def structureOf(suite: String, nodes: String): String =
+    (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
+
+  def suiteRuns(suite: String, test: String = "t", occurrenceAmongTestsOfItsName: Int = 1): TestRunPart =
+    TestRunPart.Events(
+      eventLogOfSuite(
+        suite,
+        s"""test "$test", label "- $test"""",
+        s"""test "$test" #$occurrenceAmongTestsOfItsName: TestStarting""",
+        s"""test "$test" #$occurrenceAmongTestsOfItsName: TestSucceeded"""
+      )
+    )
+
+  def runOfSuites(suites: String*): Vector[TestRunPart] =
+    runStarts +: suites.zipWithIndex.map((suite, index) => suiteRuns(suite, occurrenceAmongTestsOfItsName = index + 1)).toVector :+ runEndsCompleted
+
+  def workerAt(forkGroup: Int, workerIndex: Int): Worker =
+    Worker(ForkGroup.at(forkGroup), WorkerIndex(workerIndex))
+
+  def startedWithColour(output: OutputSink = new OutputSink): Consolidation = Consolidation.start(output, coloured = true)
+
+  def colourMarkedOutputAfter(act: Consolidation => Unit): ColourMarkedOutput = {
+    val output = new OutputSink
+    val consolidation = startedWithColour(output)
+    act(consolidation)
     consolidation.end()
+    output.colourMarkedOutput
   }
-
-  // An event is a line at the event log's least indentation, with the lines indented below it.
-  def interleavingsOf(eventLog: String, lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
-    ConsolidatedRuns.interleavings(ConsolidatedRuns.eventNotationsOf(eventLog).map(TestRunPart.Events(_)), lines)
 
   def colourMarkedTreeFrom(eventLog: String): String = colourMarkedTreeFrom(TestRunPart.Events(eventLog))
 
@@ -80,13 +118,7 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   def colourMarkedOutputFrom(eventLog: String): ColourMarkedOutput = colourMarkedOutputFrom(TestRunPart.Events(eventLog))
 
-  def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = {
-    val output = new OutputSink
-    val consolidation = Consolidation.start(output, coloured = true)
-    addRun(consolidation, parts*).endEventStream()
-    consolidation.end()
-    output.colourMarkedOutput
-  }
+  def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = colourMarkedOutputAfter(_.addRunOf(parts*))
 }
 
 private[consolidation] object ConsolidatedRuns {
@@ -102,11 +134,23 @@ private[consolidation] object ConsolidatedRuns {
   def withColoursMarked(line: String): String =
     markers.foldLeft(line) { case (marked, (sequence, marker)) => marked.replace(sequence, marker) }
 
+  private def indentationOf(line: String): Int = line.takeWhile(_ == ' ').length
+
+  private def nonBlankLinesOf(notation: String): Vector[String] = notation.linesIterator.filter(_.trim.nonEmpty).toVector
+
+  private def eventLinesOf(notation: String): Vector[String] = nonBlankLinesOf(notation).map(_.trim)
+
+  private def nested(notation: String, depth: Int): Vector[String] = {
+    val lines = nonBlankLinesOf(notation)
+    val leastIndentation = lines.map(indentationOf).minOption.getOrElse(0)
+    lines.map(line => "  " * depth + line.drop(leastIndentation))
+  }
+
   private def eventNotationsOf(eventLog: String): Vector[String] = {
-    val lines = eventLog.linesIterator.filter(_.trim.nonEmpty).toVector
-    val leastIndentation = lines.map(_.takeWhile(_ == ' ').length).min
+    val lines = nonBlankLinesOf(eventLog)
+    val leastIndentation = lines.map(indentationOf).min
     lines.foldLeft(Vector.empty[String]) { (events, line) =>
-      if (line.takeWhile(_ == ' ').length == leastIndentation || events.isEmpty) {
+      if (indentationOf(line) == leastIndentation || events.isEmpty) {
         events :+ line
       } else {
         events.init :+ (events.last + "\n" + line)

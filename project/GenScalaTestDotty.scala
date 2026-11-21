@@ -21,10 +21,10 @@ import java.io.{File, FileWriter, BufferedWriter}
 
 object GenScalaTestDotty {
 
-  /** Line ending of copies built for the JVM or Native: the build machine's, as BufferedWriter.newLine wrote. */
   val PlatformLineEnding: String = System.lineSeparator
 
-  /** Line ending of copies built for Scala.js, whose line separator is "\n" on every machine, so multi-line literals match its output. */
+  // "\n" on every machine, as Scala.js's line separator is,
+  // so that the copies' multi-line literals match Scala.js's output.
   val ScalaJsLineEnding: String = "\n"
 
   private def uncommentJsExport(line: String): String =

@@ -1,6 +1,5 @@
 package org.scalatest.mill
 
-import mill.testkit.IntegrationTester
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -22,19 +21,18 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   private val testCommandTaskName: String = "org.scalatest.mill.TestCommandModule/test"
 
-  // Mill names a task on stderr, after the task's prefix, when it starts, and with its duration when it ends.
   private def isMillsTaskNameLine(prefix: String, line: String): Boolean =
+    // On stderr, after the task's prefix, Mill writes the task's name when it starts and the name with its duration
+    // when it ends.
     line.matches(Regex.quote(prefix + testCommandTaskName) + """( [0-9]+(\.[0-9]+)?(ms|s|m))?""")
 
-  private def withSuites[A](moduleArguments: String*)(suites: String*)(test: IntegrationTester => A): A =
-    withTester("arguments") { tester =>
-      val samples = tester.workspacePath / "core" / "test" / "src" / "samples"
-      os.makeDir.all(samples)
-      suites.foreach(suite => os.copy(tester.workspacePath / "suites" / s"$suite.scala", samples / s"$suite.scala"))
+  private def withSuites[A](moduleArguments: String*)(suites: String*)(test: FixtureBuild => A): A =
+    withFixtureBuild(FixtureName.arguments) { build =>
+      build.addSuites(suites*)
       if (moduleArguments.nonEmpty) {
-        setModuleArguments(tester, moduleArguments)
+        build.setModuleArguments(moduleArguments)
       }
-      test(tester)
+      test(build)
     }
 
   Feature("The test command's output arguments") {
@@ -44,8 +42,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
         And("Mill colours its console output")
         When(s"the test command runs core.test with $what, with Mill's ticker on")
-        val (result, workerStarted) = withSuites()("CalculatorSuite") { tester =>
-          (runTestCommandWithTickerAndColour(tester, ("core.test" +: outputArguments)*), anyTestWorkerStarted(tester))
+        val (result, workerStarted) = withSuites()("CalculatorSuite") { build =>
+          (build.runTestCommandWithTickerAndColour(("core.test" +: outputArguments)*), build.anyTestWorkerStarted)
         }
 
         Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
@@ -55,17 +53,15 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         }
 
         And("no other line on stdout, and no line on stderr but Mill's own line naming the task, carries the test command's prefix")
-        val prefix = TestCommandResult.millPrefix.findPrefixOf(result.prefixedHumanReadableLines.head)
+        val prefix = result.prefixedHumanReadableLines.headOption.flatMap(TestCommandResult.millPrefix.findPrefixOf)
         withClue(result.debugString) {
           prefix shouldBe defined
-          result.stdoutLines.filter(_.startsWith(prefix.get)) shouldBe result.prefixedHumanReadableLines
-          result.stderrLines
-            .filter(_.startsWith(prefix.get))
-            .filterNot(isMillsTaskNameLine(prefix.get, _)) shouldBe empty
+          prefix.map(found => result.stdoutLines.filter(_.startsWith(found))) shouldBe Some(result.prefixedHumanReadableLines)
+          prefix.map(found => result.stderrLines.filter(_.startsWith(found)).filterNot(isMillsTaskNameLine(found, _))) shouldBe Some(Nil)
         }
 
         And("the test command succeeds, having started a test worker")
-        result.succeeded shouldBe true
+        shouldSucceed(result)
         workerStarted shouldBe true
       }
     }
@@ -73,10 +69,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     Scenario("With a bare -o, the console holds no consolidated output and none of the run's lines") {
       Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
       When("the test command runs core.test with -o")
-      val result = withSuites()("CalculatorSuite") { tester =>
-        runTestCommand(tester, "core.test", "-o")
+      val result = withSuites()("CalculatorSuite") { build =>
+        build.runTestCommand("core.test", "-o")
       }
-      val console = result.stdoutLines ++ result.stderrLines
+      val console = result.consoleLines
 
       Then("the console holds no line of human-readable output, its summary line included, and no line holding dividing now")
       withClue(result.debugString) {
@@ -86,7 +82,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
 
       And("the test command succeeds")
-      result.succeeded shouldBe true
+      shouldSucceed(result)
     }
 
     val rejectedArguments = Seq(
@@ -103,23 +99,23 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Given("CalculatorSuite")
         And("Mill colours its console output")
         When(s"the test command runs core.test with ${outputArguments.mkString(" ")}")
-        withSuites()("CalculatorSuite") { tester =>
-          val result = runTestCommandWithColour(tester, ("core.test" +: outputArguments)*)
+        withSuites()("CalculatorSuite") { build =>
+          val result = build.runTestCommandWithColour(("core.test" +: outputArguments)*)
 
           Then("the test command fails before any test starts")
-          shouldFailBeforeAnyTestStarts(tester, result)
+          shouldFailBeforeAnyTestStarts(build, result)
 
           And(s"the console names $rejected as the argument the test command rejects")
-          withClue(result.debugString) {
-            (result.eval.out + result.eval.err) should include(
-              s"The test command takes at most one of -oH or a bare -o, and at most one -fJ followed by a path, but was given: $rejected")
-          }
+          shouldWriteToTheConsole(
+            result,
+            s"The test command takes at most one of -oH or a bare -o, and at most one -fJ followed by a path, but was given: $rejected"
+          )
 
           And("the console holds no line of human-readable output")
           result.treeLines shouldBe empty
 
           And("no file report.txt is written")
-          os.walk(tester.workspacePath).filter(_.last == "report.txt") shouldBe empty
+          os.walk(build.workspace).filter(_.last == "report.txt") shouldBe empty
         }
       }
     }
@@ -130,14 +126,12 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     Scenario("A module's own ScalaTest argument whose flag the Runner does not recognise fails the test command, naming that argument") {
       Given("CalculatorSuite, in a module whose own ScalaTest arguments are -l samples.Slow -x")
       When("the test command runs core.test")
-      withSuites("-l", "samples.Slow", "-x")("CalculatorSuite") { tester =>
-        val result = runTestCommand(tester, "core.test")
+      withSuites("-l", "samples.Slow", "-x")("CalculatorSuite") { build =>
+        val result = build.runTestCommand("core.test")
 
         Then("the test command fails before any test starts, naming -x")
-        shouldFailBeforeAnyTestStarts(tester, result)
-        withClue(result.debugString) {
-          (result.eval.out + result.eval.err) should include("hold -x,")
-        }
+        shouldFailBeforeAnyTestStarts(build, result)
+        shouldWriteToTheConsole(result, "hold -x,")
 
         And("the console holds no line of human-readable output")
         result.treeLines shouldBe empty
@@ -147,8 +141,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     Scenario("A test-name substring that begins with - reaches the run") {
       Given("FlagSuite, with tests parses -y and parses -x, in a module whose own ScalaTest arguments are -z -y")
       When("the test command runs core.test")
-      val result = withSuites("-z", "-y")("FlagSuite") { tester =>
-        runTestCommand(tester, "core.test")
+      val result = withSuites("-z", "-y")("FlagSuite") { build =>
+        build.runTestCommand("core.test")
       }
 
       Then("the human-readable output shows parses -y alone")
@@ -161,8 +155,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Given("SpeedSuite, whose test slow is tagged samples.Slow and writes slow ran, in a module whose own ScalaTest arguments are -l samples.Slow")
       And("Mill colours its console output")
       When("the test command runs core.test")
-      val result = withSuites("-l", "samples.Slow")("SpeedSuite") { tester =>
-        runTestCommandWithColour(tester, "core.test")
+      val result = withSuites("-l", "samples.Slow")("SpeedSuite") { build =>
+        build.runTestCommandWithColour("core.test")
       }
 
       Then("the human-readable output shows fast alone")
@@ -172,14 +166,14 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     for (moduleArguments <- Seq(Seq("-oD"), Seq("-eD"), Seq("-s", "samples.OtherSuite"))) {
-      Scenario(s"${moduleArguments.mkString(" ")} has no effect") {
+      Scenario(s"The module's own ${moduleArguments.mkString(" ")} leaves the human-readable output unchanged") {
         Given(s"CalculatorSuite and OtherSuite, in a module whose own ScalaTest arguments are ${moduleArguments.mkString(" ")}")
+        And("the module's testParallelism is false")
         When("the test command runs core.test, and runs it again with the module's own arguments removed")
-        val (result, withoutArguments) = withSuites(moduleArguments*)("CalculatorSuite", "OtherSuite") { tester =>
-          val result = runTestCommand(tester, "core.test")
-          val buildFile = tester.workspacePath / "build.mill"
-          os.write.over(buildFile, os.read(buildFile).linesIterator.filterNot(_.contains("testArgsDefault")).mkString("\n"))
-          (result, runTestCommand(tester, "core.test"))
+        val (result, withoutArguments) = withSuites(moduleArguments*)("CalculatorSuite", "OtherSuite") { build =>
+          val result = build.runTestCommand("core.test")
+          build.removeModuleArguments()
+          (result, build.runTestCommand("core.test"))
         }
 
         Then("the human-readable output is the one the test command writes with no module arguments")

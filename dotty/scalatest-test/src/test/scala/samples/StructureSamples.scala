@@ -83,7 +83,6 @@ class ShelvedSuite extends AnyFunSuite {
   }
 }
 
-// Suite.runTests needs a public method named for an ignored test to locate its TestIgnored, so a has one.
 @DoNotDiscover
 class IgnoringPlainSuite extends Suite {
 
@@ -91,6 +90,7 @@ class IgnoringPlainSuite extends Suite {
 
   override def tags: Map[String, Set[String]] = Map("a" -> Set("org.scalatest.Ignore"))
 
+  // Suite.runTests locates ignored test a's TestIgnored at this method, and aborts the suite if it is missing.
   def a(): Unit = ()
 
   override protected def runTest(testName: String, args: Args): Status = {
@@ -135,7 +135,7 @@ class OuterSuites extends Suites(new Inner1Suite, new Inner2Suite)
 class StepwiseOuterSuites extends Suites(new Inner1Suite, new Inner2Suite) with StepwiseNestedSuiteExecution
 
 @DoNotDiscover
-class BrokenCtorSpec extends AnyFunSuite {
+class ThrowingConstructorSpec extends AnyFunSuite {
 
   throw new IllegalStateException("no config")
 }
@@ -156,17 +156,16 @@ class ReadsItsStructureSuite extends AnyFunSuite {
   }
 }
 
-// Registers its scopes and tests when first asked for them, and throws as it does.
 @DoNotDiscover
 class ThrowingScopeRefSpec extends RefSpec {
 
   object `a scope` {
+    // Thrown when the suite registers its tests, which a RefSpec does when first asked for them.
     throw new RuntimeException("boom")
     def `t 1`: Unit = ()
   }
 }
 
-// Registers scope b when first asked for its tests, in a second instance, whose constructor then throws.
 @DoNotDiscover
 class ThrowingSecondScopePathFunSpec extends PathAnyFunSpec {
 
@@ -175,11 +174,11 @@ class ThrowingSecondScopePathFunSpec extends PathAnyFunSpec {
   }
 
   describe("b") {
+    // Thrown in the second instance, which the suite constructs to register b when first asked for the suite's tests.
     throw new RuntimeException("boom")
   }
 }
 
-// Registers scope b when first asked for its tests, in a second instance, whose constructor then throws.
 @DoNotDiscover
 class ThrowingSecondScopePathFreeSpec extends PathAnyFreeSpec {
 
@@ -188,22 +187,22 @@ class ThrowingSecondScopePathFreeSpec extends PathAnyFreeSpec {
   }
 
   "b" - {
+    // Thrown in the second instance, which the suite constructs to register b when first asked for the suite's tests.
     throw new RuntimeException("boom")
   }
 }
 
-// Each counts no test of the suite it nests, so nothing asks that suite for its tests before this suite runs.
-@DoNotDiscover
-class NestsThrowingScopeRefSpec extends Suites(new ThrowingScopeRefSpec) {
+abstract class CountsNoNestedTests(nested: Suite) extends Suites(nested) {
+
+  // Counting the nested suite's tests would ask it for them before this suite runs.
   override def expectedTestCount(filter: Filter): Int = 0
 }
 
 @DoNotDiscover
-class NestsThrowingSecondScopePathFunSpec extends Suites(new ThrowingSecondScopePathFunSpec) {
-  override def expectedTestCount(filter: Filter): Int = 0
-}
+class NestsThrowingScopeRefSpec extends CountsNoNestedTests(new ThrowingScopeRefSpec)
 
 @DoNotDiscover
-class NestsThrowingSecondScopePathFreeSpec extends Suites(new ThrowingSecondScopePathFreeSpec) {
-  override def expectedTestCount(filter: Filter): Int = 0
-}
+class NestsThrowingSecondScopePathFunSpec extends CountsNoNestedTests(new ThrowingSecondScopePathFunSpec)
+
+@DoNotDiscover
+class NestsThrowingSecondScopePathFreeSpec extends CountsNoNestedTests(new ThrowingSecondScopePathFreeSpec)

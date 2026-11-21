@@ -33,9 +33,6 @@ import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 
-// One suite of each style for each declaration, named <style>With<declaration>. No sample's test body matters:
-// only what each registers.
-
 trait StringFixture { this: org.scalatest.FixtureTestSuite =>
   type FixtureParam = String
   def withFixture(test: OneArgTest): Outcome = test("fixture")
@@ -323,7 +320,7 @@ class RefSpecWithObject extends RefSpec {
 
 @DoNotDiscover
 class AnyWordSpecWithWhichAndThat extends AnyWordSpec {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "s" should {
     "u" which {
       "t" in { succeed }
@@ -342,7 +339,7 @@ class AnyWordSpecWithWhichAndThat extends AnyWordSpec {
 
 @DoNotDiscover
 class AsyncWordSpecWithWhichAndThat extends AsyncWordSpec {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "s" should {
     "u" which {
       "t" in { succeed }
@@ -361,7 +358,7 @@ class AsyncWordSpecWithWhichAndThat extends AsyncWordSpec {
 
 @DoNotDiscover
 class FixtureAnyWordSpecWithWhichAndThat extends FixtureAnyWordSpec with StringFixture {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "s" should {
     "u" which {
       "t" in { _ => succeed }
@@ -380,7 +377,7 @@ class FixtureAnyWordSpecWithWhichAndThat extends FixtureAnyWordSpec with StringF
 
 @DoNotDiscover
 class FixtureAsyncWordSpecWithWhichAndThat extends FixtureAsyncWordSpec with AsyncStringFixture {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "s" should {
     "u" which {
       "t" in { _ => succeed }
@@ -399,7 +396,7 @@ class FixtureAsyncWordSpecWithWhichAndThat extends FixtureAsyncWordSpec with Asy
 
 @DoNotDiscover
 class AnyWordSpecWithShorthandScopes extends AnyWordSpec {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "u" which { "t" in { succeed } }
   it should { "x" in { succeed } }
   "v" that { "t" in { succeed } }
@@ -416,7 +413,7 @@ class AnyWordSpecWithShorthandScopes extends AnyWordSpec {
 
 @DoNotDiscover
 class AsyncWordSpecWithShorthandScopes extends AsyncWordSpec {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "u" which { "t" in { succeed } }
   it should { "x" in { succeed } }
   "v" that { "t" in { succeed } }
@@ -433,7 +430,7 @@ class AsyncWordSpecWithShorthandScopes extends AsyncWordSpec {
 
 @DoNotDiscover
 class FixtureAnyWordSpecWithShorthandScopes extends FixtureAnyWordSpec with StringFixture {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "u" which { "t" in { _ => succeed } }
   it should { "x" in { _ => succeed } }
   "v" that { "t" in { _ => succeed } }
@@ -450,7 +447,7 @@ class FixtureAnyWordSpecWithShorthandScopes extends FixtureAnyWordSpec with Stri
 
 @DoNotDiscover
 class FixtureAsyncWordSpecWithShorthandScopes extends FixtureAsyncWordSpec with AsyncStringFixture {
-  def provides = afterWord("provides")
+  private def provides: AfterWord = afterWord("provides")
   "u" which { "t" in { _ => succeed } }
   it should { "x" in { _ => succeed } }
   "v" that { "t" in { _ => succeed } }

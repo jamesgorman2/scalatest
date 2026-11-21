@@ -8,6 +8,7 @@ import org.scalatest.exceptions.GeneratorDrivenPropertyCheckFailedException
 import org.scalatest.exceptions.StackDepthException
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.tools.StackFrames.lineNumberOfFrame
 import org.scalatest.tools.StackFrames.withFrames
 import org.scalatest.wordspec.AnyWordSpec
 import scala.io.Codec
@@ -38,7 +39,6 @@ private final case class SummaryCase(
   exceptionalEvents: Vector[ExceptionalEvent]
 )
 
-// StringReporterRecordedText.txt holds the text and colour StringReporter must keep returning.
 final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
 
   private val suiteName = "StackSpec"
@@ -66,20 +66,19 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
 
   private def plainFailureWithoutMessage: Throwable = withFrames(new RuntimeException, "Store", 2)
 
-  // Each position names its exception's second or third frame, so the failed code's stack depth is 1 or 2.
   private def stackDepthFailureWithCauses: Throwable = {
     val innermost = withFrames(new IllegalArgumentException, "Disk", 2)
     val inner = new TestFailedException(
       (_: StackDepthException) => Some("  the helper failed  "),
       Some(innermost),
-      Left(Position("Helper.scala", "/src/Helper.scala", 11)),
+      Left(Position("Helper.scala", "/src/Helper.scala", lineNumberOfFrame(1))),
       None,
       Vector.empty
     )
     val outer = new TestFailedException(
       (_: StackDepthException) => Some("1 did not equal 2"),
       Some(withFrames(inner, "Helper", 4)),
-      Left(Position("Stack.scala", "/src/Stack.scala", 12)),
+      Left(Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(2))),
       None,
       Vector.empty
     )
@@ -99,7 +98,6 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       5
     )
 
-  // The stack depth is past the last frame, so no frame gives a file name and line number.
   private def stackDepthFailureWithoutFileNameAndLineNumber: Throwable =
     withFrames(
       new TestFailedException(
@@ -118,7 +116,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       new TestFailedException(
         (_: StackDepthException) => None,
         None,
-        Left(Position("Stack.scala", "/src/Stack.scala", 10)),
+        Left(Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(0))),
         None,
         Vector.empty
       ),
@@ -131,7 +129,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       new GeneratorDrivenPropertyCheckFailedException(
         (_: StackDepthException) => "Property check failed. (StackSpec.scala:30)\n  Falsified after 2 successful property evaluations.",
         Some(withFrames(new IllegalArgumentException("negative size"), "Disk", 3)),
-        Left(Position("Stack.scala", "/src/Stack.scala", 13)),
+        Left(Position("Stack.scala", "/src/Stack.scala", lineNumberOfFrame(3))),
         None,
         "undecorated",
         List(1),
@@ -142,13 +140,14 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       4
     )
 
-  // The StackDepth exception has a cause of its own, which must not be shown where the chain ends before the StackDepth exception.
   private def plainFailureCausedByStackDepthFailure: Throwable = {
+    // `innermost` is shown only with a stack trace: without one, the cause chain ends before `inner`,
+    // the StackDepth exception it causes.
     val innermost = withFrames(new IllegalArgumentException("root cause"), "Disk", 2)
     val inner = new TestFailedException(
       (_: StackDepthException) => Some("the helper failed"),
       Some(innermost),
-      Left(Position("Helper.scala", "/src/Helper.scala", 11)),
+      Left(Position("Helper.scala", "/src/Helper.scala", lineNumberOfFrame(1))),
       None,
       Vector.empty
     )
@@ -514,8 +513,7 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     PresentationFlags("with D", allDurations = true)
   )
 
-  // Given out of ordinal order, since the reminders are sorted by ordinal.
-  private def exceptionalEvents: Vector[ExceptionalEvent] = Vector(
+  private def exceptionalEventsOutOfOrdinalOrder: Vector[ExceptionalEvent] = Vector(
     suiteAborted("the suite aborted", Some(plainFailureWithCause), None, fourthOrdinal),
     testFailed(
       "the message",
@@ -557,14 +555,14 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
           runCompleted,
           duration,
           summaryOfSeveralFailuresAndAborts,
-          exceptionalEvents
+          exceptionalEventsOutOfOrdinalOrder
         )
     withoutReminders ++ withReminders
   }
 
   private val runEndCases: Vector[RunEndCase] = {
     for {
-      (reminderName, reminderEvents) <- Vector("with no event to remind of" -> Vector.empty, "with events to remind of" -> exceptionalEvents)
+      (reminderName, reminderEvents) <- Vector("with no event to remind of" -> Vector.empty, "with events to remind of" -> exceptionalEventsOutOfOrdinalOrder)
       (eventName, event) <- Vector(
         "RunCompleted" -> RunCompleted(firstOrdinal, duration, summaryOfSeveralFailuresAndAborts, threadName = threadName, timeStamp = timeStamp),
         "RunStopped" -> RunStopped(firstOrdinal, duration, summaryOfSeveralFailuresAndAborts, threadName = threadName, timeStamp = timeStamp)
@@ -601,7 +599,6 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
       flags.filePathname
     )
 
-  // The run-aborted text holds the platform's line separator, which the recorded text holds as a line feed.
   private def recordedForm(fragment: Fragment): String = {
     val text = fragment.text
       .replace(Prettifier.lineSeparator, "\n")
@@ -649,26 +646,26 @@ final class StringReporterRecordedTextSpec extends AnyWordSpec with Matchers {
     cases.result()
   }
 
-  "StringReporter's fragmentsForEvent" should {
+  "The text a string reporter prints for an event" should {
     eventCases.foreach { eventCase =>
-      s"return the recorded fragments for ${eventCase.name}" in {
+      s"be the recorded text for ${eventCase.name}" in {
         rendered(eventFlags, fragmentsFor(eventCase.event, _, Vector.empty)) shouldBe recorded(eventCase.name)
       }
     }
     runEndCases.foreach { runEndCase =>
-      s"return the recorded fragments for ${runEndCase.name}" in {
+      s"be the recorded text for ${runEndCase.name}" in {
         rendered(summaryFlags, fragmentsFor(runEndCase.event, _, runEndCase.reminderEvents)) shouldBe recorded(runEndCase.name)
       }
     }
-    "throw a NullPointerException for a blank message and a throwable without a message" in {
+    "throw a NullPointerException when computed for a blank message and a throwable without a message" in {
       val event = testFailed("", Some(plainFailureWithoutMessage), None)
       a[NullPointerException] should be thrownBy fragmentsFor(event, eventFlags.head, Vector.empty)
     }
   }
 
-  "StringReporter's summaryFragments" should {
+  "The summary a string reporter prints at the end of a run" should {
     summaryCases.foreach { summaryCase =>
-      s"return the recorded fragments for ${summaryCase.name}" in {
+      s"be the recorded text for ${summaryCase.name}" in {
         rendered(summaryFlags, summaryFragmentsFor(summaryCase, _)) shouldBe recorded(summaryCase.name)
       }
     }

@@ -1,6 +1,7 @@
 package org.scalatest.samples
 
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.Args
 import org.scalatest.DoNotDiscover
 import org.scalatest.Filter
@@ -24,38 +25,47 @@ import scala.jdk.CollectionConverters.*
 
 object PerTestInstances {
 
-  private val ranItsTest = new ConcurrentLinkedQueue[(Suite, SuiteRegistration)]
-
-  def recordRanItsTest(suite: Suite): Unit = ranItsTest.add(suite -> RegistrationInContext.ofCallingThread)
+  private val current = new AtomicReference(new ConcurrentLinkedQueue[(Suite, SuiteRegistration)])
 
   def recordedIn(launch: => Unit): Vector[(Suite, SuiteRegistration)] = synchronized {
-    ranItsTest.clear()
+    val recording = new ConcurrentLinkedQueue[(Suite, SuiteRegistration)]
+    current.set(recording)
     launch
-    ranItsTest.asScala.toVector
+    recording.asScala.toVector
+  }
+
+  private[samples] def currentRecording: ConcurrentLinkedQueue[(Suite, SuiteRegistration)] = current.get
+}
+
+trait RecordsRanItsTest { this: Suite =>
+
+  // Taken at construction, so a run that outlives its recording cannot write into a later one.
+  private val recording = PerTestInstances.currentRecording
+
+  protected def recordRanItsTest(): Unit = recording.add(this -> RegistrationInContext.ofCallingThread)
+}
+
+@DoNotDiscover
+class OneInstancePerTestProbe extends AnyFunSuite with OneInstancePerTest with RecordsRanItsTest {
+
+  test("probes") {
+    recordRanItsTest()
   }
 }
 
 @DoNotDiscover
-class OneInstancePerTestProbe extends AnyFunSuite with OneInstancePerTest {
+class ParallelTestExecutionProbe extends AnyFunSuite with ParallelTestExecution with RecordsRanItsTest {
 
   test("probes") {
-    PerTestInstances.recordRanItsTest(this)
+    recordRanItsTest()
   }
 }
 
 @DoNotDiscover
-class ParallelTestExecutionProbe extends AnyFunSuite with ParallelTestExecution {
+class RandomTestOrderProbe extends AnyFunSuite with RandomTestOrder with RecordsRanItsTest {
 
   test("probes") {
-    PerTestInstances.recordRanItsTest(this)
-  }
-}
-
-@DoNotDiscover
-class RandomTestOrderProbe extends AnyFunSuite with RandomTestOrder {
-
-  test("probes") {
-    PerTestInstances.recordRanItsTest(this)
+    recordRanItsTest()
   }
 }
 
@@ -104,11 +114,10 @@ final class QueueingExecutionContext extends ExecutionContext {
   def runQueued(): Unit = Iterator.continually(queued.poll()).takeWhile(_ != null).foreach(_.run())
 }
 
-// Its test completes only once its execution context's queued tasks are run.
 @DoNotDiscover
 class ScopedQueueingAsyncFunSpec extends AsyncFunSpec {
 
-  val queueing = new QueueingExecutionContext
+  val queueing: QueueingExecutionContext = new QueueingExecutionContext
 
   implicit override def executionContext: ExecutionContext = queueing
 
@@ -168,7 +177,7 @@ object NodeOfRun {
 
 @DoNotDiscover
 class AsyncSuiteRecordingItsNodeAsTestsAreCounted extends AsyncFunSuite {
-  @volatile var nodeFixedAsTestsAreCounted = Vector.empty[Boolean]
+  @volatile var nodeFixedAsTestsAreCounted: Vector[Boolean] = Vector.empty
 
   override def expectedTestCount(filter: Filter): Int = {
     nodeFixedAsTestsAreCounted ++= NodeOfRun.isFixed(this)
@@ -182,7 +191,7 @@ class AsyncSuiteRecordingItsNodeAsTestsAreCounted extends AsyncFunSuite {
 
 @DoNotDiscover
 class ParallelSuiteRecordingItsNodeAsTestsAreCounted extends AnyFunSuite with ParallelTestExecution {
-  @volatile var nodeFixedAsTestsAreCounted = Vector.empty[Boolean]
+  @volatile var nodeFixedAsTestsAreCounted: Vector[Boolean] = Vector.empty
 
   override def expectedTestCount(filter: Filter): Int = {
     nodeFixedAsTestsAreCounted ++= NodeOfRun.isFixed(this)

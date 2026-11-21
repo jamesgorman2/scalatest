@@ -134,7 +134,6 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
   class ResultOfScenarioInvocation(specText: String, testTags: Tag*) {
     
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Any /* Assertion */, pos: source.Position): Unit = {
@@ -157,7 +156,6 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
     //DOTTY-ONLY }
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Any /* Assertion */, pos: source.Position): Unit = {
@@ -214,7 +212,6 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
 
   class ResultOfIgnoreInvocation(specText: String, testTags: Tag*) {
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: FixtureParam => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: FixtureParam => Any /* Assertion */, pos: source.Position): Unit = {
@@ -237,7 +234,6 @@ trait FixtureAnyFeatureSpecLike extends org.scalatest.FixtureTestSuite with org.
     //DOTTY-ONLY }
 
     // SKIP-SCALATESTNATIVE-START
-    // Code compiled against ScalaTest 3.2.20 for the JVM or Scala.js calls the accessor by this name, which Scala 3.3 no longer gives it.
     //DOTTY-ONLY def inline$applyImpl(testFun: () => Any, pos: source.Position): Unit = applyImpl(testFun, pos)
     // SKIP-SCALATESTNATIVE-END
     private final def applyImpl(testFun: () => Any /* Assertion */, pos: source.Position): Unit = {

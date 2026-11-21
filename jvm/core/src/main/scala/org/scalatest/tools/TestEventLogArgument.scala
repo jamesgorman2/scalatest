@@ -1,9 +1,5 @@
 package org.scalatest.tools
 
-/**
- * The runner argument that makes a run write its test event log to a file: its flag, followed by the file's path as
- * the next argument.
- */
 private[scalatest] object TestEventLogArgument {
 
   val flag: String = "--test-event-log"
