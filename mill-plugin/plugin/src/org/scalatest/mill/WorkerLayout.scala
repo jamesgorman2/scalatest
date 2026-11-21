@@ -7,6 +7,7 @@ import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
+import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import scala.util.control.NoStackTrace
@@ -40,6 +41,7 @@ private[mill] final case class PlannedWorker(id: Worker, processFolder: PathUnde
 }
 
 private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
+  case ClassGlobsKeepNoTestClass(classGlobs: Seq[ClassGlob])
   case ForkGroupsShareProcessFolders(sharing: Seq[SharedProcessFolder])
   case FilesystemCaseNotChecked(cause: IOException)
 
@@ -47,8 +49,16 @@ private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
 
   def message: String =
     this match {
+      case ClassGlobsKeepNoTestClass(classGlobs) => TestCommandFailure.NoTestMatchesClassGlobs(classGlobs).message
       case ForkGroupsShareProcessFolders(sharing) => sharing.map(_.message).mkString("; ")
       case FilesystemCaseNotChecked(cause) => s"checking whether the filesystem ignores case failed: $cause"
+    }
+
+  def rootFailureMessage(module: ModuleName): String =
+    this match {
+      // Attached as Mill's `testOnly` words it.
+      case ClassGlobsKeepNoTestClass(_) => message
+      case _ => s"Laying out the workers of ${module.value} failed: $message"
     }
 }
 
@@ -64,26 +74,28 @@ private[mill] object WorkerLayout {
   def ofQueue(
       forkGroups: Seq[Seq[TestClassName]],
       discovered: Set[TestClassName],
+      classGlobs: Seq[ClassGlob],
       testParallelism: Boolean,
       jobs: Int,
       filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] = {
-    val discoveredForkGroups = forkGroups.map(_.filter(discovered))
+    val keptForkGroups = forkGroups.map(_.filter(ClassGlob.keeping(classGlobs)).filter(discovered))
     // As Mill 1.3.1 does, workers get folders of their own under test parallelism unless the module queues exactly one
     // test class; a module that queues none still gets them.
     val workersPerGroup =
-      if (testParallelism && discoveredForkGroups.map(_.size).sum != 1)
+      if (testParallelism && keptForkGroups.map(_.size).sum != 1)
         WorkersPerGroup.UpToJobsInOwnFolders(jobs)
       else
         WorkersPerGroup.OneInGroupFolder
-    of(discoveredForkGroups, workersPerGroup, filesystemIgnoresCase)
+    of(keptForkGroups, classGlobs, workersPerGroup, filesystemIgnoresCase)
   }
 
   def ofBatches(
       forkGroups: Seq[Seq[TestClassName]],
+      classGlobs: Seq[ClassGlob],
       filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] =
-    of(forkGroups, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
+    of(forkGroups.map(_.filter(ClassGlob.keeping(classGlobs))), classGlobs, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
 
   private enum WorkersPerGroup {
     case OneInGroupFolder
@@ -103,11 +115,12 @@ private[mill] object WorkerLayout {
   }
 
   private def of(
-      forkGroups: Seq[Seq[TestClassName]],
+      keptForkGroups: Seq[Seq[TestClassName]],
+      classGlobs: Seq[ClassGlob],
       workersPerGroup: WorkersPerGroup,
       filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] = {
-    val groupsToRun = forkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
+    val groupsToRun = keptForkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     def forkGroupOf(classes: Seq[TestClassName], position: Int, label: ForkGroupLabel, folder: PathUnderModule): PlannedForkGroup = {
       val forkGroup = ForkGroup.at(position)
       val workerCount = workersPerGroup.count(classes)
@@ -117,6 +130,8 @@ private[mill] object WorkerLayout {
       PlannedForkGroup(forkGroup, label, folder, classes, workers)
     }
     groupsToRun match {
+      // As Mill 1.3.1's `testOnly` does, class globs that keep no class start no worker.
+      case Seq() if classGlobs.nonEmpty => Left(new ClassGlobsKeepNoTestClass(classGlobs))
       // As Mill does, when no fork group has a class, fork group 0 runs with none, so the framework's setup and
       // teardown still run.
       case Seq() => Right(WorkerLayout(Seq(forkGroupOf(Nil, 0, ForkGroupLabel.of(0, 1), PathUnderModule()))))

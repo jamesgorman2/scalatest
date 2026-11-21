@@ -57,6 +57,145 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
   }
 
+  private def moduleNode(json: JsonNode): JsonNode = json.node(NodeKind.Module, "core.test")
+
+  private def suitesRun(json: JsonNode): Seq[String] =
+    moduleNode(json).nodes
+      .filter(node => node.kind == NodeKind.Suite && node.contents.exists(test => test.kind == NodeKind.Test && !test.outcome.contains("aborted")))
+      .map(_.name)
+      .sorted
+
+  private def infoMessages(json: JsonNode): Seq[String] =
+    moduleNode(json).nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
+
+  private def sendWorkingDirectoryFrom(build: FixtureBuild, suite: String, tests: String*): Unit = {
+    val source = build.samples / s"$suite.scala"
+    val declarations = Map("fast" -> """test("fast", Fast) """, "slow" -> """test("slow") """)
+    os.write.over(
+      source,
+      tests.foldLeft(os.read(source))((text, test) => text.replace(declarations(test) + "{}", declarations(test) + """{ info(System.getProperty("user.dir")) }"""))
+    )
+  }
+
+  private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) = {
+    val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(("--" +: classGlobs)*)
+    withClue(result.debugString) {
+      os.exists(build.jsonOutputFile) shouldBe true
+    }
+    (result, build.jsonOutput)
+  }
+
+  private def shouldHoldOneRunOf(json: JsonNode, suites: Seq[String]): JsonNode = {
+    val contents = moduleNode(json).contents
+    contents.map(_.kind) shouldBe Seq(NodeKind.Run)
+    contents.head.contentNames.sorted shouldBe suites
+    contents.head
+  }
+
+  private def shouldSendOnlyTheModuleFoldersSandbox(build: FixtureBuild, json: JsonNode): Unit = {
+    val messages = infoMessages(json)
+    messages should not be empty
+    all(messages.map(os.Path(_))) shouldBe build.moduleFolder / "sandbox"
+  }
+
+  Feature("Class globs") {
+
+    val selectingGlobs = Seq(
+      Seq("samples.Alpha1") -> Seq("Alpha1"),
+      Seq("samples.Alpha*") -> Seq("Alpha1", "Alpha2"),
+      Seq("*1") -> Seq("Alpha1", "Beta1"),
+      Seq("samples.*a2") -> Seq("Alpha2"),
+      Seq("samples.Beta1", "samples.Alpha2") -> Seq("Alpha2", "Beta1")
+    )
+
+    for ((classGlobs, suites) <- selectingGlobs) {
+      Scenario(s"Class globs ${classGlobs.mkString(" ")} run only the suites ${suites.mkString(" and ")}") {
+        Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow")
+        When(s"the test command runs core.test, writing JSON output, with -- ${classGlobs.mkString(" ")}")
+        withMarkingSuites { build =>
+          val (result, json) = runWithClassGlobs(build, classGlobs*)
+
+          Then(s"the suites run are exactly ${suites.mkString(" and ")}")
+          withClue(result.debugString) {
+            suitesRun(json) shouldBe suites
+          }
+
+          And("the test command succeeds")
+          shouldSucceed(result)
+        }
+      }
+    }
+
+    for (batch <- Seq(false, true)) {
+      Scenario(s"Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks $batch") {
+        Given("a module whose testForkGrouping puts Beta1 in fork group 0, and Alpha1 and Alpha2 in fork group 1")
+        And(s"whose testBatchFrameworkTasks is $batch")
+        And("each test sends an info message holding the system property user.dir")
+        When("the test command runs core.test, writing JSON output, with -- samples.Alpha*")
+        withMarkingSuites { build =>
+          build.addToTestModule(
+            """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2")) }""",
+            s"def testBatchFrameworkTasks = $batch"
+          )
+          Seq("Alpha1", "Alpha2", "Beta1").foreach(suite => sendWorkingDirectoryFrom(build, suite, "fast", "slow"))
+          val (result, json) = runWithClassGlobs(build, "samples.Alpha*")
+
+          withClue(result.debugString) {
+            Then("the module node holds exactly one run node, of fork group 1, holding Alpha1 and Alpha2")
+            shouldHoldOneRunOf(json, Seq("Alpha1", "Alpha2")).forkGroup shouldBe Some(1)
+
+            And("every info message is the path of the folder sandbox in the module folder")
+            shouldSendOnlyTheModuleFoldersSandbox(build, json)
+          }
+        }
+      }
+    }
+
+    Scenario("Class globs that select one class under test parallelism run it in one worker, in the module folder") {
+      Given("a module with test parallelism on")
+      And("Alpha1's test fast sends an info message holding the system property user.dir")
+      When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
+      withMarkingSuites { build =>
+        build.replaceInBuild("def testParallelism = false", "def testParallelism = true")
+        sendWorkingDirectoryFrom(build, "Alpha1", "fast")
+        val (result, json) = runWithClassGlobs(build, "samples.Alpha1")
+
+        withClue(result.debugString) {
+          Then("the module node holds exactly one run node, holding Alpha1 only")
+          shouldHoldOneRunOf(json, Seq("Alpha1"))
+
+          And("the info message is the path of the folder sandbox in the module folder")
+          shouldSendOnlyTheModuleFoldersSandbox(build, json)
+        }
+      }
+    }
+
+    for (classGlob <- Seq("samples.Gamma*", "samples.Fast")) {
+      Scenario(s"The class glob $classGlob, which matches no test class, fails the test command") {
+        Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
+        And("samples.Fast, a Tag object that is not a test class")
+        When(s"the test command runs core.test, writing JSON output, with -- $classGlob")
+        withMarkingSuites { build =>
+          val (result, json) = runWithClassGlobs(build, classGlob)
+
+          Then(s"the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming $classGlob")
+          withClue(result.debugString) {
+            json.failureMessages shouldBe Seq(s"Test selector does not match any test: $classGlob\nRun discoveredTestClasses to see available tests")
+          }
+
+          And("no file exists in the markers folder, and no test worker started")
+          withClue(result.debugString) {
+            os.list(build.markersFolder) shouldBe empty
+            build.anyTestWorkerStarted shouldBe false
+          }
+
+          And("the test command fails")
+          shouldFail(result)
+        }
+      }
+    }
+  }
+
   Feature("Framework arguments") {
 
     Scenario("With no -- after the test command's own arguments, every test runs") {

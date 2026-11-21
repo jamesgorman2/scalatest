@@ -96,7 +96,9 @@ For example, `mill scalatest/test core.test`.
   - `-P`, alone or with a thread count joined to it, such as `-P4`;
   - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it.
 
-  The test command checks the framework arguments, but neither they nor the class globs change which tests run.
+  Where class globs are given, only the test classes whose fully qualified name matches at least one of them run, as under `testOnly`. A class glob without `*` matches only the name equal to it, and each `*` matches any run of characters, including none. For example, `mill scalatest/test core.test -- 'samples.Alpha*'`.
+
+  The test command checks the framework arguments, but they do not change which tests run.
 
 The module's own ScalaTest arguments (`testArgsDefault`) reach the run only if they are one of these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`.
 Every other flag, including every reporter flag, is withheld.
@@ -116,6 +118,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
+- class globs are given and none of them matches a test class of the module. No test runs, and the root carries the failure `testOnly` fails with, `Test selector does not match any test: <class globs>`;
 - laying out a fork group's files fails, or starting or running a test worker fails;
 - the test command fails to capture a test worker's output, which goes to Mill's console instead;
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;

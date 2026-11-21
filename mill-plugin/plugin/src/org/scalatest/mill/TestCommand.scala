@@ -46,6 +46,7 @@ private[mill] object TestCommand {
       module,
       inputs,
       scalaTestArguments,
+      commandArguments.classGlobs,
       moduleFolder(ctx, selectedModule.path),
       ctx,
       now,

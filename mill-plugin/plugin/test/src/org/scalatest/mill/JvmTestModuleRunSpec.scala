@@ -7,6 +7,7 @@ import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.ModuleName
 import org.scalatest.matchers.should
+import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.wordspec.AnyWordSpec
@@ -54,6 +55,30 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(notChecked))) should contain(
           "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
         )
+      }
+    }
+
+    "the class globs keep no class" should {
+      val noClassKept = ClassGlobsKeepNoTestClass(Seq(ClassGlob("samples.Gamma*"), ClassGlob("samples.Fast")))
+
+      "attach to the root the failure Mill's testOnly fails with, unprefixed, and show the module with no run" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(noClassKept))
+        consolidation.end()
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
+          "Consolidated tests:",
+          "  [core.test]",
+          "  *** CONSOLIDATED TESTS ABORTED ***",
+          "    Test selector does not match any test: samples.Gamma* samples.Fast",
+          "    Run discoveredTestClasses to see available tests"
+        )
+        consolidation.state shouldBe ConsolidationState.EndedFailed
+      }
+
+      "give nothing to launch" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(noClassKept)) shouldBe None
       }
     }
 

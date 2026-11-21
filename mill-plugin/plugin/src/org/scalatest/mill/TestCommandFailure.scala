@@ -17,6 +17,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
+  case NoTestMatchesClassGlobs(classGlobs: Seq[ClassGlob])
 
   override def getMessage: String = message
 
@@ -52,6 +53,9 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case JsonOutputNotWritten(path, cause, partlyWrittenFileDeleteFailure) =>
         s"The test command cannot write its JSON output to $path, the file $jsonOutputArgument names: $cause" +
           partlyWrittenFileDeleteFailure.fold("")(deleteFailure => s"; it cannot delete the partly written file either: $deleteFailure")
+      case NoTestMatchesClassGlobs(classGlobs) =>
+        // Mill 1.3.1's `testOnly` fails with this message.
+        s"Test selector does not match any test: ${classGlobs.map(_.text).mkString(" ")}\nRun discoveredTestClasses to see available tests"
     }
   }
 }

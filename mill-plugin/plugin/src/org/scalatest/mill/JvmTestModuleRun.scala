@@ -28,6 +28,7 @@ private[mill] final class JvmTestModuleRun(
     module: ModuleName,
     inputs: JvmTestModuleInputs,
     scalaTestArguments: Seq[ScalaTestArgument.Flagged],
+    classGlobs: Seq[ClassGlob],
     moduleFolder: os.Path,
     ctx: TaskCtx,
     now: () => Instant,
@@ -50,13 +51,13 @@ private[mill] final class JvmTestModuleRun(
 
   private def layOutWorkers(): Either[WorkerLayoutFailure, WorkerLauncher] = {
     val moduleFolderIgnoresCase = () => filesystemIgnoresCase(moduleFolder.toNIO)
-    // As Mill 1.3.1 does, batch workers run each fork group's classes as `testForkGrouping` lists them, without
-    // discovery.
+    // As Mill 1.3.1 does, batch workers run the classes the class globs keep of each fork group's `testForkGrouping`
+    // list, without discovery.
     if (inputs.testBatchFrameworkTasks)
-      WorkerLayout.ofBatches(forkGroups, moduleFolderIgnoresCase).map(new BatchLauncher(_))
+      WorkerLayout.ofBatches(forkGroups, classGlobs, moduleFolderIgnoresCase).map(new BatchLauncher(_))
     else
       WorkerLayout
-        .ofQueue(forkGroups, discoveredTestClasses(), inputs.testParallelism, ctx.jobs, moduleFolderIgnoresCase)
+        .ofQueue(forkGroups, discoveredTestClasses(), classGlobs, inputs.testParallelism, ctx.jobs, moduleFolderIgnoresCase)
         .map(new QueueLauncher(_))
   }
 
@@ -78,7 +79,7 @@ private[mill] final class JvmTestModuleRun(
           (inputs.runClasspath ++ inputs.testrunnerEntrypointClasspath).map(_.path),
           inputs.testClasspath.map(_.path),
           inputs.testFramework,
-          Nil,
+          classGlobs.map(_.text),
           scalaTestArgumentStrings,
           inputs.discoveredClasses
         ),
@@ -248,7 +249,7 @@ private[mill] object JvmTestModuleRun {
   ): Option[Launcher] =
     outcomeOfLayingOut.fold(
       failure => {
-        consolidation.addRootFailure(s"Laying out the workers of ${module.value} failed: ${failure.message}")
+        consolidation.addRootFailure(failure.rootFailureMessage(module))
         consolidation.timeModule(module, None, None)
         None
       },
