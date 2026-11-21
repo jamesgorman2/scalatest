@@ -1,13 +1,41 @@
 # Runs every test suite the feature review needs, one build-tool session at a time, so that each
 # stage starts with a fresh JVM. A failing stage does not stop the stages after it.
 #
-# Usage, from PowerShell:  .\test-all.ps1 [path-to-sbt]
-#        from cmd:         powershell -ExecutionPolicy Bypass -File test-all.ps1 [path-to-sbt]
+# Usage, from PowerShell:  .\test-all.ps1 [--compat] [path-to-sbt]
+#        from cmd:         powershell -ExecutionPolicy Bypass -File test-all.ps1 [--compat] [path-to-sbt]
+#
+# --compat (or -Compat) also runs the Dotty compatibility test suites on the JVM, Scala.js and Scala Native.
+# -Sbt <path-to-sbt> names sbt the same way as the positional argument.
 #
 # Logs go to test-all-logs\, one per stage, and test-all-logs\summary.txt lists each stage's exit code.
-# The script exits 1 if any stage failed.
+# The script exits 1 if any stage failed, and 2 on an unknown argument.
 
-param([string]$Sbt = 'sbt')
+# The arguments are parsed by hand because a PowerShell param block does not accept '--compat'.
+function Exit-Usage([string]$Message) {
+  [Console]::Error.WriteLine($Message)
+  [Console]::Error.WriteLine('Usage: .\test-all.ps1 [--compat] [path-to-sbt]')
+  exit 2
+}
+
+$Sbt = 'sbt'
+$sbtGiven = $false
+$Compat = $false
+for ($i = 0; $i -lt $args.Count; $i++) {
+  $arg = "$($args[$i])"
+  if ($arg -eq '--compat' -or $arg -eq '-Compat') {
+    $Compat = $true
+  } elseif ($arg -eq '-Sbt') {
+    if ($sbtGiven -or $i + 1 -ge $args.Count) { Exit-Usage "Unexpected argument: $arg" }
+    $i++
+    $Sbt = "$($args[$i])"; $sbtGiven = $true
+  } elseif ($arg.StartsWith('-')) {
+    Exit-Usage "Unknown argument: $arg"
+  } elseif ($sbtGiven) {
+    Exit-Usage "Unexpected argument: $arg"
+  } else {
+    $Sbt = $arg; $sbtGiven = $true
+  }
+}
 
 $root = $PSScriptRoot
 $logs = Join-Path $root 'test-all-logs'
@@ -53,6 +81,12 @@ $null = Invoke-Stage 'scalactic-js' $root $Sbt @('scalacticTestDottyJS/test')
 $null = Invoke-Stage 'scalatest-js' $root $Sbt @('scalatestTestDottyJS/test')
 $null = Invoke-Stage 'scalactic-native' $root $Sbt @('scalacticTestDottyNative/test')
 $null = Invoke-Stage 'scalatest-native' $root $Sbt @('scalatestTestDottyNative/test')
+
+if ($Compat) {
+  $null = Invoke-Stage 'compatibility-jvm' $root $Sbt @('scalatestCompatibilityTestDotty/test')
+  $null = Invoke-Stage 'compatibility-js' $root $Sbt @('scalatestCompatibilityTestDottyJS/test')
+  $null = Invoke-Stage 'compatibility-native' $root $Sbt @('scalatestCompatibilityTestDottyNative/test')
+}
 
 # The plugin's Mill build resolves the fork from the local repository.
 if (Invoke-Stage 'publish-local' $root $Sbt @('scalatestCompatible/publishLocal', 'scalacticDotty/publishLocal', 'scalatestDotty/publishLocal')) {
