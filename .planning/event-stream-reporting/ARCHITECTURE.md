@@ -73,7 +73,7 @@ Its own components are:
   - A run's own state and the output captured against the run are held on the run's run node, or on the run's module where the run has no run node.
 - **Writers** — write the progress, human-readable and JSON output (`SPECIFICATION.md` R-026, R-027). The human-readable and JSON writers run at **End** (§ APIs § The Mill plugin and the consolidation library).
   - The human-readable output ends with a summary line. Once every event stream has ended, progress output's summary equals that line, whether or not progress output is on (`SPECIFICATION.md` R-141).
-- **Consolidation state** — records whether the consolidation has ended and whether anything has failed the test command (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**), and whether any test result has reached each module (**Read whether a module has a test result**).
+- **Consolidation state** — records whether the consolidation has ended, whether anything has failed the test command, and whether any test result has reached each module (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**, **Read whether a module has a test result**).
 
 ### Mill plugin
 
