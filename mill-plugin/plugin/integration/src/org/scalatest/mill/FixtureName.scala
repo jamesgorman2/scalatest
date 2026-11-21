@@ -7,6 +7,7 @@ object FixtureName {
   val arguments: FixtureName = "arguments"
   val brokenConstructor: FixtureName = "broken-constructor"
   val capturedOutput: FixtureName = "captured-output"
+  val classGlobsAndFrameworkArguments: FixtureName = "class-globs-and-framework-arguments"
   val compatibilityFixture: FixtureName = "compatibility-fixture"
   val everyWorker: FixtureName = "every-worker"
   val jsonOutput: FixtureName = "json-output"

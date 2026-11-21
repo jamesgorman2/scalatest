@@ -82,7 +82,7 @@ Nothing else in the build names the plugin. Mill's own test tasks, such as `mill
 ## Running the test command
 
 ```
-mill scalatest/test <module selector> [-oH | -o] [-fJ <path>]
+mill scalatest/test <module selector> [-oH | -o] [-fJ <path>] [-- [<class globs>] [-- <framework arguments>]]
 ```
 
 For example, `mill scalatest/test core.test`.
@@ -91,6 +91,7 @@ For example, `mill scalatest/test core.test`.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
 - **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
+- **`--`**: the arguments after it are read as `mill <module>.testOnly` reads its arguments: class globs, then, after a second `--`, framework arguments, as in `mill scalatest/test core.test -- -- -n samples.Fast`. A framework argument is one of ScalaTest's `-D` with a config map entry joined to it (`-Dcolour=blue`), `-P` alone or with a thread count joined to it (`-P4`), or `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W` followed by the values ScalaTest's runner takes with it. The test command checks the framework arguments, but neither they nor the class globs change which tests run.
 
 The module's own ScalaTest arguments (`testArgsDefault`) reach the run only if they are one of these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`.
 Every other flag, including every reporter flag, is withheld.
@@ -99,6 +100,8 @@ The test command fails before any test starts when:
 
 - it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`;
 - it is given `-fJ` with no path;
+- it is given, after a second `--`, anything other than a framework argument, such as `-oD`, `-s`, `-n` with no value after it, `-D` with no config map entry, `foo` or a third `--`;
+- it is given one of `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, alone or with its value joined to it, before its first `--`;
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector, or more than one;
 - the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;

@@ -18,6 +18,9 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def jsonOutputFile: os.Path = workspace / "report.json"
 
+  // The folder in which the class globs and framework arguments fixture's tests create a file as they run.
+  def markers: os.Path = workspace / "markers"
+
   def buildText: String = os.read(buildFile)
 
   def editBuild(edit: String => String): Unit = os.write.over(buildFile, edit(buildText))
@@ -85,6 +88,9 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def runTestCommandWritingJsonOutput(millArguments: Seq[String] = Nil): TestCommandResult =
     runTestCommandWithMillArguments(millArguments)("core.test", "-fJ", jsonOutputFile.toString)
+
+  def runTestCommandOnCoreTestWritingJsonOutput(arguments: String*): TestCommandResult =
+    runTestCommandWithMillArguments(Seq("-j", "2"))(("core.test" +: "-fJ" +: jsonOutputFile.toString +: arguments)*)
 
   def jsonOutput: JsonNode = JsonNode.read(jsonOutputFile)
 

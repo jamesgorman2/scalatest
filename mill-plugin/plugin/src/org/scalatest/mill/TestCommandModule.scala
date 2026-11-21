@@ -15,7 +15,11 @@ object TestCommandModule extends ExternalModule {
    * JSON output to a file.
    *
    * @param arguments the module selector and, in any order, optionally `-oH` or, to write nothing to stdout, a bare
-   *   `-o`, and optionally `-fJ` and the JSON output file's path; a relative path resolves against the workspace root
+   *   `-o`, and optionally `-fJ` and the JSON output file's path; a relative path resolves against the workspace root.
+   *   Optionally `--` follows, then the arguments `mill <module>.testOnly` takes: class globs and, after a second `--`,
+   *   framework arguments, as in `core.test -fJ report.json -- samples.Alpha* -- -n samples.Fast`. A framework
+   *   argument is ScalaTest's `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W` with its
+   *   values; the command fails on any other, and on any of these before the first `--`
    */
   def test(evaluator: Evaluator, arguments: mainargs.Leftover[String]): Task.Command[Unit] =
     Task.Command(exclusive = true) {

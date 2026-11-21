@@ -35,6 +35,80 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       test(build)
     }
 
+  private def withMarkingSuites[A](test: FixtureBuild => A): A =
+    withFixtureBuild(FixtureName.classGlobsAndFrameworkArguments) { build =>
+      os.makeDir.all(build.markers)
+      test(build)
+    }
+
+  private def shouldFailBeforeAnyTestStartsWritingNoOutput(build: FixtureBuild, result: TestCommandResult, message: String): Unit = {
+    Then("Mill reports that the test command failed before any test started, with a message naming the argument")
+    shouldFailBeforeAnyTestStarts(build, result)
+    shouldWriteToTheConsole(result, message)
+
+    And("no file exists in the markers folder")
+    withClue(result.debugString) {
+      os.list(build.markers) shouldBe empty
+    }
+
+    And("nothing exists at the JSON output file's path")
+    withClue(result.debugString) {
+      os.exists(build.jsonOutputFile) shouldBe false
+    }
+  }
+
+  Feature("Framework arguments") {
+
+    Scenario("With no -- after the test command's own arguments, every test runs") {
+      Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow, each of which creates a file in the markers folder as it runs")
+      When("the test command runs core.test, writing JSON output, with nothing after -fJ and its path")
+      withMarkingSuites { build =>
+        val result = build.runTestCommandOnCoreTestWritingJsonOutput()
+
+        Then("the test command succeeds")
+        shouldSucceed(result)
+
+        And("the markers folder holds a file for each test of each suite")
+        withClue(result.debugString) {
+          os.list(build.markers).map(_.last).sorted shouldBe
+            Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
+        }
+      }
+    }
+
+    val rejectedFrameworkArguments = Seq(
+      Seq("-oD") -> "-oD",
+      Seq("-s", "samples.Alpha1") -> "-s",
+      Seq("--unknown") -> "--unknown",
+      Seq("-n") -> "-n",
+      Seq("foo") -> "foo"
+    )
+
+    for ((frameworkArguments, named) <- rejectedFrameworkArguments) {
+      Scenario(s"The framework argument ${frameworkArguments.mkString(" ")} fails the test command, naming $named") {
+        Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
+        When(s"the test command runs core.test, writing JSON output, with -- -- ${frameworkArguments.mkString(" ")}")
+        withMarkingSuites { build =>
+          val result = build.runTestCommandOnCoreTestWritingJsonOutput(("--" +: "--" +: frameworkArguments)*)
+
+          shouldFailBeforeAnyTestStartsWritingNoOutput(build, result, TestCommandFailure.FrameworkArgumentNotPassedOn(named).message)
+        }
+      }
+    }
+
+    for (arguments <- Seq(Seq("-n", "samples.Fast", "--", "samples.Alpha1"), Seq("-n", "samples.Fast"))) {
+      Scenario(s"A tag filter among the test command's own arguments, in ${arguments.mkString(" ")}, fails the test command, naming -n") {
+        Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
+        When(s"the test command runs core.test, writing JSON output, with ${arguments.mkString(" ")}")
+        withMarkingSuites { build =>
+          val result = build.runTestCommandOnCoreTestWritingJsonOutput(arguments*)
+
+          shouldFailBeforeAnyTestStartsWritingNoOutput(build, result, TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n").message)
+        }
+      }
+    }
+  }
+
   Feature("The test command's output arguments") {
 
     for ((what, outputArguments) <- Seq("no -o" -> Nil, "-oH" -> Seq("-oH"))) {

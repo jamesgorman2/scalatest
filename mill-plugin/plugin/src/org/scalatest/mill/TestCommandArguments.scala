@@ -1,9 +1,13 @@
 package org.scalatest.mill
 
+import org.scalatest.consolidation.ScalaTestArgument
+
 private[mill] final case class TestCommandArguments(
     moduleSelectors: Seq[ModuleSelectorArgument],
     stdoutContent: StdoutContent,
-    jsonOutputPath: Option[String]
+    jsonOutputPath: Option[String],
+    classGlobs: Seq[ClassGlob],
+    frameworkArguments: Seq[ScalaTestArgument.Flagged]
 )
 
 private[mill] object TestCommandArguments {
@@ -13,8 +17,20 @@ private[mill] object TestCommandArguments {
 
   val jsonOutputArgument: String = "-fJ"
 
-  def parse(arguments: Seq[String]): Either[TestCommandFailure, TestCommandArguments] =
-    parseFrom(arguments.toList, TestCommandArguments(Vector.empty, StdoutContent.HumanReadableOutput, jsonOutputPath = None), stdoutGiven = false)
+  val separator: String = "--"
+
+  private val noArguments: TestCommandArguments =
+    TestCommandArguments(Vector.empty, StdoutContent.HumanReadableOutput, jsonOutputPath = None, classGlobs = Nil, frameworkArguments = Nil)
+
+  /** Reads the arguments as `mill <module>.testOnly` reads the arguments after the module: class globs, then a `--` and framework arguments. */
+  def parse(arguments: Seq[String]): Either[TestCommandFailure, TestCommandArguments] = {
+    val (ownArguments, fromFirstSeparator) = arguments.span(_ != separator)
+    val (classGlobs, fromSecondSeparator) = fromFirstSeparator.drop(1).span(_ != separator)
+    for {
+      parsed <- parseFrom(ownArguments.toList, noArguments, stdoutGiven = false)
+      frameworkArguments <- FrameworkArguments.parse(fromSecondSeparator.drop(1))
+    } yield parsed.copy(classGlobs = classGlobs.map(ClassGlob(_)), frameworkArguments = frameworkArguments)
+  }
 
   private def parseFrom(arguments: List[String], parsed: TestCommandArguments, stdoutGiven: Boolean): Either[TestCommandFailure, TestCommandArguments] =
     arguments match {
@@ -26,6 +42,8 @@ private[mill] object TestCommandArguments {
         Left(TestCommandFailure.JsonOutputPathMissing)
       case argument :: rest if stdoutArguments.contains(argument) && !stdoutGiven =>
         parseFrom(rest, parsed.copy(stdoutContent = stdoutArguments(argument)), stdoutGiven = true)
+      case argument :: _ if FrameworkArguments.isFlag(argument) =>
+        Left(TestCommandFailure.FrameworkArgumentAmongOwnArguments(argument))
       case argument :: _ if argument.startsWith("-") =>
         Left(TestCommandFailure.UnexpectedArgument(argument))
       case moduleSelector :: rest =>
