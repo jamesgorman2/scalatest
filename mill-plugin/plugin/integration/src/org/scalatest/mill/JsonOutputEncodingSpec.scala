@@ -29,7 +29,7 @@ final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen wit
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("EscapeSuite") { build =>
         val json = build.jsonOutputOfTestCommand()
-        val bytes = os.read.bytes(build.report)
+        val bytes = os.read.bytes(build.jsonOutputFile)
 
         Then("the file is valid UTF-8 and holds no JSON null")
         isUtf8(bytes) shouldBe true

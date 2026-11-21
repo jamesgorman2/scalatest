@@ -154,7 +154,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
         val replayed = jsonOutputReplaying(eventLogOfTestCommand(build), json)
 
         Then("the JSON value the library writes is the JSON output, written as the same text")
-        replayed shouldBe os.read(build.report)
+        replayed shouldBe os.read(build.jsonOutputFile)
       }
     }
   }

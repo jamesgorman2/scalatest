@@ -16,7 +16,7 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def samples: os.Path = testSources / "samples"
 
-  def report: os.Path = workspace / "report.json"
+  def jsonOutputFile: os.Path = workspace / "report.json"
 
   def buildText: String = os.read(buildFile)
 
@@ -83,22 +83,22 @@ final class FixtureBuild(tester: IntegrationTester) {
   def runTestCommandWithMillArguments(millArguments: Seq[String])(arguments: String*): TestCommandResult =
     TestCommandResult(tester.eval(millArguments ++ ("scalatest/test" +: arguments)))
 
-  def runTestCommandWritingReport(millArguments: Seq[String] = Nil): TestCommandResult =
-    runTestCommandWithMillArguments(millArguments)("core.test", "-fJ", report.toString)
+  def runTestCommandWritingJsonOutput(millArguments: Seq[String] = Nil): TestCommandResult =
+    runTestCommandWithMillArguments(millArguments)("core.test", "-fJ", jsonOutputFile.toString)
 
-  def reportJson: JsonNode = JsonNode.read(report)
+  def jsonOutput: JsonNode = JsonNode.read(jsonOutputFile)
 
-  def resultAndReportOfTestCommand(millArguments: Seq[String] = Nil): (TestCommandResult, JsonNode) = {
-    os.remove(report)
-    val result = runTestCommandWritingReport(millArguments)
+  def resultAndJsonOutputOfTestCommand(millArguments: Seq[String] = Nil): (TestCommandResult, JsonNode) = {
+    os.remove(jsonOutputFile)
+    val result = runTestCommandWritingJsonOutput(millArguments)
     withClue(result.debugString) {
-      os.exists(report) shouldBe true
+      os.exists(jsonOutputFile) shouldBe true
     }
-    (result, reportJson)
+    (result, jsonOutput)
   }
 
   def jsonOutputOfTestCommand(): JsonNode = {
-    val (_, json) = resultAndReportOfTestCommand()
+    val (_, json) = resultAndJsonOutputOfTestCommand()
     json
   }
 

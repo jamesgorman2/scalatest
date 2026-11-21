@@ -112,11 +112,11 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
       Given("CalculatorSuite")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputFixture("CalculatorSuite") { build =>
-        val result = build.runTestCommandWritingReport()
+        val result = build.runTestCommandWritingJsonOutput()
 
         Then("the root's buildTool is Mill, at the version of the Mill release running the test command")
         withClue(result.debugString) {
-          build.reportJson("buildTool") shouldBe ujson.Obj("name" -> "Mill", "version" -> mill.api.BuildInfo.millVersion)
+          build.jsonOutput("buildTool") shouldBe ujson.Obj("name" -> "Mill", "version" -> mill.api.BuildInfo.millVersion)
         }
       }
     }
@@ -126,11 +126,11 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
         Given("CalculatorSuite, in a build with no test module other than core.test")
         When(s"the test command is invoked as mill scalatest/test $selector -fJ <report>")
         withJsonOutputFixture("CalculatorSuite") { build =>
-          val result = build.runTestCommand(selector, "-fJ", build.report.toString)
+          val result = build.runTestCommand(selector, "-fJ", build.jsonOutputFile.toString)
 
           Then(s"the root of the JSON output records the module selector $selector, resolved to core.test")
           withClue(result.debugString) {
-            build.reportJson("moduleSelectors") shouldBe ujson.Arr(ujson.Obj("selector" -> selector, "modules" -> ujson.Arr("core.test")))
+            build.jsonOutput("moduleSelectors") shouldBe ujson.Arr(ujson.Obj("selector" -> selector, "modules" -> ujson.Arr("core.test")))
           }
         }
       }

@@ -55,7 +55,7 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
       And("a suite wrapped with ConfigMapWrapperSuite, holding a scope whose tests two instances of the suite register")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       withJsonOutputTree { build =>
-        val (result, json) = build.resultAndReportOfTestCommand()
+        val (result, json) = build.resultAndJsonOutputOfTestCommand()
         val treeNodes = suitesScopesAndTests(json)
         withClue(s"in ${ujson.write(json.raw, indent = 2)}\n") {
           treeNodes.flatMap(_.outcome).toSet should contain allOf ("succeeded", "failed", "canceled", "ignored", "pending")
