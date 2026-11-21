@@ -102,7 +102,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
         "after" -> Vector(runWithSucceededTest, runWithNoSuite)
       )
     ) {
-      Scenario(s"A module has a test result when a run with no test result is added $order its run that reports a test as succeeded") {
+      Scenario(s"A module has a test result when a run that reports no suite is added $order a run that reports a test as succeeded") {
         Given("a consolidation")
         val consolidation = startedWithColour()
 

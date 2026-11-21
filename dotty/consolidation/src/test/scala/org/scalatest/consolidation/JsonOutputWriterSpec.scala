@@ -321,16 +321,14 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
   private def jsonOutputOfRowSuite(nodes: Seq[String], events: String*): JsonSink =
     jsonOutputOfRun(TestRunPart.Events(completedRunOf(("run: RunStarting" +: structureOf("RowSuite", nodes.mkString("\n")) +: events :+ "run: RunCompleted")*)))
 
-  private val testAdds = Seq("""test "adds", label "- adds"""")
-
-  private val testsAddsAndSubtracts = Seq("""test "adds", label "- adds"""", """test "subtracts", label "- subtracts"""")
+  private val testsAddsAndSubtracts = Seq(addsTest, """test "subtracts", label "- subtracts"""")
 
   "A test node in the JSON output" when {
 
     "it started and succeeded" should {
       "hold its values in a fixed order" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", Some("/build/RowSuite.scala")), threadName: "pool-1", timeStamp: 100)""",
           """test "adds": TestSucceeded(duration: 8, threadName: "pool-2", timeStamp: 110)""",
@@ -354,7 +352,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it failed" should {
       "hold its values in a fixed order, its outcome before its message" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", None), threadName: "pool-1", timeStamp: 100)""",
           """test "adds": TestFailed(message: "2 did not equal 3", duration: 8, timeStamp: 110)""",
@@ -368,7 +366,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it never started in a suite that aborted" should {
       "hold its values in a fixed order, its outcome before its reason" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """suite "RowSuite": SuiteAborted(message: "no fixture")"""
         )
@@ -379,7 +377,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "its closing event carries no duration" should {
       "have no duration, though it has both times" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting(timeStamp: 100)""",
           """test "adds": TestSucceeded(timeStamp: 110)""",
@@ -393,7 +391,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "its TestStarting's location is SeeStackDepthException" should {
       "take its location from its closing event" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting(location: SeeStackDepthException)""",
           """test "adds": TestFailed(location: TopOfMethod("samples.RowSuite", "def adds(): Unit"))""",
@@ -406,7 +404,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "neither its opening nor its closing event gives a location other than SeeStackDepthException" should {
       "have no location" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting""",
           """test "adds": TestFailed(location: SeeStackDepthException)""",
@@ -419,7 +417,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "its location is a line in a file whose path is not known" should {
       "give the file's name" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", None))""",
           """test "adds": TestSucceeded""",
@@ -432,7 +430,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "its location is a line in a file compiled without file pathnames filled" should {
       "give the file's name" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           s"""test "adds": TestStarting(location: LineInFile(7, "RowSuite.scala", Some("${Position.unfilledFilePathname}")))""",
           """test "adds": TestSucceeded""",
@@ -445,7 +443,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it is canceled" should {
       "hold the outcome canceled and its TestCanceled's message" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting""",
           """test "adds": TestCanceled(message: "no database")""",
@@ -553,7 +551,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it aborted" should {
       "hold its values in a fixed order, its outcome before its message" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting(threadName: "pool-1", timeStamp: 100)""",
           """suite "RowSuite": SuiteAborted(message: "no fixture", duration: 5, timeStamp: 105)"""
         )
@@ -597,7 +595,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
 
     "it never started" should {
       "be aborted with reason notRun, with no times or thread" in {
-        val suite = jsonOutputOfRowSuite(testAdds).node(NodeKind.Suite, "RowSuite")
+        val suite = jsonOutputOfRowSuite(Seq(addsTest)).node(NodeKind.Suite, "RowSuite")
         suite("outcome") shouldBe text("aborted")
         suite("reason") shouldBe text("notRun")
         suite.keys should contain noneOf ("startedAt", "endedAt", "duration", "threadName")
@@ -606,7 +604,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
 
     "it started and its run completed with neither its SuiteCompleted nor a RunAborted" should {
       "be aborted with no end time, duration or message" in {
-        val suite = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting(timeStamp: 100)""").node(NodeKind.Suite, "RowSuite")
+        val suite = jsonOutputOfRowSuite(Seq(addsTest), """suite "RowSuite": SuiteStarting(timeStamp: 100)""").node(NodeKind.Suite, "RowSuite")
         suite("outcome") shouldBe text("aborted")
         suite.keys should contain noneOf ("endedAt", "duration", "message")
       }
@@ -719,7 +717,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it has messages" should {
       "hold them as its output after its contents" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting""",
           """test "adds": InfoProvided(message: "adding")""",
@@ -732,7 +730,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
 
     "it has no message" should {
       "have no output" in {
-        val json = jsonOutputOfRowSuite(testAdds, """suite "RowSuite": SuiteStarting""", """test "adds": TestStarting""", """test "adds": TestSucceeded""", """suite "RowSuite": SuiteCompleted""")
+        val json = jsonOutputOfRowSuite(Seq(addsTest), """suite "RowSuite": SuiteStarting""", """test "adds": TestStarting""", """test "adds": TestSucceeded""", """suite "RowSuite": SuiteCompleted""")
         json.node(NodeKind.Test, "adds").keys should not contain "output"
       }
     }
@@ -740,7 +738,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it failed with a throwable" should {
       "hold the throwable after its message" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting""",
           """test "adds": TestFailed(message: "failed", throwable: java.lang.IllegalStateException "failed")""",
@@ -753,7 +751,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "it is a test aborted by its DistributedTestRunnerSuite" should {
       "hold that SuiteAborted's throwable" in {
         val json = jsonOutputOfRowSuite(
-          testAdds,
+          Seq(addsTest),
           """suite "RowSuite": SuiteStarting""",
           """test "adds": TestStarting""",
           """test "adds": TestSucceeded""",
