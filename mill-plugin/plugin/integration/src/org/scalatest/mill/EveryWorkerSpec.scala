@@ -45,14 +45,14 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   }
 
   private def shouldWriteOneEventLogInEachForkGroupsFolder(build: EveryWorkerBuild, result: TestCommandResult): Unit = {
-    Then("the only event logs are one in each fork group's processFolder")
+    Then("each fork group's processFolder holds one event log, and no other event log exists")
     withClue(result.debugString) {
       build.eventLogFolders.map(_.last) should contain theSameElementsAs Seq("group-0-samples.B1", "group-1-samples.A1")
     }
   }
 
   private def shouldStartAWorkerInEachEventLogFolder(build: EveryWorkerBuild): Unit = {
-    And("Mill started a worker in each of those processFolders")
+    And("Mill started a worker in each processFolder that holds an event log")
     build.eventLogFolders.filterNot(folder => os.exists(folder / "testargs")) shouldBe empty
   }
 
@@ -178,10 +178,10 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command runs the module with four jobs")
         val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 4)
 
-        Then("each run's info messages all name the same worker folder, and only a run that ran nothing has none")
+        Then("each run's info messages name one and the same worker folder, and a run with no info message ran nothing")
         val runsInWorkers = withClue(result.debugString) {
           runs(json).flatMap { run =>
-            withClue(s"in run ${run.number}, holding ${run.contentNames}, with the info messages ${infoMessages(run)}: ") {
+            withClue(s"in run ${run.number}, holding ${run.contentNames}, with info messages ${infoMessages(run)}: ") {
               inside(infoMessages(run).map(build.workerIndexOf).distinct) {
                 case Seq() if run.contents.isEmpty => None
                 case Seq(Some(workerIndex)) => Some(RunInWorker(run.forkGroup, run.number, workerIndex))
@@ -468,8 +468,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
     Scenario("A module with no test class has one empty run, which the human-readable output does not show") {
       withEveryWorkerBuild { build =>
-        Given("a module holding no test class, with test parallelism on and no testForkGrouping")
+        Given("a module holding no test class")
         build.removeSuites()
+        And("test parallelism is on, and the module has no testForkGrouping")
         build.turnOnTestParallelism()
         build.removeForkGrouping()
         When("the test command runs the module with two jobs")
