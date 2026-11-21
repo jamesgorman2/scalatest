@@ -2,16 +2,16 @@ package org.scalatest.consolidation
 
 private[consolidation] final case class ConsolidatedRun(number: RunNumber, assembled: AssembledRun)
 
-private[consolidation] final case class ConsolidatedModule(label: TestRunLabel, times: MeasuredTimes, runs: Vector[ConsolidatedRun])
+private[consolidation] final case class ConsolidatedModule(name: ModuleName, times: MeasuredTimes, runs: Vector[ConsolidatedRun])
 
 private[consolidation] object ConsolidatedModule {
 
-  def of(label: TestRunLabel, times: MeasuredTimes, runs: Vector[AssembledRun]): ConsolidatedModule = {
+  def of(name: ModuleName, times: MeasuredTimes, runs: Vector[AssembledRun]): ConsolidatedModule = {
     val numbered = runs
       .sortBy(_.worker)(AssembledRun.numberingOrder)
       .zipWithIndex
       .map((run, index) => ConsolidatedRun(RunNumber(index + 1), run))
-    ConsolidatedModule(label, times, numbered)
+    ConsolidatedModule(name, times, numbered)
   }
 }
 

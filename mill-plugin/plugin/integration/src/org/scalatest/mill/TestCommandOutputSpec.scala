@@ -23,14 +23,14 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       build.runTestCommandWithColour("core.test")
     }
 
-  Feature("The human-readable output is the module's test run label, with its suites under it") {
+  Feature("The human-readable output is the module's line, with its suites under it") {
 
-    Scenario("A module's label heads its suites") {
+    Scenario("A module's line heads its suites") {
       Given("core.test, at Mill's default testLogLevel, holds SqrtPropSpec, whose one property succeeds")
       When("the test command runs core.test")
       val result = sqrtPropSpecRun
 
-      Then("the human-readable output is the label, with the suite and its property under it")
+      Then("the human-readable output is the module's line, with the suite and its property under it")
       withClue(result.debugString) {
         result.treeLines shouldBe ("[core.test]" +: sqrtPropSpecLines.map("  " + _))
       }

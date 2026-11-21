@@ -8,11 +8,11 @@ import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.CapturedLine
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ForkGroup
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.ModuleSelector
 import org.scalatest.consolidation.RunEvent
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.RunnerArgument
-import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
-  private val module: TestRunLabel = TestRunLabel("core.test")
+  private val module: ModuleName = ModuleName("core.test")
 
   private val firstWorkerOfFirstForkGroup: Worker = Worker(ForkGroup.at(0), WorkerIndex(0))
 
@@ -128,7 +128,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
         When("CalculatorSuite runs through Framework outside Mill, given the ScalaTest runner argument that turns the emitter on and names the file to which the run writes its test event log")
         val run = runOutsideMill(build, "samples.CalculatorSuite")
-        And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, under test run label core.test, with colour on")
+        And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, as a run of module core.test, with colour on")
         val output = humanReadableOutputOf(run)
 
         Then("the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")

@@ -475,7 +475,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the library consolidates it")
       val output = colourMarkedOutputAfter { consolidation =>
         addSqrtPropSpecRun(consolidation)
-        consolidation.timeModule(TestRunLabel("app.test"), None, None)
+        consolidation.timeModule(ModuleName("app.test"), None, None)
       }
 
       Then("the line of `app.test` comes first, with nothing under it")
@@ -526,7 +526,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     Scenario("The runEnded event fails the state, not RunAborted or RunStopped") {
       Given("a run fed RunAborted and RunStopped events")
       val consolidation = startedWithColour()
-      consolidation.addRun(moduleLabel) { feed =>
+      consolidation.addRun(module) { feed =>
         feed.addAll(TestRunPart.Events("run started\nrun: RunAborted\nrun: RunStopped"))
         consolidation.state shouldBe ConsolidationState.Open
 

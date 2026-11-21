@@ -74,7 +74,7 @@ private[scalatest] object TestEventLogEncoder {
           optionalInteger("position", position.map(_.toLong)),
           text("name", name),
           text("suiteId", suiteId.value),
-          text("className", className)
+          text("className", className.value)
         )
       case StructureNode.Scope(id, parent, position, name, label) =>
         scopeOrTest("scope", id, parent, position, name, label, ignored = false)

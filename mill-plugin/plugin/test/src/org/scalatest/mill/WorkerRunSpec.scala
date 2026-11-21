@@ -10,8 +10,8 @@ import org.scalatest.concurrent.ThreadSignaler
 import org.scalatest.concurrent.TimeLimits
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.RunFeed
-import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.matchers.should
 import org.scalatest.mill.EventLogs.*
 import org.scalatest.mill.WorkerOutput.writeStdout
@@ -29,7 +29,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(5, Seconds))
 
-  private val label: TestRunLabel = TestRunLabel("core.test")
+  private val module: ModuleName = ModuleName("core.test")
   private val workerEndTimeout: FiniteDuration = 30.seconds
 
   private final class WorkerRunFixture(
@@ -96,7 +96,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     private def addRun(readRun: RunFeed => Unit): Unit = {
       runsAdded.incrementAndGet()
-      consolidation.addRun(label) { feed =>
+      consolidation.addRun(module) { feed =>
         capture.addTo(feed.add)
         readRun(feed)
       }

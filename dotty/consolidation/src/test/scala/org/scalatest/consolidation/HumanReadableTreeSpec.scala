@@ -35,7 +35,7 @@ final class HumanReadableTreeSpec extends AnyFeatureSpec with GivenWhenThen with
       When("the library consolidates it")
       val output = colourMarkedTreeFrom(eventLog)
 
-      Then("each nested suite and its test sit under the suite that nests it, under the test run label")
+      Then("each nested suite and its test sit under the suite that nests it, under the module's line")
       output shouldBe
         """{cyan}[core.test]{reset}
           |  {green}OuterSuites:{reset}

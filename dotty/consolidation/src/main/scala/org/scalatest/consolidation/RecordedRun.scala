@@ -1,12 +1,12 @@
 package org.scalatest.consolidation
 
-import scala.collection.immutable.SortedMap
 import scala.collection.immutable.VectorMap
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.NodeExecution
 import org.scalatest.events.NodeId
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestEventLogEvent
 
 private[consolidation] final case class RecordedRun(
@@ -14,7 +14,7 @@ private[consolidation] final case class RecordedRun(
   childIds: Map[NodeId, Set[NodeId]],
   latestScopesAndTests: Map[NodeId, Set[NodeId]],
   firstScopeOrTestPosition: Map[NodeId, Int],
-  executions: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]],
+  executions: RecordedExecutions,
   nextStartOrder: StartOrder,
   starting: Option[DecodedEvent.RunStarting],
   discoveryStarting: Option[DecodedEvent.DiscoveryStarting],
@@ -41,7 +41,7 @@ private[consolidation] final case class RecordedRun(
   def discovery: Option[RunDiscovery] =
     for (started <- discoveryStarting; completed <- discoveryCompleted) yield RunDiscovery.of(started, completed)
 
-  def suiteClassNames: Set[String] = structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet
+  def suiteClasses: Set[TestClassName] = structure.values.collect { case suite: StructureNode.Suite => suite.className }.toSet
 
   private def withStructure(nodes: IndexedSeq[StructureNode]): RecordedRun = {
     val suites = nodes.collect { case suite: StructureNode.Suite => suite.id }
@@ -97,8 +97,7 @@ private[consolidation] final case class RecordedRun(
     withExecutionPath(nodeExecution).withEventIn(ExecutionOfNode(nodeExecution.node, ExecutionIndex(nodeExecution.executionIndex)), event)
 
   private def withEventIn(executionOfNode: ExecutionOfNode, event: DecodedEvent): RecordedRun = {
-    val nodeExecutions = executions(executionOfNode.node)
-    val execution = nodeExecutions(executionOfNode.index)
+    val execution = executions(executionOfNode)
     val updated = event match {
       case message: DecodedEvent.Message =>
         execution.added(ReceivedMessage(ProvidedMessage.of(message), childrenStartedIn(executionOfNode)))
@@ -107,7 +106,7 @@ private[consolidation] final case class RecordedRun(
       case _: DecodedEvent.RunStarting | _: DecodedEvent.DiscoveryStarting | _: DecodedEvent.DiscoveryCompleted | _: DecodedEvent.RunClosing =>
         execution
     }
-    copy(executions = executions.updated(executionOfNode.node, nodeExecutions.updated(executionOfNode.index, updated)))
+    copy(executions = executions.updated(executionOfNode, updated))
   }
 
   private def withExecutionPath(nodeExecution: NodeExecution): RecordedRun = {
@@ -119,12 +118,11 @@ private[consolidation] final case class RecordedRun(
   }
 
   private def withExecutionStarted(execution: ExecutionOfNode, parent: Option[ExecutionOfNode]): RecordedRun = {
-    val nodeExecutions = executions.getOrElse(execution.node, SortedMap.empty[ExecutionIndex, RecordedExecution])
-    if (nodeExecutions.contains(execution.index)) {
+    if (executions.contains(execution)) {
       this
     } else {
       val started = RecordedExecution(execution.index, nextStartOrder, parent, Vector.empty, Vector.empty)
-      copy(executions = executions.updated(execution.node, nodeExecutions.updated(execution.index, started)), nextStartOrder = nextStartOrder.next)
+      copy(executions = executions.updated(execution, started), nextStartOrder = nextStartOrder.next)
     }
   }
 
@@ -138,7 +136,7 @@ private[consolidation] final case class RecordedRun(
 private[consolidation] object RecordedRun {
 
   val empty: RecordedRun =
-    RecordedRun(VectorMap.empty, Map.empty, Map.empty, Map.empty, Map.empty, StartOrder.first, None, None, None, None, None, None)
+    RecordedRun(VectorMap.empty, Map.empty, Map.empty, Map.empty, RecordedExecutions.none, StartOrder.first, None, None, None, None, None, None)
 
   private def withSuiteOf(suiteOfNode: Map[NodeId, NodeId], node: StructureNode): Map[NodeId, NodeId] =
     node match {

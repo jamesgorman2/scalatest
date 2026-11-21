@@ -54,7 +54,7 @@ private[consolidation] object HumanReadableOutput {
     val (shownRuns, hiddenRuns) = module.runs.partition(showsItsLine)
     // A stable sort keeps suites that share a name in order of their runs' numbers, then in the order each run lists them.
     val hiddenRunsSuites = hiddenRuns.flatMap(_.assembled.eventStream.topLevelSuites).sortBy(_.name)
-    linesOf("[" + module.label.value + "]", depth, AnsiCyan) ++ hiddenRunsSuites.flatMap(nodeLines(_, depth + 1)) ++
+    linesOf("[" + module.name.value + "]", depth, AnsiCyan) ++ hiddenRunsSuites.flatMap(nodeLines(_, depth + 1)) ++
       shownRuns.flatMap(runLines(_, depth + 1))
   }
 
@@ -142,16 +142,11 @@ private[consolidation] object HumanReadableOutput {
   private def suiteEndingLines(suite: StructureNode.Suite, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
     (execution.outcome, execution.ending) match {
       case (Some(NodeOutcome.NotRun), _) =>
-        linesOf(Resources.specTextAndNote(suite.className, notRunNote), depth, AnsiRed)
+        linesOf(Resources.specTextAndNote(suite.className.value, notRunNote), depth, AnsiRed)
       case (Some(NodeOutcome.Aborted), Some(aborted: FailureEnding.SuiteAborted)) =>
-        firstLineAndLinesUnder(
-          errorLines(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, formatterOf(suite.className), Some(suite.name), None),
-          aborted.throwable,
-          depth,
-          AnsiRed
-        )
+        failureLines(aborted, formatterOf(suite.className.value), Some(suite.name), None, depth)
       case (Some(NodeOutcome.Aborted), _) =>
-        linesOf(Resources.specTextAndNote(suite.className, Resources.abortedNote), depth, AnsiRed)
+        linesOf(Resources.specTextAndNote(suite.className.value, Resources.abortedNote), depth, AnsiRed)
       case _ =>
         Vector.empty
     }
@@ -174,26 +169,11 @@ private[consolidation] object HumanReadableOutput {
   private def testLines(test: StructureNode.Test, execution: AssembledExecution, depth: Int): Vector[OutputLine] =
     (execution.outcome, execution.ending) match {
       case (Some(NodeOutcome.Failed), Some(failed: FailureEnding.TestFailed)) =>
-        firstLineAndLinesUnder(
-          errorLines(Resources.failedNote, Resources.testFailed _, failed.message, failed.throwable, failed.analysis, formatterOf(test.label), None, Some(test.name)),
-          failed.throwable,
-          depth,
-          AnsiRed
-        )
+        failureLines(failed, formatterOf(test.label), None, Some(test.name), depth)
       case (Some(NodeOutcome.Canceled), Some(canceled: FailureEnding.TestCanceled)) =>
-        firstLineAndLinesUnder(
-          errorLines(Resources.canceledNote, Resources.testCanceled _, canceled.message, canceled.throwable, Vector.empty, formatterOf(test.label), None, Some(test.name)),
-          canceled.throwable,
-          depth,
-          AnsiYellow
-        )
+        failureLines(canceled, formatterOf(test.label), None, Some(test.name), depth)
       case (Some(NodeOutcome.Aborted), Some(aborted: FailureEnding.SuiteAborted)) =>
-        firstLineAndLinesUnder(
-          errorLines(Resources.abortedNote, Resources.suiteAborted _, aborted.message, aborted.throwable, Vector.empty, formatterOf(test.label), None, Some(test.name)),
-          aborted.throwable,
-          depth,
-          AnsiRed
-        )
+        failureLines(aborted, formatterOf(test.label), None, Some(test.name), depth)
       case (outcome, _) =>
         linesOf(Vector(testLine(test, outcome)), depth)
     }
@@ -277,6 +257,22 @@ private[consolidation] object HumanReadableOutput {
       case _ =>
         linesWith(throwable)
     }
+  }
+
+  private def failureLines(
+    ending: FailureEnding,
+    formatter: Option[IndentedText],
+    suiteName: Option[String],
+    testName: Option[String],
+    depth: Int
+  ): Vector[OutputLine] = {
+    val (note, errorMessage, analysis, colour) = ending match {
+      case failed: FailureEnding.TestFailed => (Resources.failedNote, Resources.testFailed _, failed.analysis, AnsiRed)
+      case _: FailureEnding.TestCanceled => (Resources.canceledNote, Resources.testCanceled _, Vector.empty, AnsiYellow)
+      case _: FailureEnding.SuiteAborted => (Resources.abortedNote, Resources.suiteAborted _, Vector.empty, AnsiRed)
+    }
+    val lines = errorLines(note, errorMessage, ending.message, ending.throwable, analysis, formatter, suiteName, testName)
+    firstLineAndLinesUnder(lines, ending.throwable, depth, colour)
   }
 
   private def stringReporterThrowsOn(message: String, throwable: ThrowableView): Boolean =

@@ -9,7 +9,7 @@ import org.scalatest.events.TestRunPart
 
 private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
-  val moduleLabel: TestRunLabel = TestRunLabel("core.test")
+  val module: ModuleName = ModuleName("core.test")
 
   extension (literal: String) {
 
@@ -30,11 +30,11 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   extension (consolidation: Consolidation) {
 
-    def addRunOf(parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel)(feed => feed.addAll(parts*))
+    def addRunOf(parts: TestRunPart*): EndedRun = consolidation.addRun(module)(feed => feed.addAll(parts*))
 
-    def addRunOf(events: Vector[RunEvent]): EndedRun = consolidation.addRun(moduleLabel)(feed => events.foreach(event => feed.add(event)))
+    def addRunOf(events: Vector[RunEvent]): EndedRun = consolidation.addRun(module)(feed => events.foreach(event => feed.add(event)))
 
-    def addRunIn(worker: Worker, parts: TestRunPart*): EndedRun = consolidation.addRun(moduleLabel, Some(worker))(feed => feed.addAll(parts*))
+    def addRunIn(worker: Worker, parts: TestRunPart*): EndedRun = consolidation.addRun(module, Some(worker))(feed => feed.addAll(parts*))
   }
 
   extension (feed: RunFeed) {

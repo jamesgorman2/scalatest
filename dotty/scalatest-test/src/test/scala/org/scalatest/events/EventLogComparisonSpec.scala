@@ -321,7 +321,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
         "structure",
         TestEventLogEvent.Structure(
           Vector(
-            StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
+            StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), TestClassName("samples.StackSuite")),
             StructureNode.Scope(scope, stackSuiteNode, 0, "A Stack", "A Stack"),
             StructureNode.Test(test, scope, 0, "pops", "- pops")
           )
@@ -330,7 +330,7 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       )
       val loggedTree = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), TestClassName("samples.StackSuite")),
           StructureNode.Scope(scope, stackSuiteNode, 0, "A Stack", "A Stack"),
           StructureNode.Test(test, stackSuiteNode, 0, "pops", "- pops")
         )
@@ -436,13 +436,13 @@ final class EventLogComparisonSpec extends AnyWordSpec with Matchers {
       val test = under(stackSuiteNode, NodePlace.Test(TestName("pops")))
       val first = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), TestClassName("samples.StackSuite")),
           StructureNode.Test(test, stackSuiteNode, 0, "pops", "- pops")
         )
       )
       val further = TestEventLogEvent.Structure(
         Vector(
-          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), "samples.StackSuite"),
+          StructureNode.Suite(stackSuiteNode, None, None, "StackSuite", SuiteId("samples.StackSuite"), TestClassName("samples.StackSuite")),
           StructureNode.Test(test, stackSuiteNode, 0, "pushes", "- pushes")
         )
       )

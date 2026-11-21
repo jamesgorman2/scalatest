@@ -214,7 +214,7 @@ private final class RunUnderConstruction {
     val structureRoot = structureRootOf(block)
     val root = structureRoot.suite
     val built = Vector.newBuilder[StructureNode]
-    built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, root.className)
+    built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, TestClassName(root.className))
     val testNames = mutable.Set.empty[(NodeId, TestName)]
     val openRoot = new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty, if (structureRoot.isFurther) root.firstPositionOfScopesAndTests else 0)
     val suitesFirstHeld = mutable.ArrayBuffer.empty[(HeldSuite, OpenTreeNode)]
@@ -233,7 +233,7 @@ private final class RunUnderConstruction {
             fail(s"a suite is nested in a suite, not in a scope: '${line.text}'")
           }
           val nested = newSuite(written, Some(above.id), Some(above.nextPosition()), line.text)
-          built += StructureNode.Suite(nested.id, nested.parent, nested.position, written.name, nested.suiteId, nested.className)
+          built += StructureNode.Suite(nested.id, nested.parent, nested.position, written.name, nested.suiteId, TestClassName(nested.className))
           val openNested = new OpenTreeNode(line.depth, nested.id, NodeKind.Suite, nested.id, Vector.empty)
           suitesFirstHeld += nested -> openNested
           open = openNested :: open

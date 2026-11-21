@@ -1,5 +1,6 @@
 package org.scalatest.consolidation
 
+import org.scalatest.events.TestClassName
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -9,7 +10,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
 
   private def runIn(worker: Option[Worker], assignedTestClass: String): AssembledRun =
     AssembledRun(
-      moduleLabel,
+      module,
       worker,
       emptyEventStream,
       Vector.empty,
@@ -23,7 +24,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
   private def runGivenNoWorker(assignedTestClass: String = "samples.Suite"): AssembledRun = runIn(None, assignedTestClass)
 
   private def numbersOf(runs: Vector[AssembledRun]): Vector[(RunNumber, AssembledRun)] =
-    ConsolidatedModule.of(moduleLabel, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembled))
+    ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembled))
 
   "A module's runs" when {
     "each given a fork group and a worker index" should {

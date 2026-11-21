@@ -4,6 +4,7 @@ import org.scalatest.events.NodeId
 import org.scalatest.events.RunOutcome
 import org.scalatest.events.StructureNode
 import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 import org.scalatest.matchers.should
@@ -26,14 +27,14 @@ final class RunAssemblySpec extends AnyWordSpec with should.Matchers with Consol
 
   private val assembledTree = Vector(
     AssembledNode(
-      StructureNode.Suite(NodeId.topLevelSuite(SuiteId("TreeSuite"), 0), None, None, "TreeSuite", SuiteId("TreeSuite"), "samples.TreeSuite"),
+      StructureNode.Suite(NodeId.topLevelSuite(SuiteId("TreeSuite"), 0), None, None, "TreeSuite", SuiteId("TreeSuite"), TestClassName("samples.TreeSuite")),
       AssembledExecution(None, None, None, None, None, None, Vector.empty, Vector.empty)
     )
   )
 
   private def endedEventStream(assembleTopLevelSuites: RecordedRun => Vector[AssembledNode]): AssembledEventStream = {
     val events = TestRunBuilder.build(TestRunPart.Events(eventLog)).events.map(_.event)
-    events.foldLeft(RunAssembly(moduleLabel, None, assembleTopLevelSuites))(_.added(_)).assembledWholeEventStream
+    events.foldLeft(RunAssembly(module, None, assembleTopLevelSuites))(_.added(_)).assembledWholeEventStream
   }
 
   "A run assembly" when {

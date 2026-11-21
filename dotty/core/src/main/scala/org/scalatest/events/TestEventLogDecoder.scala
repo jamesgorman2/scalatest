@@ -46,7 +46,7 @@ private[scalatest] object TestEventLogDecoder {
         val parent = optionalNodePath(reader, "parent")
         val position = reader.optionalIntAtLeast("position", 0)
         val suiteId = SuiteId(reader.text("suiteId"))
-        val className = reader.text("className")
+        val className = TestClassName(reader.text("className"))
         requireParentOnNodePath(reader, id, parent)
         StructureNode.Suite(id, parent, position, name, suiteId, className)
       case "scope" =>

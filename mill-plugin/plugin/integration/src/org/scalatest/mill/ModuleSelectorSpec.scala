@@ -72,7 +72,7 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
           build.anyTestWorkerStarted shouldBe true
         }
 
-        And("the human-readable output is core.test's label, with AddSuite under it")
+        And("the human-readable output is core.test's line, with AddSuite under it")
         withClue(result.debugString) {
           result.treeLines.headOption shouldBe Some("[core.test]")
           result.treeLines.map(_.trim) should contain("AddSuite:")

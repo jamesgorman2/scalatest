@@ -7,7 +7,7 @@ import mill.api.Evaluator
 import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
-import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.consolidation.ModuleName
 
 private[mill] object TestCommand {
 
@@ -32,17 +32,17 @@ private[mill] object TestCommand {
         case StdoutContent.NoOutput => _ => ()
       }
     var jsonOutputWritten: Either[TestCommandFailure, Unit] = Right(())
-    val label = TestRunLabel(selectedModule.path)
+    val module = ModuleName(selectedModule.path)
     val consolidation = Consolidation.start(
       humanReadableOutput,
       coloured = true,
       jsonOutput = jsonOutputFile.map(file => json => jsonOutputWritten = BuildCtx.withFilesystemCheckerDisabled(file.write(json.writeTo))),
-      moduleSelectors = commandArguments.moduleSelectors.map(_.resolvedTo(Vector(label))),
+      moduleSelectors = commandArguments.moduleSelectors.map(_.resolvedTo(Vector(module))),
       buildTool = Some(BuildTool("Mill", BuildInfo.millVersion)),
       startedAt = Some(now())
     )
     val moduleRun = new JvmTestModuleRun(
-      label,
+      module,
       inputs,
       scalaTestArguments,
       moduleFolder(ctx, selectedModule.path),

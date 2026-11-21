@@ -14,7 +14,7 @@ final class EmittedRunSpec extends AnyFeatureSpec with GivenWhenThen with should
       val eventLog = eventLogOfFrameworkRun(classOf[samples.UnicodeSuite].getName)
 
       And("the consolidation library is used directly, without Mill, with colour on")
-      When("the library consolidates that test event log as a run under the test run label `core.test`")
+      When("the library consolidates that test event log as a run of the module `core.test`")
       val output = colourMarkedTreeLinesFrom(eventLog)
 
       Then("the output is under `core.test`, and the lines under the failed test begin with the message in red, ending with the failing code's file and line")

@@ -31,7 +31,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
 
   private def runNodeOf(feedAfterRunStarted: RunFeed => Unit): JsonValue =
     jsonOutputAfter { consolidation =>
-      consolidation.addRun(moduleLabel) { feed =>
+      consolidation.addRun(module) { feed =>
         feed.addAll(TestRunPart.Events("run started"))
         feedAfterRunStarted(feed)
       }
@@ -84,7 +84,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
           new OutputSink,
           coloured = false,
           jsonOutput = Some(json),
-          moduleSelectors = Vector(ModuleSelector("__.test", Vector(TestRunLabel("app.test"), moduleLabel)), moduleSelectedAsItself),
+          moduleSelectors = Vector(ModuleSelector("__.test", Vector(ModuleName("app.test"), module)), moduleSelectedAsItself),
           buildTool = Some(BuildTool("Mill", "1.3.1")),
           startedAt = Some(Instant.ofEpochMilli(1000L))
         )
@@ -151,7 +151,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
 
     "given runs of two modules" should {
       "hold the modules in ascending order by name" in {
-        val json = jsonOutputAfter(consolidation => Vector("core.test", "app.test").foreach(module => consolidation.addRun(TestRunLabel(module))(_ => ())))
+        val json = jsonOutputAfter(consolidation => Vector("core.test", "app.test").foreach(module => consolidation.addRun(ModuleName(module))(_ => ())))
         json.root("contents").items.map(_("name")) shouldBe Vector(text("app.test"), text("core.test"))
       }
     }
@@ -162,7 +162,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "timed with both of its times" should {
       "hold them and its duration, then its run nodes" in {
         val json = jsonOutputAfter { consolidation =>
-          consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
           consolidation.addRunOf(completedRun)
         }
         json.module.keys shouldBe Vector("kind", "name", "startedAt", "endedAt", "duration", "contents")
@@ -177,7 +177,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "timed with only its end time" should {
       "have no duration" in {
         val json = jsonOutputAfter { consolidation =>
-          consolidation.timeModule(moduleLabel, None, Some(Instant.ofEpochMilli(2750L)))
+          consolidation.timeModule(module, None, Some(Instant.ofEpochMilli(2750L)))
           consolidation.addRunOf(completedRun)
         }
         json.module.keys shouldBe Vector("kind", "name", "endedAt", "contents")
@@ -186,7 +186,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
 
     "timed with no run" should {
       "be written with no run node" in {
-        val json = jsonOutputAfter(_.timeModule(moduleLabel, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L))))
+        val json = jsonOutputAfter(_.timeModule(module, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L))))
         json.module("contents") shouldBe arrayOf()
       }
     }

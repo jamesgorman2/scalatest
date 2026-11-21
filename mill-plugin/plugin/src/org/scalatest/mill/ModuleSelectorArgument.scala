@@ -1,7 +1,7 @@
 package org.scalatest.mill
 
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.ModuleSelector
-import org.scalatest.consolidation.TestRunLabel
 
 private[mill] opaque type ModuleSelectorArgument = String
 
@@ -13,6 +13,6 @@ private[mill] object ModuleSelectorArgument {
 
     def text: String = selector
 
-    def resolvedTo(modules: Vector[TestRunLabel]): ModuleSelector = ModuleSelector(selector, modules)
+    def resolvedTo(modules: Vector[ModuleName]): ModuleSelector = ModuleSelector(selector, modules)
   }
 }

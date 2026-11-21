@@ -11,7 +11,7 @@ import org.scalatest.events.TestRunPart
 
 private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =>
 
-  val moduleSelectedAsItself: ModuleSelector = ModuleSelector("core.test", Vector(moduleLabel))
+  val moduleSelectedAsItself: ModuleSelector = ModuleSelector("core.test", Vector(module))
 
   final class JsonSink extends (JsonOutput => Unit) {
 

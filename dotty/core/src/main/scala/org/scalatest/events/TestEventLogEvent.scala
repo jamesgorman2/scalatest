@@ -23,7 +23,7 @@ private[scalatest] object NodeId {
 }
 
 private[scalatest] enum StructureNode {
-  case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: SuiteId, className: String)
+  case Suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: SuiteId, className: TestClassName)
   case Scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String)
   case Test(id: NodeId, parent: NodeId, position: Int, name: String, label: String, ignored: Boolean = false)
 

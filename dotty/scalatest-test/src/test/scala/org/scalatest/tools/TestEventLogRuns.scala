@@ -88,7 +88,7 @@ private[tools] trait TestEventLogRuns { this: Assertions =>
   protected def classNamesGivenTo(suiteName: String, events: Seq[TestEventLogEvent]): Vector[String] =
     events.toVector
       .collect { case TestEventLogEvent.Structure(nodes) => nodes }
-      .flatMap(_.collect { case suite: StructureNode.Suite if suite.name == suiteName => suite.className })
+      .flatMap(_.collect { case suite: StructureNode.Suite if suite.name == suiteName => suite.className.value })
 
   protected def thisProcess: ProcessIdentity = {
     try {

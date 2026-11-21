@@ -153,7 +153,7 @@ private[scalatest] object EventLogComparison {
   private def inNotation(node: StructureNode): String = {
     node match {
       case StructureNode.Suite(_, _, position, name, suiteId, className) =>
-        s"suite ${quoted(name)}, class ${quoted(className)}, id ${quoted(suiteId.value)}, ${position.fold("no position")("position " + _)}"
+        s"suite ${quoted(name)}, class ${quoted(className.value)}, id ${quoted(suiteId.value)}, ${position.fold("no position")("position " + _)}"
       case StructureNode.Scope(_, _, position, name, label) => s"scope ${quoted(name)}, label ${quoted(label)}, position $position"
       case StructureNode.Test(_, _, position, name, label, ignored) =>
         s"test ${quoted(name)}, label ${quoted(label)}, position $position${if (ignored) ", ignored" else ""}"

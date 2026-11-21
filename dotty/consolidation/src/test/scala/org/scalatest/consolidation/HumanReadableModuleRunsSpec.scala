@@ -2,6 +2,7 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.CapturedStream
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should

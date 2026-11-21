@@ -86,10 +86,10 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
       "write a top-level suite without parent or position, then its nodes with only the keys of their kind" in {
         val queueSpec = NodeId(stackSpec.places :+ NodePlace.Suite(SuiteId("example.QueueSpec"), 0))
         val nodes = Vector(
-          StructureNode.Suite(stackSpec, None, None, "StackSpec", SuiteId("example.StackSpec"), "example.StackSpec"),
+          StructureNode.Suite(stackSpec, None, None, "StackSpec", SuiteId("example.StackSpec"), TestClassName("example.StackSpec")),
           StructureNode.Scope(aStack, stackSpec, 0, "A stack", "A stack"),
           StructureNode.Test(pop, aStack, 0, "pop", "- should pop"),
-          StructureNode.Suite(queueSpec, Some(stackSpec), Some(1), "QueueSpec", SuiteId("example.QueueSpec"), "example.QueueSpec")
+          StructureNode.Suite(queueSpec, Some(stackSpec), Some(1), "QueueSpec", SuiteId("example.QueueSpec"), TestClassName("example.QueueSpec"))
         )
         TestEventLogEncoder.structure(nodes) shouldBe
           """{"item":"structure","nodes":[""" +
@@ -110,7 +110,7 @@ final class TestEventLogEncoderSpec extends AnyWordSpec with Matchers {
         val secondHelper = NodeId(pop.places :+ NodePlace.Suite(SuiteId("example.HelperSpec"), 1))
         val inner = NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2))
         val nodes = Vector(
-          StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", SuiteId("example.HelperSpec"), "example.HelperSpec"),
+          StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", SuiteId("example.HelperSpec"), TestClassName("example.HelperSpec")),
           StructureNode.Scope(inner, secondHelper, 0, "A helper", "A helper")
         )
         val secondHelperText =

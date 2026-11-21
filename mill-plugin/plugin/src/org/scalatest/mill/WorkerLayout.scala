@@ -2,10 +2,10 @@ package org.scalatest.mill
 
 import java.util.Locale
 import org.scalatest.consolidation.ForkGroup
-import org.scalatest.consolidation.TestClassName
-import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
+import org.scalatest.events.TestClassName
 import scala.util.control.NoStackTrace
 
 private[mill] final case class WorkerLayout(forkGroups: Seq[PlannedForkGroup]) {
@@ -23,12 +23,12 @@ private[mill] final case class PlannedForkGroup(
 
   def workerIndexDigits: Int = PaddedIndex.digits(workers.size)
 
-  def describedIn(module: TestRunLabel): String = s"fork group ${forkGroup.position} of ${module.value}"
+  def describedIn(module: ModuleName): String = s"fork group ${forkGroup.position} of ${module.value}"
 }
 
 private[mill] final case class PlannedWorker(worker: Worker, processFolder: PathUnderModule) {
 
-  def describedIn(module: TestRunLabel): String =
+  def describedIn(module: ModuleName): String =
     s"worker ${worker.index.value} of fork group ${worker.forkGroup.position} of ${module.value}"
 }
 

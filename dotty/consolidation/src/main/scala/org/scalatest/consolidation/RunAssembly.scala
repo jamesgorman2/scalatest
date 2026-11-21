@@ -4,6 +4,7 @@ import java.time.Duration
 import java.time.Instant
 import scala.collection.immutable.SortedMap
 import org.scalatest.events.DecodedEvent
+import org.scalatest.events.JsonValue
 import org.scalatest.events.Location
 import org.scalatest.events.NodeId
 import org.scalatest.events.RunOutcome
@@ -11,14 +12,34 @@ import org.scalatest.events.SeeStackDepthException
 import org.scalatest.events.StructureNode
 import org.scalatest.events.Summary
 import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestEventLogEvent
 
 private[consolidation] final case class ExecutionOfNode(node: NodeId, index: ExecutionIndex)
 
-extension (executions: collection.Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]]) {
+private[consolidation] final case class RecordedExecutions(byNode: Map[NodeId, SortedMap[ExecutionIndex, RecordedExecution]]) {
 
-  private[consolidation] def of(id: NodeId): Vector[RecordedExecution] =
-    executions.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
+  def nodes: Iterator[NodeId] = byNode.keysIterator
+
+  def contains(id: NodeId): Boolean = byNode.contains(id)
+
+  def contains(execution: ExecutionOfNode): Boolean = byNode.get(execution.node).exists(_.contains(execution.index))
+
+  def of(id: NodeId): Vector[RecordedExecution] = byNode.get(id).fold(Vector.empty[RecordedExecution])(_.values.toVector)
+
+  def get(execution: ExecutionOfNode): Option[RecordedExecution] = byNode.get(execution.node).flatMap(_.get(execution.index))
+
+  def apply(execution: ExecutionOfNode): RecordedExecution = byNode(execution.node)(execution.index)
+
+  def updated(execution: ExecutionOfNode, recorded: RecordedExecution): RecordedExecutions = {
+    val executionsOfNode = byNode.getOrElse(execution.node, SortedMap.empty[ExecutionIndex, RecordedExecution])
+    RecordedExecutions(byNode.updated(execution.node, executionsOfNode.updated(execution.index, recorded)))
+  }
+}
+
+private[consolidation] object RecordedExecutions {
+
+  val none: RecordedExecutions = RecordedExecutions(Map.empty)
 }
 
 private[consolidation] final case class ReceivedMessage(message: ProvidedMessage, childrenStarted: Set[ExecutionOfNode]) {
@@ -194,7 +215,16 @@ private[consolidation] object RunClosing {
   }
 }
 
-private[consolidation] final case class RunDiscovery(startedAt: Instant, duration: Option[Duration])
+private[consolidation] final case class RunDiscovery(startedAt: Instant, duration: Option[Duration]) {
+
+  def toJson: JsonValue =
+    JsonOutputWriter.objectOf(
+      Vector(
+        "startedAt" -> Some(JsonOutputWriter.epochMillis(startedAt)),
+        "duration" -> duration.map(JsonOutputWriter.millis)
+      )
+    )
+}
 
 private[consolidation] object RunDiscovery {
 
@@ -213,7 +243,7 @@ private[consolidation] final case class AssembledEventStream(
   closing: Option[RunClosing],
   outcome: Option[RunOutcome],
   abort: Option[DecodedEvent.RunAborted],
-  reportedClasses: Set[String],
+  suiteClasses: Set[TestClassName],
   topLevelSuites: Vector[AssembledNode]
 ) {
 
@@ -226,7 +256,7 @@ private[consolidation] final case class AssembledEventStream(
 }
 
 private[consolidation] final case class AssembledRun(
-  label: TestRunLabel,
+  module: ModuleName,
   worker: Option[Worker],
   eventStream: AssembledEventStream,
   output: Vector[RunOutput],
@@ -234,7 +264,7 @@ private[consolidation] final case class AssembledRun(
 ) {
 
   def ranNoneOfItsAssignedTestClasses: Boolean =
-    assignedTestClasses.nonEmpty && !assignedTestClasses.exists(assigned => eventStream.reportedClasses.contains(assigned.value))
+    assignedTestClasses.nonEmpty && !assignedTestClasses.exists(eventStream.suiteClasses.contains)
 }
 
 private[consolidation] object AssembledRun {
@@ -244,7 +274,7 @@ private[consolidation] object AssembledRun {
 }
 
 private[consolidation] final case class RunAssembly private (
-  label: TestRunLabel,
+  module: ModuleName,
   worker: Option[Worker],
   assembleTopLevelSuites: RecordedRun => Vector[AssembledNode],
   recorded: RecordedRun,
@@ -266,19 +296,19 @@ private[consolidation] final case class RunAssembly private (
       recorded.closing,
       recorded.outcome,
       recorded.abort,
-      recorded.suiteClassNames,
+      recorded.suiteClasses,
       assembleTopLevelSuites(recorded)
     )
 
-  def assembled(eventStream: AssembledEventStream): AssembledRun = AssembledRun(label, worker, eventStream, output, assignedTestClasses)
+  def assembled(eventStream: AssembledEventStream): AssembledRun = AssembledRun(module, worker, eventStream, output, assignedTestClasses)
 }
 
 private[consolidation] object RunAssembly {
 
-  def apply(label: TestRunLabel, worker: Option[Worker]): RunAssembly = apply(label, worker, TreeAssembler.topLevelSuitesOf)
+  def apply(module: ModuleName, worker: Option[Worker]): RunAssembly = apply(module, worker, TreeAssembler.topLevelSuitesOf)
 
-  def apply(label: TestRunLabel, worker: Option[Worker], assembleTopLevelSuites: RecordedRun => Vector[AssembledNode]): RunAssembly =
-    new RunAssembly(label, worker, assembleTopLevelSuites, RecordedRun.empty, Vector.empty, Vector.empty)
+  def apply(module: ModuleName, worker: Option[Worker], assembleTopLevelSuites: RecordedRun => Vector[AssembledNode]): RunAssembly =
+    new RunAssembly(module, worker, assembleTopLevelSuites, RecordedRun.empty, Vector.empty, Vector.empty)
 
   def reportsFailure(event: TestEventLogEvent): Boolean =
     event match {

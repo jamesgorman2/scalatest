@@ -58,7 +58,7 @@ final class TestRunBuilderSpec extends AnyWordSpec with Matchers {
   private def under(parent: NodeId, places: NodePlace*): NodeId = NodeId(parent.places ++ places)
 
   private def suite(id: NodeId, parent: Option[NodeId], position: Option[Int], name: String, suiteId: String, className: String): StructureNode =
-    StructureNode.Suite(id, parent, position, name, SuiteId(suiteId), className)
+    StructureNode.Suite(id, parent, position, name, SuiteId(suiteId), TestClassName(className))
 
   private def scope(id: NodeId, parent: NodeId, position: Int, name: String, label: String): StructureNode =
     StructureNode.Scope(id, parent, position, name, label)

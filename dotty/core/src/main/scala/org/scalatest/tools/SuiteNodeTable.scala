@@ -5,6 +5,7 @@ import org.scalatest.ScopePlace
 import org.scalatest.events.NodeId
 import org.scalatest.events.StructureNode
 import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestName
 import scala.collection.mutable
 
@@ -136,7 +137,7 @@ private[scalatest] final class SuiteNodeTable(
 
   def replaceLatestStructure(scopesAndTests: List[ScopeOrTest]): Vector[StructureNode] = {
     val nodes = Vector.newBuilder[StructureNode]
-    nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
+    nodes += StructureNode.Suite(node, parent, position, name, suiteId, TestClassName(className))
     val added = new SuiteNodeTable.ScopesAndTests(ids.get, node, nodes)
     // Numbered from where the first structure put its first scope or test, so that the scopes and tests keep their
     // place beside the nested suites a further structure leaves out.
@@ -213,7 +214,7 @@ private[scalatest] object SuiteNodeTable {
     position: Option[Int],
     nodes: mutable.Builder[StructureNode, Vector[StructureNode]]
   ): SuiteNodeTable = {
-    nodes += StructureNode.Suite(id, parentSuite.map(_.node), position, structure.name, structure.suiteId, structure.className)
+    nodes += StructureNode.Suite(id, parentSuite.map(_.node), position, structure.name, structure.suiteId, TestClassName(structure.className))
     val nodesOfScopesAndTests = Vector.newBuilder[StructureNode]
     val scopesAndTests = new ScopesAndTests(ScopeAndTestIds.none, id, nodesOfScopesAndTests)
     val (firstPositionOfScopesAndTests, firstPositionOfNestedSuites) =

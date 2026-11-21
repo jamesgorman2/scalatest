@@ -19,7 +19,7 @@ import org.scalatest.events.TopOfMethod
 
 private[consolidation] object JsonOutputWriter {
 
-  private type Field = (String, Option[JsonValue])
+  type Field = (String, Option[JsonValue])
 
   def write(root: ConsolidatedRoot, output: String => Unit): Unit = {
     val text = new TextInPieces(output)
@@ -67,26 +67,11 @@ private[consolidation] object JsonOutputWriter {
       )
     )
 
-  extension (buildTool: BuildTool) {
-    private def toJson: JsonValue =
-      objectOf(Vector[Field]("name" -> Some(JsonValue.Text(buildTool.name)), "version" -> Some(JsonValue.Text(buildTool.version))))
-  }
-
-  extension (moduleSelector: ModuleSelector) {
-    private def toJson: JsonValue =
-      objectOf(
-        Vector[Field](
-          "selector" -> Some(JsonValue.Text(moduleSelector.text)),
-          "modules" -> Some(JsonValue.Array(moduleSelector.modules.map(module => JsonValue.Text(module.value))))
-        )
-      )
-  }
-
   private def moduleNode(module: ConsolidatedModule): JsonValue =
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text("module")),
-        "name" -> Some(JsonValue.Text(module.label.value))
+        "name" -> Some(JsonValue.Text(module.name.value))
       ) ++ measuredTimeFields(module.times) :+
         ("contents" -> Some(JsonValue.Array(module.runs.map(runNode))))
     )
@@ -173,7 +158,7 @@ private[consolidation] object JsonOutputWriter {
       case Vector(file) if file.nonEmpty => file
       case _ => Vector.empty
     }
-    objectOf(("className" -> Some(JsonValue.Text(suite.className))) +: sharedFile)
+    objectOf(("className" -> Some(JsonValue.Text(suite.className.value))) +: sharedFile)
   }
 
   extension (location: Location) {
@@ -206,16 +191,6 @@ private[consolidation] object JsonOutputWriter {
   extension (configMap: Map[String, String]) {
     private def toJson: JsonValue =
       JsonValue.Object(configMap.toVector.sortBy((key, _) => key).map((key, value) => key -> JsonValue.Text(value)))
-  }
-
-  extension (discovery: RunDiscovery) {
-    private def toJson: JsonValue =
-      objectOf(
-        Vector[Field](
-          "startedAt" -> Some(epochMillis(discovery.startedAt)),
-          "duration" -> discovery.duration.map(millis)
-        )
-      )
   }
 
   extension (summary: Summary) {
@@ -349,12 +324,12 @@ private[consolidation] object JsonOutputWriter {
     )
   }
 
-  private def epochMillis(at: Instant): JsonValue = JsonValue.Integer(at.toEpochMilli)
+  def epochMillis(at: Instant): JsonValue = JsonValue.Integer(at.toEpochMilli)
 
-  private def millis(duration: Duration): JsonValue = JsonValue.Integer(duration.toMillis)
+  def millis(duration: Duration): JsonValue = JsonValue.Integer(duration.toMillis)
 
   private def nonEmptyArray(items: Vector[JsonValue]): Option[JsonValue] = Option.when(items.nonEmpty)(JsonValue.Array(items))
 
-  private def objectOf(fields: Vector[Field]): JsonValue =
+  def objectOf(fields: Vector[Field]): JsonValue =
     JsonValue.Object(fields.collect { case (key, Some(value)) => key -> value })
 }

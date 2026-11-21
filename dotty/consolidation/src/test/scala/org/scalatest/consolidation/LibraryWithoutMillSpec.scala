@@ -29,7 +29,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
       val consolidation = startedWithColour(output)
 
       When("every event has been fed and the event stream is held open")
-      consolidation.addRun(moduleLabel) { feed =>
+      consolidation.addRun(module) { feed =>
         feed.addAll(completedRun)
 
         Then("the library has written no human-readable output")

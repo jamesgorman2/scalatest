@@ -2,6 +2,7 @@ package org.scalatest.consolidation
 
 import java.time.Instant
 import scala.collection.mutable
+import org.scalatest.events.TestClassName
 
 /**
  * Consolidates the runs of one test command into human-readable output and, where `jsonOutput` is given, JSON output.
@@ -15,12 +16,12 @@ final class Consolidation private[consolidation] (
   moduleSelectors: Seq[ModuleSelector],
   buildTool: Option[BuildTool],
   startedAt: Option[Instant],
-  newRun: (TestRunLabel, Option[Worker]) => RunAssembly
+  newRun: (ModuleName, Option[Worker]) => RunAssembly
 ) {
 
   @volatile private var currentState: ConsolidationState = ConsolidationState.Open
   private val runs = mutable.ArrayBuffer.empty[RunFeed]
-  private val moduleTimes = mutable.Map.empty[TestRunLabel, MeasuredTimes]
+  private val moduleTimes = mutable.Map.empty[ModuleName, MeasuredTimes]
   private val rootOutput = mutable.ArrayBuffer.empty[CapturedLine]
   private val rootFailures = mutable.ArrayBuffer.empty[String]
 
@@ -36,15 +37,15 @@ final class Consolidation private[consolidation] (
    * renumber earlier ones. A run's line in the human-readable output, and its run node in the JSON output, show its
    * number.
    *
-   * @param label the run's module, which heads the module's line in the human-readable output
+   * @param module the run's module, which heads the module's line in the human-readable output
    * @param worker the worker the run ran in. The run node in the JSON output records the worker's fork group but not its index.
    * @return the run, its event stream ended
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
-  def addRun(label: TestRunLabel, worker: Option[Worker] = None)(feedEventStream: RunFeed => Unit): EndedRun = {
+  def addRun(module: ModuleName, worker: Option[Worker] = None)(feedEventStream: RunFeed => Unit): EndedRun = {
     val feed = synchronized {
       requireOpen()
-      val added = new RunFeed(this, newRun(label, worker))
+      val added = new RunFeed(this, newRun(module, worker))
       runs += added
       added
     }
@@ -100,7 +101,7 @@ final class Consolidation private[consolidation] (
    * @param endedAt when the last of the module's test processes ended
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
-  def timeModule(module: TestRunLabel, startedAt: Option[Instant], endedAt: Option[Instant]): Unit =
+  def timeModule(module: ModuleName, startedAt: Option[Instant], endedAt: Option[Instant]): Unit =
     synchronized {
       requireOpen()
       moduleTimes(module) = MeasuredTimes(startedAt, endedAt)
@@ -126,7 +127,7 @@ final class Consolidation private[consolidation] (
     }
 
   private def root(endedAt: Option[Instant], assembledRuns: Vector[AssembledRun]): ConsolidatedRoot = {
-    val runsByModule = assembledRuns.groupBy(_.label)
+    val runsByModule = assembledRuns.groupBy(_.module)
     val modules = (runsByModule.keySet ++ moduleTimes.keySet).toVector.sortBy(_.value).map { module =>
       ConsolidatedModule.of(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty))
     }
@@ -193,7 +194,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
   def add(event: RunEvent): Unit =
     consolidation.feed {
       if (endedEventStream.get.nonEmpty) {
-        throw new IllegalStateException(s"the event stream of a run under ${run.get.label.value} has ended")
+        throw new IllegalStateException(s"the event stream of a run under ${run.get.module.value} has ended")
       }
       run.set(run.get.added(event.decoded))
       if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsRunAbnormally(event.decoded)) {
@@ -229,7 +230,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
 
   private[consolidation] def assembled: AssembledRun =
     run.get.assembled(
-      endedEventStream.get.getOrElse(throw new IllegalStateException(s"the event stream of a run under ${run.get.label.value} has not ended"))
+      endedEventStream.get.getOrElse(throw new IllegalStateException(s"the event stream of a run under ${run.get.module.value} has not ended"))
     )
 }
 

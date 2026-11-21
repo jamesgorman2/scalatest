@@ -29,7 +29,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
 
     "given a run" should {
       "make the run with the factory it was given, passing the run's module and worker" in {
-        var made = Vector.empty[(TestRunLabel, Option[Worker])]
+        var made = Vector.empty[(ModuleName, Option[Worker])]
         val consolidation = new Consolidation(
           new OutputSink,
           coloured = false,
@@ -42,8 +42,8 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
             RunAssembly(label, worker)
           }
         )
-        consolidation.addRun(moduleLabel, Some(workerAt(1, 2)))(_ => ())
-        made shouldBe Vector(moduleLabel -> Some(workerAt(1, 2)))
+        consolidation.addRun(module, Some(workerAt(1, 2)))(_ => ())
+        made shouldBe Vector(module -> Some(workerAt(1, 2)))
       }
     }
 
@@ -151,7 +151,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       "be refused, writing nothing" in {
         val output = new OutputSink
         val consolidation = startedWithColour(output)
-        consolidation.addRun(moduleLabel) { feed =>
+        consolidation.addRun(module) { feed =>
           feed.addAll(runOfCalculatorSuite())
           an[IllegalStateException] should be thrownBy consolidation.end()
           consolidation.state shouldBe ConsolidationState.Open
@@ -164,7 +164,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       "be refused" in {
         val consolidation = startedWithColour()
         consolidation.end()
-        an[IllegalStateException] should be thrownBy consolidation.addRun(moduleLabel)(_ => ())
+        an[IllegalStateException] should be thrownBy consolidation.addRun(module)(_ => ())
       }
     }
 
@@ -173,7 +173,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
         val consolidation = startedWithColour()
         val failure = new RuntimeException("reading failed")
         val thrown = intercept[RuntimeException] {
-          consolidation.addRun(moduleLabel) { feed =>
+          consolidation.addRun(module) { feed =>
             feed.addAll(TestRunPart.Events("run started"))
             throw failure
           }
@@ -188,8 +188,8 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
     "given a module's times twice" should {
       "hold only the later times" in {
         val json = jsonOutputAfter { consolidation =>
-          consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(1000L)), Some(Instant.ofEpochMilli(2000L)))
-          consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(3000L)), None)
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(1000L)), Some(Instant.ofEpochMilli(2000L)))
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(3000L)), None)
         }
         json.module.get("startedAt") shouldBe Some(integer(3000L))
         json.module.get("endedAt") shouldBe None
@@ -200,7 +200,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       "be refused" in {
         val consolidation = startedWithColour()
         consolidation.end()
-        an[IllegalStateException] should be thrownBy consolidation.timeModule(moduleLabel, None, None)
+        an[IllegalStateException] should be thrownBy consolidation.timeModule(module, None, None)
       }
     }
 
@@ -208,7 +208,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       "be refused" in {
         val consolidation = startedWithColour()
         val feeds = mutable.ArrayBuffer.empty[RunFeed]
-        consolidation.addRun(moduleLabel)(feed => feeds += feed)
+        consolidation.addRun(module)(feed => feeds += feed)
         an[IllegalStateException] should be thrownBy feeds.head.add("run ended completed".toRunEvent)
       }
     }
@@ -218,7 +218,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
         val output = new OutputSink
         val consolidation = Consolidation.start(output, coloured = false)
         val feeds = mutable.ArrayBuffer.empty[RunFeed]
-        consolidation.addRun(moduleLabel)(feed => feeds += feed)
+        consolidation.addRun(module)(feed => feeds += feed)
         feeds.head.add(CapturedLine.Stdout("late"))
         consolidation.end()
         output.linesWithoutSummaryLine shouldBe Vector("[core.test]", "  Run 1:", "    [stdout] late")

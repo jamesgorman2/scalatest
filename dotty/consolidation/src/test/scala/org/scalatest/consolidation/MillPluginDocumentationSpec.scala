@@ -56,10 +56,10 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       buildTool = Some(BuildTool("Mill", "1.3.1")),
       startedAt = Some(Instant.ofEpochMilli(1000L))
     )
-    consolidation.timeModule(moduleLabel, Some(Instant.ofEpochMilli(1100L)), Some(Instant.ofEpochMilli(1900L)))
+    consolidation.timeModule(module, Some(Instant.ofEpochMilli(1100L)), Some(Instant.ofEpochMilli(1900L)))
     consolidation.addRootOutput(CapturedLine.Stderr("discovering\n"))
     consolidation.addRootFailure("discovery failed")
-    consolidation.addRun(moduleLabel) { feed =>
+    consolidation.addRun(module) { feed =>
       runEventsWithEveryKey.foreach(event => feed.add(event))
       feed.add(CapturedLine.Stdout("dividing\n"))
     }

@@ -8,9 +8,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.consolidation.RunProcess
-import org.scalatest.consolidation.TestRunLabel
 import org.scalatest.events.MalformedTestEventLogException
 import org.scalatest.matchers.should
 import org.scalatest.mill.EventLogs.*
@@ -36,7 +36,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
 
     private def addRun(readRun: RunFeed => Unit): Unit = {
       runsAdded.incrementAndGet()
-      consolidation.addRun(TestRunLabel("core.test"))(readRun)
+      consolidation.addRun(ModuleName("core.test"))(readRun)
     }
 
     private def addProcessEndedBeforeAnyRun(): Unit = {

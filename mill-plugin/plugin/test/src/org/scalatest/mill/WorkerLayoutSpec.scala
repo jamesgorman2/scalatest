@@ -2,10 +2,10 @@ package org.scalatest.mill
 
 import java.io.IOException
 import org.scalatest.consolidation.ForkGroup
-import org.scalatest.consolidation.TestClassName
-import org.scalatest.consolidation.TestRunLabel
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
+import org.scalatest.events.TestClassName
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -276,13 +276,13 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
   "A worker" should {
     "be described by its index, its fork group and its module" in {
-      PlannedWorker(workerOf(1, 2), PathUnderModule()).describedIn(TestRunLabel("core.test")) shouldBe "worker 2 of fork group 1 of core.test"
+      PlannedWorker(workerOf(1, 2), PathUnderModule()).describedIn(ModuleName("core.test")) shouldBe "worker 2 of fork group 1 of core.test"
     }
   }
 
   "A fork group" should {
     "be described by its position and its module" in {
-      PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Nil).describedIn(TestRunLabel("core.test")) shouldBe "fork group 1 of core.test"
+      PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Nil).describedIn(ModuleName("core.test")) shouldBe "fork group 1 of core.test"
     }
   }
 }

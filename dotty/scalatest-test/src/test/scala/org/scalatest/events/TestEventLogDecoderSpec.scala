@@ -116,7 +116,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
       "yield a top-level suite without parent or position, then its nodes in the order written" in {
         TestEventLogDecoder.decode(structureLine) shouldBe TestEventLogEvent.Structure(
           Vector(
-            StructureNode.Suite(stackSpec, None, None, "StackSpec", SuiteId("example.StackSpec"), "example.StackSpec"),
+            StructureNode.Suite(stackSpec, None, None, "StackSpec", SuiteId("example.StackSpec"), TestClassName("example.StackSpec")),
             StructureNode.Scope(aStack, stackSpec, 0, "A stack", "A stack"),
             StructureNode.Test(pop, aStack, 0, "pop", "- should pop"),
             StructureNode.Suite(
@@ -125,7 +125,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
               Some(1),
               "QueueSpec",
               SuiteId("example.QueueSpec"),
-              "example.QueueSpec"
+              TestClassName("example.QueueSpec")
             )
           )
         )
@@ -155,7 +155,7 @@ final class TestEventLogDecoderSpec extends AnyWordSpec with Matchers {
         val secondHelper = NodeId(pop.places :+ NodePlace.Suite(SuiteId("example.HelperSpec"), 1))
         TestEventLogDecoder.decode(line) shouldBe TestEventLogEvent.Structure(
           Vector(
-            StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", SuiteId("example.HelperSpec"), "example.HelperSpec"),
+            StructureNode.Suite(secondHelper, Some(pop), None, "HelperSpec", SuiteId("example.HelperSpec"), TestClassName("example.HelperSpec")),
             StructureNode.Scope(NodeId(secondHelper.places :+ NodePlace.Scope("A helper", 2)), secondHelper, 0, "A helper", "A helper")
           )
         )

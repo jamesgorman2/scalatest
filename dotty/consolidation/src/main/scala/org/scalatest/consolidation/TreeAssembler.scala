@@ -23,7 +23,7 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   private val runEndedAbnormally = run.outcome.exists(_.isAbnormal)
   private val childrenByParent = structure.values.toVector.groupBy(_.parentId)
   private val orderFirstHeld = structure.keysIterator.zipWithIndex.toMap
-  private val keysOfTestsThatRan = executions.keysIterator.flatMap(TreeAssembler.attributionKeyOf).toSet
+  private val keysOfTestsThatRan = executions.nodes.flatMap(TreeAssembler.attributionKeyOf).toSet
   private val topLevelNodes = childrenByParent.getOrElse(None, Vector.empty)
   private val subtrees = topLevelNodes.flatMap(withDescendantsChildrenFirst).foldLeft(Map.empty[NodeId, Subtree])(withSubtreeOf)
 
@@ -86,12 +86,15 @@ private[consolidation] final class TreeAssembler(run: RecordedRun) {
   }
 
   private def executionOf(id: NodeId, index: Option[ExecutionIndex]): Option[RecordedExecution] =
-    index.flatMap(executionIndex => executions.get(id).flatMap(_.get(executionIndex)))
+    for {
+      executionIndex <- index
+      execution <- executions.get(ExecutionOfNode(id, executionIndex))
+    } yield execution
 
   private def parentIndexOf(id: NodeId, index: Option[ExecutionIndex], parent: NodeId, parentsLatest: Option[ExecutionIndex]): Option[ExecutionIndex] =
     executionOf(id, index)
       .flatMap(_.parent)
-      .filter(named => named.node == parent && executions.get(parent).exists(_.contains(named.index)))
+      .filter(named => named.node == parent && executions.contains(named))
       .map(_.index)
       .orElse(parentsLatest)
 
