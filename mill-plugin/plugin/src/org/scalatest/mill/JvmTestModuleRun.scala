@@ -175,9 +175,10 @@ private[mill] final class JvmTestModuleRun(
 
     def layOut(forkGroup: PlannedForkGroup): JvmTestModuleRun.BatchSelector = {
       val groupFolder = inModuleFolder(forkGroup.folder)
-      // As Mill 1.3.1 does, each batch worker's `result.log` starts as `(0L, 0L)`.
+      // As Mill 1.3.1 does, each fork group's `result.log` starts as `(0L, 0L)`.
       os.write.over(resultLog(groupFolder), upickle.write((0L, 0L)), createFolders = true)
-      // As Mill 1.3.1 does: an empty class list would select every class.
+      // An empty class list would select every class, so, as Mill 1.3.1 does, an empty group gets an empty queue
+      // instead.
       if (forkGroup.testClasses.isEmpty) {
         val queue = inputs.testModuleUtil(scalaTestArgumentStrings, ctx).prepareTestClassesFolder(Nil, groupFolder)
         val claimFolder = groupFolder / "claim"

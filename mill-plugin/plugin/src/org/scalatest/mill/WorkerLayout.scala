@@ -70,8 +70,8 @@ private[mill] object WorkerLayout {
       filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] = {
     val discoveredForkGroups = forkGroups.map(_.filter(discovered))
-    // As Mill 1.3.1 does, workers get folders of their own under test parallelism unless the module selects exactly one
-    // test class; zero classes count as more than one.
+    // As Mill 1.3.1 does, workers get folders of their own under test parallelism unless the module queues exactly one
+    // test class; a module that queues none still gets them.
     val workersPerGroup =
       if (testParallelism && discoveredForkGroups.map(_.size).sum != 1)
         WorkersPerGroup.UpToJobsInOwnFolders(jobs)

@@ -32,7 +32,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     consolidationUnderTest.output
   }
 
-  "Giving the launcher for a module's workers, or reporting why they could not be laid out" when {
+  "Handling the outcome of laying out a module's workers" when {
     "two fork groups would share a processFolder" should {
       val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
 
