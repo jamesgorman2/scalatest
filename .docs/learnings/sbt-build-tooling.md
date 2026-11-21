@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins, cross-builds and incremental compilation misbehave or pass silently. Read before changing the sbt build or toolchain versions, relying on a passing check, or running sbt on Windows.
+description: How sbt, its plugins, cross-builds and incremental compilation misbehave or pass silently. Read before changing the build or toolchain versions, relying on a passing check, running sbt on Windows, or adding JVM-only code to shared core sources.
 ---
 
 <learning>

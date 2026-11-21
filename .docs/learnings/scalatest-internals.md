@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's styles, runners and reporters behave otherwise than their names suggest. Read before relying on how ScalaTest registers, runs, orders or reports tests, or changing its style traits.
+description: Where upstream ScalaTest 3.2.20's styles, runners and reporters behave otherwise than their names suggest. Read before relying on how ScalaTest registers, runs, orders or reports tests, changing its style traits, or refactoring code a stack-trace test covers.
 ---
 
 <learning>
