@@ -108,7 +108,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- laying out a fork group's files, or starting a test worker, fails;
+- laying out a fork group's files fails, or starting or running a test worker fails;
 - a test worker runs outside the test command's capture, so its output goes to Mill's console;
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;
 - two of the module's fork groups would share a `processFolder`, as where each holds only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test runs;
