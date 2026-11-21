@@ -8,6 +8,7 @@ import org.scalatest.RegisteredTest
 import org.scalatest.Suite
 import org.scalatest.TestsBeforeNestedSuites
 import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestName
 
 private[scalatest] enum ScopeOrTest {
@@ -26,7 +27,7 @@ private[scalatest] final case class SuiteStructure(
   instance: Suite,
   name: String,
   suiteId: SuiteId,
-  className: String,
+  className: TestClassName,
   scopesAndTests: List[ScopeOrTest],
   nestedSuites: List[SuiteStructure],
   testsBeforeNestedSuites: Boolean,
@@ -56,7 +57,7 @@ private[scalatest] object SuiteStructure {
       suite,
       readFrom.suiteName,
       SuiteId(suiteId),
-      Suite.getSuiteClassName(readFrom),
+      TestClassName(Suite.getSuiteClassName(readFrom)),
       scopesAndTests,
       // Recurses no deeper than running the nested suites does.
       if (filter.excludeNestedSuites) Nil else readFrom.nestedSuites.toList.map(read(_, filter)),

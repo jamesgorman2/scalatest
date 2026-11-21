@@ -21,6 +21,7 @@ import org.scalatest.events.Ordinal
 import org.scalatest.events.RunCompleted
 import org.scalatest.events.RunStarting
 import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestEventLogEvent
 import org.scalatest.events.TestName
 import org.scalatest.matchers.should.Matchers
@@ -62,7 +63,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
     nestedSuites: List[SuiteStructure] = Nil,
     testsBeforeNestedSuites: Boolean = false
   ): SuiteStructure =
-    SuiteStructure(instance, name, SuiteId(s"samples.$name"), s"samples.$name", scopesAndTests, nestedSuites, testsBeforeNestedSuites)
+    SuiteStructure(instance, name, SuiteId(s"samples.$name"), TestClassName(s"samples.$name"), scopesAndTests, nestedSuites, testsBeforeNestedSuites)
 
   private def test(name: String): ScopeOrTest = ScopeOrTest.Test(name, TestName(name), s"- $name")
 
@@ -252,7 +253,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
 
       "return the suite's node table, holding the suite's node, suite ID and class name" in {
         val table = TestEventLogEmitter.appendingTo(new RecordingEventLog).addTopLevelSuite(nestedThenScopesAndTests)
-        (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), SuiteId("samples.Outer"), "samples.Outer"))
+        (table.node, table.suiteId, table.className) shouldBe ((nodeId(outerPlace), SuiteId("samples.Outer"), TestClassName("samples.Outer")))
       }
 
       "return a node table holding each test's node by its test name" in {
@@ -301,7 +302,7 @@ final class TestEventLogEmitterSpec extends AnyWordSpec with Matchers with Event
             (
               nodeId(outerPlace, NodePlace.Suite(SuiteId("samples.Inner"), 0)),
               SuiteId("samples.Inner"),
-              "samples.Inner",
+              TestClassName("samples.Inner"),
               Map(TestName("i") -> nodeId(outerPlace, NodePlace.Suite(SuiteId("samples.Inner"), 0), NodePlace.Test(TestName("i")))),
               Map.empty,
               Vector.empty

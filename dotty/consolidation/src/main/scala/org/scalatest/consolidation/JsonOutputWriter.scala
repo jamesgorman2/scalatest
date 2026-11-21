@@ -19,7 +19,7 @@ import org.scalatest.events.TopOfMethod
 
 private[consolidation] object JsonOutputWriter {
 
-  type Field = (String, Option[JsonValue])
+  private type Field = (String, Option[JsonValue])
 
   def write(root: ConsolidatedRoot, output: String => Unit): Unit = {
     val text = new TextInPieces(output)

@@ -16,6 +16,7 @@ import org.scalatest.events.NodeId
 import org.scalatest.events.StructureNode
 import org.scalatest.events.SuiteId
 import org.scalatest.events.SuiteStarting
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestName
 
 private[scalatest] enum TreeNode {
@@ -218,7 +219,7 @@ private[scalatest] final class RegisteredSuite(
     newNodeAwaitingName.set(None)
     tableIsSettled = true
     for (place <- awaiting; name <- suiteName; path <- nodePath.get; suiteId <- suiteIdOfNode.get) yield {
-      val table = place.tableAbove.addSuite(path, place.parent, name, suiteId, Suite.getSuiteClassName(instance))
+      val table = place.tableAbove.addSuite(path, place.parent, name, suiteId, TestClassName(Suite.getSuiteClassName(instance)))
       tableOfNode.set(Some(table))
       val scopesAndTests = structureAwaitingSettledTable.get.fold(List.empty[ScopeOrTest])(_(table))
       structureAwaitingSettledTable.set(None)

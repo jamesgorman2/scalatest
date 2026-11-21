@@ -74,7 +74,7 @@ private final class HeldNode(val id: NodeId, val kind: NodeKind, firstName: Stri
   def defaultExecution: Int = (executions -- endedExecutions).maxOption.orElse(executions.maxOption).getOrElse(1)
 }
 
-private final class HeldSuite(val id: NodeId, val suiteId: SuiteId, val className: String, val parent: Option[NodeId], val position: Option[Int]) {
+private final class HeldSuite(val id: NodeId, val suiteId: SuiteId, val className: TestClassName, val parent: Option[NodeId], val position: Option[Int]) {
 
   private var positionOfFirstScopeOrTest = 0
 
@@ -163,7 +163,7 @@ private final class RunUnderConstruction {
     suitesUnder.getOrElseUpdate(parent, mutable.ArrayBuffer.empty)
 
   private def newSuite(written: WrittenNode.Suite, parent: Option[NodeId], position: Option[Int], text: String): HeldSuite = {
-    val suiteId = SuiteId(written.suiteId.getOrElse(written.className))
+    val suiteId = SuiteId(written.suiteId.getOrElse(written.className.value))
     val ordinalItTakes = sharingName(NodeKind.Suite, written.name).size + 1
     written.ordinalAmongSameName.filter(_ != ordinalItTakes).foreach { ordinal =>
       fail(s"a suite new to the event log is #$ordinalItTakes among the suites that share its name, not #$ordinal: '$text'")
@@ -184,7 +184,7 @@ private final class RunUnderConstruction {
       case Some(TreeLine(1, suite: WrittenNode.Suite, text)) => (suite, text)
       case _ => fail(s"a structure starts with its suite, indented 2 spaces:\n${block.text}")
     }
-    val suiteId = SuiteId(written.suiteId.getOrElse(written.className))
+    val suiteId = SuiteId(written.suiteId.getOrElse(written.className.value))
     val parent = block.under.map(reference => nodeNamed(reference).id)
     val siblings = suitesUnderParent(parent)
     val earlier = written.ordinalAmongSameName match {
@@ -199,7 +199,7 @@ private final class RunUnderConstruction {
     earlier match {
       case Some(suite) =>
         if (suite.className != written.className) {
-          fail(s"a further structure keeps its suite's class, ${suite.className}:\n${block.text}")
+          fail(s"a further structure keeps its suite's class, ${suite.className.value}:\n${block.text}")
         }
         block.tree.tail.collectFirst { case TreeLine(_, _: WrittenNode.Suite, nested) => nested }.foreach { nested =>
           fail(s"a further structure holds its suite's scopes and tests only, not '$nested'")
@@ -214,7 +214,7 @@ private final class RunUnderConstruction {
     val structureRoot = structureRootOf(block)
     val root = structureRoot.suite
     val built = Vector.newBuilder[StructureNode]
-    built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, TestClassName(root.className))
+    built += StructureNode.Suite(root.id, root.parent, root.position, nodes(root.id).name, root.suiteId, root.className)
     val testNames = mutable.Set.empty[(NodeId, TestName)]
     val openRoot = new OpenTreeNode(1, root.id, NodeKind.Suite, root.id, Vector.empty, if (structureRoot.isFurther) root.firstPositionOfScopesAndTests else 0)
     val suitesFirstHeld = mutable.ArrayBuffer.empty[(HeldSuite, OpenTreeNode)]
@@ -233,7 +233,7 @@ private final class RunUnderConstruction {
             fail(s"a suite is nested in a suite, not in a scope: '${line.text}'")
           }
           val nested = newSuite(written, Some(above.id), Some(above.nextPosition()), line.text)
-          built += StructureNode.Suite(nested.id, nested.parent, nested.position, written.name, nested.suiteId, TestClassName(nested.className))
+          built += StructureNode.Suite(nested.id, nested.parent, nested.position, written.name, nested.suiteId, nested.className)
           val openNested = new OpenTreeNode(line.depth, nested.id, NodeKind.Suite, nested.id, Vector.empty)
           suitesFirstHeld += nested -> openNested
           open = openNested :: open

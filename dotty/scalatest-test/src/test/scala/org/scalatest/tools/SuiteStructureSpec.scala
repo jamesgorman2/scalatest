@@ -13,6 +13,7 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.events.SuiteId
+import org.scalatest.events.TestClassName
 import org.scalatest.events.TestName
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -109,14 +110,14 @@ final class SuiteStructureSpec extends AnyWordSpec with Matchers {
     }
 
     "take the suite's class name from the class of the instance" in {
-      SuiteStructure.read(new ScenarioSuite, Filter.default).className shouldBe classOf[ScenarioSuite].getName
+      SuiteStructure.read(new ScenarioSuite, Filter.default).className shouldBe TestClassName(classOf[ScenarioSuite].getName)
     }
 
     "take the class name of a suite that stands for one whose construction failed from the class that failed" in {
       val standIn = new DeferredAbortedSuite("samples.ThrowingConstructorSpec", "samples.ThrowingConstructorSpec", new IllegalStateException("no config"))
       val structure = SuiteStructure.read(standIn, Filter.default)
       (structure.name, structure.suiteId, structure.className, structure.scopesAndTests, structure.nestedSuites) shouldBe
-        (("ThrowingConstructorSpec", SuiteId("samples.ThrowingConstructorSpec"), "samples.ThrowingConstructorSpec", Nil, Nil))
+        (("ThrowingConstructorSpec", SuiteId("samples.ThrowingConstructorSpec"), TestClassName("samples.ThrowingConstructorSpec"), Nil, Nil))
     }
 
     "hold each nested suite in the order the suite nests them, read from that instance with the same filter" in {

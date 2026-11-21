@@ -243,7 +243,7 @@ final class EndedRun private[consolidation] (feed: RunFeed) {
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
-  def addAssignedTestClasses(classes: Iterable[TestClassName]): Unit = feed.addAssigned(classes)
+  private[scalatest] def addAssignedTestClasses(classes: Iterable[TestClassName]): Unit = feed.addAssigned(classes)
 }
 
 private[consolidation] final class GuardedByConsolidation[A](consolidation: Consolidation, initial: A) {

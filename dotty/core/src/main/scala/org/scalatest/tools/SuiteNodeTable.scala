@@ -73,7 +73,7 @@ private[scalatest] final class SuiteNodeTable(
   val node: NodeId,
   val name: String,
   val suiteId: SuiteId,
-  val className: String,
+  val className: TestClassName,
   val parentSuite: Option[SuiteNodeTable],
   val parent: Option[NodeId],
   val position: Option[Int],
@@ -106,12 +106,12 @@ private[scalatest] final class SuiteNodeTable(
 
   def markEnded(): Unit = hasEndedOnce.set(true)
 
-  def addSuiteUnder(parentNode: NodeId, name: String, suiteId: SuiteId, className: String): SuiteNodeTable = {
+  def addSuiteUnder(parentNode: NodeId, name: String, suiteId: SuiteId, className: TestClassName): SuiteNodeTable = {
     val id = SuiteNodeTable.nestedSuitePath(parentNode, suiteId, childSuites.filter(_.parent.contains(parentNode)).map(_.suiteId))
     addSuite(id, parentNode, name, suiteId, className)
   }
 
-  def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: SuiteId, className: String): SuiteNodeTable = {
+  def addSuite(id: NodeId, parentNode: NodeId, name: String, suiteId: SuiteId, className: TestClassName): SuiteNodeTable = {
     val added = new SuiteNodeTable(emitter, id, name, suiteId, className, Some(this), Some(parentNode), None, 0, Nil, ScopeAndTestIds.none, Map.empty)
     nestedSuitesAdded.set(nestedSuitesAdded.get :+ added)
     added
@@ -137,7 +137,7 @@ private[scalatest] final class SuiteNodeTable(
 
   def replaceLatestStructure(scopesAndTests: List[ScopeOrTest]): Vector[StructureNode] = {
     val nodes = Vector.newBuilder[StructureNode]
-    nodes += StructureNode.Suite(node, parent, position, name, suiteId, TestClassName(className))
+    nodes += StructureNode.Suite(node, parent, position, name, suiteId, className)
     val added = new SuiteNodeTable.ScopesAndTests(ids.get, node, nodes)
     // Numbered from where the first structure put its first scope or test, so that the scopes and tests keep their
     // place beside the nested suites a further structure leaves out.
@@ -214,7 +214,7 @@ private[scalatest] object SuiteNodeTable {
     position: Option[Int],
     nodes: mutable.Builder[StructureNode, Vector[StructureNode]]
   ): SuiteNodeTable = {
-    nodes += StructureNode.Suite(id, parentSuite.map(_.node), position, structure.name, structure.suiteId, TestClassName(structure.className))
+    nodes += StructureNode.Suite(id, parentSuite.map(_.node), position, structure.name, structure.suiteId, structure.className)
     val nodesOfScopesAndTests = Vector.newBuilder[StructureNode]
     val scopesAndTests = new ScopesAndTests(ScopeAndTestIds.none, id, nodesOfScopesAndTests)
     val (firstPositionOfScopesAndTests, firstPositionOfNestedSuites) =
