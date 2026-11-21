@@ -2,7 +2,6 @@ package org.scalatest.consolidation
 
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.events.TestRunBuilder
 import org.scalatest.events.TestRunPart
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -17,12 +16,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   private val calculatorSuiteStructure = structureOf("CalculatorSuite", addsTest)
 
-  private def runOfCalculatorSuite(testEvents: String*): TestRunPart =
-    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", addsTest, testEvents*)))
-
-  private def runOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
-
-  private def runEventsOf(parts: TestRunPart*): Vector[RunEvent] = TestRunBuilder.build(parts*).events.map(built => RunEvent.of(built.event))
+  private def partOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
 
   private val runWithSucceededTest: TestRunPart = runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded""")
 
@@ -122,7 +116,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       }
     }
 
-    Scenario("A suite that the library reports as not run is no test result") {
+    Scenario("A suite that the library reports as not run gives its module no test result") {
       Given("a run of the module whose structure holds the suite `CalculatorSuite`, which then has no event")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
@@ -137,12 +131,26 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       (suite("outcome"), suite("reason")) shouldBe ((text("aborted"), text("notRun")))
     }
 
-    Scenario("A suite and test that the library aborts, as the run aborts while the test is running, are no test result") {
+    Scenario("A test that its suite's structure marks ignored, with no event reporting it as ignored, gives its module no test result") {
+      Given("a run of the module whose suite `CalculatorSuite` starts and completes, and whose structure marks the test `adds` ignored")
+      val json = new JsonSink
+      val consolidation = startedWithoutMill(json)
+      consolidation.addRunOf(TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", s"$addsTest, ignored"))))
+
+      Then("the module has no test result")
+      consolidation.hasTestResult(module) shouldBe false
+
+      And("once the consolidation ends, the library reports the test as ignored")
+      consolidation.end()
+      json.node(NodeKind.Test, "adds")("outcome") shouldBe text("ignored")
+    }
+
+    Scenario("A suite and test that the library reports as aborted, as the run aborts while the test is running, give their module no test result") {
       Given("a run of the module that aborts while the test `adds` is running")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
       consolidation.addRunOf(
-        runOf(
+        partOf(
           "run started",
           calculatorSuiteStructure,
           """suite "CalculatorSuite": SuiteStarting""",
@@ -162,8 +170,8 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A module has a test result as soon as its run reports a test's outcome, before the run's event stream ends") {
       Given("a run of the module being fed, which has started the test `adds`")
-      val untilTestStarts = runOf("run started", calculatorSuiteStructure, """suite "CalculatorSuite": SuiteStarting""", """test "adds": TestStarting""")
-      val fromTestOutcome = runOf("""test "adds": TestSucceeded""", """suite "CalculatorSuite": SuiteCompleted""", "run ended completed")
+      val untilTestStarts = partOf("run started", calculatorSuiteStructure, """suite "CalculatorSuite": SuiteStarting""", """test "adds": TestStarting""")
+      val fromTestOutcome = partOf("""test "adds": TestSucceeded""", """suite "CalculatorSuite": SuiteCompleted""", "run ended completed")
       val events = runEventsOf(untilTestStarts, fromTestOutcome)
       val testOutcomeIndex = runEventsOf(untilTestStarts).size
       val consolidation = startedWithColour()

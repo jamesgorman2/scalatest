@@ -61,8 +61,10 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - R-007 The test command fails where all of these hold:
   - class globs are given, and at least one of them matches a test class that the module's test framework discovers;
   - every worker of the module has ended;
-  - under the module's node in the consolidated output, no test has the outcome succeeded, failed, ignored, pending or canceled;
-  - under the module's node in the consolidated output, no test or suite has the outcome aborted with an outcome message.
+  - no event reporting a test as succeeded, failed, ignored, pending or canceled has been added to the event stream of any of the module's runs;
+  - no event reporting a suite as aborted has been added to the event stream of any of the module's runs.
+
+  A test that the consolidated output shows as ignored only because its suite's structure marks it ignored adds no such event, nor does a suite or test that the library itself aborts, such as with reason *not run* (`../SPECIFICATION.md` R-095a).
 
   The test command then attaches one failure to the root of the consolidated output. The failure's message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
 - R-008 Each worker of the module receives the environment that a worker of Mill's `testOnly` or `testForked` receives when that task is started from a `mill` command line in the environment in which the test command's `mill` command line started:

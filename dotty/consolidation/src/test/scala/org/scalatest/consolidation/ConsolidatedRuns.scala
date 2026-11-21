@@ -2,6 +2,7 @@ package org.scalatest.consolidation
 
 import scala.collection.mutable
 import org.scalatest.Assertions
+import org.scalatest.events.BuiltEvent
 import org.scalatest.events.BuiltRunItem
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.TestRunBuilder
@@ -19,9 +20,9 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
         .replace("\r\n", "\n")
 
     def toRunEvent: RunEvent =
-      TestRunBuilder.build(TestRunPart.Events(literal)).items match {
-        case Vector(BuiltRunItem.Event(built)) => RunEvent.of(built.event)
-        case items => fail(s"expected one event, but the notation built $items")
+      runEventsOf(TestRunPart.Events(literal)) match {
+        case Vector(event) => event
+        case events => fail(s"expected one event, but the notation built $events")
       }
 
     def interleavingsWith(lines: Vector[TestRunPart]): Vector[Vector[TestRunPart]] =
@@ -41,11 +42,15 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
     def addAll(parts: TestRunPart*): Unit =
       TestRunBuilder.build(parts*).items.foreach {
-        case BuiltRunItem.Event(built) => feed.add(RunEvent.of(built.event))
+        case BuiltRunItem.Event(built) => feed.add(runEventOf(built))
         case BuiltRunItem.CapturedLine(CapturedStream.Stdout, line) => feed.add(CapturedLine.Stdout(line))
         case BuiltRunItem.CapturedLine(CapturedStream.Stderr, line) => feed.add(CapturedLine.Stderr(line))
       }
   }
+
+  def runEventsOf(parts: TestRunPart*): Vector[RunEvent] = TestRunBuilder.build(parts*).events.map(runEventOf)
+
+  private def runEventOf(built: BuiltEvent): RunEvent = RunEvent.of(built.event)
 
   final class OutputSink extends (String => Unit) {
 
@@ -82,6 +87,9 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def eventLogOfSuite(suite: String, nodes: String, events: String*): String =
     (structureOf(suite, nodes) +: s"""suite "$suite": SuiteStarting""" +: events.flatMap(ConsolidatedRuns.eventLinesOf) :+ s"""suite "$suite": SuiteCompleted""")
       .mkString("\n")
+
+  def runOfCalculatorSuite(testEvents: String*): TestRunPart =
+    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", """test "adds", label "- adds"""", testEvents*)))
 
   def structureOf(suite: String, nodes: String): String =
     (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
