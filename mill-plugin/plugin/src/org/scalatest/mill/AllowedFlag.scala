@@ -22,6 +22,15 @@ private[mill] enum AllowedFlag(val text: String) {
       case Parallel => joinedValue.isEmpty || AllowedFlag.isThreadCount(joinedValue)
       case _ => joinedValue.isEmpty
     }
+
+  /** Whether ScalaTest's runner accepts a value that follows the flag, such as `60` after `-W`. */
+  def acceptsSeparateValue(separateValue: String): Boolean =
+    this match {
+      case SpanScaleFactor | TestSortingTimeout => separateValue.toDoubleOption.isDefined
+      case Seed => separateValue.toLongOption.isDefined
+      case SlowpokeDetection => separateValue.toIntOption.isDefined
+      case _ => true
+    }
 }
 
 private[mill] object AllowedFlag {

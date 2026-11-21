@@ -230,7 +230,7 @@ final class ArgumentSplitterSpec extends AnyWordSpec with Matchers {
     }
 
     "asked whether a flag is short of values" should {
-      "say so of a flag holding fewer values than the runner needs with it" in {
+      "answer yes for a flag holding fewer values than the runner needs with it" in {
         for (arguments <- List(List("-n"), List("-W", "1"), List("-k", "localhost"), List("-h"), List("-h", "target/html", "-Y"))) {
           withClue(arguments.mkString(" ")) {
             ArgumentSplitter.split(arguments).collect { case flagged: Flagged => ArgumentSplitter.isShortOfValues(flagged) } shouldBe List(true)
@@ -238,14 +238,14 @@ final class ArgumentSplitterSpec extends AnyWordSpec with Matchers {
         }
       }
 
-      "say not of a flag holding the values the runner needs with it" in {
+      "answer no for a flag holding the values the runner needs with it" in {
         val arguments = List(
           "-Dkey=value", "-P", "-n", "Fast", "-W", "60", "30", "-k", "localhost", "8080", "-h", "target/html", "-h", "target/html", "-Y", "report.css", "-Q"
         )
         ArgumentSplitter.split(arguments).collect { case flagged: Flagged => ArgumentSplitter.isShortOfValues(flagged) } shouldBe List.fill(8)(false)
       }
 
-      "say not of a flag the runner does not recognise" in {
+      "answer no for a flag the runner does not recognise" in {
         ArgumentSplitter.isShortOfValues(Flagged("-x", List("-x"))) shouldBe false
       }
     }

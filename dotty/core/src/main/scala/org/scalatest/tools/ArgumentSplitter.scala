@@ -80,14 +80,20 @@ private[scalatest] object ArgumentSplitter {
    * integer. A flag the runner does not recognise is never short of values.
    */
   def isShortOfValues(flagged: SplitArgument.Flagged): Boolean = {
-    val valueCount = flagged.argumentAndValues.size - 1
+    val values = flagged.argumentAndValues.drop(1)
     flagOf(flagged.flag).map(valuesOf).exists {
-      case Following(count) => valueCount < count
-      case FollowingUnlessFlags(count) => valueCount < count
-      // `-h` with no directory, or with `-Y` and no CSS file.
-      case DirectoryThenCssFile => valueCount == 0 || valueCount == 2
+      case Following(count) => values.size < count
+      case FollowingUnlessFlags(count) => values.size < count
+      case DirectoryThenCssFile => isMissingDirectoryOrCssFile(values)
     }
   }
+
+  private def isMissingDirectoryOrCssFile(values: List[String]): Boolean =
+    values match {
+      case Nil => true
+      case List(_, `cssFileFlag`) => true
+      case _ => false
+    }
 
   private def flagOf(argument: String): Option[String] =
     Option(argument).flatMap { written =>

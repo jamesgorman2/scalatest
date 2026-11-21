@@ -11,12 +11,13 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
 
   private val coreTest: Seq[ModuleSelectorArgument] = Seq(ModuleSelectorArgument("core.test"))
 
-  private def ownArguments(
+  private def expected(
       stdoutContent: StdoutContent = StdoutContent.HumanReadableOutput,
       jsonOutputPath: Option[String] = None,
-      moduleSelectors: Seq[ModuleSelectorArgument] = coreTest
+      moduleSelectors: Seq[ModuleSelectorArgument] = coreTest,
+      classGlobs: Seq[ClassGlob] = Nil
   ): TestCommandArguments =
-    TestCommandArguments(moduleSelectors, stdoutContent, jsonOutputPath, classGlobs = Nil, frameworkArguments = Nil)
+    TestCommandArguments(moduleSelectors, stdoutContent, jsonOutputPath, classGlobs, frameworkArguments = Nil)
 
   private def rejection(arguments: String*): TestCommandFailure =
     TestCommandArguments.parse(arguments).left.getOrElse(fail(s"${arguments.mkString(" ")} was accepted"))
@@ -31,28 +32,28 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
   "The test command's arguments" when {
     "given no output argument" should {
       "put human-readable output on stdout, and write no JSON output" in {
-        parsed("core.test") shouldBe ownArguments()
+        parsed("core.test") shouldBe expected()
       }
     }
 
     "given -oH" should {
       "put human-readable output on stdout, wherever it is given" in {
-        parsed("core.test", "-oH") shouldBe ownArguments()
-        parsed("-oH", "core.test") shouldBe ownArguments()
+        parsed("core.test", "-oH") shouldBe expected()
+        parsed("-oH", "core.test") shouldBe expected()
       }
     }
 
     "given a bare -o" should {
       "put no output on stdout" in {
-        parsed("core.test", "-o") shouldBe ownArguments(stdoutContent = StdoutContent.NoOutput)
+        parsed("core.test", "-o") shouldBe expected(stdoutContent = StdoutContent.NoOutput)
       }
     }
 
     "given -fJ followed by a path" should {
       "take the path as the JSON output file's path, not as a module selector, wherever the module selector stands" in {
-        val expected = ownArguments(jsonOutputPath = Some("report.json"))
-        parsed("core.test", "-fJ", "report.json") shouldBe expected
-        parsed("-fJ", "report.json", "core.test") shouldBe expected
+        val withJsonOutputPath = expected(jsonOutputPath = Some("report.json"))
+        parsed("core.test", "-fJ", "report.json") shouldBe withJsonOutputPath
+        parsed("-fJ", "report.json", "core.test") shouldBe withJsonOutputPath
       }
 
       "keep the meaning of -oH or a bare -o beside it" in {
@@ -75,7 +76,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
 
     "given no module selector" should {
       "return no module selectors, leaving their check to module selection" in {
-        parsed("-oH") shouldBe ownArguments(moduleSelectors = Nil)
+        parsed("-oH") shouldBe expected(moduleSelectors = Nil)
       }
     }
 
@@ -99,13 +100,13 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
 
     "given no --" should {
       "hold no class globs and no framework arguments" in {
-        parsed("core.test", "-fJ", "report.json", "-o") shouldBe ownArguments(StdoutContent.NoOutput, Some("report.json"))
+        parsed("core.test", "-fJ", "report.json", "-o") shouldBe expected(StdoutContent.NoOutput, Some("report.json"))
       }
     }
 
     "given a -- with nothing after it" should {
       "hold no class globs and no framework arguments" in {
-        parsed("core.test", "--") shouldBe ownArguments()
+        parsed("core.test", "--") shouldBe expected()
       }
     }
 
@@ -143,7 +144,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
       }
 
       "hold no framework arguments where nothing follows the second" in {
-        parsed("core.test", "--", "samples.Alpha1", "--") shouldBe ownArguments().copy(classGlobs = Seq(ClassGlob("samples.Alpha1")))
+        parsed("core.test", "--", "samples.Alpha1", "--") shouldBe expected(classGlobs = Seq(ClassGlob("samples.Alpha1")))
       }
     }
 
@@ -157,8 +158,8 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
           Seq("-l", "samples.Slow"),
           Seq("-m", "samples"),
           Seq("-w", "samples"),
-          Seq("-F", "2"),
-          Seq("-T", "100"),
+          Seq("-F", "1.5"),
+          Seq("-T", "2.5"),
           Seq("-t", "slow"),
           Seq("-z", "slow"),
           Seq("-S", "42"),
@@ -188,6 +189,21 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
         frameworkArgumentRejection("-n") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-n")
         frameworkArgumentRejection("-l", "samples.Slow", "-z") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-z")
         frameworkArgumentRejection("-W", "60") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-W")
+      }
+
+      "reject a flag followed by a value ScalaTest's runner does not accept, naming the flag" in {
+        val flagsAndValues = Seq(
+          Seq("-W", "soon", "later"),
+          Seq("-W", "60", "later"),
+          Seq("-W", "60", "1.5"),
+          Seq("-F", "fast"),
+          Seq("-T", "soon"),
+          Seq("-S", "seed"),
+          Seq("-S", "1.5")
+        )
+        for (flagAndValues <- flagsAndValues) {
+          frameworkArgumentRejection(flagAndValues*) shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn(flagAndValues.head)
+        }
       }
 
       "reject a -D without a config map entry joined to it, naming it" in {
