@@ -222,7 +222,7 @@ private[scalatest] object EventLogComparison {
     // From the log's own structures, not the built ones: a further structure in the log can move the node.
     val loggedAncestors = ancestorsTopDown(logged.node, latestNodes.logged)
     ancestorsTopDown(expected.node, latestNodes.built).zip(expected.executionPath).iterator.collect {
-      case (ancestor, expectedExecution) if written.markedAncestors.contains(ancestor) =>
+      case (ancestor, expectedExecution) if written.markedAncestors.contains(ancestor) => {
         val name = nodeDescription(ancestor, latestNodes.built)
         nodes.loggedNode(ancestor).map(loggedAncestors.indexOf).filter(_ >= 0) match {
           case None => Some(s"it is not under $name")
@@ -233,6 +233,7 @@ private[scalatest] object EventLogComparison {
               case None => Some(s"its execution path has no execution of $name")
             }
         }
+      }
     }.collectFirst { case Some(mismatch) => mismatch }
   }
 

@@ -30,9 +30,10 @@ private[scalatest] object TestEventLogDecoder {
       case "structure" =>
         TestEventLogEvent.Structure(reader.required("nodes", reader.optionalObjects("nodes")).map(whole(_)(structureNode)))
       case "event" => TestEventLogEvent.ScalaTestEvent(nodeExecution(reader), scalaTestEvent(reader.text("event"), reader))
-      case "runEnded" =>
+      case "runEnded" => {
         val outcome = reader.text("outcome")
         TestEventLogEvent.RunEnded(RunOutcome.fromWord(outcome).getOrElse(reader.malformed(s"unknown outcome $outcome")))
+      }
       case other => reader.malformed(s"unknown item $other")
     }
   }
@@ -42,20 +43,23 @@ private[scalatest] object TestEventLogDecoder {
     val kind = reader.text("kind")
     val name = reader.text("name")
     kind match {
-      case "suite" =>
+      case "suite" => {
         val parent = optionalNodePath(reader, "parent")
         val position = reader.optionalIntAtLeast("position", 0)
         val suiteId = SuiteId(reader.text("suiteId"))
         val className = TestClassName(reader.text("className"))
         requireParentOnNodePath(reader, id, parent)
         StructureNode.Suite(id, parent, position, name, suiteId, className)
-      case "scope" =>
+      }
+      case "scope" => {
         val scope = scopeOrTest(reader)(StructureNode.Scope(id, _, _, name, _))
         requireParentOnNodePath(reader, id, scope.parentId)
         scope
-      case "test" =>
+      }
+      case "test" => {
         val ignored = reader.trueOrAbsent("ignored")
         scopeOrTest(reader)(StructureNode.Test(id, _, _, name, _, ignored))
+      }
       case other => reader.malformed(s"unknown kind $other")
     }
   }
@@ -141,33 +145,37 @@ private[scalatest] object TestEventLogDecoder {
     eventName match {
       case "TestStarting" => started(DecodedEvent.TestStarting(_, _, _))
       case "TestSucceeded" => timed(DecodedEvent.TestSucceeded(_, _, _, _))
-      case "TestFailed" =>
+      case "TestFailed" => {
         val message = readMessage
         val analysis = reader.texts("analysis")
         val throwable = readThrowable
         timed(DecodedEvent.TestFailed(message, analysis, throwable, _, _, _, _))
+      }
       case "TestIgnored" => started(DecodedEvent.TestIgnored(_, _, _))
       case "TestPending" => timed(DecodedEvent.TestPending(_, _, _, _))
       case "TestCanceled" => stoppedByThrowable(DecodedEvent.TestCanceled(_, _, _, _, _, _))
       case "SuiteStarting" => started(DecodedEvent.SuiteStarting(_, _, _))
       case "SuiteCompleted" => timed(DecodedEvent.SuiteCompleted(_, _, _, _))
       case "SuiteAborted" => stoppedByThrowable(DecodedEvent.SuiteAborted(_, _, _, _, _, _))
-      case "RunStarting" =>
+      case "RunStarting" => {
         val testCount = reader.int("testCount")
         val configMap = reader.required("configMap", reader.optionalObject("configMap")).allTexts
         started(DecodedEvent.RunStarting(testCount, configMap, _, _, _))
+      }
       case "RunCompleted" => runClosed(DecodedEvent.RunCompleted(_, _, _, _, _))
       case "RunStopped" => runClosed(DecodedEvent.RunStopped(_, _, _, _, _))
-      case "RunAborted" =>
+      case "RunAborted" => {
         val message = readMessage
         val throwable = readThrowable
         runClosed(DecodedEvent.RunAborted(message, throwable, _, _, _, _, _))
+      }
       case "InfoProvided" => withMessage(DecodedEvent.InfoProvided(_, _, _, _, _))
       case "AlertProvided" => withMessage(DecodedEvent.AlertProvided(_, _, _, _, _))
       case "NoteProvided" => withMessage(DecodedEvent.NoteProvided(_, _, _, _, _))
-      case "MarkupProvided" =>
+      case "MarkupProvided" => {
         val text = reader.text("text")
         started(DecodedEvent.MarkupProvided(text, _, _, _))
+      }
       case "ScopeOpened" => started(DecodedEvent.ScopeOpened(_, _, _))
       case "ScopeClosed" => started(DecodedEvent.ScopeClosed(_, _, _))
       case "ScopePending" => started(DecodedEvent.ScopePending(_, _, _))
@@ -214,7 +222,7 @@ private[scalatest] object TestEventLogDecoder {
     private def throwableOrRef(reader: JsonObjectReader): Either[DecodedThrowable, DecodingThrowable] = {
       reader.optionalLong("ref") match {
         case Some(id) => Left(decoded.getOrElse(id, reader.malformed(s"ref $id names no throwable the event holds before it")))
-        case None =>
+        case None => {
           val id = reader.longAtLeast("id", 1L)
           val opened = new DecodingThrowable(
             className = reader.text("className"),
@@ -228,6 +236,7 @@ private[scalatest] object TestEventLogDecoder {
           // Registered before the throwable's links are read, so that a ref among them yields the throwable.
           registered(reader, id, opened.closed)
           Right(opened)
+        }
       }
     }
 

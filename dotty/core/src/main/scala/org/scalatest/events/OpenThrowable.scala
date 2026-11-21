@@ -54,19 +54,22 @@ private[events] object OpenThrowable {
       innermost.nextLink() match {
         case Some(source) =>
           linkedOrOpened(source) match {
-            case Left(linked) =>
+            case Left(linked) => {
               innermost.add(linked)
               closing(innermost, outer)
+            }
             case Right(opened) => closing(opened, innermost :: outer)
           }
-        case None =>
+        case None => {
           val closed = innermost.closed
           outer match {
             case Nil => closed
-            case parent :: aboveParent =>
+            case parent :: aboveParent => {
               parent.add(closed)
               closing(parent, aboveParent)
+            }
           }
+        }
       }
     }
     closing(outermost, Nil)

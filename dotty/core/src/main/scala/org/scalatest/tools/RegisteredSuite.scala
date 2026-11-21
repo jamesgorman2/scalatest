@@ -230,22 +230,25 @@ private[scalatest] final class RegisteredSuite(
   private def placeBy(suiteId: SuiteId): Unit = {
     emitter.assertLockHeld()
     startedIn match {
-      case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfNode.get.contains(suiteId) =>
+      case Some(inRun: InRunOfSuite) if inRun.registration.suiteIdOfNode.get.contains(suiteId) => {
         val outer = inRun.registration
         suiteItIs.set(Some(outer.suiteItIs.get.getOrElse(outer)))
         nodePath.set(outer.nodePath.get)
         tableOfNode.set(outer.tableOfNode.get)
         executionsAbove.set(outer.executionsAbove.get)
-      case Some(inRun: InRunOfSuite) =>
+      }
+      case Some(inRun: InRunOfSuite) => {
         val outer = inRun.registration
         val executionOfOuter = outer.executionOfRun()
         val index = executionOfOuter.indexOfStartingSuite(suiteId)
         placeUnder(outer, outer.nodePath.get, NamedExecutions(outer.executionsAbove.get, executionOfOuter, Map.empty, None), suiteId, index)
-      case Some(inTest: InExecutionOfTest) =>
+      }
+      case Some(inTest: InExecutionOfTest) => {
         val outer = inTest.registration
         val index = inTest.execution.indexOfStartingSuite(suiteId)
         val testNode = outer.tableOfNode.get.flatMap(_.testsByName.get(inTest.scalaTestName))
         placeUnder(outer, testNode, inTest.executionsOfTest(), suiteId, index)
+      }
       case None => ()
     }
   }
@@ -262,9 +265,10 @@ private[scalatest] final class RegisteredSuite(
   def startExecutionOfRun(): Execution = {
     suiteItIs.get match {
       case Some(suite) => suite.executionOfRun()
-      case None if latestRunAwaitsItsStart.get =>
+      case None if latestRunAwaitsItsStart.get => {
         latestRunAwaitsItsStart.set(false)
         executionOfRun()
+      }
       case None => newRun()
     }
   }
@@ -359,9 +363,10 @@ private[scalatest] final class RegisteredSuite(
         val status =
           try runningInItsContext(run)
           catch {
-            case thrown: Throwable =>
+            case thrown: Throwable => {
               emitter.forget(RegisteredSuite.this)
               throw thrown
+            }
           }
         removedWhenCompleted(status)
         status
@@ -372,11 +377,12 @@ private[scalatest] final class RegisteredSuite(
   private def removedWhenCompleted(status: Status): Unit = {
     try status.whenCompleted(_ => emitter.forget(this))
     catch {
-      case thrown: Throwable =>
+      case thrown: Throwable => {
         // The suite's own `run` may have built `status`. If its `whenCompleted` throws, the callback may never run, so
         // the suite is forgotten here.
         emitter.forget(this)
         TestEventLogEmitter.keptFromCaller(throw thrown)
+      }
     }
   }
 

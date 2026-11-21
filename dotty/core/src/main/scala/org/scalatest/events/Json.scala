@@ -35,20 +35,23 @@ private[scalatest] object JsonWriter {
       pending = pending.tail
       next match {
         case Pending.Punctuation(char) => out.append(char)
-        case Pending.Key(key) =>
+        case Pending.Key(key) => {
           appendString(out, key)
           out.append(':')
+        }
         case Pending.Value(JsonValue.Text(text)) => appendString(out, text)
         case Pending.Value(JsonValue.Integer(number)) => out.append(number.toString)
         case Pending.Value(JsonValue.Bool(flag)) => out.append(flag.toString)
-        case Pending.Value(JsonValue.Array(items)) =>
+        case Pending.Value(JsonValue.Array(items)) => {
           out.append('[')
           val members = items.map(item => List[Pending](Pending.Value(item)))
           pending = separated(members) ::: Pending.Punctuation(']') :: pending
-        case Pending.Value(JsonValue.Object(fields)) =>
+        }
+        case Pending.Value(JsonValue.Object(fields)) => {
           out.append('{')
           val members = fields.map { case (key, fieldValue) => List[Pending](Pending.Key(key), Pending.Value(fieldValue)) }
           pending = separated(members) ::: Pending.Punctuation('}') :: pending
+        }
       }
     }
   }
@@ -174,9 +177,10 @@ private final class JsonReader(text: String) {
       case Step.Read(value) =>
         open match {
           case Nil => value
-          case innermost :: _ =>
+          case innermost :: _ => {
             innermost.add(value)
             placed(nextMember(innermost))
+          }
         }
     }
   }
@@ -228,13 +232,14 @@ private final class JsonReader(text: String) {
     skipWhitespace()
     innermost match {
       case _: OpenArray => valueStart()
-      case openObject: OpenObject =>
+      case openObject: OpenObject => {
         val fieldKey = key()
         if (openObject.holds(fieldKey)) {
           malformed(s"the key $fieldKey is repeated")
         }
         openObject.startField(fieldKey)
         valueStart()
+      }
     }
   }
 

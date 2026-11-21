@@ -65,15 +65,17 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
 
   def startOfTopLevelSuite(suite: Suite, filter: Filter, reporter: Reporter): SuiteStart = {
     TestEventLogEmitter.caughtOutsideLock(SuiteStructure.read(suite, filter)) match {
-      case Right(structure) =>
+      case Right(structure) => {
         val registration = new RegisteredSuite(this, suite, None)
         val table = addTopLevelSuite(structure)
         synchronized(registration.fixAsTopLevelSuite(table))
         registration.startAsTopLevelSuite(reporter)
-      case Left(thrown) =>
+      }
+      case Left(thrown) => {
         endWithoutRunEnded()
         TestEventLogEmitter.rethrowUnlessKeptFromCaller(thrown)
         SuiteStart.withoutEventLog(reporter)
+      }
     }
   }
 
@@ -140,18 +142,20 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         (None, false)
       } else {
         val thrown = suiteId match {
-          case Left(thrownByRead) =>
+          case Left(thrownByRead) => {
             registration.fixNode(None)
             Some(thrownByRead)
+          }
           case Right(Some(id)) =>
             TestEventLogEmitter.caught(registration.fixNode(Some(id))).fold(Some(_), _.flatMap(writeStructureWhereChanged(_, _)))
-          case Right(None) =>
+          case Right(None) => {
             // Whoever reads the suite ID, the instance's run or another thread handing off, fixes the node. An
             // instance that can have no node table is fixed here with no suite ID, since no one reads it.
             if (!registration.canHaveTable) {
               registration.fixNode(None)
             }
             None
+          }
         }
         (thrown, registration.isNodeFixed)
       }
@@ -170,9 +174,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
         (None, true)
       } else {
         val thrown = suiteName match {
-          case Left(thrownByRead) =>
+          case Left(thrownByRead) => {
             registration.addNewNode(None)
             Some(thrownByRead)
+          }
           case Right(Some(name)) =>
             TestEventLogEmitter.caught(registration.addNewNode(Some(name))).fold(Some(_), _.flatMap(writeStructure))
           case Right(None) =>
@@ -288,9 +293,10 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       if (isOpen.get && registration.table.isDefined && !registration.hasBeenRemoved) {
         built match {
           case Right((message, encoded)) => writeEvent(Right(Vector(encoded)), assignWithOrigin(origin, message))
-          case Left(thrownByBuild) =>
+          case Left(thrownByBuild) => {
             close()
             Some(thrownByBuild)
+          }
         }
       } else {
         built.left.toOption
@@ -340,13 +346,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     val wrapperNode = wrapperTable.scopeOrTest(wrapper.treeNode)
     // A `DistributedTestRunnerSuite` runs one test, so its abort is assigned to the wrapper's node, which is that test's node.
     TestEventLogEmitter.namesIn(event).filterNot(_ => TestEventLogEmitter.isAbortOfDistributedTest(event)) match {
-      case None =>
+      case None => {
         val execution = wrapperNode match {
           case Some(scopeOrTest) => assignToScopeOrTest(wrapperTable, scopeOrTest, None, event)
           case None => assignToSuite(wrapperTable, None, event)
         }
         TestEventLogEmitter.Assignment(execution, None)
-      case Some(names) =>
+      }
+      case Some(names) => {
         val found = TestEventLogEmitter.tableNamed(wrapperTable, wrapperNode, names.suiteId)
         val table = found.getOrElse {
           wrapperTable.addSuiteUnder(wrapperNode.getOrElse(wrapperTable.node), names.suiteName, names.suiteId, names.suiteClassName)
@@ -361,6 +368,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
           case None => assignToSuite(table, None, event)
         }
         TestEventLogEmitter.Assignment(execution, furtherStructure)
+      }
     }
   }
 
@@ -380,13 +388,14 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
     val executions = table.executionsOf(table.node)
     val execution = named match {
       case Some(fromOrigin) => fromOrigin.ofSuite
-      case None =>
+      case None => {
         val opensAnExecution = executions.latestOpen.isEmpty && event.isInstanceOf[SuiteStarting]
         val withNoOrigin = TestEventLogEmitter.executionWithNoOrigin(executions, event)
         if (opensAnExecution) {
           table.keepForNextRun(withNoOrigin)
         }
         withNoOrigin
+      }
     }
     val assigned = NodeExecution(table.node, table.executionPathAboveSuite(named) :+ executions.indexOf(execution))
     if (event.isInstanceOf[SuiteCompleted] || event.isInstanceOf[SuiteAborted]) {
@@ -501,9 +510,10 @@ private[scalatest] object TestEventLogEmitter {
   inline def endedIfThrownBy[A](emitter: Option[TestEventLogEmitter])(inline body: A): A = {
     try body
     catch {
-      case thrown: Throwable =>
+      case thrown: Throwable => {
         emitter.foreach(_.endWithoutRunEnded())
         throw thrown
+      }
     }
   }
 

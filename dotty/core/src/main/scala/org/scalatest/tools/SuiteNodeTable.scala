@@ -31,12 +31,13 @@ private[scalatest] final class NodeExecutions(emitter: TestEventLogEmitter) {
     val indexed = indexes.get
     Option(indexed.get(execution)) match {
       case Some(index) => index
-      case None =>
+      case None => {
         val index = indexed.size + 1
         indexed.put(execution, index)
         open.set(execution :: open.get)
         lastIndexedExecution.set(Some(execution))
         index
+      }
     }
   }
 
@@ -257,12 +258,13 @@ private[scalatest] object SuiteNodeTable {
 
     def add(children: List[ScopeOrTest], parent: NodeId, firstPosition: Int, pathOfParent: List[ScopePlace]): Unit = {
       children.zipWithIndex.foldLeft(Map.empty[String, Int]) {
-        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), offset)) =>
+        case (scopesSoFarByText, (ScopeOrTest.Test(name, testName, label, ignored), offset)) => {
           val id = NodeId.test(suite, testName)
           nodes += StructureNode.Test(id, parent, firstPosition + offset, name, label, ignored)
           added = added.copy(testsByName = added.testsByName.updated(testName, id), parents = added.parents.updated(id, parent))
           scopesSoFarByText
-        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), offset)) =>
+        }
+        case (scopesSoFarByText, (ScopeOrTest.Scope(name, text, label, scopesAndTests), offset)) => {
           val index = scopesSoFarByText.getOrElse(text, 0)
           val id = NodeId.scope(parent, text, index)
           val path = pathOfParent :+ ScopePlace(text, index)
@@ -271,6 +273,7 @@ private[scalatest] object SuiteNodeTable {
           // Recurses no deeper than registering the scopes did.
           add(scopesAndTests, id, 0, path)
           scopesSoFarByText.updated(text, index + 1)
+        }
       }
     }
   }

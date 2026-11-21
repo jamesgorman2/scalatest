@@ -168,7 +168,6 @@ private[scalatest] object DecodedEvent {
 
   type NodeClosing = SuiteCompleted | ScopeClosed | ScopePending | TestSucceeded | TestIgnored | TestPending | NodeFailure
 
-  /** A node closing that carries a failure's message and throwable. */
   type NodeFailure = TestFailed | TestCanceled | SuiteAborted
 
   type Message = InfoProvided | AlertProvided | NoteProvided | MarkupProvided

@@ -218,9 +218,10 @@ private[events] object EventNotation {
   private def fieldValue(name: String, cursor: LineCursor): FieldValue = {
     name match {
       case "message" | "text" | "threadName" => FieldValue.Text(cursor.quoted())
-      case "analysis" =>
+      case "analysis" => {
         cursor.expect("[")
         FieldValue.Texts(list(cursor)(_.quoted()))
+      }
       case "duration" | "timeStamp" | "testCount" => FieldValue.Number(cursor.number())
       case "location" => FieldValue.Place(location(cursor))
       case "throwable" => FieldValue.Thrown(throwable(cursor))
@@ -409,16 +410,18 @@ private final class LineCursor(line: String) {
       case 't' => '\t'
       case '"' => '"'
       case '\\' => '\\'
-      case 'u' =>
+      case 'u' => {
         val digits = line.substring(position, math.min(position + 4, line.length))
         if (digits.length < 4 || !digits.forall(digit => Character.digit(digit, 16) >= 0)) {
           fail("expected 4 hexadecimal digits")
         }
         position += 4
         Integer.parseInt(digits, 16).toChar
-      case other =>
+      }
+      case other => {
         position -= 1
         fail(s"the notation has no escape '\\$other'")
+      }
     }
   }
 }

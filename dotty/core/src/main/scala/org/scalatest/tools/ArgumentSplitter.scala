@@ -88,10 +88,11 @@ private[scalatest] object ArgumentSplitter {
         takeWhileNext(count, remaining)(_ => true)
       case FollowingUnlessFlags(count) =>
         takeWhileNext(count, remaining)(next => next == null || !next.startsWith("-"))
-      case DirectoryThenCssFile =>
+      case DirectoryThenCssFile => {
         val directory = takeWhileNext(1, remaining)(_ => true)
         val cssFile = takeWhileNext(1, remaining)(_ == cssFileFlag).flatMap(_ :: takeWhileNext(1, remaining)(_ => true))
         directory ::: cssFile
+      }
     }
 
   private def takeWhileNext(count: Int, remaining: BufferedIterator[String])(isValue: String => Boolean): List[String] = {

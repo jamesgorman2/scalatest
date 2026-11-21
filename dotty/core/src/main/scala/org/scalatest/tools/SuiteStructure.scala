@@ -46,11 +46,12 @@ private[scalatest] object SuiteStructure {
     }
     val suiteId = readFrom.suiteId
     val (scopesAndTests, filteredTests) = readFrom.scopesAndTestsOfRegistrationTree match {
-      case Some(registered) =>
+      case Some(registered) => {
         val tags = readFrom.tags
         val filteredTests =
           testNamesIn(registered).map(testName => testName -> FilterVerdict.of(filter(testName.value, tags, suiteId))).toMap
         (keptByFilter(registered, filteredTests), filteredTests)
+      }
       case None => (ofTestNames(filter(readFrom.testNames, readFrom.tags, suiteId)), Map.empty[TestName, FilterVerdict])
     }
     SuiteStructure(
@@ -76,7 +77,7 @@ private[scalatest] object SuiteStructure {
     registered.flatMap {
       // A scope is kept even where the filter drops all its tests, since the engine still opens it.
       case RegisteredScope(name, text, label, nodes) => Some(ScopeOrTest.Scope(name, text, label, keptByFilter(nodes, verdictOn)))
-      case RegisteredTest(name, registeredName, label, labelWhenIgnored) =>
+      case RegisteredTest(name, registeredName, label, labelWhenIgnored) => {
         val testName = TestName(registeredName)
         val verdict = verdictOn(testName)
         if (verdict.isDropped) {
@@ -84,6 +85,7 @@ private[scalatest] object SuiteStructure {
         } else {
           Some(ScopeOrTest.Test(name, testName, if (verdict.isIgnored) labelWhenIgnored else label, verdict.isIgnored))
         }
+      }
     }
   }
 
@@ -93,9 +95,10 @@ private[scalatest] object SuiteStructure {
       nodes.flatMap {
         // Recurses no deeper than registering the scopes did.
         case RegisteredScope(name, text, label, scopesAndTests) => Some(ScopeOrTest.Scope(name, text, label, nodesIn(scopesAndTests)))
-        case RegisteredTest(name, registeredName, label, _) =>
+        case RegisteredTest(name, registeredName, label, _) => {
           val testName = TestName(registeredName)
           latestTests.get(testName).orElse(Option.when(testName == added)(ScopeOrTest.Test(name, testName, label, ignored = false)))
+        }
       }
     Option.when(testNamesIn(registered).contains(added))(nodesIn(registered))
   }

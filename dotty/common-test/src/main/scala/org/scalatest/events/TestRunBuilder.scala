@@ -138,10 +138,11 @@ private final class RunUnderConstruction {
   private def hold(id: NodeId, kind: NodeKind, name: String, parent: Option[NodeId]): Unit = {
     nodes.get(id) match {
       case Some(held) => held.heldAgain(name, parent)
-      case None =>
+      case None => {
         val held = new HeldNode(id, kind, name, parent)
         nodes(id) = held
         nodesInOrderFirstHeld += held
+      }
     }
   }
 
@@ -195,7 +196,7 @@ private final class RunUnderConstruction {
       case None => siblings.find(_.suiteId == written.suiteId)
     }
     earlier match {
-      case Some(suite) =>
+      case Some(suite) => {
         if (suite.className != written.className) {
           fail(s"a further structure keeps its suite's class, ${suite.className.value}:\n${block.text}")
         }
@@ -204,6 +205,7 @@ private final class RunUnderConstruction {
         }
         hold(suite.id, NodeKind.Suite, written.name, suite.parent)
         StructureRoot(suite, isFurther = true)
+      }
       case None => StructureRoot(newSuite(written, parent, None, text), isFurther = false)
     }
   }
@@ -226,7 +228,7 @@ private final class RunUnderConstruction {
         fail(s"'${line.text}' is not indented 2 spaces under a suite or scope of its structure")
       }
       line.node match {
-        case written: WrittenNode.Suite =>
+        case written: WrittenNode.Suite => {
           if (above.kind != NodeKind.Suite) {
             fail(s"a suite is nested in a suite, not in a scope: '${line.text}'")
           }
@@ -235,12 +237,14 @@ private final class RunUnderConstruction {
           val openNested = new OpenTreeNode(line.depth, nested.id, NodeKind.Suite, nested.id, Vector.empty)
           suitesFirstHeld += nested -> openNested
           open = openNested :: open
-        case WrittenNode.Scope(name, label) =>
+        }
+        case WrittenNode.Scope(name, label) => {
           val id = NodeId.scope(above.id, name, above.nextIndexOfScopeNamed(name))
           hold(id, NodeKind.Scope, name, Some(above.id))
           built += StructureNode.Scope(id, above.id, above.nextScopeOrTestPosition(), name, label)
           open = new OpenTreeNode(line.depth, id, NodeKind.Scope, above.suite, above.scopeNames :+ name) :: open
-        case WrittenNode.Test(name, label, writtenTestName, ignored) =>
+        }
+        case WrittenNode.Test(name, label, writtenTestName, ignored) => {
           val testName = TestName(writtenTestName.getOrElse((above.scopeNames :+ name).mkString(" ")))
           if (!testNames.add((above.suite, testName))) {
             fail(s"two tests of one suite have the test name \"${testName.value}\": give '${line.text}' its own test name")
@@ -248,6 +252,7 @@ private final class RunUnderConstruction {
           val id = NodeId.test(above.suite, testName)
           hold(id, NodeKind.Test, name, Some(above.id))
           built += StructureNode.Test(id, above.id, above.nextScopeOrTestPosition(), name, label, ignored)
+        }
       }
     }
     suitesFirstHeld.foreach { (suite, openSuite) => suite.placeScopesAndTestsFrom(openSuite.firstPositionOfScopesAndTests) }
@@ -261,12 +266,13 @@ private final class RunUnderConstruction {
     val fields = new WrittenFields(line)
     val decoded = fields.decodedEvent
     val (execution, markedAncestors) = line.node match {
-      case None =>
+      case None => {
         if (line.execution.nonEmpty || line.ancestorExecutions.nonEmpty) {
           fail(s"an event assigned to the run has no execution: '${line.text}'")
         }
         (None, Set.empty[NodeId])
-      case Some(reference) =>
+      }
+      case Some(reference) => {
         val node = nodeNamed(reference)
         val ancestors = ancestorsTopDown(node)
         val marked = line.ancestorExecutions.map { marker =>
@@ -286,6 +292,7 @@ private final class RunUnderConstruction {
         marked.foreach { case (ancestor, ancestorExecution) => ancestor.record(ancestorExecution, endsIt = false) }
         node.record(ownExecution, RunUnderConstruction.eventsEndingAnExecution.contains(line.className))
         (Some(NodeExecution(node.id, executionPath :+ ownExecution)), markedExecutions.keySet)
+      }
     }
     BuiltEvent(
       line.text,
