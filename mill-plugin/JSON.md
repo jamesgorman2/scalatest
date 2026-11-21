@@ -17,7 +17,7 @@ The format carries no compatibility promise across releases of this fork: any re
 
 - The root holds one module.
 - The module holds one run node for each of its workers (README.md § What it supports), including a worker given no test class, such as the one worker of a module with no test class. Each worker writes its run's events to a file of its own, its test event log, which the test command reads.
-- The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only where laying out its fork group or starting it threw.
+- The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only where § Root lists one.
 - The module's run nodes appear in ascending order of `number`, compared as numbers, whatever order the runs started and ended in.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
 - Every node states its `kind`.
@@ -50,7 +50,10 @@ Keys, in order:
 - `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
   - failures of single workers, each naming the worker, its fork group and the module, in this order:
     1. for each fork group in order, laying out the group's files in its folder failing, as in `Laying out fork group 1 of core.test failed: …`. None of that group's workers starts;
-    2. for each worker in the order it started, starting or running it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`, then reading its test event log failing;
+    2. for each worker in the order it started:
+       1. starting or running it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`;
+       2. capturing its output failing, where it ran outside the test command's capture and its output went to Mill's console, as in `Capturing the output of worker 0 of fork group 1 of core.test failed: …`;
+       3. reading its test event log failing, including on a line that cannot be decoded (§ Run node), as in `Reading the event log of worker 0 of fork group 1 of core.test failed: …`;
   - or one failure laying out the module's workers, naming the module. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
     - two of the module's fork groups would share a `processFolder`, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
     - or checking whether the filesystem ignores case failed, and the failure gives what the check threw, as in `Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: …`. The check runs only where two or more fork groups hold a test class.
@@ -134,7 +137,7 @@ A piece of captured output is an item of an `output`: a line captured from a pro
 - `stream` — `stdout` or `stderr`.
 - `text` — the line as written, with its line terminator if it has one.
 
-Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream. Where starting or running the run's worker failed (§ Root), its output can lack an unterminated last line of each stream, and anything its process wrote after the module's last worker ended. No `output` holds Mill's list of failed tests or ScalaTest's end-of-run summary.
+Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream. Where starting or running the run's worker failed (§ Root), its output can lack an unterminated last line of each stream, and anything its process wrote after the module's last worker ended. Where capturing its worker's output failed (§ Root), its output holds none of that worker's stdout or stderr. No `output` holds Mill's list of failed tests or ScalaTest's end-of-run summary.
 
 ## Throwables
 
