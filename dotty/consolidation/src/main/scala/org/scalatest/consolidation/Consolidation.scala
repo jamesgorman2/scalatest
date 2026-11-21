@@ -30,9 +30,9 @@ final class Consolidation private[consolidation] (
   def state: ConsolidationState = currentState
 
   /**
-   * Whether an event reporting a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, has been
-   * added to the event stream of any of the module's runs. A suite or test that the library itself aborts, such as one it
-   * reports as not run, does not count. Unlike [[state]], this takes the consolidation's lock.
+   * Whether any of the module's runs has reported, in its event stream, a test as succeeded, failed, ignored, pending or
+   * canceled, or a suite as aborted. A suite or test that the consolidation reports as aborted only because it has no end
+   * event, such as one not run, does not count. Unlike [[state]], this takes the consolidation's lock.
    */
   def hasTestResult(module: ModuleName): Boolean =
     synchronized {

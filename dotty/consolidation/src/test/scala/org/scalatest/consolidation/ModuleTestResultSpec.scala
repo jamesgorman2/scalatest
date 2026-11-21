@@ -23,7 +23,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
   Feature("Whether a module has a test result") {
 
     Scenario("A module that has no run has no test result, though another module has one") {
-      Given("a consolidation with one run under another module, which reports a test as succeeded")
+      Given("a consolidation whose only run belongs to another module and reports a test as succeeded")
       val consolidation = startedWithColour()
       consolidation.addRun(otherModule)(_.addAll(runWithSucceededTest))
 
@@ -114,8 +114,8 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       }
     }
 
-    Scenario("A suite that the library reports as not run gives its module no test result") {
-      Given("a run of the module whose structure holds the suite `CalculatorSuite`, which then has no event")
+    Scenario("A suite that the consolidation reports as not run gives its module no test result") {
+      Given("a run of the module whose structure holds the suite `CalculatorSuite` but reports no event for it")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
       consolidation.addRunOf(TestRunPart.Events(completedRunOf(calculatorSuiteStructure)))
@@ -123,7 +123,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       Then("the module has no test result")
       consolidation.hasTestResult(module) shouldBe false
 
-      And("once the consolidation ends, the library reports the suite as aborted with reason not run")
+      And("once the consolidation ends, the JSON output shows the suite as aborted with reason not run")
       consolidation.end()
       val suite = json.node(NodeKind.Suite, "CalculatorSuite")
       (suite("outcome"), suite("reason")) shouldBe ((text("aborted"), text("notRun")))
@@ -138,12 +138,12 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       Then("the module has no test result")
       consolidation.hasTestResult(module) shouldBe false
 
-      And("once the consolidation ends, the library reports the test as ignored")
+      And("once the consolidation ends, the JSON output shows the test as ignored")
       consolidation.end()
       json.node(NodeKind.Test, "adds")("outcome") shouldBe text("ignored")
     }
 
-    Scenario("A suite and test that the library reports as aborted, as the run aborts while the test is running, give their module no test result") {
+    Scenario("A run that aborts while a test is running gives its module no test result") {
       Given("a run of the module that aborts while the test `adds` is running")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
@@ -161,7 +161,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       Then("the module has no test result")
       consolidation.hasTestResult(module) shouldBe false
 
-      And("once the consolidation ends, the library reports the suite and the test as aborted")
+      And("once the consolidation ends, the JSON output shows the suite and the test as aborted")
       consolidation.end()
       Vector(json.node(NodeKind.Suite, "CalculatorSuite"), json.node(NodeKind.Test, "adds")).map(_("outcome")) shouldBe Vector(text("aborted"), text("aborted"))
     }
