@@ -101,7 +101,7 @@ The test command fails before any test starts when:
 - it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`;
 - it is given `-fJ` with no path;
 - it is given, after a second `--`, anything other than a framework argument, such as `-oD`, `-s`, `-n` with no value after it, `-D` with no config map entry, `foo` or a third `--`;
-- it is given one of `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, alone or with its value joined to it, before its first `--`;
+- it is given one of `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, alone or with its value joined to it, before its first `--` or, where it is given no `--`, anywhere;
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector, or more than one;
 - the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;

@@ -55,8 +55,7 @@ private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
 private[mill] final case class SharedProcessFolder(forkGroups: Seq[ForkGroup], folder: PathUnderModule) {
 
   def message: String = {
-    val positions = forkGroups.map(_.position)
-    s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder ${folder.render}"
+    s"fork groups ${EnglishList.of(forkGroups.map(_.position.toString))} share the processFolder ${folder.render}"
   }
 }
 
