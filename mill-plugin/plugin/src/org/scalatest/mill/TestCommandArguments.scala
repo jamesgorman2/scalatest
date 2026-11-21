@@ -35,13 +35,15 @@ private[mill] object TestCommandArguments {
     arguments match {
       case Nil =>
         Right(parsed)
+      case `jsonOutputArgument` :: path :: _ if AllowedFlag.isHeldBy(path) =>
+        Left(TestCommandFailure.FrameworkArgumentAmongOwnArguments(path))
       case `jsonOutputArgument` :: path :: rest if parsed.jsonOutputPath.isEmpty =>
         parseFrom(rest, parsed.copy(jsonOutputPath = Some(path)), stdoutGiven)
       case `jsonOutputArgument` :: Nil if parsed.jsonOutputPath.isEmpty =>
         Left(TestCommandFailure.JsonOutputPathMissing)
       case argument :: rest if stdoutArguments.contains(argument) && !stdoutGiven =>
         parseFrom(rest, parsed.copy(stdoutContent = stdoutArguments(argument)), stdoutGiven = true)
-      case argument :: _ if FrameworkArguments.holdsFrameworkFlag(argument) =>
+      case argument :: _ if AllowedFlag.isHeldBy(argument) =>
         Left(TestCommandFailure.FrameworkArgumentAmongOwnArguments(argument))
       case argument :: _ if argument.startsWith("-") =>
         Left(TestCommandFailure.UnexpectedArgument(argument))

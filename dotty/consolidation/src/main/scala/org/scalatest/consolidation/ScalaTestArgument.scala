@@ -31,8 +31,11 @@ object ScalaTestArgument {
 
   extension (flagged: Flagged) {
 
-    /** What is written onto the flag: `colour=blue` for `-Dcolour=blue`, and empty for `-n`. */
-    def joinedValue: String = flagged.arguments.head.drop(flagged.flag.length)
+    /**
+     * What is written onto the flag: `colour=blue` for `-Dcolour=blue`, and empty for `-n`. None where it holds no
+     * argument, or its first argument does not start with the flag.
+     */
+    def joinedValue: Option[String] = flagged.arguments.headOption.filter(_.startsWith(flagged.flag)).map(_.drop(flagged.flag.length))
 
     /** The values that follow the flag: `Fast` for `-n Fast`. */
     def values: Seq[String] = flagged.arguments.drop(1)

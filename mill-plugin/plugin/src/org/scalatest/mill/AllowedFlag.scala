@@ -17,11 +17,9 @@ private[mill] enum AllowedFlag(val text: String) {
   case Seed extends AllowedFlag("-S")
   case SlowpokeDetection extends AllowedFlag("-W")
 
-  /** Whether ScalaTest's runner accepts the values the flagged argument holds for this flag. */
   def acceptsValuesOf(flagged: ScalaTestArgument.Flagged): Boolean =
-    acceptsJoinedValue(flagged.joinedValue) && flagged.values.forall(acceptsSeparateValue)
+    flagged.joinedValue.exists(acceptsJoinedValue) && flagged.values.forall(acceptsSeparateValue)
 
-  /** Whether ScalaTest's runner accepts what is written onto the flag, such as `colour=blue` in `-Dcolour=blue`. */
   private def acceptsJoinedValue(joinedValue: String): Boolean =
     this match {
       case ConfigMapEntry => AllowedFlag.isConfigMapEntry(joinedValue)
@@ -29,7 +27,6 @@ private[mill] enum AllowedFlag(val text: String) {
       case _ => joinedValue.isEmpty
     }
 
-  /** Whether ScalaTest's runner accepts a value that follows the flag, such as `60` after `-W`. */
   private def acceptsSeparateValue(separateValue: String): Boolean =
     this match {
       case SpanScaleFactor | TestSortingTimeout => separateValue.toDoubleOption.isDefined
@@ -42,6 +39,12 @@ private[mill] enum AllowedFlag(val text: String) {
 private[mill] object AllowedFlag {
 
   def from(flag: String): Option[AllowedFlag] = values.find(_.text == flag)
+
+  def isHeldBy(argument: String): Boolean =
+    ScalaTestArgument.split(Seq(argument)) match {
+      case Seq(ScalaTestArgument.Flagged(flag, _)) => from(flag).isDefined
+      case _ => false
+    }
 
   private def isConfigMapEntry(entry: String): Boolean = {
     // ScalaTest's runner rejects a `-D` entry without a key, `=` and a value.

@@ -244,6 +244,11 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
         rejection("core.test", "-n", "samples.Fast") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n")
       }
 
+      "reject it as the path after -fJ, naming it" in {
+        rejection("core.test", "-fJ", "-Dcolour=blue") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments("-Dcolour=blue")
+        rejection("core.test", "-fJ", "-n", "samples.Fast") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n")
+      }
+
       "reject it ahead of a framework argument the test command does not pass on" in {
         rejection("-n", "samples.Fast", "core.test", "--", "--", "-oD") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n")
       }

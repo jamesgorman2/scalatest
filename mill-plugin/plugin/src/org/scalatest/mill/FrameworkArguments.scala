@@ -12,12 +12,6 @@ private[mill] object FrameworkArguments {
     }
   }
 
-  def holdsFrameworkFlag(argument: String): Boolean =
-    ScalaTestArgument.split(Seq(argument)) match {
-      case Seq(ScalaTestArgument.Flagged(flag, _)) => AllowedFlag.from(flag).isDefined
-      case _ => false
-    }
-
   private def isPassedOn(argument: ScalaTestArgument): Boolean =
     argument match {
       case flagged: ScalaTestArgument.Flagged =>
