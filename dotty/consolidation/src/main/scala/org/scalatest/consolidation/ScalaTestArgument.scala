@@ -31,6 +31,12 @@ object ScalaTestArgument {
 
   extension (flagged: Flagged) {
 
+    /** What is written onto the flag: `colour=blue` for `-Dcolour=blue`, and empty for `-n`. */
+    def joinedValue: String = flagged.arguments.head.drop(flagged.flag.length)
+
+    /** The values that follow the flag: `Fast` for `-n Fast`. */
+    def values: Seq[String] = flagged.arguments.drop(1)
+
     /**
      * Whether the flag holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one
      * integer. A flag the runner does not recognise is never short of values.

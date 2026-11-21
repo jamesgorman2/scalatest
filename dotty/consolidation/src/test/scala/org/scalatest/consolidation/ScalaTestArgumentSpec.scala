@@ -39,6 +39,20 @@ final class ScalaTestArgumentSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "asked for what is written onto a flag" should {
+      "give what follows the flag in the argument as written" in {
+        ScalaTestArgument.split(Seq("-Dcolour=blue", "-n", "Fast")).collect { case flagged: Flagged => flagged.joinedValue } shouldBe
+          Seq("colour=blue", "")
+      }
+    }
+
+    "asked for a flag's values" should {
+      "give the values that follow the flag" in {
+        ScalaTestArgument.split(Seq("-Dcolour=blue", "-W", "120", "60")).collect { case flagged: Flagged => flagged.values } shouldBe
+          Seq(Nil, Seq("120", "60"))
+      }
+    }
+
     "asked whether a flag is short of values" should {
       "say so only of a flag holding fewer values than the runner needs with it" in {
         ScalaTestArgument.split(Seq("-n", "Fast", "-W", "60")).collect { case flagged: Flagged => flagged.isShortOfValues } shouldBe

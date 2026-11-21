@@ -41,7 +41,7 @@ private[mill] object TestCommandArguments {
         Left(TestCommandFailure.JsonOutputPathMissing)
       case argument :: rest if stdoutArguments.contains(argument) && !stdoutGiven =>
         parseFrom(rest, parsed.copy(stdoutContent = stdoutArguments(argument)), stdoutGiven = true)
-      case argument :: _ if FrameworkArguments.isAllowedFlag(argument) =>
+      case argument :: _ if FrameworkArguments.holdsFrameworkFlag(argument) =>
         Left(TestCommandFailure.FrameworkArgumentAmongOwnArguments(argument))
       case argument :: _ if argument.startsWith("-") =>
         Left(TestCommandFailure.UnexpectedArgument(argument))

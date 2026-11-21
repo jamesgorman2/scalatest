@@ -1,5 +1,7 @@
 package org.scalatest.mill
 
+import org.scalatest.consolidation.ScalaTestArgument
+
 /** A ScalaTest flag that a module's own arguments keep and that a framework argument may hold. */
 private[mill] enum AllowedFlag(val text: String) {
   case ConfigMapEntry extends AllowedFlag("-D")
@@ -15,8 +17,12 @@ private[mill] enum AllowedFlag(val text: String) {
   case Seed extends AllowedFlag("-S")
   case SlowpokeDetection extends AllowedFlag("-W")
 
+  /** Whether ScalaTest's runner accepts the values the flagged argument holds for this flag. */
+  def acceptsValuesOf(flagged: ScalaTestArgument.Flagged): Boolean =
+    acceptsJoinedValue(flagged.joinedValue) && flagged.values.forall(acceptsSeparateValue)
+
   /** Whether ScalaTest's runner accepts what is written onto the flag, such as `colour=blue` in `-Dcolour=blue`. */
-  def acceptsJoinedValue(joinedValue: String): Boolean =
+  private def acceptsJoinedValue(joinedValue: String): Boolean =
     this match {
       case ConfigMapEntry => AllowedFlag.isConfigMapEntry(joinedValue)
       case Parallel => joinedValue.isEmpty || AllowedFlag.isThreadCount(joinedValue)
@@ -24,7 +30,7 @@ private[mill] enum AllowedFlag(val text: String) {
     }
 
   /** Whether ScalaTest's runner accepts a value that follows the flag, such as `60` after `-W`. */
-  def acceptsSeparateValue(separateValue: String): Boolean =
+  private def acceptsSeparateValue(separateValue: String): Boolean =
     this match {
       case SpanScaleFactor | TestSortingTimeout => separateValue.toDoubleOption.isDefined
       case Seed => separateValue.toLongOption.isDefined

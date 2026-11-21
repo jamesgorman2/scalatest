@@ -12,7 +12,7 @@ private[mill] object FrameworkArguments {
     }
   }
 
-  def isAllowedFlag(argument: String): Boolean =
+  def holdsFrameworkFlag(argument: String): Boolean =
     ScalaTestArgument.split(Seq(argument)) match {
       case Seq(ScalaTestArgument.Flagged(flag, _)) => AllowedFlag.from(flag).isDefined
       case _ => false
@@ -21,16 +21,9 @@ private[mill] object FrameworkArguments {
   private def isPassedOn(argument: ScalaTestArgument): Boolean =
     argument match {
       case flagged: ScalaTestArgument.Flagged =>
-        !flagged.isShortOfValues && AllowedFlag.from(flagged.flag).exists(allowedFlag => acceptsValues(allowedFlag, flagged))
+        !flagged.isShortOfValues && AllowedFlag.from(flagged.flag).exists(_.acceptsValuesOf(flagged))
       case ScalaTestArgument.Unrecognised(_) => false
     }
-
-  private def acceptsValues(allowedFlag: AllowedFlag, flagged: ScalaTestArgument.Flagged): Boolean =
-    allowedFlag.acceptsJoinedValue(joinedValueOf(flagged)) && separateValuesOf(flagged).forall(allowedFlag.acceptsSeparateValue)
-
-  private def joinedValueOf(flagged: ScalaTestArgument.Flagged): String = textOf(flagged).drop(flagged.flag.length)
-
-  private def separateValuesOf(flagged: ScalaTestArgument.Flagged): Seq[String] = flagged.arguments.drop(1)
 
   private def textOf(argument: ScalaTestArgument): String =
     argument match {
