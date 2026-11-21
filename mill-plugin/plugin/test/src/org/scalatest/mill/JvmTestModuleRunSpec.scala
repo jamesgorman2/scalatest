@@ -32,26 +32,26 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     consolidationUnderTest.output
   }
 
-  "Reporting how a module's workers were laid out" when {
+  "Giving the launcher for a module's workers, or reporting why they could not be laid out" when {
     "two fork groups would share a processFolder" should {
       val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
 
       "attach the groups and the folder to the root, naming the module" in {
-        outputOf(consolidation => JvmTestModuleRun.reportLayoutFailure(consolidation, module, Left(sharing))) should contain(
+        outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(sharing))) should contain(
           "    Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
         )
       }
 
       "give nothing to launch" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
-        JvmTestModuleRun.reportLayoutFailure(consolidation, module, Left(sharing)) shouldBe None
+        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(sharing)) shouldBe None
       }
     }
 
     "checking whether the filesystem ignores case fails" should {
       "attach why the check failed to the root, naming the module" in {
         val notChecked = FilesystemCaseNotChecked(new IOException("disk full"))
-        outputOf(consolidation => JvmTestModuleRun.reportLayoutFailure(consolidation, module, Left(notChecked))) should contain(
+        outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(notChecked))) should contain(
           "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
         )
       }
@@ -60,7 +60,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     "the workers are laid out" should {
       "give the launcher, attaching nothing to the root" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
-        JvmTestModuleRun.reportLayoutFailure(consolidation, module, Right("launcher")) shouldBe Some("launcher")
+        JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Right("launcher")) shouldBe Some("launcher")
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
       }

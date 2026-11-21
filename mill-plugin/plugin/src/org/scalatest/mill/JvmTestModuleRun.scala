@@ -45,10 +45,10 @@ private[mill] final class JvmTestModuleRun(
   def execute(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
-    JvmTestModuleRun.reportLayoutFailure(consolidation, module, launcher()).foreach(launcher => runWorkers(consolidation, launcher))
+    JvmTestModuleRun.launcherOrReportFailure(consolidation, module, layOutWorkers()).foreach(launcher => runWorkers(consolidation, launcher))
   }
 
-  private def launcher(): Either[WorkerLayoutFailure, WorkerLauncher] = {
+  private def layOutWorkers(): Either[WorkerLayoutFailure, WorkerLauncher] = {
     val moduleFolderIgnoresCase = () => filesystemIgnoresCase(moduleFolder.toNIO)
     // As Mill 1.3.1 does, batch workers run each fork group's classes as `testForkGrouping` lists them, without
     // discovery.
@@ -240,8 +240,12 @@ private[mill] object JvmTestModuleRun {
       case failure: IOException => Left(new FilesystemCaseNotChecked(failure))
     }
 
-  def reportLayoutFailure[Launcher](consolidation: Consolidation, module: ModuleName, layout: Either[WorkerLayoutFailure, Launcher]): Option[Launcher] =
-    layout.fold(
+  def launcherOrReportFailure[Launcher](
+      consolidation: Consolidation,
+      module: ModuleName,
+      outcomeOfLayingOut: Either[WorkerLayoutFailure, Launcher]
+  ): Option[Launcher] =
+    outcomeOfLayingOut.fold(
       failure => {
         consolidation.addRootFailure(s"Laying out the workers of ${module.value} failed: ${failure.message}")
         consolidation.timeModule(module, None, None)
