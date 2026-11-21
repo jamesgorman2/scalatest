@@ -73,7 +73,7 @@ Its own components are:
   - A run's own state and the output captured against the run are held on the run's run node, or on the run's module where the run has no run node.
 - **Writers** — write the progress, human-readable and JSON output (`SPECIFICATION.md` R-026, R-027). The human-readable and JSON writers run at **End** (§ APIs § The Mill plugin and the consolidation library).
   - The human-readable output ends with a summary line. Once every event stream has ended, progress output's summary equals that line, whether or not progress output is on (`SPECIFICATION.md` R-141).
-- **Consolidation state** — records whether the consolidation has ended and whether anything has failed the test command (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
+- **Consolidation state** — records whether the consolidation has ended and whether anything has failed the test command (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**), and whether any test result has reached each module (**Read whether a module has a test result**).
 
 ### Mill plugin
 
@@ -82,9 +82,10 @@ Its own components are:
 - Mill fixes the plugin's Scala version: Mill `1.3.1`, the release the plugin is built against, is built on Scala 3.9.0, while core and the library are built with Scala 3.3.8 (§ ScalaTest core). The plugin loads both into Mill's JVM.
 - The plugin's integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command warns on the console and in every file output…").
-- **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event of a run's event stream (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
-  - On the JVM it keeps the results that Mill's test-runner subprocess call returns for each worker, which Mill reads from the worker's `out.json`. It uses them for one thing only: where class globs are given, every worker has ended with results and no worker's results hold a test result, it attaches to the root the failure Mill's `testOnly` fails with (`SPECIFICATION.md` R-053a).
-  - Where class globs are given and keep no class, it starts no worker of the module and attaches that same failure to the root.
+- **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
+  - Where class globs are given, it attaches to the root the failure Mill's `testOnly` fails with for want of a matching test (`SPECIFICATION.md` R-053a; `decisions/architecture-library-and-modules.md` "The consolidation library, not Mill's per-worker results, tells the test command whether a test result reached a module."):
+    - where the class globs keep no class, before it would start any worker of the module, and it starts none;
+    - otherwise once every run of the module has ended, where **Read whether a module has a test result** answers that none has.
 - **Test manifest** — gives the library each of a module's processes' assigned test classes (`.docs/ubiquitous-language.md` **Assigned test classes**), and the classes left unclaimed in a fork group's queue. A class's nested suites, scopes and tests are known only from a suite the run constructed (§ APIs § The emitter and the Mill plugin, the `structure` event). The test command writes no file for it (`decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
   - On the JVM, for a module that does not set `testBatchFrameworkTasks`, it is the files of Mill's own test queue, which the test command lays out before it starts any worker (`research/mill-test-worker-args.md` § 1.2): each fork group's `test-classes/` queue, with one file for each class the test command's class globs keep, and each worker's `claim/` folder and `claim.log` in its `processFolder`. A fork group is known by its queue folder.
     - A class is either unclaimed in its group's queue or recorded in a worker's `claim.log`; a worker claimed each class its `claim.log` records. The test command compiles the manifest from these files once a worker has ended (§ APIs § The emitter and the Mill plugin).
@@ -221,7 +222,8 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
     - the library gives a run an outcome other than completed, whether from the run's `runEnded` event or by aborting the run with reason *process failed* (`SPECIFICATION.md` R-102), as when the caller ends the run's event stream without the `runEnded` event (**Add a run**);
     - the caller adds a process that ended before any run existed in it, or adds a module whose tests did not start;
     - the caller attaches a failure to the root.
-  - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-137 for it: the results of Mill's test-runner subprocess calls reach the state only as a failure the test command attaches to the root (§ Modules § Mill plugin, Test command).
+  - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-137 for it: the result of Mill's test-runner subprocess call plays no part.
+- **Read whether a module has a test result**: given a module, returns, at once and at any time from **Start**, whether an event reporting a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, has been added to the event stream of any of the module's runs. A suite the library itself adds as aborted, such as one with reason *not run* (`SPECIFICATION.md` R-095a), is not such an event. The test command reads it once every run of the module has ended and before **End** (§ Modules § Mill plugin, Test command).
 
 ## Data flow
 

@@ -177,6 +177,7 @@ Risks:
 - `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
 - `decisions/architecture-running-tests.md` "Every Scala.js VM starts through a launcher the plugin supplies…" (Costs: shipped Windows binary; ARM64 emulation; start-up cost; not run on macOS)
 - `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Reasoning: Mill's own test body still writes the module's `testReportXml` into its `Task.dest`, which this feature must keep out of the module folder, `SPECIFICATION.md` R-047, R-110)
 - `decisions/architecture-test-event-log.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: one process hosting several runs)
 - `decisions/architecture-test-event-log.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Alternatives: Scala.js runners ignore `-C` and build no `RunStarting`)
 - `research/emission-gap-analysis.md` § Short answer (run-level events and a throwing constructor need new code on Scala.js and Native)
@@ -201,6 +202,7 @@ Risks:
 
 - `decisions/architecture-test-event-log.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: readable only while every event is one whole line)
 - `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted events), § 11 (jsdom other than `27.4.0` not run)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Reasoning: Mill's own test body still writes the module's `testReportXml` into its `Task.dest`, which this feature must keep out of the module folder, `SPECIFICATION.md` R-047, R-110)
 
 ## 13. Scala Native
 
@@ -228,6 +230,7 @@ Risks:
 - `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
 - `decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher compiled with the module's toolchain…" (Costs: compiled per module; run only on Linux, `--no-daemon`, host architecture)
 - `decisions/test-command.md` "A run that did not complete fails the test command, even where Mill's test task passes it." (Costs)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Reasoning: Mill's own test body still writes the module's `testReportXml` into its `Task.dest`, which this feature must keep out of the module folder, `SPECIFICATION.md` R-047, R-110)
 - `research/native-stdio-wrapper.md` § 4 (Mill's results line; exit status after a crash), § 7 (another architecture under its emulator; Windows crash exit status)
 - `research/mill-test-without-module-trait.md` § 8 (Native on Linux not run)
 - Mill 1.3.1 corrects a loss of data on stream close in Scala.js and Native test reporting, as feature 11's risks note; the Native launcher research ran on Mill 1.1.10 and is unchecked on 1.3.1.

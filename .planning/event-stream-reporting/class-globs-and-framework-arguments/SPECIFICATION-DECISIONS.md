@@ -2,7 +2,7 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## Where class globs are given, the test command fails wherever Mill's `testOnly` fails for want of a matching test, even though no test, suite or run failed.
+## Where class globs are given, the test command fails as Mill's `testOnly` fails for want of a matching test, even though no test, suite or run failed.
 
 **Alternatives**
 
@@ -11,7 +11,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** `../SPECIFICATION.md` R-053a has the test command run a module as `testOnly` runs it, so a user who replaces `testOnly` with the test command expects the same command lines to pass and fail. Mill 1.3.1's `testOnly` fails both before any worker starts, where no discovered class matches, and after its workers end, where they reported no result (`mill.javalib.TestModuleUtil.runTests` in `com.lihaoyi:mill-libs-javalib_3:1.3.1`). Each failure is attached to the root, so the consolidation state still decides the result (`SPECIFICATION.md` R-006, R-007).
 
-**Costs** A build whose tag or test-name filters select no test of the matched classes fails, as under `testOnly`. Applying one set of class globs alike to several modules (`../SPECIFICATION.md` R-055) can fail on every module in which the globs match nothing.
+**Costs** A build whose tag or test-name filters select no test of the matched classes fails, as under `testOnly`, and applying one set of class globs alike to several modules (`../SPECIFICATION.md` R-055) can fail on every module in which the globs match nothing. The test command finds that no test result was reported from the consolidated output, not from Mill's results, so where ScalaTest's `SuiteSortingReporter` drops a helper suite's events before they reach Mill, it can pass where `testOnly` fails.
 
 **Settled by** [Plan: class globs and framework arguments](https://github.com/jamesgorman2/scalatest/issues/214).
 

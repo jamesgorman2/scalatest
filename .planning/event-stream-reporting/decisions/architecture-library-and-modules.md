@@ -2,6 +2,18 @@
 
 Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, builds on and decides, and how the fork's artifacts are built and published, newest first.
 
+## The consolidation library, not Mill's per-worker results, tells the test command whether a test result reached a module.
+
+**Alternatives** Reading the results that Mill's test-runner subprocess call returns for each worker, from the worker's `out.json`, makes the check Mill's `testOnly` makes (`results.isEmpty && selectors.nonEmpty` in `mill.javalib.TestModuleUtil.runTests`, `com.lihaoyi:mill-libs-javalib_3:1.3.1`), but keeps a second source of test facts beside the consolidation for one check.
+
+**Reasoning** The library already knows from each run's event stream which tests and suites the run reported, so it answers whether any reached a module without a second reading of the module's runs. The plugin attaches the failure `testOnly` fails with to the root from that answer, so the consolidation state still decides the test command's result (`../SPECIFICATION.md` R-053a, R-137), and the plugin reads Mill's per-worker results for no purpose.
+
+**Costs** The answer can differ from `testOnly`'s: where ScalaTest's `SuiteSortingReporter` drops a helper suite's events before they reach Mill, the library can count a test result where `testOnly` sees none, so the test command passes where `testOnly` fails.
+
+**Settled by** [Plan: class globs and framework arguments](https://github.com/jamesgorman2/scalatest/issues/214).
+
+---
+
 ## The library's caller gives the root's and each module's start and end times, and no test event log holds them.
 
 **Alternatives** Writing the root's and a module's times into a run's test event log ties them to one run, though a module can have several runs or none, and the root belongs to no run.
