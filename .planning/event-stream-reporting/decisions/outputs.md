@@ -113,17 +113,21 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ---
 
-## The consolidation produces no JUnit XML.
+## The test command writes no JUnit XML report: neither one consolidated report nor Mill's report for each module (`../SPECIFICATION.md` R-047).
 
 **Alternatives**
 
 - Consolidated JUnit XML gives CI tools that read only JUnit XML one report for the whole test command, but loses failures outside tests.
+- Keeping Mill's report for each module in the module folder gives those tools one report per module, but it holds only test-case results, so it loses the same failures.
 - CTRF (Common Test Report Format) is a more plausible standard for CI readers, but loses the same failures.
 
-**Reasoning** Neither format can hold a failure outside a test, so either would report a run as cleaner than the human-readable and JSON output show it (`../SPECIFICATION.md` R-106d, R-028).
+**Reasoning** No JUnit XML or CTRF report can hold a failure outside a test, so any of them would report a run as cleaner than the human-readable and JSON output show it (`../SPECIFICATION.md` R-106d, R-028).
 
-**Costs** CI tools that read only JUnit XML get nothing from the consolidation.
+**Costs** CI tools that read JUnit XML get nothing from the test command.
 
-**Settled by** [Is consolidated JUnit XML in scope?](https://github.com/jamesgorman2/scalatest/issues/34).
+**Settled by**
+
+- [Is consolidated JUnit XML in scope?](https://github.com/jamesgorman2/scalatest/issues/34).
+- [Plan: class globs and framework arguments](https://github.com/jamesgorman2/scalatest/issues/214).
 
 ---

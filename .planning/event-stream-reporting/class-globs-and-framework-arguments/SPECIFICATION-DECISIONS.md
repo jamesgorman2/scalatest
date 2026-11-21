@@ -1,4 +1,4 @@
-# Decisions: class globs, framework arguments and JUnit XML
+# Decisions: class globs and framework arguments
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
@@ -13,7 +13,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Costs** A build whose tag or test-name filters select no test of the matched classes fails, as under `testOnly`. Applying one set of class globs alike to several modules (`../SPECIFICATION.md` R-055) can fail on every module in which the globs match nothing.
 
-**Settled by** [Plan: class globs, framework arguments and JUnit XML](https://github.com/jamesgorman2/scalatest/issues/214).
+**Settled by** [Plan: class globs and framework arguments](https://github.com/jamesgorman2/scalatest/issues/214).
 
 ---
 
@@ -28,6 +28,6 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Costs** Framework arguments without class globs need two separators, as in `-- -- -n samples.Fast`. A ScalaTest argument written among the test command's own arguments fails the test command.
 
-**Settled by** [Plan: class globs, framework arguments and JUnit XML](https://github.com/jamesgorman2/scalatest/issues/214).
+**Settled by** [Plan: class globs and framework arguments](https://github.com/jamesgorman2/scalatest/issues/214).
 
 ---

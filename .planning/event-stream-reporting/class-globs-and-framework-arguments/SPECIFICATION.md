@@ -1,14 +1,14 @@
-# Class globs, framework arguments and JUnit XML
+# Class globs and framework arguments
 
 Scale: feature.
 
 ## Summary
 
-The test command takes no class globs or framework arguments, so it can only run a module as Mill's `testForked` runs it with no arguments, and it writes no JUnit XML report. This feature has the test command take class globs and framework arguments as Mill 1.3.1's `testOnly` takes them, and run the module with them as `testOnly` or `testForked` would. Each worker receives the environment that Mill's task would give it, including the variables the `mill` launcher sets. The test command writes the module's JUnit XML report in the module folder, the folder the test command owns for the module.
+The test command takes no class globs or framework arguments, so it can only run a module as Mill's `testForked` runs it with no arguments. This feature has the test command take class globs and framework arguments as Mill 1.3.1's `testOnly` takes them, and run the module with them as `testOnly` or `testForked` would. Each worker receives the environment that Mill's task would give it, including the variables the `mill` launcher sets. The module folder, the folder the test command owns for the module, holds the files Mill's task would write in its task folder, except the JUnit XML report, which the test command never writes.
 
 ## Plan
 
-[Plan: class globs, framework arguments and JUnit XML](https://github.com/jamesgorman2/scalatest/issues/214)
+[Plan: class globs and framework arguments](https://github.com/jamesgorman2/scalatest/issues/214)
 
 ## Spec documents
 
@@ -24,8 +24,7 @@ Bare `R-nnn` and `AC-nnn` IDs are this document's. The epic's requirements are c
 - Class globs and framework arguments, given after the test command's first `--`, for one JVM test module named by one module selector.
 - Running the module as Mill 1.3.1's `testOnly` runs it where class globs are given, including where the class globs select no test, and as its `testForked` runs it where no class glob is given.
 - The environment each worker of the module receives, including variables the `mill` launcher sets, such as `MILL_PARAMS`.
-- The place of the module folder, and what an earlier test command left in it.
-- The module's JUnit XML report, written in the module folder.
+- The place of the module folder, what it holds, and what an earlier test command left in it.
 
 ### Out of scope
 
@@ -36,7 +35,6 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - A module that presets class globs or framework arguments (§ 17).
 - The consolidated output of a worker that ends before its tests finish (§ 8).
 - Accepting ScalaTest arguments among the test command's own arguments, before its first `--`.
-- One JUnit XML report covering more than one module, or written from the consolidated output.
 
 ## Requirements
 
@@ -55,15 +53,11 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - R-007 Where class globs are given, at least one of them matches a test class that the module's test framework discovers, every worker of the module has ended, and no run reported any test as succeeded, failed, ignored, pending or canceled or any suite as aborted, the test command fails. The JSON output's root then holds one failure, whose message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
 - R-008 Each worker of the module receives the environment that Mill's `testOnly` or `testForked` would give its workers if started from a `mill` command line in the same environment as the test command. Where the module's `propagateEnv` is on, that environment is the one in which the `mill` command line started, overlaid by the module's `forkEnv`. Where `propagateEnv` is off, that environment is the module's `forkEnv` alone. A variable that the `mill` launcher sets from its own arguments, such as `MILL_PARAMS` on Windows, holds the arguments of the `mill` command line that started the test command (`../SPECIFICATION.md` R-053a, R-053b).
 
-### The module folder and the JUnit XML report
+### The module folder
 
-- R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core[3.3.8].test` for the `test` module of the cross module `core` at `3.3.8`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file that Mill's `testOnly` or `testForked` would write in its task folder is written at the same relative path in the module folder, such as each worker's `sandbox` working directory (`../SPECIFICATION.md` R-110).
-- R-012 Before any test of the module starts, the test command deletes every file and folder that an earlier test command left in the module folder (`../SPECIFICATION.md` R-110).
-- R-010 Where the module's `testReportXml` is `Some(<name>)`, the test command writes the module's JUnit XML report to the file `<name>` in the module folder, whether or not a test failed, where both of these conditions hold:
-  - every worker of the module that started ended after its tests finished;
-  - some run of the module reported a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted.
-
-  The report holds the same set of test suites as the report that Mill's `testOnly` or `testForked` writes for the same module, class globs and framework arguments. Each suite holds the same set of test cases, and each test case has the same status and, where it failed or erred, the same failure `message` and `type` attributes. The two reports may differ in the stack trace inside a failure, in their `time`, `timestamp` and count attributes, in the order of their elements, and in how many times a test case appears. Where the module's `testReportXml` is `None`, or either condition does not hold, the test command writes no JUnit XML report for the module (`../SPECIFICATION.md` R-047, R-110).
+- R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core[3.3.8].test` for the `test` module of the cross module `core` at `3.3.8`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder, such as each worker's `sandbox` working directory (`../SPECIFICATION.md` R-110).
+- R-012 Each test command deletes every file and folder that an earlier test command left in the module folder. It deletes them before it starts any test of the module, and deletes them also where it starts no test of the module (`../SPECIFICATION.md` R-110).
+- R-010 Once a test command has ended, the module folder and every folder inside it hold no JUnit XML report. This holds whatever the module's `testReportXml` is, including where it is `Some(<name>)`, whatever class globs and framework arguments are given, and whether the test command succeeds or fails (`../SPECIFICATION.md` R-047, R-110).
 - R-011 The test command creates, changes and deletes nothing in the module's own `testForked` and `testOnly` task folders, such as `out/core/test/testForked.dest`, so a report Mill's own task wrote there stays as it was (`../SPECIFICATION.md` R-060, R-110).
 
 ## Acceptance criteria
@@ -125,7 +119,6 @@ Feature: Class globs
       When the test command is invoked with `-- <glob>`
       Then the JSON output's root holds exactly one failure, whose message begins `Test selector does not match any test: <glob>`
       And no file exists in `<markers>`
-      And no file `test-report.xml` exists in the module folder
       And the test command fails
 
       Examples:
@@ -137,7 +130,6 @@ Feature: Class globs
       When the test command is invoked with `-- samples.Alpha1 -- -z nothing-matches`
       Then the JSON output's root holds exactly one failure, whose message begins `Test selector does not match any test: samples.Alpha1`
       And no file exists in `<markers>`
-      And no file `test-report.xml` exists in the module folder
       And the test command fails
 ```
 
@@ -237,8 +229,8 @@ Feature: The environment of each worker
 ```
 
 ```gherkin
-Feature: The module's JUnit XML report
-  The test command writes the module's JUnit XML report in the module folder, as Mill's `testOnly` or `testForked` writes it in its task folder.
+Feature: The module folder
+  The module folder holds the test command's files for the module, never a JUnit XML report, and nothing an earlier test command left there.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
@@ -251,43 +243,28 @@ Feature: The module's JUnit XML report
     And `<report>` is an absolute path at which nothing exists, and `<arguments>` is what the scenario gives, or nothing
     And the module folder is `out/org.scalatest.mill.TestCommandModule/modules/core.test` in the build's workspace
 
-  Rule: The report holds what the report of the Mill task the test command runs as holds
-    Scenario Outline: AC-010 Arguments <arguments>
-      Given `Beta1`'s test `slow` fails
-      When the test command is invoked with <arguments>
-      Then the file `test-report.xml` in the module folder and the file `test-report.xml` that `mill core.test.<command>`, run in the same build, writes in its task folder hold the same set of test suites
-      And each of those suites holds the same set of test cases in both files, each with the same status and, where it failed, the same failure `message` and `type` attributes
-
-      Examples:
-        | arguments                 | command                         |
-        | no arguments              | `testForked`                    |
-        | `-- samples.Alpha*`       | `testOnly samples.Alpha*`       |
-        | `-- -- -n samples.Fast`   | `testForked -n samples.Fast`    |
-        | `-- * -- -l samples.Fast` | `testOnly * -- -l samples.Fast` |
-
-  Rule: The module's testReportXml names the report
-    Scenario Outline: AC-011 testReportXml <setting>
+  Rule: The module folder never holds a JUnit XML report
+    Scenario Outline: AC-011 testReportXml <setting>, arguments <arguments>
       Given the module's `testReportXml` is <setting>
-      When the test command is invoked
-      Then the module folder holds <files>
+      And `Beta1`'s test `slow` fails
+      When the test command is invoked with <arguments>
+      Then no file in the module folder or in any folder inside it is an XML document whose root element is `testsuites` or `testsuite`
 
       Examples:
-        | setting                     | files                                                      |
-        | `Some("junit-results.xml")` | the file `junit-results.xml` and no file `test-report.xml` |
-        | `None`                      | no file `test-report.xml`                                  |
+        | setting                     | arguments                 |
+        | `Some("test-report.xml")`   | no arguments              |
+        | `Some("junit-results.xml")` | `-- samples.Alpha*`       |
+        | `Some("test-report.xml")`   | `-- -- -n samples.Fast`   |
+        | `Some("test-report.xml")`   | `-- samples.Gamma*`       |
+        | `None`                      | `-- * -- -l samples.Fast` |
 
-  Rule: A worker that ends before its tests finish leaves no report
-    Scenario: AC-012 A test halts its worker
-      Given `Alpha1`'s test `fast` halts its JVM with `Runtime.getRuntime.halt(1)`
-      When the test command is invoked
-      Then no file `test-report.xml` exists in the module folder
-
-  Rule: A test command that writes no report leaves none from an earlier test command
-    Scenario: AC-015 An earlier report, then class globs that match no test class
-      Given the test command has been invoked with no arguments and has written `test-report.xml` in the module folder
+  Rule: A test command leaves nothing in the module folder from an earlier test command
+    Scenario: AC-015 An earlier test command's file, then class globs that match no test class
+      Given `Alpha1`'s test `fast` creates the file `leftover.txt` in its working directory when it runs
+      And the test command has been invoked with no arguments, and `leftover.txt` exists in a folder inside the module folder
       And the file at `<report>` has since been deleted
       When the test command is invoked with `-- samples.Gamma*`
-      Then no file `test-report.xml` exists in the module folder
+      Then no file `leftover.txt` exists in the module folder or in any folder inside it
 
   Rule: The test command leaves the folders of Mill's own test tasks as they were
     Scenario: AC-013 Mill's own report from an earlier testForked
@@ -299,16 +276,16 @@ Feature: The module's JUnit XML report
 
 | Requirement | Criteria                                       |
 |-------------|------------------------------------------------|
-| R-001       | AC-001, AC-006, AC-010                         |
+| R-001       | AC-001, AC-006                                 |
 | R-002       | AC-006, AC-007, AC-008                         |
-| R-003       | AC-001, AC-002, AC-003, AC-010                 |
-| R-004       | AC-006, AC-010                                 |
+| R-003       | AC-001, AC-002, AC-003                         |
+| R-004       | AC-006                                         |
 | R-005       | AC-007                                         |
 | R-006       | AC-004                                         |
 | R-007       | AC-005                                         |
 | R-008       | AC-009, AC-014                                 |
-| R-009       | AC-002, AC-003, AC-010                         |
-| R-010       | AC-004, AC-005, AC-010, AC-011, AC-012         |
+| R-009       | AC-002, AC-003                                 |
+| R-010       | AC-011                                         |
 | R-011       | AC-013                                         |
 | R-012       | AC-015                                         |
 | R-013       | AC-016                                         |

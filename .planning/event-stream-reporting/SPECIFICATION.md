@@ -155,7 +155,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-053a When class globs are provided, the consolidated test command runs each selected test module's tests as Mill's `testOnly` with the provided globs
 - R-053b When no class globs are provided, the consolidated test command runs each selected test module's tests as Mill's `testForked`
 - R-056b A selected test module may compile and run without waiting for any other test module whose compilation it does not depend on
-- R-110 The consolidated test command gives each selected test module its own folder. Every file Mill's `testOnly` or `testForked` would write in its task folder is written at the same relative path in that folder instead.
+- R-110 The consolidated test command gives each selected test module its own folder. Every file Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in that folder instead.
 - R-092 The consolidated test command does not require any additional annotation of existing mill test modules. 
 
 ### Failure
@@ -171,7 +171,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-026 Progress output is written with best effort as the consolidation plugin reads the test event logs.
 - R-027 Consolidated outputs are written after the last run has ended.
 - R-106h Consolidated console output is written through mill with mill's line prefix
-- R-047 The JUnit XML report may be output at the relative path inside the folder the consolidated test command owns for that test module
+- R-047 The consolidated test command writes no JUnit XML report for any test module.
 - R-040 Nothing that a run a consolidated test command starts writes to stdout or stderr reaches the console except through the consolidated output.
 - R-129 No line that Mill's test runner writes for a test class it runs, such as `Running Test Class <name>`, is captured from the processes of a run a consolidated test command starts.
 - R-050a the consolidated test command neither captures nor changes the output of other tasks named on the same `mill` command line, or Mill's own output

@@ -61,14 +61,11 @@ Decisions behind `../SPECIFICATION.md` on what is captured from each run and how
 
 ## Under the test command, Mill's own console results for a module's tests are replaced by the consolidated output.
 
-**Alternatives**
-
-- Leaving Mill's list of failed tests, its test progress and ScalaTest's end-of-run summary on the console needs no change to Mill's test task, but each speaks for one run and misleads when several runs are active.
-- Also turning off Mill's JUnit XML report for each module removes the last per-run result, but that report is a file read by tools, not by the person at the console, and the consolidation writes no JUnit XML to take its place (`../SPECIFICATION.md` R-047).
+**Alternatives** Leaving Mill's list of failed tests, its test progress and ScalaTest's end-of-run summary on the console needs no change to Mill's test task, but each speaks for one run and misleads when several runs are active.
 
 **Reasoning** Progress output and human-readable output report every run of the command at once, so a second per-run account of the same results adds only repetition in another format (`../SPECIFICATION.md` R-044).
 
-**Costs** The test command's result does not list the failed tests, so a tool reading Mill's failure report sees only that the test command failed. A tool reading Mill's XML report sees less than the console shows, since it omits failures outside tests, and finds no report, or an earlier one, at Mill's usual path, since R-110 moves it.
+**Costs** The test command's result does not list the failed tests, so a tool reading Mill's failure report sees only that the test command failed. A tool that reads Mill's JUnit XML report finds none written by the test command, at Mill's usual path or in the module folder (`../SPECIFICATION.md` R-047).
 
 **Settled by** [Under the plugin, what happens to each run's own reporter output and raw worker output?](https://github.com/jamesgorman2/scalatest/issues/23).
 
