@@ -316,6 +316,13 @@ private[consolidation] object RunAssembly {
       case _ => false
     }
 
+  def reportsTestResult(event: TestEventLogEvent): Boolean =
+    event match {
+      case TestEventLogEvent.ScalaTestEvent(_, _: (DecodedEvent.TestSucceeded | DecodedEvent.TestIgnored | DecodedEvent.TestPending)) => true
+      case TestEventLogEvent.ScalaTestEvent(_, _: DecodedEvent.NodeFailure) => true
+      case _ => false
+    }
+
   def endsRunAbnormally(event: TestEventLogEvent): Boolean =
     event match {
       case TestEventLogEvent.RunEnded(outcome) => outcome.isAbnormal

@@ -24,9 +24,20 @@ final class Consolidation private[consolidation] (
   private val moduleTimes = mutable.Map.empty[ModuleName, MeasuredTimes]
   private val rootOutput = mutable.ArrayBuffer.empty[CapturedLine]
   private val rootFailures = mutable.ArrayBuffer.empty[String]
+  private val modulesWithTestResult = mutable.Set.empty[ModuleName]
 
   /** A read made after an operation returns sees any failure that operation added. */
   def state: ConsolidationState = currentState
+
+  /**
+   * Whether an event reporting a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, has been
+   * added to the event stream of any of the module's runs. A suite or test that the library itself aborts, such as one it
+   * reports as not run, does not count. Unlike [[state]], this takes the consolidation's lock.
+   */
+  def hasTestResult(module: ModuleName): Boolean =
+    synchronized {
+      modulesWithTestResult.contains(module)
+    }
 
   /**
    * Adds a run and passes its feed to `feedEventStream`. The run's event stream ends when `feedEventStream` returns or
@@ -142,6 +153,11 @@ final class Consolidation private[consolidation] (
 
   private[consolidation] def fail(): Unit = currentState = currentState.withFailure
 
+  private[consolidation] def recordTestResult(module: ModuleName): Unit = {
+    assertLockHeld()
+    modulesWithTestResult += module
+  }
+
   private[consolidation] def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "the consolidation's lock is not held")
 
   private def requireOpen(): Unit =
@@ -199,6 +215,9 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       run.set(run.get.added(event.decoded))
       if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsRunAbnormally(event.decoded)) {
         consolidation.fail()
+      }
+      if (RunAssembly.reportsTestResult(event.decoded)) {
+        consolidation.recordTestResult(run.get.module)
       }
     }
 
