@@ -72,7 +72,7 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
 object TestCommandResult {
 
-  val millPrefix: scala.util.matching.Regex = """^[0-9][0-9-]*\] """.r
+  val millPrefix: Regex = """^[0-9][0-9-]*\] """.r
 
   private val escapeSequence = "\u001b\\[[0-9;]*[A-Za-z]".r
 

@@ -2,7 +2,17 @@ package org.scalatest.mill
 
 import org.scalatest.consolidation.CapturedLine
 
-enum NodeKind(val json: String) {
+trait JsonKind {
+  def json: String
+}
+
+object JsonKind {
+
+  def from[K <: JsonKind](json: String, kinds: Array[K], kindName: String): K =
+    kinds.find(_.json == json).getOrElse(throw new IllegalArgumentException(s"No $kindName $json"))
+}
+
+enum NodeKind(val json: String) extends JsonKind {
   case Root extends NodeKind("root")
   case Module extends NodeKind("module")
   case Run extends NodeKind("run")
@@ -13,11 +23,10 @@ enum NodeKind(val json: String) {
 
 object NodeKind {
 
-  def fromJson(json: String): NodeKind =
-    values.find(_.json == json).getOrElse(throw new IllegalArgumentException(s"No node kind $json"))
+  def fromJson(json: String): NodeKind = JsonKind.from(json, values, "node kind")
 }
 
-enum OutputItemKind(val json: String) {
+enum OutputItemKind(val json: String) extends JsonKind {
   case Stdio extends OutputItemKind("stdio")
   case Info extends OutputItemKind("info")
   case Note extends OutputItemKind("note")
@@ -27,8 +36,7 @@ enum OutputItemKind(val json: String) {
 
 object OutputItemKind {
 
-  def fromJson(json: String): OutputItemKind =
-    values.find(_.json == json).getOrElse(throw new IllegalArgumentException(s"No output item kind $json"))
+  def fromJson(json: String): OutputItemKind = JsonKind.from(json, values, "output item kind")
 }
 
 trait JsonWrapper {

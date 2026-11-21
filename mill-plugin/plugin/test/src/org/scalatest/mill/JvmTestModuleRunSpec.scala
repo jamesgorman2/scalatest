@@ -70,24 +70,24 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
   "Checking whether the filesystem ignores case" when {
     "the folder exists" should {
       "give whether a file is found under its name in upper case, and leave the folder empty" in {
-        val folder = Files.createTempDirectory("case-check")
-        val ignoresCase = JvmTestModuleRun.filesystemIgnoresCase(folder)
-        val emptied = Using.resource(Files.list(folder))(_.count() == 0)
-        val file = Files.createFile(folder.resolve("file"))
-        val foundInUpperCase = Files.exists(folder.resolve("FILE"))
-        Files.delete(file)
-        Files.delete(folder)
-        (ignoresCase, emptied) shouldBe ((Right(foundInUpperCase), true))
+        TemporaryFolder.within("case-check") { folder =>
+          val ignoresCase = JvmTestModuleRun.filesystemIgnoresCase(folder)
+          val emptied = Using.resource(Files.list(folder))(_.count() == 0)
+          Files.createFile(folder.resolve("file"))
+          val foundInUpperCase = Files.exists(folder.resolve("FILE"))
+          (ignoresCase, emptied) shouldBe ((Right(foundInUpperCase), true))
+        }
       }
     }
 
     "the folder is missing" should {
       "give the failure, naming the IOException that caused it" in {
-        val folder = Files.createTempDirectory("case-check")
-        Files.delete(folder)
-        JvmTestModuleRun.filesystemIgnoresCase(folder).left.map(_.message) shouldBe Left(
-          s"checking whether the filesystem ignores case failed: java.nio.file.NoSuchFileException: ${folder.resolve("case-probe")}"
-        )
+        TemporaryFolder.within("case-check") { parent =>
+          val folder = parent.resolve("missing")
+          JvmTestModuleRun.filesystemIgnoresCase(folder).left.map(_.message) shouldBe Left(
+            s"checking whether the filesystem ignores case failed: java.nio.file.NoSuchFileException: ${folder.resolve("case-probe")}"
+          )
+        }
       }
     }
   }

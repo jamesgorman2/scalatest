@@ -2,7 +2,6 @@ package org.scalatest.mill
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.Signaler
@@ -39,10 +38,9 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   ) {
     val consolidation: Consolidation = consolidationUnderTest.consolidation
     val capture: WorkerOutputCapture = new WorkerOutputCapture(StandardCharsets.UTF_8)
-    val runsAdded: AtomicInteger = new AtomicInteger(0)
-    val processesEndedBeforeAnyRun: AtomicInteger = new AtomicInteger(0)
+    private val counting: CountingConsolidation = new CountingConsolidation(consolidation, module)
     @volatile var processExited: Boolean = true
-    private val reader = new EventLogReader(eventLogFile, addRun, () => addProcessEndedBeforeAnyRun(), _ => processExited, pollInterval = 1.millis)
+    private val reader = new EventLogReader(eventLogFile, addCapturedRun, () => counting.addProcessEndedBeforeAnyRun(), _ => processExited, pollInterval = 1.millis)
     val workerRun: WorkerRun = new WorkerRun(consolidation, workerName, reader, capture)
 
     def runAndEndConsolidation(startWorker: => Future[WorkerProcess]): Unit = {
@@ -88,24 +86,21 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
 
+    def runsAdded: Int = counting.runsAdded
+
+    def processesEndedBeforeAnyRun: Int = counting.processesEndedBeforeAnyRun
+
     private def recordingWorkerEnd(startWorker: => Future[WorkerProcess]): Future[WorkerProcess] = {
       val started = startWorker
       workerEnd = Some(started)
       started
     }
 
-    private def addRun(readRun: RunFeed => Unit): Unit = {
-      runsAdded.incrementAndGet()
-      consolidation.addRun(module) { feed =>
+    private def addCapturedRun(readRun: RunFeed => Unit): Unit =
+      counting.addRun { feed =>
         capture.addTo(feed.add)
         readRun(feed)
       }
-    }
-
-    private def addProcessEndedBeforeAnyRun(): Unit = {
-      processesEndedBeforeAnyRun.incrementAndGet()
-      consolidation.addProcessEndedBeforeAnyRun()
-    }
   }
 
   private def readerThreadsOf(fixture: WorkerRunFixture): Int =
@@ -119,15 +114,6 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   private def withTwoWorkerRuns[A](test: (WorkerRunFixture, WorkerRunFixture) => A): A =
     withTwoEventLogFiles((firstFile, secondFile) => test(new WorkerRunFixture(EventLogFile.at(firstFile)), new WorkerRunFixture(EventLogFile.at(secondFile))))
-
-  private def neverOpening(file: Path): EventLogFile =
-    new EventLogFile {
-      def name: String = file.toString
-
-      def exists: Boolean = EventLogFile.at(file).exists
-
-      def open(): EventLogInput = throw sharingViolation(file)
-    }
 
   private val startedAProcess: Future[WorkerProcess] = Future.successful(WorkerProcess.Started)
 
@@ -261,8 +247,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "add neither a run nor a process that ended before any run, and leave the consolidation unfailed" in {
         withWorkerRun { (_, fixture) =>
           fixture.runAndEndConsolidation(Future.successful(WorkerProcess.NotStarted))
-          fixture.runsAdded.get shouldBe 0
-          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+          fixture.runsAdded shouldBe 0
+          fixture.processesEndedBeforeAnyRun shouldBe 0
           fixture.consolidation.state shouldBe ConsolidationState.Ended
         }
       }
@@ -272,7 +258,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "add that process as one that ended before any run" in {
         withWorkerRun { (_, fixture) =>
           fixture.runAndEndConsolidation(startedAProcess)
-          fixture.processesEndedBeforeAnyRun.get shouldBe 1
+          fixture.processesEndedBeforeAnyRun shouldBe 1
           fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
       }
@@ -288,7 +274,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           fixture.endWorker()
           fixture.consolidation.end()
           fixture.outputWithoutSummaryLine shouldBe Seq("[core.test]")
-          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+          fixture.processesEndedBeforeAnyRun shouldBe 0
           fixture.consolidation.state shouldBe ConsolidationState.Ended
         }
       }
@@ -301,7 +287,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           fixture.startWithoutMillStartingIt(startedAProcess)
           fixture.endWorker()
           fixture.consolidation.end()
-          fixture.runsAdded.get shouldBe 1
+          fixture.runsAdded shouldBe 1
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  [core.test]",
@@ -341,7 +327,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "rethrow it once the reader is abandoned, so the reader adds the worker as a process that ended before any run" in {
         withWorkerRun { (_, fixture) =>
           a[StackOverflowError] should be thrownBy fixture.start(throw new StackOverflowError("worker"))
-          eventually(fixture.processesEndedBeforeAnyRun.get shouldBe 1)
+          eventually(fixture.processesEndedBeforeAnyRun shouldBe 1)
         }
       }
     }
@@ -357,7 +343,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           }
           fixture.processExited = true
           fixture.awaitReaderEnd()
-          fixture.runsAdded.get shouldBe 1
+          fixture.runsAdded shouldBe 1
         }
       }
     }
@@ -384,7 +370,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           appendCompletedRun(file)
           workerEnd.success(WorkerProcess.Started)
           fixture.endWorker()
-          fixture.runsAdded.get shouldBe 1
+          fixture.runsAdded shouldBe 1
         }
       }
     }
@@ -397,8 +383,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           readerThreadsOf(fixture) shouldBe 1
           workerEnd.success(WorkerProcess.NotStarted)
           eventually(readerThreadsOf(fixture) shouldBe 0)
-          fixture.runsAdded.get shouldBe 0
-          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+          fixture.runsAdded shouldBe 0
+          fixture.processesEndedBeforeAnyRun shouldBe 0
           fixture.endWorker()
         }
       }
@@ -411,7 +397,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           fixture.start(workerEnd.future)
           workerEnd.success(WorkerProcess.Started)
           eventually(readerThreadsOf(fixture) shouldBe 0)
-          fixture.processesEndedBeforeAnyRun.get shouldBe 1
+          fixture.processesEndedBeforeAnyRun shouldBe 1
           fixture.endWorker()
         }
       }
@@ -434,7 +420,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           fixture.endWorker()
           millStartsWorker()
           fixture.awaitReaderEnd()
-          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+          fixture.processesEndedBeforeAnyRun shouldBe 0
         }
       }
     }
@@ -444,8 +430,8 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withWorkerRun { (_, fixture) =>
           fixture.startWithoutMillStartingIt(Future.failed(new InterruptedException("cancelled")))
           fixture.endWorker()
-          fixture.runsAdded.get shouldBe 0
-          fixture.processesEndedBeforeAnyRun.get shouldBe 0
+          fixture.runsAdded shouldBe 0
+          fixture.processesEndedBeforeAnyRun shouldBe 0
         }
       }
     }
@@ -480,7 +466,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           }
 
           a[StackOverflowError] should be thrownBy WorkerRun.startEach(Seq(first, second))(startingTheSecondFatally)
-          eventually(first.processesEndedBeforeAnyRun.get shouldBe 1)
+          eventually(first.processesEndedBeforeAnyRun shouldBe 1)
         }
       }
     }
@@ -509,7 +495,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           an[InterruptedException] should be thrownBy WorkerRun.endEach(Seq(first.workerRun, second.workerRun)) { _ =>
             throw new InterruptedException("cancelled")
           }
-          eventually(Seq(first, second).map(_.processesEndedBeforeAnyRun.get) shouldBe Seq(1, 1))
+          eventually(Seq(first, second).map(_.processesEndedBeforeAnyRun) shouldBe Seq(1, 1))
         }
       }
     }

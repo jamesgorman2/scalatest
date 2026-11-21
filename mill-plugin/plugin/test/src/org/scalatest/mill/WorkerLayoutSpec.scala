@@ -201,18 +201,20 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     }
 
     "checking whether the filesystem ignores case fails" when {
-      val notChecked = new FilesystemCaseNotChecked(new IOException("disk full"))
-      val failingCheck: () => Either[FilesystemCaseNotChecked, Boolean] = () => Left(notChecked)
+      def notChecked: FilesystemCaseNotChecked = new FilesystemCaseNotChecked(new IOException("disk full"))
+
+      def failingCheck(failure: FilesystemCaseNotChecked): () => Either[FilesystemCaseNotChecked, Boolean] = () => Left(failure)
 
       "two fork groups hold a discovered class" should {
         "give the check's failure" in {
-          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck) shouldBe Left(notChecked)
+          val failure = notChecked
+          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck(failure)) shouldBe Left(failure)
         }
       }
 
       "one fork group holds a discovered class" should {
         "give that group's worker, without checking" in {
-          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck)) shouldBe Right(
+          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck(notChecked))) shouldBe Right(
             Seq(PlannedWorker(workerOf(1), PathUnderModule()))
           )
         }
@@ -220,7 +222,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
       "no fork group holds a discovered class" should {
         "give fork group 0's worker, without checking" in {
-          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"))), discoveredClasses, false, 4, failingCheck)) shouldBe Right(Seq(PlannedWorker(workerOf(0), PathUnderModule())))
+          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"))), discoveredClasses, false, 4, failingCheck(notChecked))) shouldBe Right(Seq(PlannedWorker(workerOf(0), PathUnderModule())))
         }
       }
     }
