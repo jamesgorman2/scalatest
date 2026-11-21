@@ -37,7 +37,7 @@ final class Consolidation private[consolidation] (
    * renumber earlier ones. A run's line in the human-readable output, and its run node in the JSON output, show its
    * number.
    *
-   * @param module the run's module, which heads the module's line in the human-readable output
+   * @param module the run's module, under whose line the run appears in the human-readable output
    * @param worker the worker the run ran in. The run node in the JSON output records the worker's fork group but not its index.
    * @return the run, its event stream ended
    * @throws java.lang.IllegalStateException if the consolidation has ended

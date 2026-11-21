@@ -26,7 +26,7 @@ _Avoid_: Project, subproject, target
 
 **Module name**:
 A module's name as its build tool writes it, such as `core.test` for a Mill module.
-_Avoid_: Label, test run label, module label
+_Avoid_: Label, test run label
 
 **Worker**:
 A JVM process that Mill starts to run some of a module's test classes. A worker hosts at most one run.

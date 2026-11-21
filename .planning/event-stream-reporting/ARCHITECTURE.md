@@ -57,7 +57,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - its test class name type;
 - the version of this fork it was built at.
 
-The operation that adds a run's assigned test classes takes that type, so it is `private[scalatest]` like the type.
+The operation that adds a run's assigned test classes (§ APIs § The Mill plugin and the consolidation library, **Add a run**) takes that type, so it is also `private[scalatest]`.
 
 Its own components are:
 

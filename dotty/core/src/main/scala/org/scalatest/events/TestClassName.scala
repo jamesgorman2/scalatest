@@ -1,5 +1,6 @@
 package org.scalatest.events
 
+/** A test class's binary name, as ScalaTest reports it, such as `samples.Outer$Inner`. */
 private[scalatest] opaque type TestClassName = String
 
 private[scalatest] object TestClassName {

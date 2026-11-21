@@ -128,7 +128,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
         When("CalculatorSuite runs through Framework outside Mill, given the ScalaTest runner argument that turns the emitter on and names the file to which the run writes its test event log")
         val run = runOutsideMill(build, "samples.CalculatorSuite")
-        And("the events this fork reads back from that test event log, and the lines the run wrote to stdout and stderr, are fed to the consolidation library directly, as a run of module core.test, with colour on")
+        And("the events this fork reads back from that test event log, and the run's stdout and stderr lines, are fed directly to the consolidation library as a run of the module core.test, with colour on")
         val output = humanReadableOutputOf(run)
 
         Then("the library's human-readable output is the test command's, with the prefix Mill puts on every line the test command's own task writes removed from each line")
