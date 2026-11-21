@@ -7,6 +7,8 @@ import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
+import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import scala.util.control.NoStackTrace
 
 private[mill] final case class WorkerLayout(forkGroups: Seq[PlannedForkGroup]) {
@@ -24,29 +26,30 @@ private[mill] final case class PlannedForkGroup(
 
   def workerIndexDigits: Int = PaddedIndex.digits(workers.size)
 
-  def describedIn(module: ModuleName): String = PlannedForkGroup.describedIn(id, module)
+  def describedIn(module: ModuleName): String = id.describedIn(module)
 }
 
-private[mill] object PlannedForkGroup {
+extension (forkGroup: ForkGroup) {
 
-  def describedIn(id: ForkGroup, module: ModuleName): String = s"fork group ${id.position} of ${module.value}"
+  private[mill] def describedIn(module: ModuleName): String = s"fork group ${forkGroup.position} of ${module.value}"
 }
 
 private[mill] final case class PlannedWorker(id: Worker, processFolder: PathUnderModule) {
 
-  def describedIn(module: ModuleName): String = s"worker ${id.index.value} of ${PlannedForkGroup.describedIn(id.forkGroup, module)}"
+  def describedIn(module: ModuleName): String = s"worker ${id.index.value} of ${id.forkGroup.describedIn(module)}"
 }
 
-private[mill] sealed trait WorkerLayoutFailure extends Exception with NoStackTrace {
+private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
+  case ForkGroupsShareProcessFolders(sharing: Seq[SharedProcessFolder])
+  case FilesystemCaseCheckFailure(cause: IOException)
 
   override def getMessage: String = message
 
-  def message: String
-}
-
-private[mill] final case class ForkGroupsShareProcessFolders(sharing: Seq[SharedProcessFolder]) extends WorkerLayoutFailure {
-
-  def message: String = sharing.map(_.message).mkString("; ")
+  def message: String =
+    this match {
+      case ForkGroupsShareProcessFolders(sharing) => sharing.map(_.message).mkString("; ")
+      case FilesystemCaseCheckFailure(cause) => s"checking whether the filesystem ignores case failed: $cause"
+    }
 }
 
 private[mill] final case class SharedProcessFolder(forkGroups: Seq[ForkGroup], folder: PathUnderModule) {
@@ -55,11 +58,6 @@ private[mill] final case class SharedProcessFolder(forkGroups: Seq[ForkGroup], f
     val positions = forkGroups.map(_.position)
     s"fork groups ${positions.init.mkString(", ")} and ${positions.last} share the processFolder ${folder.render}"
   }
-}
-
-private[mill] final case class FilesystemCaseCheckFailure(cause: IOException) extends WorkerLayoutFailure {
-
-  def message: String = s"checking whether the filesystem ignores case failed: $cause"
 }
 
 private[mill] object WorkerLayout {
@@ -151,6 +149,6 @@ private[mill] object WorkerLayout {
       .toSeq
       .sortBy(_.head.id.position)
       .map(sharingGroups => SharedProcessFolder(sharingGroups.map(_.id), sharingGroups.head.workers.head.processFolder))
-    Option.when(sharing.nonEmpty)(ForkGroupsShareProcessFolders(sharing))
+    Option.when(sharing.nonEmpty)(new ForkGroupsShareProcessFolders(sharing))
   }
 }

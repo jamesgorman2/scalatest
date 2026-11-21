@@ -14,6 +14,7 @@ import org.scalatest.consolidation.RunProcess
 import org.scalatest.consolidation.RunnerArgument
 import org.scalatest.consolidation.ScalaTestArgument
 import org.scalatest.events.TestClassName
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -44,7 +45,7 @@ private[mill] final class JvmTestModuleRun(
   def execute(consolidation: Consolidation): Unit = {
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
-    JvmTestModuleRun.layOutWorkers(consolidation, module)(launcher()).foreach(launcher => runWorkers(consolidation, launcher))
+    JvmTestModuleRun.reportLayoutFailure(consolidation, module, launcher()).foreach(launcher => runWorkers(consolidation, launcher))
   }
 
   private def launcher(): Either[WorkerLayoutFailure, WorkerLauncher] = {
@@ -236,13 +237,11 @@ private[mill] object JvmTestModuleRun {
         Files.delete(probe)
       }
     } catch {
-      case failure: IOException => Left(FilesystemCaseCheckFailure(failure))
+      case failure: IOException => Left(new FilesystemCaseCheckFailure(failure))
     }
 
-  def layOutWorkers[Launcher](consolidation: Consolidation, module: ModuleName)(
-      laidOut: Either[WorkerLayoutFailure, Launcher]
-  ): Option[Launcher] =
-    laidOut.fold(
+  def reportLayoutFailure[Launcher](consolidation: Consolidation, module: ModuleName, launcher: Either[WorkerLayoutFailure, Launcher]): Option[Launcher] =
+    launcher.fold(
       failure => {
         consolidation.addRootFailure(s"Laying out the workers of ${module.value} failed: ${failure.message}")
         consolidation.timeModule(module, None, None)

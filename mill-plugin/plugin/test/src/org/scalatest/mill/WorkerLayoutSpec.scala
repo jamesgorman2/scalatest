@@ -7,6 +7,8 @@ import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
 import org.scalatest.matchers.should
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
+import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.wordspec.AnyWordSpec
 
 final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
@@ -37,7 +39,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     workersOf(layout).map(_.map(_.processFolder.segments))
 
   private def sharing(positions: Seq[Int], processFolder: String*): ForkGroupsShareProcessFolders =
-    ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(positions.map(ForkGroup.at), PathUnderModule(processFolder*))))
+    new ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(positions.map(ForkGroup.at), PathUnderModule(processFolder*))))
 
   "Laying out a module's queue" when {
     "test parallelism is off" when {
@@ -199,7 +201,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     }
 
     "checking whether the filesystem ignores case fails" when {
-      val checkFailure = FilesystemCaseCheckFailure(new IOException("disk full"))
+      val checkFailure = new FilesystemCaseCheckFailure(new IOException("disk full"))
       val failingCheck: () => Either[FilesystemCaseCheckFailure, Boolean] = () => Left(checkFailure)
 
       "two fork groups hold a discovered class" should {
