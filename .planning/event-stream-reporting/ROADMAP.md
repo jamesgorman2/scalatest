@@ -4,26 +4,6 @@ Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), i
 
 No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
 
-## 4. Class globs, framework arguments and JUnit XML
-
-The test command takes class globs and framework arguments as Mill's `testOnly` takes them, applied alike to every selected module, and runs as `testOnly` runs (or as `testForked` without globs). It writes each module's JUnit XML report as that task writes it, moved with every other `Task.dest` path to a folder the test command owns for the module, and sets launcher environment variables such as `MILL_PARAMS` from the `mill` command line that started it. Builds on feature 3.
-
-Enables:
-
-- `SPECIFICATION.md` R-055 (class globs, framework arguments), R-053a and R-053b (`testOnly` or `testForked`; class globs and framework arguments), R-110, R-047
-- `ARCHITECTURE.md` § APIs § The emitter and the Mill plugin (the runner argument among the arguments the test command adds to each run's), § Data flow (the ScalaTest arguments corresponding to the test command's class globs and framework arguments)
-
-Settles:
-
-- Where the folder the test command owns for each module sits (R-110 does not place it).
-
-Risks:
-
-- `decisions/test-command.md` "A test module's `testArgsDefault` arguments outside … are suppressed…" (whether the list should also govern the test command's own framework arguments)
-- `decisions/capture-and-console.md` "Under the test command, Mill's own console results for a module's tests are replaced by the consolidated output." (Costs: no report at Mill's usual path)
-- `decisions/architecture-test-event-log.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Costs: visible among the ScalaTest arguments each run receives)
-- `research/mill-test-without-module-trait.md` § 4 (R-053a and R-053b compared on the JVM only)
-
 ## 5. Many modules in one test command
 
 The test command takes several module selectors, resolves each to its test modules (a module two module selectors name runs once), and runs every selected module's tests in one nested evaluation with fail-fast off: each starts on its own compile, whatever happens to the others. Builds on features 2 and 4.
