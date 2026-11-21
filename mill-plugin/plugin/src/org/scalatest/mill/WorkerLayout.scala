@@ -7,7 +7,7 @@ import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
-import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import scala.util.control.NoStackTrace
 
@@ -41,14 +41,14 @@ private[mill] final case class PlannedWorker(id: Worker, processFolder: PathUnde
 
 private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
   case ForkGroupsShareProcessFolders(sharing: Seq[SharedProcessFolder])
-  case FilesystemCaseCheckFailure(cause: IOException)
+  case FilesystemCaseNotChecked(cause: IOException)
 
   override def getMessage: String = message
 
   def message: String =
     this match {
       case ForkGroupsShareProcessFolders(sharing) => sharing.map(_.message).mkString("; ")
-      case FilesystemCaseCheckFailure(cause) => s"checking whether the filesystem ignores case failed: $cause"
+      case FilesystemCaseNotChecked(cause) => s"checking whether the filesystem ignores case failed: $cause"
     }
 }
 
@@ -67,7 +67,7 @@ private[mill] object WorkerLayout {
       discovered: Set[TestClassName],
       testParallelism: Boolean,
       jobs: Int,
-      filesystemIgnoresCase: () => Either[FilesystemCaseCheckFailure, Boolean]
+      filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] = {
     val discoveredForkGroups = forkGroups.map(_.filter(discovered))
     // As Mill 1.3.1 does, workers get folders of their own under test parallelism unless the module selects exactly one
@@ -82,7 +82,7 @@ private[mill] object WorkerLayout {
 
   def ofBatches(
       forkGroups: Seq[Seq[TestClassName]],
-      filesystemIgnoresCase: () => Either[FilesystemCaseCheckFailure, Boolean]
+      filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] =
     of(forkGroups, WorkersPerGroup.OneInGroupFolder, filesystemIgnoresCase)
 
@@ -106,7 +106,7 @@ private[mill] object WorkerLayout {
   private def of(
       forkGroups: Seq[Seq[TestClassName]],
       workersPerGroup: WorkersPerGroup,
-      filesystemIgnoresCase: () => Either[FilesystemCaseCheckFailure, Boolean]
+      filesystemIgnoresCase: () => Either[FilesystemCaseNotChecked, Boolean]
   ): Either[WorkerLayoutFailure, WorkerLayout] = {
     val groupsToRun = forkGroups.zipWithIndex.filter { case (classes, _) => classes.nonEmpty }
     def forkGroupOf(classes: Seq[TestClassName], position: Int, label: ForkGroupLabel, folder: PathUnderModule): PlannedForkGroup = {

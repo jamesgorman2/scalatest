@@ -7,7 +7,7 @@ import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.ModuleName
 import org.scalatest.matchers.should
-import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Using
@@ -32,7 +32,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     consolidationUnderTest.output
   }
 
-  "Reporting a failure to lay out a module's workers" when {
+  "Reporting how a module's workers were laid out" when {
     "two fork groups would share a processFolder" should {
       val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
 
@@ -50,8 +50,8 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
     "checking whether the filesystem ignores case fails" should {
       "attach why the check failed to the root, naming the module" in {
-        val checkFailure = FilesystemCaseCheckFailure(new IOException("disk full"))
-        outputOf(consolidation => JvmTestModuleRun.reportLayoutFailure(consolidation, module, Left(checkFailure))) should contain(
+        val notChecked = FilesystemCaseNotChecked(new IOException("disk full"))
+        outputOf(consolidation => JvmTestModuleRun.reportLayoutFailure(consolidation, module, Left(notChecked))) should contain(
           "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
         )
       }

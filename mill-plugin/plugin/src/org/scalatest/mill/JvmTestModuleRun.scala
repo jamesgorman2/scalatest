@@ -14,7 +14,7 @@ import org.scalatest.consolidation.RunProcess
 import org.scalatest.consolidation.RunnerArgument
 import org.scalatest.consolidation.ScalaTestArgument
 import org.scalatest.events.TestClassName
-import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -35,7 +35,7 @@ private[mill] final class JvmTestModuleRun(
     eventLogFileAt: Path => EventLogFile,
     processHasExited: RunProcess => Boolean,
     eventLogPollInterval: FiniteDuration,
-    filesystemIgnoresCase: Path => Either[FilesystemCaseCheckFailure, Boolean]
+    filesystemIgnoresCase: Path => Either[FilesystemCaseNotChecked, Boolean]
 ) {
 
   private val scalaTestArgumentStrings: Seq[String] = scalaTestArguments.flatMap(_.arguments)
@@ -228,7 +228,7 @@ private[mill] object JvmTestModuleRun {
       }
   }
 
-  def filesystemIgnoresCase(folder: Path): Either[FilesystemCaseCheckFailure, Boolean] =
+  def filesystemIgnoresCase(folder: Path): Either[FilesystemCaseNotChecked, Boolean] =
     try {
       val probe = Files.createFile(folder.resolve("case-probe"))
       try {
@@ -237,11 +237,11 @@ private[mill] object JvmTestModuleRun {
         Files.delete(probe)
       }
     } catch {
-      case failure: IOException => Left(new FilesystemCaseCheckFailure(failure))
+      case failure: IOException => Left(new FilesystemCaseNotChecked(failure))
     }
 
-  def reportLayoutFailure[Launcher](consolidation: Consolidation, module: ModuleName, launcher: Either[WorkerLayoutFailure, Launcher]): Option[Launcher] =
-    launcher.fold(
+  def reportLayoutFailure[Launcher](consolidation: Consolidation, module: ModuleName, layout: Either[WorkerLayoutFailure, Launcher]): Option[Launcher] =
+    layout.fold(
       failure => {
         consolidation.addRootFailure(s"Laying out the workers of ${module.value} failed: ${failure.message}")
         consolidation.timeModule(module, None, None)

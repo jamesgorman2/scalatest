@@ -7,7 +7,7 @@ import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
 import org.scalatest.matchers.should
-import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseCheckFailure
+import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -201,12 +201,12 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     }
 
     "checking whether the filesystem ignores case fails" when {
-      val checkFailure = new FilesystemCaseCheckFailure(new IOException("disk full"))
-      val failingCheck: () => Either[FilesystemCaseCheckFailure, Boolean] = () => Left(checkFailure)
+      val notChecked = new FilesystemCaseNotChecked(new IOException("disk full"))
+      val failingCheck: () => Either[FilesystemCaseNotChecked, Boolean] = () => Left(notChecked)
 
       "two fork groups hold a discovered class" should {
         "give the check's failure" in {
-          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck) shouldBe Left(checkFailure)
+          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck) shouldBe Left(notChecked)
         }
       }
 
