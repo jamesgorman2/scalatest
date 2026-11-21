@@ -69,7 +69,7 @@ private[mill] object JvmTestModuleInputs {
     evaluator.execute(Seq(task(module)), logger = logger).values match {
       case Result.Success(Seq(inputs)) => Right(inputs)
       case Result.Success(values) => throw new IllegalStateException(s"Evaluating ${module.moduleSegments.render} gave ${values.size} values")
-      case failure: Result.Failure => Left(TestCommandFailure.ModuleInputsNotEvaluated(module.moduleSegments.render, failure.error))
+      case failure: Result.Failure => Left(TestCommandFailure.ModuleInputsNotEvaluated(failure.error))
     }
 
   private def task(module: TestModule): Task[JvmTestModuleInputs] = {

@@ -27,13 +27,13 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       testParallelism: Boolean = false,
       jobs: Int = 4,
       filesystemIgnoresCase: Boolean = false
-  ): Either[ForkGroupsShareProcessFolders, WorkerLayout] =
-    WorkerLayout.ofQueue(classesOf(forkGroups), discovered.map(TestClassName(_)), testParallelism, jobs, () => filesystemIgnoresCase)
+  ): Either[WorkerLayoutFailure, WorkerLayout] =
+    WorkerLayout.ofQueue(classesOf(forkGroups), discovered.map(TestClassName(_)), testParallelism, jobs, () => Right(filesystemIgnoresCase))
 
-  private def workersOf(layout: Either[ForkGroupsShareProcessFolders, WorkerLayout]): Either[ForkGroupsShareProcessFolders, Seq[PlannedWorker]] =
+  private def workersOf(layout: Either[WorkerLayoutFailure, WorkerLayout]): Either[WorkerLayoutFailure, Seq[PlannedWorker]] =
     layout.map(_.forkGroups.flatMap(_.workers))
 
-  private def processFoldersOf(layout: Either[ForkGroupsShareProcessFolders, WorkerLayout]): Either[ForkGroupsShareProcessFolders, Seq[Seq[String]]] =
+  private def processFoldersOf(layout: Either[WorkerLayoutFailure, WorkerLayout]): Either[WorkerLayoutFailure, Seq[Seq[String]]] =
     workersOf(layout).map(_.map(_.processFolder.segments))
 
   private def sharing(positions: Seq[Int], processFolder: String*): ForkGroupsShareProcessFolders =
@@ -113,7 +113,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
         }
 
         "index the group's workers from 0, in their fork group" in {
-          workersOf(layoutOf(Seq(Seq("samples.B1"), Seq("samples.A1", "samples.A2")), testParallelism = true)).map(_.map(_.worker)) shouldBe Right(
+          workersOf(layoutOf(Seq(Seq("samples.B1"), Seq("samples.A1", "samples.A2")), testParallelism = true)).map(_.map(_.id)) shouldBe Right(
             Seq(workerOf(0), workerOf(1), workerOf(1, 1))
           )
         }
@@ -130,7 +130,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
           val classNames = (0 until 10).map(index => s"samples.S$index")
           val workers = workersOf(layoutOf(Seq(classNames), classNames.toSet, testParallelism = true, jobs = 10)).fold(failure => fail(failure.message), identity)
           workers.take(2).map(_.processFolder.segments) shouldBe Seq(Seq("worker-00"), Seq("worker-01"))
-          workers.last.worker shouldBe workerOf(0, 9)
+          workers.last.id shouldBe workerOf(0, 9)
           layoutOf(Seq(classNames), classNames.toSet, testParallelism = true, jobs = 10).map(_.forkGroups.map(_.workerIndexDigits)) shouldBe Right(Seq(2))
         }
       }
@@ -199,14 +199,12 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
     }
 
     "checking whether the filesystem ignores case fails" when {
-      val checkFailure = new JvmTestModuleRun.FilesystemCaseCheckFailure(new IOException("disk full"))
-      val failingCheck: () => Boolean = () => throw checkFailure
+      val checkFailure = FilesystemCaseCheckFailure(new IOException("disk full"))
+      val failingCheck: () => Either[FilesystemCaseCheckFailure, Boolean] = () => Left(checkFailure)
 
       "two fork groups hold a discovered class" should {
-        "throw what the check threw" in {
-          the[JvmTestModuleRun.FilesystemCaseCheckFailure] thrownBy {
-            WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck)
-          } should be theSameInstanceAs checkFailure
+        "give the check's failure" in {
+          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck) shouldBe Left(checkFailure)
         }
       }
 
@@ -229,7 +227,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
   "Laying out a module's batch workers" when {
     "the module has two fork groups" should {
       "give each group one worker, index 0, in the group's folder, with the group's whole class list" in {
-        WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))), () => false) shouldBe Right(
+        WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))), () => Right(false)) shouldBe Right(
           WorkerLayout(
             Seq(
               PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
@@ -242,7 +240,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "a fork group holds no class" should {
       "not run that group, and keep the position of every later group" in {
-        workersOf(WorkerLayout.ofBatches(classesOf(Seq(Nil, Seq("samples.B1"), Seq("samples.A1"))), () => false)) shouldBe Right(
+        workersOf(WorkerLayout.ofBatches(classesOf(Seq(Nil, Seq("samples.B1"), Seq("samples.A1"))), () => Right(false))) shouldBe Right(
           Seq(PlannedWorker(workerOf(1), PathUnderModule("samples.B1")), PlannedWorker(workerOf(2), PathUnderModule("samples.A1")))
         )
       }
@@ -250,7 +248,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "the module has no fork group" should {
       "give fork group 0 one worker with no class, in the module's folder" in {
-        WorkerLayout.ofBatches(Nil, () => false) shouldBe Right(
+        WorkerLayout.ofBatches(Nil, () => Right(false)) shouldBe Right(
           WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
         )
       }
@@ -258,7 +256,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "two fork groups each hold the same one class" should {
       "give no layout, naming the shared processFolder and the groups sharing it" in {
-        WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.A1"), Seq("samples.A1"))), () => false) shouldBe Left(sharing(Seq(0, 1), "samples.A1"))
+        WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.A1"), Seq("samples.A1"))), () => Right(false)) shouldBe Left(sharing(Seq(0, 1), "samples.A1"))
       }
     }
   }

@@ -52,7 +52,7 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
 
     "the module's inputs are not evaluated" should {
       "be Mill's error" in {
-        TestCommandFailure.ModuleInputsNotEvaluated("core.test", "compile failed").message shouldBe "compile failed"
+        TestCommandFailure.ModuleInputsNotEvaluated("compile failed").message shouldBe "compile failed"
       }
     }
 

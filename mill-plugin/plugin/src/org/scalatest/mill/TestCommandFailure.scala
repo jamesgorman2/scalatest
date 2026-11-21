@@ -10,7 +10,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case SeveralModuleSelectors(selectors: Seq[ModuleSelectorArgument])
   case NotOneJvmTestModule(selector: ModuleSelectorArgument, resolved: String)
   case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
-  case ModuleInputsNotEvaluated(module: String, error: String)
+  case ModuleInputsNotEvaluated(error: String)
   case UnrecognisedModuleArgument(argument: String)
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
@@ -33,7 +33,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
         s"Module selector ${selector.text} must resolve to one JVM test module, but resolved to: $resolved"
       case UnresolvedModuleSelector(selector, error) =>
         s"Module selector ${selector.text} resolves to no module: $error"
-      case ModuleInputsNotEvaluated(_, error) =>
+      case ModuleInputsNotEvaluated(error) =>
         error
       case UnrecognisedModuleArgument(argument) =>
         s"The module's ScalaTest arguments hold $argument, which ScalaTest does not recognise"

@@ -8,6 +8,7 @@ import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ModuleName
+import scala.concurrent.duration.DurationInt
 
 private[mill] object TestCommand {
 
@@ -48,7 +49,11 @@ private[mill] object TestCommand {
       moduleFolder(ctx, selectedModule.path),
       ctx,
       now,
-      WorkerOutputCapture.workerCharset(systemProperty)
+      WorkerOutputCapture.workerCharset(systemProperty),
+      EventLogFile.at,
+      ProcessExit.hasExited,
+      10.millis,
+      JvmTestModuleRun.filesystemIgnoresCase
     )
     BuildCtx.withFilesystemCheckerDisabled {
       moduleRun.execute(consolidation)

@@ -48,8 +48,8 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
     "checking whether the filesystem ignores case fails" should {
       "attach why the check failed to the root, naming the module" in {
-        val checkFailure = new JvmTestModuleRun.FilesystemCaseCheckFailure(new IOException("disk full"))
-        outputOf(consolidation => JvmTestModuleRun.layOutWorkers(consolidation, module)(throw checkFailure)) should contain(
+        val checkFailure = FilesystemCaseCheckFailure(new IOException("disk full"))
+        outputOf(consolidation => JvmTestModuleRun.layOutWorkers(consolidation, module)(Left(checkFailure))) should contain(
           "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
         )
       }
@@ -75,17 +75,17 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         val foundInUpperCase = Files.exists(folder.resolve("FILE"))
         Files.delete(file)
         Files.delete(folder)
-        (ignoresCase, emptied) shouldBe ((foundInUpperCase, true))
+        (ignoresCase, emptied) shouldBe ((Right(foundInUpperCase), true))
       }
     }
 
     "the folder is missing" should {
-      "throw, naming the IOException that caused the failure" in {
+      "give the failure, naming the IOException that caused it" in {
         val folder = Files.createTempDirectory("case-check")
         Files.delete(folder)
-        the[JvmTestModuleRun.FilesystemCaseCheckFailure] thrownBy {
-          JvmTestModuleRun.filesystemIgnoresCase(folder)
-        } should have message s"checking whether the filesystem ignores case failed: java.nio.file.NoSuchFileException: ${folder.resolve("case-probe")}"
+        JvmTestModuleRun.filesystemIgnoresCase(folder).left.map(_.message) shouldBe Left(
+          s"checking whether the filesystem ignores case failed: java.nio.file.NoSuchFileException: ${folder.resolve("case-probe")}"
+        )
       }
     }
   }
