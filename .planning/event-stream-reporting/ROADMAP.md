@@ -12,11 +12,11 @@ The test command takes several module selectors, resolves each to its test modul
 - A module whose tests cannot start, as when it fails to compile, has an outcome showing that error (R-098e), and fails the test command.
 - A module that does not test with this release of the fork fails the test command before any test starts (R-059). Until features 11–13, so does every Scala.js and Native module.
 - A failure under R-059 leaves no file at the `-fJ` path.
-- The class globs and framework arguments apply alike to every selected module. Each module in which the class globs select no test fails as a single module does under feature 4.
+- The class globs and framework arguments apply alike to every selected module. Each module in which the class globs select no test fails the test command with the message Mill's `testOnly` fails with.
 
 Enables:
 
-- `SPECIFICATION.md` R-055 (several module selectors; class globs and framework arguments applying alike to every selected test module), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
+- `SPECIFICATION.md` R-055 (several module selectors; class globs and framework arguments across them), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
 - `JSON-LAYOUT.md` § Root and modules (`moduleSelectors` with several module selectors; several modules)
 - `ARCHITECTURE.md` § Modules § Mill plugin (Test command: resolves the module selectors), § APIs § The Mill plugin and the consolidation library (Start: module selectors; Add a module whose tests did not start), § Data flow (one nested evaluation with fail-fast off)
 
@@ -25,6 +25,7 @@ Settles:
 - How the test command tells that a module tests with this release of the fork (R-059).
 - What the test command does with a module selector that resolves to no test module.
 - How the error that stopped a module is shown (R-098e gives the module an outcome, not its form).
+- Where the failure for class globs that select no test in a module is shown when several modules are selected: on the root (R-098f) or on the module (R-098e).
 
 Risks:
 
@@ -162,7 +163,7 @@ Builds on features 5 and 8.
 Enables:
 
 - `SPECIFICATION.md` R-059 (JS environment), § Scope (Scala 3 on Scala.js), and on Scala.js under `NodeJs`: R-001, R-002, R-051, R-063, R-011, R-074a, R-074b, R-073, R-095a, R-076, R-040, R-106f, R-125a, R-125b, R-097a, R-097b, R-087, R-043 (order in the launcher's files), R-044, R-053a, R-053b, R-110, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files; Test manifest, on Scala.js), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event under `NodeJs`; the module's one event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § APIs § The Mill plugin and the consolidation library (the test classes the process was assigned, on Scala.js), § Data flow (Scala.js and Native bullet: `jsEnvConfig`; the module's test classes, on Scala.js), § External systems (Scala.js test adapter; `destroyForcibly()`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Scala.js), § Modules § Mill plugin (Scala.js launcher; launcher written once per command and swapped in; Event log reading and Process capture from launchers' files; Test manifest, on Scala.js), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event under `NodeJs`; the module's one event log file under `NodeJs`; launcher folder created afresh; end of the event stream from the launcher's header; each pair tied to its run by PID), § APIs § The Mill plugin and the consolidation library (the test classes the process was assigned, on Scala.js), § Data flow (Scala.js and Native bullet: `testOnly` or `testForked`, `jsEnvConfig` and `testReportXml`; the module's test classes, on Scala.js), § External systems (Scala.js test adapter; `destroyForcibly()`)
 
 Settles:
 
@@ -171,13 +172,13 @@ Settles:
 - The C toolchain that cross-compiles the Windows launcher (`decisions/architecture-library-and-modules.md` "The Mill plugin is built by its own Mill build in this repo." Costs).
 - The names of each launcher's file pair in the launcher folder.
 - How the test command learns a Scala.js module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-095a cannot be met on Scala.js, and `SPECIFICATION.md` § Scope needs that exception.
+- Whether class globs that select no test fail the test command on Scala.js. Mill's own Scala.js `testOnly` makes no check for a matching test and passes (`mill.scalajslib.ScalaJSModule`'s `testTask` in `com.lihaoyi:mill-libs-scalajslib_3:1.3.1`).
 
 Risks:
 
 - `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
 - `decisions/architecture-running-tests.md` "Every Scala.js VM starts through a launcher the plugin supplies…" (Costs: shipped Windows binary; ARM64 emulation; start-up cost; not run on macOS)
-- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time)
-- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Reasoning: Mill's own test body still writes the module's `testReportXml` into its `Task.dest`, which this feature must keep out of the module folder, `SPECIFICATION.md` R-047, R-110)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: breaks at run time; `testReportXml` must also be replaced)
 - `decisions/architecture-test-event-log.md` "The plugin learns that a run's stream has ended when the run's process exits." (Costs: one process hosting several runs)
 - `decisions/architecture-test-event-log.md` "The Mill plugin turns the emitter on with a ScalaTest runner argument." (Alternatives: Scala.js runners ignore `-C` and build no `RunStarting`)
 - `research/emission-gap-analysis.md` § Short answer (run-level events and a throwing constructor need new code on Scala.js and Native)
@@ -202,7 +203,7 @@ Risks:
 
 - `decisions/architecture-test-event-log.md` "Under `JsDom`, a run's test event log is framed lines…" (Costs: readable only while every event is one whole line)
 - `research/jsdom-channel.md` § 3 (lines must be assembled per writing thread; one buffer corrupted events), § 11 (jsdom other than `27.4.0` not run)
-- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Reasoning: Mill's own test body still writes the module's `testReportXml` into its `Task.dest`, which this feature must keep out of the module folder, `SPECIFICATION.md` R-047, R-110)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: `testReportXml` must also be replaced)
 
 ## 13. Scala Native
 
@@ -218,19 +219,20 @@ Builds on features 8 and 11.
 Enables:
 
 - `SPECIFICATION.md` § Scope (Scala 3 on Native), and on Native: R-001, R-002, R-051, R-063, R-011, R-074a, R-074b, R-073, R-095a, R-076, R-040, R-106f, R-125a, R-125b, R-097a, R-097b, R-087, R-043 (order in the launcher's files), R-044, R-046c, R-137, R-053a, R-053b, R-110, R-047
-- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in; Test manifest, on Native), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event on Native; the module's one event log file on Native; header and the `runStarted` event carrying the same PID and start time), § APIs § The Mill plugin and the consolidation library (the test classes the process was assigned, on Native), § Data flow (Scala.js and Native bullet: `nativeLink`; the module's test classes, on Native), § External systems (Native test adapter; `inheritIO()`)
+- `ARCHITECTURE.md` § Modules § ScalaTest core (Structure wrapper, Emitter, Codec encoder, on Native), § Modules § Mill plugin (Native launcher; launcher written once per command and swapped in; Test manifest, on Native), § APIs § The emitter and the Mill plugin (the runner argument and the `runStarted` event on Native; the module's one event log file on Native; header and the `runStarted` event carrying the same PID and start time), § APIs § The Mill plugin and the consolidation library (the test classes the process was assigned, on Native), § Data flow (Scala.js and Native bullet: `testOnly` or `testForked`, `nativeLink` and `testReportXml`; the module's test classes, on Native), § External systems (Native test adapter; `inheritIO()`)
 
 Settles:
 
 - Whether a module's compiled launcher is reused across test commands (`decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher…" Costs). Any reuse still writes the launcher into the module's launcher folder, which the test command creates afresh for each test command (`ARCHITECTURE.md` § APIs § The emitter and the Mill plugin).
 - How the test command learns a Native module's test classes before it evaluates Mill's test task, so that they are the classes that task runs (`ARCHITECTURE.md` § Data flow: "from test classes it learns itself"). Unproven: if no way is found, R-095a cannot be met on Native, and `SPECIFICATION.md` § Scope needs that exception.
+- Whether class globs that select no test fail the test command on Native. Mill's own Native `testOnly` makes no check for a matching test and passes (`mill.scalanativelib.ScalaNativeModule`'s `testTask` in `com.lihaoyi:mill-libs-scalanativelib_3:1.3.1`).
 
 Risks:
 
 - `decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…" (Costs: no prototype has learned a module's test classes ahead of Mill's test task)
 - `decisions/architecture-running-tests.md` "Every Native test binary starts through a launcher compiled with the module's toolchain…" (Costs: compiled per module; run only on Linux, `--no-daemon`, host architecture)
 - `decisions/test-command.md` "A run that did not complete fails the test command, even where Mill's test task passes it." (Costs)
-- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Reasoning: Mill's own test body still writes the module's `testReportXml` into its `Task.dest`, which this feature must keep out of the module folder, `SPECIFICATION.md` R-047, R-110)
+- `decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…" (Costs: `testReportXml` must also be replaced)
 - `research/native-stdio-wrapper.md` § 4 (Mill's results line; exit status after a crash), § 7 (another architecture under its emulator; Windows crash exit status)
 - `research/mill-test-without-module-trait.md` § 8 (Native on Linux not run)
 - Mill 1.3.1 corrects a loss of data on stream close in Scala.js and Native test reporting, as feature 11's risks note; the Native launcher research ran on Mill 1.1.10 and is unchecked on 1.3.1.

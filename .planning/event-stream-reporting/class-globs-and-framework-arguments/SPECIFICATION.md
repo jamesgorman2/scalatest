@@ -41,24 +41,34 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 ### Arguments
 
 - R-001 The test command reads every argument after its first `--` as Mill's `testOnly` reads its arguments: the arguments before the next `--` are *class globs*, and the arguments after that `--` are *framework arguments*. Where no second `--` follows, every argument after the first `--` is a class glob. Where the test command's arguments hold no `--`, it has no class globs and no framework arguments. The module selector and the test command's output arguments come before the first `--` (`../SPECIFICATION.md` R-055).
-- R-002 The test command accepts its framework arguments only where every one of them is either one of the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, followed by the values ScalaTest's runner takes after that flag, or one of those values. Where any framework argument is another flag that ScalaTest's runner recognises, a flag it does not recognise, a listed flag without the values it takes, or an argument that is neither a flag nor a value of a listed flag before it, such as `foo`, the test command fails before any test starts with a message naming that argument, and writes no consolidated output (`../SPECIFICATION.md` R-125a, R-125b).
-- R-013 Where a ScalaTest argument, such as `-n`, is among the test command's arguments before its first `--`, or among any of its arguments where they hold no `--`, the test command fails before any test starts with a message naming that argument, and writes no consolidated output (`../SPECIFICATION.md` R-125b).
+- R-002 The test command accepts its framework arguments only where each framework argument has one of these forms:
+  - `-D` with a config map entry joined to it, such as `-Dcolour=blue`;
+  - `-P` alone, or with a thread count joined to it, such as `-P4`;
+  - one of the ScalaTest flags `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, followed by the separate values ScalaTest's runner takes after that flag;
+  - one of the separate values that ScalaTest's runner takes after the flag before it, such as `samples.Fast` after `-n`.
+
+  Where any framework argument has none of these forms, such as the ScalaTest flags `-oD` and `-s`, the unknown flag `--unknown`, `-n` with no value after it, `-D` with no config map entry joined to it, or `foo`, the test command fails before any test starts with a message naming that argument, and writes no consolidated output (`../SPECIFICATION.md` R-125a, R-125b).
+- R-013 Where an argument before the test command's first `--`, or any argument where the test command's arguments hold no `--`, is one of the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, alone or with its value joined to it, such as `-n` or `-Dcolour=blue`, the test command fails before any test starts with a message naming that argument, and writes no consolidated output (`../SPECIFICATION.md` R-125b).
 
 ### Running the module
 
-- R-003 Where at least one class glob is given, the test command runs the module's tests as `mill <module>.testOnly <class globs> -- <framework arguments>` runs them. Only the test classes that at least one class glob matches run. A class glob is matched against a test class's fully qualified name without any trailing `$`. A class glob without `*` matches only that exact name, and each `*` in a class glob matches any run of characters, including none (`../SPECIFICATION.md` R-053a, R-055).
+- R-003 Where at least one class glob is given, the test command runs the module's tests as `mill <module>.testOnly <class globs> -- <framework arguments>` runs them. Only the test classes whose fully qualified name at least one class glob matches run. A class glob without `*` matches only that exact name, and each `*` in a class glob matches any run of characters, including none (`../SPECIFICATION.md` R-053a, R-055).
 - R-004 Where no class glob is given, the test command runs the module's tests as `mill <module>.testForked <framework arguments>` runs them (`../SPECIFICATION.md` R-053b).
-- R-005 Each run of the module receives the module's `testArgsDefault` arguments that are among the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, each with its values, followed by the test command's framework arguments in the order given. Where ScalaTest takes the later of two arguments that set one thing, such as two `-D` arguments for one config map key, the framework argument takes effect over the `testArgsDefault` argument, as it does under Mill's `testOnly` and `testForked` (`../SPECIFICATION.md` R-053a, R-053b, R-142).
-- R-006 Where class globs are given and none of them matches a test class that the module's test framework discovers, the test command starts no test of the module and fails. The JSON output's root then holds one failure, whose message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
-- R-007 Where class globs are given, at least one of them matches a test class that the module's test framework discovers, and every worker of the module has ended, the test command fails if the JSON output holds, under the module's node, no test whose `outcome` is `succeeded`, `failed`, `ignored`, `pending` or `canceled`, and no suite whose `outcome` is `aborted` and that has a `message` (`../JSON-LAYOUT.md` § Nodes). The JSON output's root then holds one failure, whose message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
-- R-008 Each worker of the module receives the environment that Mill's `testOnly` or `testForked` would give its workers if started from a `mill` command line in the same environment as the test command. Where the module's `propagateEnv` is on, that environment is the one in which the `mill` command line started, overlaid by the module's `forkEnv`. Where `propagateEnv` is off, that environment is the module's `forkEnv` alone. A variable that the `mill` launcher sets from its own arguments, such as `MILL_PARAMS` on Windows, holds the arguments of the `mill` command line that started the test command (`../SPECIFICATION.md` R-053a, R-053b).
+- R-005 Each run of the module receives, first, each of the module's `testArgsDefault` arguments that is one of the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, with the values ScalaTest's runner takes with that flag, whether joined to it or after it. The run then receives the test command's framework arguments, in the order given. Where ScalaTest takes the later of two arguments that set one thing, such as two `-D` arguments for one config map key, the framework argument takes effect over the `testArgsDefault` argument, as it does under Mill's `testOnly` and `testForked` (`../SPECIFICATION.md` R-053a, R-053b, R-142).
+- R-006 Where class globs are given and none of them matches a test class that the module's test framework discovers, the test command starts no test of the module and fails. The test command then attaches one failure to the root of the consolidated output, whose message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
+- R-007 Where class globs are given, at least one of them matches a test class that the module's test framework discovers, and every worker of the module has ended, the test command fails if, under the module's node in the consolidated output, no test has the outcome succeeded, failed, ignored, pending or canceled, and no test or suite has the outcome aborted with an outcome message. The test command then attaches one failure to the root of the consolidated output, whose message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
+- R-008 Each worker of the module receives the environment that a worker of Mill's `testOnly` or `testForked` receives when that task is started from a `mill` command line in the environment in which the test command's `mill` command line started:
+  - where the module's `propagateEnv` is on, the environment in which `mill` started, overlaid by the module's `allForkEnv`;
+  - where the module's `propagateEnv` is off, the module's `allForkEnv` alone.
+
+  Unless the module overrides `allForkEnv`, the module's `allForkEnv` holds the module's `forkEnv` and the variables Mill 1.3.1 adds to it: `PATH`, the `bin` folder of the module's Java home followed by the `PATH` in which `mill` started; `MILL_WORKSPACE_ROOT`, the build's workspace folder; and `MILL_TEST_RESOURCE_DIR`, the module's resource folders separated by `;`. Where the module's `propagateEnv` is on, a variable that the `mill` launcher sets from its own arguments, such as `MILL_PARAMS` on Windows, holds the arguments of the `mill` command line that started the test command (`../SPECIFICATION.md` R-053a, R-053b).
 
 ### The module folder
 
-- R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core[3.3.8].test` for the `test` module of the cross module `core` at `3.3.8`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder, such as each worker's `sandbox` working directory (`../SPECIFICATION.md` R-110).
+- R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core[3.3.8].test` for the `test` module of the cross module `core` at `3.3.8`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder. Each worker's working directory `sandbox` is one such folder (`../SPECIFICATION.md` R-110).
 - R-012 Each test command deletes every file and folder that an earlier test command left in the module folder. It deletes them before it starts any test of the module, and deletes them also where it starts no test of the module (`../SPECIFICATION.md` R-110).
-- R-010 Once a test command has ended, the module folder and every folder inside it hold no JUnit XML report. This holds whatever the module's `testReportXml` is, including where it is `Some(<name>)`, whatever class globs and framework arguments are given, and whether the test command succeeds or fails (`../SPECIFICATION.md` R-047, R-110).
-- R-011 The test command creates, changes and deletes nothing in the module's own `testForked` and `testOnly` task folders, such as `out/core/test/testForked.dest`, so a report Mill's own task wrote there stays as it was (`../SPECIFICATION.md` R-060, R-110).
+- R-010 Once a test command has ended, whether it succeeded or failed, the module folder and every folder inside it hold no JUnit XML report, whatever the module's `testReportXml` is and whatever class globs and framework arguments are given (`../SPECIFICATION.md` R-047, R-110).
+- R-011 The test command creates neither of the module's `testForked` and `testOnly` task folders, such as `out/core/test/testForked.dest`, and creates, changes and deletes nothing in either where it exists (`../SPECIFICATION.md` R-060, R-110).
 
 ## Acceptance criteria
 
@@ -131,6 +141,14 @@ Feature: Class globs
       Then the JSON output's root holds exactly one failure, whose message begins `Test selector does not match any test: samples.Alpha1`
       And no file exists in `<markers>`
       And the test command fails
+
+  Rule: A suite that aborts is a test result
+    Scenario: AC-017 The only matched suite aborts before its tests run
+      Given the module also holds the suite `Broken1`, the class `samples.Broken1`, an `AnyFunSuite` mixing in `BeforeAndAfterAll` with one test `fast`, whose `beforeAll` throws an exception
+      When the test command is invoked with `-- samples.Broken1`
+      Then the JSON output holds the suite `Broken1` with the outcome `aborted` and a `message`
+      And the JSON output's root holds no failure whose message begins `Test selector does not match any test`
+      And the test command fails
 ```
 
 ```gherkin
@@ -187,11 +205,16 @@ Feature: Framework arguments
         | `foo`               | `foo`       |
 
   Rule: A ScalaTest argument before the first `--` fails the test command
-    Scenario: AC-016 A tag filter among the test command's own arguments
-      When the test command is invoked with `-n samples.Fast -- samples.Alpha1`
+    Scenario Outline: AC-016 A tag filter among the test command's own arguments, arguments <arguments>
+      When the test command is invoked with `<arguments>`
       Then Mill reports that the test command failed, with a message naming `-n`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
+
+      Examples:
+        | arguments                           |
+        | `-n samples.Fast -- samples.Alpha1` |
+        | `-n samples.Fast`                   |
 ```
 
 ```gherkin
@@ -211,18 +234,19 @@ Feature: The environment of each worker
       Given the module's `propagateEnv` is <propagate>
       And the module's `forkEnv` sets `FIXTURE_FORK` to `from-forkEnv` and `FIXTURE_BOTH` to `from-forkEnv`
       And the environment in which `mill` starts sets `FIXTURE_OUTER` to `from-outer` and `FIXTURE_BOTH` to `from-outer`
-      And `Alpha1`'s test `fast` sends an `info` message holding the environment variables `FIXTURE_OUTER`, `FIXTURE_FORK` and `FIXTURE_BOTH`, each `absent` where it is not set
+      And `Alpha1`'s test `fast` sends an `info` message holding the environment variables `FIXTURE_OUTER`, `FIXTURE_FORK`, `FIXTURE_BOTH` and `MILL_WORKSPACE_ROOT`, each `absent` where it is not set
       When the test command is invoked with `-- samples.Alpha1`
-      Then the `info` message holds `FIXTURE_OUTER` <outer>, `FIXTURE_FORK` `from-forkEnv` and `FIXTURE_BOTH` `from-forkEnv`
+      Then the `info` message holds `FIXTURE_OUTER` <outer>, `FIXTURE_FORK` `from-forkEnv`, `FIXTURE_BOTH` `from-forkEnv` and `MILL_WORKSPACE_ROOT` the absolute path of the build's workspace
 
       Examples:
         | propagate | outer        |
         | `true`    | `from-outer` |
         | `false`   | `absent`     |
 
-  Rule: A variable the `mill` launcher sets from its own arguments holds the test command's `mill` command line
+  Rule: Where propagateEnv is on, a variable the `mill` launcher sets from its own arguments holds the test command's `mill` command line
     Scenario: AC-014 MILL_PARAMS on Windows
       Given the build runs on Windows, where `mill` starts through its `mill.bat` launcher
+      And the module's `propagateEnv` is `true`
       And `Alpha1`'s test `fast` sends an `info` message holding the environment variable `MILL_PARAMS`
       When the test command is invoked with `-- samples.Alpha1`
       Then the `info` message is `-j 2 scalatest/test core.test -fJ <report> -- samples.Alpha1`, the arguments `mill` was invoked with
@@ -269,6 +293,7 @@ Feature: The module folder
   Rule: The test command leaves the folders of Mill's own test tasks as they were
     Scenario: AC-013 Mill's own report from an earlier testForked
       Given `mill core.test.testForked` has run in the build and written `out/core/test/testForked.dest/test-report.xml`
+      And no folder `out/core/test/testOnly.dest` exists
       When the test command is invoked with `-- samples.Alpha1`
       Then `out/core/test/testForked.dest/test-report.xml` has the content and modification time it had before the test command was invoked
       And no folder `out/core/test/testOnly.dest` exists
@@ -282,7 +307,7 @@ Feature: The module folder
 | R-004       | AC-006                                         |
 | R-005       | AC-007                                         |
 | R-006       | AC-004                                         |
-| R-007       | AC-005                                         |
+| R-007       | AC-005, AC-017                                 |
 | R-008       | AC-009, AC-014                                 |
 | R-009       | AC-002, AC-003                                 |
 | R-010       | AC-011                                         |

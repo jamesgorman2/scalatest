@@ -83,9 +83,9 @@ Its own components are:
 - The plugin's integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command warns on the console and in every file output…").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
-  - Where class globs are given, it attaches to the root the failure Mill's `testOnly` fails with for want of a matching test (`SPECIFICATION.md` R-053a; `decisions/architecture-library-and-modules.md` "The consolidation library, not Mill's per-worker results, tells the test command whether a test result reached a module."):
-    - where the class globs keep no class, before it would start any worker of the module, and it starts none;
-    - otherwise once every run of the module has ended, where **Read whether a module has a test result** answers that none has.
+  - On the JVM, where class globs are given, it attaches to the root the failure Mill's `testOnly` fails with for want of a matching test (`SPECIFICATION.md` R-053a; `decisions/architecture-library-and-modules.md` "The consolidation library, not Mill's per-worker results, tells the test command whether a test result reached a module."):
+    - where the class globs keep no class, before it would start any worker of the module;
+    - otherwise once every test process of the module has ended, where **Read whether a module has a test result** answers that the module has no test result.
 - **Test manifest** — gives the library each of a module's processes' assigned test classes (`.docs/ubiquitous-language.md` **Assigned test classes**), and the classes left unclaimed in a fork group's queue. A class's nested suites, scopes and tests are known only from a suite the run constructed (§ APIs § The emitter and the Mill plugin, the `structure` event). The test command writes no file for it (`decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
   - On the JVM, for a module that does not set `testBatchFrameworkTasks`, it is the files of Mill's own test queue, which the test command lays out before it starts any worker (`research/mill-test-worker-args.md` § 1.2): each fork group's `test-classes/` queue, with one file for each class the test command's class globs keep, and each worker's `claim/` folder and `claim.log` in its `processFolder`. A fork group is known by its queue folder.
     - A class is either unclaimed in its group's queue or recorded in a worker's `claim.log`; a worker claimed each class its `claim.log` records. The test command compiles the manifest from these files once a worker has ended (§ APIs § The emitter and the Mill plugin).
@@ -94,7 +94,7 @@ Its own components are:
     - The queue and claim layout is `@internal` to Mill. The test command already relies on it to drive the queue (`research/mill-test-worker-args.md` § 2.2; `research/mill-parallel-worker-capture.md` § 6).
     - The files last until the next test command clears the module's folder (§ APIs § The emitter and the Mill plugin).
   - On the JVM, for a module that sets `testBatchFrameworkTasks`, it is the class list the test command gives each fork group's one worker, as Mill 1.3.1 does (`research/mill-plugin-conventions.md` § 5). No class of such a module is queued or claimed: a batch worker was assigned every class in its list, and no class is left unclaimed. The test command keeps each list in memory.
-  - Scala.js and Native have no queue and no claim files. The test command keeps the module's test classes in memory (§ Data flow), and the module's one process is assigned them all (§ External systems).
+  - Scala.js and Native have no queue and no claim files. The test command keeps the module's test classes in memory (§ Data flow), and the module's one process is assigned every test class the class globs keep (§ External systems).
 - **Event log reading** — reads each run's test event log live and turns it into that run's event stream (§ APIs § The Mill plugin and the consolidation library, **Decode**). It reads the event log file in each JVM worker's `processFolder`, each Scala.js `NodeJs` or Native module's one event log file and, under `JsDom`, the launchers' stdout files, and ends each stream as § APIs § The emitter and the Mill plugin describes.
   - On the JVM it starts reading a worker's event log file as the worker starts: inside the async body that starts it or, where the worker runs on the calling thread, just before that call (§ Process capture).
     - The reader is told the worker has ended as soon as Mill's future for it completes, so it polls only while its worker runs. The readers polling at once are bounded by the workers running at once, not by the workers planned.
@@ -223,7 +223,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
     - the caller adds a process that ended before any run existed in it, or adds a module whose tests did not start;
     - the caller attaches a failure to the root.
   - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-137 for it: the result of Mill's test-runner subprocess call plays no part.
-- **Read whether a module has a test result**: given a module, returns, at once and at any time from **Start**, whether an event reporting a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, has been added to the event stream of any of the module's runs. A suite the library itself adds as aborted, such as one with reason *not run* (`SPECIFICATION.md` R-095a), is not such an event. The test command reads it once every run of the module has ended and before **End** (§ Modules § Mill plugin, Test command).
+- **Read whether a module has a test result**: given a module, returns, at once and at any time from **Start**, whether an event reporting a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, has been added to the event stream of any of the module's runs. The library's own aborting of a suite, such as with reason *not run* (`SPECIFICATION.md` R-095a), does not count. The test command reads it once every test process of the module has ended and before **End** (§ Modules § Mill plugin, Test command).
 
 ## Data flow
 
@@ -232,6 +232,8 @@ The test command runs each selected module's tests under a task context it suppl
 - the module's own ScalaTest arguments that `SPECIFICATION.md` R-142 lists, found with the argument splitter;
 - the test command's framework arguments, in the order given (`SPECIFICATION.md` R-053a, R-053b);
 - the arguments it adds, among them the runner argument.
+
+A class glob keeps each test class whose fully qualified name it matches, as under Mill's `testOnly`. Where no class glob is given, every test class is kept.
 
 It runs the tests:
 
@@ -244,14 +246,16 @@ It runs the tests:
     - Where no class globs are given and the module's fork groups hold no class, it runs fork group 0's worker on an empty queue. Where class globs are given and keep no class, it starts no worker of the module.
     - Where more than one fork group holds a class the class globs keep, each worker is forked through its own task context, as `testForked` does, whatever the module's `testParallelism`.
     - Otherwise the one worker runs on the command's thread;
-- on Scala.js and Native, it evaluates the module's own Mill test task. In that evaluation only, it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher (`decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…").
+- on Scala.js and Native, it evaluates the module's own Mill test task: `testOnly`, with the class globs as its selectors, where class globs are given, and `testForked` otherwise. In that evaluation only, it replaces two task values (`decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…"):
+  - it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher;
+  - the value of `testReportXml` becomes `None`, so that Mill's test body writes no JUnit XML report into the module folder (`SPECIFICATION.md` R-047).
 
 Before it starts any of a module's test processes, the test command knows the module's test classes, from which it later compiles the test manifest (§ Modules § Mill plugin):
 
 - on the JVM:
   - for a module that does not set `testBatchFrameworkTasks`, as the queue it lays out for each fork group from its own discovery, which starts no test;
   - for a module that sets `testBatchFrameworkTasks`, as the class list it gives each fork group's worker;
-- on Scala.js and Native, from test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
+- on Scala.js and Native, as the classes the class globs keep among the test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
 
 All of this runs in one nested evaluation of the test command's own, with fail-fast off (`decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
 
@@ -291,7 +295,7 @@ flowchart LR
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
   CMD -- "each run's module, selectors, test classes each process was assigned, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version, start and end times of the root and each module" --> LIB
-  LIB -- "runner argument; consolidation state" --> CMD
+  LIB -- "runner argument; consolidation state; whether a module has a test result" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]
 ```

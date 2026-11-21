@@ -142,7 +142,7 @@ _Avoid_: Mill command, invocation
 The folder Mill gives a task to write its files in.
 
 **Module folder**:
-The folder a test command owns for one test module, in Mill's output folder. Each file that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, sits at the same relative path in the module folder instead.
+The folder a test command owns for one test module, in Mill's output folder.
 _Avoid_: Module's output folder, module dest
 
 **Supported Mill release**:
