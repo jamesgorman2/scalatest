@@ -634,13 +634,11 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
   def resultAndJsonOutputOfTestCommand(): (TestCommandResult, JsonNode) = fixtureBuild.resultAndJsonOutputOfTestCommand()
 
   def resultAndJsonOutputOfTestCommand(jobs: Int): (TestCommandResult, JsonNode) =
-    fixtureBuild.resultAndJsonOutputOfTestCommand(jobsArguments(jobs))
+    fixtureBuild.resultAndJsonOutputOfTestCommand(FixtureBuild.jobsArguments(jobs))
 
   def runTestCommandAsAtTheConsole(): TestCommandResult =
     // With the ticker on, Mill puts its prefix on each line the test command writes.
-    fixtureBuild.runTestCommandWritingJsonOutput(jobsArguments(2) ++ Seq("--ticker", "true"))
-
-  private def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
+    fixtureBuild.runTestCommandWritingJsonOutput(FixtureBuild.jobsArguments(2) ++ Seq("--ticker", "true"))
 
   def workerIndexOf(path: String): Option[Int] =
     Some(os.Path(path))

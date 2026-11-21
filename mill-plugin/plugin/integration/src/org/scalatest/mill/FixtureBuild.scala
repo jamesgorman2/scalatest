@@ -18,7 +18,7 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def jsonOutputFile: os.Path = workspace / "report.json"
 
-  def testRunMarkers: os.Path = workspace / "markers"
+  def markersFolder: os.Path = workspace / "markers"
 
   def buildText: String = os.read(buildFile)
 
@@ -124,4 +124,9 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def resultWithBspNotifications[A](stderrLog: os.Path)(use: BspClientSession => A): WithNotifications[A] =
     BspClientSession.resultWithNotifications(tester, IntegrationEnvironment.millExecutable, stderrLog)(use)
+}
+
+object FixtureBuild {
+
+  def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
 }

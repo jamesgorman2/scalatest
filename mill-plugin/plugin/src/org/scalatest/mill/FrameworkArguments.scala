@@ -6,34 +6,26 @@ private[mill] object FrameworkArguments {
 
   def parse(arguments: Seq[String]): Either[TestCommandFailure, Seq[ScalaTestArgument.Flagged]] = {
     val split = ScalaTestArgument.split(arguments)
-    split
-      .filterNot(isPassedOn)
-      .headOption
-      .map(argument => TestCommandFailure.FrameworkArgumentNotPassedOn(textOf(argument)))
-      .toLeft(split.collect { case flagged: ScalaTestArgument.Flagged => flagged })
+    split.find(argument => !isPassedOn(argument)) match {
+      case Some(argument) => Left(TestCommandFailure.FrameworkArgumentNotPassedOn(textOf(argument)))
+      case None => Right(split.collect { case flagged: ScalaTestArgument.Flagged => flagged })
+    }
   }
 
   def isAllowedFlag(argument: String): Boolean =
     ScalaTestArgument.split(Seq(argument)) match {
-      case Seq(ScalaTestArgument.Flagged(flag, _)) => ModuleScalaTestArguments.allowedFlag(flag).isDefined
+      case Seq(ScalaTestArgument.Flagged(flag, _)) => AllowedFlag.from(flag).isDefined
       case _ => false
     }
 
   private def isPassedOn(argument: ScalaTestArgument): Boolean =
     argument match {
-      case ScalaTestArgument.Flagged("-D", Seq(text)) => isConfigMapEntry(text.drop(2))
-      case ScalaTestArgument.Flagged("-P", Seq(text)) => text == "-P" || isThreadCount(text.drop(2))
-      case flagged: ScalaTestArgument.Flagged => ModuleScalaTestArguments.allowedFlag(flagged.flag).exists(_.hasItsSeparateValues(flagged))
+      case flagged: ScalaTestArgument.Flagged =>
+        !flagged.isShortOfValues && AllowedFlag.from(flagged.flag).exists(_.acceptsJoinedValue(joinedValueOf(flagged)))
       case ScalaTestArgument.Unrecognised(_) => false
     }
 
-  private def isConfigMapEntry(entry: String): Boolean = {
-    // ScalaTest's runner rejects a `-D` entry without a key, `=` and a value.
-    val equalsAt = entry.indexOf('=')
-    equalsAt > 0 && equalsAt < entry.length - 1
-  }
-
-  private def isThreadCount(count: String): Boolean = count.matches("[0-9]+") && count.toIntOption.exists(_ > 0)
+  private def joinedValueOf(flagged: ScalaTestArgument.Flagged): String = textOf(flagged).drop(flagged.flag.length)
 
   private def textOf(argument: ScalaTestArgument): String =
     argument match {

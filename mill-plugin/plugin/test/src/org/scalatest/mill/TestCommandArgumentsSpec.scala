@@ -213,7 +213,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
 
     "given, before the first --, a flag a framework argument may hold" should {
       "reject it alone, naming it" in {
-        for (flag <- ModuleScalaTestArguments.allowedFlags.map(_.flag)) {
+        for (flag <- AllowedFlag.values.map(_.text)) {
           rejection("core.test", flag, "--", "samples.Alpha1") shouldBe TestCommandFailure.FrameworkArgumentAmongOwnArguments(flag)
         }
       }

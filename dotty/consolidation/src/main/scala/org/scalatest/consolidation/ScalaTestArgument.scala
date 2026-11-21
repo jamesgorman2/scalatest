@@ -28,4 +28,13 @@ object ScalaTestArgument {
       case SplitArgument.Flagged(flag, flagArguments) => Flagged(flag, flagArguments)
       case SplitArgument.Unrecognised(argument) => Unrecognised(argument)
     }
+
+  extension (flagged: Flagged) {
+
+    /**
+     * Whether the flag holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one
+     * integer. A flag the runner does not recognise is never short of values.
+     */
+    def isShortOfValues: Boolean = ArgumentSplitter.isShortOfValues(SplitArgument.Flagged(flagged.flag, flagged.arguments.toList))
+  }
 }

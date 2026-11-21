@@ -19,8 +19,6 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private val calculatorSuiteSummaryLine: String =
     "Suites: 1 of 1 completed, 0 aborted. Tests: 1 of 1 run: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
 
-  private val twoJobs: Seq[String] = Seq("-j", "2")
-
   private val testCommandTaskName: String = "org.scalatest.mill.TestCommandModule/test"
 
   private def isMillsTaskNameLine(prefix: String, line: String): Boolean =
@@ -39,7 +37,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   private def withMarkingSuites[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.classGlobsAndFrameworkArguments) { build =>
-      os.makeDir.all(build.testRunMarkers)
+      os.makeDir.all(build.markersFolder)
       test(build)
     }
 
@@ -50,7 +48,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     And("no file exists in the markers folder")
     withClue(result.debugString) {
-      os.list(build.testRunMarkers) shouldBe empty
+      os.list(build.markersFolder) shouldBe empty
     }
 
     And("nothing exists at the JSON output file's path")
@@ -65,14 +63,14 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow, each of which creates a file in the markers folder as it runs")
       When("the test command runs core.test, writing JSON output, with nothing after -fJ and its path")
       withMarkingSuites { build =>
-        val result = build.runTestCommandWritingJsonOutputWith(twoJobs)()
+        val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))()
 
         Then("the test command succeeds")
         shouldSucceed(result)
 
         And("the markers folder holds a file for each test of each suite")
         withClue(result.debugString) {
-          os.list(build.testRunMarkers).map(_.last).sorted shouldBe
+          os.list(build.markersFolder).map(_.last).sorted shouldBe
             Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
         }
       }
@@ -91,7 +89,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
         When(s"the test command runs core.test, writing JSON output, with -- -- ${frameworkArguments.mkString(" ")}")
         withMarkingSuites { build =>
-          val result = build.runTestCommandWritingJsonOutputWith(twoJobs)(("--" +: "--" +: frameworkArguments)*)
+          val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(("--" +: "--" +: frameworkArguments)*)
 
           shouldFailBeforeAnyTestStartsWritingNoOutput(build, result, TestCommandFailure.FrameworkArgumentNotPassedOn(named).message)
         }
@@ -103,7 +101,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
         When(s"the test command runs core.test, writing JSON output, with ${arguments.mkString(" ")}")
         withMarkingSuites { build =>
-          val result = build.runTestCommandWritingJsonOutputWith(twoJobs)(arguments*)
+          val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
 
           shouldFailBeforeAnyTestStartsWritingNoOutput(build, result, TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n").message)
         }

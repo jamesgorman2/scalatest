@@ -75,6 +75,20 @@ private[scalatest] object ArgumentSplitter {
     split.toList
   }
 
+  /**
+   * Whether the flag holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one
+   * integer. A flag the runner does not recognise is never short of values.
+   */
+  def isShortOfValues(flagged: SplitArgument.Flagged): Boolean = {
+    val valueCount = flagged.argumentAndValues.size - 1
+    flagOf(flagged.flag).map(valuesOf).exists {
+      case Following(count) => valueCount < count
+      case FollowingUnlessFlags(count) => valueCount < count
+      // `-h` with no directory, or with `-Y` and no CSS file.
+      case DirectoryThenCssFile => valueCount == 0 || valueCount == 2
+    }
+  }
+
   private def flagOf(argument: String): Option[String] =
     Option(argument).flatMap { written =>
       Some(written.take(2)).filter(flagsMatchedByPrefix.contains).orElse(Some(written).filter(flagsMatchedExactly.contains))

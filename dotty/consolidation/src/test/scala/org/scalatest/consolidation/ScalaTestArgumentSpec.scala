@@ -38,5 +38,12 @@ final class ScalaTestArgumentSpec extends AnyWordSpec with should.Matchers {
         ScalaTestArgument.split(Nil) shouldBe Nil
       }
     }
+
+    "asked whether a flag is short of values" should {
+      "say so only of a flag holding fewer values than the runner needs with it" in {
+        ScalaTestArgument.split(Seq("-n", "Fast", "-W", "60")).collect { case flagged: Flagged => flagged.isShortOfValues } shouldBe
+          Seq(false, true)
+      }
+    }
   }
 }

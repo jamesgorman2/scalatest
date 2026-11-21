@@ -23,7 +23,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   def message: String = {
     val jsonOutputArgument = TestCommandArguments.jsonOutputArgument
     val separator = TestCommandArguments.separator
-    val frameworkFlags = EnglishList.of(ModuleScalaTestArguments.allowedFlags.map(_.flag))
+    val frameworkFlags = EnglishList.of(AllowedFlag.values.toSeq.map(_.text))
     this match {
       case JsonOutputPathMissing =>
         s"The test command's $jsonOutputArgument takes a path, but none follows it: $jsonOutputArgument"
