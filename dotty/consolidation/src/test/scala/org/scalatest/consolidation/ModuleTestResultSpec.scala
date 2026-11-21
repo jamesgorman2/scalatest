@@ -12,8 +12,6 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   private val otherModule = ModuleName("api.test")
 
-  private val addsTest = """test "adds", label "- adds""""
-
   private val calculatorSuiteStructure = structureOf("CalculatorSuite", addsTest)
 
   private def partOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
@@ -135,7 +133,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       Given("a run of the module whose suite `CalculatorSuite` starts and completes, and whose structure marks the test `adds` ignored")
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
-      consolidation.addRunOf(TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", s"$addsTest, ignored"))))
+      consolidation.addRunOf(runOfCalculatorSuiteHolding(s"$addsTest, ignored"))
 
       Then("the module has no test result")
       consolidation.hasTestResult(module) shouldBe false

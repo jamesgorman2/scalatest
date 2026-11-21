@@ -88,8 +88,12 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
     (structureOf(suite, nodes) +: s"""suite "$suite": SuiteStarting""" +: events.flatMap(ConsolidatedRuns.eventLinesOf) :+ s"""suite "$suite": SuiteCompleted""")
       .mkString("\n")
 
-  def runOfCalculatorSuite(testEvents: String*): TestRunPart =
-    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", """test "adds", label "- adds"""", testEvents*)))
+  val addsTest: String = """test "adds", label "- adds""""
+
+  def runOfCalculatorSuite(testEvents: String*): TestRunPart = runOfCalculatorSuiteHolding(addsTest, testEvents*)
+
+  def runOfCalculatorSuiteHolding(nodes: String, testEvents: String*): TestRunPart =
+    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", nodes, testEvents*)))
 
   def structureOf(suite: String, nodes: String): String =
     (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
