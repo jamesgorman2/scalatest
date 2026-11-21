@@ -23,16 +23,12 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
   private final class Reading(eventLogFile: EventLogFile) {
     private val consolidationUnderTest = new ConsolidationUnderTest
     val consolidation: Consolidation = consolidationUnderTest.consolidation
-    private val counting: CountingConsolidation = new CountingConsolidation(consolidation, ModuleName("core.test"))
+    val counting: CountingConsolidation = new CountingConsolidation(consolidation, ModuleName("core.test"))
     val processExited: AtomicBoolean = new AtomicBoolean(false)
     val processesWatched: mutable.Set[RunProcess] = mutable.Set.empty[RunProcess]
     private val firstWatch: CountDownLatch = new CountDownLatch(1)
 
     val reader: EventLogReader = new EventLogReader(eventLogFile, counting.addRun, () => counting.addProcessEndedBeforeAnyRun(), watch, 1.millis)
-
-    def runsAdded: Int = counting.runsAdded
-
-    def processesEndedBeforeAnyRun: Int = counting.processesEndedBeforeAnyRun
 
     private def watch(process: RunProcess): Boolean = {
       processesWatched.synchronized(processesWatched += process)
@@ -59,8 +55,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
-          reading.runsAdded shouldBe 0
-          reading.processesEndedBeforeAnyRun shouldBe 1
+          reading.counting.runsAdded shouldBe 0
+          reading.counting.processesEndedBeforeAnyRun shouldBe 1
         }
       }
     }
@@ -71,8 +67,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           val reading = new Reading(EventLogFile.at(file))
           reading.reader.start()
           reading.stateAfterEnd(WorkerProcess.NotStarted) shouldBe ConsolidationState.Ended
-          reading.runsAdded shouldBe 0
-          reading.processesEndedBeforeAnyRun shouldBe 0
+          reading.counting.runsAdded shouldBe 0
+          reading.counting.processesEndedBeforeAnyRun shouldBe 0
         }
       }
     }
@@ -85,8 +81,8 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
-          reading.runsAdded shouldBe 1
-          reading.processesEndedBeforeAnyRun shouldBe 0
+          reading.counting.runsAdded shouldBe 1
+          reading.counting.processesEndedBeforeAnyRun shouldBe 0
           reading.outputWithoutSummaryLine shouldBe Seq("[core.test]")
         }
       }
@@ -100,7 +96,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           reading.processExited.set(true)
           reading.reader.start()
           reading.stateAfterEnd() shouldBe ConsolidationState.Ended
-          reading.runsAdded shouldBe 1
+          reading.counting.runsAdded shouldBe 1
         }
       }
     }
