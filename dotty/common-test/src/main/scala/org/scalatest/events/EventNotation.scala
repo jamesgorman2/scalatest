@@ -14,7 +14,7 @@ private[events] final case class NodeReference(kind: NodeKind, name: String, ord
 }
 
 private[events] enum WrittenNode {
-  case Suite(name: String, ordinalAmongSameName: Option[Int], className: TestClassName, suiteId: Option[String])
+  case Suite(name: String, ordinalAmongSameName: Option[Int], className: TestClassName, suiteId: SuiteId)
   case Scope(name: String, label: String)
   case Test(name: String, label: String, testName: Option[String], ignored: Boolean)
 }
@@ -144,7 +144,8 @@ private[events] object EventNotation {
         val ordinal = if (cursor.accepts(" #")) Some(cursor.positiveInt()) else None
         cursor.expect(", class ")
         val className = cursor.quoted()
-        WrittenNode.Suite(name, ordinal, TestClassName(className), if (cursor.accepts(", id ")) Some(cursor.quoted()) else None)
+        val suiteId = if (cursor.accepts(", id ")) cursor.quoted() else className
+        WrittenNode.Suite(name, ordinal, TestClassName(className), SuiteId(suiteId))
       } else if (cursor.accepts("scope ")) {
         val name = cursor.quoted()
         cursor.expect(", label ")

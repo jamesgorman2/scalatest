@@ -163,15 +163,14 @@ private final class RunUnderConstruction {
     suitesUnder.getOrElseUpdate(parent, mutable.ArrayBuffer.empty)
 
   private def newSuite(written: WrittenNode.Suite, parent: Option[NodeId], position: Option[Int], text: String): HeldSuite = {
-    val suiteId = SuiteId(written.suiteId.getOrElse(written.className.value))
     val ordinalItTakes = sharingName(NodeKind.Suite, written.name).size + 1
     written.ordinalAmongSameName.filter(_ != ordinalItTakes).foreach { ordinal =>
       fail(s"a suite new to the event log is #$ordinalItTakes among the suites that share its name, not #$ordinal: '$text'")
     }
     val siblings = suitesUnderParent(parent)
-    val index = siblings.count(_.suiteId == suiteId)
-    val id = parent.fold(NodeId.topLevelSuite(suiteId, index))(NodeId.nestedSuite(_, suiteId, index))
-    val added = new HeldSuite(id, suiteId, written.className, parent, position)
+    val index = siblings.count(_.suiteId == written.suiteId)
+    val id = parent.fold(NodeId.topLevelSuite(written.suiteId, index))(NodeId.nestedSuite(_, written.suiteId, index))
+    val added = new HeldSuite(id, written.suiteId, written.className, parent, position)
     siblings += added
     hold(added.id, NodeKind.Suite, written.name, parent)
     added
@@ -184,17 +183,16 @@ private final class RunUnderConstruction {
       case Some(TreeLine(1, suite: WrittenNode.Suite, text)) => (suite, text)
       case _ => fail(s"a structure starts with its suite, indented 2 spaces:\n${block.text}")
     }
-    val suiteId = SuiteId(written.suiteId.getOrElse(written.className.value))
     val parent = block.under.map(reference => nodeNamed(reference).id)
     val siblings = suitesUnderParent(parent)
     val earlier = written.ordinalAmongSameName match {
       case Some(ordinal) =>
         sharingName(NodeKind.Suite, written.name).lift(ordinal - 1).map { named =>
-          siblings.find(sibling => sibling.id == named.id && sibling.suiteId == suiteId).getOrElse {
-            fail(s"suite \"${written.name}\" #$ordinal is not a suite of suite ID ${suiteId.value} under the structure's parent: '$text'")
+          siblings.find(sibling => sibling.id == named.id && sibling.suiteId == written.suiteId).getOrElse {
+            fail(s"suite \"${written.name}\" #$ordinal is not a suite of suite ID ${written.suiteId.value} under the structure's parent: '$text'")
           }
         }
-      case None => siblings.find(_.suiteId == suiteId)
+      case None => siblings.find(_.suiteId == written.suiteId)
     }
     earlier match {
       case Some(suite) =>

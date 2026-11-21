@@ -349,7 +349,7 @@ private[scalatest] final class TestEventLogEmitter private (eventLog: OutputStre
       case Some(names) =>
         val found = TestEventLogEmitter.tableNamed(wrapperTable, wrapperNode, names.suiteId)
         val table = found.getOrElse {
-          wrapperTable.addSuiteUnder(wrapperNode.getOrElse(wrapperTable.node), names.suiteName, names.suiteId, names.suiteClassName.getOrElse(TestClassName(names.suiteId.value)))
+          wrapperTable.addSuiteUnder(wrapperNode.getOrElse(wrapperTable.node), names.suiteName, names.suiteId, names.suiteClassName)
         }
         val lackedTest = names.testName.filterNot(table.testsByName.contains)
         val isIgnoredByFilter = false
@@ -539,12 +539,12 @@ private[scalatest] object TestEventLogEmitter {
     caughtOutsideLock(recorded.map(TestEventLogEncoder.encoded) :+ TestEventLogEncoder.encoded(event))
   }
 
-  final case class NamesInEvent(suiteName: String, suiteId: SuiteId, suiteClassName: Option[TestClassName], testName: Option[TestName])
+  final case class NamesInEvent(suiteName: String, suiteId: SuiteId, suiteClassName: TestClassName, testName: Option[TestName])
 
   object NamesInEvent {
 
     def from(suiteName: String, suiteId: String, suiteClassName: Option[String], testName: Option[String]): NamesInEvent =
-      NamesInEvent(suiteName, SuiteId(suiteId), suiteClassName.map(TestClassName(_)), testName.map(TestName(_)))
+      NamesInEvent(suiteName, SuiteId(suiteId), TestClassName(suiteClassName.getOrElse(suiteId)), testName.map(TestName(_)))
   }
 
   def namesIn(event: Event): Option[NamesInEvent] = {

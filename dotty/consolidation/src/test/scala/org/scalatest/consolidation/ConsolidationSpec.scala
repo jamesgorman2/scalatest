@@ -37,9 +37,9 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
           moduleSelectors = Vector.empty,
           buildTool = None,
           startedAt = None,
-          newRun = (module, worker) => {
-            made :+= (module -> worker)
-            RunAssembly(module, worker)
+          newRun = (runModule, worker) => {
+            made :+= (runModule -> worker)
+            RunAssembly(runModule, worker)
           }
         )
         consolidation.addRun(module, Some(workerAt(1, 2)))(_ => ())

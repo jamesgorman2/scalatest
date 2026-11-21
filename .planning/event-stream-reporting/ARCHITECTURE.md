@@ -54,7 +54,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - its argument splitter;
 - its definition of the runner argument;
 - its JSON encoder;
-- its test class name type, which the Mill plugin also names when it adds a run's assigned test classes;
+- its test class name type;
 - the version of this fork it was built at.
 
 The operation that adds a run's assigned test classes takes that type, so it is `private[scalatest]` like the type.
