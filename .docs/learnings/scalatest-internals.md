@@ -1,6 +1,6 @@
 ---
 kind: scalatest-internals
-description: Where upstream ScalaTest 3.2.20's sources, styles and runners behave otherwise than their names suggest. Read before writing a suite, sample or test that depends on which styles ship, on which tests a style registers ignored, on how Framework or Runner filters, orders, threads or reports a suite's tests, on when a suite registers its tests, on a run asked to stop, on a failure's source pathname, on a reporter a run constructs from its class name, on which of an error event's message and throwable lines a reporter prints, on a reporter's output on Scala.js or Native, or on a printed stack trace's `... N more` count; and before changing a style trait's private registration members or moving Scala 3 code into a helper.
+description: Where upstream ScalaTest 3.2.20's styles, runners and reporters behave otherwise than their names suggest. Read before relying on how ScalaTest registers, runs, orders or reports tests, or changing its style traits.
 ---
 
 <learning>

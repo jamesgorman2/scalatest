@@ -1,6 +1,6 @@
 ---
 kind: sbt-build-tooling
-description: How sbt, its plugins, incremental compilation, generated sources and dependency resolution misbehave or pass silently. Read before changing toolchain versions, MiMa settings or sbt configurations, relying on a passing MiMa check or on `-Werror` covering Scaladoc, running sbt from GitBash on Windows, packaging dependent projects in one sbt session on Windows, linking Scala Native on Windows, adding JVM-only code to Scala 3 core sources, or relying on a build-generated source being current after a version bump.
+description: How sbt, its plugins, cross-builds and incremental compilation misbehave or pass silently. Read before changing the sbt build or toolchain versions, relying on a passing check, or running sbt on Windows.
 ---
 
 <learning>

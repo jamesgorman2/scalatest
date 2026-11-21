@@ -1,6 +1,6 @@
-# Decisions: when the human-readable output shows a run
+# Decisions: the root, runs and modules in the output
 
-Decisions behind `../SPECIFICATION.md` on when the human-readable output shows a run, newest first.
+Decisions behind `../SPECIFICATION.md` on how the root, runs and modules appear in the consolidated output, and when the human-readable output shows the root or a run, newest first.
 
 ---
 
@@ -17,5 +17,41 @@ Decisions behind `../SPECIFICATION.md` on when the human-readable output shows a
 **Costs** The human-readable output does not show which suites shared a worker unless the run is shown; a reader who needs that reads the JSON output.
 
 **Settled by** [Plan: every worker of a JVM module](https://github.com/jamesgorman2/scalatest/issues/159).
+
+---
+
+## Human-readable output shows the root only where the root failed or has output attached (`../SPECIFICATION.md` R-143).
+
+**Alternatives**
+
+**Reasoning**
+
+**Costs**
+
+**Settled by**
+
+---
+
+## A forked JVM run is a node, and a non-forked run is reported as part of its module (`../SPECIFICATION.md` R-096a, R-135).
+
+**Alternatives**
+
+**Reasoning**
+
+**Costs**
+
+**Settled by**
+
+---
+
+## A module has an outcome only when the module has an error (`../SPECIFICATION.md` R-098e).
+
+**Alternatives**
+
+**Reasoning**
+
+**Costs**
+
+**Settled by**
 
 ---
