@@ -16,7 +16,7 @@ The format carries no compatibility promise across releases of this fork: any re
 ## Tree
 
 - The root holds one module.
-- The module holds one run node for each of its workers (README.md § What it supports), including a worker given no test class, such as the one worker of a module with no test class. Each worker writes its run's events to a file of its own, its test event log, which the test command reads.
+- The module holds one run node for each of its workers (README.md § What it supports), including a worker given no test class, such as the one worker of a module with no test class where no class glob is given. Each worker writes its run's events to a file of its own, its test event log, which the test command reads.
 - The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only in the cases § Root lists.
 - The module's run nodes appear in ascending order of `number`, compared as numbers, whatever order the runs started and ended in.
 - The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
@@ -80,7 +80,7 @@ Keys, in order:
 
 - `kind` — `run`.
 - `number` — the run's number within its module, from 1, in ascending order of `forkGroup`, then of the worker's index within its fork group: the `<i>` of the worker's folder `worker-<i>`, or 0 where the fork group has one worker.
-- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that hold no test class and so have no worker. A module that does not set `testForkGrouping` has its runs in fork group `0`. A module that holds no test class has one run, in fork group `0`. A fork group's runs are:
+- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that have no worker because they hold no test class to run, as where they hold no test class or no class glob matches their classes. A module that does not set `testForkGrouping` has its runs in fork group `0`. Where no class glob is given, a module that holds no test class has one run, in fork group `0`. A fork group's runs are:
   - for a module that does not set `testBatchFrameworkTasks`, one for each worker Mill starts for the group (README.md § What it supports);
   - for a module that sets `testBatchFrameworkTasks`, at most one, whatever the module's test parallelism.
 - `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.

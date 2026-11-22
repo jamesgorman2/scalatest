@@ -10,9 +10,9 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 - One JVM test module per command, testing with this fork at the plugin's release.
 - The module's tests run in the workers that Mill's `testForked`, or `testOnly` where class globs are given (§ Running the test command), starts for each fork group that holds a test class to run.
   - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
-    - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the group's test class count. The group's workers run in parallel.
+    - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the number of the group's test classes to run. The group's workers run in parallel.
     - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
-  - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's whole class list as `testForkGrouping` gives it, whatever the module's `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
+  - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's class list as `testForkGrouping` gives it, or, where class globs are given, the classes in that list that a class glob matches, whatever the module's `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
   - A module that does not set `testForkGrouping` has one fork group. Where no class glob is given, a module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
@@ -145,7 +145,7 @@ Under the test command, ScalaTest prints no end-of-run summary of its own. Inste
 
 The test command writes a module's files in its module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
 
-- Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder.
+- Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is at the same relative path in the module folder. Each worker's working directory `sandbox` is one such folder.
 - Once it has resolved the module selector, the test command deletes everything an earlier test command left in the module folder. It does so before any test starts, and also where none starts, as where no class glob matches.
 - A test command that fails on its arguments, such as on a framework argument it does not accept, leaves the module folder as it was.
 - The test command writes no JUnit XML report, whatever the module's `testReportXml`.

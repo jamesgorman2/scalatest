@@ -334,9 +334,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     for (batch <- Seq(false, true)) {
-      Scenario(s"A config map key given by both, testBatchFrameworkTasks $batch") {
-        Given("a module whose own ScalaTest arguments are -Dcolour=red")
-        And(s"whose testBatchFrameworkTasks is $batch")
+      Scenario(s"A framework argument takes effect over the module's own argument for the same config map key, testBatchFrameworkTasks $batch") {
+        Given("the module's testArgsDefault is Seq(\"-Dcolour=red\")")
+        And(s"the module's testBatchFrameworkTasks is $batch")
         And("Alpha1's test fast sends an info message holding the config map's value for colour")
         When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -Dcolour=blue")
         withMarkingSuites { build =>
@@ -356,8 +356,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
     }
 
-    Scenario("A span scale factor given by both") {
-      Given("a module whose own ScalaTest arguments are -F 2")
+    Scenario("A framework argument replaces the module's own argument for the span scale factor") {
+      Given("the module's testArgsDefault is Seq(\"-F\", \"2\")")
       And("Alpha1's test fast sends an info message holding the span scale factor")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -F 3")
       withMarkingSuites { build =>
