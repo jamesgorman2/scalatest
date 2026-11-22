@@ -15,7 +15,7 @@ private[mill] object FrameworkArguments {
   private def isPassedOn(argument: ScalaTestArgument): Boolean =
     argument match {
       case flagged: ScalaTestArgument.Flagged =>
-        !flagged.isShortOfValues && AllowedFlag.from(flagged.flag).exists(_.acceptsValuesOf(flagged))
+        !flagged.isShortOfValues && AllowedFlag.of(flagged).exists(_.acceptsValuesOf(flagged))
       case ScalaTestArgument.Unrecognised(_) => false
     }
 

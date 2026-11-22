@@ -50,6 +50,8 @@ private[mill] object AllowedFlag {
 
   def from(flag: String): Option[AllowedFlag] = values.find(_.text == flag)
 
+  def of(argument: ScalaTestArgument.Flagged): Option[AllowedFlag] = from(argument.flag)
+
   def isHeldBy(argument: String): Boolean =
     ScalaTestArgument.split(Seq(argument)) match {
       case Seq(ScalaTestArgument.Flagged(flag, _)) => from(flag).isDefined

@@ -9,7 +9,7 @@ private[mill] object ModuleScalaTestArguments {
     split.collectFirst { case ScalaTestArgument.Unrecognised(argument) => argument } match {
       case Some(argument) => Left(TestCommandFailure.UnrecognisedModuleArgument(argument))
       case None =>
-        Right(split.collect { case flagged @ ScalaTestArgument.Flagged(flag, _) if AllowedFlag.from(flag).isDefined => flagged })
+        Right(split.collect { case flagged: ScalaTestArgument.Flagged if AllowedFlag.of(flagged).isDefined => flagged })
     }
   }
 }
