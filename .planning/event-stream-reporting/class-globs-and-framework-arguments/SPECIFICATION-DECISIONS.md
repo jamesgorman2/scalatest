@@ -2,6 +2,20 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## A test command clears the module folder only once it has resolved the module, so a test command that fails on its arguments leaves the module folder as it was.
+
+**Alternatives**
+
+- Resolving the module selector before failing on any other argument would let the test command clear the module folder also where it fails on its framework arguments, so that every test command whose module selector names the module clears it.
+
+**Reasoning** A test command that fails on its arguments fails before any test starts and writes no consolidated output (`SPECIFICATION.md` R-002, R-013), so it should change nothing on disk. It leaves the file at its `-fJ` path as it was, and likewise leaves the module folder as it was (`SPECIFICATION.md` R-012).
+
+**Costs** After such a failure, the module folder can still hold an earlier test command's files. They are never read as a run, because the next test command that resolves the module clears the module folder before it starts any test.
+
+**Settled by** [Class globs and framework arguments - The module folder](https://github.com/jamesgorman2/scalatest/issues/227).
+
+---
+
 ## A framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's `testArgsDefault` arguments that have the same flag, rather than following them.
 
 **Alternatives**

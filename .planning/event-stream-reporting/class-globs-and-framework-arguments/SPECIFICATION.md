@@ -82,7 +82,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 ### The module folder
 
 - R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`, which a module selector can also name `core[3.3.8].test`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder. Each worker's working directory `sandbox` is one such folder (`../SPECIFICATION.md` R-110).
-- R-012 Each test command deletes every file and folder that an earlier test command left in the module folder. It deletes them before it starts any test of the module, and deletes them also where it starts no test of the module (`../SPECIFICATION.md` R-110).
+- R-012 Once a test command has resolved the module from its module selector, it deletes every file and folder that an earlier test command left in the module folder. It deletes them before it starts any test of the module, and deletes them also where it then starts no test of the module, as where no class glob matches a test class (R-006). A test command that fails before it has resolved the module, as where it fails on its arguments (R-002, R-013), creates, changes and deletes nothing in the module folder (`../SPECIFICATION.md` R-110).
 - R-010 Once a test command has ended, whether it succeeded or failed, the module folder and every folder inside it hold no JUnit XML report, whatever the module's `testReportXml` is and whatever class globs and framework arguments are given (`../SPECIFICATION.md` R-047, R-110).
 - R-011 The test command creates neither of the module's `testForked` and `testOnly` task folders, such as `out/core/test/testForked.dest`, and creates, changes and deletes nothing in either where it exists (`../SPECIFICATION.md` R-060, R-110).
 
@@ -278,7 +278,7 @@ Feature: The environment of each worker
 
 ```gherkin
 Feature: The module folder
-  The module folder holds the test command's files for the module, never a JUnit XML report, and nothing an earlier test command left there.
+  The module folder holds the test command's files for the module and never a JUnit XML report. Once a test command has resolved the module, the module folder holds nothing an earlier test command left there.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
@@ -306,13 +306,22 @@ Feature: The module folder
         | `Some("test-report.xml")`   | `-- samples.Gamma*`       |
         | `None`                      | `-- * -- -l samples.Fast` |
 
-  Rule: A test command leaves nothing in the module folder from an earlier test command
+  Rule: A test command that resolves the module leaves nothing in the module folder from an earlier test command
     Scenario: AC-015 An earlier test command's file, then class globs that match no test class
       Given `Alpha1`'s test `fast` creates the file `leftover.txt` in its working directory when it runs
       And the test command has been invoked with no arguments, and `leftover.txt` exists in a folder inside the module folder
       And the file at `<report>` has since been deleted
       When the test command is invoked with `-- samples.Gamma*`
       Then no file `leftover.txt` exists in the module folder or in any folder inside it
+
+  Rule: A test command that fails on its arguments leaves the module folder as it was
+    Scenario: AC-019 An earlier test command's file, then a framework argument the test command does not accept
+      Given `Alpha1`'s test `fast` creates the file `leftover.txt` in its working directory when it runs
+      And the test command has been invoked with no arguments, and `leftover.txt` exists in a folder inside the module folder
+      And the file at `<report>` has since been deleted
+      When the test command is invoked with `-- -- foo`
+      Then the test command fails with a message naming `foo`
+      And the module folder and every folder inside it hold the files they held before the test command was invoked, `leftover.txt` among them, each with the content it had
 
   Rule: The test command leaves the folders of Mill's own test tasks as they were
     Scenario: AC-013 Mill's own report from an earlier testForked
@@ -336,5 +345,5 @@ Feature: The module folder
 | R-009       | AC-002, AC-003                                 |
 | R-010       | AC-011                                         |
 | R-011       | AC-013                                         |
-| R-012       | AC-015                                         |
+| R-012       | AC-015, AC-019                                 |
 | R-013       | AC-016                                         |

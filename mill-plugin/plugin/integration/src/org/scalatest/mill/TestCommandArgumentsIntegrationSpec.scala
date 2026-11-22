@@ -567,6 +567,36 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
     }
 
+    Scenario("A test command that fails on a framework argument leaves the file an earlier test command left in the module folder") {
+      Given("Alpha1's test fast creates the file leftover.txt in its working directory when it runs")
+      And("the test command has run core.test with no arguments, and leftover.txt exists in a folder inside the module folder")
+      And("the JSON output file has since been deleted")
+      When("the test command runs core.test, writing JSON output, with -- -- foo")
+      withMarkingSuites { build =>
+        def filesAndContents: Map[os.Path, Seq[Byte]] = filesIn(build.moduleFolder).map(file => file -> os.read.bytes(file).toSeq).toMap
+        val leftover = "leftover.txt"
+        makeAlpha1FastCreateFileInWorkingDirectory(build, leftover)
+        val earlierResult = runWritingJsonOutput(build)
+        withClue(earlierResult.debugString) {
+          filesIn(build.moduleFolder).map(_.last) should contain(leftover)
+        }
+        os.remove(build.jsonOutputFile)
+        val earlierFilesAndContents = filesAndContents
+        val result = runWritingJsonOutput(build, "--", "--", "foo")
+
+        Then("the test command fails with a message naming foo")
+        withClue(result.debugString) {
+          result.succeeded shouldBe false
+        }
+        shouldWriteToTheConsole(result, TestCommandFailure.FrameworkArgumentNotPassedOn("foo").message)
+
+        And("the module folder and every folder inside it hold the files they held before, leftover.txt among them, each with the content it had")
+        withClue(result.debugString) {
+          filesAndContents shouldBe earlierFilesAndContents
+        }
+      }
+    }
+
     Scenario("The test command leaves Mill's own report from an earlier testForked as it was, and creates no testOnly task folder") {
       Given("mill core.test.testForked has run in the build and written out/core/test/testForked.dest/test-report.xml")
       And("no folder out/core/test/testOnly.dest exists")
