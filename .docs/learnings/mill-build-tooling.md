@@ -207,5 +207,5 @@ date: 2026-11-22
 ---
 Mill 1.3.1 names a cross module in task names, and in `Segments.render` (so `module.moduleSegments.render`), with dots, not brackets: the `test` module of the cross module `core` at `3.3.8` is `core.3_3_8.test`, and its task `core.3_3_8.test.testForked`. Each `.`, `/` and `:` in a cross value becomes `_`. A selector still accepts `core[3.3.8].test`, and `Segments.renderBracketSyntax` gives that form.
 
-A requirement, folder name or test that expects `core[3.3.8].test` as "the name Mill writes in a task name" is wrong under Mill 1.3.1. Check a cross name with `mill resolve 'core[3.3.8].test._'` before writing it into a specification.
+A requirement, folder name or test that expects `core[3.3.8].test` as "the name Mill writes in a task name" is wrong under Mill 1.3.1. Check a cross name before writing it into a specification by running the build's checked-in launcher from the build's folder, such as `./mill.bat --no-daemon resolve 'core[3.3.8].test._'`.
 </learning>

@@ -119,8 +119,11 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
          |  ${MarkingSuiteTest.Fast.withEmptyBody}""".stripMargin
     )
 
+  private def runWritingJsonOutput(build: FixtureBuild, arguments: String*): TestCommandResult =
+    build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
+
   private def runWithArguments(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
-    build.resultAndJsonOutput(build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*))
+    build.resultAndJsonOutput(runWritingJsonOutput(build, arguments*))
 
   private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
     runWithArguments(build, ("--" +: classGlobs)*)
@@ -286,7 +289,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       And("each test creates a file in the markers folder as it runs")
       When("the test command runs core.test, writing JSON output, with nothing after -fJ and its path")
       withMarkingSuites { build =>
-        val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))()
+        val result = runWritingJsonOutput(build)
 
         Then("the test command succeeds")
         shouldSucceed(result)
@@ -382,7 +385,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
         When(s"the test command runs core.test, writing JSON output, with -- -- ${frameworkArguments.mkString(" ")}")
         withMarkingSuites { build =>
-          val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(("--" +: "--" +: frameworkArguments)*)
+          val result = runWritingJsonOutput(build, ("--" +: "--" +: frameworkArguments)*)
 
           shouldFailBeforeAnyTestStartsWritingNoOutput(build, result, TestCommandFailure.FrameworkArgumentNotPassedOn(named).message)
         }
@@ -394,7 +397,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
         When(s"the test command runs core.test, writing JSON output, with ${arguments.mkString(" ")}")
         withMarkingSuites { build =>
-          val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
+          val result = runWritingJsonOutput(build, arguments*)
 
           shouldFailBeforeAnyTestStartsWritingNoOutput(build, result, TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n").message)
         }
@@ -512,10 +515,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     def describe(arguments: Seq[String]): String = if (arguments.isEmpty) "no arguments" else arguments.mkString(" ")
 
-    def runWritingJsonOutput(build: FixtureBuild, arguments: String*): TestCommandResult =
-      build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
-
-    val reportSettings = Seq(
+    val reportSettingsAndArguments = Seq(
       """Some("test-report.xml")""" -> Nil,
       """Some("junit-results.xml")""" -> Seq("--", "samples.Alpha*"),
       """Some("test-report.xml")""" -> Seq("--", "--", "-n", "samples.Fast"),
@@ -523,7 +523,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       "None" -> Seq("--", "*", "--", "-l", "samples.Fast")
     )
 
-    for ((setting, arguments) <- reportSettings) {
+    for ((setting, arguments) <- reportSettingsAndArguments) {
       Scenario(s"With testReportXml $setting and ${describe(arguments)}, the module folder holds no JUnit XML report") {
         Given(s"a module whose testReportXml is $setting")
         And("Beta1's test slow fails")
@@ -569,9 +569,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       And("no folder out/core/test/testOnly.dest exists")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
       withMarkingSuites { build =>
-        val millsOwnTaskFolders = build.workspace / "out" / "core" / "test"
-        val millsReport = millsOwnTaskFolders / "testForked.dest" / "test-report.xml"
-        val testOnlyTaskFolder = millsOwnTaskFolders / "testOnly.dest"
+        val millsTestModuleOutFolder = build.workspace / "out" / "core" / "test"
+        val millsReport = millsTestModuleOutFolder / "testForked.dest" / "test-report.xml"
+        val testOnlyTaskFolder = millsTestModuleOutFolder / "testOnly.dest"
         val testForkedResult = build.eval(Seq("core.test.testForked"))
         withClue(testForkedResult.debugString) {
           os.isFile(millsReport) shouldBe true
@@ -594,9 +594,16 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     Scenario("The module folder of a cross module's test module is named as Mill writes the module in a task name") {
       Given("the cross module core at 3.3.8, whose test module Mill names core.3_3_8.test in a task name")
+      And("Alpha1's test fast creates the file working-directory.txt in its working directory when it runs")
       When("the test command runs core[3.3.8].test with -- samples.Alpha1")
       withMarkingSuites { build =>
+        val workingDirectoryMarker = "working-directory.txt"
         build.replaceInBuild("object core extends ScalaModule {", "object core extends Cross[CoreModule](\"3.3.8\")\n\ntrait CoreModule extends CrossScalaModule {")
+        build.replaceInSample(
+          s"${MarkingSuite.Alpha1}.scala",
+          MarkingSuiteTest.Fast.withEmptyBody,
+          MarkingSuiteTest.Fast.creatingFileInWorkingDirectory(workingDirectoryMarker)
+        )
         val result = build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2))("core[3.3.8].test", "--", "samples.Alpha1")
 
         Then("the test command succeeds")
@@ -605,7 +612,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         withClue(result.debugString) {
           And("its worker ran in the folder sandbox of the module folder out/org.scalatest.mill.TestCommandModule/modules/core.3_3_8.test, the only module folder")
           os.list(build.modulesFolder).map(_.last) shouldBe Seq("core.3_3_8.test")
-          os.isDir(build.modulesFolder / "core.3_3_8.test" / "sandbox") shouldBe true
+          os.isFile(build.modulesFolder / "core.3_3_8.test" / "sandbox" / workingDirectoryMarker) shouldBe true
         }
       }
     }

@@ -24,7 +24,8 @@ private[mill] object TestCommand {
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
     jsonOutputFile.foreach(file => orFail(BuildCtx.withFilesystemCheckerDisabled(file.delete())))
     val selectedModule = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
-    val moduleFolder = BuildCtx.withFilesystemCheckerDisabled(clearedModuleFolder(ctx, selectedModule.path))
+    val module = selectedModule.name
+    val moduleFolder = BuildCtx.withFilesystemCheckerDisabled(clearedModuleFolder(ctx, module))
     val inputs = orFail(JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log))
     val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.forRun(inputs.testArgs)), commandArguments.frameworkArguments)
     val output = ctx.log.streams.out
@@ -34,7 +35,6 @@ private[mill] object TestCommand {
         case StdoutContent.NoOutput => _ => ()
       }
     var jsonOutputWritten: Either[TestCommandFailure, Unit] = Right(())
-    val module = ModuleName(selectedModule.path)
     val consolidation = Consolidation.start(
       humanReadableOutput,
       coloured = true,
@@ -63,12 +63,12 @@ private[mill] object TestCommand {
     val endedState = consolidation.end(Some(now()))
     orFail(jsonOutputWritten)
     if (endedState.failed) {
-      ctx.fail(s"The tests of ${selectedModule.path} failed")
+      ctx.fail(s"The tests of ${module.value} failed")
     }
   }
 
-  private def clearedModuleFolder(ctx: TaskCtx, modulePath: String): os.Path = {
-    val moduleFolder = ctx.dest / os.up / "modules" / modulePath
+  private def clearedModuleFolder(ctx: TaskCtx, module: ModuleName): os.Path = {
+    val moduleFolder = ctx.dest / os.up / "modules" / module.value
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     moduleFolder
