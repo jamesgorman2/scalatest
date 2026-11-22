@@ -134,8 +134,8 @@ It also fails when:
 - laying out a fork group's files fails, or starting or running a test worker fails;
 - the test command fails to capture a test worker's output, which goes to Mill's console instead;
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;
-- two of the module's fork groups would share a `processFolder`, as where each holds only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test runs;
-- two or more of the module's fork groups hold a test class, and the test command cannot tell whether the filesystem is case-insensitive. No test runs;
+- two of the module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test runs;
+- two or more of the module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test runs;
 - the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
@@ -145,10 +145,9 @@ Under the test command, ScalaTest prints no end-of-run summary of its own. Inste
 
 The test command writes a module's files in its module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
 
-- Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is at the same relative path in the module folder. Each worker's working directory `sandbox` is one such folder.
+- Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder is at the same relative path in the module folder, other than its JUnit XML report: the test command writes none, whatever the module's `testReportXml`. Each worker's working directory `sandbox` is one such folder.
 - Once it has resolved the module selector, the test command deletes everything an earlier test command left in the module folder. It does so before any test starts, and also where none starts, as where no class glob matches.
 - A test command that fails on its arguments, such as on a framework argument it does not accept, leaves the module folder as it was.
-- The test command writes no JUnit XML report, whatever the module's `testReportXml`.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
 
 ## Runs in the human-readable output

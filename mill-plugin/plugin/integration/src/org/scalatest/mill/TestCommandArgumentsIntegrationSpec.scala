@@ -174,8 +174,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     for (batch <- Seq(false, true)) {
       Scenario(s"Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks $batch") {
-        Given("a module whose testForkGrouping puts Beta1 in fork group 0, and Alpha1 and Alpha2 in fork group 1")
-        And(s"whose testBatchFrameworkTasks is $batch")
+        Given(
+          s"""the module's testForkGrouping is Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2")) and its testBatchFrameworkTasks is $batch"""
+        )
         And("each test sends an info message holding the system property user.dir")
         When("the test command runs core.test, writing JSON output, with -- samples.Alpha*")
         withMarkingSuites { build =>
@@ -198,7 +199,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     Scenario("Class globs that select one class under test parallelism run it in one worker, in the module folder") {
-      Given("a module with test parallelism on")
+      Given("the module's testParallelism is on")
       And("Alpha1's test fast sends an info message holding the system property user.dir")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
       withMarkingSuites { build =>
@@ -542,7 +543,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     for ((setting, arguments) <- reportSettingsAndArguments) {
       Scenario(s"With testReportXml $setting and ${describe(arguments)}, the module folder holds no JUnit XML report") {
-        Given(s"a module whose testReportXml is $setting")
+        Given(s"the module's testReportXml is $setting")
         And("Beta1's test slow fails")
         When(s"the test command runs core.test, writing JSON output, with ${describe(arguments)}")
         withMarkingSuites { build =>

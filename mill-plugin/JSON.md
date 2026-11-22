@@ -60,7 +60,7 @@ Keys, in order:
   - or one failure laying out the module's workers. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
     - class globs are given and none of them matches a test class of the module, and the failure is the one Mill's `testOnly` fails with. Its first line is `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, and its second is `Run discoveredTestClasses to see available tests`;
     - two of the module's fork groups would share a `processFolder`, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
-    - or checking whether the filesystem ignores case failed, and the failure gives what the check threw, as in `Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: …`. The check runs only where two or more fork groups hold a test class.
+    - or checking whether the filesystem ignores case failed, and the failure gives what the check threw, as in `Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: …`. The check runs only where two or more fork groups hold a test class to run.
 - `startedAt`, `endedAt`, `duration` — measured by the test command, from just before it lays out the module's workers until every run has ended. For a module that does not set `testBatchFrameworkTasks`, laying out its workers includes discovering its tests.
 - `contents` — an array holding the module.
 - `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.
