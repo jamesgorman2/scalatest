@@ -209,3 +209,14 @@ Mill 1.3.1 writes a cross module's name with dots, not brackets, both in task na
 
 A requirement, folder name or test that expects `core[3.3.8].test` as "the name Mill writes in a task name" is wrong under Mill 1.3.1. Check a cross name before writing it into a specification by running the build's checked-in launcher from the build's folder, such as `./mill.bat --no-daemon resolve 'core[3.3.8].test._'`.
 </learning>
+
+<learning>
+date: 2026-11-23
+---
+In Mill 1.3.1, `testOnly` raises `Test selector does not match any test: <selectors>` in only two places of `mill.javalib.TestModuleUtil.runTests`: before any worker starts, where no class is left once its globs and test discovery have filtered the fork groups, and after its scheduler returns `Result.Success` with no `TestResult`. The second check is skipped whenever any worker gives no success:
+
+- a worker that throws, as where writing its `testargs` or spawning its JVM fails, propagates the exception out of `runTests`;
+- a worker whose JVM exits without writing `out.json`, as where it dies, gives `Result.Failure("Test reporting Failed: … does not exist")`, and `processTestResults` returns the joined failure.
+
+A plugin that matches `testOnly`'s failures must decide for each of these cases whether it adds the no-match failure: `testOnly` adds it after neither, only where every worker ended with a result and none held a test.
+</learning>

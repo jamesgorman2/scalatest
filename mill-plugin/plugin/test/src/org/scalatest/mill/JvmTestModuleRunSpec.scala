@@ -11,6 +11,8 @@ import org.scalatest.matchers.should
 import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
+import org.scalatest.mill.WorkerRun.Ending.Ended
+import org.scalatest.mill.WorkerRun.Ending.FailedToStart
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Using
 
@@ -111,12 +113,12 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     def addCompletedRunWithNoSuite(consolidation: Consolidation): Unit =
       addRunReading(consolidation, Seq(EventLogs.runStarted, EventLogs.runEndedCompleted))
 
-    "class globs are given and no run of the module reported a test result" should {
+    "class globs are given, no worker of the module failed to start and no run of the module reported a test result" should {
       "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
         addCompletedRunWithNoSuite(consolidation)
-        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, Seq(Ended, Ended))
         consolidation.end()
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
           "Consolidated tests:",
@@ -129,12 +131,23 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "class globs are given, a worker of the module failed to start and no run of the module reported a test result" should {
+      "attach nothing to the root" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        addCompletedRunWithNoSuite(consolidation)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, Seq(Ended, FailedToStart))
+        consolidation.end()
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
+      }
+    }
+
     "class globs are given and a run of the module reported a suite as aborted" should {
       "attach nothing to the root" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
         addRunWithAbortedSuite(consolidation)
-        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, Seq(Ended))
         consolidation.end()
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
       }
@@ -144,7 +157,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       "attach nothing to the root, leaving the consolidation unfailed" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         addCompletedRunWithNoSuite(consolidation)
-        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, Nil)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, Nil, Seq(Ended))
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
       }

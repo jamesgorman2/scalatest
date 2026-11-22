@@ -23,7 +23,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     }
   }
 
-  def end(awaitWorker: Future[WorkerProcess] => Unit): Unit = {
+  def end(awaitWorker: Future[WorkerProcess] => Unit): WorkerRun.Ending = {
     val ended = WorkerRun.abandoningOnThrow(abandon()) {
       started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
     }
@@ -39,6 +39,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
       consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
     }
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
+    if (ended.isFailure) WorkerRun.Ending.FailedToStart else WorkerRun.Ending.Ended
   }
 
   def abandon(): Unit = {
@@ -80,6 +81,11 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
 private[mill] object WorkerRun {
 
+  enum Ending {
+    case Ended
+    case FailedToStart
+  }
+
   private enum ReaderState {
     case NotStarted
     case Started
@@ -98,12 +104,10 @@ private[mill] object WorkerRun {
       started :+ abandoningOnThrow(started.foreach(_.abandon()))(start(worker))
     }
 
-  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[WorkerProcess] => Unit): Unit =
+  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[WorkerProcess] => Unit): Seq[Ending] =
     try {
-      workerRuns.tails.foreach {
-        case workerRun +: notYetEnded =>
-          abandoningOnThrow(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
-        case _ => ()
+      workerRuns.tails.toSeq.collect { case workerRun +: notYetEnded =>
+        abandoningOnThrow(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
       }
     } finally {
       // A failed worker can go on writing output, which must not reach a run that has ended.
