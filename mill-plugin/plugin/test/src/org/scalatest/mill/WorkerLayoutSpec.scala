@@ -169,7 +169,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "class globs are given" when {
       "they keep classes of only the second of two fork groups" should {
-        "give that group one worker in the module's folder, keeping the group's position, and queue only the kept classes" in {
+        "give that group one worker in the module's folder, keeping the group's position" in {
           layoutOf(twoForkGroups, classGlobs = globs("samples.A*")) shouldBe Right(
             WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), classes("samples.A1", "samples.A2"), Seq(PlannedWorker(workerOf(1), PathUnderModule())))))
           )
@@ -178,8 +178,8 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
       "they keep some classes of each fork group" should {
         "queue each group's kept classes only" in {
-          layoutOf(twoForkGroups, classGlobs = globs("samples.B2", "*1")).map(_.forkGroups.map(_.testClasses)) shouldBe Right(
-            Seq(classes("samples.B1", "samples.B2"), classes("samples.A1"))
+          layoutOf(twoForkGroups, classGlobs = globs("samples.B2", "samples.A1")).map(_.forkGroups.map(_.testClasses)) shouldBe Right(
+            Seq(classes("samples.B2"), classes("samples.A1"))
           )
         }
       }

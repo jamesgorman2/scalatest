@@ -12,9 +12,9 @@ private enum MarkingSuite {
   case Beta1
 }
 
-private enum FixtureTest(declaration: String) {
-  case Fast extends FixtureTest("""test("fast", Fast) """)
-  case Slow extends FixtureTest("""test("slow") """)
+private enum MarkingSuiteTest(declaration: String) {
+  case Fast extends MarkingSuiteTest("""test("fast", Fast) """)
+  case Slow extends MarkingSuiteTest("""test("slow") """)
 
   def withEmptyBody: String = declaration + "{}"
 
@@ -83,7 +83,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private def infoMessages(json: JsonNode): Seq[String] =
     moduleNode(json).nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
 
-  private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: MarkingSuite, tests: FixtureTest*): Unit =
+  private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: MarkingSuite, tests: MarkingSuiteTest*): Unit =
     tests.foreach(test => build.replaceInSample(s"$suite.scala", test.withEmptyBody, test.sendingWorkingDirectory))
 
   private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) = {
@@ -146,7 +146,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
             """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2")) }""",
             s"def testBatchFrameworkTasks = $batch"
           )
-          MarkingSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, FixtureTest.Fast, FixtureTest.Slow))
+          MarkingSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, MarkingSuiteTest.Fast, MarkingSuiteTest.Slow))
           val (result, json) = runWithClassGlobs(build, "samples.Alpha*")
 
           withClue(result.debugString) {
@@ -166,7 +166,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
       withMarkingSuites { build =>
         build.replaceInBuild("def testParallelism = false", "def testParallelism = true")
-        makeTestsSendWorkingDirectory(build, MarkingSuite.Alpha1, FixtureTest.Fast)
+        makeTestsSendWorkingDirectory(build, MarkingSuite.Alpha1, MarkingSuiteTest.Fast)
         val (result, json) = runWithClassGlobs(build, "samples.Alpha1")
 
         withClue(result.debugString) {
