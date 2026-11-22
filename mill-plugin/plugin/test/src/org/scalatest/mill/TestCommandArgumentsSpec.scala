@@ -158,7 +158,6 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
       "split them by flag, each with its values, in the order given" in {
         val arguments = Seq(
           Seq("-Dcolour=blue"),
-          Seq("-P"),
           Seq("-P4"),
           Seq("-n", "samples.Fast"),
           Seq("-l", "samples.Slow"),
@@ -221,6 +220,10 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
         for (argument <- Seq("-D", "-Dcolour", "-D=blue", "-Dcolour=")) {
           frameworkArgumentRejection(argument) shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn(argument)
         }
+      }
+
+      "reject a -P alone, which ScalaTest's sbt Framework does not accept, naming it" in {
+        frameworkArgumentRejection("-P") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-P")
       }
 
       "reject a -P with anything but a thread count joined to it, naming it" in {

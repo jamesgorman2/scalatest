@@ -43,11 +43,11 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - R-001 The test command reads every argument after its first `--` as Mill's `testOnly` reads its arguments: the arguments before the next `--` are *class globs*, and the arguments after that `--` are *framework arguments*. Where no second `--` follows, every argument after the first `--` is a class glob. Where the test command's arguments hold no `--`, it has no class globs and no framework arguments. The module selector and the test command's output arguments come before the first `--` (`../SPECIFICATION.md` R-055).
 - R-002 The test command accepts its framework arguments only where each framework argument has one of these forms:
   - `-D` with a config map entry joined to it, such as `-Dcolour=blue`;
-  - `-P` alone, or with a thread count joined to it, such as `-P4`;
+  - `-P` with a thread count, a positive whole number, joined to it, such as `-P4`;
   - one of the ScalaTest flags `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, followed by the separate values ScalaTest's runner takes after that flag;
   - one of the separate values that ScalaTest's runner takes after the flag before it, such as `samples.Fast` after `-n`.
 
-  Where any framework argument has none of these forms, the test command fails before any test starts with a message naming that argument, and writes no consolidated output (`../SPECIFICATION.md` R-125a, R-125b). Such framework arguments include the ScalaTest flags `-oD` and `-s`, the unknown flag `--unknown`, `-n` with no value after it, `-D` with no config map entry joined to it, and `foo`.
+  Where any framework argument has none of these forms, the test command fails before any test starts with a message naming that argument, and writes no consolidated output (`../SPECIFICATION.md` R-125a, R-125b). Such framework arguments include the ScalaTest flags `-oD` and `-s`, the unknown flag `--unknown`, `-n` with no value after it, `-D` with no config map entry joined to it, `-P` with no thread count joined to it, and `foo`.
 - R-013 The test command fails before any test starts, with a message naming the argument, and writes no consolidated output, where any of these arguments is one of the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, alone or with its value joined to it, such as `-n` or `-Dcolour=blue` (`../SPECIFICATION.md` R-125b):
   - an argument before the test command's first `--`;
   - any argument, where the test command's arguments hold no `--`.
@@ -239,6 +239,7 @@ Feature: Framework arguments
         | `-s samples.Alpha1` | `-s`        |
         | `--unknown`         | `--unknown` |
         | `-n`                | `-n`        |
+        | `-P`                | `-P`        |
         | `foo`               | `foo`       |
 
   Rule: A ScalaTest argument before the first `--` fails the test command

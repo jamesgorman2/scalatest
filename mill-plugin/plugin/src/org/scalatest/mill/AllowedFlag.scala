@@ -33,7 +33,8 @@ private[mill] enum AllowedFlag(val text: String) {
   private def acceptsJoinedValue(joinedValue: String): Boolean =
     this match {
       case ConfigMapEntry => AllowedFlag.isConfigMapEntry(joinedValue)
-      case Parallel => joinedValue.isEmpty || AllowedFlag.isThreadCount(joinedValue)
+      // ScalaTest's sbt Framework, which runs the tests under Mill, rejects a -P without a thread count.
+      case Parallel => AllowedFlag.isThreadCount(joinedValue)
       case _ => joinedValue.isEmpty
     }
 

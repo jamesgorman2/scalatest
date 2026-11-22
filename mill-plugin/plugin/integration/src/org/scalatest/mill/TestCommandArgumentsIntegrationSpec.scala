@@ -394,6 +394,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Seq("-s", "samples.Alpha1") -> "-s",
       Seq("--unknown") -> "--unknown",
       Seq("-n") -> "-n",
+      Seq("-P") -> "-P",
       Seq("foo") -> "foo"
     )
 

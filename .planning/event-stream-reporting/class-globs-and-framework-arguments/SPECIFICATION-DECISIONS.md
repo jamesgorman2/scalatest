@@ -2,6 +2,20 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
+## A framework `-P` without a thread count fails the test command before any test starts, rather than being passed on.
+
+**Alternatives**
+
+- Accepting a bare `-P` and documenting its effect, as Mill's `testOnly` passes it on.
+
+**Reasoning** ScalaTest's sbt `Framework` rejects `-P` without a thread count (`jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`, `Framework.runner`). Where the module's `testBatchFrameworkTasks` is off, the test command's own discovery then throws, so the test command fails with no consolidated output. Where it is on, every worker fails before a run starts. Rejecting a bare `-P` before any test starts names the argument and starts nothing (`SPECIFICATION.md` R-002).
+
+**Costs** The test command departs from Mill's `testOnly` and `testForked`, which pass a bare `-P` on.
+
+**Settled by** [Class globs and framework arguments - Reject a bare -P before any test starts](https://github.com/jamesgorman2/scalatest/issues/236).
+
+---
+
 ## A test command clears the module folder only once it has resolved the module, so one that fails on its arguments leaves the folder as it was.
 
 **Alternatives**
@@ -28,7 +42,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Reasoning** A user types a framework argument for this test command alone, so it should take effect over the module's standing setting (`SPECIFICATION.md` R-005). For the other flags R-005 lists, ScalaTest takes the later argument or adds to the earlier, so passing both on in order already gives the framework argument effect. Only these five flags need replacing.
 
-**Costs** For these five flags the test command departs from Mill's `testOnly` and `testForked`: a command line that fails or keeps the module's setting under Mill takes the framework argument's setting under the test command. A framework `-P` without a thread count replaces a module `-P` holding one, so ScalaTest's runner rejects the run, whereas Mill's tasks run with the module's thread count.
+**Costs** For these five flags the test command departs from Mill's `testOnly` and `testForked`: a command line that fails or keeps the module's setting under Mill takes the framework argument's setting under the test command.
 
 **Settled by** [Class globs and framework arguments - Framework arguments in every run](https://github.com/jamesgorman2/scalatest/issues/224).
 
