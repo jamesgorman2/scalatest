@@ -107,14 +107,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     )
 
   private def runWithArguments(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
-    withJsonOutput(build, build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*))
-
-  private def withJsonOutput(build: FixtureBuild, result: TestCommandResult): (TestCommandResult, JsonNode) = {
-    withClue(result.debugString) {
-      os.exists(build.jsonOutputFile) shouldBe true
-    }
-    (result, build.jsonOutput)
-  }
+    build.withJsonOutput(build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*))
 
   private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
     runWithArguments(build, ("--" +: classGlobs)*)
@@ -371,8 +364,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     def daemonDescription(daemonMode: Boolean): String =
       if (daemonMode) "under a Mill daemon that an earlier mill command started in another environment" else "with no Mill daemon"
 
-    for (daemonMode <- Seq(false, true); (propagate, outer) <- Seq(true -> "from-outer", false -> "absent")) {
-      Scenario(s"With propagateEnv $propagate, a worker receives FIXTURE_OUTER $outer from the environment in which mill started, ${daemonDescription(daemonMode)}") {
+    for (daemonMode <- Seq(false, true); (propagate, expectedOuterValue) <- Seq(true -> "from-outer", false -> "absent")) {
+      val receives = if (propagate) "receives" else "does not receive"
+      Scenario(s"With propagateEnv $propagate, a worker $receives FIXTURE_OUTER from the environment in which mill started, ${daemonDescription(daemonMode)}") {
         Given(s"a module whose propagateEnv is $propagate")
         And("whose forkEnv sets FIXTURE_FORK and FIXTURE_BOTH to from-forkEnv")
         And(s"Alpha1's test fast sends an info message holding the environment variables ${sentVariables.mkString(", ")}, each absent where it is not set")
@@ -390,8 +384,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           if (daemonMode) {
             build.compileBuildFile()
           }
-          val (result, json) = withJsonOutput(
-            build,
+          val (result, json) = build.withJsonOutput(
             build.runTestCommandWritingJsonOutputWith(
               FixtureBuild.jobsArguments(2),
               Map("FIXTURE_OUTER" -> "from-outer", "FIXTURE_BOTH" -> "from-outer")
@@ -399,10 +392,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           )
           val variables = infoMessages(json).map(variablesIn)
 
-          Then(s"the info message holds FIXTURE_OUTER $outer, FIXTURE_FORK and FIXTURE_BOTH from-forkEnv, and MILL_WORKSPACE_ROOT the build's workspace")
+          Then(s"the info message holds FIXTURE_OUTER $expectedOuterValue, FIXTURE_FORK and FIXTURE_BOTH from-forkEnv, and MILL_WORKSPACE_ROOT the build's workspace")
           withClue(result.debugString) {
             variables.map(_.removed("MILL_WORKSPACE_ROOT")) shouldBe
-              Seq(Map("FIXTURE_OUTER" -> outer, "FIXTURE_FORK" -> "from-forkEnv", "FIXTURE_BOTH" -> "from-forkEnv"))
+              Seq(Map("FIXTURE_OUTER" -> expectedOuterValue,"FIXTURE_FORK" -> "from-forkEnv", "FIXTURE_BOTH" -> "from-forkEnv"))
             variables.map(_.get("MILL_WORKSPACE_ROOT").map(os.Path(_))) shouldBe Seq(Some(build.workspace))
           }
 
@@ -413,28 +406,27 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     for (daemonMode <- Seq(false, true)) {
-      Scenario(s"On Windows, a worker receives MILL_PARAMS holding the arguments mill.bat started the test command with, ${daemonDescription(daemonMode)}") {
+      val afterNoDaemon = if (daemonMode) "" else " after --no-daemon"
+      Scenario(s"On Windows, a worker receives MILL_PARAMS holding the arguments mill.bat was given$afterNoDaemon, ${daemonDescription(daemonMode)}") {
         assume(scala.util.Properties.isWin, "mill.bat, which sets MILL_PARAMS, starts Mill on Windows only")
         Given("a build started through Mill's mill.bat launcher")
         And("a module whose propagateEnv is true")
         And("Alpha1's test fast sends an info message holding the environment variable MILL_PARAMS")
         if (daemonMode) {
-          And("a Mill daemon that an earlier mill.bat resolve _ started")
+          And("a Mill daemon that an earlier mill.bat resolve _ started, in an environment whose MILL_PARAMS is resolve _")
         }
-        When("mill.bat runs the test command on core.test, writing JSON output, with -j 2 and -- samples.Alpha1")
+        val noDaemonFirst = if (daemonMode) "" else "--no-daemon first, then "
+        When(s"mill.bat runs the test command on core.test, writing JSON output, with $noDaemonFirst-j 2 and -- samples.Alpha1")
         withMarkingSuites(daemonMode) { build =>
           build.addToTestModule("def propagateEnv = true")
           makeAlpha1FastSendInfo(build, """sys.env.getOrElse("MILL_PARAMS", "absent")""")
           if (daemonMode) {
-            val compiled = build.runThroughMillBat("resolve", "_")
-            withClue(compiled.debugString) {
-              compiled.succeeded shouldBe true
-            }
+            build.compileBuildFileThroughMillBat()
           }
           val (result, json) =
-            withJsonOutput(build, build.runTestCommandThroughMillBatWritingJsonOutputWith(FixtureBuild.jobsArguments(2))("--", "samples.Alpha1"))
+            build.withJsonOutput(build.runTestCommandThroughMillBatWritingJsonOutputWith(FixtureBuild.jobsArguments(2))("--", "samples.Alpha1"))
 
-          Then("the info message is the arguments mill.bat was given: -j 2 scalatest/test core.test -fJ <report> -- samples.Alpha1")
+          Then(s"the info message is the arguments mill.bat was given$afterNoDaemon: -j 2 scalatest/test core.test -fJ <report> -- samples.Alpha1")
           withClue(result.debugString) {
             infoMessages(json) shouldBe
               Seq(Seq("-j", "2", "scalatest/test", "core.test", "-fJ", build.jsonOutputFile.toString, "--", "samples.Alpha1").mkString(" "))

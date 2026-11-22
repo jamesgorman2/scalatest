@@ -101,39 +101,42 @@ final class FixtureBuild(tester: IntegrationTester) {
     runTestCommandWithMillArguments(millArguments, environment)(writingJsonOutput(arguments)*)
 
   def runTestCommandThroughMillBatWritingJsonOutputWith(millArguments: Seq[String])(arguments: String*): TestCommandResult =
-    runThroughMillBat((millArguments ++ testCommandLine(writingJsonOutput(arguments)))*)
+    TestCommandResult(evalThroughMillBat(millArguments ++ testCommandLine(writingJsonOutput(arguments))))
 
   private def testCommandLine(arguments: Seq[String]): Seq[String] = "scalatest/test" +: arguments
 
   private def writingJsonOutput(arguments: Seq[String]): Seq[String] = "core.test" +: "-fJ" +: jsonOutputFile.toString +: arguments
 
-  def runThroughMillBat(millArguments: String*): TestCommandResult = {
+  def evalThroughMillBat(arguments: Seq[String]): IntegrationTester.EvalResult = {
     // `mill.bat` runs the Mill it finds in its download folder under the name `MILL_VERSION` gives, so placing the
     // tester's own Mill executable there under that name has `mill.bat` run it without downloading a release.
-    val downloadFolder = os.temp.dir()
-    os.copy(IntegrationEnvironment.millExecutable, downloadFolder / s"${FixtureBuild.millBatVersion}.bat")
+    val downloadFolder = workspace / "mill-download"
+    os.copy.over(IntegrationEnvironment.millExecutable, downloadFolder / s"${FixtureBuild.millBatVersion}.bat", createFolders = true)
     // The tester's own arguments, such as `--ticker false`, would reach `MILL_PARAMS`, so `mill.bat` is called
     // directly. It leaves `--no-daemon` out of `MILL_PARAMS` where that is the first argument.
     val daemonArguments = if (tester.daemonMode) Nil else Seq("--no-daemon")
     val result = os.call(
-      cmd = (IntegrationEnvironment.millBootstrapScript, daemonArguments, millArguments),
+      cmd = (IntegrationEnvironment.millBootstrapScript, daemonArguments, arguments),
       env = tester.millTestSuiteEnv ++ Map("MILL_VERSION" -> FixtureBuild.millBatVersion, "MILL_FINAL_DOWNLOAD_FOLDER" -> downloadFolder.toString),
       cwd = workspace,
       stderr = os.Pipe,
       check = false
     )
-    TestCommandResult(IntegrationTester.EvalResult(result))
+    IntegrationTester.EvalResult(result)
   }
 
   def jsonOutput: JsonNode = JsonNode.read(jsonOutputFile)
 
-  def resultAndJsonOutputOfTestCommand(millArguments: Seq[String] = Nil): (TestCommandResult, JsonNode) = {
-    os.remove(jsonOutputFile)
-    val result = runTestCommandWritingJsonOutput(millArguments)
+  def withJsonOutput(result: TestCommandResult): (TestCommandResult, JsonNode) = {
     withClue(result.debugString) {
       os.exists(jsonOutputFile) shouldBe true
     }
     (result, jsonOutput)
+  }
+
+  def resultAndJsonOutputOfTestCommand(millArguments: Seq[String] = Nil): (TestCommandResult, JsonNode) = {
+    os.remove(jsonOutputFile)
+    withJsonOutput(runTestCommandWritingJsonOutput(millArguments))
   }
 
   def jsonOutputOfTestCommand(): JsonNode = {
@@ -147,11 +150,15 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
 
-  def compileBuildFile(): Unit = {
-    // `resolve _` compiles the build, so a later command's output holds no compile messages.
-    val result = tester.eval(Seq("resolve", "_"))
+  // `resolve _` compiles the build, so a later command's output holds no compile messages.
+  def compileBuildFile(): Unit = requireCompiled(tester.eval(compilingArguments))
+
+  def compileBuildFileThroughMillBat(): Unit = requireCompiled(evalThroughMillBat(compilingArguments))
+
+  private val compilingArguments: Seq[String] = Seq("resolve", "_")
+
+  private def requireCompiled(result: IntegrationTester.EvalResult): Unit =
     require(result.isSuccess, s"the build did not compile:\n${result.debugString}")
-  }
 
   def removeModuleOutput(): Unit = os.remove.all(workspace / "out" / "core")
 
