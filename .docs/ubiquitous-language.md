@@ -159,4 +159,4 @@ _Avoid_: Class selector, test selector, class filter
 
 **Framework argument**:
 An argument of the test command after its second `--`, as Mill's `testOnly` reads its arguments. Each run of the module receives the test command's framework arguments.
-_Avoid_: Test argument, runner argument
+_Avoid_: Test argument
