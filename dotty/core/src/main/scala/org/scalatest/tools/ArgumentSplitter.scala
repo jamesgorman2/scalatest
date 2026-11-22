@@ -1,5 +1,7 @@
 package org.scalatest.tools
 
+import scala.annotation.tailrec
+
 private[scalatest] enum SplitArgument {
 
   case Flagged(flag: String, argumentAndValues: List[String])
@@ -17,26 +19,28 @@ private[scalatest] object ArgumentSplitter {
 
     def isShortOf(heldValues: List[String]): Boolean = heldValues.size < countNeeded(heldValues)
 
-    def take(remaining: List[String]): (List[String], List[String]) = {
-      val taken = remaining.take(countNeeded(remaining)).takeWhile(isValue)
-      (taken, remaining.drop(taken.size))
+    def splitFrom(remaining: List[String]): (List[String], List[String]) = {
+      val values = remaining.take(countNeeded(remaining)).takeWhile(isValue)
+      (values, remaining.drop(values.size))
     }
 
     private def countNeeded(arguments: List[String]): Int =
       this match {
         case Following(count, _) => count
         case DirectoryThenCssFile =>
-          arguments match {
-            case _ :: `cssFileFlag` :: _ => 3
-            case _ => 1
-          }
+          if (arguments.drop(1).headOption.contains(cssFileFlag))
+            3
+          else
+            1
       }
 
     private def isValue(argument: String): Boolean =
       this match {
-        case Following(_, endsAtFlag) => !endsAtFlag || Option(argument).forall(!_.startsWith("-"))
+        case Following(_, endsAtFlag) => !(endsAtFlag && looksLikeFlag(argument))
         case DirectoryThenCssFile => true
       }
+
+    private def looksLikeFlag(argument: String): Boolean = Option(argument).exists(_.startsWith("-"))
   }
 
   import Values.*
@@ -84,18 +88,19 @@ private[scalatest] object ArgumentSplitter {
 
   private val cssFileFlag = "-Y"
 
-  def split(arguments: Seq[String]): List[SplitArgument] = List.unfold(arguments.toList)(splitFirst)
+  def split(arguments: Seq[String]): List[SplitArgument] = splitAll(arguments.toList, Nil)
 
-  private def splitFirst(arguments: List[String]): Option[(SplitArgument, List[String])] =
-    arguments match {
-      case Nil => None
+  @tailrec
+  private def splitAll(remaining: List[String], splitSoFar: List[SplitArgument]): List[SplitArgument] =
+    remaining match {
+      case Nil => splitSoFar.reverse
       case argument :: following =>
         flagOf(argument) match {
           case Some(flag) => {
-            val (values, afterValues) = valuesOf(flag).take(following)
-            Some((SplitArgument.Flagged(flag, argument :: values), afterValues))
+            val (values, afterValues) = valuesOf(flag).splitFrom(following)
+            splitAll(afterValues, SplitArgument.Flagged(flag, argument :: values) :: splitSoFar)
           }
-          case None => Some((SplitArgument.Unrecognised(argument), following))
+          case None => splitAll(following, SplitArgument.Unrecognised(argument) :: splitSoFar)
         }
     }
 
