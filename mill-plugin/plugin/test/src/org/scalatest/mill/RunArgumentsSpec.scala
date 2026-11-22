@@ -10,7 +10,7 @@ final class RunArgumentsSpec extends AnyWordSpec with should.Matchers {
     ScalaTestArgument.split(arguments).collect { case argument: ScalaTestArgument.Flagged => argument }
 
   private def runArguments(moduleArguments: Seq[String], frameworkArguments: Seq[String]): Seq[String] =
-    RunArguments.from(flagged(moduleArguments*), flagged(frameworkArguments*)).flatMap(_.arguments)
+    RunArguments.from(flagged(moduleArguments*), flagged(frameworkArguments*)).written
 
   "A run's arguments" when {
     "the module and the test command each give arguments whose flags the runner takes more than once" should {
@@ -24,7 +24,7 @@ final class RunArgumentsSpec extends AnyWordSpec with should.Matchers {
 
     for (
       (moduleArgument, frameworkArgument) <- Seq(
-        Seq("-P4") -> Seq("-P"),
+        Seq("-P4") -> Seq("-P2"),
         Seq("-F", "2") -> Seq("-F", "3"),
         Seq("-T", "10") -> Seq("-T", "20"),
         Seq("-S", "42") -> Seq("-S", "7"),
@@ -32,7 +32,7 @@ final class RunArgumentsSpec extends AnyWordSpec with should.Matchers {
       )
     ) {
       s"the module gives ${moduleArgument.mkString(" ")} and the test command gives ${frameworkArgument.mkString(" ")}" should {
-        s"hold only ${frameworkArgument.mkString(" ")}, as the runner takes ${frameworkArgument.head} only once" in {
+        s"hold the framework's ${frameworkArgument.mkString(" ")} and no copy of the module's ${moduleArgument.mkString(" ")}" in {
           runArguments(Seq("-l", "samples.Slow") ++ moduleArgument ++ moduleArgument, Seq("-z", "adds") ++ frameworkArgument) shouldBe
             Seq("-l", "samples.Slow", "-z", "adds") ++ frameworkArgument
         }

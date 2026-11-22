@@ -18,8 +18,8 @@ private[mill] enum AllowedFlag(val text: String) {
   case SlowpokeDetection extends AllowedFlag("-W")
 
   /**
-   * Whether ScalaTest's runner takes this flag's setting from one argument only: it rejects a second `-F`, `-T` or
-   * `-S`, and keeps the first `-P` or `-W`.
+   * ScalaTest's runner rejects a second `-F`, `-T` or `-S`, keeps the first `-W`, and keeps the first `-P` holding a
+   * thread count.
    */
   def isTakenOnce: Boolean =
     this match {

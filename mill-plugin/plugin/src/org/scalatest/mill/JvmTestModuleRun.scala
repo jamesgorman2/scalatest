@@ -12,7 +12,6 @@ import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.RunProcess
 import org.scalatest.consolidation.RunnerArgument
-import org.scalatest.consolidation.ScalaTestArgument
 import org.scalatest.events.TestClassName
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import scala.concurrent.Await
@@ -27,7 +26,7 @@ import scala.util.Try
 private[mill] final class JvmTestModuleRun(
     module: ModuleName,
     inputs: JvmTestModuleInputs,
-    runArguments: Seq[ScalaTestArgument.Flagged],
+    runArguments: RunArguments,
     classGlobs: Seq[ClassGlob],
     moduleFolder: os.Path,
     ctx: TaskCtx,
@@ -38,8 +37,6 @@ private[mill] final class JvmTestModuleRun(
     eventLogPollInterval: FiniteDuration,
     filesystemIgnoresCase: Path => Either[FilesystemCaseNotChecked, Boolean]
 ) {
-
-  private val runArgumentStrings: Seq[String] = runArguments.flatMap(_.arguments)
 
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
@@ -80,7 +77,7 @@ private[mill] final class JvmTestModuleRun(
           inputs.testClasspath.map(_.path),
           inputs.testFramework,
           classGlobs.map(_.text),
-          runArgumentStrings,
+          runArguments.written,
           inputs.discoveredClasses
         ),
         javaHome = inputs.javaHome
@@ -111,7 +108,7 @@ private[mill] final class JvmTestModuleRun(
     val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(module), reader, capture)
     workerRun.start { workerStarting =>
       val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
-      runWorker(workerCtx, inputs.testModuleUtil(runArgumentStrings ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
+      runWorker(workerCtx, inputs.testModuleUtil(runArguments.written ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun
   }
@@ -138,7 +135,7 @@ private[mill] final class JvmTestModuleRun(
     type LaidOut = os.Path
 
     def layOut(forkGroup: PlannedForkGroup): os.Path =
-      inputs.testModuleUtil(runArgumentStrings, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), inModuleFolder(forkGroup.folder))
+      inputs.testModuleUtil(runArguments.written, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), inModuleFolder(forkGroup.folder))
 
     def launch(
         forkGroup: PlannedForkGroup,
@@ -181,7 +178,7 @@ private[mill] final class JvmTestModuleRun(
       // An empty class list would select every class, so, as Mill 1.3.1 does, an empty group gets an empty queue
       // instead.
       if (forkGroup.testClasses.isEmpty) {
-        val queue = inputs.testModuleUtil(runArgumentStrings, ctx).prepareTestClassesFolder(Nil, groupFolder)
+        val queue = inputs.testModuleUtil(runArguments.written, ctx).prepareTestClassesFolder(Nil, groupFolder)
         val claimFolder = groupFolder / "claim"
         os.makeDir.all(claimFolder)
         JvmTestModuleRun.BatchSelector.EmptyQueue(queue, claimFolder)

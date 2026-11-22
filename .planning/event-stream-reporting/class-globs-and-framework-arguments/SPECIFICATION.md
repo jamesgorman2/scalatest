@@ -169,7 +169,7 @@ Feature: Class globs
 
 ```gherkin
 Feature: Framework arguments
-  After a second `--`, the test command's arguments are framework arguments, which every run of the module receives after the module's own `testArgsDefault`.
+  After a second `--`, the test command's arguments are framework arguments, which every run of the module receives after the module's own `testArgsDefault`. A framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's arguments with the same flag.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
@@ -198,12 +198,19 @@ Feature: Framework arguments
         | `-- -- -l samples.Fast`        | `Alpha1`, `Alpha2` and `Beta1` | `slow` |
         | `-- samples.Alpha* -- -z slow` | `Alpha1` and `Alpha2`          | `slow` |
 
-  Rule: A framework argument follows the module's own arguments
+  Rule: A framework argument takes effect over the module's own argument for the same setting
     Scenario: AC-007 A config map key given by both
       Given the module's `testArgsDefault` is `Seq("-Dcolour=red")`
       And `Alpha1`'s test `fast` sends an `info` message holding the config map's value for `colour`
       When the test command is invoked with `-- samples.Alpha1 -- -Dcolour=blue`
       Then the `info` message is `blue`
+
+    Scenario: AC-018 A span scale factor given by both
+      Given the module's `testArgsDefault` is `Seq("-F", "2")`
+      And `Alpha1`'s test `fast` sends an `info` message holding the span scale factor
+      When the test command is invoked with `-- samples.Alpha1 -- -F 3`
+      Then the `info` message is `3.0`
+      And the test command succeeds
 
   Rule: The test command accepts only the framework arguments it passes on
     Scenario Outline: AC-008 Framework argument <argument>
@@ -318,10 +325,10 @@ Feature: The module folder
 | Requirement | Criteria                                       |
 |-------------|------------------------------------------------|
 | R-001       | AC-001, AC-006                                 |
-| R-002       | AC-006, AC-007, AC-008                         |
+| R-002       | AC-006, AC-007, AC-008, AC-018                 |
 | R-003       | AC-001, AC-002, AC-003                         |
 | R-004       | AC-006                                         |
-| R-005       | AC-007                                         |
+| R-005       | AC-007, AC-018                                 |
 | R-006       | AC-004                                         |
 | R-007       | AC-005, AC-017                                 |
 | R-008       | AC-009, AC-014                                 |

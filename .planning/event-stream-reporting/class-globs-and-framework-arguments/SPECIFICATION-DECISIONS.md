@@ -6,12 +6,12 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Alternatives**
 
-- Passing both on, as Mill's `testOnly` and `testForked` do, fails every run where the flag is `-F`, `-T` or `-S`: ScalaTest's `ArgsParser.parseDoubleArgument` and `parseLongArgument` throw `Only one -F can be specified.` Where the flag is `-P` or `-W`, the runner keeps the first, so the module's argument takes effect.
+- Passing both on, as Mill's `testOnly` and `testForked` do, fails every run where the flag is `-F`, `-T` or `-S`: ScalaTest's `ArgsParser.parseDoubleArgument` and `parseLongArgument` throw `Only one -F can be specified.` Where the flag is `-W`, the runner keeps the first `-W`, so the module's argument takes effect. Where it is `-P`, the runner keeps the first `-P` holding a thread count, so a module `-P` with a thread count takes effect.
 - Replacing only `-F`, `-T` and `-S` keeps Mill's behaviour for `-P` and `-W`, but leaves a framework argument that the test command accepts with no effect.
 
 **Reasoning** A user types a framework argument for this test command alone, so it takes effect over the module's standing setting for every flag (`SPECIFICATION.md` R-005). For every other listed flag, ScalaTest takes the later argument or adds to the earlier, so passing both on in order already gives the framework argument effect.
 
-**Costs** For these five flags the test command departs from Mill's `testOnly` and `testForked`: a command line that fails or keeps the module's setting under Mill takes the framework argument's setting under the test command.
+**Costs** For these five flags the test command departs from Mill's `testOnly` and `testForked`: a command line that fails or keeps the module's setting under Mill takes the framework argument's setting under the test command. A framework `-P` without a thread count replaces a module `-P` holding one, so ScalaTest's runner rejects the run, where Mill's tasks run with the module's thread count.
 
 **Settled by** [Class globs and framework arguments - Framework arguments in every run](https://github.com/jamesgorman2/scalatest/issues/224).
 
