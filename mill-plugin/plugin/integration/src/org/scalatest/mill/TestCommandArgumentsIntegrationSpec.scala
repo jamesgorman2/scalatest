@@ -509,6 +509,20 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     def filesIn(folder: os.Path): Seq[os.Path] = os.walk(folder).filter(os.isFile)
 
+    val leftover = "leftover.txt"
+
+    def givenAnEarlierTestCommandLeftTheLeftoverInTheModuleFolder(build: FixtureBuild): Unit = {
+      Given(s"Alpha1's test fast creates the file $leftover in its working directory when it runs")
+      And(s"the test command has run core.test with no arguments, and $leftover exists in a folder inside the module folder")
+      And("the JSON output file has since been deleted")
+      makeAlpha1FastCreateFileInWorkingDirectory(build, leftover)
+      val earlierResult = runWritingJsonOutput(build)
+      withClue(earlierResult.debugString) {
+        filesIn(build.moduleFolder).map(_.last) should contain(leftover)
+      }
+      os.remove(build.jsonOutputFile)
+    }
+
     def isJUnitXmlReport(file: os.Path): Boolean = {
       val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
       // The default error handler writes each parse error to stderr.
@@ -546,18 +560,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     Scenario("A test command whose class globs match no test class deletes the file an earlier test command left in the module folder") {
-      Given("Alpha1's test fast creates the file leftover.txt in its working directory when it runs")
-      And("the test command has run core.test with no arguments, and leftover.txt exists in a folder inside the module folder")
-      And("the JSON output file has since been deleted")
-      When("the test command runs core.test, writing JSON output, with -- samples.Gamma*")
       withMarkingSuites { build =>
-        val leftover = "leftover.txt"
-        makeAlpha1FastCreateFileInWorkingDirectory(build, leftover)
-        val earlierResult = runWritingJsonOutput(build)
-        withClue(earlierResult.debugString) {
-          filesIn(build.moduleFolder).map(_.last) should contain(leftover)
-        }
-        os.remove(build.jsonOutputFile)
+        givenAnEarlierTestCommandLeftTheLeftoverInTheModuleFolder(build)
+        When("the test command runs core.test, writing JSON output, with -- samples.Gamma*")
         val result = runWritingJsonOutput(build, "--", "samples.Gamma*")
 
         Then("no file leftover.txt exists in the module folder or in any folder inside it")
@@ -568,20 +573,11 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     Scenario("A test command that fails on a framework argument leaves the file an earlier test command left in the module folder") {
-      Given("Alpha1's test fast creates the file leftover.txt in its working directory when it runs")
-      And("the test command has run core.test with no arguments, and leftover.txt exists in a folder inside the module folder")
-      And("the JSON output file has since been deleted")
-      When("the test command runs core.test, writing JSON output, with -- -- foo")
       withMarkingSuites { build =>
         def filesAndContents: Map[os.Path, Seq[Byte]] = filesIn(build.moduleFolder).map(file => file -> os.read.bytes(file).toSeq).toMap
-        val leftover = "leftover.txt"
-        makeAlpha1FastCreateFileInWorkingDirectory(build, leftover)
-        val earlierResult = runWritingJsonOutput(build)
-        withClue(earlierResult.debugString) {
-          filesIn(build.moduleFolder).map(_.last) should contain(leftover)
-        }
-        os.remove(build.jsonOutputFile)
+        givenAnEarlierTestCommandLeftTheLeftoverInTheModuleFolder(build)
         val earlierFilesAndContents = filesAndContents
+        When("the test command runs core.test, writing JSON output, with -- -- foo")
         val result = runWritingJsonOutput(build, "--", "--", "foo")
 
         Then("the test command fails with a message naming foo")
