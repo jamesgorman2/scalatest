@@ -41,6 +41,7 @@ private[mill] enum AllowedFlag(val text: String) {
     this match {
       case SpanScaleFactor | TestSortingTimeout => separateValue.toDoubleOption.isDefined
       case Seed => separateValue.toLongOption.isDefined
+      // ScalaTest's runner rejects a -W value that is not an Int before it reads the value as a Long.
       case SlowpokeDetection => separateValue.toIntOption.isDefined
       case _ => true
     }

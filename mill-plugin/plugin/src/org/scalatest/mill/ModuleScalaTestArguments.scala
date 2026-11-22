@@ -4,7 +4,7 @@ import org.scalatest.consolidation.ScalaTestArgument
 
 private[mill] object ModuleScalaTestArguments {
 
-  def forRun(moduleArguments: Seq[String]): Either[TestCommandFailure, Seq[ScalaTestArgument.Flagged]] = {
+  def kept(moduleArguments: Seq[String]): Either[TestCommandFailure, Seq[ScalaTestArgument.Flagged]] = {
     val split = ScalaTestArgument.split(moduleArguments)
     split.collectFirst { case ScalaTestArgument.Unrecognised(argument) => argument } match {
       case Some(argument) => Left(TestCommandFailure.UnrecognisedModuleArgument(argument))

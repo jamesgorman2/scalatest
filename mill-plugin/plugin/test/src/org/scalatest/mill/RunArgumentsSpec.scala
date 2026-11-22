@@ -10,7 +10,7 @@ final class RunArgumentsSpec extends AnyWordSpec with should.Matchers {
     ScalaTestArgument.split(arguments).collect { case argument: ScalaTestArgument.Flagged => argument }
 
   private def runArguments(moduleArguments: Seq[String], frameworkArguments: Seq[String]): Seq[String] =
-    RunArguments.from(flagged(moduleArguments*), flagged(frameworkArguments*)).written
+    RunArguments.from(flagged(moduleArguments*), flagged(frameworkArguments*)).commandLine
 
   "A run's arguments" when {
     "the module and the test command each give arguments whose flags the runner takes more than once" should {

@@ -5,8 +5,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matchers {
 
-  private def argumentsForRun(moduleArguments: Seq[String]): Either[TestCommandFailure, Seq[String]] =
-    ModuleScalaTestArguments.forRun(moduleArguments).map(_.flatMap(_.arguments))
+  private def keptArguments(moduleArguments: Seq[String]): Either[TestCommandFailure, Seq[String]] =
+    ModuleScalaTestArguments.kept(moduleArguments).map(_.flatMap(_.arguments))
 
   "A module's own ScalaTest arguments" when {
     "every flag is one a run receives" should {
@@ -25,7 +25,7 @@ final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matcher
           "-S", "42",
           "-W", "60", "30"
         )
-        argumentsForRun(arguments) shouldBe Right(arguments)
+        keptArguments(arguments) shouldBe Right(arguments)
       }
     }
 
@@ -43,24 +43,24 @@ final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matcher
           "-R", "classes",
           "-z", "adds"
         )
-        argumentsForRun(arguments) shouldBe Right(Seq("-l", "samples.Slow", "-z", "adds"))
+        keptArguments(arguments) shouldBe Right(Seq("-l", "samples.Slow", "-z", "adds"))
       }
 
       "withhold a value that looks like a flag a run receives" in {
-        argumentsForRun(Seq("-s", "-z", "-l", "samples.Slow")) shouldBe Right(Seq("-l", "samples.Slow"))
+        keptArguments(Seq("-s", "-z", "-l", "samples.Slow")) shouldBe Right(Seq("-l", "samples.Slow"))
       }
     }
 
     "they hold an argument whose flag ScalaTest does not recognise" should {
       "fail, naming the first such argument" in {
-        argumentsForRun(Seq("-l", "samples.Slow", "-x", "-y")) shouldBe
+        keptArguments(Seq("-l", "samples.Slow", "-x", "-y")) shouldBe
           Left(TestCommandFailure.UnrecognisedModuleArgument("-x"))
       }
     }
 
     "they are empty" should {
       "give the run none" in {
-        argumentsForRun(Nil) shouldBe Right(Nil)
+        keptArguments(Nil) shouldBe Right(Nil)
       }
     }
   }

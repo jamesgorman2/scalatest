@@ -206,6 +206,11 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
+      "reject a -W value too large for an Int, which ScalaTest's runner does not accept, naming the flag" in {
+        frameworkArgumentRejection("-W", "3000000000", "60") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-W")
+        frameworkArgumentRejection("-W", "60", "3000000000") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-W")
+      }
+
       "reject a -D without a config map entry joined to it, naming it" in {
         for (argument <- Seq("-D", "-Dcolour", "-D=blue", "-Dcolour=")) {
           frameworkArgumentRejection(argument) shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn(argument)

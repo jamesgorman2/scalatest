@@ -80,7 +80,7 @@ private[mill] final class JvmTestModuleRun(
           inputs.testClasspath.map(_.path),
           inputs.testFramework,
           classGlobs.map(_.text),
-          runArguments.written,
+          runArguments.commandLine,
           inputs.discoveredClasses
         ),
         javaHome = inputs.javaHome
@@ -111,7 +111,7 @@ private[mill] final class JvmTestModuleRun(
     val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(module), reader, capture)
     workerRun.start { workerStarting =>
       val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
-      runWorker(workerCtx, inputs.testModuleUtil(runArguments.written ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
+      runWorker(workerCtx, inputs.testModuleUtil(runArguments.commandLine ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun
   }
@@ -138,7 +138,7 @@ private[mill] final class JvmTestModuleRun(
     type LaidOut = os.Path
 
     def layOut(forkGroup: PlannedForkGroup): os.Path =
-      inputs.testModuleUtil(runArguments.written, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), inModuleFolder(forkGroup.folder))
+      inputs.testModuleUtil(runArguments.commandLine, ctx).prepareTestClassesFolder(forkGroup.testClasses.map(_.value), inModuleFolder(forkGroup.folder))
 
     def launch(
         forkGroup: PlannedForkGroup,
@@ -181,7 +181,7 @@ private[mill] final class JvmTestModuleRun(
       // An empty class list would select every class, so, as Mill 1.3.1 does, an empty group gets an empty queue
       // instead.
       if (forkGroup.testClasses.isEmpty) {
-        val queue = inputs.testModuleUtil(runArguments.written, ctx).prepareTestClassesFolder(Nil, groupFolder)
+        val queue = inputs.testModuleUtil(runArguments.commandLine, ctx).prepareTestClassesFolder(Nil, groupFolder)
         val claimFolder = groupFolder / "claim"
         os.makeDir.all(claimFolder)
         JvmTestModuleRun.BatchSelector.EmptyQueue(queue, claimFolder)

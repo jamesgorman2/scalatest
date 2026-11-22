@@ -27,7 +27,7 @@ private[mill] object TestCommand {
     val module = selectedModule.name
     val moduleFolder = BuildCtx.withFilesystemCheckerDisabled(clearedModuleFolder(ctx, module))
     val inputs = orFail(JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log))
-    val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.forRun(inputs.testArgs)), commandArguments.frameworkArguments)
+    val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.kept(inputs.testArgs)), commandArguments.frameworkArguments)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       commandArguments.stdoutContent match {
@@ -68,7 +68,7 @@ private[mill] object TestCommand {
   }
 
   private def clearedModuleFolder(ctx: TaskCtx, module: ModuleName): os.Path = {
-    val moduleFolder = ctx.dest / os.up / "modules" / module.value
+    val moduleFolder = os.Path(ModuleFolder.inside((ctx.dest / os.up / "modules").toNIO, module))
     os.remove.all(moduleFolder)
     os.makeDir.all(moduleFolder)
     moduleFolder
