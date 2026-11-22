@@ -297,7 +297,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
     }
 
-    Scenario("A framework argument replaces the module's own argument for a setting ScalaTest's runner takes only once") {
+    Scenario("A span scale factor given by both") {
       Given("a module whose own ScalaTest arguments are -F 2")
       And("Alpha1's test fast sends an info message holding the span scale factor")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -F 3")

@@ -32,15 +32,15 @@ final class RunArgumentsSpec extends AnyWordSpec with should.Matchers {
       )
     ) {
       s"the module gives ${moduleArgument.mkString(" ")} twice and the test command gives ${frameworkArgument.mkString(" ")}" should {
-        s"hold the framework's ${frameworkArgument.mkString(" ")}, no copy of the module's ${moduleArgument.mkString(" ")}, and every other argument" in {
+        s"hold the framework argument ${frameworkArgument.mkString(" ")}, no copy of the module's ${moduleArgument.mkString(" ")}, and every other argument" in {
           runArguments(Seq("-l", "samples.Slow") ++ moduleArgument ++ moduleArgument, Seq("-z", "adds") ++ frameworkArgument) shouldBe
             Seq("-l", "samples.Slow", "-z", "adds") ++ frameworkArgument
         }
       }
     }
 
-    "the module gives a flag the runner takes only once and the test command does not" should {
-      "keep the module's argument" in {
+    "the module gives flags the runner takes only once and the test command gives none of them" should {
+      "keep the module's arguments" in {
         runArguments(Seq("-F", "2", "-S", "42"), Seq("-T", "20")) shouldBe Seq("-F", "2", "-S", "42", "-T", "20")
       }
     }

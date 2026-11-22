@@ -229,7 +229,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 
 The test command runs each selected module's tests under a task context it supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."). It gives each run:
 
-- the module's own ScalaTest arguments that `SPECIFICATION.md` R-142 lists, found with the argument splitter, less each one whose flag is `-P`, `-F`, `-T`, `-S` or `-W` where a framework argument has the same flag;
+- the module's own ScalaTest arguments that `SPECIFICATION.md` R-142 lists, found with the argument splitter, except any `-P`, `-F`, `-T`, `-S` or `-W` that a framework argument also gives;
 - the test command's framework arguments, in the order given (`SPECIFICATION.md` R-053a, R-053b);
 - the arguments it adds, among them the runner argument.
 
