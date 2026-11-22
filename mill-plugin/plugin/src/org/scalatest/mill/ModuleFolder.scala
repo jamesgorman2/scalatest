@@ -5,7 +5,6 @@ import org.scalatest.consolidation.ModuleName
 
 private[mill] object ModuleFolder {
 
-  /** The module folder of `module` in `modulesFolder`. A module name that would place it anywhere but strictly inside `modulesFolder` is a defect. */
   def inside(modulesFolder: Path, module: ModuleName): Path = {
     val normalisedModulesFolder = modulesFolder.normalize
     val moduleFolder = normalisedModulesFolder.resolve(module.value).normalize
