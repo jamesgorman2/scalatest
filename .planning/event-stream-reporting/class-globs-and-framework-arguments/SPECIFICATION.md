@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-The test command takes no class globs or framework arguments, so it can only run a module as Mill's `testForked` runs it with no arguments. This feature has the test command take class globs and framework arguments as Mill 1.3.1's `testOnly` takes them, and run the module with them as `testOnly` or `testForked` would. Each worker receives the environment that Mill's task would give it, including the variables the `mill` launcher sets. The module folder, the folder the test command owns for the module, holds the files Mill's task would write in its task folder, except the JUnit XML report, which the test command never writes.
+The test command takes no class globs or framework arguments, so it can only run a module as Mill's `testForked` runs it with no arguments. This feature has the test command take class globs and framework arguments as Mill 1.3.1's `testOnly` takes them, and run the module with them as `testOnly` or `testForked` would, except that a framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's own arguments that have the same flag. Each worker receives the environment that Mill's task would give it, including the variables the `mill` launcher sets. The module folder, the folder the test command owns for the module, holds the files Mill's task would write in its task folder, except the JUnit XML report, which the test command never writes.
 
 ## Plan
 
@@ -22,7 +22,7 @@ Bare `R-nnn` and `AC-nnn` IDs are this document's. The epic's requirements are c
 ## Scope
 
 - Class globs and framework arguments, given after the test command's first `--`, for one JVM test module named by one module selector.
-- Running the module as Mill 1.3.1's `testOnly` runs it where class globs are given, including where the class globs select no test, and as Mill 1.3.1's `testForked` runs it where no class glob is given.
+- Running the module as Mill 1.3.1's `testOnly` runs it where class globs are given, including where the class globs select no test, and as Mill 1.3.1's `testForked` runs it where no class glob is given, except for the arguments each run receives, which R-005 gives.
 - The environment each worker of the module receives, including variables the `mill` launcher sets, such as `MILL_PARAMS`.
 - The place of the module folder, what it holds, and what an earlier test command left in it.
 
@@ -54,8 +54,8 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 
 ### Running the module
 
-- R-003 Where at least one class glob is given, the test command runs the module's tests as `mill <module>.testOnly <class globs> -- <framework arguments>` runs them. Only the test classes whose fully qualified name matches at least one class glob run. A class glob without `*` matches only the name equal to it, and each `*` in a class glob matches any run of characters, including none (`../SPECIFICATION.md` R-053a, R-055).
-- R-004 Where no class glob is given, the test command runs the module's tests as `mill <module>.testForked <framework arguments>` runs them (`../SPECIFICATION.md` R-053b).
+- R-003 Where at least one class glob is given, the test command runs the module's tests as `mill <module>.testOnly <class globs> -- <framework arguments>` runs them, except that each run receives the arguments R-005 gives. Only the test classes whose fully qualified name matches at least one class glob run. A class glob without `*` matches only the name equal to it, and each `*` in a class glob matches any run of characters, including none (`../SPECIFICATION.md` R-053a, R-055).
+- R-004 Where no class glob is given, the test command runs the module's tests as `mill <module>.testForked <framework arguments>` runs them, except that each run receives the arguments R-005 gives (`../SPECIFICATION.md` R-053b).
 - R-005 Each run of the module receives, first, each of the module's `testArgsDefault` arguments that is one of the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, with the values ScalaTest's runner takes with that flag, whether joined to it or after it. The run then receives the test command's framework arguments, in the order given. Where ScalaTest takes the later of two arguments that set the same setting, such as two `-D` arguments for one config map key, the framework argument takes effect over the `testArgsDefault` argument, as it does under Mill's `testOnly` and `testForked`. Where a framework argument is one of the ScalaTest flags `-P`, `-F`, `-T`, `-S` and `-W`, whose setting ScalaTest's runner takes from one argument only, the run receives none of the module's `testArgsDefault` arguments with that flag, so that the framework argument takes effect (`../SPECIFICATION.md` R-053a, R-053b, R-142).
 - R-006 Where class globs are given and none of them matches a test class that the module's test framework discovers, the test command starts no test of the module and fails. The test command then attaches one failure to the root of the consolidated output. The failure's message is the one Mill's `testOnly` fails with: `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, followed by the line `Run discoveredTestClasses to see available tests` (`../SPECIFICATION.md` R-053a, R-098f, R-137).
 - R-007 The test command fails where all of these hold:
