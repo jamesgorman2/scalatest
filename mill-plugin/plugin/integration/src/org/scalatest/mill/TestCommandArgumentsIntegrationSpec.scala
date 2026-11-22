@@ -107,6 +107,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       .map(_.name)
       .sorted
 
+  private def makeAlpha1FastCreateFileInWorkingDirectory(build: FixtureBuild, fileName: String): Unit =
+    build.replaceInSample(s"${MarkingSuite.Alpha1}.scala", MarkingSuiteTest.Fast.withEmptyBody, MarkingSuiteTest.Fast.creatingFileInWorkingDirectory(fileName))
+
   private def makeAlpha1FastSendInfo(build: FixtureBuild, messageExpression: String): Unit =
     build.replaceInSample(
       s"${MarkingSuite.Alpha1}.scala",
@@ -549,7 +552,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       When("the test command runs core.test, writing JSON output, with -- samples.Gamma*")
       withMarkingSuites { build =>
         val leftover = "leftover.txt"
-        build.replaceInSample(s"${MarkingSuite.Alpha1}.scala", MarkingSuiteTest.Fast.withEmptyBody, MarkingSuiteTest.Fast.creatingFileInWorkingDirectory(leftover))
+        makeAlpha1FastCreateFileInWorkingDirectory(build, leftover)
         val earlierResult = runWritingJsonOutput(build)
         withClue(earlierResult.debugString) {
           filesIn(build.moduleFolder).map(_.last) should contain(leftover)
@@ -599,11 +602,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       withMarkingSuites { build =>
         val workingDirectoryMarker = "working-directory.txt"
         build.replaceInBuild("object core extends ScalaModule {", "object core extends Cross[CoreModule](\"3.3.8\")\n\ntrait CoreModule extends CrossScalaModule {")
-        build.replaceInSample(
-          s"${MarkingSuite.Alpha1}.scala",
-          MarkingSuiteTest.Fast.withEmptyBody,
-          MarkingSuiteTest.Fast.creatingFileInWorkingDirectory(workingDirectoryMarker)
-        )
+        makeAlpha1FastCreateFileInWorkingDirectory(build, workingDirectoryMarker)
         val result = build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2))("core[3.3.8].test", "--", "samples.Alpha1")
 
         Then("the test command succeeds")
