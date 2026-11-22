@@ -255,8 +255,9 @@ private[mill] object JvmTestModuleRun {
     )
 
   def reportNoTestResultForClassGlobs(consolidation: Consolidation, module: ModuleName, classGlobs: Seq[ClassGlob]): Unit =
-    // As Mill 1.3.1's `testOnly` does, once the workers have ended. The consolidation, not the result Mill gives for
-    // each worker, tells whether a test result reached the module.
+    // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
+    // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
+    // reached it.
     if (classGlobs.nonEmpty && !consolidation.hasTestResult(module)) {
       consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
     }

@@ -119,7 +119,9 @@ It also fails when:
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
 - class globs are given and none of them matches a test class of the module. No test runs, and the failure is the one Mill's `testOnly` gives: `Test selector does not match any test: <class globs>`;
-- class globs are given, and once every test worker has ended, no run has reported a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, as where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. A test shown as ignored only because its suite's structure marks it ignored, or a suite or test shown as aborted only because it has no end event, such as one with reason *not run*, does not count as such a report. The failure is the same one Mill's `testOnly` gives;
+- class globs are given, and once every test worker has ended, no run has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The failure is the same one Mill's `testOnly` gives. Neither of these counts as such a report:
+  - a test shown as ignored only because its suite's structure marks it ignored;
+  - a suite or test shown as aborted only because it has no end event, such as one with reason *not run*;
 - laying out a fork group's files fails, or starting or running a test worker fails;
 - the test command fails to capture a test worker's output, which goes to Mill's console instead;
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;

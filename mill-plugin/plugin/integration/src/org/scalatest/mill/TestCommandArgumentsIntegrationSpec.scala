@@ -247,7 +247,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     Scenario("The only matched suite aborting before its tests run counts as a test result") {
-      Given("Broken1, whose beforeAll throws before its one test fast runs")
+      Given("Broken1, whose beforeAll throws before its one test, fast, runs")
       When("the test command runs core.test, writing JSON output, with -- samples.Broken1")
       withMarkingSuites { build =>
         build.addSuites("Broken1")
