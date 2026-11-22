@@ -154,7 +154,7 @@ An argument of the test command that names test modules, such as `__.test` or `f
 _Avoid_: Selector, task selector
 
 **Class glob**:
-An argument of the test command after its first `--` and before any second `--`, as Mill's `testOnly` reads its arguments. In each test module the test command selects, it keeps each test class whose fully qualified name it matches. Each `*` in it matches any run of characters, including none.
+An argument of the test command after its first `--` and before any second `--`, as Mill's `testOnly` reads its arguments. In each test module the test command selects, the class glob keeps each test class whose fully qualified name it matches. Each `*` in it matches any run of characters, including none.
 _Avoid_: Class selector, test selector, class filter
 
 **Framework argument**:

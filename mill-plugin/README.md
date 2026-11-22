@@ -95,7 +95,7 @@ For example, `mill scalatest/test core.test`.
   - `-D` with a config map entry joined to it, such as `-Dcolour=blue`;
   - `-P` with a thread count of 1 or more joined to it, such as `-P4`;
   - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it;
-  - a value ScalaTest's runner takes after the flag before it, such as `samples.Fast` after `-n`.
+  - one of the values that follow such a flag, such as `samples.Fast` after `-n`.
 
   The module runs as one of Mill's own test tasks runs it, except for the arguments each run receives (below):
 
