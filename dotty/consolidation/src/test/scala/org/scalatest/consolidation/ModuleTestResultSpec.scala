@@ -14,7 +14,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   private val calculatorSuiteStructure = structureOf("CalculatorSuite", addsTest)
 
-  private def partOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
+  private def runPartOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
 
   private val runWithSucceededTest: TestRunPart = runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded""")
 
@@ -77,18 +77,10 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       When("the module is given a run that reports no suite, and a run whose suite completes with only a scope in it")
       consolidation.addRunOf(runWithNoSuite)
       consolidation.addRunOf(
-        TestRunPart.Events(
-          """
-          run started
-          structure
-            suite "CalculatorSuite", class "samples.CalculatorSuite"
-              scope "A calculator", label "A calculator"
-          suite "CalculatorSuite": SuiteStarting
-          scope "A calculator": ScopeOpened
-          scope "A calculator": ScopeClosed
-          suite "CalculatorSuite": SuiteCompleted
-          run ended completed
-          """
+        runOfCalculatorSuiteHolding(
+          """scope "A calculator", label "A calculator"""",
+          """scope "A calculator": ScopeOpened""",
+          """scope "A calculator": ScopeClosed"""
         )
       )
 
@@ -148,7 +140,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       val json = new JsonSink
       val consolidation = startedWithoutMill(json)
       consolidation.addRunOf(
-        partOf(
+        runPartOf(
           "run started",
           calculatorSuiteStructure,
           """suite "CalculatorSuite": SuiteStarting""",
@@ -168,8 +160,8 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A module has a test result as soon as its run reports a test's outcome, before the run's event stream ends") {
       Given("a run of the module being fed, which has started the test `adds`")
-      val untilTestStarts = partOf("run started", calculatorSuiteStructure, """suite "CalculatorSuite": SuiteStarting""", """test "adds": TestStarting""")
-      val fromTestOutcome = partOf("""test "adds": TestSucceeded""", """suite "CalculatorSuite": SuiteCompleted""", "run ended completed")
+      val untilTestStarts = runPartOf("run started", calculatorSuiteStructure, """suite "CalculatorSuite": SuiteStarting""", """test "adds": TestStarting""")
+      val fromTestOutcome = runPartOf("""test "adds": TestSucceeded""", """suite "CalculatorSuite": SuiteCompleted""", "run ended completed")
       val events = runEventsOf(untilTestStarts, fromTestOutcome)
       val testOutcomeIndex = runEventsOf(untilTestStarts).size
       val consolidation = startedWithColour()

@@ -3,7 +3,10 @@ package org.scalatest.consolidation
 import org.scalatest.tools.ArgumentSplitter
 import org.scalatest.tools.SplitArgument
 
-/** One of a module's ScalaTest arguments, as ScalaTest's JVM runner reads it. */
+/**
+ * One ScalaTest argument, as ScalaTest's JVM runner reads it: one of a module's ScalaTest arguments, or one of the
+ * framework arguments given to the test command.
+ */
 enum ScalaTestArgument {
 
   /**
@@ -20,8 +23,9 @@ enum ScalaTestArgument {
 object ScalaTestArgument {
 
   /**
-   * Splits a module's ScalaTest arguments by flag, in the order given. Each flag takes the values the runner reads
-   * for it, so a value is never returned as a flag. A flag short of values keeps those it has. Never throws.
+   * Splits ScalaTest arguments, such as a module's or the test command's framework arguments, by flag, in the order
+   * given. Each flag takes the values the runner reads for it, so a value is never returned as a flag. A flag short of
+   * values keeps those it has. Never throws.
    */
   def split(arguments: Seq[String]): Seq[ScalaTestArgument] =
     ArgumentSplitter.split(arguments).map {
