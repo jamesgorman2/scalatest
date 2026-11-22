@@ -39,7 +39,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
       consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
     }
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
-    if (ended.isFailure) WorkerRun.Ending.FailedToStart else WorkerRun.Ending.Ended
+    if (ended.isFailure) WorkerRun.Ending.Failed else WorkerRun.Ending.Ended
   }
 
   def abandon(): Unit = {
@@ -83,7 +83,7 @@ private[mill] object WorkerRun {
 
   enum Ending {
     case Ended
-    case FailedToStart
+    case Failed
   }
 
   private enum ReaderState {

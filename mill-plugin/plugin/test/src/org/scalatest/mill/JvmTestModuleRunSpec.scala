@@ -12,7 +12,7 @@ import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.mill.WorkerRun.Ending.Ended
-import org.scalatest.mill.WorkerRun.Ending.FailedToStart
+import org.scalatest.mill.WorkerRun.Ending.Failed
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Using
 
@@ -113,7 +113,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     def addCompletedRunWithNoSuite(consolidation: Consolidation): Unit =
       addRunReading(consolidation, Seq(EventLogs.runStarted, EventLogs.runEndedCompleted))
 
-    "class globs are given, no worker of the module failed to start and no run of the module reported a test result" should {
+    "class globs are given, no worker of the module failed to start or run and no run of the module reported a test result" should {
       "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
@@ -131,12 +131,12 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "class globs are given, a worker of the module failed to start and no run of the module reported a test result" should {
+    "class globs are given, a worker of the module failed to start or run and no run of the module reported a test result" should {
       "attach nothing to the root" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
         addCompletedRunWithNoSuite(consolidation)
-        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, Seq(Ended, FailedToStart))
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, Seq(Ended, Failed))
         consolidation.end()
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
       }
