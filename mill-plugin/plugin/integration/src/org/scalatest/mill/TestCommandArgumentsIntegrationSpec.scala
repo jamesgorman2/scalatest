@@ -377,8 +377,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       }
     }
 
-    Scenario("The module's own tag filter still takes effect beside a framework argument that replaces the span scale factor") {
-      Given("the module's testArgsDefault is Seq(\"-l\", \"samples.Fast\")")
+    Scenario("The module's own tag filter takes effect beside a framework argument that sets the span scale factor") {
+      Given("Alpha1, Alpha2 and Beta1, each with the tests fast, tagged samples.Fast, and slow")
+      And("the module's testArgsDefault is Seq(\"-l\", \"samples.Fast\")")
       When("the test command runs core.test, writing JSON output, with -- -- -F 3")
       withMarkingSuites { build =>
         build.setModuleArguments(Seq("-l", "samples.Fast"))

@@ -218,8 +218,8 @@ Feature: Framework arguments
       Then the `info` message is `3.0`
       And the test command succeeds
 
-  Rule: The module's own argument for a setting no framework argument gives still takes effect
-    Scenario: AC-021 A tag filter given by the module alone, beside a framework span scale factor
+  Rule: The module's own argument takes effect where no framework argument sets the same setting
+    Scenario: AC-021 A tag filter given by the module alone, beside a span scale factor given by a framework argument
       Given the module's `testArgsDefault` is `Seq("-l", "samples.Fast")`
       When the test command is invoked with `-- -- -F 3`
       Then the suites run are exactly `Alpha1`, `Alpha2` and `Beta1`
