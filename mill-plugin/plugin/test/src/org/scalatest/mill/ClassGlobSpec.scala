@@ -17,7 +17,7 @@ final class ClassGlobSpec extends AnyWordSpec with should.Matchers {
         matching("samples.Alpha1", (classNames :+ "samples.Alpha10")*) shouldBe Seq("samples.Alpha1")
       }
 
-      "match a . only as a ." in {
+      "treat . as a literal character" in {
         matching("samples.Alpha1", "samplesXAlpha1") shouldBe empty
       }
 
@@ -45,7 +45,7 @@ final class ClassGlobSpec extends AnyWordSpec with should.Matchers {
     }
 
     "it holds several *" should {
-      "match any run of characters, including none, at each" in {
+      "match any run of characters, including none, at each *" in {
         matching("*.*Alpha*", (classNames :+ "Alpha")*) shouldBe Seq("samples.Alpha1", "samples.Alpha2", "other.Alpha1")
       }
     }

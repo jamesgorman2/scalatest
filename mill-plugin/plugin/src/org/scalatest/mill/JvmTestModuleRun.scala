@@ -51,8 +51,8 @@ private[mill] final class JvmTestModuleRun(
 
   private def layOutWorkers(): Either[WorkerLayoutFailure, WorkerLauncher] = {
     val moduleFolderIgnoresCase = () => filesystemIgnoresCase(moduleFolder.toNIO)
-    // As Mill 1.3.1 does, batch workers run the classes the class globs keep of each fork group's `testForkGrouping`
-    // list, without discovery.
+    // As Mill 1.3.1 does, batch workers run, without discovery, the classes in each fork group's `testForkGrouping` list
+    // that the class globs match.
     if (inputs.testBatchFrameworkTasks)
       WorkerLayout.ofBatches(forkGroups, classGlobs, moduleFolderIgnoresCase).map(new BatchLauncher(_))
     else

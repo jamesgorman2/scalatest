@@ -118,7 +118,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- class globs are given and none of them matches a test class of the module. No test runs, and the root carries the failure `testOnly` fails with, `Test selector does not match any test: <class globs>`;
+- class globs are given and none of them matches a test class of the module. No test runs, and the failure is the one Mill's `testOnly` gives: `Test selector does not match any test: <class globs>`;
 - laying out a fork group's files fails, or starting or running a test worker fails;
 - the test command fails to capture a test worker's output, which goes to Mill's console instead;
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;

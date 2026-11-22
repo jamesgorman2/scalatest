@@ -56,7 +56,7 @@ private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
 
   def rootMessage(module: ModuleName): String =
     this match {
-      // Attached as Mill's `testOnly` words it.
+      // Unprefixed, as Mill's `testOnly` words it.
       case ClassGlobsKeepNoTestClass(_) => message
       case _ => s"Laying out the workers of ${module.value} failed: $message"
     }
