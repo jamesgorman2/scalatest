@@ -152,3 +152,11 @@ _Avoid_: Compatible Mill version, Mill version range
 **Module selector**:
 An argument of the test command that names test modules, such as `__.test` or `foo.test`.
 _Avoid_: Selector, task selector
+
+**Class glob**:
+An argument of the test command after its first `--` and before any second `--`, as Mill's `testOnly` reads its arguments. It keeps each test class of the module whose fully qualified name it matches. Each `*` in it matches any run of characters, including none.
+_Avoid_: Class selector, test selector, class filter
+
+**Framework argument**:
+An argument of the test command after its second `--`, as Mill's `testOnly` reads its arguments. It is one of the ScalaTest flags the test command accepts there, or a value ScalaTest's runner takes after the flag before it. Each run of the module receives the test command's framework arguments.
+_Avoid_: Test argument, runner argument

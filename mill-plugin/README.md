@@ -93,7 +93,7 @@ For example, `mill scalatest/test core.test`.
 - **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
 - **`--`**: the arguments after it are read as `mill <module>.testOnly` reads its arguments: class globs, then framework arguments after a second `--`. For example, `mill scalatest/test core.test -- -- -n samples.Fast`. A framework argument is one of these ScalaTest flags:
   - `-D` with a config map entry joined to it, such as `-Dcolour=blue`;
-  - `-P`, alone or with a thread count joined to it, such as `-P4`;
+  - `-P`, alone or with a thread count joined to it, such as `-P4`. A bare `-P` is accepted, but every run then fails, because ScalaTest's sbt `Framework`, which runs the tests under Mill, rejects `-P` without a thread count;
   - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it.
 
   The module runs as one of Mill's own test tasks runs it, except for the arguments each run receives (below):
