@@ -80,9 +80,9 @@ Keys, in order:
 
 - `kind` — `run`.
 - `number` — the run's number within its module, from 1, in ascending order of `forkGroup`, then of the worker's index within its fork group: the `<i>` of the worker's folder `worker-<i>`, or 0 where the fork group has one worker.
-- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that have no worker because they hold no test class to run, as where they hold no test class or no class glob matches their classes. A module that does not set `testForkGrouping` has its runs in fork group `0`. Where no class glob is given, a module that holds no test class has one run, in fork group `0`. A fork group's runs are:
+- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that have no worker because they hold no test class or, where class globs are given, none that a class glob matches. A module that does not set `testForkGrouping` has its runs in fork group `0`. Where no class glob is given, a module that holds no test class has one run, in fork group `0`. A fork group's runs are:
   - for a module that does not set `testBatchFrameworkTasks`, one for each worker Mill starts for the group (README.md § What it supports);
-  - for a module that sets `testBatchFrameworkTasks`, at most one, whatever the module's test parallelism.
+  - for a module that sets `testBatchFrameworkTasks`, at most one, whatever the module's `testParallelism`.
 - `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.
 - `configMap` — the run's config map, as an object of each value's `toString`, with keys in ascending order.
 - `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s time and `DiscoveryCompleted`'s duration. Absent unless the run reported both events. `duration` is absent where `DiscoveryCompleted` carries none.

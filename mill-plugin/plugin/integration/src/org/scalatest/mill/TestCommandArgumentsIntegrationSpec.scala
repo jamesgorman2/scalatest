@@ -335,8 +335,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     for (batch <- Seq(false, true)) {
       Scenario(s"A framework argument takes effect over the module's own argument for the same config map key, testBatchFrameworkTasks $batch") {
-        Given("the module's testArgsDefault is Seq(\"-Dcolour=red\")")
-        And(s"the module's testBatchFrameworkTasks is $batch")
+        Given(s"the module's testArgsDefault is Seq(\"-Dcolour=red\") and its testBatchFrameworkTasks is $batch")
         And("Alpha1's test fast sends an info message holding the config map's value for colour")
         When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -Dcolour=blue")
         withMarkingSuites { build =>

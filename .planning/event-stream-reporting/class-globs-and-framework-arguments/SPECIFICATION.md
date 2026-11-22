@@ -77,7 +77,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
   - `MILL_WORKSPACE_ROOT`: the build's workspace folder;
   - `MILL_TEST_RESOURCE_DIR`: the module's resource folders, separated by `;`.
 
-  Where the module's `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the `mill` command line that started the test command, not those of the command that started a running Mill daemon. One is `MILL_PARAMS` on Windows, which `mill.bat` sets to that command line's arguments less a leading launcher option such as `--no-daemon` (`../SPECIFICATION.md` R-053a, R-053b).
+  Where the module's `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the `mill` command line that started the test command, not those of the command that started a running Mill daemon. For example, on Windows `mill.bat` sets `MILL_PARAMS` to that command line's arguments, omitting a leading launcher option such as `--no-daemon` (`../SPECIFICATION.md` R-053a, R-053b).
 
 ### The module folder
 
@@ -199,12 +199,17 @@ Feature: Framework arguments
         | `-- samples.Alpha* -- -z slow` | `Alpha1` and `Alpha2`          | `slow` |
 
   Rule: A framework argument takes effect over the module's own argument for the same setting
-    Scenario: AC-007 A config map key given by both
-      Given the module's `testArgsDefault` is `Seq("-Dcolour=red")`
+    Scenario Outline: AC-007 A config map key given by both, testBatchFrameworkTasks <batch>
+      Given the module's `testArgsDefault` is `Seq("-Dcolour=red")` and its `testBatchFrameworkTasks` is <batch>
       And `Alpha1`'s test `fast` sends an `info` message holding the config map's value for `colour`
       When the test command is invoked with `-- samples.Alpha1 -- -Dcolour=blue`
       Then the `info` message is `blue`
       And the test command succeeds
+
+      Examples:
+        | batch   |
+        | `false` |
+        | `true`  |
 
     Scenario: AC-018 A span scale factor given by both
       Given the module's `testArgsDefault` is `Seq("-F", "2")`
@@ -267,7 +272,7 @@ Feature: The environment of each worker
         | `true`    | `from-outer` |
         | `false`   | `absent`     |
 
-  Rule: Where propagateEnv is on, a variable the `mill` launcher sets from its own arguments comes from the test command's `mill` command line
+  Rule: Where propagateEnv is on, each worker receives the variables the `mill` launcher set for the test command's `mill` command line
     Scenario: AC-014 MILL_PARAMS on Windows
       Given the build runs on Windows, where `mill` starts through its `mill.bat` launcher
       And the module's `propagateEnv` is `true`

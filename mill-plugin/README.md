@@ -8,7 +8,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
-- The module's tests run in the workers that Mill's `testForked`, or `testOnly` where class globs are given (§ Running the test command), starts for each fork group that holds a test class to run.
+- The module's tests run in the workers that Mill's `testForked` starts for each fork group that holds a test class to run, or that `testOnly` starts for each such group where class globs are given (§ Running the test command).
   - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
     - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the number of the group's test classes to run. The group's workers run in parallel.
     - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
@@ -96,9 +96,12 @@ For example, `mill scalatest/test core.test`.
   - `-P`, alone or with a thread count joined to it, such as `-P4`;
   - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it.
 
-  Where class globs are given, the module runs as `mill <module>.testOnly <class globs> -- <framework arguments>` runs it, except for the arguments each run receives (below). Only the test classes whose fully qualified name matches at least one class glob run. A class glob without `*` matches only the name equal to it, and each `*` matches any run of characters, including none. For example, `mill scalatest/test core.test -- 'samples.Alpha*'`.
+  The module runs as one of Mill's own test tasks runs it, except for the arguments each run receives (below):
 
-  Where no class glob is given, the module runs as `mill <module>.testForked <framework arguments>` runs it, with the same exception.
+  - with class globs, as `mill <module>.testOnly <class globs> -- <framework arguments>`;
+  - with none, as `mill <module>.testForked <framework arguments>`.
+
+  Where class globs are given, only the test classes whose fully qualified name matches at least one of them run. A class glob without `*` matches only the name equal to it, and each `*` matches any run of characters, including none. For example, `mill scalatest/test core.test -- 'samples.Alpha*'`.
 
   Every run, with or without class globs, receives the module's own ScalaTest arguments that reach the run (below), then the framework arguments in the order given. For example, `mill scalatest/test core.test -- 'samples.Alpha*' -- -z slow` runs only the tests whose names contain `slow` in the classes matching `samples.Alpha*`. A framework argument therefore takes effect over a module argument wherever ScalaTest takes the later of two arguments, as for two `-D` entries with one key. ScalaTest's runner takes the setting of `-P`, `-F`, `-T`, `-S` and `-W` from one argument only, so a framework argument with one of these flags replaces each module argument with that flag, whereas Mill's `testOnly` and `testForked` pass both on.
 
@@ -110,7 +113,7 @@ Each worker receives the environment that a worker of Mill's own `testOnly` or `
 - where the module's `propagateEnv` is on, the environment `mill` started in, overlaid by the module's `allForkEnv`, which by default holds its `forkEnv` and the variables Mill adds, such as `MILL_WORKSPACE_ROOT`;
 - where it is off, the module's `allForkEnv` alone.
 
-Where `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the test command's own `mill` command line, not those of the command that started a running Mill daemon. One is `MILL_PARAMS` on Windows, which `mill.bat` sets to that command line's arguments less a leading launcher option such as `--no-daemon`.
+Where `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the test command's own `mill` command line, not those of the command that started a running Mill daemon. For example, on Windows `mill.bat` sets `MILL_PARAMS` to that command line's arguments, omitting a leading launcher option such as `--no-daemon`.
 
 The test command fails before any test starts, and writes no consolidated output, when:
 
@@ -145,7 +148,7 @@ Under the test command, ScalaTest prints no end-of-run summary of its own. Inste
 
 The test command writes a module's files in its module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
 
-- Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder is at the same relative path in the module folder, other than its JUnit XML report: the test command writes none, whatever the module's `testReportXml`. Each worker's working directory `sandbox` is one such folder.
+- Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder. The exception is Mill's JUnit XML report: the test command writes none, whatever the module's `testReportXml`.
 - Once it has resolved the module selector, the test command deletes everything an earlier test command left in the module folder. It does so before any test starts, and also where none starts, as where no class glob matches.
 - A test command that fails on its arguments, such as on a framework argument it does not accept, leaves the module folder as it was.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
