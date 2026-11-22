@@ -107,7 +107,7 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   private def writingJsonOutput(arguments: Seq[String]): Seq[String] = "core.test" +: "-fJ" +: jsonOutputFile.toString +: arguments
 
-  def evalThroughMillBat(arguments: Seq[String]): IntegrationTester.EvalResult = {
+  private def evalThroughMillBat(arguments: Seq[String]): IntegrationTester.EvalResult = {
     // `mill.bat` runs the Mill it finds in its download folder under the name `MILL_VERSION` gives, so placing the
     // tester's own Mill executable there under that name has `mill.bat` run it without downloading a release.
     val downloadFolder = workspace / "mill-download"

@@ -364,6 +364,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     def daemonDescription(daemonMode: Boolean): String =
       if (daemonMode) "under a Mill daemon that an earlier mill command started in another environment" else "with no Mill daemon"
 
+    def startDaemonInAnotherEnvironment(build: FixtureBuild): Unit = build.compile()
+
+    def startDaemonThroughMillBat(build: FixtureBuild): Unit = build.compileThroughMillBat()
+
     for (daemonMode <- Seq(false, true); (propagate, expectedOuterValue) <- Seq(true -> "from-outer", false -> "absent")) {
       val receives = if (propagate) "receives" else "does not receive"
       Scenario(s"With propagateEnv $propagate, a worker $receives FIXTURE_OUTER from the environment in which mill started, ${daemonDescription(daemonMode)}") {
@@ -373,8 +377,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         if (daemonMode) {
           And("a Mill daemon that an earlier mill command started in an environment setting neither FIXTURE_OUTER nor FIXTURE_BOTH")
         }
-        When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
         And("mill starts in an environment that sets FIXTURE_OUTER and FIXTURE_BOTH to from-outer")
+        When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
         withMarkingSuites(daemonMode) { build =>
           build.addToTestModule(
             s"def propagateEnv = $propagate",
@@ -382,7 +386,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           )
           makeAlpha1FastSendInfo(build, sendingVariables(sentVariables))
           if (daemonMode) {
-            build.compile()
+            startDaemonInAnotherEnvironment(build)
           }
           val (result, json) = build.resultAndJsonOutput(
             build.runTestCommandWritingJsonOutputWith(
@@ -396,7 +400,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           withClue(result.debugString) {
             variables.map(_.removed("MILL_WORKSPACE_ROOT")) shouldBe
               Seq(Map("FIXTURE_OUTER" -> expectedOuterValue, "FIXTURE_FORK" -> "from-forkEnv", "FIXTURE_BOTH" -> "from-forkEnv"))
-            variables.map(_.get("MILL_WORKSPACE_ROOT").map(os.Path(_))) shouldBe Seq(Some(build.workspace))
+            variables.map(_.get("MILL_WORKSPACE_ROOT").map(os.FilePath(_))) shouldBe Seq(Some(build.workspace))
           }
 
           And("the test command succeeds")
@@ -421,7 +425,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           build.addToTestModule("def propagateEnv = true")
           makeAlpha1FastSendInfo(build, """sys.env.getOrElse("MILL_PARAMS", "absent")""")
           if (daemonMode) {
-            build.compileThroughMillBat()
+            startDaemonThroughMillBat(build)
           }
           val (result, json) =
             build.resultAndJsonOutput(build.runTestCommandThroughMillBatWritingJsonOutputWith(FixtureBuild.jobsArguments(2))("--", "samples.Alpha1"))
