@@ -88,13 +88,42 @@ final class FixtureBuild(tester: IntegrationTester) {
   def runTestCommandWithTickerAndColour(arguments: String*): TestCommandResult =
     runTestCommandWithMillArguments(Seq("--ticker", "true", "--color", "true"))(arguments*)
 
-  def runTestCommandWithMillArguments(millArguments: Seq[String])(arguments: String*): TestCommandResult =
-    TestCommandResult(tester.eval(millArguments ++ ("scalatest/test" +: arguments)))
+  def runTestCommandWithMillArguments(millArguments: Seq[String], environment: Map[String, String] = Map.empty)(
+      arguments: String*
+  ): TestCommandResult =
+    TestCommandResult(tester.eval(millArguments ++ testCommandLine(arguments), env = environment))
 
   def runTestCommandWritingJsonOutput(millArguments: Seq[String] = Nil): TestCommandResult = runTestCommandWritingJsonOutputWith(millArguments)()
 
-  def runTestCommandWritingJsonOutputWith(millArguments: Seq[String])(arguments: String*): TestCommandResult =
-    runTestCommandWithMillArguments(millArguments)(("core.test" +: "-fJ" +: jsonOutputFile.toString +: arguments)*)
+  def runTestCommandWritingJsonOutputWith(millArguments: Seq[String], environment: Map[String, String] = Map.empty)(
+      arguments: String*
+  ): TestCommandResult =
+    runTestCommandWithMillArguments(millArguments, environment)(writingJsonOutput(arguments)*)
+
+  def runTestCommandThroughMillBatWritingJsonOutputWith(millArguments: Seq[String])(arguments: String*): TestCommandResult =
+    runThroughMillBat((millArguments ++ testCommandLine(writingJsonOutput(arguments)))*)
+
+  private def testCommandLine(arguments: Seq[String]): Seq[String] = "scalatest/test" +: arguments
+
+  private def writingJsonOutput(arguments: Seq[String]): Seq[String] = "core.test" +: "-fJ" +: jsonOutputFile.toString +: arguments
+
+  def runThroughMillBat(millArguments: String*): TestCommandResult = {
+    // `mill.bat` runs the Mill it finds in its download folder under the name `MILL_VERSION` gives, so placing the
+    // tester's own Mill executable there under that name has `mill.bat` run it without downloading a release.
+    val downloadFolder = os.temp.dir()
+    os.copy(IntegrationEnvironment.millExecutable, downloadFolder / s"${FixtureBuild.millBatVersion}.bat")
+    // The tester's own arguments, such as `--ticker false`, would reach `MILL_PARAMS`, so `mill.bat` is called
+    // directly. It leaves `--no-daemon` out of `MILL_PARAMS` where that is the first argument.
+    val daemonArguments = if (tester.daemonMode) Nil else Seq("--no-daemon")
+    val result = os.call(
+      cmd = (IntegrationEnvironment.millBootstrapScript, daemonArguments, millArguments),
+      env = tester.millTestSuiteEnv ++ Map("MILL_VERSION" -> FixtureBuild.millBatVersion, "MILL_FINAL_DOWNLOAD_FOLDER" -> downloadFolder.toString),
+      cwd = workspace,
+      stderr = os.Pipe,
+      check = false
+    )
+    TestCommandResult(IntegrationTester.EvalResult(result))
+  }
 
   def jsonOutput: JsonNode = JsonNode.read(jsonOutputFile)
 
@@ -135,4 +164,7 @@ final class FixtureBuild(tester: IntegrationTester) {
 object FixtureBuild {
 
   def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
+
+  // The `-jvm` suffix has `mill.bat` run a `.bat` file rather than a native executable.
+  private val millBatVersion: String = "1.3.1-jvm"
 }
