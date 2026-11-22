@@ -86,13 +86,34 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: MarkingSuite, tests: MarkingSuiteTest*): Unit =
     tests.foreach(test => build.replaceInSample(s"$suite.scala", test.withEmptyBody, test.sendingWorkingDirectory))
 
-  private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) = {
-    val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(("--" +: classGlobs)*)
+  private def testsRun(suite: JsonNode): Seq[String] =
+    suite.nodes
+      .filter(node => node.kind == NodeKind.Test && node.outcome.exists(outcome => outcome == "succeeded" || outcome == "failed"))
+      .map(_.name)
+      .sorted
+
+  private def makeAlpha1FastSendInfo(build: FixtureBuild, message: String): Unit =
+    build.replaceInSample(
+      s"${MarkingSuite.Alpha1}.scala",
+      MarkingSuiteTest.Fast.withEmptyBody,
+      s"""override def withFixture(test: NoArgTest): org.scalatest.Outcome = {
+         |    if (test.name == "fast") info($message)
+         |    super.withFixture(test)
+         |  }
+         |
+         |  ${MarkingSuiteTest.Fast.withEmptyBody}""".stripMargin
+    )
+
+  private def runWithArguments(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) = {
+    val result = build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
     withClue(result.debugString) {
       os.exists(build.jsonOutputFile) shouldBe true
     }
     (result, build.jsonOutput)
   }
+
+  private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
+    runWithArguments(build, ("--" +: classGlobs)*)
 
   private def shouldHoldOneRunOf(json: JsonNode, suites: Seq[String]): JsonNode = {
     val contents = moduleNode(json).contents
@@ -222,6 +243,76 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           os.list(build.markersFolder).map(_.last).sorted shouldBe
             Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
         }
+      }
+    }
+
+    val filteringArguments = Seq(
+      Seq("--", "--", "-n", "samples.Fast") -> (Seq("Alpha1", "Alpha2", "Beta1"), Seq("fast")),
+      Seq("--", "--", "-l", "samples.Fast") -> (Seq("Alpha1", "Alpha2", "Beta1"), Seq("slow")),
+      Seq("--", "samples.Alpha*", "--", "-z", "slow") -> (Seq("Alpha1", "Alpha2"), Seq("slow"))
+    )
+
+    for ((arguments, (suites, tests)) <- filteringArguments) {
+      val suiteList = s"${suites.init.mkString(", ")} and ${suites.last}"
+      Scenario(s"The arguments ${arguments.mkString(" ")} run only the test ${tests.mkString(" and ")} of each of $suiteList") {
+        Given("Alpha1, Alpha2 and Beta1, each with the tests fast, tagged samples.Fast, and slow")
+        When(s"the test command runs core.test, writing JSON output, with ${arguments.mkString(" ")}")
+        withMarkingSuites { build =>
+          val (result, json) = runWithArguments(build, arguments*)
+
+          withClue(result.debugString) {
+            Then(s"the suites run are exactly $suiteList")
+            suitesRun(json) shouldBe suites
+
+            And(s"in each of those suites, the tests run are exactly ${tests.mkString(" and ")}")
+            suites.map(suite => suite -> testsRun(moduleNode(json).node(NodeKind.Suite, suite))) shouldBe suites.map(_ -> tests)
+          }
+
+          And("the test command succeeds")
+          shouldSucceed(result)
+        }
+      }
+    }
+
+    for (batch <- Seq(false, true)) {
+      Scenario(s"A framework argument takes effect over the module's own argument for the same config map key, testBatchFrameworkTasks $batch") {
+        Given("a module whose own ScalaTest arguments are -Dcolour=red")
+        And(s"whose testBatchFrameworkTasks is $batch")
+        And("Alpha1's test fast sends an info message holding the config map's value for colour")
+        When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -Dcolour=blue")
+        withMarkingSuites { build =>
+          build.setModuleArguments(Seq("-Dcolour=red"))
+          build.addToTestModule(s"def testBatchFrameworkTasks = $batch")
+          makeAlpha1FastSendInfo(build, """test.configMap.getRequired[String]("colour")""")
+          val (result, json) = runWithArguments(build, "--", "samples.Alpha1", "--", "-Dcolour=blue")
+
+          Then("the info message is blue")
+          withClue(result.debugString) {
+            infoMessages(json) shouldBe Seq("blue")
+          }
+
+          And("the test command succeeds")
+          shouldSucceed(result)
+        }
+      }
+    }
+
+    Scenario("A framework argument replaces the module's own argument for a setting ScalaTest's runner takes only once") {
+      Given("a module whose own ScalaTest arguments are -F 2")
+      And("Alpha1's test fast sends an info message holding the span scale factor")
+      When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -F 3")
+      withMarkingSuites { build =>
+        build.setModuleArguments(Seq("-F", "2"))
+        makeAlpha1FastSendInfo(build, "new org.scalatest.concurrent.ScaledTimeSpans {}.spanScaleFactor.toString")
+        val (result, json) = runWithArguments(build, "--", "samples.Alpha1", "--", "-F", "3")
+
+        Then("the info message is 3.0")
+        withClue(result.debugString) {
+          infoMessages(json) shouldBe Seq("3.0")
+        }
+
+        And("the test command succeeds")
+        shouldSucceed(result)
       }
     }
 

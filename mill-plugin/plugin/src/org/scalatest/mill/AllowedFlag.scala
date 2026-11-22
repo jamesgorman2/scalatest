@@ -17,6 +17,16 @@ private[mill] enum AllowedFlag(val text: String) {
   case Seed extends AllowedFlag("-S")
   case SlowpokeDetection extends AllowedFlag("-W")
 
+  /**
+   * Whether ScalaTest's runner takes this flag's setting from one argument only: it rejects a second `-F`, `-T` or
+   * `-S`, and keeps the first `-P` or `-W`.
+   */
+  def isTakenOnce: Boolean =
+    this match {
+      case Parallel | SpanScaleFactor | TestSortingTimeout | Seed | SlowpokeDetection => true
+      case _ => false
+    }
+
   def acceptsValuesOf(flagged: ScalaTestArgument.Flagged): Boolean =
     flagged.joinedValue.exists(acceptsJoinedValue) && flagged.values.forall(acceptsSeparateValue)
 

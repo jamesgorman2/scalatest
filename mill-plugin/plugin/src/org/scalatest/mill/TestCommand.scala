@@ -25,7 +25,7 @@ private[mill] object TestCommand {
     jsonOutputFile.foreach(file => orFail(BuildCtx.withFilesystemCheckerDisabled(file.delete())))
     val selectedModule = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
     val inputs = orFail(JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log))
-    val scalaTestArguments = orFail(ModuleScalaTestArguments.forRun(inputs.testArgs))
+    val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.forRun(inputs.testArgs)), commandArguments.frameworkArguments)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       commandArguments.stdoutContent match {
@@ -45,7 +45,7 @@ private[mill] object TestCommand {
     val moduleRun = new JvmTestModuleRun(
       module,
       inputs,
-      scalaTestArguments,
+      runArguments,
       commandArguments.classGlobs,
       moduleFolder(ctx, selectedModule.path),
       ctx,
