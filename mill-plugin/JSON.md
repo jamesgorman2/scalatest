@@ -48,13 +48,15 @@ Keys, in order:
 - `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
 - `outcome` — `aborted`, present only where `failures` is.
 - `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
-  - failures while the module's workers run, in this order:
+  - failures from running the module's workers, in this order:
     1. for each fork group in order, laying out the group's files in its folder failing, naming the fork group and the module, as in `Laying out fork group 1 of core.test failed: …`. None of that group's workers starts;
     2. for each worker in the order it started, naming the worker, its fork group and the module:
        1. starting or running it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`;
        2. capturing its output failing, so its output went to Mill's console, as in `Capturing the output of worker 0 of fork group 1 of core.test failed: …`;
        3. reading its test event log failing, including where a line of it cannot be decoded (§ Run node), as in `Reading the event log of worker 0 of fork group 1 of core.test failed: …`;
-    3. where class globs are given and, once every worker has ended, no run has reported a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, the failure Mill's `testOnly` fails with, worded as below for class globs that match no test class. A suite or test aborted only because it has no end event, such as one with reason *not run*, is not such a report;
+    3. where class globs are given and, once every worker has ended, no run has reported a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, the failure Mill's `testOnly` fails with, worded as below for class globs that match no test class. These do not count as such a report:
+       - a test shown as ignored only because its suite's structure marks it ignored;
+       - a suite or test aborted only because it has no end event, such as one with reason *not run*;
   - or one failure laying out the module's workers. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
     - class globs are given and none of them matches a test class of the module, and the failure is the one Mill's `testOnly` fails with. Its first line is `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, and its second is `Run discoveredTestClasses to see available tests`;
     - two of the module's fork groups would share a `processFolder`, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
