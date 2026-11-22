@@ -18,8 +18,8 @@ private[mill] enum AllowedFlag(val text: String) {
   case SlowpokeDetection extends AllowedFlag("-W")
 
   /**
-   * A framework argument with this flag replaces each module argument with it, because ScalaTest's runner rejects a
-   * second `-F`, `-T` or `-S`, keeps the first `-W`, and keeps the first `-P` holding a thread count.
+   * A framework argument with this flag replaces each module argument that has this flag, because ScalaTest's runner
+   * rejects a second `-F`, `-T` or `-S`, keeps the first `-W`, and keeps the first `-P` holding a thread count.
    */
   def frameworkArgumentReplacesModuleArguments: Boolean =
     this match {
@@ -48,13 +48,11 @@ private[mill] enum AllowedFlag(val text: String) {
 
 private[mill] object AllowedFlag {
 
-  def from(flag: String): Option[AllowedFlag] = values.find(_.text == flag)
-
-  def of(argument: ScalaTestArgument.Flagged): Option[AllowedFlag] = from(argument.flag)
+  def from(argument: ScalaTestArgument.Flagged): Option[AllowedFlag] = values.find(_.text == argument.flag)
 
   def isHeldBy(argument: String): Boolean =
     ScalaTestArgument.split(Seq(argument)) match {
-      case Seq(ScalaTestArgument.Flagged(flag, _)) => from(flag).isDefined
+      case Seq(flagged: ScalaTestArgument.Flagged) => from(flagged).isDefined
       case _ => false
     }
 

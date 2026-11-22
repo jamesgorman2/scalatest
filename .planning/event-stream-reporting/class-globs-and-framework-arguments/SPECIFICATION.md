@@ -169,7 +169,7 @@ Feature: Class globs
 
 ```gherkin
 Feature: Framework arguments
-  After a second `--`, the test command's arguments are framework arguments, which every run of the module receives after the module's own `testArgsDefault`. A framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's arguments with the same flag.
+  After a second `--`, the test command's arguments are framework arguments, which every run of the module receives after the module's own `testArgsDefault`. A framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's arguments that have the same flag.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
@@ -204,6 +204,7 @@ Feature: Framework arguments
       And `Alpha1`'s test `fast` sends an `info` message holding the config map's value for `colour`
       When the test command is invoked with `-- samples.Alpha1 -- -Dcolour=blue`
       Then the `info` message is `blue`
+      And the test command succeeds
 
     Scenario: AC-018 A span scale factor given by both
       Given the module's `testArgsDefault` is `Seq("-F", "2")`

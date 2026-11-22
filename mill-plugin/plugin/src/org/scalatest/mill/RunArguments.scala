@@ -12,8 +12,8 @@ private[mill] object RunArguments {
 
   def from(moduleArguments: Seq[ScalaTestArgument.Flagged], frameworkArguments: Seq[ScalaTestArgument.Flagged]): RunArguments = {
     val replacedFlags: Set[AllowedFlag] =
-      frameworkArguments.flatMap(AllowedFlag.of).filter(_.frameworkArgumentReplacesModuleArguments).toSet
-    val keptModuleArguments = moduleArguments.filterNot(argument => AllowedFlag.of(argument).exists(replacedFlags.contains))
+      frameworkArguments.flatMap(AllowedFlag.from).filter(_.frameworkArgumentReplacesModuleArguments).toSet
+    val keptModuleArguments = moduleArguments.filterNot(argument => AllowedFlag.from(argument).exists(replacedFlags.contains))
     new RunArguments((keptModuleArguments ++ frameworkArguments).flatMap(_.arguments))
   }
 }

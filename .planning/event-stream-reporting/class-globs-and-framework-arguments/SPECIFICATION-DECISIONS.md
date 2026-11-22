@@ -2,7 +2,7 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## A framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's `testArgsDefault` arguments with the same flag, rather than following them.
+## A framework `-P`, `-F`, `-T`, `-S` or `-W` replaces the module's `testArgsDefault` arguments that have the same flag, rather than following them.
 
 **Alternatives**
 
