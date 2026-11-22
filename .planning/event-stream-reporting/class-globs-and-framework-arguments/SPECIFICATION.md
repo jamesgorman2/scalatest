@@ -77,7 +77,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
   - `MILL_WORKSPACE_ROOT`: the build's workspace folder;
   - `MILL_TEST_RESOURCE_DIR`: the module's resource folders, separated by `;`.
 
-  Where the module's `propagateEnv` is on, a variable that the `mill` launcher sets from its own arguments, such as `MILL_PARAMS` on Windows, holds the arguments of the `mill` command line that started the test command (`../SPECIFICATION.md` R-053a, R-053b).
+  Where the module's `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the `mill` command line that started the test command, not those of the command that started a running Mill daemon. One is `MILL_PARAMS` on Windows, which `mill.bat` sets to that command line's arguments less a leading launcher option such as `--no-daemon` (`../SPECIFICATION.md` R-053a, R-053b).
 
 ### The module folder
 
@@ -267,7 +267,7 @@ Feature: The environment of each worker
         | `true`    | `from-outer` |
         | `false`   | `absent`     |
 
-  Rule: Where propagateEnv is on, a variable the `mill` launcher sets from its own arguments holds the test command's `mill` command line
+  Rule: Where propagateEnv is on, a variable the `mill` launcher sets from its own arguments comes from the test command's `mill` command line
     Scenario: AC-014 MILL_PARAMS on Windows
       Given the build runs on Windows, where `mill` starts through its `mill.bat` launcher
       And the module's `propagateEnv` is `true`

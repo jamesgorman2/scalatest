@@ -174,14 +174,13 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     for (batch <- Seq(false, true)) {
       Scenario(s"Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks $batch") {
-        Given(
-          s"""the module's testForkGrouping is Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2")) and its testBatchFrameworkTasks is $batch"""
-        )
+        val forkGrouping = """Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2"))"""
+        Given(s"the module's testForkGrouping is $forkGrouping and its testBatchFrameworkTasks is $batch")
         And("each test sends an info message holding the system property user.dir")
         When("the test command runs core.test, writing JSON output, with -- samples.Alpha*")
         withMarkingSuites { build =>
           build.addToTestModule(
-            """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2")) }""",
+            s"def testForkGrouping = Task { $forkGrouping }",
             s"def testBatchFrameworkTasks = $batch"
           )
           MarkingSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, MarkingSuiteTest.Fast, MarkingSuiteTest.Slow))

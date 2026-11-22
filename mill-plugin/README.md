@@ -12,7 +12,7 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
   - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
     - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the number of the group's test classes to run. The group's workers run in parallel.
     - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
-  - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's class list as `testForkGrouping` gives it, or, where class globs are given, the classes in that list that a class glob matches, whatever the module's `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
+  - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's class list as `testForkGrouping` gives it, or, where class globs are given, the classes in that list that a class glob matches, whatever the module's `testParallelism`. Where more than one fork group holds a class to run, the workers run in parallel.
   - A module that does not set `testForkGrouping` has one fork group. Where no class glob is given, a module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
@@ -110,7 +110,7 @@ Each worker receives the environment that a worker of Mill's own `testOnly` or `
 - where the module's `propagateEnv` is on, the environment `mill` started in, overlaid by the module's `allForkEnv`, which by default holds its `forkEnv` and the variables Mill adds, such as `MILL_WORKSPACE_ROOT`;
 - where it is off, the module's `allForkEnv` alone.
 
-Where `propagateEnv` is on, a variable that the `mill` launcher sets from its own arguments, such as `MILL_PARAMS` on Windows, holds the arguments of that `mill` command line.
+Where `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the test command's own `mill` command line, not those of the command that started a running Mill daemon. One is `MILL_PARAMS` on Windows, which `mill.bat` sets to that command line's arguments less a leading launcher option such as `--no-daemon`.
 
 The test command fails before any test starts, and writes no consolidated output, when:
 
