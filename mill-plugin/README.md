@@ -94,7 +94,8 @@ For example, `mill scalatest/test core.test`.
 - **`--`**: the arguments after it are read as `mill <module>.testOnly` reads its arguments: class globs, then framework arguments after a second `--`. For example, `mill scalatest/test core.test -- -- -n samples.Fast`. The test command accepts a framework argument only in one of these forms:
   - `-D` with a config map entry joined to it, such as `-Dcolour=blue`;
   - `-P` with a thread count of 1 or more joined to it, such as `-P4`;
-  - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it.
+  - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it;
+  - a value ScalaTest's runner takes after the flag before it, such as `samples.Fast` after `-n`.
 
   The module runs as one of Mill's own test tasks runs it, except for the arguments each run receives (below):
 

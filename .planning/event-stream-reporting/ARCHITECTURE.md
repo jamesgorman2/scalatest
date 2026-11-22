@@ -197,7 +197,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - `isShortOfValues`: whether the flag holds fewer values than the runner needs with it, from `ArgumentSplitter.isShortOfValues`.
 
   The test command calls `split`:
-  - on its framework arguments, as it reads its own arguments and before it resolves the module. It accepts them only where each is a `Flagged` that is not short of values and whose flag, `joinedValue` and `values` take a form `class-globs-and-framework-arguments/SPECIFICATION.md` R-002 lists;
+  - on its framework arguments, as it reads its own arguments and before it resolves the module. It accepts them only where `split` returns no `Unrecognised`, and each `Flagged` is not short of values and has a flag, `joinedValue` and `values` that `class-globs-and-framework-arguments/SPECIFICATION.md` R-002 allows;
   - on each argument before its first `--`, to find one of the ScalaTest flags `class-globs-and-framework-arguments/SPECIFICATION.md` R-013 lists;
   - on the module's `testArgsDefault` arguments, once it has resolved the module and before it runs the module's test discovery or starts its tests. It fails where any is `Unrecognised`, and keeps each `Flagged` that `class-globs-and-framework-arguments/SPECIFICATION.md` R-005 lists (§ Data flow).
 - **Build the runner argument** (§ APIs § The emitter and the Mill plugin): given what the argument carries, returns the argument, from core's runner argument definition (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot read. The argument carries the event log file's absolute path or, under `JsDom`, the framing prefix and this test command's nonce. The test command calls it for each run it starts.
