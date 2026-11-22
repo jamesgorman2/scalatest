@@ -158,5 +158,5 @@ An argument of the test command after its first `--` and before any second `--`,
 _Avoid_: Class selector, test selector, class filter
 
 **Framework argument**:
-An argument of the test command after its second `--`, as Mill's `testOnly` reads its arguments. It is one of the ScalaTest flags the test command accepts there, or a value ScalaTest's runner takes after the flag before it. Each run of the module receives the test command's framework arguments.
+An argument of the test command after its second `--`, as Mill's `testOnly` reads its arguments. The test command accepts a framework argument only where it is one of the ScalaTest flags the test command allows there, or a value ScalaTest's runner takes after the flag before it, and otherwise fails. Each run of the module receives the test command's framework arguments.
 _Avoid_: Test argument, runner argument
