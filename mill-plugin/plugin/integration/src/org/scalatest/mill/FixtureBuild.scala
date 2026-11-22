@@ -20,7 +20,9 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def markersFolder: os.Path = workspace / "markers"
 
-  def moduleFolder: os.Path = workspace / "out" / "org.scalatest.mill.TestCommandModule" / "modules" / "core.test"
+  def modulesFolder: os.Path = workspace / "out" / "org.scalatest.mill.TestCommandModule" / "modules"
+
+  def moduleFolder: os.Path = modulesFolder / "core.test"
 
   def buildText: String = os.read(buildFile)
 

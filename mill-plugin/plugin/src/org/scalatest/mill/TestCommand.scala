@@ -24,6 +24,7 @@ private[mill] object TestCommand {
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
     jsonOutputFile.foreach(file => orFail(BuildCtx.withFilesystemCheckerDisabled(file.delete())))
     val selectedModule = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
+    val moduleFolder = BuildCtx.withFilesystemCheckerDisabled(clearedModuleFolder(ctx, selectedModule.path))
     val inputs = orFail(JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log))
     val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.forRun(inputs.testArgs)), commandArguments.frameworkArguments)
     val output = ctx.log.streams.out
@@ -47,7 +48,7 @@ private[mill] object TestCommand {
       inputs,
       runArguments,
       commandArguments.classGlobs,
-      moduleFolder(ctx, selectedModule.path),
+      moduleFolder,
       ctx,
       now,
       WorkerOutputCapture.workerCharset(systemProperty),
@@ -66,5 +67,10 @@ private[mill] object TestCommand {
     }
   }
 
-  private def moduleFolder(ctx: TaskCtx, modulePath: String): os.Path = ctx.dest / os.up / "modules" / modulePath
+  private def clearedModuleFolder(ctx: TaskCtx, modulePath: String): os.Path = {
+    val moduleFolder = ctx.dest / os.up / "modules" / modulePath
+    os.remove.all(moduleFolder)
+    os.makeDir.all(moduleFolder)
+    moduleFolder
+  }
 }

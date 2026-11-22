@@ -25,7 +25,6 @@ private[mill] final case class JvmTestModuleInputs(
     forkEnv: Map[String, String],
     testSandboxWorkingDir: Boolean,
     forkWorkingDir: os.Path,
-    testReportXml: Option[String],
     javaHome: Option[os.Path],
     testParallelism: Boolean,
     testLogLevel: TestReporter.LogLevel,
@@ -51,7 +50,8 @@ private[mill] final case class JvmTestModuleInputs(
       forkEnv,
       testSandboxWorkingDir,
       forkWorkingDir,
-      testReportXml,
+      // The test command writes no JUnit XML report, whatever the module's `testReportXml`.
+      None,
       javaHome,
       testParallelism,
       // At `Info` or above, Mill writes no `Running Test Class` line to the workers' stderr.
@@ -89,7 +89,6 @@ private[mill] object JvmTestModuleInputs {
         module.allForkEnv(),
         module.testSandboxWorkingDir(),
         module.forkWorkingDir(),
-        module.testReportXml(),
         module.javaHome().map(_.path),
         module.testParallelism(),
         module.testLogLevel(),

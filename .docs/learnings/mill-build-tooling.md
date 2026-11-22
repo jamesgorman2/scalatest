@@ -201,3 +201,11 @@ To test what `mill.bat` sets, call `mill.bat` with `os.call` in the tester's wor
 
 Pass `--no-daemon` first for a run without the daemon; `mill.bat` leaves it out of `MILL_PARAMS`. With the tester in daemon mode, the tester's `close()` also stops the daemon `mill.bat` started, as both use the workspace's `out/mill-daemon` folder.
 </learning>
+
+<learning>
+date: 2026-11-22
+---
+Mill 1.3.1 names a cross module in task names, and in `Segments.render` (so `module.moduleSegments.render`), with dots, not brackets: the `test` module of the cross module `core` at `3.3.8` is `core.3_3_8.test`, and its task `core.3_3_8.test.testForked`. Each `.`, `/` and `:` in a cross value becomes `_`. A selector still accepts `core[3.3.8].test`, and `Segments.renderBracketSyntax` gives that form.
+
+A requirement, folder name or test that expects `core[3.3.8].test` as "the name Mill writes in a task name" is wrong under Mill 1.3.1. Check a cross name with `mill resolve 'core[3.3.8].test._'` before writing it into a specification.
+</learning>

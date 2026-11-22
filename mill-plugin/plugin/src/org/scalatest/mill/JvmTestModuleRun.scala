@@ -29,7 +29,7 @@ private[mill] final class JvmTestModuleRun(
     runArguments: RunArguments,
     classGlobs: Seq[ClassGlob],
     moduleFolder: os.Path,
-    ctx: TaskCtx,
+    commandCtx: TaskCtx,
     now: () => Instant,
     workerCharset: Charset,
     eventLogFileAt: Path => EventLogFile,
@@ -38,13 +38,13 @@ private[mill] final class JvmTestModuleRun(
     filesystemIgnoresCase: Path => Either[FilesystemCaseNotChecked, Boolean]
 ) {
 
+  // Mill's test tasks derive their workers' paths from `Task.dest`, so the module folder stands in for it.
+  private val ctx: TaskCtx = new ModuleFolderTaskCtx(commandCtx, moduleFolder)
+
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
-  def execute(consolidation: Consolidation): Unit = {
-    os.remove.all(moduleFolder)
-    os.makeDir.all(moduleFolder)
+  def execute(consolidation: Consolidation): Unit =
     JvmTestModuleRun.launcherOrReportFailure(consolidation, module, layOutWorkers()).foreach(launcher => runWorkers(consolidation, launcher))
-  }
 
   private def layOutWorkers(): Either[WorkerLayoutFailure, WorkerLauncher] = {
     val moduleFolderIgnoresCase = () => filesystemIgnoresCase(moduleFolder.toNIO)

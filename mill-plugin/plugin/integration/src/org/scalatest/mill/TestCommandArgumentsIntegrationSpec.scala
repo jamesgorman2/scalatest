@@ -3,7 +3,10 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.xml.sax.helpers.DefaultHandler
 
+import javax.xml.parsers.DocumentBuilderFactory
+import scala.util.Try
 import scala.util.matching.Regex
 
 private enum MarkingSuite {
@@ -18,7 +21,14 @@ private enum MarkingSuiteTest(declaration: String) {
 
   def withEmptyBody: String = declaration + "{}"
 
-  def sendingWorkingDirectory: String = declaration + """{ info(System.getProperty("user.dir")) }"""
+  def withBody(body: String): String = declaration + s"{ $body }"
+
+  def sendingWorkingDirectory: String = withBody("""info(System.getProperty("user.dir"))""")
+
+  def creatingFileInWorkingDirectory(fileName: String): String =
+    withBody(s"""java.nio.file.Files.write(java.nio.file.Paths.get("$fileName"), Array.emptyByteArray)""")
+
+  def failing: String = withBody("""fail("fails as the scenario asks")""")
 }
 
 final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
@@ -484,6 +494,118 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
           And("the test command succeeds")
           shouldSucceed(result)
+        }
+      }
+    }
+  }
+
+  Feature("The module folder") {
+
+    def filesIn(folder: os.Path): Seq[os.Path] = os.walk(folder).filter(os.isFile)
+
+    def isJUnitXmlReport(file: os.Path): Boolean = {
+      val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+      // The default error handler writes each parse error to stderr.
+      builder.setErrorHandler(new DefaultHandler)
+      Try(builder.parse(file.toIO).getDocumentElement.getTagName).toOption.exists(root => root == "testsuites" || root == "testsuite")
+    }
+
+    def describe(arguments: Seq[String]): String = if (arguments.isEmpty) "no arguments" else arguments.mkString(" ")
+
+    def runWritingJsonOutput(build: FixtureBuild, arguments: String*): TestCommandResult =
+      build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
+
+    val reportSettings = Seq(
+      """Some("test-report.xml")""" -> Nil,
+      """Some("junit-results.xml")""" -> Seq("--", "samples.Alpha*"),
+      """Some("test-report.xml")""" -> Seq("--", "--", "-n", "samples.Fast"),
+      """Some("test-report.xml")""" -> Seq("--", "samples.Gamma*"),
+      "None" -> Seq("--", "*", "--", "-l", "samples.Fast")
+    )
+
+    for ((setting, arguments) <- reportSettings) {
+      Scenario(s"With testReportXml $setting and ${describe(arguments)}, the module folder holds no JUnit XML report") {
+        Given(s"a module whose testReportXml is $setting")
+        And("Beta1's test slow fails")
+        When(s"the test command runs core.test, writing JSON output, with ${describe(arguments)}")
+        withMarkingSuites { build =>
+          build.addToTestModule(s"def testReportXml: T[Option[String]] = Task { $setting }")
+          build.replaceInSample(s"${MarkingSuite.Beta1}.scala", MarkingSuiteTest.Slow.withEmptyBody, MarkingSuiteTest.Slow.failing)
+          val result = runWritingJsonOutput(build, arguments*)
+
+          Then("no file in the module folder or in any folder inside it is an XML document whose root element is testsuites or testsuite")
+          withClue(result.debugString) {
+            os.isDir(build.moduleFolder) shouldBe true
+            filesIn(build.moduleFolder).filter(isJUnitXmlReport) shouldBe empty
+          }
+        }
+      }
+    }
+
+    Scenario("A test command whose class globs match no test class deletes the file an earlier test command left in the module folder") {
+      Given("Alpha1's test fast creates the file leftover.txt in its working directory when it runs")
+      And("the test command has run core.test with no arguments, and leftover.txt exists in a folder inside the module folder")
+      And("the JSON output file has since been deleted")
+      When("the test command runs core.test, writing JSON output, with -- samples.Gamma*")
+      withMarkingSuites { build =>
+        val leftover = "leftover.txt"
+        build.replaceInSample(s"${MarkingSuite.Alpha1}.scala", MarkingSuiteTest.Fast.withEmptyBody, MarkingSuiteTest.Fast.creatingFileInWorkingDirectory(leftover))
+        val earlierResult = runWritingJsonOutput(build)
+        withClue(earlierResult.debugString) {
+          filesIn(build.moduleFolder).map(_.last) should contain(leftover)
+        }
+        os.remove(build.jsonOutputFile)
+        val result = runWritingJsonOutput(build, "--", "samples.Gamma*")
+
+        Then("no file leftover.txt exists in the module folder or in any folder inside it")
+        withClue(result.debugString) {
+          filesIn(build.moduleFolder).map(_.last) should not contain leftover
+        }
+      }
+    }
+
+    Scenario("The test command leaves Mill's own report from an earlier testForked as it was, and creates no testOnly task folder") {
+      Given("mill core.test.testForked has run in the build and written out/core/test/testForked.dest/test-report.xml")
+      And("no folder out/core/test/testOnly.dest exists")
+      When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
+      withMarkingSuites { build =>
+        val millsOwnTaskFolders = build.workspace / "out" / "core" / "test"
+        val millsReport = millsOwnTaskFolders / "testForked.dest" / "test-report.xml"
+        val testOnlyTaskFolder = millsOwnTaskFolders / "testOnly.dest"
+        val testForkedResult = build.eval(Seq("core.test.testForked"))
+        withClue(testForkedResult.debugString) {
+          os.isFile(millsReport) shouldBe true
+          os.exists(testOnlyTaskFolder) shouldBe false
+        }
+        val reportContent = os.read(millsReport)
+        val reportModified = os.mtime(millsReport)
+        val result = runWritingJsonOutput(build, "--", "samples.Alpha1")
+
+        withClue(result.debugString) {
+          Then("out/core/test/testForked.dest/test-report.xml has the content and modification time it had before the test command ran")
+          os.read(millsReport) shouldBe reportContent
+          os.mtime(millsReport) shouldBe reportModified
+
+          And("no folder out/core/test/testOnly.dest exists")
+          os.exists(testOnlyTaskFolder) shouldBe false
+        }
+      }
+    }
+
+    Scenario("The module folder of a cross module's test module is named as Mill writes the module in a task name") {
+      Given("the cross module core at 3.3.8, whose test module Mill names core.3_3_8.test in a task name")
+      When("the test command runs core[3.3.8].test with -- samples.Alpha1")
+      withMarkingSuites { build =>
+        build.replaceInBuild("object core extends ScalaModule {", "object core extends Cross[CoreModule](\"3.3.8\")\n\ntrait CoreModule extends CrossScalaModule {")
+        val result = build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2))("core[3.3.8].test", "--", "samples.Alpha1")
+
+        Then("the test command succeeds")
+        shouldSucceed(result)
+
+        withClue(result.debugString) {
+          And("its worker ran in the folder sandbox of the module folder out/org.scalatest.mill.TestCommandModule/modules/core.3_3_8.test, the only module folder")
+          os.list(build.modulesFolder).map(_.last) shouldBe Seq("core.3_3_8.test")
+          os.isDir(build.modulesFolder / "core.3_3_8.test" / "sandbox") shouldBe true
         }
       }
     }

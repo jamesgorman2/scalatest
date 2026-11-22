@@ -132,6 +132,8 @@ It also fails when:
 
 Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
 
+The test command writes each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, at the same relative path in the module folder, `out/org.scalatest.mill.TestCommandModule/modules/<module>`. `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`. Before any test starts, the test command deletes everything an earlier test command left in the module folder. It writes no JUnit XML report, whatever the module's `testReportXml`, and leaves Mill's own `testForked` and `testOnly` task folders as they were.
+
 ## Runs in the human-readable output
 
 A run's number is its `number` in [JSON.md](JSON.md) § Run node. The human-readable output shows a run's line, `Run <n>:`, only where the run:
