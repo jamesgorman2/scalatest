@@ -8,12 +8,12 @@ Each plugin release is a release of this fork. The plugin, the fork's ScalaTest 
 
 - Mill 1.3.1 only.
 - One JVM test module per command, testing with this fork at the plugin's release.
-- The module's tests run in the workers Mill's `testForked` starts for each fork group that holds a test class.
+- The module's tests run in the workers that Mill's `testForked`, or `testOnly` where class globs are given (§ Running the test command), starts for each fork group that holds a test class to run.
   - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
     - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the group's test class count. The group's workers run in parallel.
     - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
   - A module that sets `testBatchFrameworkTasks` is given no queue of its classes. Each fork group gets one worker, which is given the group's whole class list as `testForkGrouping` gives it, whatever the module's `testParallelism`. Where more than one fork group holds a class, the workers run in parallel.
-  - A module that does not set `testForkGrouping` has one fork group. A module with no test class still runs one worker.
+  - A module that does not set `testForkGrouping` has one fork group. Where no class glob is given, a module with no test class still runs one worker.
 - Test modules on Scala 3.3 or later. The fork is built with Scala 3.3.8, so a test module on Scala 2, 3.1 or 3.2 cannot use it.
 - Human-readable output on stdout, and JSON output to a file in the format [JSON.md](JSON.md) gives. The only output arguments are `-oH`, a bare `-o` and `-fJ <path>`.
 
@@ -96,14 +96,23 @@ For example, `mill scalatest/test core.test`.
   - `-P`, alone or with a thread count joined to it, such as `-P4`;
   - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it.
 
-  Where class globs are given, only the test classes whose fully qualified name matches at least one of them run, as under `testOnly`. A class glob without `*` matches only the name equal to it, and each `*` matches any run of characters, including none. For example, `mill scalatest/test core.test -- 'samples.Alpha*'`.
+  Where class globs are given, the module runs as `mill <module>.testOnly <class globs> -- <framework arguments>` runs it, except for the arguments each run receives (below). Only the test classes whose fully qualified name matches at least one class glob run. A class glob without `*` matches only the name equal to it, and each `*` matches any run of characters, including none. For example, `mill scalatest/test core.test -- 'samples.Alpha*'`.
+
+  Where no class glob is given, the module runs as `mill <module>.testForked <framework arguments>` runs it, with the same exception.
 
   Every run, with or without class globs, receives the module's own ScalaTest arguments that reach the run (below), then the framework arguments in the order given. For example, `mill scalatest/test core.test -- 'samples.Alpha*' -- -z slow` runs only the tests whose names contain `slow` in the classes matching `samples.Alpha*`. A framework argument therefore takes effect over a module argument wherever ScalaTest takes the later of two arguments, as for two `-D` entries with one key. ScalaTest's runner takes the setting of `-P`, `-F`, `-T`, `-S` and `-W` from one argument only, so a framework argument with one of these flags replaces each module argument with that flag, whereas Mill's `testOnly` and `testForked` pass both on.
 
 The module's own ScalaTest arguments (`testArgsDefault`) reach the run only if they are one of these flags, with their values: `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`.
 Every other flag, including every reporter flag, is withheld.
 
-The test command fails before any test starts when:
+Each worker receives the environment that a worker of Mill's own `testOnly` or `testForked` receives when that task starts from the test command's `mill` command line:
+
+- where the module's `propagateEnv` is on, the environment `mill` started in, overlaid by the module's `allForkEnv`, which by default holds its `forkEnv` and the variables Mill adds, such as `MILL_WORKSPACE_ROOT`;
+- where it is off, the module's `allForkEnv` alone.
+
+Where `propagateEnv` is on, a variable that the `mill` launcher sets from its own arguments, such as `MILL_PARAMS` on Windows, holds the arguments of that `mill` command line.
+
+The test command fails before any test starts, and writes no consolidated output, when:
 
 - it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`;
 - it is given `-fJ` with no path;
@@ -118,8 +127,8 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- class globs are given and none of them matches a test class of the module. No test runs, and the failure is the one Mill's `testOnly` gives: `Test selector does not match any test: <class globs>`;
-- class globs are given, and once every test worker has ended, no run has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The failure is the same one Mill's `testOnly` gives. Neither of these counts as such a report:
+- class globs are given and none of them matches a test class of the module. No test runs. The consolidated output is written, and its root holds the failure Mill's `testOnly` gives: `Test selector does not match any test: <class globs>` ([JSON.md](JSON.md) § Root);
+- class globs are given, and once every test worker has ended, no run has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The consolidated output is written, and its root holds the same failure. Neither of these counts as such a report:
   - a test shown as ignored only because its suite's structure marks it ignored;
   - a suite or test shown as aborted only because it has no end event, such as one with reason *not run*;
 - laying out a fork group's files fails, or starting or running a test worker fails;

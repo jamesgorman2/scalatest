@@ -61,7 +61,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - R-007 The test command fails where all of these hold:
   - class globs are given, and at least one of them matches a test class that the module's test framework discovers;
   - every worker of the module has ended;
-  - no run of the module has reported, in its event stream, a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted.
+  - no run of the module has reported, in its event stream, a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted.
 
   These do not count as such a report:
   - a test that the consolidated output shows as ignored only because its suite's structure marks it ignored;
