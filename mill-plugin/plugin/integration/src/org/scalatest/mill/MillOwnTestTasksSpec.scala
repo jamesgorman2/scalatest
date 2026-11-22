@@ -24,7 +24,7 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
     }
 
   private def runAlone(build: FixtureBuild, task: Seq[String]): MillConsole = {
-    build.compileBuildFile()
+    build.compile()
     build.removeModuleOutput()
     MillConsole(build.eval(task))
   }

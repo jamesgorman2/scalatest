@@ -127,7 +127,7 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def jsonOutput: JsonNode = JsonNode.read(jsonOutputFile)
 
-  def withJsonOutput(result: TestCommandResult): (TestCommandResult, JsonNode) = {
+  def resultAndJsonOutput(result: TestCommandResult): (TestCommandResult, JsonNode) = {
     withClue(result.debugString) {
       os.exists(jsonOutputFile) shouldBe true
     }
@@ -136,7 +136,7 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def resultAndJsonOutputOfTestCommand(millArguments: Seq[String] = Nil): (TestCommandResult, JsonNode) = {
     os.remove(jsonOutputFile)
-    withJsonOutput(runTestCommandWritingJsonOutput(millArguments))
+    resultAndJsonOutput(runTestCommandWritingJsonOutput(millArguments))
   }
 
   def jsonOutputOfTestCommand(): JsonNode = {
@@ -151,9 +151,9 @@ final class FixtureBuild(tester: IntegrationTester) {
   def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
 
   // `resolve _` compiles the build, so a later command's output holds no compile messages.
-  def compileBuildFile(): Unit = requireCompiled(tester.eval(compilingArguments))
+  def compile(): Unit = requireCompiled(tester.eval(compilingArguments))
 
-  def compileBuildFileThroughMillBat(): Unit = requireCompiled(evalThroughMillBat(compilingArguments))
+  def compileThroughMillBat(): Unit = requireCompiled(evalThroughMillBat(compilingArguments))
 
   private val compilingArguments: Seq[String] = Seq("resolve", "_")
 

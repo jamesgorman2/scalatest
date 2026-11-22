@@ -107,7 +107,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     )
 
   private def runWithArguments(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
-    build.withJsonOutput(build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*))
+    build.resultAndJsonOutput(build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*))
 
   private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
     runWithArguments(build, ("--" +: classGlobs)*)
@@ -382,9 +382,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           )
           makeAlpha1FastSendInfo(build, sendingVariables(sentVariables))
           if (daemonMode) {
-            build.compileBuildFile()
+            build.compile()
           }
-          val (result, json) = build.withJsonOutput(
+          val (result, json) = build.resultAndJsonOutput(
             build.runTestCommandWritingJsonOutputWith(
               FixtureBuild.jobsArguments(2),
               Map("FIXTURE_OUTER" -> "from-outer", "FIXTURE_BOTH" -> "from-outer")
@@ -395,7 +395,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           Then(s"the info message holds FIXTURE_OUTER $expectedOuterValue, FIXTURE_FORK and FIXTURE_BOTH from-forkEnv, and MILL_WORKSPACE_ROOT the build's workspace")
           withClue(result.debugString) {
             variables.map(_.removed("MILL_WORKSPACE_ROOT")) shouldBe
-              Seq(Map("FIXTURE_OUTER" -> expectedOuterValue,"FIXTURE_FORK" -> "from-forkEnv", "FIXTURE_BOTH" -> "from-forkEnv"))
+              Seq(Map("FIXTURE_OUTER" -> expectedOuterValue, "FIXTURE_FORK" -> "from-forkEnv", "FIXTURE_BOTH" -> "from-forkEnv"))
             variables.map(_.get("MILL_WORKSPACE_ROOT").map(os.Path(_))) shouldBe Seq(Some(build.workspace))
           }
 
@@ -421,10 +421,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           build.addToTestModule("def propagateEnv = true")
           makeAlpha1FastSendInfo(build, """sys.env.getOrElse("MILL_PARAMS", "absent")""")
           if (daemonMode) {
-            build.compileBuildFileThroughMillBat()
+            build.compileThroughMillBat()
           }
           val (result, json) =
-            build.withJsonOutput(build.runTestCommandThroughMillBatWritingJsonOutputWith(FixtureBuild.jobsArguments(2))("--", "samples.Alpha1"))
+            build.resultAndJsonOutput(build.runTestCommandThroughMillBatWritingJsonOutputWith(FixtureBuild.jobsArguments(2))("--", "samples.Alpha1"))
 
           Then(s"the info message is the arguments mill.bat was given$afterNoDaemon: -j 2 scalatest/test core.test -fJ <report> -- samples.Alpha1")
           withClue(result.debugString) {
