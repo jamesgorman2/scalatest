@@ -108,12 +108,12 @@ final class FixtureBuild(tester: IntegrationTester) {
   private def writingJsonOutput(arguments: Seq[String]): Seq[String] = "core.test" +: "-fJ" +: jsonOutputFile.toString +: arguments
 
   private def evalThroughMillBat(arguments: Seq[String]): IntegrationTester.EvalResult = {
-    // `mill.bat` runs the Mill it finds in its download folder under the name `MILL_VERSION` gives, so placing the
-    // tester's own Mill executable there under that name has `mill.bat` run it without downloading a release.
+    // `mill.bat` runs the Mill in its download folder named after `MILL_VERSION`, so a copy of the tester's Mill
+    // executable under that name runs without a download.
     val downloadFolder = workspace / "mill-download"
     os.copy.over(IntegrationEnvironment.millExecutable, downloadFolder / s"${FixtureBuild.millBatVersion}.bat", createFolders = true)
-    // The tester's own arguments, such as `--ticker false`, would reach `MILL_PARAMS`, so `mill.bat` is called
-    // directly. It leaves `--no-daemon` out of `MILL_PARAMS` where that is the first argument.
+    // `mill.bat` is called directly, not through the tester, whose own arguments such as `--ticker false` would
+    // reach `MILL_PARAMS`. `mill.bat` leaves a leading `--no-daemon` out of `MILL_PARAMS`.
     val daemonArguments = if (tester.daemonMode) Nil else Seq("--no-daemon")
     val result = os.call(
       cmd = (IntegrationEnvironment.millBootstrapScript, daemonArguments, arguments),

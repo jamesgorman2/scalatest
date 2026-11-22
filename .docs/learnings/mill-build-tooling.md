@@ -192,12 +192,12 @@ In Mill 1.3.1, `<module>.testForked <fully qualified class>` does not narrow the
 <learning>
 date: 2026-11-22
 ---
-`mill.testkit.IntegrationTester` (Mill 1.3.1) starts its Mill executable directly, not through a `mill.bat` bootstrap script, so the test build's processes never see the variables `mill.bat` sets, such as `MILL_PARAMS` (`set "MILL_PARAMS=%*%"`, its arguments less a leading `--no-daemon`, `-i`, `--bsp` or similar). Passing a copy of `mill.bat` as the tester's `millExecutable` does not fix this: the tester adds `--ticker false`, which then reaches `MILL_PARAMS`.
+`mill.testkit.IntegrationTester` (Mill 1.3.1) starts its Mill executable directly, not through the `mill.bat` bootstrap script. The test build's processes therefore never see the variables `mill.bat` sets, such as `MILL_PARAMS`: its arguments, less a leading `--no-daemon`, `-i`, `--bsp` or similar. Passing a copy of `mill.bat` as the tester's `millExecutable` does not fix this, as the tester adds `--ticker false`, which then reaches `MILL_PARAMS`.
 
 To test what `mill.bat` sets, call `mill.bat` with `os.call` in the tester's workspace, with the tester's `millTestSuiteEnv` and:
 
 - `MILL_VERSION` set to a version ending in `-jvm`, such as `1.3.1-jvm`, so that `mill.bat` runs `<download folder>\<MILL_VERSION>.bat`;
 - `MILL_FINAL_DOWNLOAD_FOLDER` set to a folder holding a copy of the tester's Mill executable under that name, so that `mill.bat` runs it rather than downloading a release.
 
-Pass `--no-daemon` first for a run without the daemon; `mill.bat` leaves it out of `MILL_PARAMS`. With the tester in daemon mode, `close()` stops the daemon `mill.bat` started, as it shares the workspace's `out/mill-daemon` folder.
+Pass `--no-daemon` first for a run without the daemon; `mill.bat` leaves it out of `MILL_PARAMS`. With the tester in daemon mode, the tester's `close()` also stops the daemon `mill.bat` started, as both use the workspace's `out/mill-daemon` folder.
 </learning>
