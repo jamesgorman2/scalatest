@@ -6,9 +6,14 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 **Alternatives**
 
-- Accepting a bare `-P` and documenting its effect, as Mill's `testOnly` passes it on.
+- Passing a bare `-P` on, as Mill's `testOnly` does, and documenting that the test command then fails.
 
-**Reasoning** ScalaTest's sbt `Framework` rejects `-P` without a thread count (`jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`, `Framework.runner`). Where the module's `testBatchFrameworkTasks` is off, the test command's own discovery then throws, so the test command fails with no consolidated output. Where it is on, every worker fails before a run starts. Rejecting a bare `-P` before any test starts names the argument and starts nothing (`SPECIFICATION.md` R-002).
+**Reasoning** ScalaTest's sbt `Framework` rejects `-P` without a thread count (`jvm/core/src/main/scala/org/scalatest/tools/Framework.scala`, `Framework.runner`), so passing a bare `-P` on fails the test command either way:
+
+- where the module's `testBatchFrameworkTasks` is off, the test command's own discovery throws, and the test command writes no consolidated output;
+- where it is on, every worker fails before a run starts.
+
+Rejecting a bare `-P` instead fails the test command before any test starts, with a message naming it (`SPECIFICATION.md` R-002).
 
 **Costs** The test command departs from Mill's `testOnly` and `testForked`, which pass a bare `-P` on.
 

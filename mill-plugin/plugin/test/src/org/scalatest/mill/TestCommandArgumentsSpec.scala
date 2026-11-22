@@ -222,7 +222,7 @@ final class TestCommandArgumentsSpec extends AnyWordSpec with should.Matchers {
         }
       }
 
-      "reject a -P alone, which ScalaTest's sbt Framework does not accept, naming it" in {
+      "reject a -P alone, naming it" in {
         frameworkArgumentRejection("-P") shouldBe TestCommandFailure.FrameworkArgumentNotPassedOn("-P")
       }
 
