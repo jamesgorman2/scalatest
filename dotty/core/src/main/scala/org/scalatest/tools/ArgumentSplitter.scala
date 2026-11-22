@@ -1,7 +1,5 @@
 package org.scalatest.tools
 
-import scala.collection.mutable.ListBuffer
-
 private[scalatest] enum SplitArgument {
 
   case Flagged(flag: String, argumentAndValues: List[String])
@@ -13,35 +11,31 @@ private[scalatest] object ArgumentSplitter {
 
   private enum Values {
 
-    /** `count` values. Where `endsAtFlag`, an argument starting with `-` ends them early. */
     case Following(count: Int, endsAtFlag: Boolean = false)
 
-    /** A directory, then `-Y` and a CSS file where `-Y` follows the directory. */
     case DirectoryThenCssFile
 
-    def isShortOf(heldValues: List[String]): Boolean = heldValues.size < countNeededHolding(heldValues)
+    def isShortOf(heldValues: List[String]): Boolean = heldValues.size < countNeeded(heldValues)
 
-    def take(remaining: BufferedIterator[String]): List[String] = {
-      val taken = new ListBuffer[String]
-      while (remaining.hasNext && takesNext(remaining.head, taken.toList)) {
-        taken += remaining.next()
-      }
-      taken.toList
+    def take(remaining: List[String]): (List[String], List[String]) = {
+      val taken = remaining.take(countNeeded(remaining)).takeWhile(isValue)
+      (taken, remaining.drop(taken.size))
     }
 
-    private def takesNext(argument: String, heldValues: List[String]): Boolean =
-      isValue(argument) && heldValues.size < countNeededHolding(heldValues :+ argument)
-
-    private def countNeededHolding(values: List[String]): Int =
+    private def countNeeded(arguments: List[String]): Int =
       this match {
         case Following(count, _) => count
-        case DirectoryThenCssFile => if (values.lift(1).contains(cssFileFlag)) 3 else 1
+        case DirectoryThenCssFile =>
+          arguments match {
+            case _ :: `cssFileFlag` :: _ => 3
+            case _ => 1
+          }
       }
 
     private def isValue(argument: String): Boolean =
       this match {
-        case Following(_, true) => argument == null || !argument.startsWith("-")
-        case _ => true
+        case Following(_, endsAtFlag) => !endsAtFlag || Option(argument).forall(!_.startsWith("-"))
+        case DirectoryThenCssFile => true
       }
   }
 
@@ -90,18 +84,20 @@ private[scalatest] object ArgumentSplitter {
 
   private val cssFileFlag = "-Y"
 
-  def split(arguments: Seq[String]): List[SplitArgument] = {
-    val remaining = arguments.iterator.buffered
-    val split = new ListBuffer[SplitArgument]
-    while (remaining.hasNext) {
-      val argument = remaining.next()
-      split += (flagOf(argument) match {
-        case Some(flag) => SplitArgument.Flagged(flag, argument :: valuesOf(flag).take(remaining))
-        case None => SplitArgument.Unrecognised(argument)
-      })
+  def split(arguments: Seq[String]): List[SplitArgument] = List.unfold(arguments.toList)(splitFirst)
+
+  private def splitFirst(arguments: List[String]): Option[(SplitArgument, List[String])] =
+    arguments match {
+      case Nil => None
+      case argument :: following =>
+        flagOf(argument) match {
+          case Some(flag) => {
+            val (values, afterValues) = valuesOf(flag).take(following)
+            Some((SplitArgument.Flagged(flag, argument :: values), afterValues))
+          }
+          case None => Some((SplitArgument.Unrecognised(argument), following))
+        }
     }
-    split.toList
-  }
 
   /**
    * Whether the flag holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one

@@ -23,9 +23,9 @@ enum ScalaTestArgument {
 object ScalaTestArgument {
 
   /**
-   * Splits ScalaTest arguments, such as a module's or the test command's framework arguments, by flag, in the order
-   * given. Each flag takes the values the runner reads for it, so a value is never returned as a flag. A flag short of
-   * values keeps those it has. Never throws.
+   * Splits ScalaTest arguments by flag, in the order given: a module's ScalaTest arguments, or the test command's
+   * framework arguments. Each flag takes the values the runner reads for it, so a value is never returned as a flag. A
+   * flag short of values keeps those it has. Never throws.
    */
   def split(arguments: Seq[String]): Seq[ScalaTestArgument] =
     ArgumentSplitter.split(arguments).map {
