@@ -6,6 +6,7 @@ import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ForkGroup
 import org.scalatest.consolidation.ModuleName
+import org.scalatest.consolidation.RunEvent
 import org.scalatest.matchers.should
 import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
@@ -81,6 +82,65 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       "give the launcher, attaching nothing to the root" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Right("launcher")) shouldBe Some("launcher")
+        consolidation.end()
+        consolidation.state shouldBe ConsolidationState.Ended
+      }
+    }
+  }
+
+  "Reporting, once a module's workers have ended, that its class globs gave no test result" when {
+    val classGlobs = Seq(ClassGlob("samples.Alpha1"), ClassGlob("samples.Beta*"))
+
+    def runWithAbortedSuite(consolidation: Consolidation): Unit = {
+      val suite = """[{"suiteId":"samples.Alpha1","index":0}]"""
+      consolidation.addRun(module) { feed =>
+        Seq(
+          EventLogs.runStarted,
+          s"""{"item":"structure","nodes":[{"id":$suite,"kind":"suite","name":"Alpha1","suiteId":"samples.Alpha1","className":"samples.Alpha1"}]}""",
+          s"""{"item":"event","node":$suite,"executions":[1],"event":"SuiteStarting","threadName":"main","timeStamp":1}""",
+          s"""{"item":"event","node":$suite,"executions":[1],"event":"SuiteAborted","message":"beforeAll failed","threadName":"main","timeStamp":2}""",
+          EventLogs.runEndedCompleted
+        ).foreach(line => feed.add(RunEvent.decode(line)))
+      }
+    }
+
+    def completedRunWithNoSuite(consolidation: Consolidation): Unit =
+      consolidation.addRun(module)(feed => Seq(EventLogs.runStarted, EventLogs.runEndedCompleted).foreach(line => feed.add(RunEvent.decode(line))))
+
+    "class globs are given and no run of the module reported a test result" should {
+      "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        completedRunWithNoSuite(consolidation)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs)
+        consolidation.end()
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
+          "Consolidated tests:",
+          "  [core.test]",
+          "  *** CONSOLIDATED TESTS ABORTED ***",
+          "    Test selector does not match any test: samples.Alpha1 samples.Beta*",
+          "    Run discoveredTestClasses to see available tests"
+        )
+        consolidation.state shouldBe ConsolidationState.EndedFailed
+      }
+    }
+
+    "class globs are given and a run of the module reported a suite as aborted" should {
+      "attach nothing to the root" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        runWithAbortedSuite(consolidation)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs)
+        consolidation.end()
+        consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
+      }
+    }
+
+    "no class glob is given and no run of the module reported a test result" should {
+      "attach nothing to the root, leaving the consolidation unfailed" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        completedRunWithNoSuite(consolidation)
+        JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, Nil)
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
       }

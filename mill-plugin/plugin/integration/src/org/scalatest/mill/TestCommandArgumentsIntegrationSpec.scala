@@ -76,6 +76,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   private def moduleNode(json: JsonNode): JsonNode = json.node(NodeKind.Module, "core.test")
 
+  private def noTestMatchedMessageNaming(classGlob: String): String =
+    s"Test selector does not match any test: $classGlob\nRun discoveredTestClasses to see available tests"
+
   private def suitesRun(json: JsonNode): Seq[String] =
     moduleNode(json).nodes
       .filter(node => node.kind == NodeKind.Suite && node.contents.exists(test => test.kind == NodeKind.Test && !test.outcome.contains("aborted")))
@@ -207,7 +210,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
           Then(s"the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming $classGlob")
           withClue(result.debugString) {
-            json.failureMessages shouldBe Seq(s"Test selector does not match any test: $classGlob\nRun discoveredTestClasses to see available tests")
+            json.failureMessages shouldBe Seq(noTestMatchedMessageNaming(classGlob))
           }
 
           And("no file exists in the markers folder, and no test worker started")
@@ -219,6 +222,49 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           And("the test command fails")
           shouldFail(result)
         }
+      }
+    }
+
+    Scenario("Framework arguments that leave no test of the matched classes to run fail the test command") {
+      Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
+      When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -z nothing-matches")
+      withMarkingSuites { build =>
+        val (result, json) = runWithArguments(build, "--", "samples.Alpha1", "--", "-z", "nothing-matches")
+
+        Then("the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming samples.Alpha1")
+        withClue(result.debugString) {
+          json.failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Alpha1"))
+        }
+
+        And("no file exists in the markers folder")
+        withClue(result.debugString) {
+          os.list(build.markersFolder) shouldBe empty
+        }
+
+        And("the test command fails")
+        shouldFail(result)
+      }
+    }
+
+    Scenario("The only matched suite aborting before its tests run counts as a test result") {
+      Given("Broken1, whose beforeAll throws before its one test fast runs")
+      When("the test command runs core.test, writing JSON output, with -- samples.Broken1")
+      withMarkingSuites { build =>
+        build.addSuites("Broken1")
+        val (result, json) = runWithClassGlobs(build, "samples.Broken1")
+
+        withClue(result.debugString) {
+          Then("the JSON output holds the suite Broken1, aborted, with a message")
+          val broken1 = moduleNode(json).node(NodeKind.Suite, "Broken1")
+          broken1.outcome shouldBe Some("aborted")
+          broken1.holds("message") shouldBe true
+
+          And("the JSON output's root holds no failure whose message begins Test selector does not match any test")
+          json.failureMessages.filter(_.startsWith("Test selector does not match any test")) shouldBe empty
+        }
+
+        And("the test command fails")
+        shouldFail(result)
       }
     }
   }
