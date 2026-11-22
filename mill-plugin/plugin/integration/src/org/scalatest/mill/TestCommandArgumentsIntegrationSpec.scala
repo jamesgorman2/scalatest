@@ -287,6 +287,19 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   Feature("Framework arguments") {
 
+    def shouldRunExactly(result: TestCommandResult, json: JsonNode, suites: Seq[String], testsInEachSuite: Seq[String]): Unit = {
+      withClue(result.debugString) {
+        Then(s"the suites run are exactly ${EnglishList.of(suites)}")
+        suitesRun(json) shouldBe suites
+
+        And(s"in each of those suites, the tests run are exactly ${EnglishList.of(testsInEachSuite)}")
+        suites.map(suite => suite -> testsRun(moduleNode(json).node(NodeKind.Suite, suite))) shouldBe suites.map(_ -> testsInEachSuite)
+      }
+
+      And("the test command succeeds")
+      shouldSucceed(result)
+    }
+
     Scenario("With no -- after the test command's own arguments, every test runs") {
       Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow")
       And("each test creates a file in the markers folder as it runs")
@@ -310,19 +323,6 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Seq("--", "--", "-l", "samples.Fast") -> (Seq("Alpha1", "Alpha2", "Beta1"), Seq("slow")),
       Seq("--", "samples.Alpha*", "--", "-z", "slow") -> (Seq("Alpha1", "Alpha2"), Seq("slow"))
     )
-
-    def shouldRunExactly(result: TestCommandResult, json: JsonNode, suites: Seq[String], testsInEachSuite: Seq[String]): Unit = {
-      withClue(result.debugString) {
-        Then(s"the suites run are exactly ${EnglishList.of(suites)}")
-        suitesRun(json) shouldBe suites
-
-        And(s"in each of those suites, the tests run are exactly ${EnglishList.of(testsInEachSuite)}")
-        suites.map(suite => suite -> testsRun(moduleNode(json).node(NodeKind.Suite, suite))) shouldBe suites.map(_ -> testsInEachSuite)
-      }
-
-      And("the test command succeeds")
-      shouldSucceed(result)
-    }
 
     for ((arguments, (suites, tests)) <- filteringArguments) {
       Scenario(s"The arguments ${arguments.mkString(" ")} run only the test ${EnglishList.of(tests)} of each of ${EnglishList.of(suites)}") {
