@@ -26,13 +26,17 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def editBuild(edit: String => String): Unit = os.write.over(buildFile, edit(buildText))
 
-  def replaceInBuild(from: String, to: String): Unit =
-    editBuild { build =>
-      withClue(s"the build file holds no $from:\n$build\n") {
-        build should include(from)
-      }
-      build.replace(from, to)
+  def replaceInBuild(from: String, to: String): Unit = replaceIn(buildFile, "the build file")(from, to)
+
+  def replaceInSample(fileName: String, from: String, to: String): Unit = replaceIn(samples / fileName, fileName)(from, to)
+
+  private def replaceIn(file: os.Path, description: String)(from: String, to: String): Unit = {
+    val text = os.read(file)
+    withClue(s"$description holds no $from:\n$text\n") {
+      text should include(from)
     }
+    os.write.over(file, text.replace(from, to))
+  }
 
   def addPlugin(): Unit =
     editBuild { build =>

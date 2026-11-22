@@ -6,8 +6,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ClassGlobSpec extends AnyWordSpec with should.Matchers {
 
-  private def matching(glob: String, classNames: String*): Seq[String] =
-    classNames.filter(name => ClassGlob(glob).matches(TestClassName(name)))
+  private def matching(glob: String, names: String*): Seq[String] =
+    names.filter(name => ClassGlob(glob).matches(TestClassName(name)))
 
   private val classNames: Seq[String] = Seq("samples.Alpha1", "samples.Alpha2", "samples.Beta1", "other.Alpha1")
 
