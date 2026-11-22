@@ -18,10 +18,10 @@ private[mill] enum AllowedFlag(val text: String) {
   case SlowpokeDetection extends AllowedFlag("-W")
 
   /**
-   * ScalaTest's runner rejects a second `-F`, `-T` or `-S`, keeps the first `-W`, and keeps the first `-P` holding a
-   * thread count.
+   * A framework argument with this flag replaces each module argument with it, because ScalaTest's runner rejects a
+   * second `-F`, `-T` or `-S`, keeps the first `-W`, and keeps the first `-P` holding a thread count.
    */
-  def isTakenOnce: Boolean =
+  def frameworkArgumentReplacesModuleArguments: Boolean =
     this match {
       case Parallel | SpanScaleFactor | TestSortingTimeout | Seed | SlowpokeDetection => true
       case _ => false

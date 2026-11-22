@@ -31,8 +31,8 @@ final class RunArgumentsSpec extends AnyWordSpec with should.Matchers {
         Seq("-W", "60", "30") -> Seq("-W", "120", "60")
       )
     ) {
-      s"the module gives ${moduleArgument.mkString(" ")} and the test command gives ${frameworkArgument.mkString(" ")}" should {
-        s"hold the framework's ${frameworkArgument.mkString(" ")} and no copy of the module's ${moduleArgument.mkString(" ")}" in {
+      s"the module gives ${moduleArgument.mkString(" ")} twice and the test command gives ${frameworkArgument.mkString(" ")}" should {
+        s"hold the framework's ${frameworkArgument.mkString(" ")}, no copy of the module's ${moduleArgument.mkString(" ")}, and every other argument" in {
           runArguments(Seq("-l", "samples.Slow") ++ moduleArgument ++ moduleArgument, Seq("-z", "adds") ++ frameworkArgument) shouldBe
             Seq("-l", "samples.Slow", "-z", "adds") ++ frameworkArgument
         }

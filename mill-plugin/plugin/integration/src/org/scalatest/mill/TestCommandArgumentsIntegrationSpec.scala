@@ -92,12 +92,12 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       .map(_.name)
       .sorted
 
-  private def makeAlpha1FastSendInfo(build: FixtureBuild, message: String): Unit =
+  private def makeAlpha1FastSendInfo(build: FixtureBuild, messageExpression: String): Unit =
     build.replaceInSample(
       s"${MarkingSuite.Alpha1}.scala",
       MarkingSuiteTest.Fast.withEmptyBody,
       s"""override def withFixture(test: NoArgTest): org.scalatest.Outcome = {
-         |    if (test.name == "fast") info($message)
+         |    if (test.name == "fast") info($messageExpression)
          |    super.withFixture(test)
          |  }
          |
