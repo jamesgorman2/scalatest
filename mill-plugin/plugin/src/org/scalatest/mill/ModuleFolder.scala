@@ -10,7 +10,7 @@ private[mill] object ModuleFolder {
     val moduleFolder = normalisedModulesFolder.resolve(module.value).normalize
     require(
       moduleFolder.startsWith(normalisedModulesFolder) && moduleFolder != normalisedModulesFolder,
-      s"The module folder of ${module.value} must be strictly inside $normalisedModulesFolder, but is $moduleFolder"
+      s"The module folder of ${module.value} must be a subfolder of $normalisedModulesFolder, but is $moduleFolder"
     )
     moduleFolder
   }
