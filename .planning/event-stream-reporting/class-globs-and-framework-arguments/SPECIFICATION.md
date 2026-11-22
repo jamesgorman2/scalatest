@@ -81,8 +81,8 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 
 ### The module folder
 
-- R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`, which a module selector can also name `core[3.3.8].test`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder. Each worker's working directory `sandbox` is one such folder (`../SPECIFICATION.md` R-110).
-- R-012 Once a test command has resolved the module from its module selector, it deletes every file and folder that an earlier test command left in the module folder. It deletes them before it starts any test of the module, and deletes them also where it then starts no test of the module, as where no class glob matches a test class (R-006). A test command that fails before it has resolved the module, as where it fails on its arguments (R-002, R-013), creates, changes and deletes nothing in the module folder (`../SPECIFICATION.md` R-110).
+- R-009 The module folder is `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder, where `<module>` is the module's name as Mill writes it in a task name: `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`. A module selector can also name that module `core[3.3.8].test`. For the build's default output folder, the module `core.test` has the module folder `out/org.scalatest.mill.TestCommandModule/modules/core.test`. Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder. Each worker's working directory `sandbox` is one such folder (`../SPECIFICATION.md` R-110).
+- R-012 Once a test command has resolved the module from its module selector, it deletes every file and folder that an earlier test command left in the module folder. It deletes them before it starts any test of the module, and also where it starts none, as where no class glob matches a test class (R-006). A test command that fails on its arguments (R-002, R-013), or otherwise before it has resolved the module, creates, changes and deletes nothing in the module folder (`../SPECIFICATION.md` R-110).
 - R-010 Once a test command has ended, whether it succeeded or failed, the module folder and every folder inside it hold no JUnit XML report, whatever the module's `testReportXml` is and whatever class globs and framework arguments are given (`../SPECIFICATION.md` R-047, R-110).
 - R-011 The test command creates neither of the module's `testForked` and `testOnly` task folders, such as `out/core/test/testForked.dest`, and creates, changes and deletes nothing in either where it exists (`../SPECIFICATION.md` R-060, R-110).
 
@@ -330,6 +330,15 @@ Feature: The module folder
       When the test command is invoked with `-- samples.Alpha1`
       Then `out/core/test/testForked.dest/test-report.xml` has the content and modification time it had before the test command was invoked
       And no folder `out/core/test/testOnly.dest` exists
+
+  Rule: The module folder is named as Mill writes the module in a task name
+    Scenario: AC-020 The test module of a cross module
+      Given the module is instead the `test` module of the cross module `core` at `3.3.8`, which Mill names `core.3_3_8.test` in a task name
+      And `Alpha1`'s test `fast` creates the file `working-directory.txt` in its working directory when it runs
+      When the test command is invoked as `mill -j 2 scalatest/test core[3.3.8].test -- samples.Alpha1`
+      Then the test command succeeds
+      And `out/org.scalatest.mill.TestCommandModule/modules` holds one folder, `core.3_3_8.test`
+      And `working-directory.txt` exists in the folder `sandbox` of that folder
 ```
 
 | Requirement | Criteria                                       |
@@ -342,7 +351,7 @@ Feature: The module folder
 | R-006       | AC-004                                         |
 | R-007       | AC-005, AC-017                                 |
 | R-008       | AC-009, AC-014                                 |
-| R-009       | AC-002, AC-003                                 |
+| R-009       | AC-002, AC-003, AC-020                         |
 | R-010       | AC-011                                         |
 | R-011       | AC-013                                         |
 | R-012       | AC-015, AC-019                                 |

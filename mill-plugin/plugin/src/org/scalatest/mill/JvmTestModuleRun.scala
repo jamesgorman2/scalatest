@@ -38,9 +38,9 @@ private[mill] final class JvmTestModuleRun(
     filesystemIgnoresCase: Path => Either[FilesystemCaseNotChecked, Boolean]
 ) {
 
-  // Every worker path is placed in the module folder explicitly; `dest` points there too so that anything Mill derives
-  // from `Task.dest` also lands in it. In Mill 1.3.1 only test discovery reads this `dest`, and it writes nothing there,
-  // so no test can tell the two folders apart.
+  // The test command places every worker path in the module folder itself. `dest` points there too, so anything Mill
+  // derives from `Task.dest` also lands there. In Mill 1.3.1 only test discovery reads `dest`, and it writes nothing
+  // there, so no test can show whether `dest` is the module folder or the command's own.
   private val ctx: TaskCtx = new ModuleFolderTaskCtx(commandCtx, moduleFolder)
 
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))

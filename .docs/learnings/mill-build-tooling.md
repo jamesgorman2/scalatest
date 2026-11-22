@@ -205,7 +205,7 @@ Pass `--no-daemon` first for a run without the daemon; `mill.bat` leaves it out 
 <learning>
 date: 2026-11-22
 ---
-Mill 1.3.1 names a cross module in task names, and in `Segments.render` (so `module.moduleSegments.render`), with dots, not brackets: the `test` module of the cross module `core` at `3.3.8` is `core.3_3_8.test`, and its task `core.3_3_8.test.testForked`. Each `.`, `/` and `:` in a cross value becomes `_`. A selector still accepts `core[3.3.8].test`, and `Segments.renderBracketSyntax` gives that form.
+Mill 1.3.1 writes a cross module's name with dots, not brackets, both in task names and in `Segments.render` (so `module.moduleSegments.render`). The `test` module of the cross module `core` at `3.3.8` is `core.3_3_8.test`, and its task is `core.3_3_8.test.testForked`. Each `.`, `/` and `:` in a cross value becomes `_`. Mill's command line still accepts `core[3.3.8].test`, and `Segments.renderBracketSyntax` gives that form.
 
 A requirement, folder name or test that expects `core[3.3.8].test` as "the name Mill writes in a task name" is wrong under Mill 1.3.1. Check a cross name before writing it into a specification by running the build's checked-in launcher from the build's folder, such as `./mill.bat --no-daemon resolve 'core[3.3.8].test._'`.
 </learning>

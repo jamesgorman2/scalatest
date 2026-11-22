@@ -586,7 +586,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         }
         shouldWriteToTheConsole(result, TestCommandFailure.FrameworkArgumentNotPassedOn("foo").message)
 
-        And("the module folder and every folder inside it hold the files they held before, leftover.txt among them, each with the content it had")
+        And("the module folder and every folder inside it hold the files they held before the test command ran, leftover.txt among them, each with the content it had")
         withClue(result.debugString) {
           filesAndContents shouldBe earlierFilesAndContents
         }
@@ -622,7 +622,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     }
 
     Scenario("The module folder of a cross module's test module is named as Mill writes the module in a task name") {
-      Given("the cross module core at 3.3.8, whose test module Mill names core.3_3_8.test in a task name")
+      Given("the module is instead the test module of the cross module core at 3.3.8, which Mill names core.3_3_8.test in a task name")
       And("Alpha1's test fast creates the file working-directory.txt in its working directory when it runs")
       When("the test command runs core[3.3.8].test with -- samples.Alpha1")
       withMarkingSuites { build =>
@@ -635,8 +635,10 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         shouldSucceed(result)
 
         withClue(result.debugString) {
-          And("its worker ran in the folder sandbox of the module folder out/org.scalatest.mill.TestCommandModule/modules/core.3_3_8.test, the only module folder")
+          And("out/org.scalatest.mill.TestCommandModule/modules holds one folder, core.3_3_8.test")
           os.list(build.modulesFolder).map(_.last) shouldBe Seq("core.3_3_8.test")
+
+          And("working-directory.txt exists in the folder sandbox of that folder")
           os.isFile(build.modulesFolder / "core.3_3_8.test" / "sandbox" / workingDirectoryMarker) shouldBe true
         }
       }
