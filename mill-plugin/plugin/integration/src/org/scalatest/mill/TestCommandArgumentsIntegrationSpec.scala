@@ -9,15 +9,15 @@ import javax.xml.parsers.DocumentBuilderFactory
 import scala.util.Try
 import scala.util.matching.Regex
 
-private enum MarkingSuite {
+private enum SampleSuite {
   case Alpha1
   case Alpha2
   case Beta1
 }
 
-private enum MarkingSuiteTest(declaration: String) {
-  case Fast extends MarkingSuiteTest("""test("fast", Fast) """)
-  case Slow extends MarkingSuiteTest("""test("slow") """)
+private enum SampleTest(declaration: String) {
+  case Fast extends SampleTest("""test("fast", Fast) """)
+  case Slow extends SampleTest("""test("slow") """)
 
   def withEmptyBody: String = declaration + "{}"
 
@@ -98,7 +98,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
   private def infoMessages(json: JsonNode): Seq[String] =
     moduleNode(json).nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
 
-  private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: MarkingSuite, tests: MarkingSuiteTest*): Unit =
+  private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: SampleSuite, tests: SampleTest*): Unit =
     tests.foreach(test => build.replaceInSample(s"$suite.scala", test.withEmptyBody, test.sendingWorkingDirectory))
 
   private def testsRun(suite: JsonNode): Seq[String] =
@@ -108,28 +108,28 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       .sorted
 
   private def makeAlpha1FastCreateFileInWorkingDirectory(build: FixtureBuild, fileName: String): Unit =
-    build.replaceInSample(s"${MarkingSuite.Alpha1}.scala", MarkingSuiteTest.Fast.withEmptyBody, MarkingSuiteTest.Fast.creatingFileInWorkingDirectory(fileName))
+    build.replaceInSample(s"${SampleSuite.Alpha1}.scala", SampleTest.Fast.withEmptyBody, SampleTest.Fast.creatingFileInWorkingDirectory(fileName))
 
   private def makeAlpha1FastSendInfo(build: FixtureBuild, messageExpression: String): Unit =
     build.replaceInSample(
-      s"${MarkingSuite.Alpha1}.scala",
-      MarkingSuiteTest.Fast.withEmptyBody,
+      s"${SampleSuite.Alpha1}.scala",
+      SampleTest.Fast.withEmptyBody,
       s"""override def withFixture(test: NoArgTest): org.scalatest.Outcome = {
          |    if (test.name == "fast") info($messageExpression)
          |    super.withFixture(test)
          |  }
          |
-         |  ${MarkingSuiteTest.Fast.withEmptyBody}""".stripMargin
+         |  ${SampleTest.Fast.withEmptyBody}""".stripMargin
     )
 
   private def runWritingJsonOutput(build: FixtureBuild, arguments: String*): TestCommandResult =
     build.runTestCommandWritingJsonOutputWith(FixtureBuild.jobsArguments(2))(arguments*)
 
-  private def runWithArguments(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
+  private def runReadingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
     build.resultAndJsonOutput(runWritingJsonOutput(build, arguments*))
 
-  private def runWithClassGlobs(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
-    runWithArguments(build, ("--" +: classGlobs)*)
+  private def runWithClassGlobsReadingJsonOutput(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
+    runReadingJsonOutput(build, ("--" +: classGlobs)*)
 
   private def shouldHoldOneRunOf(json: JsonNode, suites: Seq[String]): JsonNode = {
     val contents = moduleNode(json).contents
@@ -155,13 +155,13 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
     )
 
     for ((classGlobs, suites) <- selectingGlobs) {
-      Scenario(s"Class globs ${classGlobs.mkString(" ")} run only the suites ${suites.mkString(" and ")}") {
+      Scenario(s"Class globs ${classGlobs.mkString(" ")} run only the suites ${EnglishList.of(suites)}") {
         Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow")
         When(s"the test command runs core.test, writing JSON output, with -- ${classGlobs.mkString(" ")}")
         withMarkingSuites { build =>
-          val (result, json) = runWithClassGlobs(build, classGlobs*)
+          val (result, json) = runWithClassGlobsReadingJsonOutput(build, classGlobs*)
 
-          Then(s"the suites run are exactly ${suites.mkString(" and ")}")
+          Then(s"the suites run are exactly ${EnglishList.of(suites)}")
           withClue(result.debugString) {
             suitesRun(json) shouldBe suites
           }
@@ -183,8 +183,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
             s"def testForkGrouping = Task { $forkGrouping }",
             s"def testBatchFrameworkTasks = $batch"
           )
-          MarkingSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, MarkingSuiteTest.Fast, MarkingSuiteTest.Slow))
-          val (result, json) = runWithClassGlobs(build, "samples.Alpha*")
+          SampleSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, SampleTest.Fast, SampleTest.Slow))
+          val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Alpha*")
 
           withClue(result.debugString) {
             Then("the module node holds exactly one run node, of fork group 1, holding Alpha1 and Alpha2")
@@ -203,8 +203,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
       withMarkingSuites { build =>
         build.replaceInBuild("def testParallelism = false", "def testParallelism = true")
-        makeTestsSendWorkingDirectory(build, MarkingSuite.Alpha1, MarkingSuiteTest.Fast)
-        val (result, json) = runWithClassGlobs(build, "samples.Alpha1")
+        makeTestsSendWorkingDirectory(build, SampleSuite.Alpha1, SampleTest.Fast)
+        val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Alpha1")
 
         withClue(result.debugString) {
           Then("the module node holds exactly one run node, holding Alpha1 only")
@@ -222,7 +222,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         And("samples.Fast, a Tag object that is not a test class")
         When(s"the test command runs core.test, writing JSON output, with -- $classGlob")
         withMarkingSuites { build =>
-          val (result, json) = runWithClassGlobs(build, classGlob)
+          val (result, json) = runWithClassGlobsReadingJsonOutput(build, classGlob)
 
           Then(s"the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming $classGlob")
           withClue(result.debugString) {
@@ -245,7 +245,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -z nothing-matches")
       withMarkingSuites { build =>
-        val (result, json) = runWithArguments(build, "--", "samples.Alpha1", "--", "-z", "nothing-matches")
+        val (result, json) = runReadingJsonOutput(build, "--", "samples.Alpha1", "--", "-z", "nothing-matches")
 
         Then("the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming samples.Alpha1")
         withClue(result.debugString) {
@@ -267,7 +267,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       When("the test command runs core.test, writing JSON output, with -- samples.Broken1")
       withMarkingSuites { build =>
         build.addSuites("Broken1")
-        val (result, json) = runWithClassGlobs(build, "samples.Broken1")
+        val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Broken1")
 
         withClue(result.debugString) {
           Then("the JSON output holds the suite Broken1, aborted, with a message")
@@ -311,24 +311,27 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       Seq("--", "samples.Alpha*", "--", "-z", "slow") -> (Seq("Alpha1", "Alpha2"), Seq("slow"))
     )
 
+    def shouldRunExactly(result: TestCommandResult, json: JsonNode, suites: Seq[String], testsInEachSuite: Seq[String]): Unit = {
+      withClue(result.debugString) {
+        Then(s"the suites run are exactly ${EnglishList.of(suites)}")
+        suitesRun(json) shouldBe suites
+
+        And(s"in each of those suites, the tests run are exactly ${EnglishList.of(testsInEachSuite)}")
+        suites.map(suite => suite -> testsRun(moduleNode(json).node(NodeKind.Suite, suite))) shouldBe suites.map(_ -> testsInEachSuite)
+      }
+
+      And("the test command succeeds")
+      shouldSucceed(result)
+    }
+
     for ((arguments, (suites, tests)) <- filteringArguments) {
-      val suiteList = s"${suites.init.mkString(", ")} and ${suites.last}"
-      Scenario(s"The arguments ${arguments.mkString(" ")} run only the test ${tests.mkString(" and ")} of each of $suiteList") {
+      Scenario(s"The arguments ${arguments.mkString(" ")} run only the test ${EnglishList.of(tests)} of each of ${EnglishList.of(suites)}") {
         Given("Alpha1, Alpha2 and Beta1, each with the tests fast, tagged samples.Fast, and slow")
         When(s"the test command runs core.test, writing JSON output, with ${arguments.mkString(" ")}")
         withMarkingSuites { build =>
-          val (result, json) = runWithArguments(build, arguments*)
+          val (result, json) = runReadingJsonOutput(build, arguments*)
 
-          withClue(result.debugString) {
-            Then(s"the suites run are exactly $suiteList")
-            suitesRun(json) shouldBe suites
-
-            And(s"in each of those suites, the tests run are exactly ${tests.mkString(" and ")}")
-            suites.map(suite => suite -> testsRun(moduleNode(json).node(NodeKind.Suite, suite))) shouldBe suites.map(_ -> tests)
-          }
-
-          And("the test command succeeds")
-          shouldSucceed(result)
+          shouldRunExactly(result, json, suites, tests)
         }
       }
     }
@@ -342,7 +345,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           build.setModuleArguments(Seq("-Dcolour=red"))
           build.addToTestModule(s"def testBatchFrameworkTasks = $batch")
           makeAlpha1FastSendInfo(build, """test.configMap.getRequired[String]("colour")""")
-          val (result, json) = runWithArguments(build, "--", "samples.Alpha1", "--", "-Dcolour=blue")
+          val (result, json) = runReadingJsonOutput(build, "--", "samples.Alpha1", "--", "-Dcolour=blue")
 
           Then("the info message is blue")
           withClue(result.debugString) {
@@ -362,7 +365,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       withMarkingSuites { build =>
         build.setModuleArguments(Seq("-F", "2"))
         makeAlpha1FastSendInfo(build, "new org.scalatest.concurrent.ScaledTimeSpans {}.spanScaleFactor.toString")
-        val (result, json) = runWithArguments(build, "--", "samples.Alpha1", "--", "-F", "3")
+        val (result, json) = runReadingJsonOutput(build, "--", "samples.Alpha1", "--", "-F", "3")
 
         Then("the info message is 3.0")
         withClue(result.debugString) {
@@ -371,6 +374,17 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
         And("the test command succeeds")
         shouldSucceed(result)
+      }
+    }
+
+    Scenario("The module's own tag filter still takes effect beside a framework argument that replaces the span scale factor") {
+      Given("the module's testArgsDefault is Seq(\"-l\", \"samples.Fast\")")
+      When("the test command runs core.test, writing JSON output, with -- -- -F 3")
+      withMarkingSuites { build =>
+        build.setModuleArguments(Seq("-l", "samples.Fast"))
+        val (result, json) = runReadingJsonOutput(build, "--", "--", "-F", "3")
+
+        shouldRunExactly(result, json, Seq("Alpha1", "Alpha2", "Beta1"), Seq("slow"))
       }
     }
 
@@ -546,7 +560,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         When(s"the test command runs core.test, writing JSON output, with ${describe(arguments)}")
         withMarkingSuites { build =>
           build.addToTestModule(s"def testReportXml: T[Option[String]] = Task { $setting }")
-          build.replaceInSample(s"${MarkingSuite.Beta1}.scala", MarkingSuiteTest.Slow.withEmptyBody, MarkingSuiteTest.Slow.failing)
+          build.replaceInSample(s"${SampleSuite.Beta1}.scala", SampleTest.Slow.withEmptyBody, SampleTest.Slow.failing)
           val result = runWritingJsonOutput(build, arguments*)
 
           Then("no file in the module folder or in any folder inside it is an XML document whose root element is testsuites or testsuite")
@@ -580,9 +594,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         val result = runWritingJsonOutput(build, "--", "--", "foo")
 
         Then("the test command fails with a message naming foo")
-        withClue(result.debugString) {
-          result.succeeded shouldBe false
-        }
+        shouldFail(result)
         shouldWriteToTheConsole(result, TestCommandFailure.FrameworkArgumentNotPassedOn("foo").message)
 
         And("the module folder and every folder inside it hold the files they held before the test command ran, leftover.txt among them, each with the content it had")

@@ -218,6 +218,14 @@ Feature: Framework arguments
       Then the `info` message is `3.0`
       And the test command succeeds
 
+  Rule: The module's own argument for a setting no framework argument gives still takes effect
+    Scenario: AC-021 A tag filter given by the module alone, beside a framework span scale factor
+      Given the module's `testArgsDefault` is `Seq("-l", "samples.Fast")`
+      When the test command is invoked with `-- -- -F 3`
+      Then the suites run are exactly `Alpha1`, `Alpha2` and `Beta1`
+      And in each of those suites, the tests run are exactly `slow`
+      And the test command succeeds
+
   Rule: The test command accepts only the framework arguments it passes on
     Scenario Outline: AC-008 Framework argument <argument>
       When the test command is invoked with `-- -- <argument>`
@@ -349,10 +357,10 @@ Feature: The module folder
 | Requirement | Criteria                                       |
 |-------------|------------------------------------------------|
 | R-001       | AC-001, AC-006                                 |
-| R-002       | AC-006, AC-007, AC-008, AC-018                 |
+| R-002       | AC-006, AC-007, AC-008, AC-018, AC-021         |
 | R-003       | AC-001, AC-002, AC-003                         |
-| R-004       | AC-006                                         |
-| R-005       | AC-007, AC-018                                 |
+| R-004       | AC-006, AC-021                                 |
+| R-005       | AC-007, AC-018, AC-021                         |
 | R-006       | AC-004                                         |
 | R-007       | AC-005, AC-017                                 |
 | R-008       | AC-009, AC-014                                 |
