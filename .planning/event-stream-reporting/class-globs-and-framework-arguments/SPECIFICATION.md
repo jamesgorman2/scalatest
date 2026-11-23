@@ -62,6 +62,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
   - class globs are given, and at least one of them matches a test class that the module's test framework discovers;
   - every worker of the module has ended;
   - no fork group of the module failed to lay out and no worker of it failed to start or run, so the root holds no failure such as `Laying out fork group 1 of core.test failed: …` or `Starting worker 0 of fork group 1 of core.test failed: …`;
+  - no worker's JVM of the module ended without writing its result, as where the JVM died;
   - no run of the module has reported, in its event stream, a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted.
 
   These do not count as such a report:
@@ -165,6 +166,13 @@ Feature: Class globs
       When the test command is invoked with `-- samples.Broken1`
       Then the JSON output holds the suite `Broken1` with the outcome `aborted` and a `message`
       And the JSON output's root holds no failure whose message begins `Test selector does not match any test`
+      And the test command fails
+
+  Rule: A worker's JVM that dies is not reported as class globs that match no test
+    Scenario: AC-022 The JVM running the only matched suite dies before its tests run
+      Given the module also holds the suite `Halting1`, the class `samples.Halting1`, an `AnyFunSuite` mixing in `BeforeAndAfterAll` with one test `fast`, whose `beforeAll` halts the JVM
+      When the test command is invoked with `-- samples.Halting1`
+      Then the JSON output's root holds no failure whose message begins `Test selector does not match any test`
       And the test command fails
 ```
 
@@ -364,7 +372,7 @@ Feature: The module folder
 | R-004       | AC-006, AC-021                                 |
 | R-005       | AC-007, AC-018, AC-021                         |
 | R-006       | AC-004                                         |
-| R-007       | AC-005, AC-017                                 |
+| R-007       | AC-005, AC-017, AC-022                         |
 | R-008       | AC-009, AC-014                                 |
 | R-009       | AC-002, AC-003, AC-020                         |
 | R-010       | AC-011                                         |

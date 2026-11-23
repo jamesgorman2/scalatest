@@ -283,6 +283,23 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         shouldFail(result)
       }
     }
+
+    Scenario("The JVM running the only matched suite dying before its tests run is not reported as class globs that match no test") {
+      Given("Halting1, whose beforeAll halts the JVM before its one test, fast, runs")
+      When("the test command runs core.test, writing JSON output, with -- samples.Halting1")
+      withMarkingSuites { build =>
+        build.addSuites("Halting1")
+        val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Halting1")
+
+        Then("the JSON output's root holds no failure whose message begins Test selector does not match any test")
+        withClue(result.debugString) {
+          json.failureMessages.filter(_.startsWith("Test selector does not match any test")) shouldBe empty
+        }
+
+        And("the test command fails")
+        shouldFail(result)
+      }
+    }
   }
 
   Feature("Framework arguments") {
