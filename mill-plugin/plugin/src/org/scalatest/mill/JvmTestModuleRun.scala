@@ -272,10 +272,10 @@ private[mill] object JvmTestModuleRun {
   ): Unit = {
     // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
     // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
-    // reached it. A fork group that failed to lay out, or a worker that failed to start or run, already explains the
-    // missing result, and Mill's `testOnly` skips this check after either. So does a worker whose JVM ended without
-    // writing its result, but only where the test command already fails, as where the JVM died before its run ended: a
-    // JVM that dies after its run ended leaves nothing else to fail the test command.
+    // reached it. Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a
+    // worker's JVM ended without writing its result. Unlike Mill, a JVM that ended without its result skips the check
+    // only where the test command already fails: one that dies after its run ended leaves no aborted run or class, so
+    // the test command could otherwise pass where Mill's fails.
     val missingTestResultExplained =
       !everyForkGroupLaidOut ||
         workerEndings.contains(WorkerRun.Ending.Failed) ||
