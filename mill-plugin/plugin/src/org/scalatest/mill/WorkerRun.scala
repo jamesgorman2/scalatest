@@ -17,9 +17,8 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     // The reader starts when the worker starts, so a worker Mill has not yet scheduled holds no reader thread.
     started = WorkerRun.abandoningOnThrow(abandon())(Try(startWorker(() => startReading())))
     started match {
-      case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started)))(using ExecutionContext.parasitic)
-      // A worker whose start threw may have started a process.
-      case Failure(_) => reader.workerHasEnded(WorkerProcess.Started)
+      case Success(workerEnd) => workerEnd.onComplete(tellReaderOfEnd)(using ExecutionContext.parasitic)
+      case Failure(_) => reader.workerEndIsUnknown()
     }
   }
 
@@ -30,8 +29,7 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as when Mill
     // cancels the task, can leave its process and those threads running, so the capture's streams stay open.
     ended.foreach(_ => capture.endStreams())
-    // A worker whose end is unknown may have started a process, unless it never started.
-    reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started))
+    tellReaderOfEnd(ended)
     val startedUncaptured = ended.toOption.exists(_.started) && startReadingLate()
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
     ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
@@ -44,9 +42,15 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
   def abandon(): Unit = {
     closeReader()
-    reader.workerHasEnded(WorkerProcess.Started)
+    reader.workerEndIsUnknown()
     stopCapturing()
   }
+
+  private def tellReaderOfEnd(ended: Try[WorkerProcess]): Unit =
+    ended match {
+      case Success(process) => reader.workerHasEnded(process)
+      case Failure(_) => reader.workerEndIsUnknown()
+    }
 
   private def startReading(): Unit =
     synchronized {
@@ -82,8 +86,9 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 private[mill] object WorkerRun {
 
   enum Ending {
-    case Ended
+    case EndedWithResult
     case EndedWithoutResult
+    case StartedNoProcess
     case Failed
   }
 
@@ -91,8 +96,9 @@ private[mill] object WorkerRun {
     def of(ended: Try[WorkerProcess]): Ending =
       ended match {
         case Failure(_) => Failed
+        case Success(WorkerProcess.EndedWithResult) => EndedWithResult
         case Success(WorkerProcess.EndedWithoutResult) => EndedWithoutResult
-        case Success(WorkerProcess.Started | WorkerProcess.NotStarted) => Ended
+        case Success(WorkerProcess.NotStarted) => StartedNoProcess
       }
   }
 

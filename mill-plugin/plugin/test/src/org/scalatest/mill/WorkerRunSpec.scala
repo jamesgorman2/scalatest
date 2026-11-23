@@ -111,7 +111,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   private def withTwoWorkerRuns[A](test: (WorkerRunFixture, WorkerRunFixture) => A): A =
     withTwoEventLogFiles((firstFile, secondFile) => test(new WorkerRunFixture(EventLogFile.at(firstFile)), new WorkerRunFixture(EventLogFile.at(secondFile))))
 
-  private val startedAProcess: Future[WorkerProcess] = Future.successful(WorkerProcess.Started)
+  private val processEndedWithResult: Future[WorkerProcess] = Future.successful(WorkerProcess.EndedWithResult)
 
   private def unendingWorker: Future[WorkerProcess] = Promise[WorkerProcess]().future
 
@@ -128,7 +128,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withEventLogFile { file =>
           appendCompletedRun(file)
           val fixture = new WorkerRunFixture(neverOpening(file))
-          fixture.runAndEndConsolidation(startedAProcess)
+          fixture.runAndEndConsolidation(processEndedWithResult)
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  [core.test]",
@@ -145,7 +145,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withWorkerRun { (file, fixture) =>
           append(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
           fixture.processExited = false
-          fixture.runAndEndConsolidation(startedAProcess)
+          fixture.runAndEndConsolidation(processEndedWithResult)
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "Consolidated tests:",
             "  [core.test]",
@@ -207,7 +207,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           appendCompletedRun(file)
           fixture.runAndEndConsolidation {
             writeStdout(fixture.capture, "partial")
-            startedAProcess
+            processEndedWithResult
           }
           fixture.outputWithoutSummaryLine shouldBe Seq(
             "[core.test]",
@@ -257,22 +257,17 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
-    "the worker started a process in which no run existed" should {
-      "add that process as one that ended before any run" in {
-        withWorkerRun { (_, fixture) =>
-          fixture.runAndEndConsolidation(startedAProcess)
-          fixture.counting.processesEndedBeforeAnyRun shouldBe 1
-          fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
-        }
-      }
-    }
-
-    "the worker's process ended without writing its result before any run existed in it, as where its JVM died" should {
-      "add that process as one that ended before any run" in {
-        withWorkerRun { (_, fixture) =>
-          fixture.runAndEndConsolidation(Future.successful(WorkerProcess.EndedWithoutResult))
-          fixture.counting.processesEndedBeforeAnyRun shouldBe 1
-          fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
+    Seq(
+      "wrote its result" -> WorkerProcess.EndedWithResult,
+      "ended without writing its result, as where its JVM died" -> WorkerProcess.EndedWithoutResult
+    ).foreach { case (howTheProcessEnded, process) =>
+      s"the worker started a process in which no run existed, and the process $howTheProcessEnded" should {
+        "add that process as one that ended before any run" in {
+          withWorkerRun { (_, fixture) =>
+            fixture.runAndEndConsolidation(Future.successful(process))
+            fixture.counting.processesEndedBeforeAnyRun shouldBe 1
+            fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
+          }
         }
       }
     }
@@ -283,7 +278,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
           appendCompletedRun(file)
-          workerEnd.success(WorkerProcess.Started)
+          workerEnd.success(WorkerProcess.EndedWithResult)
           fixture.endWorker()
           fixture.consolidation.end()
           fixture.outputWithoutSummaryLine shouldBe Seq("[core.test]")
@@ -297,7 +292,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       "read the worker's run once it has ended, and attach a failure naming the worker to the root" in {
         withWorkerRun { (file, fixture) =>
           appendCompletedRun(file)
-          fixture.startWithoutMillStartingIt(startedAProcess)
+          fixture.startWithoutMillStartingIt(processEndedWithResult)
           fixture.endWorker()
           fixture.consolidation.end()
           fixture.counting.runsAdded shouldBe 1
@@ -321,7 +316,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           first.run(throw new IllegalStateException("testargs already exists"))
           second.run {
             writeStdout(second.capture, "second\n")
-            startedAProcess
+            processEndedWithResult
           }
           consolidationUnderTest.consolidation.end()
           consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
@@ -381,7 +376,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           millStartsWorker()
           readerThreadsOf(fixture) shouldBe 1
           appendCompletedRun(file)
-          workerEnd.success(WorkerProcess.Started)
+          workerEnd.success(WorkerProcess.EndedWithResult)
           fixture.endWorker()
           fixture.counting.runsAdded shouldBe 1
         }
@@ -408,7 +403,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
         withWorkerRun { (_, fixture) =>
           val workerEnd = Promise[WorkerProcess]()
           fixture.start(workerEnd.future)
-          workerEnd.success(WorkerProcess.Started)
+          workerEnd.success(WorkerProcess.EndedWithResult)
           eventually(readerThreadsOf(fixture) shouldBe 0)
           fixture.counting.processesEndedBeforeAnyRun shouldBe 1
           fixture.endWorker()
@@ -502,22 +497,28 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   "Ending each of two workers" when {
     "the first fails after it started and the second finds its fork group's queue empty" should {
-      "give the first as failed and the second as ended" in {
-        endingsWhereTheSecondFindsItsQueueEmpty(Future.failed(new IllegalStateException("claim folder missing"))) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
+      "give the first as failed and the second as having started no process" in {
+        endingsWhereTheSecondFindsItsQueueEmpty(Future.failed(new IllegalStateException("claim folder missing"))) shouldBe Seq(
+          WorkerRun.Ending.Failed,
+          WorkerRun.Ending.StartedNoProcess
+        )
       }
     }
 
     "starting the first throws and the second finds its fork group's queue empty" should {
-      "give the first as failed and the second as ended" in {
-        endingsWhereTheSecondFindsItsQueueEmpty(throw new IllegalStateException("testargs already exists")) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
+      "give the first as failed and the second as having started no process" in {
+        endingsWhereTheSecondFindsItsQueueEmpty(throw new IllegalStateException("testargs already exists")) shouldBe Seq(
+          WorkerRun.Ending.Failed,
+          WorkerRun.Ending.StartedNoProcess
+        )
       }
     }
 
     "the first's process ended without writing its result and the second finds its fork group's queue empty" should {
-      "give the first as ended without its result and the second as ended" in {
+      "give the first as ended without its result and the second as having started no process" in {
         endingsWhereTheSecondFindsItsQueueEmpty(Future.successful(WorkerProcess.EndedWithoutResult)) shouldBe Seq(
           WorkerRun.Ending.EndedWithoutResult,
-          WorkerRun.Ending.Ended
+          WorkerRun.Ending.StartedNoProcess
         )
       }
     }

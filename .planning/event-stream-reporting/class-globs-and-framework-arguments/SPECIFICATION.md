@@ -62,7 +62,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
   - class globs are given, and at least one of them matches a test class that the module's test framework discovers;
   - every worker of the module has ended;
   - no fork group of the module failed to lay out and no worker of it failed to start or run, so the root holds no failure such as `Laying out fork group 1 of core.test failed: …` or `Starting worker 0 of fork group 1 of core.test failed: …`;
-  - no worker's JVM of the module ended without writing its result, as where the JVM died;
+  - no worker's JVM of the module ended without writing its result while the test command already fails, as where the JVM died before its run ended and so left the run aborted (`../SPECIFICATION.md` R-095b, R-137);
   - no run of the module has reported, in its event stream, a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted.
 
   These do not count as such a report:

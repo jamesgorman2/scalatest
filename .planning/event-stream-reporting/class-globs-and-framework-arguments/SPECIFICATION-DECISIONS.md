@@ -2,18 +2,19 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## The test command adds no `Test selector does not match any test` failure to the root where a worker's JVM ends without writing its result.
+## The test command adds no `Test selector does not match any test` failure to the root where a worker's JVM ends without writing its result and the test command already fails.
 
 **Alternatives**
 
 - Adding the failure after a worker's JVM ends without writing its result, wherever no run of the module reported a test result, as a departure from Mill's `testOnly`.
+- Skipping the failure after every worker's JVM that ends without writing its result. A JVM that ends after its run has ended, but before it writes its result, leaves no aborted run or class. Where no run of the module reported a test result, the test command would then succeed where Mill's `testOnly` fails, against `SPECIFICATION.md` R-003.
 
-**Reasoning** A JVM that ends before its run ends leaves the run, or a class it claimed, aborted, so the test command already fails (`../SPECIFICATION.md` R-095a, R-095b, R-137). The class globs did match a test class, so "does not match any test" points the reader at the class globs rather than at the dead JVM. Mill 1.3.1's `testOnly` adds no such failure in this case. Such a worker does not throw: `callTestRunnerSubprocess` gives `Result.Failure("Test reporting Failed: … does not exist")` for its missing `out.json`, so the scheduler gives a `Result.Failure`, which `runTests` returns before its no-match check (`mill.javalib.TestModuleUtil.runTests` in `com.lihaoyi:mill-libs-javalib_3:1.3.1`). This keeps R-007 consistent with a worker that fails to start. R-007 therefore holds only where no worker's JVM of the module ended without writing its result (`SPECIFICATION.md` R-007).
+**Reasoning** A JVM that ends before its run ends leaves the run, or a class it claimed, aborted, so the test command already fails (`../SPECIFICATION.md` R-095a, R-095b, R-137). The class globs did match a test class, so "does not match any test" points the reader at the class globs rather than at the dead JVM. Mill 1.3.1's `testOnly` adds no such failure in this case. Such a worker does not throw: `callTestRunnerSubprocess` gives `Result.Failure("Test reporting Failed: … does not exist")` for its missing `out.json`, so the scheduler gives a `Result.Failure`, which `runTests` returns before its no-match check (`mill.javalib.TestModuleUtil.runTests` in `com.lihaoyi:mill-libs-javalib_3:1.3.1`). This keeps R-007 consistent with a worker that fails to start. The skip applies only where the test command already fails, so it never turns a failing test command into a passing one. R-007 therefore holds only where no worker's JVM of the module ended without writing its result while the test command already fails (`SPECIFICATION.md` R-007).
 
 **Costs**
 
 - R-007 has one more condition.
-- A JVM that ends after its run has ended, but before it writes its result, leaves no aborted run or class. Where no run of the module reported a test result, the test command then succeeds where Mill's `testOnly` fails.
+- Where a JVM ends after its run has ended, but before it writes its result, and no run of the module reported a test result, the root holds `Test selector does not match any test`, where Mill's `testOnly` fails with `Test reporting Failed: … does not exist`.
 
 **Settled by** [Class globs and framework arguments - Skip the no-test-result failure where a worker's JVM ends without its result](https://github.com/jamesgorman2/scalatest/issues/238).
 

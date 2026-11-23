@@ -56,7 +56,7 @@ Keys, in order:
        3. reading its test event log failing, including where a line of it cannot be decoded (§ Run node), as in `Reading the event log of worker 0 of fork group 1 of core.test failed: …`;
     3. where class globs are given, the failure Mill's `testOnly` fails with, worded as in the later item where class globs are given and none of them matches a test class of the module. It is added only where:
        - the root holds no failure of laying out a fork group (item 1) or of starting or running a worker (item 2.1);
-       - no worker's JVM ended without writing its result, as where the JVM died;
+       - no worker's JVM ended without writing its result while the test command already fails, as where the JVM died before its run ended;
        - once every worker has ended, no run has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. Neither of these counts as such a report:
          - a test shown as ignored only because its suite's structure marks it ignored;
          - a suite or test shown as aborted only because it has no end event, such as one with reason *not run*;

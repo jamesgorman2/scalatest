@@ -41,7 +41,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
 
     def outputWithoutSummaryLine: Seq[String] = consolidationUnderTest.outputWithoutSummaryLine
 
-    def stateAfterEnd(workerProcess: WorkerProcess = WorkerProcess.Started): ConsolidationState = {
+    def stateAfterEnd(workerProcess: WorkerProcess = WorkerProcess.EndedWithResult): ConsolidationState = {
       reader.workerHasEnded(workerProcess)
       reader.awaitStreamEnd()
       consolidation.end()
@@ -49,26 +49,19 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
   }
 
   "An event log reader" when {
-    "its worker started a process and ends with no event log file" should {
-      "add no run, but add the worker's process as one that ended before any run existed in it" in {
-        withEventLogFile { file =>
-          val reading = new Reading(EventLogFile.at(file))
-          reading.reader.start()
-          reading.stateAfterEnd() shouldBe ConsolidationState.EndedFailed
-          reading.counting.runsAdded shouldBe 0
-          reading.counting.processesEndedBeforeAnyRun shouldBe 1
-        }
-      }
-    }
-
-    "its worker's process ended without writing its result and ends with no event log file" should {
-      "add no run, but add the worker's process as one that ended before any run existed in it" in {
-        withEventLogFile { file =>
-          val reading = new Reading(EventLogFile.at(file))
-          reading.reader.start()
-          reading.stateAfterEnd(WorkerProcess.EndedWithoutResult) shouldBe ConsolidationState.EndedFailed
-          reading.counting.runsAdded shouldBe 0
-          reading.counting.processesEndedBeforeAnyRun shouldBe 1
+    Seq(
+      "wrote its result" -> WorkerProcess.EndedWithResult,
+      "ended without writing its result" -> WorkerProcess.EndedWithoutResult
+    ).foreach { case (howTheProcessEnded, process) =>
+      s"its worker started a process that $howTheProcessEnded, and it ends with no event log file" should {
+        "add no run, but add the worker's process as one that ended before any run existed in it" in {
+          withEventLogFile { file =>
+            val reading = new Reading(EventLogFile.at(file))
+            reading.reader.start()
+            reading.stateAfterEnd(process) shouldBe ConsolidationState.EndedFailed
+            reading.counting.runsAdded shouldBe 0
+            reading.counting.processesEndedBeforeAnyRun shouldBe 1
+          }
         }
       }
     }
@@ -120,7 +113,7 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
           val reading = new Reading(neverOpening(file))
           reading.processExited.set(true)
           reading.reader.start()
-          reading.reader.workerHasEnded(WorkerProcess.Started)
+          reading.reader.workerHasEnded(WorkerProcess.EndedWithResult)
           a[FileNotFoundException] should be thrownBy reading.reader.awaitStreamEnd()
         }
       }

@@ -102,7 +102,7 @@ private[mill] final class JvmTestModuleRun(
   private def processEndedWith(processResult: Result[?]): WorkerProcess =
     processResult match {
       case _: Result.Failure => WorkerProcess.EndedWithoutResult
-      case _: Result.Success[?] => WorkerProcess.Started
+      case _: Result.Success[?] => WorkerProcess.EndedWithResult
     }
 
   private def inModuleFolder(path: PathUnderModule): os.Path = moduleFolder / path.segments
@@ -178,7 +178,10 @@ private[mill] final class JvmTestModuleRun(
       // group's folder runs on this thread.
       val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
       workerEnd.map { case (_, _, processResult) =>
-        processResult.fold(WorkerProcess.NotStarted)(processEndedWith)
+        processResult match {
+          case Some(result) => processEndedWith(result)
+          case None => WorkerProcess.NotStarted
+        }
       }(using ExecutionContext.parasitic)
     }
   }
@@ -271,14 +274,21 @@ private[mill] object JvmTestModuleRun {
       classGlobs: Seq[ClassGlob],
       everyForkGroupLaidOut: Boolean,
       workerEndings: Seq[WorkerRun.Ending]
-  ): Unit =
+  ): Unit = {
     // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
     // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
-    // reached it. A fork group that failed to lay out, a worker that failed to start or run, or a worker whose JVM ended
-    // without writing its result already explains the missing result, and Mill's `testOnly` skips this check after each.
-    if (classGlobs.nonEmpty && everyForkGroupLaidOut && workerEndings.forall(_ == WorkerRun.Ending.Ended) && !consolidation.hasTestResult(module)) {
+    // reached it. A fork group that failed to lay out, or a worker that failed to start or run, already explains the
+    // missing result, and Mill's `testOnly` skips this check after either. So does a worker whose JVM ended without
+    // writing its result, but only where the test command already fails, as where the JVM died before its run ended: a
+    // JVM that dies after its run ended leaves nothing else to fail the test command.
+    val missingTestResultExplained =
+      !everyForkGroupLaidOut ||
+        workerEndings.contains(WorkerRun.Ending.Failed) ||
+        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.state.failed)
+    if (classGlobs.nonEmpty && !missingTestResultExplained && !consolidation.hasTestResult(module)) {
       consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
     }
+  }
 
   def layOutForkGroups[LaidOut](consolidation: Consolidation, module: ModuleName, forkGroups: Seq[PlannedForkGroup])(
       layOut: PlannedForkGroup => LaidOut
