@@ -15,6 +15,7 @@ Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
 - R-007 has one more condition.
 - Where a JVM ends after its run has ended, but before it writes its result, and no run of the module reported a test result, the root holds `Test selector does not match any test`, where Mill's `testOnly` fails with `Test reporting Failed: … does not exist`.
+- The skip reads whether the whole test command already fails, not the module. The two agree only while a test command runs one module. Once a test command runs several modules (`../ROADMAP.md` § 5 Many modules in one test command), the skip must read whether the module already fails, which needs a per-module query the consolidation library does not yet have.
 
 **Settled by** [Class globs and framework arguments - Skip the no-test-result failure where a worker's JVM ends without its result](https://github.com/jamesgorman2/scalatest/issues/238).
 

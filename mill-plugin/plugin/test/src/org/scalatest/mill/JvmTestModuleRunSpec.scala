@@ -131,18 +131,30 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, everyForkGroupLaidOut, workerEndings)
       }
 
-    "class globs are given, every fork group of the module was laid out, every worker of it started, ran and wrote its result, and no run of the module reported a test result" should {
-      "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
+    Seq(
+      "every worker of it wrote its result or started no process" -> Seq(EndedWithResult, StartedNoProcess),
+      "the JVM of a worker of it ended without writing its result after its run completed" -> Seq(EndedWithResult, EndedWithoutResult)
+    ).foreach { case (howTheWorkersEnded, workerEndings) =>
+      s"class globs are given, every fork group of the module was laid out, $howTheWorkersEnded, and no run of the module reported a test result" should {
+        "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
+          val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, workerEndings)
+          consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
+            "Consolidated tests:",
+            "  [core.test]",
+            "  *** CONSOLIDATED TESTS ABORTED ***",
+            "    Test selector does not match any test: samples.Alpha1 samples.Beta*",
+            "    Run discoveredTestClasses to see available tests"
+          )
+          consolidationUnderTest.consolidation.state shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
+    "class globs are given, every fork group of the module was laid out, every worker of it wrote its result, a run of the module did not finish, and no run of the module reported a test result" should {
+      "attach to the root the failure Mill's testOnly fails with" in {
         val consolidationUnderTest =
-          consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, StartedNoProcess))
-        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-          "Consolidated tests:",
-          "  [core.test]",
-          "  *** CONSOLIDATED TESTS ABORTED ***",
-          "    Test selector does not match any test: samples.Alpha1 samples.Beta*",
-          "    Run discoveredTestClasses to see available tests"
-        )
-        consolidationUnderTest.consolidation.state shouldBe ConsolidationState.EndedFailed
+          consolidationEndedAfterReportingNoTestResult(addUnfinishedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, EndedWithResult))
+        consolidationUnderTest.output should contain("    Test selector does not match any test: samples.Alpha1 samples.Beta*")
       }
     }
 
@@ -165,21 +177,6 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         val consolidationUnderTest =
           consolidationEndedAfterReportingNoTestResult(addUnfinishedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, EndedWithoutResult))
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
-      }
-    }
-
-    "class globs are given, the JVM of a worker of the module ended without writing its result after its run completed, and no run of the module reported a test result" should {
-      "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
-        val consolidationUnderTest =
-          consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, EndedWithoutResult))
-        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-          "Consolidated tests:",
-          "  [core.test]",
-          "  *** CONSOLIDATED TESTS ABORTED ***",
-          "    Test selector does not match any test: samples.Alpha1 samples.Beta*",
-          "    Run discoveredTestClasses to see available tests"
-        )
-        consolidationUnderTest.consolidation.state shouldBe ConsolidationState.EndedFailed
       }
     }
 

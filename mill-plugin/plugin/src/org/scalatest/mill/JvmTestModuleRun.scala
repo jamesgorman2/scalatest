@@ -177,12 +177,7 @@ private[mill] final class JvmTestModuleRun(
       // Mill forks a worker through `workerCtx` only when the worker has its own `processFolder`; a worker in the fork
       // group's folder runs on this thread.
       val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
-      workerEnd.map { case (_, _, processResult) =>
-        processResult match {
-          case Some(result) => processEndedWith(result)
-          case None => WorkerProcess.NotStarted
-        }
-      }(using ExecutionContext.parasitic)
+      workerEnd.map { case (_, _, processResult) => processResult.map(processEndedWith).getOrElse(WorkerProcess.NotStarted) }(using ExecutionContext.parasitic)
     }
   }
 
