@@ -272,7 +272,7 @@ private[mill] object JvmTestModuleRun {
     // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
     // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
     // reached it. A fork group that failed to lay out, or a worker that failed to start or run, already explains the
-    // missing result, and Mill's `testOnly` never reaches this check after either.
+    // missing result, and Mill's `testOnly` skips this check after either.
     if (classGlobs.nonEmpty && everyForkGroupLaidOut && workerEndings.forall(_ == WorkerRun.Ending.Ended) && !consolidation.hasTestResult(module)) {
       consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
     }

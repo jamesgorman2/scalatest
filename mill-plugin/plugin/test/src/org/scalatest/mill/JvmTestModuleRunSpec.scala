@@ -140,7 +140,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "class globs are given, laying out a fork group of the module failed and no run of the module reported a test result" should {
+    "class globs are given, a fork group of the module failed to lay out and no run of the module reported a test result" should {
       "attach nothing to the root" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = false, Seq(Ended))
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
