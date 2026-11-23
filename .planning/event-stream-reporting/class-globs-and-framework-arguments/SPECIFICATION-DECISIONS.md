@@ -2,13 +2,13 @@
 
 Decisions behind [SPECIFICATION.md](SPECIFICATION.md), newest first.
 
-## Where class globs are given and a worker of the module fails to start or run, the test command adds no `Test selector does not match any test` failure to the root.
+## Where class globs are given and a fork group of the module fails to lay out, or a worker of it fails to start or run, the test command adds no `Test selector does not match any test` failure to the root.
 
 **Alternatives**
 
-- Adding the failure after a worker fails to start or run, wherever no run of the module reported a test result.
+- Adding the failure after a fork group fails to lay out or a worker fails to start or run, wherever no run of the module reported a test result.
 
-**Reasoning** The worker's failure on the root already explains the missing test result. The class globs did match a test class, so "does not match any test" misleads. Mill 1.3.1's `testOnly` adds no such failure when a worker fails to start or run: it raises that failure only once every worker has given a result, and a worker that fails throws before then (`mill.javalib.TestModuleUtil.runTests` in `com.lihaoyi:mill-libs-javalib_3:1.3.1`). R-007 therefore holds only where no worker of the module failed to start or run (`SPECIFICATION.md` R-007).
+**Reasoning** The fork group's or worker's failure on the root already explains the missing test result. The class globs did match a test class, so "does not match any test" misleads. Mill 1.3.1's `testOnly` adds no such failure after either: it raises that failure only once every worker has given a result, and both a failure writing a fork group's `test-classes` queue and a failing worker throw before then (`mill.javalib.TestModuleUtil.runTests` in `com.lihaoyi:mill-libs-javalib_3:1.3.1`). R-007 therefore holds only where no fork group of the module failed to lay out and no worker of it failed to start or run (`SPECIFICATION.md` R-007).
 
 **Costs** R-007 has one more condition.
 

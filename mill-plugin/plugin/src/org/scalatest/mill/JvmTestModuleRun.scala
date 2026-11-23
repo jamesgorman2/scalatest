@@ -69,7 +69,13 @@ private[mill] final class JvmTestModuleRun(
     }
     val workerEndings = WorkerRun.endEach(workerRuns)(workerEnd => ctx.fork.blocking(Await.ready(workerEnd, Duration.Inf)))
     consolidation.timeModule(module, Some(startedAt), Some(now()))
-    JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, workerEndings)
+    JvmTestModuleRun.reportNoTestResultForClassGlobs(
+      consolidation,
+      module,
+      classGlobs,
+      everyForkGroupLaidOut = laidOutForkGroups.size == launcher.layout.forkGroups.size,
+      workerEndings
+    )
   }
 
   private def discoveredTestClasses(): Set[TestClassName] =
@@ -260,13 +266,14 @@ private[mill] object JvmTestModuleRun {
       consolidation: Consolidation,
       module: ModuleName,
       classGlobs: Seq[ClassGlob],
+      everyForkGroupLaidOut: Boolean,
       workerEndings: Seq[WorkerRun.Ending]
   ): Unit =
     // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
     // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
-    // reached it. A worker that failed to start or run already explains the missing result, and Mill's `testOnly` never
-    // reaches this check after one.
-    if (classGlobs.nonEmpty && !workerEndings.contains(WorkerRun.Ending.Failed) && !consolidation.hasTestResult(module)) {
+    // reached it. A fork group that failed to lay out, or a worker that failed to start or run, already explains the
+    // missing result, and Mill's `testOnly` never reaches this check after either.
+    if (classGlobs.nonEmpty && everyForkGroupLaidOut && workerEndings.forall(_ == WorkerRun.Ending.Ended) && !consolidation.hasTestResult(module)) {
       consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
     }
 

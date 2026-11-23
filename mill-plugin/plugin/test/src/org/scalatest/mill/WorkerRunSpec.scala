@@ -115,6 +115,13 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   private def unendingWorker: Future[WorkerProcess] = Promise[WorkerProcess]().future
 
+  private def endingsWhereTheSecondFindsItsQueueEmpty(startingTheFirst: => Future[WorkerProcess]): Seq[WorkerRun.Ending] =
+    withTwoWorkerRuns { (first, second) =>
+      first.start(startingTheFirst)
+      second.start(Future.successful(WorkerProcess.NotStarted))
+      WorkerRun.endEach(Seq(first.workerRun, second.workerRun))(_ => ())
+    }
+
   "Running a worker" when {
     "its event log file never becomes readable" should {
       "attach what reading threw to the root, end the run's event stream and fail the consolidation" in {
@@ -486,23 +493,13 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
   "Ending each of two workers" when {
     "the first fails after it started and the second finds its fork group's queue empty" should {
       "give the first as failed and the second as ended" in {
-        withTwoWorkerRuns { (first, second) =>
-          first.start(Future.failed(new IllegalStateException("claim folder missing")))
-          second.start(Future.successful(WorkerProcess.NotStarted))
-          Seq(first, second).foreach(_.awaitWorkerEnd())
-          WorkerRun.endEach(Seq(first.workerRun, second.workerRun))(_ => ()) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
-        }
+        endingsWhereTheSecondFindsItsQueueEmpty(Future.failed(new IllegalStateException("claim folder missing"))) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
       }
     }
 
     "starting the first throws and the second finds its fork group's queue empty" should {
       "give the first as failed and the second as ended" in {
-        withTwoWorkerRuns { (first, second) =>
-          first.start(throw new IllegalStateException("testargs already exists"))
-          second.start(Future.successful(WorkerProcess.NotStarted))
-          Seq(first, second).foreach(_.awaitWorkerEnd())
-          WorkerRun.endEach(Seq(first.workerRun, second.workerRun))(_ => ()) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
-        }
+        endingsWhereTheSecondFindsItsQueueEmpty(throw new IllegalStateException("testargs already exists")) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
       }
     }
 
