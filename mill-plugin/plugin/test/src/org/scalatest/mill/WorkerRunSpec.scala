@@ -495,6 +495,17 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
+    "starting the first throws and the second finds its fork group's queue empty" should {
+      "give the first as failed and the second as ended" in {
+        withTwoWorkerRuns { (first, second) =>
+          first.start(throw new IllegalStateException("testargs already exists"))
+          second.start(Future.successful(WorkerProcess.NotStarted))
+          Seq(first, second).foreach(_.awaitWorkerEnd())
+          WorkerRun.endEach(Seq(first.workerRun, second.workerRun))(_ => ()) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
+        }
+      }
+    }
+
     "waiting on the first throws an InterruptedException, as where Mill cancels the task" should {
       "rethrow it once both workers' readers are abandoned, so both readers end" in {
         withTwoWorkerRuns { (first, second) =>
