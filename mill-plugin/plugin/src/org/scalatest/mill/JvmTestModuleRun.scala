@@ -5,6 +5,7 @@ import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import mill.api.Result
 import mill.api.TaskCtx
 import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.ZincOp
@@ -96,6 +97,14 @@ private[mill] final class JvmTestModuleRun(
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
+  // Mill 1.3.1 gives a failure for a process only where it exited without writing its `out.json`. Beyond that, the
+  // `Result` is ignored: the consolidation decides the test command's result.
+  private def processEndedWith(processResult: Result[?]): WorkerProcess =
+    processResult match {
+      case _: Result.Failure => WorkerProcess.EndedWithoutResult
+      case _: Result.Success[?] => WorkerProcess.Started
+    }
+
   private def inModuleFolder(path: PathUnderModule): os.Path = moduleFolder / path.segments
 
   private def startWorker(consolidation: Consolidation, plannedWorker: PlannedWorker)(
@@ -168,10 +177,8 @@ private[mill] final class JvmTestModuleRun(
       // Mill forks a worker through `workerCtx` only when the worker has its own `processFolder`; a worker in the fork
       // group's folder runs on this thread.
       val (_, workerEnd) = if (plannedWorker.processFolder == forkGroup.folder) workerCtx.runOnThisThread(joinQueue()) else joinQueue()
-      // The `Result` Mill gives for the process is ignored, even a failure: the consolidation decides the test command's
-      // result.
       workerEnd.map { case (_, _, processResult) =>
-        if (processResult.isDefined) WorkerProcess.Started else WorkerProcess.NotStarted
+        processResult.fold(WorkerProcess.NotStarted)(processEndedWith)
       }(using ExecutionContext.parasitic)
     }
   }
@@ -204,12 +211,8 @@ private[mill] final class JvmTestModuleRun(
         testModuleUtil: TestModuleUtil
     ): Future[WorkerProcess] = {
       val groupFolder = inModuleFolder(forkGroup.folder)
-      def runProcess(): WorkerProcess = {
-        // The `Result` Mill gives for the process is ignored, even a failure: the consolidation decides the test
-        // command's result.
-        testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector.toMill, () => ())(using workerCtx)
-        WorkerProcess.Started
-      }
+      def runProcess(): WorkerProcess =
+        processEndedWith(testModuleUtil.callTestRunnerSubprocess(groupFolder, resultLog(groupFolder), selector.toMill, () => ())(using workerCtx))
       // As Mill 1.3.1 does, each fork group's worker is forked when there is more than one fork group, whatever the
       // module's `testParallelism`.
       if (layout.forkGroups.size > 1)
@@ -271,8 +274,8 @@ private[mill] object JvmTestModuleRun {
   ): Unit =
     // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
     // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
-    // reached it. A fork group that failed to lay out, or a worker that failed to start or run, already explains the
-    // missing result, and Mill's `testOnly` skips this check after either.
+    // reached it. A fork group that failed to lay out, a worker that failed to start or run, or a worker whose JVM ended
+    // without writing its result already explains the missing result, and Mill's `testOnly` skips this check after each.
     if (classGlobs.nonEmpty && everyForkGroupLaidOut && workerEndings.forall(_ == WorkerRun.Ending.Ended) && !consolidation.hasTestResult(module)) {
       consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
     }

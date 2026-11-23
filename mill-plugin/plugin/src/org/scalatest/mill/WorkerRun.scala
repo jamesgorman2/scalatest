@@ -32,14 +32,14 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     ended.foreach(_ => capture.endStreams())
     // A worker whose end is unknown may have started a process, unless it never started.
     reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started))
-    val startedUncaptured = ended.toOption.contains(WorkerProcess.Started) && startReadingLate()
+    val startedUncaptured = ended.toOption.exists(_.started) && startReadingLate()
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
     ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
     if (startedUncaptured) {
       consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
     }
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
-    if (ended.isFailure) WorkerRun.Ending.Failed else WorkerRun.Ending.Ended
+    WorkerRun.Ending.of(ended)
   }
 
   def abandon(): Unit = {
@@ -83,7 +83,17 @@ private[mill] object WorkerRun {
 
   enum Ending {
     case Ended
+    case EndedWithoutResult
     case Failed
+  }
+
+  object Ending {
+    def of(ended: Try[WorkerProcess]): Ending =
+      ended match {
+        case Failure(_) => Failed
+        case Success(WorkerProcess.EndedWithoutResult) => EndedWithoutResult
+        case Success(WorkerProcess.Started | WorkerProcess.NotStarted) => Ended
+      }
   }
 
   private enum ReaderState {

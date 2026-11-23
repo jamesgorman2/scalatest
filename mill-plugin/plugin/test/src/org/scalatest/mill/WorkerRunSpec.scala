@@ -267,6 +267,16 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       }
     }
 
+    "the worker's process ended without writing its result before any run existed in it, as where its JVM died" should {
+      "add that process as one that ended before any run" in {
+        withWorkerRun { (_, fixture) =>
+          fixture.runAndEndConsolidation(Future.successful(WorkerProcess.EndedWithoutResult))
+          fixture.counting.processesEndedBeforeAnyRun shouldBe 1
+          fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
+        }
+      }
+    }
+
     "the worker runs on a future" should {
       "read the event log the worker writes after it started, and add its run" in {
         withWorkerRun { (file, fixture) =>
@@ -500,6 +510,15 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     "starting the first throws and the second finds its fork group's queue empty" should {
       "give the first as failed and the second as ended" in {
         endingsWhereTheSecondFindsItsQueueEmpty(throw new IllegalStateException("testargs already exists")) shouldBe Seq(WorkerRun.Ending.Failed, WorkerRun.Ending.Ended)
+      }
+    }
+
+    "the first's process ended without writing its result and the second finds its fork group's queue empty" should {
+      "give the first as ended without its result and the second as ended" in {
+        endingsWhereTheSecondFindsItsQueueEmpty(Future.successful(WorkerProcess.EndedWithoutResult)) shouldBe Seq(
+          WorkerRun.Ending.EndedWithoutResult,
+          WorkerRun.Ending.Ended
+        )
       }
     }
 

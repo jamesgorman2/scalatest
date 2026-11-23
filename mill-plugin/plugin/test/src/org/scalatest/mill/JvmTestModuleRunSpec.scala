@@ -12,6 +12,7 @@ import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.mill.WorkerRun.Ending.Ended
+import org.scalatest.mill.WorkerRun.Ending.EndedWithoutResult
 import org.scalatest.mill.WorkerRun.Ending.Failed
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Using
@@ -126,7 +127,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, classGlobs, everyForkGroupLaidOut, workerEndings)
       }
 
-    "class globs are given, every fork group of the module was laid out, every worker of it started and ran, and no run of the module reported a test result" should {
+    "class globs are given, every fork group of the module was laid out, every worker of it started, ran and wrote its result, and no run of the module reported a test result" should {
       "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(Ended, Ended))
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
@@ -150,6 +151,14 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     "class globs are given, a worker of the module failed to start or run and no run of the module reported a test result" should {
       "attach nothing to the root" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(Ended, Failed))
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
+      }
+    }
+
+    "class globs are given, a worker's JVM of the module ended without writing its result and no run of the module reported a test result" should {
+      "attach nothing to the root" in {
+        val consolidationUnderTest =
+          consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(Ended, EndedWithoutResult))
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
       }
     }

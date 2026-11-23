@@ -61,6 +61,18 @@ final class EventLogReaderSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "its worker's process ended without writing its result and ends with no event log file" should {
+      "add no run, but add the worker's process as one that ended before any run existed in it" in {
+        withEventLogFile { file =>
+          val reading = new Reading(EventLogFile.at(file))
+          reading.reader.start()
+          reading.stateAfterEnd(WorkerProcess.EndedWithoutResult) shouldBe ConsolidationState.EndedFailed
+          reading.counting.runsAdded shouldBe 0
+          reading.counting.processesEndedBeforeAnyRun shouldBe 1
+        }
+      }
+    }
+
     "its worker started no process and ends with no event log file" should {
       "add neither a run nor a process, and leave the consolidation unfailed" in {
         withEventLogFile { file =>

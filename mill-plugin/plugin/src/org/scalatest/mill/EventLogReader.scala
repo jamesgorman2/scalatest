@@ -43,7 +43,7 @@ private[mill] final class EventLogReader(
         case EventLogReader.EventLogFileArrival.Appeared =>
           addRun(readRun)
         case EventLogReader.EventLogFileArrival.WillNotAppear =>
-          if (endedWorkerProcess.contains(WorkerProcess.Started)) {
+          if (endedWorkerProcess.exists(_.started)) {
             addProcessEndedBeforeAnyRun()
           }
       }
