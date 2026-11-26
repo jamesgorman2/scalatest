@@ -1,6 +1,6 @@
 # Where the Mill plugin's integration test time goes, and how to cut it
 
-Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` took 2388 s, and which changes to the integration tests would shorten the run without weakening them (issue #260). Scope: the run of 2026-11-27 07:55–08:34 (local time) on the development machine, the suites and fixtures in `mill-plugin/plugin/integration/`, `test-all.sh`, `test-all.ps1` and `.github/workflows/ci.yml`. No test, build or script was changed, and no run was made for this note: every number comes from the run's files on disk.
+Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` took 2388 s, and which changes to the integration tests would shorten the run without weakening them (issue #260). Scope: the run of 2026-11-27 07:55–08:34 (local time) on the development machine, the suites and fixtures in `mill-plugin/plugin/integration/`, the lower-layer tests that cover them, `test-all.sh`, `test-all.ps1` and `.github/workflows/ci.yml`. No test, build or script was changed, and no run was made for this note: every number comes from the run's files on disk.
 
 ## Short answer
 
@@ -8,7 +8,8 @@ Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` t
 - **One suite sets the wall clock.** `TestCommandArgumentsIntegrationSpec` (59 scenarios) ran 2167 s on one worker. It was claimed 173 s into the run, because Mill hands out classes in name order, and it was the only suite left for the last 409 s. The 16 workers were busy 48 % of the run (§ 1.2).
 - **The machine is oversubscribed, so parallelism buys little.** Each of the 16 workers launches its own nested Mill JVMs on 8 cores. The same build.mill compile took a median 5.7 s with one worker active and 31.7 s with 16 active. The 16 workers deliver about 2.9 times the throughput of one; the run as a whole was about 1.85 times faster than running every scenario alone, one after another (§ 1.3).
 - **The repeated work is a cold build per scenario.** Each of the 216 sandboxes starts from a copy of its fixture, so each pays a cold Mill JVM, a build.mill compile and a test-module compile. Uncontended, a fresh scenario costs 10–15 s, of which 5.7 s is compiling build.mill. The same command in a sandbox already compiled costs 3–5 s (§ 1.4). The 229 scenarios need only about 108 distinct (build.mill, sources) states (§ 1.5).
-- **Recommended:** split the two longest suites by Feature, share one sandbox among scenarios whose build and sources are identical, merge `JsonOutputNodesSpec`'s 16 rows into one build, and share one eval among scenarios that run the same command. The model in § 4 predicts about 1320 s for the integration suites instead of 2364 s, so a full run of about 1350 s, 43 % less (§ 3). Sharding the suites by tag across CI jobs is the further lever for CI (P6).
+- **Other tests already cover 104 of the 229 scenarios.** The consolidation library's behaviour tests, the unit tests and other integration scenarios assert every claim of 100 scenarios, and part of 4 more, while each integration path keeps an end-to-end proof. Removing or simplifying them takes away 44 % of the solo work. One acceptance criterion, AC-010, would lose its proving scenario, though AC-011 asserts the same claims (P5).
+- **Recommended:** split the two longest suites by Feature, remove or simplify the covered scenarios, then share one sandbox among the remaining scenarios whose build and sources are identical, and one eval among those that run the same command. The model in § 4 predicts about 900–930 s for the integration suites instead of 2364 s, so a full run of about 930–950 s, 60 % less; a more cautious count gives about 1130–1150 s, 52 % less (§ 3). Sharding the suites by tag across CI jobs is the further lever for CI (P6).
 
 ## Sources
 
@@ -21,6 +22,7 @@ Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` t
 | `[log]` | `test-all-logs/mill-plugin.log`: an earlier run (2026-11-26), 2053 s. |
 | `[testkit]` | `mill-testkit_3-1.3.1-sources.jar` in the Coursier cache: `mill/testkit/IntegrationTester.scala`, `mill/testkit/IntegrationTesterBase.scala`. |
 | `[this]` | This repo at `22ba3665c`. Suites and helpers are in `mill-plugin/plugin/integration/src/org/scalatest/mill/`. |
+| `[coverage]` | [`integration-test-coverage.md`](integration-test-coverage.md): the per-scenario classification behind P5, made against this repo at `2552d698b`, the plugin's unit tests in `mill-plugin/plugin/test/src/org/scalatest/mill/`, the consolidation library's tests in `dotty/consolidation/src/test/scala/`, and the emitter's tests in `dotty/scalatest-test/src/test/scala/`. |
 | `[machine]` | Intel i9-11900KF, 8 cores and 16 logical processors, 32 GB RAM, Windows 11, Defender real-time protection on (exclusions not readable without admin rights). |
 
 The files under `mill-plugin/out/` are build output and will be overwritten by the next run. The scripts that derived the numbers were throwaway and are not kept.
@@ -171,7 +173,7 @@ Savings are for `plugin.integration.testForked` on the development machine, from
 
 Scenarios that stay alone: those under a Mill daemon or started through `mill.bat` (separate testers), the cross-module scenario (it asserts the module folder holds exactly one module), the `-fJ` "exactly one report.json in the workspace" scenario, and anything whose Given is a fresh build.
 
-**Saving.** About 108 fewer sandboxes, at 7–9 solo-seconds each (§ 1.4): **about 800 solo-seconds**. Alone it predicts 1840–1850 s (**about −490 s**), because shortening the longest suite is part of it. With P1, 1430–1480 s.
+**Saving.** About 108 fewer sandboxes, at 7–9 solo-seconds each (§ 1.4): **about 800 solo-seconds**. Alone it predicts 1840–1850 s (**about −490 s**), because shortening the longest suite is part of it. With P1, 1430–1480 s. After P5, most of these groups shrink or disappear, and P2 removes about 39 sandboxes, about 300 solo-seconds (P5).
 
 **Risk.** Medium; this is the change that most needs care.
 
@@ -191,7 +193,7 @@ Scenarios that stay alone: those under a Mill daemon or started through `mill.ba
 - test lookups scoped to their suite (`json.node(Suite, X).node(Test, "adds")`), because `adds` occurs in 9 rows, and `talks` and `throws` in 2 each, and `JsonNode.node` requires exactly one match (`JsonNode.scala` lines 100–110);
 - the nested-suite scenario (lines 112–115) and the top-level-order scenario (line 205) rewritten to check relative order and nesting instead of "the run holds exactly these suites". The renamed suites must still sort in the opposite order to their `suiteName`s, or the ordering scenario loses its point.
 
-**Saving.** 15 sandboxes and 15 evals: **about 270 solo-seconds** (297 → about 25). With P1 and P2, about −90 s more wall clock.
+**Saving.** 15 sandboxes and 15 evals: **about 270 solo-seconds** (297 → about 25). With P1 and P2, about −90 s more wall clock. P5 removes 13 of the 16 rows, after which P3 merges three rows for about 16 solo-seconds and is not recommended.
 
 **Risk.** Medium-low. One suite's compile error or crash now affects all 16 scenarios' diagnosis, though each still fails. The ordering and nesting scenarios assert less strictly than "exactly", so they must be rewritten carefully to keep their point. No row depends on running alone: the aborted suite aborts in `beforeAll`, test parallelism is off, and throwable ids restart per record.
 
@@ -209,27 +211,80 @@ Scenarios that stay alone: those under a Mill daemon or started through `mill.ba
 - `JsonOutputArgumentSpec`: "core.test -fJ <report> writes the JSON output…" and "The JSON output replaces a file from an earlier test command" can share one run.
 - `MillOwnTestTasksSpec`: drop the 10 `resolve _` evals that compile nothing (keep the first in each plugin state): 24 → 14.
 
-**Saving.** **About 140 solo-seconds.** About −30 to −50 s of wall clock once balanced.
+**Saving.** **About 140 solo-seconds.** About −30 to −50 s of wall clock once balanced. After P5, about 86 solo-seconds remain: `MillOwnTestTasksSpec`'s 10 evals, one in `JsonOutputRootSpec` (#1 and #3), the reference run of `TestCommandArgumentsIntegrationSpec`'s own-argument scenarios (#57 and #59), and `SeveralModulesSpec`'s pair. The `JsonOutputTreeSpec` and `JsonOutputArgumentSpec` shared evals go with the scenarios P5 removes.
 
 **Risk.** Low. Each scenario's assertions are unchanged; only the eval is shared. A shared eval failing fails every scenario that reads it, as `MillOwnTestTasksSpec` already accepts.
 
 **Touches.** The suites listed.
 
-### P5. Keep one end-to-end scenario per argument-rejection path
+### P5. Remove or simplify the integration scenarios that other tests already cover
 
-**What.** 24 integration scenarios run a full Mill launch only to check that one malformed argument fails at parsing: Framework arguments 9–16 and output arguments 4–9 in `TestCommandArgumentsIntegrationSpec`, and output arguments 1–10 in `JsonOutputArgumentSpec`. The rejected arguments they use also appear in the unit tests in `plugin/test/src/org/scalatest/mill/TestCommandArgumentsSpec.scala`: a search finds each of `-oHd`, `-oHy`, `-oHP`, `-oJ`, `-oP`, `-oD`, `-fH`, `-fHP`, `-fJH`, `-fJc`, `-f`, `--unknown`, `-P`, `-s`, `-n` and `foo` there. Before deleting a scenario, confirm that its case is asserted there, not just mentioned. Keep one integration scenario per rejection path (framework argument, output argument, `-fJ` argument), which proves the end-to-end behaviour: Mill fails before any worker starts, writes nothing, and names the argument. Leave the variants to the unit tests.
+**What.** Remove 100 of the 229 scenarios and simplify 4, keeping 125. A scenario goes only where every claim it asserts is asserted by other tests: the consolidation library's module behaviour tests plus unit tests, or two or more other tests between them, other integration scenarios included. Each cover was confirmed by reading its assertion. Cover from reading production code or Mill's sources does not count. Nor does cover from the `--compat` suites, which CI does not run. The per-scenario classification, with the claims and the tests that assert each, is in [`integration-test-coverage.md`](integration-test-coverage.md).
 
-**Saving.** About 19 scenarios. After P2 they cost 3–5 s each, so about 70 solo-seconds and about −25 s of wall clock; without P2, about 200 solo-seconds.
+The layers compared:
 
-**Risk.** Low for coverage, since the parser is the same code path for every variant and the unit tests hold each case. But this deletes scenarios, which needs a check that none is cited by an acceptance criterion in `.planning/event-stream-reporting/**/SPECIFICATION.md`. A search for `-oHd`, `-fJc` and `--unknown` there finds nothing, but criteria may name the cases in words. Lowest priority of the recommended set.
+- **Module behaviour tests:** the `AnyFeatureSpec` suites of `dotty/consolidation/src/test/scala/org/scalatest/consolidation/`, run by `scalatestConsolidation/test`. They drive the library with real ScalaTest runs, without Mill.
+- **Unit tests:** the `AnyWordSpec` suites in that folder, and every suite in `mill-plugin/plugin/test/src/org/scalatest/mill/`.
+- **The emitter's tests:** in `dotty/scalatest-test/`, run by `scalatestTestDotty/test`.
 
-**Touches.** `TestCommandArgumentsIntegrationSpec.scala`, `JsonOutputArgumentSpec.scala`.
+All three run in CI (`.github/workflows/ci.yml`).
+
+| Suite | Scenarios | Remove | Simplify | Keep | Main cover for the removals |
+|---|---|---|---|---|---|
+| `TestCommandArgumentsIntegrationSpec` | 59 | 32 | 0 | 27 | `TestCommandArgumentsSpec`, `TestCommandFailureSpec`, `ClassGlobSpec`, `RunArgumentsSpec`, `ModuleScalaTestArgumentsSpec`, `WorkerLayoutSpec`; `SeveralModulesSpec`'s AC-008, AC-009 and AC-022 scenarios |
+| `JsonOutputArgumentSpec` | 24 | 18 | 0 | 6 | the same parser and message unit tests, `JsonOutputFileSpec`; `JsonOutputRootSpec` #1, `JsonOutputTreeSpec` #1 |
+| `JsonOutputNodesSpec` | 16 | 13 | 0 | 3 | library `JsonOutputNodesSpec`, the emitter's `TestEventLog*Spec`; `JsonOutputTreeSpec` #1 |
+| `TestCommandResultSpec` | 13 | 9 | 0 | 4 | `ConsolidationSpec`, `HumanReadableRunSpec`, `ChangedRegistrationOrderSpec`, `ModuleCheckSpec`; AC-011 |
+| `ModulesTheTestCommandCannotRunSpec` | 10 | 6 | 0 | 4 | AC-011 (#7) asserts every AC-010 row's claims for all six modules at once |
+| `SeveralModulesSpec` | 30 | 5 | 0 | 25 | the AC-001 rows kept, AC-015, `JsonOutputWriterSpec` |
+| `EveryWorkerSpec` | 22 | 3 | 4 | 15 | `WorkerLayoutSpec`, `ConsolidatedModuleSpec`, stricter scenarios in the suite; the four simplified scenarios' checks move onto another scenario's eval |
+| `JsonOutputRootSpec`, `JsonOutputTreeSpec`, `TestCommandOutputSpec`, `ModuleSelectorSpec`, `CapturedOutputSpec` | 30 | 14 | 0 | 16 | scenario #1 of the same suite, `AddingThePluginSpec` #1, `CompatibilityFixtureSpec`, `ModuleScalaTestArgumentsSpec` |
+| `MillOwnTestTasksSpec`, `HeaderPluginSpec`, `AddingThePluginSpec`, `MillBspServerSpec`, `LibraryWithoutMillSpec`, `CompatibilityFixtureSpec`, `JsonOutputEncodingSpec` | 25 | 0 | 0 | 25 | – |
+| **Total** | **229** | **100** | **4** | **125** | |
+
+Each distinct integration path keeps at least one end-to-end proof (`integration-test-coverage.md` § End-to-end proof kept for each integration path). For example:
+
+- Mill failing before any worker starts, with nothing written, on a rejected framework, output or `-fJ` argument: `TestCommandArgumentsIntegrationSpec` #22 and #48, `JsonOutputArgumentSpec` #15.
+- A module the test command cannot run, and an unrecognised `testArgsDefault` argument: AC-011 and AC-019.
+- Console output through Mill with and without the daemon, `mill.bat`, BSP, every worker layout, nested evaluation across several modules, a dead or unstarted worker JVM, and the JSON file's lifecycle.
+
+Several removals rely on named scenarios staying. The coverage file says which in each row, so any later removal must check them again.
+
+**Saving.** About 1896 of the 4337 solo-seconds (44 %): 103 of the 216 sandboxes and 112 of the 265 evals. Alone, this predicts 1290–1300 s, against 2335 s (**about −1040 s**). With P1, it predicts 1060–1080 s.
+
+**Effect on P1–P4.**
+
+- **P1.** P1 still pays: without it, `SeveralModulesSpec` (452 solo-seconds after removals) and `TestCommandArgumentsIntegrationSpec` (436) set the critical path. With P1, the largest unit is `EveryWorkerSpec`, at 266.
+- **P2.** Most sharing groups shrink:
+  - `TestCommandArgumentsIntegrationSpec`'s class-globs group goes from 21 to 3, and its output-argument group from 9 to 3.
+  - `JsonOutputArgumentSpec`'s group goes from 22 to 5.
+  - `ModulesTheTestCommandCannotRunSpec`'s and `TestCommandOutputSpec`'s groups disappear.
+
+  P2 then removes about 39 sandboxes rather than 108, about 300 solo-seconds rather than 800, and needs fewer resets.
+- **P3.** Only `JsonOutputNodesSpec` #2, #11 and #15 remain, so P3 would merge three rows for about 16 solo-seconds. It is no longer worth its preparation.
+- **P4.** The shared evals of `JsonOutputTreeSpec` and `JsonOutputArgumentSpec` disappear. About 86 solo-seconds remain, 60 of them in `MillOwnTestTasksSpec`.
+
+The coverage file lists each group's change (`integration-test-coverage.md` § Effect on P2, P3 and P4).
+
+**Risk.** Medium for coverage. Coverage moves down to the library and unit tests: a variant no longer runs through Mill, and a fault in the wiring between Mill and a covered component shows only in the path's kept proof. Against the specifications, which this proposal does not change:
+
+- **AC-010 loses every proving scenario** (`ModulesTheTestCommandCannotRunSpec` #1–#6), in `.planning/event-stream-reporting/many-modules-in-one-test-command/SPECIFICATION.md`. AC-011 (#7) asserts the same claims for all six modules at once, and `TestCommandFailureSpec` and `ModuleCheckSpec` cover the message and the check.
+- **Examples rows with no scenario left**, while each criterion keeps one: AC-001 `alpha.test beta.test`, `beta.test alpha.test` and `__.test alpha.test beta.test`; AC-005 `--keep-going`; AC-006 `none`.
+- **No row of the coverage table** at the end of that specification is left without a proving criterion.
+- **Epic requirements losing their only integration test**, in `.planning/event-stream-reporting/SPECIFICATION.md`, though lower layers still cover them: R-046a (ignored and pending tests do not fail) and R-130e (a test run twice is two nodes). R-063's JSON half also loses `JsonOutputTreeSpec` #2.
+
+Two further risks:
+
+- A simplification moves assertions onto another scenario's eval, so the receiving scenario must gain them before the simplified one is deleted.
+- The `mill.bat` scenarios (`TestCommandArgumentsIntegrationSpec` #34, #35) cancel off Windows, so CI never runs that path. That is true today and is not caused by this proposal.
+
+**Touches.** Twelve suites: `TestCommandArgumentsIntegrationSpec.scala`, `SeveralModulesSpec.scala`, `EveryWorkerSpec.scala`, `JsonOutputArgumentSpec.scala`, `JsonOutputNodesSpec.scala`, `ModulesTheTestCommandCannotRunSpec.scala`, `CapturedOutputSpec.scala`, `TestCommandResultSpec.scala`, `JsonOutputRootSpec.scala`, `TestCommandOutputSpec.scala`, `JsonOutputTreeSpec.scala` and `ModuleSelectorSpec.scala`. Fixture files that only removed scenarios use can go as well.
 
 ### P6. Shard the integration suites by tag, and run the shards as parallel CI jobs
 
 **What.** Tag each suite with one shard tag: a Java runtime-retained annotation per shard (`edc-bestpractice/scala/scalatest.md`, "Tagging"). Run shard *k* with `plugin.integration.testForked -n <tag k>`. Run the last shard with `-l <tag 1> … -l <tag k-1>`, so a suite with no tag still runs. `testForked`'s arguments reach the test framework (`.docs/learnings/mill-build-tooling.md`, 2026-11-20). In `.github/workflows/ci.yml`, turn `test-mill-plugin` into a matrix over the shards; each job repeats checkout and `publishLocal`, or downloads the fork's local repository from one publishing job. `test-all.sh` and `test-all.ps1` keep running every suite in one command; they need no change unless a shard option is wanted for local use.
 
-**Saving.** None on the development machine: shards on one machine compete for the same cores (§ 1.3). On CI, N runners do N times the work in the same time, so the CI integration time falls to about 1/N plus each job's setup. With P1–P4 the solo work is about 3100 s, so three or four shards of about 800–1000 solo-seconds each balance well. This is the main lever for CI, and the only perceived-time lever found. A developer can also run just the shard that covers their change.
+**Saving.** None on the development machine: shards on one machine compete for the same cores (§ 1.3). On CI, N runners do N times the work in the same time, so the CI integration time falls to about 1/N plus each job's setup. With the recommended set the solo work is about 2060 s, so two or three shards of about 700–1000 solo-seconds each balance well. This is the main lever for CI, and the only perceived-time lever found. A developer can also run just the shard that covers their change.
 
 **Risk.** Low for testing: every suite still runs in exactly one shard, and the `-l` remainder shard catches untagged suites. The cost is CI minutes (N jobs each paying setup) and keeping the shards balanced as suites grow. Splitting `plugin.integration` into separate Mill modules would do the same, but would need the helpers and resources moved into a shared module; tags need only an annotation per suite.
 
@@ -264,15 +319,17 @@ Apply in this order. Each step is independently useful, and each is measured bef
 |---|---|---|---|
 | – | Today | 2335 (measured 2339–2364) | – |
 | 1 | P1, split `TestCommandArgumentsIntegrationSpec` and `SeveralModulesSpec` by Feature | 1740–1820 | about 550 |
-| 2 | P2, share sandboxes among identical build states | 1430–1480 | about 880 |
-| 3 | P3, merge `JsonOutputNodesSpec`'s rows | 1340–1370 | about 980 |
-| 4 | P4, share same-command evals | 1290–1320 | about 1030 |
-| 5 | P5, one end-to-end scenario per rejection path | 1260–1300 | about 1060 |
+| 2 | P5, remove or simplify the 104 scenarios other tests cover | 1060–1080 | about 1260 |
+| 3 | P2, share sandboxes among the remaining identical build states | 940–970 | about 1380 |
+| 4 | P4, share the remaining same-command evals | 900–930 | about 1420 |
 | CI | P6 shards across CI jobs, and P7 the CI cache | development machine unchanged; CI integration time about 1/N | – |
 
-Steps 1–4 bring the full `plugin.test.testForked + plugin.integration.testForked` from 2388 s to **about 1350 s (−43 %)**, with no scenario removed. Step 5 adds about 25 s. Splitting every remaining suite by Feature as well would add about 60–90 s.
+Steps 1–4 bring the full `plugin.test.testForked + plugin.integration.testForked` from 2388 s to **about 930–950 s (−60 %)**. Steps 1 and 2 alone bring it to about 1090–1100 s (−54 %). P3 is left out: after P5 it saves about 16 solo-seconds. Splitting every suite by Feature as well would save about 50–70 s more.
 
-Step 1 comes first because it is cheap and low-risk, and because the critical path hides every other saving until it is fixed: P2–P4 alone, without P1, predict only 1680 s. P2 can be done one suite at a time, starting with `TestCommandArgumentsIntegrationSpec` and `JsonOutputArgumentSpec`, which hold the largest groups.
+- **Step 1 comes first** because it is cheap and low-risk, and because the critical path hides every other saving until it is fixed: P5 alone predicts 1290–1300 s, against 1060–1080 s with P1.
+- **P5 comes before P2** because it removes most of the groups P2 would need resets for, so P2 becomes a smaller and safer change. P5 can be done one suite at a time, and each suite's removals must keep the scenarios that the coverage file names as cover.
+- **P2–P4 without P5** predict 1290–1320 s after P1.
+- **Two counts bound the estimate.** In the model, the end point does not depend on the order of the steps. A second count assumes P2 first, so that a removed scenario then saves only a warm eval, about 4 s (`integration-test-coverage.md` § Summary). It puts the end point at 1100–1130 s instead of 900–930 s. The two figures bound the estimate (§ 4).
 
 ## 4. The model and its limits
 
@@ -281,6 +338,8 @@ Step 1 comes first because it is cheap and low-risk, and because the critical pa
   - The slowdown curve comes from one task (build.mill compiles), and from one run. The high-concurrency samples are early in the run, when caches were also cold, so the curve may overstate the slowdown at 16 workers.
   - Solo-equivalents are estimates, not measured solo times. The scenarios measured alone at the end of the run (§ 1.4) agree with them.
   - The P2 and P4 savings assume 7–9 s per removed sandbox and 3–12 s per removed eval, from § 1.4. Groups whose scenarios swap source files save less, as the test module still recompiles.
+  - P5 removes each scenario's solo-equivalent, taken per scenario from `[report]` and `[claim]` (the active workers at the scenario's midpoint), and the predictions with P5 apply P2 and P4 only to the groups and evals that remain. The removed scenarios average about 18 solo-seconds, more than the 10–15 s measured for a fresh scenario alone (§ 1.4), so P2's 7–9 s per sandbox and the 3–5 s of a warm eval do not add up to them. Counting a removal after P2 as only a warm eval instead gives 1100–1130 s for the recommended set rather than 900–930 s; 1100–1130 s is the more cautious figure.
+  - The model was rebuilt from the same inputs for P5's predictions. It replays today's run at 2270 s rather than 2335 s, and its predictions are scaled by 1.03 to the measured run. Scaled, it reproduces the first pass's P1–P4 predictions within 2 %.
   - Two runs of the same tests differed by 15 % (2053 s and 2388 s).
 - **Measuring each step.** Read `test-report.xml`, `worker-NN/claim.log` and each sandbox's `out/mill-chrome-profile.json` after the run, as this note does.
 
