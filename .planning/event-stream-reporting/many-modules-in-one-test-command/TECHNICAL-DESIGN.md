@@ -12,8 +12,8 @@ This design checks every selected JVM test module before any test starts, then r
 
 `org.scalatest.consolidation.Consolidation` has a method for each of these operations of `../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, beside `addRootFailure` and `addRootOutput`:
 
-- **Attach output or a failure to a module**, which also serves **Add a module whose tests did not start**: `addModuleFailure` and `addModuleOutput`. The library keeps each module's failures and output beside the module's runs, as it keeps the root's. With them:
-  - a module given a failure or output but no run is a module of every output, which the library orders by name with the other modules however late it is added (AC-006, AC-015, AC-024);
+- **Attach output or a failure to a module**, which also serves **Add a module whose tests did not start**: `addModuleFailure` and `addModuleOutput`. The library keeps each module's failures and output beside the module's runs, as it keeps the root's. As a result:
+  - a module given a failure or output but no run appears in both outputs, ordered by name with the other modules however late it is added (AC-006, AC-015, AC-024);
   - the JSON writer writes a module's `outcome` and `failures` (AC-006, AC-009, AC-015, AC-022, AC-024) and its `output` (AC-025);
   - the human-readable writer writes a module's output lines and its `*** MODULE ABORTED ***` block after the module's runs, built as it builds the root's (AC-023, AC-026);
   - attaching a failure fails the consolidation state (`../SPECIFICATION.md` R-137).

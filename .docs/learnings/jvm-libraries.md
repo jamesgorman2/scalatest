@@ -10,5 +10,5 @@ date: 2026-11-26
 
 Jackson 3's default `StreamReadConstraints` allow a nesting depth of 500. `validate` on a document nested deeper throws `tools.jackson.core.exc.StreamConstraintsException: Document nesting depth (501) exceeds the maximum allowed (500 …)` instead of returning violations. A throwable's cause chain written as nested objects reaches that depth.
 
-Do not route every JSON output through the validator by default: an output built to test a long chain then fails for the parser's limit, not the schema. Validate outputs of bounded depth, and test deep nesting separately.
+Do not route every JSON output through the validator by default: an output built to test a long cause chain then fails on the parser's depth limit, not the schema. Validate outputs of bounded depth, and test deep nesting separately.
 </learning>

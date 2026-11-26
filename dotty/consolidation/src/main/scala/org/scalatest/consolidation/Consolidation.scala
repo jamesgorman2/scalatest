@@ -95,8 +95,8 @@ final class Consolidation private[consolidation] (
 
   /**
    * Attaches a line captured from a runner that is not a run, such as a build tool's discovery runner, to the module.
-   * A module given output but no run is still a module of every output. The module's captured lines follow the lines
-   * for its runs, in the order they were attached.
+   * A module given output but no run still appears in the human-readable and JSON outputs. The module's captured lines
+   * follow the lines for its runs, in the order they were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -107,9 +107,9 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Attaches the message of a failure that belongs to the module but to none of its runs, such as its tests not
-   * starting, to the module. This fails the test command and the module. A module given a failure but no run is still a
-   * module of every output. The module's failures follow its captured lines, in the order they were attached.
+   * Attaches to the module the message of a failure that belongs to none of its runs, such as its tests not starting.
+   * This fails the test command and the module. A module given a failure but no run still appears in the
+   * human-readable and JSON outputs. The module's failures follow its captured lines, in the order they were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -148,7 +148,7 @@ final class Consolidation private[consolidation] (
 
   /**
    * Sets a module's start and end times by the caller's clock, replacing any an earlier call set. A module timed but
-   * given no run is still a module of every output, with nothing under it.
+   * given no run still appears in the human-readable and JSON outputs, with nothing under it.
    *
    * @param startedAt when the caller started the module's tests
    * @param endedAt when the last of the module's test processes ended

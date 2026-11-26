@@ -212,7 +212,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     }
 
     "given failures and output, interleaved, with its times and a run" should {
-      "hold its outcome and failures, then its times, its run node and its output, each failure and line in the order it was attached" in {
+      "hold its outcome, failures, times, run node and output in that order, with failures and lines in the order attached" in {
         val json = jsonOutputAfter { consolidation =>
           consolidation.timeModule(module, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
           consolidation.addModuleFailure(module, "first failure")

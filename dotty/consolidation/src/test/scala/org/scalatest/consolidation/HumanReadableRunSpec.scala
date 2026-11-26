@@ -489,7 +489,7 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   Feature("A module's output and failures") {
 
-    Scenario("After the lines for a module's runs, the module's captured lines then its abort with each failure's lines under it") {
+    Scenario("A module's captured lines, then its abort with each failure under it, follow the lines for its runs") {
       Given("an event log of a completed run of SqrtPropSpec, consolidated as a run of the module `core.test`")
       And("a failure, a stdout line, a stderr line and a failure of two lines attached to `core.test`, in that order")
       When("the library consolidates it")
