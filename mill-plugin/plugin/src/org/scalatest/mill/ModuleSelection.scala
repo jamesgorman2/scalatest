@@ -22,10 +22,7 @@ private[mill] object ModuleSelection {
     if (moduleSelectors.isEmpty) {
       Left(TestCommandFailure.NoModuleSelector)
     } else {
-      val resolvedSelectors = moduleSelectors.map(selector => ResolvedModuleSelector.from(evaluator, selector))
-      resolvedSelectors
-        .collectFirst { case Left(failure) => failure }
-        .toLeft(ModuleSelection(resolvedSelectors.collect { case Right(resolved) => resolved }))
+      FirstFailure.orValues(moduleSelectors.map(selector => ResolvedModuleSelector.from(evaluator, selector))).map(ModuleSelection(_))
     }
 
   private def distinctSortedByName(modules: Seq[SelectedTestModule]): Seq[SelectedTestModule] = modules.distinctBy(_.name).sortBy(_.name.value)

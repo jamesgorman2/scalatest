@@ -15,71 +15,28 @@ import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.ScalaTestArgument
 import scala.concurrent.duration.DurationInt
 
-private[mill] object TestCommand {
+private[mill] final class TestCommand private (
+    failFastOffEvaluator: Evaluator,
+    commandArguments: TestCommandArguments,
+    jsonOutputFile: Option[JsonOutputFile],
+    selection: ModuleSelection,
+    ctx: TaskCtx,
+    now: () => Instant,
+    systemProperty: String => Option[String]
+) {
 
-  def run(
-      evaluator: Evaluator,
-      arguments: Seq[String],
-      ctx: TaskCtx,
-      now: () => Instant,
-      systemProperty: String => Option[String]
-  ): Result[Unit] = {
-    val outcome = for {
-      commandArguments <- TestCommandArguments.parse(arguments)
-      jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
-      _ <- jsonOutputFile.map(file => BuildCtx.withFilesystemCheckerDisabled(file.delete())).getOrElse(Right(()))
-      selection <- ModuleSelection.from(evaluator, commandArguments.moduleSelectors)
-      failures <- testFailures(evaluator, commandArguments, jsonOutputFile, selection, ctx, now, systemProperty)
-    } yield failures
-    outcome match {
-      case Left(failure) => Result.Failure(failure.message)
-      case Right(Seq()) => Result.Success(())
-      case Right(failures) => Result.Failure.join(failures)
-    }
-  }
-
-  private def testFailures(
-      evaluator: Evaluator,
-      commandArguments: TestCommandArguments,
-      jsonOutputFile: Option[JsonOutputFile],
-      selection: ModuleSelection,
-      ctx: TaskCtx,
-      now: () => Instant,
-      systemProperty: String => Option[String]
-  ): Either[TestCommandFailure, Seq[Result.Failure]] = {
-    // Fail-fast off lets every module's tests run, whatever happens to the others' tasks.
-    val failFastOffEvaluator = FailFastOffEvaluator.from(evaluator)
-    val checkTasks = selection.modules.map(module => module -> moduleCheckTask(module))
+  def checkAndRunTests(): Either[TestCommandFailure, Seq[Result.Failure]] = {
+    val checkTasks = selection.modules.map(module => module -> TestCommand.moduleCheckTask(module))
     val checkEvaluation = failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log)
-    for {
-      runArguments <- runArgumentsFrom(successfulValues(checkEvaluation, checkTasks), commandArguments.frameworkArguments)
-      runFailures <- moduleRunFailures(failFastOffEvaluator, commandArguments, jsonOutputFile, selection, runArguments, ctx, now, systemProperty)
-    } yield failuresOf(checkEvaluation) ++ runFailures
+    TestCommand
+      .runArgumentsFrom(TestCommand.successfulValues(checkEvaluation, checkTasks), commandArguments.frameworkArguments)
+      .flatMap(runSelectedModules)
+      .map(runFailures => TestCommand.failuresOf(checkEvaluation) ++ runFailures)
   }
 
-  private def runArgumentsFrom(
-      moduleTestArgs: Seq[(SelectedTestModule, Seq[String])],
-      frameworkArguments: Seq[ScalaTestArgument.Flagged]
-  ): Either[TestCommandFailure, Seq[(SelectedTestModule, RunArguments)]] = {
-    val runArguments = moduleTestArgs.map { case (module, testArgs) =>
-      ModuleScalaTestArguments.kept(testArgs).map(kept => module -> RunArguments.from(kept, frameworkArguments))
-    }
-    runArguments
-      .collectFirst { case Left(failure) => failure }
-      .toLeft(runArguments.collect { case Right(moduleRunArguments) => moduleRunArguments })
-  }
-
-  private def moduleRunFailures(
-      failFastOffEvaluator: Evaluator,
-      commandArguments: TestCommandArguments,
-      jsonOutputFile: Option[JsonOutputFile],
-      selection: ModuleSelection,
-      runArguments: Seq[(SelectedTestModule, RunArguments)],
-      ctx: TaskCtx,
-      now: () => Instant,
-      systemProperty: String => Option[String]
-  ): Either[TestCommandFailure, Seq[Result.Failure]] = {
-    val moduleFolders = BuildCtx.withFilesystemCheckerDisabled(selection.modules.map(module => module -> clearedModuleFolder(ctx, module.name)).toMap)
+  private def runSelectedModules(runArguments: Seq[(SelectedTestModule, RunArguments)]): Either[TestCommandFailure, Seq[Result.Failure]] = {
+    val moduleFolders =
+      BuildCtx.withFilesystemCheckerDisabled(selection.modules.map(module => module -> TestCommand.clearedModuleFolder(ctx, module.name)).toMap)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       commandArguments.stdoutContent match {
@@ -97,15 +54,49 @@ private[mill] object TestCommand {
     )
     val workerCharset = WorkerOutputCapture.workerCharset(systemProperty)
     val moduleRunTasks = runArguments.map { case (module, moduleRunArguments) =>
-      moduleRunTask(module, moduleRunArguments, commandArguments.classGlobs, moduleFolders(module), consolidation, ctx.log, now, workerCharset)
+      TestCommand.moduleRunTask(module, moduleRunArguments, commandArguments.classGlobs, moduleFolders(module), consolidation, ctx.log, now, workerCharset)
     }
     val runEvaluation = failFastOffEvaluator.execute(moduleRunTasks, logger = ctx.log)
     val endedState = consolidation.end(Some(now()))
     jsonOutputWritten.map { _ =>
-      failuresOf(runEvaluation) ++
+      TestCommand.failuresOf(runEvaluation) ++
         Option.when(endedState.failed)(Result.Failure(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed"))
     }
   }
+}
+
+private[mill] object TestCommand {
+
+  def run(
+      evaluator: Evaluator,
+      arguments: Seq[String],
+      ctx: TaskCtx,
+      now: () => Instant,
+      systemProperty: String => Option[String]
+  ): Result[Unit] = {
+    val outcome = for {
+      commandArguments <- TestCommandArguments.parse(arguments)
+      jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
+      _ <- jsonOutputFile.map(file => BuildCtx.withFilesystemCheckerDisabled(file.delete())).getOrElse(Right(()))
+      selection <- ModuleSelection.from(evaluator, commandArguments.moduleSelectors)
+      // Fail-fast off lets every module's tests run, whatever happens to the others' tasks.
+      testCommand = new TestCommand(FailFastOffEvaluator.from(evaluator), commandArguments, jsonOutputFile, selection, ctx, now, systemProperty)
+      failures <- testCommand.checkAndRunTests()
+    } yield failures
+    outcome match {
+      case Left(failure) => Result.Failure(failure.message)
+      case Right(Seq()) => Result.Success(())
+      case Right(failures) => Result.Failure.join(failures)
+    }
+  }
+
+  private def runArgumentsFrom(
+      moduleTestArgs: Seq[(SelectedTestModule, Seq[String])],
+      frameworkArguments: Seq[ScalaTestArgument.Flagged]
+  ): Either[TestCommandFailure, Seq[(SelectedTestModule, RunArguments)]] =
+    FirstFailure.orValues(moduleTestArgs.map { case (module, testArgs) =>
+      ModuleScalaTestArguments.kept(testArgs).map(kept => module -> RunArguments.from(kept, frameworkArguments))
+    })
 
   private def failuresOf(evaluation: Evaluator.Result[?]): Seq[Result.Failure] =
     evaluation.values match {
