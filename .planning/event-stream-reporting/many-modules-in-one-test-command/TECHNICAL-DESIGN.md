@@ -2,7 +2,7 @@
 
 ## Summary
 
-This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. The nested evaluation's per-module tasks are confirmed on Mill 1.3.1 (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The check tasks and the capture of what test discovery writes are not yet confirmed.
+This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. The nested evaluation's per-module tasks are confirmed on Mill 1.3.1 (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The capture of what test discovery writes is confirmed by reading Mill 1.3.1's source (`../research/mill-test-discovery-output.md`). The check tasks are not yet confirmed.
 
 Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the evaluator the test command builds over a copy of Mill's `Execution` with fail-fast off (`../decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation…").
 
@@ -55,7 +55,13 @@ Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the
 
 - The test command adds no module name to a failure it attaches to a module. Mill's own text, such as task names and `testOnly`'s message, stays as Mill writes it.
 - The module run attaches each failure it raises to its module with **Attach output or a failure to a module**, not to the root (AC-009, AC-022, AC-024). These are the failures of `JvmTestModuleRun.launcherOrReportFailure`, `JvmTestModuleRun.layOutForkGroups`, `JvmTestModuleRun.reportNoTestResultForClassGlobs` and `WorkerRun.end`.
-- The module run captures each line test discovery writes to stdout and stderr while `ZincOp.GetTestTasks` runs, and attaches it to the module with **Attach output or a failure to a module** (AC-025, AC-026).
+- The module run captures each line test discovery writes to stdout and stderr while `ZincOp.GetTestTasks` runs, and attaches it to the module with **Attach output or a failure to a module** (AC-025, AC-026). The capture follows `../research/mill-test-discovery-output.md` § 5.1:
+  - The capture wraps the `jvmWorker.apply(ZincOp.GetTestTasks(...))` call in `JvmTestModuleRun.discoveredTestClasses`, on the module's anonymous task thread.
+  - The capture binds `SystemStreams.current`, which receives discovery's writes where the module has no `javaHome`. The capture also binds `Console.out` and `Console.err`, which receive them where the module has a `javaHome`.
+  - Each binding holds only on the thread that made it, so the lines of modules discovered at the same time stay apart.
+  - The capture does not use `SystemStreamsUtils.withStreams`. That method also binds `os.Inherit`, so a JVM worker subprocess that the call starts would send its stderr into the capture for the rest of the subprocess's life.
+  - The capture attaches what it holds in a `finally`, so the output survives a `ZincOp.GetTestTasks` that throws.
+- Discovery runs the static initializer of each test class that the class globs, `-w` and `-m` keep, on every test command. Mill passes `explicitlySpecified = false` and builds a new class loader for each `ZincOp.GetTestTasks` call (`../research/mill-test-discovery-output.md` § 3, § 4).
 
 ### A module whose tests cannot start
 
