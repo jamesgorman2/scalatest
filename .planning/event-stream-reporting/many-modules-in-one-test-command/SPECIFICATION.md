@@ -27,7 +27,10 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 - A selected test module whose tests cannot start, as where it fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
 - The class globs and framework arguments applying alike to every selected test module.
 - Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
-- Failing the test command before any test starts where a module selector resolves to a test module that does not test with the release of this fork the Mill plugin belongs to, to a Scala.js or Native test module, or to a test module whose `testArgsDefault` holds an argument ScalaTest does not recognise.
+- Failing the test command before any test starts where a module selector resolves to:
+  - a test module that does not test with the release of this fork the Mill plugin belongs to;
+  - a Scala.js or Native test module;
+  - a test module whose `testArgsDefault` holds an argument ScalaTest does not recognise.
 - The test command not running where a task Mill must complete before it, such as another goal on the same `mill` command line, fails first.
 
 ### Out of scope
@@ -40,7 +43,7 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 - The warning on an unsupported Mill release (§ 6).
 - The consolidated output of a worker that ends before its tests finish (§ 8).
 - Progress output (§ 9).
-- What the test command does where another Mill launcher, sharing the daemon, changes a task that a selected test module's tests depend on while the test command runs is undefined.
+- The test command's behaviour is undefined where another Mill launcher that shares the daemon changes a task that a selected test module's tests depend on while the test command runs.
 
 ## Acceptance criteria
 
@@ -54,7 +57,7 @@ Feature: Several module selectors
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
     And the build's JVM test modules `alpha.test` and `beta.test` each test with `com.edc::scalatest` at that release, and their definitions name nothing of the plugin
     And each of those modules has `testParallelism` off and `testSandboxWorkingDir` on, and leaves `testForkGrouping`, `testBatchFrameworkTasks`, `testArgsDefault` and `testReportXml` unset
-    And `alpha.test` holds the suites `Alpha1` and `Alpha2`, the classes `samples.Alpha1` and `samples.Alpha2`, and `beta.test` holds the suite `Beta1`, the class `samples.Beta1`
+    And `alpha.test` holds the suites `Alpha1` and `Alpha2`, whose classes are `samples.Alpha1` and `samples.Alpha2`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
     And each of those suites is an `AnyFunSuite` with two tests, `fast` and `slow`, both of which succeed
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, appends one line to the file `<suite>.<test>` in `<markers>`
     And the test command is invoked as `mill -j 2 scalatest/test <selectors> -fJ <report>` unless the scenario states its own `mill` command line
@@ -121,7 +124,7 @@ Feature: Several module selectors
       Then the JSON output's root holds exactly the module nodes `B1.test`, `alpha.test`, `b10.test`, `b2.test` and `beta.test`, in that order
 
   Rule: Each selected test module's workers run in the folder `sandbox` of that module's own module folder
-    A module's module folder is the module's name, as Mill writes it in a task name, in the folder `org.scalatest.mill.TestCommandModule/modules` of Mill's output folder.
+    A module's module folder is the folder whose name is the module's name, as Mill writes it in a task name, inside the folder `org.scalatest.mill.TestCommandModule/modules` of Mill's output folder.
 
     Scenario: AC-004 The working directory of each module's tests
       Given `Alpha1`'s test `fast` and `Beta1`'s test `fast` each send an `info` message holding the system property `user.dir`
@@ -132,12 +135,13 @@ Feature: Several module selectors
 
 ```gherkin
 Feature: Every selected module runs, whatever happens to the others
-  The test command runs the tests of every selected test module, whether or not Mill's `--keep-going` is given, and whether another selected test module's tests cannot start, another selected test module has a test that fails, or another selected test module fails the test command in any other way.
+  The test command runs the tests of every selected test module, whether or not Mill's `--keep-going` is given.
+  The test command runs the tests of every selected test module where another selected test module's tests cannot start, where another selected test module has a test that fails, and where another selected test module fails the test command in any other way.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
     And the build's JVM test modules `alpha.test` and `beta.test` each test with `com.edc::scalatest` at that release, and their definitions name nothing of the plugin
-    And `alpha.test` holds the suite `Alpha1`, the class `samples.Alpha1`, and `beta.test` holds the suite `Beta1`, the class `samples.Beta1`
+    And `alpha.test` holds the suite `Alpha1`, whose class is `samples.Alpha1`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
     And each of those suites is an `AnyFunSuite` with two tests, `fast` and `slow`, both of which succeed unless the scenario says otherwise
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`
     And the test command is invoked as `mill -j 2 <flags> scalatest/test <selectors> -fJ <report>`, each argument reaching `mill` exactly as written, with no shell expansion
@@ -187,7 +191,8 @@ Feature: Every selected module runs, whatever happens to the others
 
   Rule: A module's tests start once that module and each module it depends on have compiled, without waiting for another selected test module to compile
     Scenario: AC-007 late.test compiles only after a test of alpha.test has run
-      Given the build also has the JVM test module `late.test`, which tests with `com.edc::scalatest` at the release under test and holds the suite `Late1`, the class `samples.Late1`, an `AnyFunSuite` whose test `fast` creates the file `Late1.fast` in `<markers>`
+      Given the build also has the JVM test module `late.test`, which tests with `com.edc::scalatest` at the release under test and holds the suite `Late1`, whose class is `samples.Late1`
+      And `Late1` is an `AnyFunSuite` whose test `fast` creates the file `Late1.fast` in `<markers>`
       And `late.test`'s compile depends on a task that ends once the file `Alpha1.fast` exists in `<markers>`, and fails if that file does not exist within 120 seconds
       When the test command is invoked with no flags and the module selectors `alpha.test late.test`
       Then the files `Alpha1.fast` and `Late1.fast` exist in `<markers>`
@@ -204,9 +209,9 @@ Feature: Class globs and framework arguments across modules
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
     And the build's JVM test modules `alpha.test` and `beta.test` each test with `com.edc::scalatest` at that release, and their definitions name nothing of the plugin
-    And `alpha.test` holds the suites `Alpha1` and `Alpha2`, the classes `samples.Alpha1` and `samples.Alpha2`, and `beta.test` holds the suite `Beta1`, the class `samples.Beta1`
-    And each of those suites is an `AnyFunSuite` with two tests, `fast`, tagged `samples.Fast`, and `slow`, both of which succeed
-    And each of those modules holds `samples.Fast`, an object extending `org.scalatest.Tag` with the name `samples.Fast`, which is not a test class
+    And `alpha.test` holds the suites `Alpha1` and `Alpha2`, whose classes are `samples.Alpha1` and `samples.Alpha2`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
+    And each of those suites is an `AnyFunSuite` with two tests, `fast` and `slow`, both of which succeed, and only `fast` is tagged `samples.Fast`
+    And each of those modules holds the object `samples.Fast`, which extends `org.scalatest.Tag` with the name `samples.Fast` and is not a test class
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`
     And the test command is invoked as `mill -j 2 scalatest/test alpha.test beta.test -fJ <report> <arguments>`, each argument reaching `mill` exactly as written, with no shell expansion
     And `<report>` is an absolute path at which nothing exists
@@ -223,7 +228,7 @@ Feature: Class globs and framework arguments across modules
         | `-- -- -n samples.Fast`                    | `Alpha1.fast`, `Alpha2.fast` and `Beta1.fast`                          |
         | `-- *1 -- -z slow`                         | `Alpha1.slow` and `Beta1.slow`                                         |
 
-  Rule: Where no class glob matches a test class that a selected module's test framework discovers, no test of that module starts and the test command fails, and every other module's tests still run
+  Rule: Where no class glob matches a test class that a selected module's test framework discovers, no test of that module starts, the test command fails, and every other module's tests still run
     Scenario: AC-009 Class globs that match only alpha.test's classes
       When the test command is invoked with `-- samples.Alpha*`
       Then the files in `<markers>` are exactly `Alpha1.fast`, `Alpha1.slow`, `Alpha2.fast` and `Alpha2.slow`
