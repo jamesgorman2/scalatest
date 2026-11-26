@@ -8,9 +8,9 @@ import mill.javalib.BoundDep
 
 private[mill] object ModuleCheckTask {
 
-  // The check evaluates no compile, so that no module's tests wait on another module's compile. `resolution`, unlike
-  // the `classpath` that `resolvedRunMvnDeps` calls, fetches no artifact, but it also takes none of the runtime
-  // resolution parameters, so the root dependency names the runtime configuration itself.
+  // The check evaluates no compile, so that no module's tests wait on another module's compile. `resolution` fetches
+  // no artifact, unlike the `classpath` that `resolvedRunMvnDeps` calls. It also takes none of the runtime resolution
+  // parameters, so the root dependency names the runtime configuration itself.
   def of(module: SelectedTestModule): Task[ModuleCheck] = {
     val testModule = module.module
     Task.Anon {

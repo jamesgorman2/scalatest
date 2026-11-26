@@ -59,7 +59,7 @@ The build runs Mill 1.3.1. Add the plugin to the header of its `build.mill`:
 
 If the header already has `mvnDeps`, add `"com.edc::scalatest-mill::3.2.20"` to it.
 
-A test module run by the test command must depend on this fork's `scalatest` at the plugin's release, itself or through a module or library it depends on, and be built with Scala 3.3 or later:
+A test module run by the test command must be built with Scala 3.3 or later and depend on this fork's `scalatest` at the plugin's release, directly or through a module or library it depends on:
 
 ```scala
 //| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
@@ -129,10 +129,10 @@ The test command fails before any test starts, and writes no consolidated output
 - it is given no module selector;
 - a module selector resolves to no module, or to no test module;
 - a selected test module is a Scala.js or Native test module;
-- a selected test module does not test with this fork at the plugin's release: the dependencies Mill resolves for it hold no `com.edc:scalatest-core_3` at that release, as for a module testing with MUnit, uTest, upstream `org.scalatest:scalatest` or another release of this fork;
+- the dependencies Mill resolves for a selected test module hold no `com.edc:scalatest-core_3` at the plugin's release, as for a module testing with MUnit, uTest, upstream `org.scalatest:scalatest` or another release of this fork;
 - a selected module's own ScalaTest arguments hold a flag ScalaTest's runner does not recognise.
 
-The failure names each selected test module the test command cannot run, and each such flag. A selected module whose dependencies fail to resolve is not among them: its tests do not start (below).
+The failure names each selected test module the test command cannot run, and each such flag. A selected module whose dependencies fail to resolve does not stop other modules' tests from starting. Only its own tests do not start (below).
 
 It also fails when:
 
@@ -157,8 +157,8 @@ Under the test command, ScalaTest prints no end-of-run summary of its own. Inste
 The test command writes a module's files in its module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
 
 - Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder. The exception is Mill's JUnit XML report: the test command writes none, whatever the module's `testReportXml`.
-- Once it has resolved its module selectors and read each selected module's own ScalaTest arguments, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, and also where none starts, as where no class glob matches.
-- A test command that fails on its arguments, such as on a framework argument it does not accept, or on a selected module it cannot run, such as one whose own ScalaTest arguments hold a flag ScalaTest's runner does not recognise, leaves every module folder as it was.
+- Once it has resolved its module selectors and checked that it can run every selected test module, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, and also where none starts, as where no class glob matches.
+- A test command that fails on its arguments, such as a framework argument it does not accept, or on a selected test module it cannot run, leaves every module folder as it was.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
 
 ## Runs in the human-readable output

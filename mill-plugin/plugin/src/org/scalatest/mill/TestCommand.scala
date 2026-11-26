@@ -28,7 +28,8 @@ private[mill] final class TestCommand private (
     val (jvmModules, otherModules) = selection.modules.partition(_.isJvm)
     val checkTasks = jvmModules.map(module => module -> ModuleCheckTask.of(module))
     val checkResults = EvaluatedTasks.of(failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log))
-    // A module whose check task failed is not rejected here: its tests did not start.
+    // A module whose check task failed is not a module the test command cannot run: its failure goes on its module
+    // node, and its tests do not start.
     val (checkFailures, moduleChecks) = checkTasks.partitionMap { case (module, task) =>
       checkResults.valueOrFailure(task).left.map(failure => module -> failure).map(check => module -> check)
     }

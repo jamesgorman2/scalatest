@@ -59,7 +59,7 @@ A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `Sc
 
 Where a case class's companion object holds a method that builds a `Task.Anon`, a unit test calling the case class's `apply` compiles but fails at run time with `java.lang.NoClassDefFoundError: mill/api/Task`, and the suite aborts.
 
-Keep classes under unit test free of Mill and os-lib types. Do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill, and build a task in an object that no unit test loads, not in the companion of a class under unit test. Test that wiring under testkit.
+Keep classes under unit test free of Mill and os-lib types. Do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Build a task in an object that no unit test loads, not in the companion of a class under unit test. Test that wiring under testkit.
 </learning>
 
 <learning>
@@ -282,7 +282,7 @@ Declare extra repositories, such as a fixture's local `file://` Maven repository
 <learning>
 date: 2026-11-27
 ---
-To read which version of a library a Mill module's dependencies resolve to without downloading jars, take the `coursier.core.Resolution` that `millResolver().resolution` returns for the module's `coursierDependencyTask()` and read `retainedVersions`, a `Map[coursier.core.Module, coursier.version.Version]` (Coursier 2.1.26). Compare `module.organization.value`, `module.name.value` (the artifact name with its Scala suffix, such as `_3`) and `version.repr`.
+To read which version of a library a Mill module's dependencies resolve to, without downloading jars, read `retainedVersions` on the `coursier.core.Resolution` that `millResolver().resolution` returns for the module's `coursierDependencyTask()`. It is a `Map[coursier.core.Module, coursier.version.Version]` (Coursier 2.1.26). Compare `module.organization.value`, `module.name.value` (the artifact name with its Scala suffix, such as `_3`) and `version.repr`.
 
-The root dependency is the module's own Coursier project, so the result also holds the libraries the module gets through its `moduleDeps`, served from Mill's internal repositories. A library a module reaches only through another module is therefore found without walking `moduleDeps` yourself.
+The root dependency is the module's own Coursier project, so the result also holds the libraries the module gets through its `moduleDeps`, served from Mill's internal repositories. You need not walk `moduleDeps` yourself.
 </learning>

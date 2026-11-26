@@ -34,7 +34,7 @@ final class ModuleCheckSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "its runtime dependencies hold upstream ScalaTest's core at the same version" should {
+    "its runtime dependencies hold upstream ScalaTest's core at the version the consolidation library was built at" should {
       "say the module does not test with this release" in {
         runArguments(Nil, scalaLibrary, forkCore.copy(organization = Organization("org.scalatest"))) shouldBe
           Left(Seq(CannotRunReason.WithoutThisRelease(module)))
@@ -48,7 +48,7 @@ final class ModuleCheckSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "it neither tests with this release nor has only arguments ScalaTest recognises" should {
+    "it does not test with this release and its testArgsDefault holds an argument ScalaTest does not recognise" should {
       "give both reasons" in {
         runArguments(Seq("-x"), scalaLibrary) shouldBe
           Left(Seq(CannotRunReason.WithoutThisRelease(module), CannotRunReason.UnrecognisedArguments(module, Seq("-x"))))
