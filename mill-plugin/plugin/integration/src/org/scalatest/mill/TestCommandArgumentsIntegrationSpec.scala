@@ -75,7 +75,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
     And("no file exists in the markers folder")
     withClue(result.debugString) {
-      os.list(build.markersFolder) shouldBe empty
+      build.markers shouldBe empty
     }
 
     And("nothing exists at the JSON output file's path")
@@ -236,7 +236,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
           And("no file exists in the markers folder, and no test worker started")
           withClue(result.debugString) {
-            os.list(build.markersFolder) shouldBe empty
+            build.markers shouldBe empty
             build.anyTestWorkerStarted shouldBe false
           }
 
@@ -264,7 +264,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
         And("no file exists in the markers folder")
         withClue(result.debugString) {
-          os.list(build.markersFolder) shouldBe empty
+          build.markers shouldBe empty
         }
 
         And("the test command fails")
