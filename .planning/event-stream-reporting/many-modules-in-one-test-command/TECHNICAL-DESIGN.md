@@ -4,7 +4,7 @@ Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the
 
 ## Summary
 
-This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. Experiments on Mill 1.3.1 confirm the nested evaluation's per-module tasks (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The capture of what test discovery writes follows from Mill 1.3.1's source (`../research/mill-test-discovery-output.md`). Neither the capture nor the check task's Coursier resolution has been tried on Mill 1.3.1.
+This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. Experiments on Mill 1.3.1 confirm the nested evaluation's per-module tasks (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The capture of what test discovery writes follows from Mill 1.3.1's source (`../research/mill-test-discovery-output.md`), and has not been tried on Mill 1.3.1. On Mill 1.3.1, the check tasks, Coursier resolution included, evaluate no compile (AC-007).
 
 ## Components
 
@@ -29,6 +29,8 @@ This design checks every selected JVM test module before any test starts, then r
 - The test command then calls `execute` once on the fail-fast-off evaluator, over one anonymous *check task* for each selected JVM test module. A module's check task reads:
   - the module's `testArgsDefault`;
   - the Coursier resolution of the module's runtime dependencies: the module's `millResolver` resolving the module's `coursierDependencyTask` in the runtime configuration, as `resolvedRunMvnDeps` does. The resolution covers the dependencies of every module the module depends on, and fetches metadata only.
+    - The check task calls the resolver's `resolution`, which fetches no artifact. Unlike the `classpath` call in `resolvedRunMvnDeps`, `resolution` takes the module's `resolutionParams` unchanged. It therefore sets neither the runtime configuration as the default configuration nor the Gradle runtime variant attributes. The resolution's root dependency names the runtime configuration itself.
+- The test command holds each module's check result, its resolution included, once that `execute` returns.
 - A check task evaluates no compile. A module's tests therefore wait on every selected module's dependency resolution and `testArgsDefault`, but on no other module's compile (AC-007).
 - A JVM test module tests with the release of this fork where its resolution holds `com.edc:scalatest-core_3` at the version the consolidation library was built at (AC-010, AC-011, AC-020).
 - Once that `execute` returns, and before **Start**, the test command fails where any selected module is:

@@ -246,3 +246,14 @@ A Mill module trait that declares `object test extends ScalaTests, ...` gives ev
 
 Where modules share test settings but one may need its own, declare the settings as an inner trait of the module trait (`trait SharedTests extends ScalaTests, TestModule.ScalaTest { ... }`) and have each module declare `object test extends SharedTests`. A module can then override a task of its own test module: `object test extends SharedTests { def testForkGrouping = ... }`. This applies equally to a test fixture build that a scenario edits.
 </learning>
+
+<learning>
+date: 2026-11-27
+---
+In Mill 1.3.1, `mill.javalib.CoursierModule.Resolver` resolves dependencies in two ways that do not match:
+
+- `classpath(deps, sources, artifactTypes, resolutionParamsMapOpt, ...)` downloads every artifact. `JavaModule.resolvedRunMvnDeps` calls it with a map that sets `withDefaultConfiguration(runtime)` and the Gradle `org.gradle.usage` runtime variant attribute.
+- `resolution(deps)` returns the `coursier.core.Resolution` from metadata alone and downloads no jar, but takes no parameter map: it resolves with the module's `resolutionParams` unchanged.
+
+A metadata-only resolution therefore cannot copy `resolvedRunMvnDeps`'s parameters. Name the configuration on the root dependency yourself, as `coursierDependencyTask().copy(variantSelector = VariantSelector.ConfigurationBased(Configuration.runtime))`. Mill gives every dependency of a module's Coursier project a configuration, so only a dependency or BOM that names none, or a Gradle module variant under `checkGradleModules`, can resolve differently. Where exact parity matters, call `classpath` and accept the downloads.
+</learning>

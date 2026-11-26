@@ -25,10 +25,11 @@ private[mill] final class TestCommand private (
 ) {
 
   def checkAndRunTests(): Either[TestCommandFailure, Seq[Result.Failure]] = {
-    val checkTasks = selection.modules.map(module => module -> TestCommand.moduleCheckTask(module))
+    val checkTasks = selection.modules.map(module => module -> ModuleCheck.task(module))
     val checkEvaluation = failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log)
+    val moduleChecks = TestCommand.successfulValues(checkEvaluation, checkTasks)
     TestCommand
-      .runArgumentsFrom(TestCommand.successfulValues(checkEvaluation, checkTasks), commandArguments.frameworkArguments)
+      .runArgumentsFrom(moduleChecks, commandArguments.frameworkArguments)
       .flatMap(runSelectedModules)
       .map(runFailures => TestCommand.failuresOf(checkEvaluation) ++ runFailures)
   }
@@ -131,23 +132,17 @@ private[mill] object TestCommand {
   }
 
   private def runArgumentsFrom(
-      moduleTestArgs: Seq[(SelectedTestModule, Seq[String])],
+      moduleChecks: Seq[(SelectedTestModule, ModuleCheck)],
       frameworkArguments: Seq[ScalaTestArgument.Flagged]
   ): Either[TestCommandFailure, Seq[(SelectedTestModule, RunArguments)]] =
-    FirstFailure.orValues(moduleTestArgs.map { case (module, testArgs) =>
-      ModuleScalaTestArguments.kept(testArgs).map(kept => module -> RunArguments.from(kept, frameworkArguments))
+    FirstFailure.orValues(moduleChecks.map { case (module, check) =>
+      ModuleScalaTestArguments.kept(check.testArgsDefault).map(kept => module -> RunArguments.from(kept, frameworkArguments))
     })
 
   private def failuresOf(evaluation: Evaluator.Result[?]): Seq[Result.Failure] =
     evaluation.values match {
       case failure: Result.Failure => Seq(failure)
       case _: Result.Success[?] => Nil
-    }
-
-  // The check evaluates no compile, so that no module's tests wait on another module's compile.
-  private def moduleCheckTask(module: SelectedTestModule): Task[Seq[String]] =
-    Task.Anon {
-      module.module.testArgsDefault()
     }
 
   private def successfulValues[K, V](evaluation: Evaluator.Result[V], tasks: Seq[(K, Task[V])]): Seq[(K, V)] =
