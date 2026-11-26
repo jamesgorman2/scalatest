@@ -15,7 +15,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the deployable units, the boundaries between the emitter, the Mill plugin and the consolidation library, and how each run's events reach the consolidated output.
 - [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md) — the decisions behind the architecture.
-- [JSON-LAYOUT.md](JSON-LAYOUT.md) — the layout of the JSON output, with its decisions in [JSON-LAYOUT-DECISIONS.md](JSON-LAYOUT-DECISIONS.md).
+- [../../mill-plugin/consolidated.schema.json](../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, with the decisions behind its layout in [JSON-LAYOUT-DECISIONS.md](JSON-LAYOUT-DECISIONS.md).
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
@@ -215,7 +215,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 ### JSON output
 
-- R-028 JSON output encodes the node tree, per `JSON-LAYOUT.md`.
+- R-028 JSON output encodes the node tree, per the JSON schema `../../mill-plugin/consolidated.schema.json`.
 - R-084 The JSON output records the release of this fork that wrote it.
 - R-127c JSON output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes. 
 - R-127d JSON output omits a scope when all its children have been omitted by filtering characters. This is recursive.

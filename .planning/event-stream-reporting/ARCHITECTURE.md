@@ -219,14 +219,14 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - The caller splits each stream into lines and decodes them to text before adding them, since a stream reaches it in chunks that can split a line or a character (`research/mill-worker-channels.md` § 1.3).
   - The caller adds a stream's unterminated last line once that stream ends, so a process that dies keeps its last line (R-097a).
   - The caller tells the library when the run's event stream has ended (§ APIs § The emitter and the Mill plugin, "Each event" and "The end of a run's event stream").
-  - The caller may also give the run's worker: the position of its fork group among the groups the module's `testForkGrouping` gives, and its index within that fork group. The library numbers the module's runs from these two values (`JSON-LAYOUT.md` § Run nodes).
+  - The caller may also give the run's worker: the position of its fork group among the groups the module's `testForkGrouping` gives, and its index within that fork group. The library numbers the module's runs from these two values (`../../mill-plugin/consolidated.schema.json` `$defs/run`, `number`).
   - The Mill plugin takes the position from its own enumeration of the module's `testForkGrouping`. It takes the worker index from the index under which it starts the worker, which Mill's folder name `worker-<i>` carries; a fork group's only worker has index 0.
 
   Once the run's process has ended, the caller adds the test classes that process was assigned, from the module's test manifest (§ Modules § Mill plugin).
 - **Time a module**: the caller gives a start time and an end time for each module whose tests it starts, each by the caller's own clock.
   - A module's start time is the time at which the caller starts the module's tests.
   - A module's end time is the time at which the last of the module's test processes has ended.
-  - These times, with the root's start and end times, supply the times of the root and the modules in the JSON output (`JSON-LAYOUT.md` § Root and modules). No test event log holds these times.
+  - These times, with the root's start and end times, supply the times of the root and the modules in the JSON output (`../../mill-plugin/consolidated.schema.json` `$defs/root` and `$defs/module`, `startedAt` and `endedAt`). No test event log holds these times.
 - **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its module, the test classes it was assigned, and the output captured from its stdout and stderr, in the form **Add a run** takes it. The library attaches that output to the module, the most specific node the process identifies.
 - **Add a module whose tests did not start** (R-098e), naming the module and, where a failure stopped them, that failure.
 - **Add a test class** left in a fork group's queue when the group's last worker ended, with its module. The library adds the class as a suite node aborted with reason *not run* (R-095a).

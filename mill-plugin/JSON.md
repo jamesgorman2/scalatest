@@ -1,177 +1,179 @@
-# The JSON output
+# Consolidated JSON output
 
-`mill scalatest/test <module selector> -fJ <path>` writes the JSON output to the file at `<path>` ([README.md](README.md) § Running the test command). This document gives the output's format.
+The consolidated JSON output is a UTF-8 encoded file containing a single RFC 8259 JSON object. The JSON schema is in [consolidated.schema.json](./consolidated.schema.json).
 
-The format carries no compatibility promise across releases of this fork: any release may change it. It has no format version. The root's `scalaTestVersion` names the release that wrote it; read the output against that release's copy of this document.
-
-## Encoding
-
-- The file holds one JSON object, the root, as RFC 8259 defines it, encoded in UTF-8.
-- A key is always present unless this document states when it is absent.
-- A key whose value is absent is left out. `null` is never written. An empty string is written `""`.
-- Keys are written in the order this document lists them.
-- `startedAt`, `endedAt` and a message's `at` are in epoch milliseconds. `duration` is in milliseconds.
-- Strings escape `"`, `\` and control characters. An unpaired UTF-16 surrogate, which UTF-8 cannot encode, is written as a `\uXXXX` escape.
-
-## Tree
-
-- The root holds one module.
-- The module holds one run node for each of its workers (README.md § What it supports), including a worker given no test class, such as the one worker of a module with no test class where no class glob is given. Each worker writes its run's events to a file of its own, its test event log, which the test command reads.
-- The module holds no run node for a worker that wrote no test event log, as where its JVM failed to start or exited before its run began. That worker's captured output is not written, and the test command fails. The root has a failure for that worker only in the cases § Root lists.
-- The module's run nodes appear in ascending order of `number`, compared as numbers, whatever order the runs started and ended in.
-- The run node holds the run's top-level suites. A suite holds its nested suites, scopes and tests. A scope holds its scopes and tests. A test holds the suites it ran.
-- Every node states its `kind`.
-- A suite, scope or test that ran more than once is one node for each time it ran.
-
-Children of a suite, scope or test appear in this order:
-
-1. Children with a declared place, in declared order.
-   - A scope's or test's declared place is its index in the order its parent registered its scopes and tests, counting only those the run's filter keeps. It is numbered the same way each time the suite declares its tests. It is not a source line.
-   - A nested suite's declared place is its index in its parent's `nestedSuites`. A suite's nested suites come before all its scopes and tests, or after them where the suite mixes in `TestsBeforeNestedSuites`.
-   - Where a suite's declaration changes during the run, as when a suite mixing in `OneInstancePerTest` registers different tests in a later instance, a scope or test its latest declaration drops keeps the place it last had, and appears after the scope or test the latest declaration holds there. Several dropped at one place appear in the order they were first declared.
-   - A suite with no declared place that shares a `suiteId` with a sibling that has one appears directly after the last such sibling. Several such suites appear in the order the run first reported them.
-2. The remaining children, which are suites, in ascending order by name. Suites that share a name appear in the order they started, followed by those that never started, in the order the run first reported them.
-
-A child that ran more than once while its parent ran once has its nodes in the order they started. The nodes of a child with a declared place are together. The nodes of a remaining suite are ordered as point 2 gives, so a suite of the same name that started between them separates them.
-
-A run node's top-level suites appear in ascending order by name; suites that share a name appear in the order they started, followed by those that never started. Names are compared as Java's `String.compareTo` compares them.
-
-No node's outcome is rolled up from its children. Roll up outcomes yourself.
+The file holds the consolidated JSON output of one consolidation, such as the file a test command writes for `-fJ <path>`. Its one object is the [Root](#root). A key is present unless its entry says when it is absent. An absent value is left out, never written as `null`. Epoch milliseconds are an integer count of milliseconds since the Unix epoch; a duration is an integer count of milliseconds.
 
 ## Root
 
-Keys, in order:
+The consolidation as a whole, holding its modules.
 
-- `kind` — `root`.
-- `scalaTestVersion` — the release of this fork that wrote the output, such as `3.2.20`.
-- `buildTool` — `{ "name", "version" }`: `Mill` and the version of Mill that ran the test command.
-- `moduleSelectors` — the module selector as given, as `[{ "selector", "modules" }]`, where `modules` is the names of the test modules it resolved to.
-- `outcome` — `aborted`, present only where `failures` is.
-- `failures` — `[{ "message" }]`: the failures that are not a run's. Absent where there is none. Either:
-  - failures from running the module's workers, in this order:
-    1. for each fork group in order, laying out the group's files in its folder failing, naming the fork group and the module, as in `Laying out fork group 1 of core.test failed: …`. None of that group's workers starts;
-    2. for each worker in the order it started, naming the worker, its fork group and the module:
-       1. starting or running it failing, as in `Starting worker 0 of fork group 1 of core.test failed: …`;
-       2. capturing its output failing, so its output went to Mill's console, as in `Capturing the output of worker 0 of fork group 1 of core.test failed: …`;
-       3. reading its test event log failing, including where a line of it cannot be decoded (§ Run node), as in `Reading the event log of worker 0 of fork group 1 of core.test failed: …`;
-    3. where class globs are given, the failure Mill's `testOnly` fails with, worded as in the later item where class globs are given and none of them matches a test class of the module. It is added only where:
-       - the root holds no failure of laying out a fork group (item 1) or of starting or running a worker (item 2.1);
-       - no worker's JVM ended without writing its result while the test command already fails, as where the JVM died before its run ended;
-       - once every worker has ended, no run has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. Neither of these counts as such a report:
-         - a test shown as ignored only because its suite's structure marks it ignored;
-         - a suite or test shown as aborted only because it has no end event, such as one with reason *not run*;
-  - or one failure laying out the module's workers. No worker starts, and the module has no run node and no `startedAt`, `endedAt` or `duration`. Either:
-    - class globs are given and none of them matches a test class of the module, and the failure is the one Mill's `testOnly` fails with. Its first line is `Test selector does not match any test: <class globs>`, with the class globs separated by single spaces, and its second is `Run discoveredTestClasses to see available tests`;
-    - two of the module's fork groups would share a `processFolder`, and the failure names the folder and the groups, as in `Laying out the workers of core.test failed: fork groups 0 and 2 share the processFolder samples.A1`;
-    - or checking whether the filesystem ignores case failed, and the failure gives what the check threw, as in `Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: …`. The check runs only where two or more fork groups hold a test class to run.
-- `startedAt`, `endedAt`, `duration` — measured by the test command, from just before it lays out the module's workers until every run has ended. For a module that does not set `testBatchFrameworkTasks`, laying out its workers includes discovering its tests.
-- `contents` — an array holding the module.
-- `output` — output captured from a process that is not a run (§ Captured output). The test command captures none, so this key is absent.
+- `kind` — string, always `root`.
+- `scalaTestVersion` — string: the version of the release of this fork that wrote the output, such as `3.2.20`. The format may change between releases, so read the output against that release's documentation.
+- `buildTool` — [Build tool](#build-tool) object: the build tool that started the runs. Absent where the consolidation library's caller gives no build tool.
+- `moduleSelectors` — array of [Module selector](#module-selector) objects, one for each module selector the test command was given. Empty where none was given.
+- `outcome` — string, always `aborted`. Present exactly when `failures` is. No outcome is rolled up from the modules.
+- `failures` — array of one or more [Failure](#failure) objects: the failures attached to the root, which belong to no run, such as a worker failing to start. Present exactly when `outcome` is; absent where no failure is attached.
+- `startedAt` — integer, epoch milliseconds: the root's start time, which the consolidation library's caller gives. Absent where the caller gives none.
+- `endedAt` — integer, epoch milliseconds: the root's end time, which the consolidation library's caller gives. Absent where the caller gives none.
+- `duration` — integer, milliseconds: `endedAt` less `startedAt`. Present exactly when both `startedAt` and `endedAt` are.
+- `contents` — array of [Module](#module) objects: the root's modules. Empty where there are none.
+- `output` — array of one or more [Captured output](#captured-output) items: the output captured against the root rather than against any module or run, in the order it was written. Absent where there is none.
+
+## Build tool
+
+The build tool that started the runs, and its running version.
+
+- `name` — string: the build tool's name, `Mill` under the test command.
+- `version` — string: the running version of the build tool, such as `1.3.1`.
+
+## Module selector
+
+One module selector as the build tool was given it, with the test modules it resolved to.
+
+- `selector` — string: the module selector as given, such as `__.test`.
+- `modules` — array of strings, possibly empty: the module names of the test modules the module selector resolved to.
+
+## Failure
+
+A failure attached to the root: one that belongs to no run, such as laying out a fork group or starting a worker failing.
+
+- `message` — string: the failure's text, such as `Starting worker 0 of fork group 1 of core.test failed: …`.
 
 ## Module
 
-Keys, in order:
+A build tool's unit of build whose tests produced the runs it holds.
 
-- `kind` — `module`.
-- `name` — the module's Mill path, such as `core.test`.
-- `startedAt`, `endedAt`, `duration` — measured by the test command, from just before the module's first worker starts until its last worker has ended and that worker's test event log is read.
-- `contents` — an array holding the module's run nodes, or `[]` where it has none (§ Tree).
+- `kind` — string, always `module`.
+- `name` — string: the module name, such as `core.test` for a Mill module.
+- `startedAt` — integer, epoch milliseconds: the module's start time, which the consolidation library's caller gives. Absent where the caller gives none.
+- `endedAt` — integer, epoch milliseconds: the module's end time, which the consolidation library's caller gives. Absent where the caller gives none.
+- `duration` — integer, milliseconds: `endedAt` less `startedAt`. Present exactly when both `startedAt` and `endedAt` are.
+- `contents` — array of [Run node](#run-node) objects, one for each of the module's runs. Empty where it has none.
 
 ## Run node
 
-Keys, in order:
+One run's own state, including how the run ended, and its top-level suites. Besides the absences each entry states, a key is absent where the run never reported the event that supplies it.
 
-- `kind` — `run`.
-- `number` — the run's number within its module, from 1, in ascending order of `forkGroup`, then of the worker's index within its fork group: the `<i>` of the worker's folder `worker-<i>`, or 0 where the fork group has one worker.
-- `forkGroup` — the 0-based position of the run's fork group in the module's `testForkGrouping`, counting groups that have no worker because they hold no test class or, where class globs are given, none that a class glob matches. A module that does not set `testForkGrouping` has its runs in fork group `0`. Where no class glob is given, a module that holds no test class has one run, in fork group `0`. A fork group's runs are:
-  - for a module that does not set `testBatchFrameworkTasks`, one for each worker Mill starts for the group (README.md § What it supports);
-  - for a module that sets `testBatchFrameworkTasks`, at most one, whatever the module's `testParallelism`.
-- `testCount` — the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill.
-- `configMap` — the run's config map, as an object of each value's `toString`, with keys in ascending order.
-- `discovery` — `{ "startedAt", "duration" }`, from `DiscoveryStarting`'s time and `DiscoveryCompleted`'s duration. Absent unless the run reported both events. `duration` is absent where `DiscoveryCompleted` carries none.
-- `outcome` — `aborted` or `stopped`, from the run's end as its test event log records it. Absent where the run completed, or where the log does not record the run's end.
-- `message`, `throwable` — the `message` and `throwable` (§ Throwables) of the run's `RunAborted`. Absent where the run did not abort. `throwable` is also absent where `RunAborted` carries none.
-- `startedAt` — `RunStarting`'s time.
-- `endedAt`, `duration` — those of the run's `RunCompleted`, `RunStopped` or `RunAborted`. `duration` is absent where that event carries none.
-- `summary` — that event's summary: `testsSucceededCount`, `testsFailedCount`, `testsIgnoredCount`, `testsPendingCount`, `testsCanceledCount`, `suitesCompletedCount`, `suitesAbortedCount`, `scopesPendingCount`. Absent where that event carries none.
-- `contents` — the run's top-level suites (§ Tree), `[]` when empty.
-- `output` — the messages sent outside any suite (§ Messages) and the output captured from the run's process (§ Captured output), in one sequence, in the order the test command received them. Lines captured before the run's test event log appeared come first. Absent where there is none.
+- `kind` — string, always `run`.
+- `number` — integer, at least 1: the run's number, unique within its module and counted from 1. Runs given a worker are numbered by fork group, then by the worker's index within its fork group.
+- `forkGroup` — integer, at least 0: the 0-based position of the run's fork group among the fork groups the module's `testForkGrouping` gives. Absent where the consolidation library's caller gives the run no fork group.
+- `testCount` — integer: the expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill, or where the run reported no `RunStarting`.
+- `configMap` — [Config map](#config-map) object: the config map of the run's `RunStarting`. Absent where the run reported no `RunStarting`.
+- `discovery` — [Discovery](#discovery) object: the run's discovery of its suites. Absent unless the run reported both `DiscoveryStarting` and `DiscoveryCompleted`.
+- `outcome` — string, `aborted` or `stopped`: the run's outcome where it aborted or stopped. Absent where the run completed, or where its event stream does not record how it ended.
+- `message` — string: the message of the run's `RunAborted`. Absent where the run reported no `RunAborted`.
+- `throwable` — [Throwable](#throwable) record: the throwable of the run's `RunAborted`. Absent where the run reported no `RunAborted`, or where that event carries none. Present only where `message` is.
+- `startedAt` — integer, epoch milliseconds: the time of the run's `RunStarting`.
+- `endedAt` — integer, epoch milliseconds: the time of the run's `RunCompleted`, `RunStopped` or `RunAborted`. Absent on a run that does not finish.
+- `duration` — integer, milliseconds: the duration that the run's `RunCompleted`, `RunStopped` or `RunAborted` carries. Absent where that event carries none. Present only where `endedAt` is.
+- `summary` — [Summary](#summary) object: the summary that the run's `RunCompleted`, `RunStopped` or `RunAborted` carries. Absent where that event carries none. Present only where `endedAt` is.
+- `contents` — array of [Test node](#test-node) objects: the run's top-level suites. Empty where it has none.
+- `output` — array of one or more items, each a [Message](#message) or a [Captured output](#captured-output) item, told apart by `kind`: the messages sent outside any suite and the output captured against the run, in one sequence in the order they were received. Absent where there is none.
 
-A key is absent where the run never reported the event that supplies it.
+## Config map
 
-A run's events can stop before the run's end is recorded:
+A run's config map: one key for each of the config map's entries, its value a string, the entry's value's `toString`. Its keys are the run's own, not the format's.
 
-- the worker's JVM dies; or
-- the test command reaches a line of the run's test event log that it cannot decode. It reads no further, and the root has a failure for that worker naming the line and why it cannot be decoded (§ Root).
+## Discovery
 
-Either way, the run node has no `outcome`, though the run did not complete, and the suites, scopes and tests the run left open have no `outcome` either. The test command fails. Such a run node has no `endedAt` unless the log recorded the run's `RunCompleted`, `RunStopped` or `RunAborted`; every run node without `endedAt` is such a run.
+A run's discovery of its suites, from its `DiscoveryStarting` and `DiscoveryCompleted`.
 
-## Suite, scope and test
+- `startedAt` — integer, epoch milliseconds: the time of the run's `DiscoveryStarting`.
+- `duration` — integer, milliseconds: the duration that the run's `DiscoveryCompleted` carries. Absent where it carries none.
 
-Keys, in order:
+## Summary
 
-- `kind` — `suite`, `scope` or `test`.
-- `name` — the node's own name, never a joined name. In `"A" when { "b" should { "c" in { … } } }`, the names are `A`, `b` and `c`. A suite's name is its suite name. In a suite mixing in a ScalaTest style trait (one in `org.scalatest.funsuite`, `flatspec`, `funspec`, `wordspec`, `freespec`, `propspec`, `featurespec` or `refspec`, async and fixture variants included), a scope's or test's name is the name it was registered with. In any other suite, a test's name is its entry in the suite's `testNames`.
-- `label` — scopes and tests only: the line the human-readable output shows for the node, without indentation. In the example above, `A`, `when b` and `- should c`. In a suite mixing in no style trait, a test's label is `- ` followed by its name.
-- `suiteId` — suites only.
-- `location` — § Locations. A scope's comes from its `ScopeOpened`. A test's comes from its `TestStarting`, else from the event that closed it. A scope's or test's is absent where none of those events gives a location other than `SeeStackDepthException`. A suite's holds its class name in `className`, plus `filePath` or `fileName` where every location of its own scopes and tests names the same file; it never holds a `lineNumber`.
-- `outcome` — a test's is `succeeded`, `failed`, `canceled`, `ignored`, `pending` or `aborted`; a scope's `pending` or `aborted`; a suite's `aborted`. Absent where the node has none, as on a suite that completed, or on a node left open by a run whose end its test event log does not record (§ Run node).
-- `reason` — `notRun`, on a node that never started, other than an ignored test: no event reports it or any node below it. Examples are a suite scheduled but never started, and a scope or test its suite or run never reached. Its `outcome` is `aborted`.
-- `message`, `throwable` — the `message` and `throwable` (§ Throwables) of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent where no such event closed the node, as on an aborted node with no closing event of its own. `throwable` is also absent where that event carries none.
-- `startedAt` — the time of the `SuiteStarting`, `ScopeOpened` or `TestStarting`. Absent where the node has none, as on a node that never started or an ignored test.
-- `endedAt` — the time of the event that closed the node. For an aborted node without such an event of its own, the time of the `SuiteAborted` of the nearest suite above it that aborted, else of the run's `RunAborted`. Absent where there is none of these, as on a node with reason `notRun`, or on a node left open by a run that stopped or whose end its test event log does not record.
-- `duration` — a suite's or test's comes from the event that closed it, and is absent where that event carries none, as on an ignored test. A scope's, and that of a node without such an event of its own, is `endedAt` less `startedAt`, absent unless both are present.
-- `threadName` — suites and tests only: the thread of the event that opened the node, else of the event that closed it. Absent where the node has neither.
-- `contents` — the node's children (§ Tree), `[]` when empty.
-- `output` — the node's messages (§ Messages), in the order they were sent. Absent where there are none.
+ScalaTest's own counts for a run, as its closing event's summary gives them. Every key is an integer.
 
-## Messages
+- `testsSucceededCount` — the number of tests that succeeded.
+- `testsFailedCount` — the number of tests that failed.
+- `testsIgnoredCount` — the number of tests that were ignored.
+- `testsPendingCount` — the number of tests that were pending.
+- `testsCanceledCount` — the number of tests that were canceled.
+- `suitesCompletedCount` — the number of suites that completed.
+- `suitesAbortedCount` — the number of suites that aborted.
+- `scopesPendingCount` — the number of scopes that were pending.
 
-A message is an item of an `output`, from an `info`, `alert`, `note` or `markup` call. Keys, in order:
+## Test node
 
-- `kind` — `info`, `alert`, `note` or `markup`.
-- `message` — the text.
-- `at` — the time it was sent.
-- `location` — § Locations. Absent where the message carries none.
-- `throwable` — § Throwables. Absent where the message carries none, and always on a `markup`.
-- `threadName` — the thread that sent it. Present only where it differs from its node's `threadName`, or the node has none, as on a run node.
+A suite, scope or test: one execution of it, so a node that ran more than once is one node for each time it ran. No node's outcome is rolled up from its children.
+
+- `kind` — string: `suite`, `scope` or `test`.
+- `name` — string: the node's name, a suite's suite name, or a scope's or test's own text without that of the scopes around it. It is never ScalaTest's joined test name.
+- `label` — string: a scope's or test's label, such as `when b` or `- should c`, without its indentation. Present on every scope and test; absent on a suite.
+- `suiteId` — string: a suite's suite ID. Present on every suite; absent on a scope or test.
+- `location` — [Location](#location) object: for a suite, its class name and the source file its own scopes and tests share; for a scope or test, the location its opening or closing event gives. Present on every suite; absent on a scope or test whose events give none.
+- `outcome` — string, in ScalaTest's spelling: `succeeded`, `failed`, `canceled`, `ignored`, `pending` or `aborted`. A test's may be any of these, a scope's `pending` or `aborted`, and a suite's `aborted`. Absent where the node has none, as on a suite that completed or a node its run left open.
+- `reason` — string, always `notRun`: why the node aborted, on a node that never started, where no event reports it or any node below it. Present only where `outcome` is `aborted`; absent otherwise.
+- `message` — string: the message of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent where no such event closed it.
+- `throwable` — [Throwable](#throwable) record: the throwable of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent where no such event closed it, or where that event carries none. Present only where `message` is.
+- `startedAt` — integer, epoch milliseconds: the time of the node's `SuiteStarting`, `ScopeOpened` or `TestStarting`. Absent on a node that never started.
+- `endedAt` — integer, epoch milliseconds: the time of the event that closed the node or, for an aborted node with no closing event of its own, of the `SuiteAborted` or `RunAborted` that aborted it. Absent where there is none of these.
+- `duration` — integer, milliseconds: for a suite or test, the duration its closing event carries; for a scope, or a node with no closing event of its own, `endedAt` less `startedAt`. Absent where neither is known.
+- `threadName` — string: the thread of the event that opened the node, else of the event that closed it. Never present on a scope; absent on a suite or test with neither event.
+- `contents` — array of [Test node](#test-node) objects: the node's children, a suite's nested suites, scopes and tests, a scope's scopes and tests, or the suites a test ran. Empty where it has none.
+- `output` — array of one or more [Message](#message) objects: the node's messages, in the order they were sent. Absent where there are none.
+
+## Message
+
+One `info`, `alert`, `note` or `markup` call's `InfoProvided`, `AlertProvided`, `NoteProvided` or `MarkupProvided`, as an item of an `output`.
+
+- `kind` — string: `info`, `alert`, `note` or `markup`.
+- `message` — string: the message's text; for a `markup`, the `MarkupProvided`'s `text`.
+- `at` — integer, epoch milliseconds: the time the message was sent.
+- `location` — [Location](#location) object: the location the message carries. Absent where it carries none.
+- `throwable` — [Throwable](#throwable) record: the throwable the message carries. Absent where it carries none, and always on a `markup`.
+- `threadName` — string: the thread that sent the message. Present only where it differs from its node's `threadName`, or the node has none, as on a run node.
 
 ## Captured output
 
-A piece of captured output is an item of an `output`: a line captured from a process's stdout or stderr. Keys, in order:
+One line captured from a process's stdout or stderr, as an item of an `output`. Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream.
 
-- `kind` — `stdio`.
-- `stream` — `stdout` or `stderr`.
-- `text` — the line as written, with its line terminator if it has one.
+- `kind` — string, always `stdio`.
+- `stream` — string: the stream the line was captured from, `stdout` or `stderr`.
+- `text` — string: the line as the process wrote it, with its line terminator where it has one.
 
-Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream. Where starting or running the run's worker failed (§ Root), its output can lack an unterminated last line of each stream, and anything its process wrote after the module's last worker ended. Where capturing that worker's output failed (§ Root), its output holds none of the worker's stdout or stderr. No `output` holds Mill's list of failed tests or ScalaTest's end-of-run summary.
+## Throwable
 
-## Throwables
+A throwable record: a throwable with its cause and suppressed throwables, each recorded in full the first time it appears within the record. `location` and `stackTrace` are never both present.
 
-A throwable is one object. Keys, in order:
+- `id` — integer, at least 1: the throwable's number, from 1, unique within one record. A `ref` within the same record names it.
+- `className` — string: the throwable's fully qualified class name.
+- `message` — string: the throwable's `getMessage`. Absent where it is `null`.
+- `location` — [Failed code location](#failed-code-location) object: for a throwable mixing in `org.scalatest.exceptions.StackDepth`, such as `TestFailedException`, the failed code's file and line, each where known. Absent for any other throwable, and where neither is known.
+- `stackTrace` — array of [Stack frame](#stack-frame) objects, innermost call first: for a throwable not mixing in `StackDepth`, every frame of its stack trace. Absent for a throwable mixing in `StackDepth`.
+- `cause` — a throwable record or a throwable reference: the throwable's cause, recorded the same way, or a reference where it already appears in the record. Absent where there is none.
+- `suppressed` — array of one or more items, each a throwable record or a throwable reference: the throwable's suppressed throwables, each recorded the same way, or a reference where it already appears in the record. Absent where there are none.
 
-- `id` — an integer, numbered depth-first from 1 within one `throwable`, a cause before suppressed throwables.
-- `className`.
-- `message` — `getMessage`. Absent where it is `null`.
-- `location` — for a throwable mixing in `org.scalatest.exceptions.StackDepth`, such as `TestFailedException` or `TestCanceledException`: the failed code's file and line (§ Locations), each where known. Absent for any other throwable, and where neither is known.
-- `stackTrace` — for a throwable not mixing in `StackDepth`: every frame, as `{ "className", "methodName", "fileName", "lineNumber", "isNative" }`. `fileName` is absent where unknown, `lineNumber` where negative, and `isNative` unless it is `true`. Absent for a throwable mixing in `StackDepth`.
-- `cause` — the cause, written the same way. Absent where there is none.
-- `suppressed` — the suppressed throwables, in order, each written the same way. Absent where there are none.
+A throwable reference, `{ "ref": <id> }`, stands for a throwable already recorded within the same record, and ends any cycle. Only the same object counts, never an equal one.
 
-A throwable already written within the same `throwable` is written `{ "ref": <id> }`, which ends any cycle. "Already written" means the same object, not an equal one.
+- `ref` — integer, at least 1: the `id` of the throwable's record.
 
-## Locations
+## Stack frame
 
-A location is one object. Keys, in order, each present only where known:
+One frame of a throwable's stack trace.
 
-- `className`.
-- `methodId`.
-- `filePath` or `fileName` — never both. `filePath` is the source file's path as recorded, usually absolute. `fileName` is the file's name, written only where the path is not recorded, as where the code was compiled without the environment variable `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`.
-- `lineNumber`.
+- `className` — string: the fully qualified name of the class holding the frame's method.
+- `methodName` — string: the name of the frame's method.
+- `fileName` — string: the name of the frame's source file. Absent where it is unknown.
+- `lineNumber` — integer, at least 0: the frame's line number. Absent where it is unknown, which Java gives as a negative number.
+- `isNative` — boolean, always `true`: present only where the frame's method is native.
 
-ScalaTest's locations become:
+## Location
 
-- `LineInFile` — `filePath` or `fileName`, and `lineNumber`.
-- `TopOfClass` — `className`.
-- `TopOfMethod` — `className` and `methodId`.
-- `SeeStackDepthException` — no `location`. The node's or message's `throwable` carries it.
+Where a node or message is, folded from ScalaTest's `Location`: `TopOfClass` gives `className`, `TopOfMethod` gives `className` and `methodId`, and `LineInFile` gives `filePath` or `fileName` and `lineNumber`. It holds at least one key, and each key is present only where known.
+
+- `className` — string: the fully qualified name of the class.
+- `methodId` — string: the method's ID, as `TopOfMethod` gives it, such as `def adds(): Unit`. Present only where `className` is.
+- `filePath` — string: the source file's path as recorded, usually absolute. Written where ScalaTest has the path. Never present with `fileName`.
+- `fileName` — string: the source file's name, written only where ScalaTest has no path, as where the code was compiled without `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`. Never present with `filePath`.
+- `lineNumber` — integer: the line number in the source file.
+
+## Failed code location
+
+The failed code's file and line, as a throwable mixing in `org.scalatest.exceptions.StackDepth` gives them. It holds at least one key, and each key is present only where known.
+
+- `filePath` — string: the source file's path as recorded, usually absolute. Written where ScalaTest has the path. Never present with `fileName`.
+- `fileName` — string: the source file's name, written only where ScalaTest has no path, as where the code was compiled without `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`. Never present with `filePath`.
+- `lineNumber` — integer: the line number of the failed code.

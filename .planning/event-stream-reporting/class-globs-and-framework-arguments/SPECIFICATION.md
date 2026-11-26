@@ -14,7 +14,7 @@ The test command takes no class globs or framework arguments, so it can only run
 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this specification.
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against.
-- [../JSON-LAYOUT.md](../JSON-LAYOUT.md) — the layout of the JSON output, including the root's `failures` (§ Root and modules).
+- [../../../mill-plugin/consolidated.schema.json](../../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, including the root's `failures` (`$defs/root` and `$defs/failure`).
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 
 Bare `R-nnn` and `AC-nnn` IDs are this document's. The epic's requirements are cited as `../SPECIFICATION.md` R-nnn. Terms are defined in `.docs/ubiquitous-language.md`, among them *worker*, *fork group*, *task folder* and *module folder*.

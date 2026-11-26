@@ -1,0 +1,614 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Consolidated JSON output",
+  "description": "The consolidated JSON output of one consolidation, such as the file a test command writes for `-fJ <path>`. It is one object, the root, whose absent values are left out rather than written as `null`.",
+  "$ref": "#/$defs/root",
+  "$defs": {
+    "root": {
+      "description": "The root of the JSON output: the consolidation as a whole, holding its modules. Its `outcome` and `failures` are present together or not at all.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The node's kind, always `root` for the root.",
+          "const": "root"
+        },
+        "scalaTestVersion": {
+          "description": "The version of the release of this fork that wrote the JSON output, such as `3.2.20`. The format may change between releases, so read the output against that release's documentation.",
+          "type": "string"
+        },
+        "buildTool": {
+          "description": "The build tool that started the runs and its running version. Absent where the consolidation library's caller gives no build tool.",
+          "$ref": "#/$defs/buildTool"
+        },
+        "moduleSelectors": {
+          "description": "Each module selector the test command was given, with the test modules it resolved to. Empty where none was given.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/moduleSelector" }
+        },
+        "outcome": {
+          "description": "The root's outcome, `aborted`, present only where a failure is attached to the root. No outcome is rolled up from the modules.",
+          "const": "aborted"
+        },
+        "failures": {
+          "description": "The failures attached to the root, which belong to no run, such as a worker failing to start. Absent where none is attached.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/failure" }
+        },
+        "startedAt": {
+          "description": "The root's start time, which the consolidation library's caller gives. Absent where the caller gives none.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "endedAt": {
+          "description": "The root's end time, which the consolidation library's caller gives. Absent where the caller gives none.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "duration": {
+          "description": "`endedAt` less `startedAt`. Absent unless both are present.",
+          "$ref": "#/$defs/milliseconds"
+        },
+        "contents": {
+          "description": "The root's modules. Empty where there are none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/module" }
+        },
+        "output": {
+          "description": "The output captured against the root rather than against any module or run, in the order it was written. Absent where there is none.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/capturedOutput" }
+        }
+      },
+      "required": ["kind", "scalaTestVersion", "moduleSelectors", "contents"],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "outcome": ["failures"],
+        "failures": ["outcome"],
+        "duration": ["startedAt", "endedAt"]
+      },
+      "if": { "required": ["startedAt", "endedAt"] },
+      "then": { "required": ["duration"] }
+    },
+    "buildTool": {
+      "description": "The build tool that started the runs, and its running version.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The build tool's name, `Mill` under the test command.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The running version of the build tool, such as `1.3.1`.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "version"],
+      "additionalProperties": false
+    },
+    "moduleSelector": {
+      "description": "One module selector as the build tool was given it, with the test modules it resolved to.",
+      "type": "object",
+      "properties": {
+        "selector": {
+          "description": "The module selector as given, such as `__.test`.",
+          "type": "string"
+        },
+        "modules": {
+          "description": "The module names of the test modules the module selector resolved to.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["selector", "modules"],
+      "additionalProperties": false
+    },
+    "failure": {
+      "description": "A failure attached to the root: one that belongs to no run, such as laying out a fork group or starting a worker failing.",
+      "type": "object",
+      "properties": {
+        "message": {
+          "description": "The failure's text, such as `Starting worker 0 of fork group 1 of core.test failed: …`.",
+          "type": "string"
+        }
+      },
+      "required": ["message"],
+      "additionalProperties": false
+    },
+    "module": {
+      "description": "A module: a build tool's unit of build whose tests produced the runs it holds.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The node's kind, always `module` for a module.",
+          "const": "module"
+        },
+        "name": {
+          "description": "The module's name as its build tool writes it, such as `core.test` for a Mill module.",
+          "type": "string"
+        },
+        "startedAt": {
+          "description": "The module's start time, which the consolidation library's caller gives. Absent where the caller gives none.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "endedAt": {
+          "description": "The module's end time, which the consolidation library's caller gives. Absent where the caller gives none.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "duration": {
+          "description": "`endedAt` less `startedAt`. Absent unless both are present.",
+          "$ref": "#/$defs/milliseconds"
+        },
+        "contents": {
+          "description": "The module's run nodes, one for each of its runs. Empty where it has none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/run" }
+        }
+      },
+      "required": ["kind", "name", "contents"],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "duration": ["startedAt", "endedAt"]
+      },
+      "if": { "required": ["startedAt", "endedAt"] },
+      "then": { "required": ["duration"] }
+    },
+    "run": {
+      "description": "A run node: one run's own state, including how the run ended, and its top-level suites. A key is absent where the run never reported the event that supplies it.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The node's kind, always `run` for a run node.",
+          "const": "run"
+        },
+        "number": {
+          "description": "The run's number, unique within its module and counted from 1. Runs given a worker are numbered by fork group, then by the worker's index within its fork group.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "forkGroup": {
+          "description": "The 0-based position of the run's fork group among the fork groups the module's `testForkGrouping` gives. Absent where the consolidation library's caller gives the run no fork group.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "testCount": {
+          "description": "The expected test count of the run's `RunStarting`. Absent where that count is 0, as it is under Mill, or where the run reported no `RunStarting`.",
+          "type": "integer"
+        },
+        "configMap": {
+          "description": "The config map of the run's `RunStarting`. Absent where the run reported no `RunStarting`.",
+          "$ref": "#/$defs/configMap"
+        },
+        "discovery": {
+          "description": "The run's discovery of its suites. Absent unless the run reported both `DiscoveryStarting` and `DiscoveryCompleted`.",
+          "$ref": "#/$defs/discovery"
+        },
+        "outcome": {
+          "description": "The run's outcome where it aborted or stopped. Absent where the run completed, or where its event stream does not record how it ended.",
+          "enum": ["aborted", "stopped"]
+        },
+        "message": {
+          "description": "The message of the run's `RunAborted`. Absent where the run reported no `RunAborted`.",
+          "type": "string"
+        },
+        "throwable": {
+          "description": "The throwable of the run's `RunAborted`. Absent where the run reported no `RunAborted`, or where that event carries none.",
+          "$ref": "#/$defs/throwable"
+        },
+        "startedAt": {
+          "description": "The time of the run's `RunStarting`.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "endedAt": {
+          "description": "The time of the run's `RunCompleted`, `RunStopped` or `RunAborted`. Absent on a run that does not finish.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "duration": {
+          "description": "The duration that the run's `RunCompleted`, `RunStopped` or `RunAborted` carries. Absent where that event carries none.",
+          "$ref": "#/$defs/milliseconds"
+        },
+        "summary": {
+          "description": "The summary that the run's `RunCompleted`, `RunStopped` or `RunAborted` carries. Absent where that event carries none.",
+          "$ref": "#/$defs/summary"
+        },
+        "contents": {
+          "description": "The run's top-level suites. Empty where it has none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/testNode" }
+        },
+        "output": {
+          "description": "The messages sent outside any suite and the output captured against the run, in one sequence in the order they were received. Absent where there is none.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/message" },
+              { "$ref": "#/$defs/capturedOutput" }
+            ]
+          }
+        }
+      },
+      "required": ["kind", "number", "contents"],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "throwable": ["message"],
+        "duration": ["endedAt"],
+        "summary": ["endedAt"]
+      }
+    },
+    "configMap": {
+      "description": "A run's config map, each entry's value written as its `toString`.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "discovery": {
+      "description": "A run's discovery of its suites, from its `DiscoveryStarting` and `DiscoveryCompleted`.",
+      "type": "object",
+      "properties": {
+        "startedAt": {
+          "description": "The time of the run's `DiscoveryStarting`.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "duration": {
+          "description": "The duration that the run's `DiscoveryCompleted` carries. Absent where it carries none.",
+          "$ref": "#/$defs/milliseconds"
+        }
+      },
+      "required": ["startedAt"],
+      "additionalProperties": false
+    },
+    "summary": {
+      "description": "ScalaTest's own counts for a run, as its closing event's summary gives them.",
+      "type": "object",
+      "properties": {
+        "testsSucceededCount": {
+          "description": "The number of tests that succeeded.",
+          "type": "integer"
+        },
+        "testsFailedCount": {
+          "description": "The number of tests that failed.",
+          "type": "integer"
+        },
+        "testsIgnoredCount": {
+          "description": "The number of tests that were ignored.",
+          "type": "integer"
+        },
+        "testsPendingCount": {
+          "description": "The number of tests that were pending.",
+          "type": "integer"
+        },
+        "testsCanceledCount": {
+          "description": "The number of tests that were canceled.",
+          "type": "integer"
+        },
+        "suitesCompletedCount": {
+          "description": "The number of suites that completed.",
+          "type": "integer"
+        },
+        "suitesAbortedCount": {
+          "description": "The number of suites that aborted.",
+          "type": "integer"
+        },
+        "scopesPendingCount": {
+          "description": "The number of scopes that were pending.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "testsSucceededCount",
+        "testsFailedCount",
+        "testsIgnoredCount",
+        "testsPendingCount",
+        "testsCanceledCount",
+        "suitesCompletedCount",
+        "suitesAbortedCount",
+        "scopesPendingCount"
+      ],
+      "additionalProperties": false
+    },
+    "testNode": {
+      "description": "A suite, scope or test: one execution of it, so a node that ran more than once is one node for each time it ran. No node's outcome is rolled up from its children.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The node's kind: `suite`, `scope` or `test`.",
+          "enum": ["suite", "scope", "test"]
+        },
+        "name": {
+          "description": "The node's name: a suite's suite name, or a scope's or test's own text without that of the scopes around it. It is never ScalaTest's joined test name.",
+          "type": "string"
+        },
+        "label": {
+          "description": "A scope's or test's label, such as `when b` or `- should c`, without its indentation. Present on every scope and test, and absent on a suite.",
+          "type": "string"
+        },
+        "suiteId": {
+          "description": "A suite's suite ID. Present on every suite, and absent on a scope or test.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Where the node is: for a suite, its class name and the source file its own scopes and tests share; for a scope or test, the location its opening or closing event gives. Always present on a suite, and absent on a scope or test whose events give none.",
+          "$ref": "#/$defs/location"
+        },
+        "outcome": {
+          "description": "How the node ended, in ScalaTest's spelling: a test's may be any of these, a scope's `pending` or `aborted`, and a suite's `aborted`. Absent where the node has none, as on a suite that completed or a node its run left open.",
+          "enum": ["succeeded", "failed", "canceled", "ignored", "pending", "aborted"]
+        },
+        "reason": {
+          "description": "Why the node aborted, `notRun`, on a node that never started: no event reports it or any node below it. Its `outcome` is `aborted`.",
+          "const": "notRun"
+        },
+        "message": {
+          "description": "The message of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent where no such event closed it.",
+          "type": "string"
+        },
+        "throwable": {
+          "description": "The throwable of the `TestFailed`, `TestCanceled` or `SuiteAborted` that closed the node. Absent where no such event closed it, or where that event carries none.",
+          "$ref": "#/$defs/throwable"
+        },
+        "startedAt": {
+          "description": "The time of the node's `SuiteStarting`, `ScopeOpened` or `TestStarting`. Absent on a node that never started.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "endedAt": {
+          "description": "The time of the event that closed the node or, for an aborted node with no closing event of its own, of the `SuiteAborted` or `RunAborted` that aborted it. Absent where there is none of these.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "duration": {
+          "description": "For a suite or test, the duration its closing event carries; for a scope, or a node with no closing event of its own, `endedAt` less `startedAt`. Absent where neither is known.",
+          "$ref": "#/$defs/milliseconds"
+        },
+        "threadName": {
+          "description": "The thread of the event that opened the node, else of the event that closed it. Absent on a scope, and on a suite or test with neither event.",
+          "type": "string"
+        },
+        "contents": {
+          "description": "The node's children: a suite's nested suites, scopes and tests, a scope's scopes and tests, or the suites a test ran. Empty where it has none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/testNode" }
+        },
+        "output": {
+          "description": "The node's messages, in the order they were sent. Absent where there are none.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/message" }
+        }
+      },
+      "required": ["kind", "name", "contents"],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "throwable": ["message"]
+      },
+      "dependentSchemas": {
+        "reason": {
+          "properties": { "outcome": { "const": "aborted" } },
+          "required": ["outcome"]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "suite" } }, "required": ["kind"] },
+          "then": {
+            "required": ["suiteId", "location"],
+            "not": { "required": ["label"] }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["scope", "test"] } }, "required": ["kind"] },
+          "then": {
+            "required": ["label"],
+            "not": { "required": ["suiteId"] }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "scope" } }, "required": ["kind"] },
+          "then": {
+            "not": { "required": ["threadName"] }
+          }
+        }
+      ]
+    },
+    "message": {
+      "description": "A message: one `info`, `alert`, `note` or `markup` call's `InfoProvided`, `AlertProvided`, `NoteProvided` or `MarkupProvided`, as an item of an `output`.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The message's kind: `info`, `alert`, `note` or `markup`.",
+          "enum": ["info", "alert", "note", "markup"]
+        },
+        "message": {
+          "description": "The message's text; for a `markup`, the `MarkupProvided`'s `text`.",
+          "type": "string"
+        },
+        "at": {
+          "description": "The time the message was sent.",
+          "$ref": "#/$defs/epochMillis"
+        },
+        "location": {
+          "description": "The location the message carries. Absent where it carries none.",
+          "$ref": "#/$defs/location"
+        },
+        "throwable": {
+          "description": "The throwable the message carries. Absent where it carries none, and always on a `markup`.",
+          "$ref": "#/$defs/throwable"
+        },
+        "threadName": {
+          "description": "The thread that sent the message. Present only where it differs from its node's `threadName`, or the node has none, as on a run node.",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "message", "at"],
+      "additionalProperties": false
+    },
+    "capturedOutput": {
+      "description": "A piece of captured output: one line captured from a process's stdout or stderr, as an item of an `output`. Joined in order, the `text` of one stream's items in an `output` is what was captured from that stream.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The item's kind, always `stdio` for captured output.",
+          "const": "stdio"
+        },
+        "stream": {
+          "description": "The stream the line was captured from: `stdout` or `stderr`.",
+          "enum": ["stdout", "stderr"]
+        },
+        "text": {
+          "description": "The line as the process wrote it, with its line terminator where it has one.",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "stream", "text"],
+      "additionalProperties": false
+    },
+    "throwable": {
+      "description": "A throwable record: a throwable with its cause and suppressed throwables, each recorded in full the first time it appears within the record.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The throwable's number, from 1, unique within one record. A `ref` within the same record names it.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "className": {
+          "description": "The throwable's fully qualified class name.",
+          "type": "string"
+        },
+        "message": {
+          "description": "The throwable's `getMessage`. Absent where it is `null`.",
+          "type": "string"
+        },
+        "location": {
+          "description": "For a throwable mixing in `org.scalatest.exceptions.StackDepth`, such as `TestFailedException`, the failed code's file and line, each where known. Absent for any other throwable, and where neither is known.",
+          "$ref": "#/$defs/failedCodeLocation"
+        },
+        "stackTrace": {
+          "description": "For a throwable not mixing in `StackDepth`, every frame of its stack trace, innermost call first. Absent for a throwable mixing in `StackDepth`.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/stackFrame" }
+        },
+        "cause": {
+          "description": "The throwable's cause, recorded the same way, or a `ref` where it already appears in the record. Absent where there is none.",
+          "$ref": "#/$defs/linkedThrowable"
+        },
+        "suppressed": {
+          "description": "The throwable's suppressed throwables, each recorded the same way, or a `ref` where it already appears in the record. Absent where there are none.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/linkedThrowable" }
+        }
+      },
+      "required": ["id", "className"],
+      "additionalProperties": false,
+      "not": { "required": ["location", "stackTrace"] }
+    },
+    "linkedThrowable": {
+      "description": "A cause or suppressed throwable: recorded in full, or a `ref` to the same throwable recorded earlier within the record.",
+      "oneOf": [
+        { "$ref": "#/$defs/throwable" },
+        { "$ref": "#/$defs/throwableRef" }
+      ]
+    },
+    "throwableRef": {
+      "description": "A throwable already recorded within the same record, which ends any cycle. Only the same object counts, never an equal one.",
+      "type": "object",
+      "properties": {
+        "ref": {
+          "description": "The `id` of the throwable's record.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["ref"],
+      "additionalProperties": false
+    },
+    "stackFrame": {
+      "description": "One frame of a throwable's stack trace.",
+      "type": "object",
+      "properties": {
+        "className": {
+          "description": "The fully qualified name of the class holding the frame's method.",
+          "type": "string"
+        },
+        "methodName": {
+          "description": "The name of the frame's method.",
+          "type": "string"
+        },
+        "fileName": {
+          "description": "The name of the frame's source file. Absent where it is unknown.",
+          "type": "string"
+        },
+        "lineNumber": {
+          "description": "The frame's line number. Absent where it is unknown, which Java gives as a negative number.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "isNative": {
+          "description": "`true` where the frame's method is native. Absent otherwise.",
+          "const": true
+        }
+      },
+      "required": ["className", "methodName"],
+      "additionalProperties": false
+    },
+    "location": {
+      "description": "Where a node or message is, folded from ScalaTest's `Location`: `TopOfClass` gives `className`, `TopOfMethod` gives `className` and `methodId`, and `LineInFile` gives `filePath` or `fileName` and `lineNumber`. Each key is present only where known, and `filePath` and `fileName` never both.",
+      "type": "object",
+      "properties": {
+        "className": {
+          "description": "The fully qualified name of the class.",
+          "type": "string"
+        },
+        "methodId": {
+          "description": "The method's ID, as `TopOfMethod` gives it, such as `def adds(): Unit`.",
+          "type": "string"
+        },
+        "filePath": {
+          "description": "The source file's path as recorded, usually absolute. Written where ScalaTest has the path.",
+          "type": "string"
+        },
+        "fileName": {
+          "description": "The source file's name, written only where ScalaTest has no path, as where the code was compiled without `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`.",
+          "type": "string"
+        },
+        "lineNumber": {
+          "description": "The line number in the source file.",
+          "type": "integer"
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false,
+      "dependentRequired": {
+        "methodId": ["className"]
+      },
+      "not": { "required": ["filePath", "fileName"] }
+    },
+    "failedCodeLocation": {
+      "description": "The failed code's file and line, as a throwable mixing in `org.scalatest.exceptions.StackDepth` gives them. Each key is present only where known, and `filePath` and `fileName` never both.",
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "description": "The source file's path as recorded, usually absolute. Written where ScalaTest has the path.",
+          "type": "string"
+        },
+        "fileName": {
+          "description": "The source file's name, written only where ScalaTest has no path, as where the code was compiled without `SCALACTIC_FILL_FILE_PATHNAMES` set to `yes`.",
+          "type": "string"
+        },
+        "lineNumber": {
+          "description": "The line number of the failed code.",
+          "type": "integer"
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false,
+      "not": { "required": ["filePath", "fileName"] }
+    },
+    "epochMillis": {
+      "description": "A point in time, in milliseconds since the Unix epoch.",
+      "type": "integer"
+    },
+    "milliseconds": {
+      "description": "A length of time, in milliseconds.",
+      "type": "integer"
+    }
+  }
+}

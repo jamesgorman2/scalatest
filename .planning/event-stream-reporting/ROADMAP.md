@@ -17,14 +17,14 @@ The test command takes several module selectors, resolves each to its test modul
 Enables:
 
 - `SPECIFICATION.md` R-055 (several module selectors; class globs and framework arguments across them), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
-- `JSON-LAYOUT.md` § Root and modules (`moduleSelectors` with several module selectors; several modules)
+- `../../mill-plugin/consolidated.schema.json` `$defs/root`, `moduleSelectors` and `contents` (several module selectors; several modules)
 - `ARCHITECTURE.md` § Modules § Mill plugin (Test command: resolves the module selectors), § APIs § The Mill plugin and the consolidation library (Start: module selectors; Add a module whose tests did not start), § Data flow (one nested evaluation with fail-fast off)
 
 Settles:
 
 - How the test command tells that a module tests with this release of the fork (R-059).
 - What the test command does with a module selector that resolves to no test module.
-- How the error that stopped a module is shown (R-098e gives the module an outcome, not its form).
+- How the error that stopped a module is shown, and the keys that record a module's outcome and failure in the JSON output (R-098e gives the module an outcome, not its form).
 - Where the failure for class globs that select no test in a module is shown when several modules are selected: on the root (R-098f) or on the module (R-098e).
 
 Risks:
@@ -36,17 +36,18 @@ Risks:
 
 ## 6. Supported Mill releases
 
-Each release of the fork lists the Mill releases its integration tests passed on. On any other Mill release the test command warns on the console and in any file outputs before any test starts, naming the running Mill version (R-093), and any JSON root records that the release is unsupported (`JSON-LAYOUT.md` § Not yet fixed). Beyond that warning, its behaviour on such a release is undefined. Mill's test tasks and IDE launches behave as without the plugin on every Mill release it runs on. Builds on features 2 and 5. Every later feature delivers its behaviour on every supported release.
+Each release of the fork lists the Mill releases its integration tests passed on. On any other Mill release the test command warns on the console and in any file outputs before any test starts, naming the running Mill version (R-093), and any JSON root records that the release is unsupported. Beyond that warning, its behaviour on such a release is undefined. Mill's test tasks and IDE launches behave as without the plugin on every Mill release it runs on. Builds on features 2 and 5. Every later feature delivers its behaviour on every supported release.
 
 Enables:
 
 - `SPECIFICATION.md` R-003 and R-060 (on unsupported Mill releases), R-093, § Scope (supported Mill releases)
-- `JSON-LAYOUT.md` § Not yet fixed (the root: support status)
+- `../../mill-plugin/consolidated.schema.json` `$defs/root` (a key recording whether the running Mill release is supported, which the schema does not yet carry)
 - `ARCHITECTURE.md` § Modules § Mill plugin (integration tests under Mill's testkit; API confined to classes the test command alone loads), § APIs § The Mill plugin and the consolidation library (Start: support status and warning)
 
 Settles:
 
 - Where a release records its supported Mill releases, and how CI runs the integration tests on each.
+- The key and form in which the JSON root records whether the build tool's running version is a supported Mill release (R-093).
 
 Risks:
 
@@ -90,7 +91,9 @@ Enables:
 
 Settles:
 
-- Whether a suite that has no events, and that a run was to execute, is written inside that run's node (R-101, R-136; `JSON-LAYOUT.md` § Tree writes every such suite as a child of its module).
+- Whether a suite that has no events, and that a run was to execute, is written inside that run's node or as a child of its module (R-101, R-136; a module's `contents` holds only its run nodes, `../../mill-plugin/consolidated.schema.json` `$defs/module`).
+- Whether the `name` of a suite scheduled to run that has no events is its simple or its fully qualified class name (R-095a).
+- How a module records a process that ended before any run existed in it, and the output captured from that process's stdout and stderr; the JSON output writes no `output` on a module (R-076).
 - The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-095b aborts them and states no reason; R-102 gives the run *process failed*, and R-095a gives registered suites, scopes and tests that have no events *not run*).
 
 Risks:
@@ -138,7 +141,7 @@ Inside each JVM run, output that capture can tie to a suite, scope or test is ca
 Enables:
 
 - `SPECIFICATION.md` R-097a and R-097b (output captured against a node), R-043, R-087, R-011 (captured output)
-- `JSON-LAYOUT.md` § Captured output (each piece of output written at most once)
+- `../../mill-plugin/consolidated.schema.json` `$defs/testNode`, `output` (output captured against a suite, scope or test, among its messages, which the schema does not yet carry; each piece of output a process wrote written at most once, even where it was captured both against a node and from the process's stdout or stderr)
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Test output capture, on the JVM)
 
 Settles:
@@ -244,7 +247,7 @@ As feature 10, on Scala.js under `NodeJs` and `JsDom`: writes through `console` 
 
 Enables:
 
-- `SPECIFICATION.md` R-011, R-097a, R-097b, R-043, R-087, and `JSON-LAYOUT.md` § Captured output, on Scala.js
+- `SPECIFICATION.md` R-011, R-097a, R-097b, R-043, R-087, and `../../mill-plugin/consolidated.schema.json` `$defs/testNode`, `output` (output captured against a node, as feature 10 adds it), on Scala.js
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Test output capture, on Scala.js)
 
 Risks:
@@ -257,7 +260,7 @@ As feature 10, on Native: writes through `System.out` and `System.err` are captu
 
 Enables:
 
-- `SPECIFICATION.md` R-011, R-097a, R-097b, R-043, R-087, and `JSON-LAYOUT.md` § Captured output, on Native
+- `SPECIFICATION.md` R-011, R-097a, R-097b, R-043, R-087, and `../../mill-plugin/consolidated.schema.json` `$defs/testNode`, `output` (output captured against a node, as feature 10 adds it), on Native
 - `ARCHITECTURE.md` § Modules § ScalaTest core (Test output capture, on Native)
 
 Risks:
@@ -311,20 +314,19 @@ The filtering characters on a `-fJ` argument omit nodes and messages from the JS
 Enables:
 
 - `SPECIFICATION.md` R-127c, R-127d, R-138 and R-139 (filtering characters on a `-fJ`), R-028 (the tree less what filtering characters omit), R-055 (filtering of JSON output)
-- `JSON-LAYOUT.md` § Tree (every node except what the `-f` argument's filtering characters omit)
 
 Settles:
 
 - How the JSON writer is given its `-f` argument's filtering characters (`ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, Start, gives characters for each human-readable output only).
-- Whether the JSON output records which filtering characters were applied, or that a node's `contents` had nodes or messages omitted (`JSON-LAYOUT.md` § Nodes, § Messages and § Not yet fixed are silent).
-- Where the output captured against an omitted test or scope goes (R-127c and R-127d are silent; `JSON-LAYOUT.md` § Captured output).
+- Whether the JSON output records which filtering characters were applied, or that a node's `contents` had nodes or messages omitted (`../../mill-plugin/consolidated.schema.json` `$defs/testNode` and `$defs/message` are silent).
+- Where the output captured against an omitted test or scope goes (R-127c and R-127d are silent; R-097b attaches output to the most specific identifiable node).
 - Whether a scope is omitted when its tests and scopes are all omitted but a message remains in its `contents`, or output is captured against it (R-127d speaks of its children).
 - Whether a suite, run node or module is omitted when everything beneath it is omitted (R-127d names scopes only).
 - What a formatting character, `w` or `d`, does on a `-fJ` (R-138 allows formatting characters on each `-f`; R-106f and R-106g name the human-readable output only).
 
 Risks:
 
-- `JSON-LAYOUT.md` § Nodes ("No node's outcome is rolled up from its children; readers of the output roll up outcomes themselves"): a reader rolling up a filtered tree counts only the nodes left.
+- `../../mill-plugin/consolidated.schema.json` `$defs/testNode` ("No node's outcome is rolled up from its children."): a reader rolling up a filtered tree counts only the nodes left.
 
 ## Deferred
 
