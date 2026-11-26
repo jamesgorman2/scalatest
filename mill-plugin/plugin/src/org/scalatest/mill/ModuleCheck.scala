@@ -16,7 +16,8 @@ private[mill] final case class ModuleCheck(testArgsDefault: Seq[String], runtime
 private[mill] object ModuleCheck {
 
   // The check evaluates no compile, so that no module's tests wait on another module's compile. `resolution`, unlike
-  // the `classpath` that `resolvedRunMvnDeps` calls, fetches no artifact.
+  // the `classpath` that `resolvedRunMvnDeps` calls, fetches no artifact, but it also takes none of the runtime
+  // resolution parameters, so the root dependency names the runtime configuration itself.
   def task(module: SelectedTestModule): Task[ModuleCheck] = {
     val testModule = module.module
     Task.Anon {
