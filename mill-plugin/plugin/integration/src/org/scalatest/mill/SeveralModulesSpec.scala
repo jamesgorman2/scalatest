@@ -298,9 +298,9 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
   Feature("Every selected module runs, whatever happens to the others") {
 
     for (millFlags <- Seq(Nil, Seq("--keep-going"))) {
-      val flagsDescription = if (millFlags.isEmpty) "no flags" else millFlags.mkString(" ")
+      val flagsDescription = if (millFlags.isEmpty) "none" else millFlags.mkString(" ")
 
-      Scenario(s"A failing test of alpha.test fails the test command and does not stop beta.test's tests, with $flagsDescription") {
+      Scenario(s"A test of alpha.test fails, flags $flagsDescription") {
         withSeveralModules { build =>
           Given("Alpha1's test slow fails")
           replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")
@@ -318,9 +318,9 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
 
     for (millFlags <- Seq(Nil, Seq("--keep-going"))) {
-      val flagsDescription = if (millFlags.isEmpty) "no flags" else millFlags.mkString(" ")
+      val flagsDescription = if (millFlags.isEmpty) "none" else millFlags.mkString(" ")
 
-      Scenario(s"broken.test does not compile, with $flagsDescription") {
+      Scenario(s"broken.test does not compile, flags $flagsDescription") {
         withSeveralModules { build =>
           addBrokenTestThatDoesNotCompile(build)
           val (result, json) = runWritingJsonOutput(build, millFlags*)("alpha.test", "broken.test", "beta.test")
@@ -369,7 +369,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           moduleLine should be >= 0
           colourMarkedLines.lift(moduleLine + 1) shouldBe Some("  {red}*** MODULE ABORTED ***{reset}")
 
-          And("each line between *** MODULE ABORTED *** and the next line indented no more than it is in red and indented one level more than it")
+          And("each line between *** MODULE ABORTED *** and the next line indented no more than *** MODULE ABORTED *** is in red and indented one level more than *** MODULE ABORTED ***")
           val failureLines = lines.zip(colourMarkedLines).drop(moduleLine + 2).takeWhile { case (line, _) => indentationOf(line) > 2 }
           failureLines.foreach { case (line, colourMarkedLine) =>
             line shouldBe s"    ${line.trim}"
@@ -396,10 +396,8 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow")
           build.markers should contain noneOf ("Beta1.fast", "Beta1.slow")
 
-          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains samples.Beta1")
+          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains samples.Beta1 and does not contain beta.test")
           shouldBeAbortedWithOneFailureContaining(json, "beta.test", "samples.Beta1")
-
-          And("that entry's message does not contain beta.test")
           moduleNode(json, "beta.test").failureMessages.head should not include "beta.test"
 
           And("the module node alpha.test has no outcome and no failures")

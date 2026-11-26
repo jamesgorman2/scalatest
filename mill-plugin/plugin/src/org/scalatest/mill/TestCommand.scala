@@ -63,8 +63,8 @@ private[mill] final class TestCommand private (
       module -> moduleRunTask(module, moduleRunArguments, moduleFolders(module), consolidation, workerCharset)
     }
     val runResults = EvaluatedTasks.of(failFastOffEvaluator.execute(moduleRunTasks.map(_._2), logger = ctx.log))
-    // A module run task that fails, or that Mill skips because a task upstream of it failed, does not attach that
-    // failure to its module.
+    // Where a module run task fails, or Mill skips it because a task upstream of it failed, the task attaches no
+    // failure to its module, so the test command attaches it here.
     TestCommand.addModuleFailures(
       consolidation,
       moduleRunTasks.flatMap { case (module, task) => runResults.valueOrFailure(task).left.toOption.map(module -> _) }
