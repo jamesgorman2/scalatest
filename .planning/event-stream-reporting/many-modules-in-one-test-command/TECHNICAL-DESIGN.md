@@ -10,15 +10,16 @@ This design checks every selected JVM test module before any test starts, then r
 
 ### The consolidation library's additions
 
-`org.scalatest.consolidation.Consolidation` has `addRootFailure` and `addRootOutput`, and nothing that attaches to a module. It gains a method for each of these operations of `../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library:
+`org.scalatest.consolidation.Consolidation` has a method for each of these operations of `../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, beside `addRootFailure` and `addRootOutput`:
 
-- **Attach output or a failure to a module**, which also serves **Add a module whose tests did not start**. The library keeps each module's failures and output beside the module's runs, as it keeps the root's. The library also needs:
-  - a module given a failure or output but no run, which the library orders by name with the other modules however late it is added (AC-006, AC-015, AC-024);
-  - a module's `outcome` and `failures` in the JSON writer (AC-006, AC-009, AC-015, AC-022, AC-024);
-  - a module's `output` in the JSON writer (AC-025);
-  - in the human-readable writer, a module's output lines and its `*** MODULE ABORTED ***` block, built as `HumanReadableOutput`'s `rootFailureLines` builds the root's (AC-023, AC-026);
-  - a failed consolidation state once a failure is attached (`../SPECIFICATION.md` R-137).
-- **Read whether a module has failed**, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
+- **Attach output or a failure to a module**, which also serves **Add a module whose tests did not start**: `addModuleFailure` and `addModuleOutput`. The library keeps each module's failures and output beside the module's runs, as it keeps the root's. With them:
+  - a module given a failure or output but no run is a module of every output, which the library orders by name with the other modules however late it is added (AC-006, AC-015, AC-024);
+  - the JSON writer writes a module's `outcome` and `failures` (AC-006, AC-009, AC-015, AC-022, AC-024) and its `output` (AC-025);
+  - the human-readable writer writes a module's output lines and its `*** MODULE ABORTED ***` block after the module's runs, built as it builds the root's (AC-023, AC-026);
+  - attaching a failure fails the consolidation state (`../SPECIFICATION.md` R-137).
+- **Add a process that ended before any run existed in it**: `addProcessEndedBeforeAnyRun`, which takes the process's module.
+- **Read whether a module has failed**: `hasFailed`, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
+- **Read the version the library was built at**: `Consolidation.scalaTestVersion`, which the check before any test starts compares with each module's resolved `com.edc:scalatest-core_3` (§ The check before any test starts).
 
 ## Critical code paths
 

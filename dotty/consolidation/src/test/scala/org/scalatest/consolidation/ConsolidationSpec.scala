@@ -108,8 +108,56 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
     "given a process that ended before any run existed in it" should {
       "be open and failed" in {
         val consolidation = startedWithColour()
-        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.addProcessEndedBeforeAnyRun(module)
         consolidation.state shouldBe ConsolidationState.OpenFailed
+      }
+    }
+
+    "given a failure attached to a module" should {
+      "be open and failed" in {
+        val consolidation = startedWithColour()
+        consolidation.addModuleFailure(module, "the module's tests did not start")
+        consolidation.state shouldBe ConsolidationState.OpenFailed
+      }
+    }
+
+    "given output attached to a module" should {
+      "stay open" in {
+        val consolidation = startedWithColour()
+        consolidation.addModuleOutput(module, CapturedLine.Stderr("warn: slow discovery\n"))
+        consolidation.state shouldBe ConsolidationState.Open
+      }
+    }
+
+    "ended after a failure attached to a module" should {
+      "be ended and failed" in {
+        val consolidation = startedWithColour()
+        consolidation.addModuleFailure(module, "the module's tests did not start")
+        consolidation.end() shouldBe ConsolidationState.EndedFailed
+      }
+    }
+
+    "given a failure attached to a module after it has ended" should {
+      "be refused" in {
+        val consolidation = startedWithColour()
+        consolidation.end()
+        an[IllegalStateException] should be thrownBy consolidation.addModuleFailure(module, "too late")
+      }
+    }
+
+    "given output attached to a module after it has ended" should {
+      "be refused" in {
+        val consolidation = startedWithColour()
+        consolidation.end()
+        an[IllegalStateException] should be thrownBy consolidation.addModuleOutput(module, CapturedLine.Stdout("too late\n"))
+      }
+    }
+
+    "given a process that ended before any run existed in it after it has ended" should {
+      "be refused" in {
+        val consolidation = startedWithColour()
+        consolidation.end()
+        an[IllegalStateException] should be thrownBy consolidation.addProcessEndedBeforeAnyRun(module)
       }
     }
 
@@ -125,13 +173,13 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
     "ended after a failure" should {
       "be ended and failed" in {
         val consolidation = startedWithColour()
-        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.addProcessEndedBeforeAnyRun(module)
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }
       "give that state as it ends" in {
         val consolidation = startedWithColour()
-        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.addProcessEndedBeforeAnyRun(module)
         consolidation.end() shouldBe ConsolidationState.EndedFailed
       }
     }

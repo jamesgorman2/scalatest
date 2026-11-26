@@ -119,7 +119,7 @@ private[mill] final class JvmTestModuleRun(
           capture.addTo(feed.add)
           readRun(feed)
         },
-      () => consolidation.addProcessEndedBeforeAnyRun(),
+      () => consolidation.addProcessEndedBeforeAnyRun(module),
       processHasExited,
       eventLogPollInterval
     )

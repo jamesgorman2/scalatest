@@ -62,7 +62,7 @@ private[mill] object EventLogs {
 
     def addProcessEndedBeforeAnyRun(): Unit = {
       processEndedBeforeAnyRunCount.incrementAndGet()
-      consolidation.addProcessEndedBeforeAnyRun()
+      consolidation.addProcessEndedBeforeAnyRun(module)
     }
   }
 }

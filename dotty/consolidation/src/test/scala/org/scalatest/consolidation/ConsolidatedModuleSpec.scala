@@ -24,7 +24,7 @@ final class ConsolidatedModuleSpec extends AnyWordSpec with should.Matchers with
   private def runGivenNoWorker(assignedTestClass: String = "samples.Suite"): AssembledRun = runIn(None, assignedTestClass)
 
   private def numbersOf(runs: Vector[AssembledRun]): Vector[(RunNumber, AssembledRun)] =
-    ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs).runs.map(run => (run.number, run.assembled))
+    ConsolidatedModule.of(module, MeasuredTimes.unmeasured, runs, Attachments.none).runs.map(run => (run.number, run.assembled))
 
   "A module's runs" when {
     "each given a fork group and a worker index" should {

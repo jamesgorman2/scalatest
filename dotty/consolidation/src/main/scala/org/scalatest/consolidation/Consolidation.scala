@@ -2,6 +2,7 @@ package org.scalatest.consolidation
 
 import java.time.Instant
 import scala.collection.mutable
+import org.scalatest.ScalaTestVersions
 import org.scalatest.events.TestClassName
 
 /**
@@ -22,9 +23,10 @@ final class Consolidation private[consolidation] (
   @volatile private var currentState: ConsolidationState = ConsolidationState.Open
   private val runs = mutable.ArrayBuffer.empty[RunFeed]
   private val moduleTimes = mutable.Map.empty[ModuleName, MeasuredTimes]
-  private val rootOutput = mutable.ArrayBuffer.empty[CapturedLine]
-  private val rootFailures = mutable.ArrayBuffer.empty[String]
+  private var rootAttachments = Attachments.none
+  private val moduleAttachments = mutable.Map.empty[ModuleName, Attachments]
   private val modulesWithTestResult = mutable.Set.empty[ModuleName]
+  private val failedModules = mutable.Set.empty[ModuleName]
 
   /** A read made after an operation returns sees any failure that operation added. */
   def state: ConsolidationState = currentState
@@ -37,6 +39,17 @@ final class Consolidation private[consolidation] (
   def hasTestResult(module: ModuleName): Boolean =
     synchronized {
       modulesWithTestResult.contains(module)
+    }
+
+  /**
+   * Whether a failure is attached to the module, any of the module's runs has an outcome other than completed, or a
+   * process of the module ended before any run existed in it. A run whose event stream ended without recording how the
+   * run ended has an outcome other than completed. A test that fails does not count. Unlike [[state]], this takes the
+   * consolidation's lock, and it answers before and after the consolidation ends.
+   */
+  def hasFailed(module: ModuleName): Boolean =
+    synchronized {
+      failedModules.contains(module)
     }
 
   /**
@@ -69,13 +82,42 @@ final class Consolidation private[consolidation] (
   }
 
   /**
-   * Adds a process that ended before any run existed in it. This fails the test command.
+   * Adds a process of the module that ended before any run existed in it. This fails the test command and the module.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
-  def addProcessEndedBeforeAnyRun(): Unit =
+  def addProcessEndedBeforeAnyRun(module: ModuleName): Unit =
     synchronized {
       requireOpen()
+      failedModules += module
+      fail()
+    }
+
+  /**
+   * Attaches a line captured from a runner that is not a run, such as a build tool's discovery runner, to the module.
+   * A module given output but no run is still a module of every output. The module's captured lines follow the lines
+   * for its runs, in the order they were attached.
+   *
+   * @throws java.lang.IllegalStateException if the consolidation has ended
+   */
+  def addModuleOutput(module: ModuleName, line: CapturedLine): Unit =
+    synchronized {
+      requireOpen()
+      attachToModule(module, _.withOutput(line))
+    }
+
+  /**
+   * Attaches the message of a failure that belongs to the module but to none of its runs, such as its tests not
+   * starting, to the module. This fails the test command and the module. A module given a failure but no run is still a
+   * module of every output. The module's failures follow its captured lines, in the order they were attached.
+   *
+   * @throws java.lang.IllegalStateException if the consolidation has ended
+   */
+  def addModuleFailure(module: ModuleName, message: String): Unit =
+    synchronized {
+      requireOpen()
+      attachToModule(module, _.withFailure(message))
+      failedModules += module
       fail()
     }
 
@@ -88,7 +130,7 @@ final class Consolidation private[consolidation] (
   def addRootOutput(line: CapturedLine): Unit =
     synchronized {
       requireOpen()
-      rootOutput += line
+      rootAttachments = rootAttachments.withOutput(line)
     }
 
   /**
@@ -100,7 +142,7 @@ final class Consolidation private[consolidation] (
   def addRootFailure(message: String): Unit =
     synchronized {
       requireOpen()
-      rootFailures += message
+      rootAttachments = rootAttachments.withFailure(message)
       fail()
     }
 
@@ -139,11 +181,19 @@ final class Consolidation private[consolidation] (
 
   private def root(endedAt: Option[Instant], assembledRuns: Vector[AssembledRun]): ConsolidatedRoot = {
     val runsByModule = assembledRuns.groupBy(_.module)
-    val modules = (runsByModule.keySet ++ moduleTimes.keySet).toVector.sortBy(_.value).map { module =>
-      ConsolidatedModule.of(module, moduleTimes.getOrElse(module, MeasuredTimes.unmeasured), runsByModule.getOrElse(module, Vector.empty))
+    val modules = (runsByModule.keySet ++ moduleTimes.keySet ++ moduleAttachments.keySet).toVector.sortBy(_.value).map { module =>
+      ConsolidatedModule.of(
+        module,
+        moduleTimes.getOrElse(module, MeasuredTimes.unmeasured),
+        runsByModule.getOrElse(module, Vector.empty),
+        moduleAttachments.getOrElse(module, Attachments.none)
+      )
     }
-    ConsolidatedRoot(buildTool, moduleSelectors, rootFailures.toVector, MeasuredTimes(startedAt, endedAt), modules, rootOutput.toVector)
+    ConsolidatedRoot(buildTool, moduleSelectors, rootAttachments.failures, MeasuredTimes(startedAt, endedAt), modules, rootAttachments.output)
   }
+
+  private def attachToModule(module: ModuleName, attach: Attachments => Attachments): Unit =
+    moduleAttachments(module) = attach(moduleAttachments.getOrElse(module, Attachments.none))
 
   private[consolidation] def feed(add: => Unit): Unit =
     synchronized {
@@ -158,6 +208,11 @@ final class Consolidation private[consolidation] (
     modulesWithTestResult += module
   }
 
+  private[consolidation] def recordFailedModule(module: ModuleName): Unit = {
+    assertLockHeld()
+    failedModules += module
+  }
+
   private[consolidation] def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "the consolidation's lock is not held")
 
   private def requireOpen(): Unit =
@@ -167,6 +222,9 @@ final class Consolidation private[consolidation] (
 }
 
 object Consolidation {
+
+  /** The version of `com.edc:scalatest-core_3` this library was built at, which the JSON output writes as `scalaTestVersion`. */
+  val scalaTestVersion: String = ScalaTestVersions.ScalaTestVersion
 
   /**
    * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
@@ -216,6 +274,9 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsRunAbnormally(event.decoded)) {
         consolidation.fail()
       }
+      if (RunAssembly.endsRunAbnormally(event.decoded)) {
+        consolidation.recordFailedModule(run.get.module)
+      }
       if (RunAssembly.reportsTestResult(event.decoded)) {
         consolidation.recordTestResult(run.get.module)
       }
@@ -238,6 +299,9 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
         endedEventStream.set(Some(eventStream))
         if (eventStream.failsTestCommand) {
           consolidation.fail()
+        }
+        if (eventStream.endedOtherThanCompleted) {
+          consolidation.recordFailedModule(run.get.module)
         }
       }
     }

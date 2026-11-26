@@ -251,6 +251,9 @@ private[consolidation] final case class AssembledEventStream(
 
   def endedAbnormally: Boolean = outcome.exists(_.isAbnormal)
 
+  // A stream without the run's outcome is one the consolidation aborts with reason process failed.
+  def endedOtherThanCompleted: Boolean = outcome.forall(_.isAbnormal)
+
   def failsTestCommand: Boolean =
     outcome.isEmpty || topLevelSuites.exists(_.withDescendants.exists(_.execution.outcome.exists(_.isAbortedOrNotRun)))
 }
