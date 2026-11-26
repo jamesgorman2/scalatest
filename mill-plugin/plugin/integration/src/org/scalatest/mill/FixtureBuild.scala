@@ -20,6 +20,8 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def markersFolder: os.Path = workspace / "markers"
 
+  def markers: Seq[String] = os.list(markersFolder).map(_.last).sorted
+
   def modulesFolder: os.Path = workspace / "out" / "org.scalatest.mill.TestCommandModule" / "modules"
 
   def moduleFolder: os.Path = modulesFolder / "core.test"

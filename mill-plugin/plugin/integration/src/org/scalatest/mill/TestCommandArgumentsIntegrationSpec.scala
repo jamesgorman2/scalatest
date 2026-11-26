@@ -339,7 +339,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
         And("the markers folder holds a file for each test of each suite")
         withClue(result.debugString) {
-          os.list(build.markersFolder).map(_.last).sorted shouldBe
+          build.markers shouldBe
             Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
         }
       }

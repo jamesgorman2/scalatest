@@ -527,7 +527,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command runs the module")
         val (result, json) = build.resultAndJsonOutputOfTestCommand()
 
-        Then("the module node core.test holds exactly one failure, naming the worker that could not start but not the module")
+        Then("the module node core.test holds exactly one failure, whose message begins Starting worker 0 of fork group 1 failed:")
         val failures = json.node(NodeKind.Module, "core.test").failureMessages
         withClue(result.debugString) {
           failures should have size 1

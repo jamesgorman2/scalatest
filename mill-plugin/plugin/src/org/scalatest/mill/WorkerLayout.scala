@@ -53,7 +53,7 @@ private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
       case FilesystemCaseNotChecked(cause) => s"checking whether the filesystem ignores case failed: $cause"
     }
 
-  def moduleFailureMessage: String =
+  def moduleMessage: String =
     this match {
       // Unprefixed, as Mill's `testOnly` words it.
       case ClassGlobsKeepNoTestClass(_) => message

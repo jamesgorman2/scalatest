@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
+final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private val sampleMarkers: Seq[String] = Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
 
@@ -56,13 +56,6 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   private def runNodesOf(json: JsonNode, module: String): Seq[JsonNode] = moduleNode(json, module).nodes.filter(_.kind == NodeKind.Run)
 
-  private def shouldHaveNoOutcomeAndNoFailures(node: JsonNode): Unit = {
-    node.holds("outcome") shouldBe false
-    node.holds("failures") shouldBe false
-  }
-
-  private def markerFiles(build: FixtureBuild): Seq[String] = os.list(build.markersFolder).map(_.last).sorted
-
   private def moduleSelectorsOf(json: JsonNode): Seq[(String, Seq[String])] =
     json("moduleSelectors").arr.toSeq.map(entry => entry("selector").str -> entry("modules").arr.toSeq.map(_.str))
 
@@ -112,7 +105,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         withClue(result.debugString) {
           And("no file exists in <markers>")
-          os.list(build.markersFolder) shouldBe empty
+          build.markers shouldBe empty
 
           And("nothing exists at <report>")
           os.exists(build.jsonOutputFile) shouldBe false
@@ -235,7 +228,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
           withClue(result.debugString) {
-            Seq("Beta1.fast", "Beta1.slow").filterNot(marker => os.exists(build.markersFolder / marker)) shouldBe empty
+            build.markers should contain allOf ("Beta1.fast", "Beta1.slow")
           }
 
           And("the test command fails")
@@ -252,7 +245,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         Then("the files Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow exist in <markers>")
         withClue(result.debugString) {
-          Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow").filterNot(marker => os.exists(build.markersFolder / marker)) shouldBe empty
+          build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
         }
 
         And("Mill reports that the test command failed, naming the failed task beta.test.compile")
@@ -269,8 +262,8 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         withClue(result.debugString) {
           Then("the files Alpha1.fast and Alpha1.slow exist in <markers>, and neither Beta1.fast nor Beta1.slow does")
-          Seq("Alpha1.fast", "Alpha1.slow").filterNot(marker => os.exists(build.markersFolder / marker)) shouldBe empty
-          Seq("Beta1.fast", "Beta1.slow").filter(marker => os.exists(build.markersFolder / marker)) shouldBe empty
+          build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow")
+          build.markers should contain noneOf ("Beta1.fast", "Beta1.slow")
 
           And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry")
           val beta = moduleNode(json, "beta.test")
@@ -283,10 +276,10 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           beta.failureMessages.head should not include "beta.test"
 
           And("the module node alpha.test has no outcome and no failures")
-          shouldHaveNoOutcomeAndNoFailures(moduleNode(json, "alpha.test"))
+          shouldHaveNoKeys(moduleNode(json, "alpha.test"), "outcome", "failures")
 
           And("the JSON output's root has no outcome and no failures")
-          shouldHaveNoOutcomeAndNoFailures(json)
+          shouldHaveNoKeys(json, "outcome", "failures")
         }
 
         And("the test command fails")
@@ -310,7 +303,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
           Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
           withClue(result.debugString) {
-            markerFiles(build) shouldBe markers
+            build.markers shouldBe markers
           }
 
           And("the test command succeeds")
@@ -325,19 +318,22 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         withClue(result.debugString) {
           Then("the files in <markers> are exactly Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow")
-          markerFiles(build) shouldBe Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
+          build.markers shouldBe Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
 
-          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly the failure Mill's testOnly fails with, naming samples.Alpha*")
+          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry")
           val beta = moduleNode(json, "beta.test")
           runNodesOf(json, "beta.test") shouldBe empty
           beta.outcome shouldBe Some("aborted")
-          beta.failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Alpha*"))
+          beta.failureMessages should have size 1
+
+          And("that entry's message is Test selector does not match any test: samples.Alpha* and Run discoveredTestClasses to see available tests, joined by a line feed")
+          beta.failureMessages.head shouldBe noTestMatchedMessageNaming("samples.Alpha*")
 
           And("the module node alpha.test has no outcome and no failures")
-          shouldHaveNoOutcomeAndNoFailures(moduleNode(json, "alpha.test"))
+          shouldHaveNoKeys(moduleNode(json, "alpha.test"), "outcome", "failures")
 
           And("the JSON output's root has no outcome and no failures")
-          shouldHaveNoOutcomeAndNoFailures(json)
+          shouldHaveNoKeys(json, "outcome", "failures")
         }
 
         And("the test command fails")
@@ -351,17 +347,21 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         withClue(result.debugString) {
           Then("no file exists in <markers>")
-          markerFiles(build) shouldBe empty
+          build.markers shouldBe empty
 
           for (module <- Seq("alpha.test", "beta.test")) {
-            And(s"the module node $module holds one or more run nodes, its outcome is aborted, and its failures holds exactly the failure Mill's testOnly fails with, naming *1")
+            And(s"the module node $module holds one or more run nodes, and has the outcome aborted and a failures that holds exactly one entry")
             runNodesOf(json, module) should not be empty
             moduleNode(json, module).outcome shouldBe Some("aborted")
-            moduleNode(json, module).failureMessages shouldBe Seq(noTestMatchedMessageNaming("*1"))
+            moduleNode(json, module).failureMessages should have size 1
           }
 
+          And("each of those entries' message is Test selector does not match any test: *1 and Run discoveredTestClasses to see available tests, joined by a line feed")
+          Seq("alpha.test", "beta.test").map(module => moduleNode(json, module).failureMessages.head) shouldBe
+            Seq.fill(2)(noTestMatchedMessageNaming("*1"))
+
           And("the JSON output's root has no outcome and no failures")
-          shouldHaveNoOutcomeAndNoFailures(json)
+          shouldHaveNoKeys(json, "outcome", "failures")
         }
 
         And("the test command fails")
