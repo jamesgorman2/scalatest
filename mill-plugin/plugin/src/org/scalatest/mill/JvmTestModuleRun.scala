@@ -85,9 +85,9 @@ private[mill] final class JvmTestModuleRun(
   private def discoveredTestClasses(consolidation: Consolidation): Set[TestClassName] =
     // Without `javaHome`, discovery runs on this thread, and its writes reach `SystemStreams.current` through Mill's
     // process-wide `System.out` and `System.err`. `SystemStreamsUtils.withStreams` would also bind `os.Inherit`, and so
-    // send the stderr of a JVM worker subprocess that discovery starts into the capture for the rest of its life.
-    // With or without `javaHome`, Mill's JVM encodes each of discovery's writes with its default charset, so the capture
-    // decodes with it too.
+    // send the stderr of a JVM worker subprocess that discovery starts into the capture for the rest of the
+    // subprocess's life. With or without `javaHome`, Mill's JVM encodes each of discovery's writes with its default
+    // charset, so the capture decodes with it too.
     JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, Charset.defaultCharset()) { (stdout, stderr) =>
       SystemStreams.current.withValue(new SystemStreams(stdout, stderr, SystemStreams.current.value.in)) {
         inputs.jvmWorker
