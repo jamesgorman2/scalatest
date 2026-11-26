@@ -242,7 +242,7 @@ To keep test class names off the console, a plugin that runs Mill's test workers
 <learning>
 date: 2026-11-27
 ---
-A Mill module trait that declares `object test extends ScalaTests, ...` gives every module that extends it the same test module, and no module can change it: Scala cannot override an `object`, so a module cannot set its own test module's tasks, such as `testForkGrouping`. Copying the whole module out to change one task duplicates the trait.
+A Mill module trait that declares `object test extends ScalaTests, ...` gives every module that extends it the same test module definition. Scala cannot override an `object`, so no module can change one of its test module's tasks, such as `testForkGrouping`, without copying the whole trait.
 
-Where modules share test settings but one may need its own, declare the settings as an inner trait of the module trait (`trait SharedTests extends ScalaTests, TestModule.ScalaTest { ... }`) and have each module declare `object test extends SharedTests`. One module's test module then takes its own tasks in `object test extends SharedTests { def testForkGrouping = ... }`. This holds for a test fixture build that a scenario edits as much as for a real one.
+Where modules share test settings but one may need its own, declare the settings as an inner trait of the module trait (`trait SharedTests extends ScalaTests, TestModule.ScalaTest { ... }`) and have each module declare `object test extends SharedTests`. A module can then override a task of its own test module: `object test extends SharedTests { def testForkGrouping = ... }`. This applies equally to a test fixture build that a scenario edits.
 </learning>

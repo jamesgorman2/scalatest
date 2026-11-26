@@ -172,7 +172,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "class globs are given, the JVM of a worker of the module ended without writing its result before its run finished, and no run of the module reported a test result" should {
-      "attach nothing about no test matching" in {
+      "not attach the failure Mill's testOnly fails with" in {
         val consolidationUnderTest =
           consolidationEndedAfterReportingNoTestResult(addUnfinishedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, EndedWithoutResult))
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
@@ -180,7 +180,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "class globs are given, the JVM of a worker of the module ended without writing its result before any run existed in it, and no run of the module reported a test result" should {
-      "attach nothing about no test matching" in {
+      "not attach the failure Mill's testOnly fails with" in {
         val consolidationUnderTest =
           consolidationEndedAfterReportingNoTestResult(_.addProcessEndedBeforeAnyRun(module), everyForkGroupLaidOut = true, Seq(EndedWithoutResult))
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
@@ -210,7 +210,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "class globs are given and a run of the module reported a suite as aborted" should {
-      "attach nothing about no test matching" in {
+      "not attach the failure Mill's testOnly fails with" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addRunWithAbortedSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult))
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
       }

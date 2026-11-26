@@ -19,8 +19,9 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
   private def withClassGlobsAcrossModules[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.classGlobsAcrossModules) { build =>
       Given("the JVM test modules alpha.test, holding Alpha1 and Alpha2, and beta.test, holding Beta1")
-      And("each suite's tests fast, tagged samples.Fast, and slow succeed, and each test, when it runs, creates the file <suite>.<test> in <markers>")
+      And("each of those suites is an AnyFunSuite with two tests, fast and slow, both of which succeed, and only fast is tagged samples.Fast")
       And("each of those modules holds the object samples.Fast, which is a Tag and not a test class")
+      And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>")
       os.makeDir.all(build.markersFolder)
       test(build)
     }
@@ -254,7 +255,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("Two of beta.test's fork groups each holding only samples.Beta1 abort beta.test, and do not stop alpha.test's tests") {
+    Scenario("Two of beta.test's fork groups each hold only samples.Beta1") {
       withSeveralModules { build =>
         Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
         setForkGroupingOfBetaTest(build, """Seq(Seq("samples.Beta1"), Seq("samples.Beta1"))""")
@@ -297,7 +298,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     )
 
     for ((arguments, markers) <- argumentsAndMarkers) {
-      Scenario(s"Arguments ${arguments.mkString(" ")} reach every selected module") {
+      Scenario(s"Arguments ${arguments.mkString(" ")}") {
         withClassGlobsAcrossModules { build =>
           val (result, _) = runOnBothModulesWritingJsonOutput(build, arguments*)
 
@@ -312,7 +313,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("Class globs that match only alpha.test's classes abort beta.test with the failure Mill's testOnly fails with") {
+    Scenario("Class globs that match only alpha.test's classes") {
       withClassGlobsAcrossModules { build =>
         val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "samples.Alpha*")
 
@@ -341,7 +342,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("Framework arguments that exclude every test the class globs keep abort each module, which keeps its runs") {
+    Scenario("Framework arguments that exclude every test the class globs keep") {
       withClassGlobsAcrossModules { build =>
         val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
 
