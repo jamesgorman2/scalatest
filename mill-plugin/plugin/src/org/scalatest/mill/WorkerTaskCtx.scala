@@ -4,7 +4,12 @@ import mill.api.Logger
 import mill.api.TaskCtx
 import scala.concurrent.Future
 
-private[mill] final class WorkerTaskCtx(ctx: TaskCtx, capture: WorkerOutputCapture, workerStarting: () => Unit) extends DelegatingTaskCtx(ctx) {
+private[mill] final class WorkerTaskCtx(ctx: TaskCtx, workerLog: Logger, capture: WorkerOutputCapture, workerStarting: () => Unit)
+    extends DelegatingTaskCtx(ctx) {
+
+  // Mill's test queue names a worker's current test class through this logger's ticker. Given a logger with no line on
+  // Mill's prompt, such as the exclusive command's, the name stays off the console.
+  override def log: Logger = workerLog
 
   private def capturing[T](body: => T): T =
     os.Inherit.out.withValue(os.ProcessOutput.ReadBytes(capture.stdout)) {

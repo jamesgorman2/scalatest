@@ -16,6 +16,7 @@ object FixtureName {
   val moduleSelectors: FixtureName = "module-selectors"
   val munit: FixtureName = "munit"
   val result: FixtureName = "result"
+  val severalModules: FixtureName = "several-modules"
   val styles: FixtureName = "styles"
   val upstreamScalaTest: FixtureName = "upstream-scalatest"
   val utest: FixtureName = "utest"

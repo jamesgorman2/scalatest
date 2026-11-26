@@ -2,6 +2,7 @@ package org.scalatest.mill
 
 import java.io.IOException
 import java.nio.file.Paths
+import org.scalatest.consolidation.ModuleName
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,22 +41,21 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
     }
 
     "no module selector is given" should {
-      "say the command takes one" in {
-        TestCommandFailure.NoModuleSelector.message shouldBe "The test command takes one module selector, but was given none"
+      "say the command takes one or more" in {
+        TestCommandFailure.NoModuleSelector.message shouldBe "The test command takes one or more module selectors, but was given none"
       }
     }
 
-    "several module selectors are given" should {
-      "say the command takes one, naming each separated by a space" in {
-        TestCommandFailure.SeveralModuleSelectors(Seq(ModuleSelectorArgument("core.test"), ModuleSelectorArgument("util.test"))).message shouldBe
-          "The test command takes one module selector, but was given: core.test util.test"
+    "a module selector resolves to no test module" should {
+      "name the selector" in {
+        TestCommandFailure.NoTestModule(ModuleSelectorArgument("core")).message shouldBe "Module selector core resolves to no test module"
       }
     }
 
-    "a module selector resolves to other than one JVM test module" should {
-      "name the selector and what it resolved to" in {
-        TestCommandFailure.NotOneJvmTestModule(ModuleSelectorArgument("core"), "nothing").message shouldBe
-          "Module selector core must resolve to one JVM test module, but resolved to: nothing"
+    "a module selector resolves to Scala.js or Native test modules" should {
+      "name the selector and each such module" in {
+        TestCommandFailure.NotJvmTestModules(ModuleSelectorArgument("__.test"), Seq(ModuleName("coreJS.test"), ModuleName("coreNative.test"))).message shouldBe
+          "Module selector __.test resolves to Scala.js or Native test modules, which the test command cannot run: coreJS.test and coreNative.test"
       }
     }
 
@@ -63,12 +63,6 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
       "name the selector and Mill's error" in {
         TestCommandFailure.UnresolvedModuleSelector(ModuleSelectorArgument("missing"), "Cannot resolve missing").message shouldBe
           "Module selector missing resolves to no module: Cannot resolve missing"
-      }
-    }
-
-    "the module's inputs are not evaluated" should {
-      "be Mill's error" in {
-        TestCommandFailure.ModuleInputsNotEvaluated("compile failed").message shouldBe "compile failed"
       }
     }
 

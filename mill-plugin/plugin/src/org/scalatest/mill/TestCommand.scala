@@ -1,9 +1,12 @@
 package org.scalatest.mill
 
+import java.nio.charset.Charset
 import java.time.Instant
 import mill.api.BuildCtx
 import mill.api.BuildInfo
 import mill.api.Evaluator
+import mill.api.Logger
+import mill.api.Task
 import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
@@ -23,11 +26,14 @@ private[mill] object TestCommand {
     val commandArguments = orFail(TestCommandArguments.parse(arguments))
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
     jsonOutputFile.foreach(file => orFail(BuildCtx.withFilesystemCheckerDisabled(file.delete())))
-    val selectedModule = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
-    val module = selectedModule.name
-    val moduleFolder = BuildCtx.withFilesystemCheckerDisabled(clearedModuleFolder(ctx, module))
-    val inputs = orFail(JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log))
-    val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.kept(inputs.testArgs)), commandArguments.frameworkArguments)
+    val selection = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
+    // Fail-fast off lets every module's tests run, whatever happens to the others' tasks.
+    val failFastOffEvaluator = FailFastOffEvaluator.from(evaluator)
+    val checkedModules = successfulValues(failFastOffEvaluator, ctx.log)(selection.modules.map(module => module -> moduleCheckTask(module)))
+    val runArguments = checkedModules.map { case (module, moduleArguments) =>
+      module -> RunArguments.from(orFail(ModuleScalaTestArguments.kept(moduleArguments)), commandArguments.frameworkArguments)
+    }
+    val moduleFolders = BuildCtx.withFilesystemCheckerDisabled(selection.modules.map(module => module -> clearedModuleFolder(ctx, module.name)).toMap)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       commandArguments.stdoutContent match {
@@ -39,31 +45,69 @@ private[mill] object TestCommand {
       humanReadableOutput,
       coloured = true,
       jsonOutput = jsonOutputFile.map(file => json => jsonOutputWritten = BuildCtx.withFilesystemCheckerDisabled(file.write(json.writeTo))),
-      moduleSelectors = commandArguments.moduleSelectors.map(_.resolvedTo(Vector(module))),
+      moduleSelectors = selection.moduleSelectors,
       buildTool = Some(BuildTool("Mill", BuildInfo.millVersion)),
       startedAt = Some(now())
     )
-    val moduleRun = new JvmTestModuleRun(
-      module,
-      inputs,
-      runArguments,
-      commandArguments.classGlobs,
-      moduleFolder,
-      ctx,
-      now,
-      WorkerOutputCapture.workerCharset(systemProperty),
-      EventLogFile.at,
-      ProcessExit.hasExited,
-      10.millis,
-      JvmTestModuleRun.filesystemIgnoresCase
-    )
-    BuildCtx.withFilesystemCheckerDisabled {
-      moduleRun.execute(consolidation)
+    val workerCharset = WorkerOutputCapture.workerCharset(systemProperty)
+    val moduleRunTasks = runArguments.map { case (module, moduleRunArguments) =>
+      moduleRunTask(module, moduleRunArguments, commandArguments.classGlobs, moduleFolders(module), consolidation, ctx.log, now, workerCharset)
     }
+    failFastOffEvaluator.execute(moduleRunTasks, logger = ctx.log)
     val endedState = consolidation.end(Some(now()))
     orFail(jsonOutputWritten)
     if (endedState.failed) {
-      ctx.fail(s"The tests of ${module.value} failed")
+      ctx.fail(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed")
+    }
+  }
+
+  // The check evaluates no compile, so that no module's tests wait on another module's compile.
+  private def moduleCheckTask(module: SelectedTestModule): Task[Seq[String]] =
+    Task.Anon {
+      module.module.testArgsDefault()
+    }
+
+  // Each module's tests run in this task's body, downstream of only that module's inputs, so they start once that
+  // module's inputs are evaluated.
+  private def moduleRunTask(
+      module: SelectedTestModule,
+      runArguments: RunArguments,
+      classGlobs: Seq[ClassGlob],
+      moduleFolder: os.Path,
+      consolidation: Consolidation,
+      workerLog: Logger,
+      now: () => Instant,
+      workerCharset: Charset
+  ): Task[Unit] = {
+    val inputsTask = JvmTestModuleInputs.task(module.module)
+    Task.Anon {
+      val moduleRun = new JvmTestModuleRun(
+        module.name,
+        inputsTask(),
+        runArguments,
+        classGlobs,
+        moduleFolder,
+        Task.ctx(),
+        workerLog,
+        now,
+        workerCharset,
+        EventLogFile.at,
+        ProcessExit.hasExited,
+        10.millis,
+        JvmTestModuleRun.filesystemIgnoresCase
+      )
+      // Mill's filesystem checker refuses this task's writes to the module folder, as an anonymous task has no `dest`.
+      // Workers forked inside the block run with the checker off too.
+      BuildCtx.withFilesystemCheckerDisabled {
+        moduleRun.execute(consolidation)
+      }
+    }
+  }
+
+  private def successfulValues[K, V](evaluator: Evaluator, logger: Logger)(tasks: Seq[(K, Task[V])]): Seq[(K, V)] = {
+    val results = evaluator.execute(tasks.map(_._2), logger = logger).executionResults.transitiveResults
+    tasks.flatMap { case (key, task) =>
+      results.get(task).flatMap(_.asSuccess).map(success => key -> success.value.value.asInstanceOf[V])
     }
   }
 

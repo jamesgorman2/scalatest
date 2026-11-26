@@ -5,6 +5,7 @@ import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import mill.api.Logger
 import mill.api.Result
 import mill.api.TaskCtx
 import mill.javalib.TestModuleUtil
@@ -30,7 +31,8 @@ private[mill] final class JvmTestModuleRun(
     runArguments: RunArguments,
     classGlobs: Seq[ClassGlob],
     moduleFolder: os.Path,
-    commandCtx: TaskCtx,
+    taskCtx: TaskCtx,
+    workerLog: Logger,
     now: () => Instant,
     workerCharset: Charset,
     eventLogFileAt: Path => EventLogFile,
@@ -42,7 +44,7 @@ private[mill] final class JvmTestModuleRun(
   // The test command places every worker path in the module folder itself. `dest` points there too, so anything Mill
   // derives from `Task.dest` also lands there. In Mill 1.3.1 only test discovery reads `dest`, and it writes nothing
   // there, so no test can show whether `dest` is the module folder or the command's own.
-  private val ctx: TaskCtx = new ModuleFolderTaskCtx(commandCtx, moduleFolder)
+  private val ctx: TaskCtx = new ModuleFolderTaskCtx(taskCtx, moduleFolder)
 
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
@@ -125,7 +127,7 @@ private[mill] final class JvmTestModuleRun(
     )
     val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(module), reader, capture)
     workerRun.start { workerStarting =>
-      val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
+      val workerCtx = new WorkerTaskCtx(ctx, workerLog, capture, workerStarting)
       runWorker(workerCtx, inputs.testModuleUtil(runArguments.commandLine ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun

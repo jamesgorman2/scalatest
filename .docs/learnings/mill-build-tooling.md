@@ -226,3 +226,15 @@ It skips the second check whenever laying out a fork group fails or any worker d
 
 A plugin that matches `testOnly`'s failures must decide, for each of these cases, whether to add the no-match failure. `testOnly` adds it after none of them: only where every worker ended with a result and none held a test.
 </learning>
+
+<learning>
+date: 2026-11-26
+---
+In Mill 1.3.1 with the ticker on (`--ticker true`) and output that is not a terminal, such as a testkit `IntegrationTester` run, Mill's prompt logger dumps its prompt lines to the console at intervals while tasks run. Each line shows a running task's prompt key, its name, its time and the detail `logger.ticker` last set, such as `1-144] Task.Anon@6342ff7f(<enclosing method>) 3s samples.QueueFlatSpec`.
+
+- Every non-exclusive task gets a prompt line, anonymous tasks included, and so does each `Task.fork.async` body. A `ticker` call on that task's or body's logger therefore reaches the console.
+- An exclusive command gets no prompt line. A `ticker` call on its logger sets the detail of no line and prints nothing, even inside a nested `Evaluator.execute`.
+- `TestModuleUtil.runTestFuture`, where it runs a worker on the calling thread, calls `ticker` with each test class the worker claims, on the logger of the `TaskCtx` it was built with.
+
+A plugin that runs Mill's test workers inside an anonymous task of its exclusive command, and must keep test class names off the console, must give the `TaskCtx` it builds `TestModuleUtil` with the exclusive command's logger, not the anonymous task's.
+</learning>

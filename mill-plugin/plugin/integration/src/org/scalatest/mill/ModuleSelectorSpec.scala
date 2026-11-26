@@ -6,28 +6,18 @@ import org.scalatest.matchers.should
 
 final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
-  Feature("The test command fails unless given one module selector that resolves to one JVM test module") {
+  Feature("The test command fails before any test starts unless given module selectors that each resolve to JVM test modules") {
 
     val selectorsThatFail = Seq(
       (
-        "two module selectors",
-        Seq("core.test", "util.test"),
-        "The test command takes one module selector, but was given: core.test util.test"
-      ),
-      (
-        "one resolving to three test modules",
-        Seq("__.test"),
-        "Module selector __.test must resolve to one JVM test module, but resolved to: "
-      ),
-      (
         "one resolving to a module that is not a test module",
         Seq("core"),
-        "Module selector core must resolve to one JVM test module, but resolved to: core"
+        "Module selector core resolves to no test module"
       ),
       (
         "one resolving to a Scala.js test module",
         Seq("coreJS.test"),
-        "Module selector coreJS.test must resolve to one JVM test module, but resolved to: coreJS.test"
+        "Module selector coreJS.test resolves to Scala.js or Native test modules, which the test command cannot run: coreJS.test"
       ),
       (
         "one resolving to no module",
@@ -37,7 +27,7 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
       (
         "no module selector",
         Seq("-oH"),
-        "The test command takes one module selector, but was given none"
+        "The test command takes one or more module selectors, but was given none"
       )
     )
 

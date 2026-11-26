@@ -1,14 +1,14 @@
 # ScalaTest's Mill plugin
 
-The plugin `com.edc:scalatest-mill_mill1_3` adds the test command `mill scalatest/test`. It runs one JVM test module's tests and writes their consolidated human-readable output to stdout and, on request, their consolidated JSON output to a file.
+The plugin `com.edc:scalatest-mill_mill1_3` adds the test command `mill scalatest/test`. It runs the tests of one or more JVM test modules and writes their consolidated human-readable output to stdout and, on request, their consolidated JSON output to a file.
 
 Each plugin release is a release of this fork. The plugin, the fork's ScalaTest artifacts and the consolidation library share one version, `3.2.20`.
 
 ## What it supports
 
 - Mill 1.3.1 only.
-- One JVM test module per command, testing with this fork at the plugin's release.
-- The module's tests run in the workers that Mill's `testForked` starts for each fork group that holds a test class to run, or that `testOnly` starts for each such group where class globs are given (§ Running the test command).
+- One or more JVM test modules per command, each testing with this fork at the plugin's release.
+- Each module's tests run in the workers that Mill's `testForked` starts for each fork group that holds a test class to run, or that `testOnly` starts for each such group where class globs are given (§ Running the test command).
   - A module that does not set `testBatchFrameworkTasks` runs through Mill's test queue.
     - With `testParallelism` on (the default), Mill starts a fork group's first worker. It starts each further worker only where a test class remains in the group's queue, up to the lesser of Mill's `--jobs` and the number of the group's test classes to run. The group's workers run in parallel.
     - With `testParallelism` off, each fork group gets one worker, and the workers run one after another.
@@ -82,12 +82,12 @@ Nothing else in the build names the plugin. Mill's own test tasks, such as `mill
 ## Running the test command
 
 ```
-mill scalatest/test <module selector> [-oH | -o] [-fJ <path>] [-- [<class globs>] [-- <framework arguments>]]
+mill scalatest/test <module selectors> [-oH | -o] [-fJ <path>] [-- [<class globs>] [-- <framework arguments>]]
 ```
 
-For example, `mill scalatest/test core.test`.
+For example, `mill scalatest/test core.test util.test`.
 
-- **Module selector**: exactly one, resolving to one JVM test module.
+- **Module selectors**: one or more, each a separate argument before the first `--`, in any order among the output arguments. Each resolves to the JVM test modules it names, such as `__.test`, and keeps only its test modules, so `__` selects every test module. Each test module any module selector resolves to runs its tests once. Every selected module's tests run, whatever happens to the other modules' tests, whether or not Mill's `--keep-going` is given.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
 - **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
@@ -123,24 +123,25 @@ The test command fails before any test starts, and writes no consolidated output
 - a framework argument has none of the forms the test command accepts, such as `-oD`, `-s`, `foo`, a third `--`, `-n` with no value after it, `-W` followed by anything but two integers, `-D` with no config map entry, or a bare `-P`;
 - it is given one of `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, alone or with its value joined to it, before the first `--`, or anywhere if no `--` is given;
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
-- it is given no module selector, or more than one;
-- the module selector resolves to anything other than one JVM test module, such as a Scala.js test module or `__.test`;
-- the module's own ScalaTest arguments hold a flag ScalaTest's runner does not recognise.
+- it is given no module selector;
+- a module selector resolves to no module, or to no test module;
+- a module selector resolves to a Scala.js or Native test module;
+- a selected module's own ScalaTest arguments hold a flag ScalaTest's runner does not recognise.
 
 It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- class globs are given and none of them matches a test class of the module. No test runs. The consolidated output is written, and its root holds the failure Mill's `testOnly` gives: `Test selector does not match any test: <class globs>` ([JSON.md](JSON.md) § Root);
-- class globs are given, and once every test worker has ended, no run has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The consolidated output is written, and its root holds the same failure unless laying out a fork group's files or starting or running a test worker failed. The failure is also left out where a test worker's JVM ended without writing its result and the test command already fails. Neither of these counts as such a report:
+- class globs are given and none of them matches a test class of a selected module. No test of that module runs. The consolidated output is written, and its root holds the failure Mill's `testOnly` gives: `Test selector does not match any test: <class globs>` ([JSON.md](JSON.md) § Root);
+- class globs are given, and once every test worker of a module has ended, no run of that module has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The consolidated output is written, and its root holds the same failure unless laying out a fork group's files or starting or running a test worker failed. The failure is also left out where a test worker's JVM ended without writing its result and the test command already fails. Neither of these counts as such a report:
   - a test shown as ignored only because its suite's structure marks it ignored;
   - a suite or test shown as aborted only because it has no end event, such as one with reason *not run*;
 - laying out a fork group's files fails, or starting or running a test worker fails;
 - the test command fails to capture a test worker's output, which goes to Mill's console instead;
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;
-- two of the module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test runs;
-- two or more of the module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test runs;
-- the module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
+- two of a module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test of that module runs;
+- two or more of a module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test of that module runs;
+- a selected module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
 Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
@@ -150,8 +151,8 @@ Under the test command, ScalaTest prints no end-of-run summary of its own. Inste
 The test command writes a module's files in its module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
 
 - Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder. The exception is Mill's JUnit XML report: the test command writes none, whatever the module's `testReportXml`.
-- Once it has resolved the module selector, the test command deletes everything an earlier test command left in the module folder. It does so before any test starts, and also where none starts, as where no class glob matches.
-- A test command that fails on its arguments, such as on a framework argument it does not accept, leaves the module folder as it was.
+- Once it has resolved its module selectors and read each selected module's own ScalaTest arguments, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, and also where none starts, as where no class glob matches.
+- A test command that fails on its arguments, such as on a framework argument it does not accept or a module's own ScalaTest argument ScalaTest's runner does not recognise, leaves every module folder as it was.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
 
 ## Runs in the human-readable output

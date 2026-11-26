@@ -1,6 +1,7 @@
 package org.scalatest.mill
 
 import java.nio.file.Path
+import org.scalatest.consolidation.ModuleName
 import scala.util.control.NoStackTrace
 
 private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
@@ -9,10 +10,9 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case FrameworkArgumentAmongOwnArguments(argument: String)
   case FrameworkArgumentNotPassedOn(argument: String)
   case NoModuleSelector
-  case SeveralModuleSelectors(selectors: Seq[ModuleSelectorArgument])
-  case NotOneJvmTestModule(selector: ModuleSelectorArgument, resolved: String)
+  case NoTestModule(selector: ModuleSelectorArgument)
+  case NotJvmTestModules(selector: ModuleSelectorArgument, modules: Seq[ModuleName])
   case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
-  case ModuleInputsNotEvaluated(error: String)
   case UnrecognisedModuleArgument(argument: String)
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
@@ -34,15 +34,14 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case FrameworkArgumentNotPassedOn(argument) =>
         s"The test command takes only ScalaTest's $frameworkFlags as framework arguments, each with the values ScalaTest's runner takes with it, but was given: $argument"
       case NoModuleSelector =>
-        "The test command takes one module selector, but was given none"
-      case SeveralModuleSelectors(selectors) =>
-        s"The test command takes one module selector, but was given: ${selectors.map(_.text).mkString(" ")}"
-      case NotOneJvmTestModule(selector, resolved) =>
-        s"Module selector ${selector.text} must resolve to one JVM test module, but resolved to: $resolved"
+        "The test command takes one or more module selectors, but was given none"
+      case NoTestModule(selector) =>
+        s"Module selector ${selector.text} resolves to no test module"
+      case NotJvmTestModules(selector, modules) =>
+        s"Module selector ${selector.text} resolves to Scala.js or Native test modules, which the test command cannot run: " +
+          EnglishList.of(modules.map(_.value))
       case UnresolvedModuleSelector(selector, error) =>
         s"Module selector ${selector.text} resolves to no module: $error"
-      case ModuleInputsNotEvaluated(error) =>
-        error
       case UnrecognisedModuleArgument(argument) =>
         s"The module's ScalaTest arguments hold $argument, which ScalaTest does not recognise"
       case JsonOutputPathIsFolder(path) =>

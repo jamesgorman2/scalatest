@@ -1,9 +1,6 @@
 package org.scalatest.mill
 
-import mill.api.Evaluator
-import mill.api.Logger
 import mill.api.PathRef
-import mill.api.Result
 import mill.api.Task
 import mill.api.TaskCtx
 import mill.api.daemon.internal.TestReporter
@@ -12,7 +9,6 @@ import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.InternalJvmWorkerApi
 
 private[mill] final case class JvmTestModuleInputs(
-    testArgs: Seq[String],
     useArgsFile: Boolean,
     forkArgs: Seq[String],
     scalalibClasspath: Seq[PathRef],
@@ -65,18 +61,10 @@ private[mill] final case class JvmTestModuleInputs(
 
 private[mill] object JvmTestModuleInputs {
 
-  def evaluate(evaluator: Evaluator, module: TestModule, logger: Logger): Either[TestCommandFailure, JvmTestModuleInputs] =
-    evaluator.execute(Seq(task(module)), logger = logger).values match {
-      case Result.Success(Seq(inputs)) => Right(inputs)
-      case Result.Success(values) => throw new IllegalStateException(s"Evaluating ${module.moduleSegments.render} gave ${values.size} values")
-      case failure: Result.Failure => Left(TestCommandFailure.ModuleInputsNotEvaluated(failure.error))
-    }
-
-  private def task(module: TestModule): Task[JvmTestModuleInputs] = {
+  def task(module: TestModule): Task[JvmTestModuleInputs] = {
     val discoveredClasses = discoveredClassesTask(module)
     Task.Anon {
       JvmTestModuleInputs(
-        module.testArgsDefault(),
         module.testUseArgsFile(),
         module.forkArgs(),
         module.jvmWorker().scalalibClasspath(),

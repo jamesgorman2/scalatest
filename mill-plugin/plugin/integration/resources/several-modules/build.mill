@@ -1,0 +1,22 @@
+//| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
+package build
+
+import mill.*
+import mill.api.BuildCtx
+import mill.scalalib.*
+
+trait SampleModule extends ScalaModule {
+  def scalaVersion = "3.3.8"
+
+  object test extends ScalaTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+    def testParallelism = false
+    def testSandboxWorkingDir = true
+    def forkArgs = Task { Seq(s"-Dmarkers=${BuildCtx.workspaceRoot / "markers"}") }
+    def sources = Task.Sources(moduleDir / "src", BuildCtx.workspaceRoot / "marking")
+  }
+}
+
+object alpha extends SampleModule
+
+object beta extends SampleModule
