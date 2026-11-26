@@ -250,10 +250,17 @@ Where modules share test settings but one may need its own, declare the settings
 <learning>
 date: 2026-11-27
 ---
-In Mill 1.3.1, `mill.javalib.CoursierModule.Resolver` resolves dependencies in two ways that do not match:
+In Mill 1.3.1, `mill.javalib.CoursierModule.Resolver` resolves dependencies in two ways that take different resolution parameters:
 
 - `classpath(deps, sources, artifactTypes, resolutionParamsMapOpt, ...)` downloads every artifact. `JavaModule.resolvedRunMvnDeps` calls it with a map that sets `withDefaultConfiguration(runtime)` and the Gradle `org.gradle.usage` runtime variant attribute.
 - `resolution(deps)` returns the `coursier.core.Resolution` from metadata alone and downloads no jar, but takes no parameter map: it resolves with the module's `resolutionParams` unchanged.
 
-A metadata-only resolution therefore cannot copy `resolvedRunMvnDeps`'s parameters. Name the configuration on the root dependency yourself, as `coursierDependencyTask().copy(variantSelector = VariantSelector.ConfigurationBased(Configuration.runtime))`. Mill gives every dependency of a module's Coursier project a configuration, so only a dependency or BOM that names none, or a Gradle module variant under `checkGradleModules`, can resolve differently. Where exact parity matters, call `classpath` and accept the downloads.
+A metadata-only resolution can still use `resolvedRunMvnDeps`'s parameters, without downloads, but only by bypassing `millResolver`:
+
+- `mill.javalib.Lib.resolveDependenciesMetadataSafe` is public, fetches metadata only and takes `resolutionParams`.
+- `CoursierModule.Resolver`'s constructor is public, and so is every module task `millResolver` builds it from: `allRepositories`, `bindDependency`, `mapDependencies`, `resolutionCustomizer`, `coursierCacheCustomizer`, `resolutionParams`, `checkGradleModules` and `coursierConfigModule().coursierConfig()`.
+
+Pass those tasks' values to `resolveDependenciesMetadataSafe`, or to a new `Resolver` whose `resolution` you then call, with `resolutionParams` mapped as `resolvedRunMvnDeps` maps it. Either way ignores a module's override of `millResolver`.
+
+`millResolver().resolution` keeps any such override but not the parameters. With it, name the configuration on the root dependency yourself, as `coursierDependencyTask().copy(variantSelector = VariantSelector.ConfigurationBased(Configuration.runtime))`. Mill gives every dependency of a module's Coursier project a configuration, so only a dependency or BOM that names none, or a Gradle module variant under `checkGradleModules`, can then resolve differently.
 </learning>

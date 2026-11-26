@@ -5,8 +5,13 @@ import coursier.core.Resolution
 import coursier.core.VariantSelector
 import mill.api.Task
 import mill.javalib.BoundDep
+import org.scalatest.consolidation.ScalaTestArgument
 
-private[mill] final case class ModuleCheck(testArgsDefault: Seq[String], runtimeResolution: Resolution)
+private[mill] final case class ModuleCheck(testArgsDefault: Seq[String], runtimeResolution: Resolution) {
+
+  def runArguments(frameworkArguments: Seq[ScalaTestArgument.Flagged]): Either[TestCommandFailure, RunArguments] =
+    ModuleScalaTestArguments.kept(testArgsDefault).map(kept => RunArguments.from(kept, frameworkArguments))
+}
 
 private[mill] object ModuleCheck {
 

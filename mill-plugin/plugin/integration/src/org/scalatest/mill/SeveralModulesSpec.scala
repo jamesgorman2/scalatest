@@ -32,14 +32,14 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
   }
 
   private def addLateTestCompilingAfterAlpha1Fast(build: FixtureBuild): Unit = {
-    Given("the build also has the JVM test module late.test, which holds the suite Late1, whose class is samples.Late1")
+    Given("the build also has the JVM test module late.test, which tests with com.edc::scalatest at the release under test and holds the suite Late1, whose class is samples.Late1")
     And("Late1 is an AnyFunSuite whose test fast creates the file Late1.fast in <markers>")
     And("late.test's compile depends on a task that ends once the file Alpha1.fast exists in <markers>, and fails if that file does not exist within 120 seconds")
     // The wait gates the compile of late, which late.test's compile depends on, so the scenario also fails where the
     // check compiles a module that late.test depends on through moduleDeps.
     build.appendToBuild(
       """object late extends SampleModule {
-        |  def alpha1FastExists: Task[Unit] = Task.Anon {
+        |  def awaitAlpha1Fast: Task[Unit] = Task.Anon {
         |    val marker = BuildCtx.workspaceRoot / "markers" / "Alpha1.fast"
         |    val deadline = System.nanoTime() + 120L * 1000000000L
         |    while (!os.exists(marker) && System.nanoTime() < deadline) {
@@ -49,7 +49,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
         |  }
         |
         |  def compile: T[mill.javalib.api.CompilationResult] = Task {
-        |    alpha1FastExists()
+        |    awaitAlpha1Fast()
         |    super.compile()
         |  }
         |

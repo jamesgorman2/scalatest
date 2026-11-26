@@ -136,7 +136,7 @@ private[mill] object TestCommand {
       frameworkArguments: Seq[ScalaTestArgument.Flagged]
   ): Either[TestCommandFailure, Seq[(SelectedTestModule, RunArguments)]] =
     FirstFailure.orValues(moduleChecks.map { case (module, check) =>
-      ModuleScalaTestArguments.kept(check.testArgsDefault).map(kept => module -> RunArguments.from(kept, frameworkArguments))
+      check.runArguments(frameworkArguments).map(runArguments => module -> runArguments)
     })
 
   private def failuresOf(evaluation: Evaluator.Result[?]): Seq[Result.Failure] =
