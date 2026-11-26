@@ -22,7 +22,7 @@ private[mill] object TestCommand {
       ctx: TaskCtx,
       now: () => Instant,
       systemProperty: String => Option[String]
-  ): Unit = {
+  ): Result[Unit] = {
     def orFail[A](result: Either[TestCommandFailure, A]): A = result.fold(failure => ctx.fail(failure.message), identity)
     val commandArguments = orFail(TestCommandArguments.parse(arguments))
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
@@ -61,11 +61,7 @@ private[mill] object TestCommand {
     orFail(jsonOutputWritten)
     val failures = Seq(checkEvaluation.values, runEvaluation.values).collect { case failure: Result.Failure => failure } ++
       Option.when(endedState.failed)(Result.Failure(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed"))
-    if (failures.nonEmpty) {
-      // `ctx.fail` takes only a message; the joined failure keeps each failed task's name and Mill's own error.
-      val failure = Result.Failure.join(failures)
-      throw new Result.Exception(failure.error, Some(failure))
-    }
+    if (failures.nonEmpty) Result.Failure.join(failures) else Result.Success(())
   }
 
   // The check evaluates no compile, so that no module's tests wait on another module's compile.
@@ -113,10 +109,7 @@ private[mill] object TestCommand {
 
   private def successfulValues[K, V](evaluation: Evaluator.Result[V], tasks: Seq[(K, Task[V])]): Seq[(K, V)] =
     tasks.flatMap { case (key, task) =>
-      for {
-        result <- evaluation.executionResults.transitiveResults.get(task)
-        success <- result.asSuccess
-      } yield key -> success.value.value.asInstanceOf[V]
+      evaluation.executionResults.transitiveResults.get(task).flatMap(_.asSuccess).map(success => key -> success.value.value.asInstanceOf[V])
     }
 
   private def clearedModuleFolder(ctx: TaskCtx, module: ModuleName): os.Path = {

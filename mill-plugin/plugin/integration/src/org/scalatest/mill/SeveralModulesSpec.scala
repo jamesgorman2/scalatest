@@ -88,7 +88,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
           And("Mill's console shows no consolidated output")
           result.treeLines shouldBe empty
-          result.consoleLines.map(TestCommandResult.withoutMillPrefix).filter(_.startsWith("Suites: ")) shouldBe empty
+          result.summaryLinesAnywhereOnTheConsole shouldBe empty
         }
       }
     }
@@ -226,7 +226,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
         And("Mill reports that the test command failed, naming the failed task beta.test.compile")
         shouldFail(result)
-        shouldWriteToTheConsole(result, "beta.test.compile")
+        shouldWriteToTheConsole(result, "org.scalatest.mill.TestCommandModule/test beta.test.compile")
       }
     }
   }
