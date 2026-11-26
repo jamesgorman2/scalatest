@@ -24,8 +24,10 @@ private[mill] object TestCommand {
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
     jsonOutputFile.foreach(file => orFail(BuildCtx.withFilesystemCheckerDisabled(file.delete())))
     val selectedModule = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
+    val module = selectedModule.name
+    val moduleFolder = BuildCtx.withFilesystemCheckerDisabled(clearedModuleFolder(ctx, module))
     val inputs = orFail(JvmTestModuleInputs.evaluate(evaluator, selectedModule.module, ctx.log))
-    val scalaTestArguments = orFail(ModuleScalaTestArguments.forRun(inputs.testArgs))
+    val runArguments = RunArguments.from(orFail(ModuleScalaTestArguments.kept(inputs.testArgs)), commandArguments.frameworkArguments)
     val output = ctx.log.streams.out
     val humanReadableOutput: String => Unit =
       commandArguments.stdoutContent match {
@@ -33,7 +35,6 @@ private[mill] object TestCommand {
         case StdoutContent.NoOutput => _ => ()
       }
     var jsonOutputWritten: Either[TestCommandFailure, Unit] = Right(())
-    val module = ModuleName(selectedModule.path)
     val consolidation = Consolidation.start(
       humanReadableOutput,
       coloured = true,
@@ -45,8 +46,9 @@ private[mill] object TestCommand {
     val moduleRun = new JvmTestModuleRun(
       module,
       inputs,
-      scalaTestArguments,
-      moduleFolder(ctx, selectedModule.path),
+      runArguments,
+      commandArguments.classGlobs,
+      moduleFolder,
       ctx,
       now,
       WorkerOutputCapture.workerCharset(systemProperty),
@@ -61,9 +63,14 @@ private[mill] object TestCommand {
     val endedState = consolidation.end(Some(now()))
     orFail(jsonOutputWritten)
     if (endedState.failed) {
-      ctx.fail(s"The tests of ${selectedModule.path} failed")
+      ctx.fail(s"The tests of ${module.value} failed")
     }
   }
 
-  private def moduleFolder(ctx: TaskCtx, modulePath: String): os.Path = ctx.dest / os.up / "modules" / modulePath
+  private def clearedModuleFolder(ctx: TaskCtx, module: ModuleName): os.Path = {
+    val moduleFolder = os.Path(ModuleFolder.inside((ctx.dest / os.up / "modules").toNIO, module))
+    os.remove.all(moduleFolder)
+    os.makeDir.all(moduleFolder)
+    moduleFolder
+  }
 }

@@ -1,6 +1,6 @@
 # Decisions: JSON output layout
 
-Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
+Decisions behind the layout of the JSON output that [../../mill-plugin/consolidated.schema.json](../../mill-plugin/consolidated.schema.json) states, newest first.
 
 ## A module's runs are numbered by their fork group's position in the module's `testForkGrouping`, then by their worker's index within the fork group.
 
@@ -35,11 +35,20 @@ Decisions behind [JSON-LAYOUT.md](JSON-LAYOUT.md), newest first.
 
 ## A node's children are ordered by declared place, then by name and start order; a dropped scope or test follows the current node at its place (`SPECIFICATION.md` R-105).
 
-The order is [JSON-LAYOUT.md](JSON-LAYOUT.md) § Nodes, `contents`. A scope's or test's declared place is its registration index among its parent's scopes and tests after filtering, numbered the same way in every structure of its suite; it is not a source line.
+A node's children appear in this order:
+
+- Children with a declared place come first, in declared order. A nested suite's declared place is its index in its parent's `nestedSuites`. A suite's nested suites with a declared place come before all its scopes and tests, or after them where the suite mixes in `TestsBeforeNestedSuites`.
+- A scope or test that a later structure of its suite drops keeps the place it last had, and follows the node the latest structure holds there. Several dropped at one place follow in the order a structure first held them.
+- A suite with no declared place that shares a `suiteId` with a sibling that has one sits directly after the last sibling with that `suiteId`. Several such suites follow in the order a structure first held them.
+- The remaining children are suites, in ascending order by name, compared with `String.compareTo`. Suites that share a name appear in the order they started, followed by those that never started, in the order a structure first held them.
+
+A child that ran more than once in one execution of its parent has one node per execution, in the order its executions started. The nodes of a child with a declared place are together. The nodes of a remaining suite are ordered by name and start order, so a suite of the same name that started between them separates them.
+
+A scope's or test's declared place is its registration index among its parent's scopes and tests after filtering, numbered the same way in every structure of its suite; it is not a source line.
 
 **Alternatives** Ordering scopes and tests that share a declared place by start order puts a node a later structure dropped before the node that now holds its place whenever the dropped one ran first, and makes their order depend on timing in a concurrent run.
 
-**Reasoning** R-105 orders by declaration order where it is known. Registration order is the declaration order every structure carries, so numbering it from the same first position in every structure of a suite gives each scope and test one place across structures. Where a later structure drops a node, the latest structure states the suite's current declaration, so its node comes first and the dropped node follows. A suite that runs again beside its declared self has no declared place of its own; placing it after the last sibling with its `suiteId` keeps a suite's runs together. Suites with no declared place have only a name, so they follow § Tree's order by name and start order.
+**Reasoning** R-105 orders by declaration order where it is known. Registration order is the declaration order every structure carries, so numbering it from the same first position in every structure of a suite gives each scope and test one place across structures. Where a later structure drops a node, the latest structure states the suite's current declaration, so its node comes first and the dropped node follows. A suite that runs again beside its declared self has no declared place of its own; placing it after the last sibling with its `suiteId` keeps a suite's runs together. Suites with no declared place have only a name, so they follow the order by name and start order that modules and top-level suites take.
 
 **Costs** Where the declaration changed between structures, a dropped node sits at a place the current declaration gives another node. The executions of distinct suites that share a name and have no declared place interleave by start order.
 
@@ -106,7 +115,7 @@ Top-level suites that share a name follow their start order, as R-105 gives for 
 
 - A flat `buildToolName` and `buildToolVersion` on the root splits one optional fact into two keys a reader must check together.
 - Making each module selector a node, with its modules beneath it, nests a module under every selector that resolved to it, so a module two selectors share would appear twice.
-- Writing modules as an object keyed by name loses the order § Tree gives and differs from the `contents` array every other node uses.
+- Writing modules as an object keyed by name loses the modules' order by name and differs from the `contents` array every other node uses.
 
 **Reasoning** Each key names the one fact it holds in ScalaTest's and Mill's own words: ScalaTest's version, the build tool, the module selector as given and the Mill module path. Grouping the build tool's name and version makes it absent or present as a whole, as the caller gives it. Keeping module selectors as data on the root, with the modules they resolved to by name, leaves `contents` as the tree alone.
 

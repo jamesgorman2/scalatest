@@ -3,7 +3,10 @@ package org.scalatest.consolidation
 import org.scalatest.tools.ArgumentSplitter
 import org.scalatest.tools.SplitArgument
 
-/** One of a module's ScalaTest arguments, as ScalaTest's JVM runner reads it. */
+/**
+ * A ScalaTest argument, as ScalaTest's JVM runner reads it, from a module's ScalaTest arguments or the test command's
+ * framework arguments.
+ */
 enum ScalaTestArgument {
 
   /**
@@ -20,12 +23,30 @@ enum ScalaTestArgument {
 object ScalaTestArgument {
 
   /**
-   * Splits a module's ScalaTest arguments by flag, in the order given. Each flag takes the values the runner reads
-   * for it, so a value is never returned as a flag. A flag short of values keeps those it has. Never throws.
+   * Splits ScalaTest arguments by flag, in the order given. Each flag takes the values the runner reads for it, so a
+   * value is never returned as a flag. A flag short of values keeps those it has. Never throws.
    */
   def split(arguments: Seq[String]): Seq[ScalaTestArgument] =
     ArgumentSplitter.split(arguments).map {
       case SplitArgument.Flagged(flag, flagArguments) => Flagged(flag, flagArguments)
       case SplitArgument.Unrecognised(argument) => Unrecognised(argument)
     }
+
+  extension (flagged: Flagged) {
+
+    /**
+     * The value joined to the flag: `colour=blue` for `-Dcolour=blue`, and empty for `-n`. None where the flag holds
+     * no argument, or its first argument does not start with the flag.
+     */
+    def joinedValue: Option[String] = flagged.arguments.headOption.filter(_.startsWith(flagged.flag)).map(_.drop(flagged.flag.length))
+
+    /** The values that follow the flag: `Fast` for `-n Fast`. */
+    def values: Seq[String] = flagged.arguments.drop(1)
+
+    /**
+     * Whether the flag holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one
+     * integer. A flag the runner does not recognise is never short of values.
+     */
+    def isShortOfValues: Boolean = ArgumentSplitter.isShortOfValues(SplitArgument.Flagged(flagged.flag, flagged.arguments.toList))
+  }
 }

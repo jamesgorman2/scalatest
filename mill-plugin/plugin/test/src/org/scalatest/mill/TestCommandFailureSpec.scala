@@ -23,6 +23,22 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "a framework argument's flag is among the test command's own arguments" should {
+      "say the flags are taken only after a second --, naming the argument" in {
+        TestCommandFailure.FrameworkArgumentAmongOwnArguments("-n").message shouldBe
+          "The test command takes ScalaTest's -D, -n, -l, -P, -m, -w, -F, -T, -t, -z, -S and -W only as framework arguments, " +
+          "after a second --, but was given among its own arguments: -n"
+      }
+    }
+
+    "a framework argument is not one the test command passes on" should {
+      "say which framework arguments the command takes, naming the argument" in {
+        TestCommandFailure.FrameworkArgumentNotPassedOn("-oD").message shouldBe
+          "The test command takes only ScalaTest's -D, -n, -l, -P, -m, -w, -F, -T, -t, -z, -S and -W as framework arguments, " +
+          "each with the values ScalaTest's runner takes with it, but was given: -oD"
+      }
+    }
+
     "no module selector is given" should {
       "say the command takes one" in {
         TestCommandFailure.NoModuleSelector.message shouldBe "The test command takes one module selector, but was given none"

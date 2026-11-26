@@ -2,7 +2,7 @@
 
 For each need of the consolidated progress, human-readable and JSON output: what ScalaTest's events carry in memory on the JVM, Scala.js and Native, what `Event.toJson` keeps of it, and whether new code is needed at the point of emission. Facts only; no design is chosen or recommended.
 
-The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from `.planning/event-stream-reporting/JSON-LAYOUT.md`, the JSON layout its R-028 cites.
+The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and from `mill-plugin/consolidated.schema.json`, the JSON schema its R-028 cites.
 
 `.planning/event-stream-reporting/research/emitter-and-mill-channel.md`, cited as `EMC`, already lists what serialisation loses; this note does not repeat it.
 
@@ -22,7 +22,7 @@ The needs are read from `.planning/event-stream-reporting/SPECIFICATION.md` and 
 | `[this]` | this repo | `47f849e7d` |
 | `EMC` | `.planning/event-stream-reporting/research/emitter-and-mill-channel.md` | as committed at `47f849e7d` |
 | `ESR` | `.planning/event-stream-reporting/SPECIFICATION.md` | as committed with this note |
-| `JL` | `.planning/event-stream-reporting/JSON-LAYOUT.md` | the same |
+| `SCH` | `mill-plugin/consolidated.schema.json` | the same |
 | `JSN` | `.planning/event-stream-reporting/research/js-native-structure-and-capture.md` | read from the sources its § Sources lists |
 
 `[this]` paths are relative to the repo root. Abbreviations:
@@ -120,7 +120,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 3. Order
 
-**Need.** The order of events within a node is kept (`ESR` R-043). Children appear in declared order where it is known, and each message keeps its place among them (`ESR` R-105; `JL` § Nodes).
+**Need.** The order of events within a node is kept (`ESR` R-043). Children appear in declared order where it is known, and each message keeps its place among them (`ESR` R-105; `SCH` `$defs/testNode`, `contents`).
 
 **In memory.** Every event holds an `Ordinal`; `Event.compare` orders by it (`EV/Event.scala` line 80; `EV/Ordinal.scala` lines 172, 232, 242). One tracker gives a total order of one process's events (`CORE/Tracker.scala` lines 64–70). Recorded messages are an ordered `IndexedSeq`, each with its own ordinal and `timeStamp` (`EV/Event.scala` line 358; `CORE/Suite.scala` line 1696).
 
@@ -133,7 +133,7 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 
 ## 4. Outcome
 
-**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`ESR` R-098a–R-098d, R-095a, R-095b, R-101, R-102; `JL` § Nodes and § Run nodes, `outcome`, `reason`). Messages and throwables are exact, with cause chain and suppressed exceptions (`ESR` R-011, R-028; `JL` § Throwables).
+**Need.** Every test has an outcome; a scope when pending or aborted; a suite when aborted; the run when aborted or stopped. A suite whose constructor throws is aborted on every runtime. Never-run nodes are aborted with reason *not run*, and a dead process gives *process failed* (`ESR` R-098a–R-098d, R-095a, R-095b, R-101, R-102; `SCH` `$defs/testNode` and `$defs/run`, `outcome`, and `$defs/testNode`, `reason`). A run aborted with reason *process failed* is to record that reason as its run node's `reason`. Messages and throwables are exact, with cause chain and suppressed exceptions (`ESR` R-011, R-028; `SCH` `$defs/throwable`).
 
 **In memory and `toJson`.**
 
@@ -141,53 +141,53 @@ Scala.js and Native have no sorting reporter and no distributor in the chain: `T
 - **Suite aborted.** `SuiteAborted` carries message and throwable (lines 935–949, 966). The JVM `Framework` turns a throwing constructor into a `DeferredAbortedSuite` and reports it (`TOOLS/Framework.scala` lines 443–458, 334, 358). **Provided** on the JVM.
 - **Constructor throws on Scala.js and Native.** `TaskRunner` instantiates the suite before it builds a reporter, outside any `try` (`JS/TaskRunner.scala` lines 79, 141, 149; `NAT/TaskRunner.scala` lines 79–83). No event is created. **Absent.**
 - **Run outcome.** The JVM `Framework` sends `RunCompleted` in `done()` and forwards a fork's `RunAborted` and `RunStopped` (`TOOLS/Framework.scala` lines 794, 921–924, 941). Scala.js and Native send no run-level event (`EMC` § 5). **Provided** on the JVM; **absent** on Scala.js and Native.
-- **Reasons.** No event has a reason field; the JSON output holds it as a node's or run's `reason` (`JL` § Nodes and § Run nodes). **Absent.**
-- **Throwable.** The event holds the `Throwable` itself. Of it, `toJson` keeps class, message and stack, which are **provided**, and drops the cause chain and suppressed exceptions, which are **lost** (`EMC` § 1.1). Also lost is a `StackDepthException`'s `failedCodeFilePathname`, which `JL` § Throwables and § Locations need as `filePath`.
-- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The JSON output holds neither (`JL` § Nodes), and the test event log does not carry the payload (`ESR` § Out of scope).
+- **Reasons.** No event has a reason field; the JSON output holds *not run* as a node's `reason` (`SCH` `$defs/testNode`), and is to hold *process failed* as a run node's `reason`. **Absent.**
+- **Throwable.** The event holds the `Throwable` itself. Of it, `toJson` keeps class, message and stack, which are **provided**, and drops the cause chain and suppressed exceptions, which are **lost** (`EMC` § 1.1). Also lost is a `StackDepthException`'s `failedCodeFilePathname`, which `SCH` `$defs/throwable` and `$defs/failedCodeLocation` need as `filePath`.
+- **`analysis` and payload.** `toJson` writes neither (`EMC` § 1.1). **Lost.** The JSON output holds neither (`SCH` `$defs/testNode`), and the test event log does not carry the payload (`ESR` § Out of scope).
 
 ## 5. Duration
 
-**Need.** A node that ran has a start time, end time and duration; suites and tests a thread name (`ESR` R-103; `JL` § Nodes).
+**Need.** A node that ran has a start time, end time and duration; suites and tests a thread name (`ESR` R-103; `SCH` `$defs/testNode`).
 
-- **Tests, times, thread names.** Closing test events carry `Some(duration)`; every event carries `timeStamp` and `threadName` (`CORE/Suite.scala` lines 1636, 1647, 1671, 1675; `EV/Event.scala` lines 63–70). `toJson` writes all three. `TestIgnored` has no duration, as `JL` § Nodes expects. **Provided.**
+- **Tests, times, thread names.** Closing test events carry `Some(duration)`; every event carries `timeStamp` and `threadName` (`CORE/Suite.scala` lines 1636, 1647, 1671, 1675; `EV/Event.scala` lines 63–70). `toJson` writes all three. `TestIgnored` has no duration, as `SCH` `$defs/testNode`, `duration`, allows. **Provided.**
 - **Top-level suite, JVM.** `Some(duration)` on `SuiteCompleted` and `SuiteAborted` (`TOOLS/Framework.scala` lines 325, 334–337). **Provided.**
 - **Top-level suite, Scala.js and Native.** On completion `TaskRunner` passes `Platform.currentTime`, the current epoch time and not an elapsed time, as the duration (`JS/TaskRunner.scala` lines 154–161; `NAT/TaskRunner.scala` lines 159–166). Only the path that catches a throw from `suite.run` subtracts the start time (lines 171, 176). **Derivable** from the `timeStamp`s of `SuiteStarting` and the closing event. Nested suites carry a true duration (`CORE/Suite.scala` lines 1182, 1204).
-- **Scope.** No duration field; **derivable** from the `timeStamp`s of `ScopeOpened` and `ScopeClosed`, as `JL` § Nodes computes it.
+- **Scope.** No duration field; **derivable** from the `timeStamp`s of `ScopeOpened` and `ScopeClosed`, as `SCH` `$defs/testNode`, `duration`, computes it.
 - **Run.** JVM: `RunCompleted` carries `Some(duration)` (`TOOLS/Framework.scala` lines 790–794). `toJson` does not tell a missing run duration from zero (`EMC` § 1.1). Scala.js and Native compute it only for the `done()` string (`JS/MasterRunner.scala` lines 133–149). **Absent** there as an event.
 
 ## 6. Test output
 
-**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-097a, R-097b, R-043; `JL` § Nodes, `output`).
+**Need.** The output a run captures is sent in its test event log and shown on the narrowest suite, scope or test it was captured against, with its stream, and in the human-readable output keeps its position among that node's events (`ESR` R-097a, R-097b, R-043). In the JSON output it is to be an item of that node's `output`, among its messages.
 
 - No event type carries output (`EV/Event.scala`), and ScalaTest captures none (`EMC` § 4; the search was re-run for this note).
 - **Absent** on every runtime. Capture mechanisms per runtime: `JSN` § 4.
 
 ## 7. Names, labels and locations
 
-**Need.** A suite's name, suite ID and location; a scope's or test's name as written in the source, its label, and its location; a suite's source file (`JL` § Nodes, `name`, `label`, `suiteId`, `location`; § Locations).
+**Need.** A suite's name, suite ID and location; a scope's or test's name as written in the source, its label, and its location; a suite's source file (`SCH` `$defs/testNode`, `name`, `label`, `suiteId`, `location`; `$defs/location`).
 
 - **Suite name, ID, class.** On every suite event and in `toJson`. **Provided.**
 - **Name as written.** `ScopeOpened.message` is the description with its parent's child prefix applied (`CORE/Engine.scala` lines 387–389, 435–439). A test's `testName` is the joined name. Its `testText` is the text the style trait registered, without the parent's child prefix, on `TestStarting` and the closing events (lines 85, 267, 315) but with it on `TestIgnored` (lines 408–410). Whether each style trait registers the source text or text already joined to a verb was not opened (§ 11). **Absent** as a field that always holds the source text.
 - **Label.** `ScopeOpened` and a test's closing event carry `IndentedText.formattedText`, and `toJson` writes it (`EV/Event.scala` line 109). **Provided.** `TestStarting` carries `MotionToSuppress` (`CORE/Suite.scala` line 1642), so a test that never closes has no label, and its parent's child prefix is in no event. **Absent** before the test closes.
 - **Location.** Scopes and tests carry a `LineInFile` with file name, path and line where the style passes a `Position` (`CORE/Engine.scala` lines 589–597, 676–684). Suites carry `TopOfClass` (`TOOLS/Framework.scala` line 310; `JS/TaskRunner.scala` line 144). `toJson` writes each (`EV/Event.scala` lines 115–132). **Provided.**
-- **Suite's file.** No suite event carries a file. **Derivable** from the `LineInFile`s of the suite's scope and test events where they share one, which is the definition `JL` § Nodes, `location` gives; not for a suite with none or one that never ran.
+- **Suite's file.** No suite event carries a file. **Derivable** from the `LineInFile`s of the suite's scope and test events where they share one, which is the definition `SCH` `$defs/testNode`, `location`, gives; not for a suite with none or one that never ran.
 
 ## 8. Messages
 
-**Need.** `info`, `alert`, `note` and `markup` attach to their node and are never lost or reordered (`ESR` R-097a, R-043; `JL` § Messages).
+**Need.** `info`, `alert`, `note` and `markup` attach to their node and are never lost or reordered (`ESR` R-097a, R-043; `SCH` `$defs/message`).
 
 - Notes and alerts are reported at once; info and markup inside a test arrive late (`EMC` § 5; `CORE/Engine.scala` lines 272–297, 310–315). `toJson` writes `recordedEvents` in full (`EV/Event.scala` line 383). **Provided.**
 - A test that never closes never sends its recorded messages. This is the unfinished-node case of § 10.
 
 ## 9. Run-level facts
 
-**Need.** A run's own state includes its expected test count, config map and summary counts (`JL` § Run nodes). The JSON output's root records the ScalaTest version, which every run shares (`JL` § Not yet fixed). Progress output shows a current summary of the test command (`ESR` R-090a).
+**Need.** A run's own state includes its expected test count, config map and summary counts (`SCH` `$defs/run`). The JSON output's root records the ScalaTest version, which every run shares (`SCH` `$defs/root`, `scalaTestVersion`). Progress output shows a current summary of the test command (`ESR` R-090a).
 
 - **Expected test count.** The JVM `Framework` sends `RunStarting(…, 0, configMap)` (`TOOLS/Framework.scala` line 687); `Runner` sends the real count (`TOOLS/Runner.scala` line 1235). Scala.js and Native send no `RunStarting` (`EMC` § 5). **Absent** under every `Framework`.
 - **Config map.** In the JVM `RunStarting`. Scala.js and Native pass `ConfigMap.empty` to every suite and send no run event (`JS/TaskRunner.scala` line 146). **Provided** on the JVM; **absent** elsewhere.
 - **Summary.** JVM: `RunCompleted` carries the `Summary` (`TOOLS/Framework.scala` lines 791–794; `EV/Event.scala` lines 145–151). Scala.js and Native keep the counts for the `done()` string only (`JS/MasterRunner.scala` lines 132–150), counted from event class names (lines 192–213). **Derivable** there by counting event types, given every process's events.
 - **ScalaTest version.** No event carries it. **Absent.**
-- **Discovery.** Only `Runner` sends `DiscoveryStarting` and `DiscoveryCompleted` (`TOOLS/Runner.scala` lines 1109, 1150); a run's own state holds `discovery` only where the run reported them (`JL` § Run nodes).
+- **Discovery.** Only `Runner` sends `DiscoveryStarting` and `DiscoveryCompleted` (`TOOLS/Runner.scala` lines 1109, 1150); a run's own state holds `discovery` only where the run reported them (`SCH` `$defs/run`, `discovery`).
 
 ## 10. Nodes that never produce an event
 

@@ -43,7 +43,10 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
   - The codec encodes and decodes the format by hand, since core builds for the JVM, Scala.js and Native and takes no serialisation library.
   - The decoder yields each ScalaTest event as a member of the decoded event family, one class per `org.scalatest.events` class, containing what the event log carries of that event (`decisions/architecture-test-event-log.md` "Core's decoder yields each ScalaTest event as a member of a decoded event family…").
 - **Runner argument definition** — the one definition of the runner argument's spelling and syntax (§ APIs § The emitter and the Mill plugin). Core's own argument parsing reads the argument through it.
-- **Argument splitter** — in package `org.scalatest.tools`, beside `ArgsParser`: takes ScalaTest arguments and returns them grouped by flag, each with its values. Its arities match `ArgsParser.parseArgs`'s, so that a flag's values are never read as flags. It runs in Mill's JVM (§ Data flow).
+- **Argument splitter** — `ArgumentSplitter`, in package `org.scalatest.tools`, beside `ArgsParser`. It runs in Mill's JVM, on a module's ScalaTest arguments, on the test command's arguments before its first `--`, and on its framework arguments (§ APIs § The Mill plugin and the consolidation library, **Split ScalaTest arguments**).
+  - `split` takes ScalaTest arguments and returns them grouped by flag, each with its values. Any other argument is returned on its own.
+  - `isShortOfValues` tells whether a flag returned by `split` holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one value.
+  - Both read one definition of the values each flag takes, which matches `ArgsParser.parseArgs`, so that a flag's values are never read as flags.
 
 ### Consolidation library
 
@@ -73,7 +76,7 @@ Its own components are:
   - A run's own state and the output captured against the run are held on the run's run node, or on the run's module where the run has no run node.
 - **Writers** — write the progress, human-readable and JSON output (`SPECIFICATION.md` R-026, R-027). The human-readable and JSON writers run at **End** (§ APIs § The Mill plugin and the consolidation library).
   - The human-readable output ends with a summary line. Once every event stream has ended, progress output's summary equals that line, whether or not progress output is on (`SPECIFICATION.md` R-141).
-- **Consolidation state** — records whether the consolidation has ended and whether anything has failed the test command (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
+- **Consolidation state** — records whether the consolidation has ended, whether anything has failed the test command, and whether any test result has reached each module (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**, **Read whether a module has a test result**).
 
 ### Mill plugin
 
@@ -83,22 +86,30 @@ Its own components are:
 - The plugin's integration tests run under Mill's testkit.
 - Mill API marked `@experimental` or `@internal`, or declared `private[mill]`, is used only from classes that the test command alone loads (`decisions/test-command.md` "On an unsupported Mill release, the test command warns on the console and in every file output…").
 - **Test command** — resolves the module selectors, runs every selected module's tests (§ Data flow), compiles each module's test manifest, and gives the library each run's event stream and its other inputs. It derives no result from any event (§ APIs § The Mill plugin and the consolidation library, **Read the consolidation state**).
+  - On the JVM, where class globs are given, it attaches to the root the failure Mill's `testOnly` fails with for want of a matching test (`SPECIFICATION.md` R-053a; `decisions/architecture-library-and-modules.md` "The consolidation library, not Mill's per-worker results, tells the test command whether a test result reached a module."):
+    - where the class globs keep no class, before it would start any worker of the module;
+    - otherwise once every test process of the module has ended, where all of these hold:
+      - no fork group of the module failed to lay out, and no worker of it failed to start or run;
+      - no worker's JVM ended without writing its result while **Read the consolidation state** answers failed;
+      - **Read whether a module has a test result** answers that the module has no test result.
 - **Test manifest** — gives the library each of a module's processes' assigned test classes (`.docs/ubiquitous-language.md` **Assigned test classes**), and the classes left unclaimed in a fork group's queue. A class's nested suites, scopes and tests are known only from a suite the run constructed (§ APIs § The emitter and the Mill plugin, the `structure` event). The test command writes no file for it (`decisions/architecture-running-tests.md` "The test manifest is compiled from Mill's test queue and claim files on the JVM…").
   - On the JVM, for a module that does not set `testBatchFrameworkTasks`, it is the files of Mill's own test queue, which the test command lays out before it starts any worker (`research/mill-test-worker-args.md` § 1.2): each fork group's `test-classes/` queue, with one file for each class the test command's class globs keep, and each worker's `claim/` folder and `claim.log` in its `processFolder`. A fork group is known by its queue folder.
     - A class is either unclaimed in its group's queue or recorded in a worker's `claim.log`; a worker claimed each class its `claim.log` records. The test command compiles the manifest from these files once a worker has ended (§ APIs § The emitter and the Mill plugin).
     - A worker's claims are tied to the worker by its `processFolder`, even where the worker dies before it writes an event log: the test command starts each worker in a folder it chose.
     - On Windows two workers' `claim.log` can record one class while its file is in one `claim/` folder (`research/emitter-plugin-spike.md` § 2). Such a class is claimed by both, and counts as reported if any run reported it.
     - The queue and claim layout is `@internal` to Mill. The test command already relies on it to drive the queue (`research/mill-test-worker-args.md` § 2.2; `research/mill-parallel-worker-capture.md` § 6).
-    - The files last until the next test command clears the module's folder (§ APIs § The emitter and the Mill plugin).
+    - The files last until a later test command that resolves the module clears the module folder (§ APIs § The emitter and the Mill plugin).
   - On the JVM, for a module that sets `testBatchFrameworkTasks`, it is the class list the test command gives each fork group's one worker, as Mill 1.3.1 does (`research/mill-plugin-conventions.md` § 5). No class of such a module is queued or claimed: a batch worker was assigned every class in its list, and no class is left unclaimed. The test command keeps each list in memory.
-  - Scala.js and Native have no queue and no claim files. The test command keeps the module's test classes in memory (§ Data flow), and the module's one process is assigned them all (§ External systems).
+  - Scala.js and Native have no queue and no claim files. The test command keeps the module's test classes in memory (§ Data flow), and the module's one process is assigned every test class the class globs keep (§ External systems).
 - **Event log reading** — reads each run's test event log live and turns it into that run's event stream (§ APIs § The Mill plugin and the consolidation library, **Decode**). It reads the event log file in each JVM worker's `processFolder`, each Scala.js `NodeJs` or Native module's one event log file and, under `JsDom`, the launchers' stdout files, and ends each stream as § APIs § The emitter and the Mill plugin describes.
   - On the JVM it starts reading a worker's event log file as the worker starts: inside the async body that starts it or, where the worker runs on the calling thread, just before that call (§ Process capture).
     - The reader is told the worker has ended as soon as Mill's future for it completes, so it polls only while its worker runs. The readers polling at once are bounded by the workers running at once, not by the workers planned.
     - A worker whose body never runs, as where the task is cancelled first, has no reader and gives no run.
     - A worker that started a process without starting its reader ran with its output uncaptured, as where the test command mispredicts which workers Mill runs on the calling thread. Its event log is read once it has ended, and a failure naming the worker is attached to the root.
 - **Process capture** — captures each run's processes' stdout and stderr, against the run (`SPECIFICATION.md` R-097b).
-  - On the JVM it takes each worker's streams inside the body that spawns the worker, so no worker output reaches the console. Mill's test queue spawns the worker or, in a module that sets `testBatchFrameworkTasks`, the test command's own call to `TestModuleUtil.callTestRunnerSubprocess` does. The test command gives each worker a `TaskCtx` that delegates to the command's own, except in `fork.async`. That calls Mill's `fork.async` and sets `os.Inherit.out` and `os.Inherit.err` to the worker's capture inside the async body. Mill resets them around each async body, so setting them outside it has no effect. Where a worker runs on the calling thread, the test command sets them around that call (`research/mill-parallel-worker-capture.md` § Short answer, Route A).
+  - On the JVM it takes each worker's streams inside the body that spawns the worker, so no worker output reaches the console. Mill's test queue spawns the worker or, in a module that sets `testBatchFrameworkTasks`, the test command's own call to `TestModuleUtil.callTestRunnerSubprocess` does.
+    - The test command runs the module under a `TaskCtx` that delegates to the command's own, except that its `dest` is the module folder. Anything Mill derives from `Task.dest` therefore also lands there. The test command places every worker path in the module folder itself. In Mill 1.3.1 only test discovery, which is not a worker, reads `dest`.
+    - The test command gives each worker a `TaskCtx` that delegates to the module's, except in `fork.async`. Its `fork.async` calls Mill's `fork.async` and sets `os.Inherit.out` and `os.Inherit.err` to the worker's capture inside the async body. Mill resets them around each async body, so setting them outside it has no effect. Where a worker runs on the calling thread, the test command sets them around that call (`research/mill-parallel-worker-capture.md` § Short answer, Route A).
   - On Scala.js and Native it takes them from launchers' files, each tied to its run by its header (§ APIs § The emitter and the Mill plugin), so that R-040 and R-097a are met there (`decisions/architecture-running-tests.md` "Every Scala.js VM starts through a launcher…" and "Every Native test binary starts through a launcher…").
 - **Scala.js launcher** — starts every Scala.js VM, under `NodeJs` and `JsDom` alike, in place of the `executable` in the module's `jsEnvConfig`. It carries the module's launcher folder and the original `executable`, which it starts with the arguments and environment it receives: the config's `args` and `env`.
   - It writes the VM's stdout and stderr to its own pair of files in the module's launcher folder. The stdout file's first line is a header that carries the VM's PID and a start time that matches `ProcessHandle`'s.
@@ -115,7 +126,7 @@ Its own components are:
 
 - **The runner argument** — one ScalaTest runner argument, among those the test command adds to each run's arguments (`SPECIFICATION.md` R-053a, R-053b). It turns the emitter on, turns off the reporter ScalaTest uses when no reporter is configured (`SPECIFICATION.md` R-002), and makes the framework's `done` return an empty string in place of the end-of-run summary (`SPECIFICATION.md` R-044; `decisions/architecture-test-event-log.md` "Under the runner argument, `Framework.done` returns an empty string…"). It reaches the runner on every runtime and in every JS environment the epic covers. The test command gets each run's argument from **Build the runner argument** (§ APIs § The Mill plugin and the consolidation library).
   - Where the test event log is a file (below), the argument carries its path. On Scala.js under `NodeJs` and on Native that is the absolute path of the module's one event log file.
-  - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's framework arguments are those of the `TestModuleUtil` that spawns it, so the test command starts each worker on one built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
+  - On the JVM each worker is given the absolute path of the file in its own `processFolder`, whether the module's test sandboxing (`testSandboxWorkingDir`) is on or off. A worker's ScalaTest arguments are those of the `TestModuleUtil` that spawns it, so the test command spawns each worker from a `TestModuleUtil` built with that worker's arguments (`research/jvm-per-worker-event-log-path.md` § 1, § 2, § 5).
   - Mill's discovery runner, which is not a run, gets no runner argument and so opens no test event log (`SPECIFICATION.md` R-072; § Data flow). Scala.js and Native have no discovery runner (`research/mill-worker-channels.md` § 4).
 - **The run's test event log** — carries exactly one run, in the codec's format. The test event log is the internal API between the emitter and the consolidation library. No consumer outside this fork may rely on it. Within one release of this fork, every consumer inside the fork may rely on it: the consolidation library reads every test event log that the release's emitter writes (`SPECIFICATION.md` § Scope; `decisions/event-log-contract.md` "The test event log's format is private to this fork." and "A test event log is read only by the release of this fork that wrote it."). Its events are the consolidator events, `runStarted`, `structure` and `runEnded`, and the ScalaTest events. In order:
   1. the `runStarted` event, written before the runner's construction returns, recording that the run exists, with:
@@ -156,10 +167,10 @@ Its own components are:
     - A whole line that cannot be decoded ends the run's event stream there, so the library treats the run as one that does not finish. The plugin adds a root failure naming the line and why it cannot be decoded.
   - **On the JVM, on Scala.js under `NodeJs` and on Native,** the event log is one file per run, at the path the runner argument gives. The run appends each event to the file unbuffered, and the plugin reads the file while the run appends (`decisions/architecture-test-event-log.md` "On the JVM, on Scala.js under `NodeJs` and on Native, a run's test event log is one file per run.").
     - On the JVM the file has one fixed name, which Mill does not use, in the worker's `processFolder`. It is not in the worker's `sandbox`, so nothing new appears in the tests' working directory (`SPECIFICATION.md` R-053a, R-053b). Mill writes a `processFolder`'s `testargs` with `CREATE_NEW`, so it starts at most one JVM there in one test command and the name cannot collide (`research/mill-test-worker-args.md` § 2.3). The plugin reads the file in each `processFolder` it starts a worker in.
-      - Two fork groups share one `processFolder` where each holds only the same class or, on a case-insensitive filesystem, only classes whose names differ only in case. Mill's `testForked` then fails.
+      - Two fork groups share one `processFolder` where each runs only the same class or, on a case-insensitive filesystem, only classes whose names differ only in case. Mill's `testOnly` or `testForked` then fails.
       - Before it starts any worker, the test command compares the names of the module's fork-group folders (each holds its workers' `processFolder`s), ignoring case where the filesystem does. Where two match, or the case check fails, it starts no worker of the module. It attaches a failure to the root naming the module and either the shared folder and its fork groups, or what the check threw.
-    - On Scala.js and Native the file is in the folder the test command owns for the module (R-110). Mill's test task gives the module one run in one process (§ External systems), so the module has one event log file.
-    - Before any test starts, each test command clears the folder it owns for each selected module, which contains every `processFolder`, and creates the module's launcher folder afresh. No earlier command's file is then read as a run, and Mill's `CREATE_NEW` write of `testargs` succeeds. The launcher folder contains the module's launcher and the file pairs it writes. Each task folder R-110 names is that task's Mill `Task.dest`.
+    - On Scala.js and Native the file is in the module folder (R-110). Mill's test task gives the module one run in one process (§ External systems), so the module has one event log file.
+    - Once it has resolved its selected modules, and before any test starts, each test command clears the module folder of each selected module and creates the module's launcher folder afresh. The module folder contains every `processFolder`. No earlier command's file is then read as a run, and Mill's `CREATE_NEW` write of `testargs` succeeds. The launcher folder contains the module's launcher and the file pairs it writes. Each task folder R-110 names is that task's Mill `Task.dest`.
     - The event log file never exists under its name without its complete `runStarted` event. On the JVM a `processFolder` that contains no event log file once its worker has ended is therefore a worker in which no run existed.
       - Such a worker gives no PID to watch (below). Such a worker has ended when its future completes. That is the future Mill's test queue gives for the worker or, for a module that sets `testBatchFrameworkTasks`, the one the test command makes for its `callTestRunnerSubprocess` call. The plugin uses that completion as the worker's end only where no event log file appeared. Once it completes successfully, the worker's captured output is complete and the worker's claims are final.
         - A future that fails, as where the task is cancelled, does not show that the worker's process or its output pumps have stopped. The plugin therefore leaves the worker's output streams open, so a line the pump completes later is still captured.
@@ -183,7 +194,15 @@ Its own components are:
 
 The Mill plugin is the library's only caller (`decisions/event-log-contract.md` "The consolidation library's API carries no compatibility promise…"). Its operations:
 
-- **Split a module's ScalaTest arguments**: returns them grouped by flag, each with its values, from core's argument splitter (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot call. The test command calls it before it starts the module's tests.
+- **Split ScalaTest arguments**: `ScalaTestArgument.split` returns ScalaTest arguments grouped by flag, each with its values, from core's argument splitter (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot call. It returns each flag the runner recognises as a `ScalaTestArgument.Flagged`, and each other argument as a `ScalaTestArgument.Unrecognised`. The extensions of `Flagged` read what the flag holds:
+  - `joinedValue`: the value joined to the flag, such as `colour=blue` for `-Dcolour=blue`;
+  - `values`: the values that follow the flag, such as `Fast` for `-n Fast`;
+  - `isShortOfValues`: whether the flag holds fewer values than the runner needs with it, from `ArgumentSplitter.isShortOfValues`.
+
+  The test command calls `split`:
+  - on its framework arguments, as it reads its own arguments and before it resolves the module. It accepts them only where `split` returns no `Unrecognised`, and each `Flagged` is not short of values and has a flag, `joinedValue` and `values` that `class-globs-and-framework-arguments/SPECIFICATION.md` R-002 allows;
+  - on each argument before its first `--`, to find one of the ScalaTest flags `class-globs-and-framework-arguments/SPECIFICATION.md` R-013 lists;
+  - on the module's `testArgsDefault` arguments, once it has resolved the module and before it runs the module's test discovery or starts its tests. It fails where any is `Unrecognised`, and keeps each `Flagged` that `class-globs-and-framework-arguments/SPECIFICATION.md` R-005 lists (§ Data flow).
 - **Build the runner argument** (§ APIs § The emitter and the Mill plugin): given what the argument carries, returns the argument, from core's runner argument definition (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot read. The argument carries the event log file's absolute path or, under `JsDom`, the framing prefix and this test command's nonce. The test command calls it for each run it starts.
 - **Decode a line of a run's test event log**: given one whole line without its `\n`, and under `JsDom` without its frame, returns the event the line encodes, from core's decoder (§ Modules § ScalaTest core, Codec), which the plugin, outside core's package, cannot call. Where the line cannot be decoded, it throws an exception naming the line and why. Event log reading calls it for each line, then adds each event to the run's event stream (**Add a run**).
   - The plugin sees an event only as a handle exposing the `runStarted` event's PID and start time, which it watches the run's process by (§ APIs § The emitter and the Mill plugin, "The end of a run's event stream").
@@ -200,14 +219,14 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - The caller splits each stream into lines and decodes them to text before adding them, since a stream reaches it in chunks that can split a line or a character (`research/mill-worker-channels.md` § 1.3).
   - The caller adds a stream's unterminated last line once that stream ends, so a process that dies keeps its last line (R-097a).
   - The caller tells the library when the run's event stream has ended (§ APIs § The emitter and the Mill plugin, "Each event" and "The end of a run's event stream").
-  - The caller may also give the run's worker: the position of its fork group among the groups the module's `testForkGrouping` gives, and its index within that fork group. The library numbers the module's runs from these two values (`JSON-LAYOUT.md` § Run nodes).
+  - The caller may also give the run's worker: the position of its fork group among the groups the module's `testForkGrouping` gives, and its index within that fork group. The library numbers the module's runs from these two values (`../../mill-plugin/consolidated.schema.json` `$defs/run`, `number`).
   - The Mill plugin takes the position from its own enumeration of the module's `testForkGrouping`. It takes the worker index from the index under which it starts the worker, which Mill's folder name `worker-<i>` carries; a fork group's only worker has index 0.
 
   Once the run's process has ended, the caller adds the test classes that process was assigned, from the module's test manifest (§ Modules § Mill plugin).
 - **Time a module**: the caller gives a start time and an end time for each module whose tests it starts, each by the caller's own clock.
   - A module's start time is the time at which the caller starts the module's tests.
   - A module's end time is the time at which the last of the module's test processes has ended.
-  - These times, with the root's start and end times, supply the times of the root and the modules in the JSON output (`JSON-LAYOUT.md` § Root and modules). No test event log holds these times.
+  - These times, with the root's start and end times, supply the times of the root and the modules in the JSON output (`../../mill-plugin/consolidated.schema.json` `$defs/root` and `$defs/module`, `startedAt` and `endedAt`). No test event log holds these times.
 - **Add a process that ended before any run existed in it** (`SPECIFICATION.md` R-076), with its module, the test classes it was assigned, and the output captured from its stdout and stderr, in the form **Add a run** takes it. The library attaches that output to the module, the most specific node the process identifies.
 - **Add a module whose tests did not start** (R-098e), naming the module and, where a failure stopped them, that failure.
 - **Add a test class** left in a fork group's queue when the group's last worker ended, with its module. The library adds the class as a suite node aborted with reason *not run* (R-095a).
@@ -220,32 +239,39 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
     - the caller adds a process that ended before any run existed in it, or adds a module whose tests did not start;
     - the caller attaches a failure to the root.
   - The test command reads the state after **End** and fails where it is *ended, failed*. Nothing else decides R-137 for it: the result of Mill's test-runner subprocess call plays no part.
+- **Read whether a module has a test result**: given a module, returns, at any time from **Start** and under the consolidation's lock, whether an event reporting a test as succeeded, failed, ignored, pending or canceled, or a suite as aborted, has been added to the event stream of any of the module's runs. The library's own aborting of a suite, such as with reason *not run* (`SPECIFICATION.md` R-095a), does not count. The test command reads it once every test process of the module has ended and before **End** (§ Modules § Mill plugin, Test command).
 
 ## Data flow
 
 The test command runs each selected module's tests under a task context it supplies (`decisions/test-command.md` "A test module needs no change to its definition for the test command to run it."). It gives each run:
 
-- the module's own ScalaTest arguments that `SPECIFICATION.md` R-142 lists, found with the argument splitter;
-- the test command's class globs and framework arguments as ScalaTest arguments, converted where ScalaTest takes them in another form (R-053a);
+- the module's own ScalaTest arguments that `SPECIFICATION.md` R-142 lists, found with the argument splitter, except any `-P`, `-F`, `-T`, `-S` or `-W` that a framework argument also gives;
+- the test command's framework arguments, in the order given (`SPECIFICATION.md` R-053a, R-053b);
 - the arguments it adds, among them the runner argument.
+
+A class glob keeps each test class whose fully qualified name it matches, as under Mill's `testOnly`. Where no class glob is given, every test class is kept.
 
 It runs the tests:
 
 - on the JVM:
-  - For a module that does not set `testBatchFrameworkTasks`, it runs the module's test discovery itself without the runner argument (`decisions/architecture-running-tests.md` "The plugin runs a module's test discovery itself…"). It lays out Mill's test queue, then starts each worker Mill 1.3.1's `testForked` would start through `TestModuleUtil.runTestFuture`, and waits for every worker.
+  - For a module that does not set `testBatchFrameworkTasks`, it runs the module's test discovery itself without the runner argument (`decisions/architecture-running-tests.md` "The plugin runs a module's test discovery itself…"). Where class globs are given and keep no class the discovery finds, it starts no worker of the module. Otherwise it lays out Mill's test queue, then starts each worker Mill 1.3.1's `testOnly` or `testForked` would start through `TestModuleUtil.runTestFuture`, and waits for every worker (`SPECIFICATION.md` R-053a, R-053b).
     - Where `testParallelism` is on, unless exactly one test class is queued, each worker is forked through its own task context, as `testForked` does, and the workers run in parallel on Mill's pool.
     - Otherwise each worker runs on the command's thread, one after another.
-  - For a module that sets `testBatchFrameworkTasks`, it runs no discovery, as Mill 1.3.1 runs none. It starts one worker for each fork group that holds a class through `TestModuleUtil.callTestRunnerSubprocess`, gives each worker its group's class list as `testForkGrouping` gives it, and waits for every worker. A module whose fork groups hold no class runs fork group 0's worker on an empty queue (`SPECIFICATION.md` R-053b; `research/mill-plugin-conventions.md` § 5).
-    - Where more than one fork group holds a class, each worker is forked through its own task context, as `testForked` does, whatever the module's `testParallelism`.
+  - For a module that sets `testBatchFrameworkTasks`, it runs no discovery, as Mill 1.3.1 runs none. It gives each fork group's worker the group's class list as `testForkGrouping` gives it, less the classes the test command's class globs do not keep (`SPECIFICATION.md` R-053a, R-053b; `research/mill-plugin-conventions.md` § 5).
+    - It starts one worker for each fork group that holds a class the class globs keep, through `TestModuleUtil.callTestRunnerSubprocess`, and waits for every worker.
+    - Where no class globs are given and the module's fork groups hold no class, it runs fork group 0's worker on an empty queue. Where class globs are given and keep no class, it starts no worker of the module.
+    - Where more than one fork group holds a class the class globs keep, each worker is forked through its own task context, as `testForked` does, whatever the module's `testParallelism`.
     - Otherwise the one worker runs on the command's thread;
-- on Scala.js and Native, it evaluates the module's own Mill test task. In that evaluation only, it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher (`decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…").
+- on Scala.js and Native, it evaluates the module's own Mill test task: `testOnly`, with the class globs as its selectors, where class globs are given, and `testForked` otherwise. In that evaluation only, it replaces two task values (`decisions/architecture-running-tests.md` "The plugin installs each launcher by replacing a task's value…"):
+  - it swaps in the module's launcher: on Scala.js the value of `jsEnvConfig` becomes a copy whose `executable` is the launcher, and on Native the value of `nativeLink` becomes the launcher;
+  - the value of `testReportXml` becomes `None`, so that Mill's test body writes no JUnit XML report into the module folder (`SPECIFICATION.md` R-047).
 
 Before it starts any of a module's test processes, the test command knows the module's test classes, from which it later compiles the test manifest (§ Modules § Mill plugin):
 
 - on the JVM:
   - for a module that does not set `testBatchFrameworkTasks`, as the queue it lays out for each fork group from its own discovery, which starts no test;
-  - for a module that sets `testBatchFrameworkTasks`, as each fork group's class list;
-- on Scala.js and Native, from test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
+  - for a module that sets `testBatchFrameworkTasks`, as the class list it gives each fork group's worker;
+- on Scala.js and Native, as the classes the class globs keep among the test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
 
 All of this runs in one nested evaluation of the test command's own, with fail-fast off (`decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…").
 
@@ -285,7 +311,7 @@ flowchart LR
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
   CMD -- "each run's module, selectors, test classes each process was assigned, modules not started, test classes left in a queue, processes with no run, output and failures for the root, Mill version, start and end times of the root and each module" --> LIB
-  LIB -- "runner argument; consolidation state" --> CMD
+  LIB -- "runner argument; consolidation state; whether a module has a test result" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]
 ```
@@ -301,13 +327,13 @@ flowchart LR
   - A process that dies before any run exists in it writes nothing to a test event log; the plugin adds it to the library with the output captured from its streams (R-076) and the test classes it was assigned.
   - On the JVM the library still reports each class the dead worker was assigned that no run reported, from the test manifest (§ Modules § Mill plugin, Test manifest):
     - a queue worker claims one class at a time, so its one such class is the last one it claimed before it died;
-    - a batch worker was assigned its fork group's whole class list, so every class in that list that no run reported is such a class.
+    - a batch worker was assigned the class list the test command gave it, so every class in that list that no run reported is such a class.
   - Each class that no worker claimed stays in its fork group's queue, and the test command adds it with **Add a test class** (`SPECIFICATION.md` R-095a). A module that sets `testBatchFrameworkTasks` leaves no class in a queue.
 
 ## External systems
 
 - **Mill** — hosts the plugin in its JVM. Its fork grouping, test parallelism, test queue and `testBatchFrameworkTasks` decide which processes run each module's tests. The test command must start the processes they decide, including on the JVM, where it drives the test queue itself or, for a module that sets `testBatchFrameworkTasks`, starts each fork group's worker through `TestModuleUtil.callTestRunnerSubprocess` (`SPECIFICATION.md` R-053a, R-053b). `ScalaJSModule.testFrameworkInstance` uses the module's `jsEnvConfig` only to build the JS environment, and `TestScalaNativeModule.testTask` uses `nativeLink` only as the test binary. That is what lets the test command swap in a launcher (`research/js-stdout-launcher.md` § 2.1; `research/mill-test-without-module-trait.md` § 3.3).
-- **Scala.js and Native test adapters** — launch the Node VM or native binary that runs a Scala.js or Native run, in Mill's own working directory, and carry the framework arguments to its runner unchanged, including in `JsDom` window code (`research/js-environment-channels.md` § 2.2; `research/node-native-file-channel.md` § 7). Under Mill's test task each run executes in one Node VM or native binary, which carries no other run and exits shortly after it (`research/js-native-structure-and-capture.md` § 1.3; `research/node-native-file-channel.md` § 4, § 5.2).
+- **Scala.js and Native test adapters** — launch the Node VM or native binary that runs a Scala.js or Native run, in Mill's own working directory, and pass the run's arguments to its runner unchanged, including in `JsDom` window code (`research/js-environment-channels.md` § 2.2; `research/node-native-file-channel.md` § 7). Under Mill's test task each run executes in one Node VM or native binary, which carries no other run and exits shortly after it (`research/js-native-structure-and-capture.md` § 1.3; `research/node-native-file-channel.md` § 4, § 5.2).
   - The Scala.js adapter runs the `jsEnvConfig`'s `executable` with its `args` and `env`. When it closes a run it calls `destroyForcibly()` on that process, which on Linux closes Mill's pipes to it and discards what Mill had not read (`research/jsdom-channel.md` § 4).
   - The Native adapter runs `<CROSSCOMPILING_EMULATOR words> <binaryFile> <port>` on Mill's own stdin, stdout and stderr (`inheritIO()`), so no byte the binary writes passes through Mill's JVM (`research/js-native-channels.md` § 1.2, § 5.2).
   - `JsDom` window code has no `require` and no `process`, so a `JsDom` run can write no file, open no Node socket, and learn neither its PID nor its start time (`research/jsdom-channel.md` § 1).

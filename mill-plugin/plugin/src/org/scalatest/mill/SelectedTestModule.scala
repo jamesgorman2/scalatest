@@ -6,10 +6,11 @@ import mill.api.SelectMode
 import mill.javalib.TestModule
 import mill.scalajslib.ScalaJSModule
 import mill.scalanativelib.ScalaNativeModule
+import org.scalatest.consolidation.ModuleName
 
 private[mill] final case class SelectedTestModule(module: TestModule) {
 
-  def path: String = module.moduleSegments.render
+  def name: ModuleName = ModuleName(module.moduleSegments.render)
 }
 
 private[mill] object SelectedTestModule {

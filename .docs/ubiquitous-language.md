@@ -141,6 +141,10 @@ _Avoid_: Mill command, invocation
 **Task folder**:
 The folder Mill gives a task to write its files in.
 
+**Module folder**:
+The folder a test command owns for one test module, in Mill's output folder.
+_Avoid_: Module's output folder, module dest
+
 **Supported Mill release**:
 A Mill release on which the Mill plugin's integration tests passed, as listed by the running release of this fork. Any other Mill release is unsupported, even within the same major version.
 _Avoid_: Compatible Mill version, Mill version range
@@ -148,3 +152,11 @@ _Avoid_: Compatible Mill version, Mill version range
 **Module selector**:
 An argument of the test command that names test modules, such as `__.test` or `foo.test`.
 _Avoid_: Selector, task selector
+
+**Class glob**:
+An argument of the test command after its first `--` and before any second `--`, as Mill's `testOnly` reads its arguments. In each test module the test command selects, the class glob keeps each test class whose fully qualified name it matches. Each `*` in it matches any run of characters, including none.
+_Avoid_: Class selector, test selector, class filter
+
+**Framework argument**:
+An argument of the test command after its second `--`, as Mill's `testOnly` reads its arguments. Every run of each test module the test command selects receives the test command's framework arguments.
+_Avoid_: Test argument

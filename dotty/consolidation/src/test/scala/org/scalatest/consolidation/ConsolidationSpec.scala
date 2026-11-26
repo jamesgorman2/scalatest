@@ -10,9 +10,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ConsolidationSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
-  private def runOfCalculatorSuite(testEvents: String*): TestRunPart =
-    TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", """test "adds", label "- adds"""", testEvents*)))
-
   private def stateAfterRunOf(testEvents: String*): ConsolidationState = {
     val consolidation = startedWithColour()
     consolidation.addRunOf(runOfCalculatorSuite(testEvents*))

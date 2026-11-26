@@ -18,7 +18,7 @@ private[mill] final class EventLogReader(
     pollInterval: FiniteDuration
 ) {
 
-  @volatile private var endedWorkerProcess: Option[WorkerProcess] = None
+  @volatile private var workerEnd: Option[EventLogReader.WorkerEnd] = None
   @volatile private var failure: Option[Throwable] = None
   private val thread: Thread = new Thread(() => readCapturingFailure(), EventLogReader.threadName(eventLogFile))
   thread.setDaemon(true)
@@ -26,11 +26,10 @@ private[mill] final class EventLogReader(
   def start(): Unit = thread.start()
 
   def workerHasEnded(process: WorkerProcess): Unit =
-    synchronized {
-      if (endedWorkerProcess.isEmpty) {
-        endedWorkerProcess = Some(process)
-      }
-    }
+    endWorker(if (process.started) EventLogReader.WorkerEnd.MayHaveStartedAProcess else EventLogReader.WorkerEnd.StartedNoProcess)
+
+  // A worker whose start threw, or whose end is unknown, may have started a process.
+  def workerEndIsUnknown(): Unit = endWorker(EventLogReader.WorkerEnd.MayHaveStartedAProcess)
 
   def awaitStreamEnd(): Unit = {
     thread.join()
@@ -43,7 +42,7 @@ private[mill] final class EventLogReader(
         case EventLogReader.EventLogFileArrival.Appeared =>
           addRun(readRun)
         case EventLogReader.EventLogFileArrival.WillNotAppear =>
-          if (endedWorkerProcess.contains(WorkerProcess.Started)) {
+          if (workerEnd.contains(EventLogReader.WorkerEnd.MayHaveStartedAProcess)) {
             addProcessEndedBeforeAnyRun()
           }
       }
@@ -51,9 +50,16 @@ private[mill] final class EventLogReader(
       case throwable: Throwable => failure = Some(throwable)
     }
 
+  private def endWorker(end: EventLogReader.WorkerEnd): Unit =
+    synchronized {
+      if (workerEnd.isEmpty) {
+        workerEnd = Some(end)
+      }
+    }
+
   @tailrec
   private def awaitEventLogFile(): EventLogReader.EventLogFileArrival = {
-    val ended = endedWorkerProcess.isDefined
+    val ended = workerEnd.isDefined
     if (eventLogFile.exists) {
       EventLogReader.EventLogFileArrival.Appeared
     } else if (ended) {
@@ -121,6 +127,11 @@ private[mill] object EventLogReader {
   def threadName(eventLogFile: EventLogFile): String = s"scalatest event log reader: ${eventLogFile.name}"
 
   private val retriedOpens: Int = 500
+
+  private enum WorkerEnd {
+    case MayHaveStartedAProcess
+    case StartedNoProcess
+  }
 
   private enum EventLogFileArrival {
     case Appeared

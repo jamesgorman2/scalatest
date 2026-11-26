@@ -7,6 +7,7 @@ import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
 import org.scalatest.matchers.should
+import org.scalatest.mill.WorkerLayoutFailure.ClassGlobsKeepNoTestClass
 import org.scalatest.mill.WorkerLayoutFailure.FilesystemCaseNotChecked
 import org.scalatest.mill.WorkerLayoutFailure.ForkGroupsShareProcessFolders
 import org.scalatest.wordspec.AnyWordSpec
@@ -23,14 +24,22 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
   private val discoveredClasses: Set[TestClassName] = discovered.map(TestClassName(_))
 
+  private def globs(texts: String*): Seq[ClassGlob] = texts.map(ClassGlob(_))
+
   private def layoutOf(
       forkGroups: Seq[Seq[String]],
       discovered: Set[String] = discovered,
+      classGlobs: Seq[ClassGlob] = Nil,
       testParallelism: Boolean = false,
       jobs: Int = 4,
       filesystemIgnoresCase: Boolean = false
   ): Either[WorkerLayoutFailure, WorkerLayout] =
-    WorkerLayout.ofQueue(classesOf(forkGroups), discovered.map(TestClassName(_)), testParallelism, jobs, () => Right(filesystemIgnoresCase))
+    WorkerLayout.ofQueue(classesOf(forkGroups), discovered.map(TestClassName(_)), classGlobs, testParallelism, jobs, () => Right(filesystemIgnoresCase))
+
+  private def batchLayoutOf(forkGroups: Seq[Seq[String]], classGlobs: Seq[ClassGlob] = Nil): Either[WorkerLayoutFailure, WorkerLayout] =
+    WorkerLayout.ofBatches(classesOf(forkGroups), classGlobs, () => Right(false))
+
+  private val twoForkGroups: Seq[Seq[String]] = Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))
 
   private def workersOf(layout: Either[WorkerLayoutFailure, WorkerLayout]): Either[WorkerLayoutFailure, Seq[PlannedWorker]] =
     layout.map(_.forkGroups.flatMap(_.workers))
@@ -53,7 +62,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
       "the module has two fork groups" should {
         "give each group one worker, in a folder named by the group's index and first class" in {
-          layoutOf(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))) shouldBe Right(
+          layoutOf(twoForkGroups) shouldBe Right(
             WorkerLayout(
               Seq(
                 PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
@@ -158,6 +167,54 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "class globs are given" when {
+      "they keep classes of only the second of two fork groups" should {
+        "give that group one worker in the module's folder, keeping the group's position" in {
+          layoutOf(twoForkGroups, classGlobs = globs("samples.A*")) shouldBe Right(
+            WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), classes("samples.A1", "samples.A2"), Seq(PlannedWorker(workerOf(1), PathUnderModule())))))
+          )
+        }
+      }
+
+      "they keep some classes of each fork group" should {
+        "queue each group's kept classes only" in {
+          layoutOf(twoForkGroups, classGlobs = globs("samples.B2", "samples.A1")).map(_.forkGroups.map(_.testClasses)) shouldBe Right(
+            Seq(classes("samples.B2"), classes("samples.A1"))
+          )
+        }
+      }
+
+      "they keep a class that was not discovered" should {
+        "leave that class out of its group's queue" in {
+          layoutOf(Seq(Seq("samples.A1", "samples.Gone")), classGlobs = globs("samples.*")).map(_.forkGroups.map(_.testClasses)) shouldBe Right(Seq(classes("samples.A1")))
+        }
+      }
+
+      "they keep exactly one class under test parallelism" should {
+        "give its fork group one worker in the group's folder" in {
+          processFoldersOf(layoutOf(twoForkGroups, classGlobs = globs("samples.A1"), testParallelism = true)) shouldBe Right(Seq(Nil))
+        }
+      }
+
+      "they keep two classes under test parallelism" should {
+        "give their fork group a worker for each, each in its own folder" in {
+          processFoldersOf(layoutOf(twoForkGroups, classGlobs = globs("samples.A*"), testParallelism = true)) shouldBe Right(Seq(Seq("worker-0"), Seq("worker-1")))
+        }
+      }
+
+      "they keep no class" should {
+        "give no layout, naming the class globs" in {
+          layoutOf(twoForkGroups, classGlobs = globs("samples.Gamma*", "samples.Fast")) shouldBe Left(ClassGlobsKeepNoTestClass(globs("samples.Gamma*", "samples.Fast")))
+        }
+      }
+
+      "they keep only classes that were not discovered" should {
+        "give no layout, naming the class globs" in {
+          layoutOf(Seq(Seq("samples.Gone")), classGlobs = globs("samples.Gone")) shouldBe Left(ClassGlobsKeepNoTestClass(globs("samples.Gone")))
+        }
+      }
+    }
+
     "no fork group holds a discovered class" should {
       "give fork group 0 one worker with no class, in the module's folder" in {
         layoutOf(Seq(Seq("samples.Gone"))) shouldBe Right(
@@ -208,13 +265,13 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
       "two fork groups hold a discovered class" should {
         "give the check's failure" in {
           val failure = notChecked
-          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck(failure)) shouldBe Left(failure)
+          WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.B1"), Seq("samples.A1"))), discoveredClasses, Nil, false, 4, failingCheck(failure)) shouldBe Left(failure)
         }
       }
 
       "one fork group holds a discovered class" should {
         "give that group's worker, without checking" in {
-          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"), Seq("samples.A1"))), discoveredClasses, false, 4, failingCheck(notChecked))) shouldBe Right(
+          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"), Seq("samples.A1"))), discoveredClasses, Nil, false, 4, failingCheck(notChecked))) shouldBe Right(
             Seq(PlannedWorker(workerOf(1), PathUnderModule()))
           )
         }
@@ -222,7 +279,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
       "no fork group holds a discovered class" should {
         "give fork group 0's worker, without checking" in {
-          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"))), discoveredClasses, false, 4, failingCheck(notChecked))) shouldBe Right(Seq(PlannedWorker(workerOf(0), PathUnderModule())))
+          workersOf(WorkerLayout.ofQueue(classesOf(Seq(Seq("samples.Gone"))), discoveredClasses, Nil, false, 4, failingCheck(notChecked))) shouldBe Right(Seq(PlannedWorker(workerOf(0), PathUnderModule())))
         }
       }
     }
@@ -231,7 +288,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
   "Laying out a module's batch workers" when {
     "the module has two fork groups" should {
       "give each group one worker, index 0, in the group's folder, with the group's whole class list" in {
-        WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))), () => Right(false)) shouldBe Right(
+        batchLayoutOf(twoForkGroups) shouldBe Right(
           WorkerLayout(
             Seq(
               PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 2), PathUnderModule("group-0-samples.B1"), classes("samples.B1", "samples.B2"), Seq(PlannedWorker(workerOf(0), PathUnderModule("group-0-samples.B1")))),
@@ -244,7 +301,7 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "a fork group holds no class" should {
       "not run that group, and keep the position of every later group" in {
-        workersOf(WorkerLayout.ofBatches(classesOf(Seq(Nil, Seq("samples.B1"), Seq("samples.A1"))), () => Right(false))) shouldBe Right(
+        workersOf(batchLayoutOf(Seq(Nil, Seq("samples.B1"), Seq("samples.A1")))) shouldBe Right(
           Seq(PlannedWorker(workerOf(1), PathUnderModule("samples.B1")), PlannedWorker(workerOf(2), PathUnderModule("samples.A1")))
         )
       }
@@ -252,15 +309,41 @@ final class WorkerLayoutSpec extends AnyWordSpec with should.Matchers {
 
     "the module has no fork group" should {
       "give fork group 0 one worker with no class, in the module's folder" in {
-        WorkerLayout.ofBatches(Nil, () => Right(false)) shouldBe Right(
+        batchLayoutOf(Nil) shouldBe Right(
           WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(0), ForkGroupLabel.of(0, 1), PathUnderModule(), Nil, Seq(PlannedWorker(workerOf(0), PathUnderModule())))))
         )
       }
     }
 
+    "class globs keep classes of only the second of two fork groups" should {
+      "give only that group a worker, in the module's folder, with the group's kept classes and position" in {
+        batchLayoutOf(twoForkGroups, globs("samples.A2", "samples.Gone")) shouldBe Right(
+          WorkerLayout(Seq(PlannedForkGroup(ForkGroup.at(1), ForkGroupLabel.of(0, 1), PathUnderModule(), classes("samples.A2"), Seq(PlannedWorker(workerOf(1), PathUnderModule())))))
+        )
+      }
+    }
+
+    "class globs keep a class that does not exist" should {
+      "keep that class in its group's list, as no discovery runs" in {
+        batchLayoutOf(Seq(Seq("samples.A1", "samples.Gone")), globs("samples.*")).map(_.forkGroups.map(_.testClasses)) shouldBe Right(Seq(classes("samples.A1", "samples.Gone")))
+      }
+    }
+
+    "class globs keep no class" should {
+      "give no layout, naming the class globs" in {
+        batchLayoutOf(twoForkGroups, globs("samples.Gamma*")) shouldBe Left(ClassGlobsKeepNoTestClass(globs("samples.Gamma*")))
+      }
+    }
+
+    "class globs are given and the module has no fork group" should {
+      "give no layout, naming the class globs" in {
+        batchLayoutOf(Nil, globs("*")) shouldBe Left(ClassGlobsKeepNoTestClass(globs("*")))
+      }
+    }
+
     "two fork groups each hold the same one class" should {
       "give no layout, naming the shared processFolder and the groups sharing it" in {
-        WorkerLayout.ofBatches(classesOf(Seq(Seq("samples.A1"), Seq("samples.A1"))), () => Right(false)) shouldBe Left(sharing(Seq(0, 1), "samples.A1"))
+        batchLayoutOf(Seq(Seq("samples.A1"), Seq("samples.A1"))) shouldBe Left(sharing(Seq(0, 1), "samples.A1"))
       }
     }
   }

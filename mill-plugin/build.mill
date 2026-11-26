@@ -88,6 +88,8 @@ object plugin extends PluginScalaModule, PublishModule {
 
     def sources: T[Seq[PathRef]] = Task { super.sources() ++ compatibilityRecorders() }
 
+    def millBootstrapScript: T[PathRef] = Task.Source(BuildCtx.workspaceRoot / "mill.bat")
+
     def forkEnv: T[Map[String, String]] = Task {
       val repositories = Seq(
         publishLocalTestRepo().path.toNIO.toUri.toASCIIString,
@@ -95,6 +97,7 @@ object plugin extends PluginScalaModule, PublishModule {
       )
       super.forkEnv() ++ Map(
         "MILL_EXECUTABLE_PATH" -> millExecutable.program().path.toString,
+        "MILL_BOOTSTRAP_SCRIPT_PATH" -> millBootstrapScript().path.toString,
         "COURSIER_REPOSITORIES" -> repositories.mkString("|"),
         "SCALATEST_MILL_VERSION" -> publishVersion(),
         "COMPATIBILITY_FIXTURE_SUITES" -> compatibilityFixtureSuites().map(_.path.toString).mkString(java.io.File.pathSeparator)

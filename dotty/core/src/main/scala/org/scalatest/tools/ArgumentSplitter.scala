@@ -1,6 +1,6 @@
 package org.scalatest.tools
 
-import scala.collection.mutable.ListBuffer
+import scala.annotation.tailrec
 
 private[scalatest] enum SplitArgument {
 
@@ -12,9 +12,35 @@ private[scalatest] enum SplitArgument {
 private[scalatest] object ArgumentSplitter {
 
   private enum Values {
-    case Following(count: Int)
-    case FollowingUnlessFlags(count: Int)
+
+    case Following(count: Int, endsAtFlag: Boolean = false)
+
     case DirectoryThenCssFile
+
+    def isShortOf(heldValues: List[String]): Boolean = heldValues.size < countNeeded(heldValues)
+
+    def splitFrom(remaining: List[String]): (List[String], List[String]) = {
+      val values = remaining.take(countNeeded(remaining)).takeWhile(isValue)
+      (values, remaining.drop(values.size))
+    }
+
+    private def countNeeded(arguments: List[String]): Int =
+      this match {
+        case Following(count, _) => count
+        case DirectoryThenCssFile =>
+          if (arguments.drop(1).headOption.contains(cssFileFlag))
+            3
+          else
+            1
+      }
+
+    private def isValue(argument: String): Boolean =
+      this match {
+        case Following(_, endsAtFlag) => !(endsAtFlag && looksLikeFlag(argument))
+        case DirectoryThenCssFile => true
+      }
+
+    private def looksLikeFlag(argument: String): Boolean = Option(argument).exists(_.startsWith("-"))
   }
 
   import Values.*
@@ -49,8 +75,8 @@ private[scalatest] object ArgumentSplitter {
     "-b" -> Following(1),
     "-q" -> Following(1),
     "-Q" -> Following(0),
-    "-k" -> FollowingUnlessFlags(2),
-    "-K" -> FollowingUnlessFlags(2),
+    "-k" -> Following(2, endsAtFlag = true),
+    "-K" -> Following(2, endsAtFlag = true),
     "-y" -> Following(1),
     "-F" -> Following(1),
     "-S" -> Following(1),
@@ -62,17 +88,29 @@ private[scalatest] object ArgumentSplitter {
 
   private val cssFileFlag = "-Y"
 
-  def split(arguments: Seq[String]): List[SplitArgument] = {
-    val remaining = arguments.iterator.buffered
-    val split = new ListBuffer[SplitArgument]
-    while (remaining.hasNext) {
-      val argument = remaining.next()
-      split += (flagOf(argument) match {
-        case Some(flag) => SplitArgument.Flagged(flag, argument :: take(valuesOf(flag), remaining))
-        case None => SplitArgument.Unrecognised(argument)
-      })
+  def split(arguments: Seq[String]): List[SplitArgument] = splitAll(arguments.toList, Nil)
+
+  @tailrec
+  private def splitAll(remaining: List[String], splitSoFar: List[SplitArgument]): List[SplitArgument] =
+    remaining match {
+      case Nil => splitSoFar.reverse
+      case argument :: following =>
+        flagOf(argument) match {
+          case Some(flag) => {
+            val (values, afterValues) = valuesOf(flag).splitFrom(following)
+            splitAll(afterValues, SplitArgument.Flagged(flag, argument :: values) :: splitSoFar)
+          }
+          case None => splitAll(following, SplitArgument.Unrecognised(argument) :: splitSoFar)
+        }
     }
-    split.toList
+
+  /**
+   * Whether the flag holds fewer values than the runner needs with it, such as `-n` with no tag or `-W` with one
+   * integer. A flag the runner does not recognise is never short of values.
+   */
+  def isShortOfValues(flagged: SplitArgument.Flagged): Boolean = {
+    val heldValues = flagged.argumentAndValues.drop(1)
+    flagOf(flagged.flag).map(valuesOf).exists(_.isShortOf(heldValues))
   }
 
   private def flagOf(argument: String): Option[String] =
@@ -81,25 +119,4 @@ private[scalatest] object ArgumentSplitter {
     }
 
   private def valuesOf(flag: String): Values = flagsMatchedByPrefix.getOrElse(flag, flagsMatchedExactly(flag))
-
-  private def take(values: Values, remaining: BufferedIterator[String]): List[String] =
-    values match {
-      case Following(count) =>
-        takeWhileNext(count, remaining)(_ => true)
-      case FollowingUnlessFlags(count) =>
-        takeWhileNext(count, remaining)(next => next == null || !next.startsWith("-"))
-      case DirectoryThenCssFile => {
-        val directory = takeWhileNext(1, remaining)(_ => true)
-        val cssFile = takeWhileNext(1, remaining)(_ == cssFileFlag).flatMap(_ :: takeWhileNext(1, remaining)(_ => true))
-        directory ::: cssFile
-      }
-    }
-
-  private def takeWhileNext(count: Int, remaining: BufferedIterator[String])(isValue: String => Boolean): List[String] = {
-    val taken = new ListBuffer[String]
-    while (taken.size < count && remaining.hasNext && isValue(remaining.head)) {
-      taken += remaining.next()
-    }
-    taken.toList
-  }
 }

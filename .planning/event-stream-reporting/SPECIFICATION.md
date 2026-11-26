@@ -15,7 +15,7 @@ Testing a Mill build can start many runs: several modules, parallel runs within 
 - [SPECIFICATION-DECISIONS.md](SPECIFICATION-DECISIONS.md) — the decisions behind this document, indexed by topic.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the deployable units, the boundaries between the emitter, the Mill plugin and the consolidation library, and how each run's events reach the consolidated output.
 - [ARCHITECTURE-DECISIONS.md](ARCHITECTURE-DECISIONS.md) — the decisions behind the architecture.
-- [JSON-LAYOUT.md](JSON-LAYOUT.md) — the layout of the JSON output, with its decisions in [JSON-LAYOUT-DECISIONS.md](JSON-LAYOUT-DECISIONS.md).
+- [../../mill-plugin/consolidated.schema.json](../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, with the decisions behind its layout in [JSON-LAYOUT-DECISIONS.md](JSON-LAYOUT-DECISIONS.md).
 
 Terms are defined in `.docs/ubiquitous-language.md`.
 
@@ -41,7 +41,6 @@ A test event log's format, the consolidation library's API, the switch by which 
 - Changing any existing ScalaTest reporter.
 - New or changed ScalaTest runner arguments, beyond the switch by which the Mill plugin turns the emitter on. The consolidated test command's `-o` and `-f` arguments and their characters belong to the consolidated test command, not to ScalaTest's runner.
 - A consolidated HTML report; a follow-up epic.
-- Consolidated JUnit XML.
 - A consolidated CTRF (Common Test Report Format) report; a possible later feature.
 - Build tools other than Mill.
 - Consolidated output for Scala.js runs in a JS environment other than `NodeJs` and `JsDom`: `ExoegoJsDomNodeJs`, `Phantom`, and the browsers that `Selenium` and `Playwright` drive; browsers are a possible later feature.
@@ -155,7 +154,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-053a When class globs are provided, the consolidated test command runs each selected test module's tests as Mill's `testOnly` with the provided globs
 - R-053b When no class globs are provided, the consolidated test command runs each selected test module's tests as Mill's `testForked`
 - R-056b A selected test module may compile and run without waiting for any other test module whose compilation it does not depend on
-- R-110 The consolidated test command gives each selected test module its own folder. Every file Mill's `testOnly` or `testForked` would write in its task folder is written at the same relative path in that folder instead.
+- R-110 The consolidated test command gives each selected test module a module folder. Every file Mill's `testOnly` or `testForked` would write in its task folder, other than its JUnit XML report, is written at the same relative path in the module folder instead.
 - R-092 The consolidated test command does not require any additional annotation of existing mill test modules. 
 
 ### Failure
@@ -171,7 +170,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-026 Progress output is written with best effort as the consolidation plugin reads the test event logs.
 - R-027 Consolidated outputs are written after the last run has ended.
 - R-106h Consolidated console output is written through mill with mill's line prefix
-- R-047 The JUnit XML report may be output at the relative path inside the folder the consolidated test command owns for that test module
+- R-047 The consolidated test command writes no JUnit XML report.
 - R-040 Nothing that a run a consolidated test command starts writes to stdout or stderr reaches the console except through the consolidated output.
 - R-129 No line that Mill's test runner writes for a test class it runs, such as `Running Test Class <name>`, is captured from the processes of a run a consolidated test command starts.
 - R-050a the consolidated test command neither captures nor changes the output of other tasks named on the same `mill` command line, or Mill's own output
@@ -216,7 +215,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 ### JSON output
 
-- R-028 JSON output encodes the node tree, per `JSON-LAYOUT.md`.
+- R-028 JSON output encodes the node tree, per the JSON schema `../../mill-plugin/consolidated.schema.json`.
 - R-084 The JSON output records the release of this fork that wrote it.
 - R-127c JSON output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes. 
 - R-127d JSON output omits a scope when all its children have been omitted by filtering characters. This is recursive.

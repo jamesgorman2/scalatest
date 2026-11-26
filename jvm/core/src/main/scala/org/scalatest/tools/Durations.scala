@@ -131,7 +131,7 @@ private[scalatest] case class Durations(file: File) {
     }
     
     val test = getTest()
-    test.durations ::= new Duration(run, millis)
+    test.durations ::= Duration(run, millis)
 
     if ((test.numberOfDurations * 0.8) > test.previousNum) {
       archiveOldestDuration(test)

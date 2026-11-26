@@ -81,7 +81,7 @@ final class JsonNode(val raw: ujson.Value) extends JsonWrapper {
 
   def forkGroup: Option[Int] = field("forkGroup").map(_.num.toInt)
 
-  def failureMessages: Seq[String] = raw("failures").arr.toSeq.map(_("message").str)
+  def failureMessages: Seq[String] = field("failures").toSeq.flatMap(_.arr).map(_("message").str)
 
   def apply(key: String): ujson.Value = raw(key)
 

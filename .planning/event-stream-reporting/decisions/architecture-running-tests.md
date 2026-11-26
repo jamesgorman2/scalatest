@@ -57,7 +57,7 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 
 **Reasoning** Both are named tasks upstream of the tasks the plugin evaluates, so the plugin can put its own value in their place while the module's definition stays unchanged (R-092). Mill's own test body then runs, producing its results and JUnit XML. Tests ran under the launcher in 112 of 112 Scala.js module runs, and on Native the exit status and JUnit XML test cases matched Mill's own task.
 
-**Costs** The swap relies on Mill's test task using each value only as `../ARCHITECTURE.md` § External systems describes, so a Mill change there breaks it at run time, not compile time.
+**Costs** The swap relies on Mill's test task using each value only as `../ARCHITECTURE.md` § External systems describes, so a Mill change there breaks it at run time, not compile time. Mill's own test body also writes the module's JUnit XML report into the task folder of that evaluation, which is the module folder, so the plugin must also replace `testReportXml`'s value with `None` there (`../SPECIFICATION.md` R-047).
 
 **Settled by**
 

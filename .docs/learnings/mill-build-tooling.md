@@ -188,3 +188,41 @@ In Mill 1.3.1, `<module>.testForked <fully qualified class>` does not narrow the
 
 `testOnly` writes its report to `out/<module>/testOnly.dest/test-report.xml`, not `testForked.dest`, so read results from there after a narrowed run.
 </learning>
+
+<learning>
+date: 2026-11-22
+---
+`mill.testkit.IntegrationTester` (Mill 1.3.1) starts its Mill executable directly, not through the `mill.bat` bootstrap script. The test build's processes therefore never see the variables `mill.bat` sets, such as `MILL_PARAMS`: its arguments, less a leading `--no-daemon`, `-i`, `--bsp` or similar. Passing a copy of `mill.bat` as the tester's `millExecutable` does not fix this, as the tester adds `--ticker false`, which then reaches `MILL_PARAMS`.
+
+To test what `mill.bat` sets, call `mill.bat` with `os.call` in the tester's workspace, with the tester's `millTestSuiteEnv` and:
+
+- `MILL_VERSION` set to a version ending in `-jvm`, such as `1.3.1-jvm`, so that `mill.bat` runs `<download folder>\<MILL_VERSION>.bat`;
+- `MILL_FINAL_DOWNLOAD_FOLDER` set to a folder holding a copy of the tester's Mill executable under that name, so that `mill.bat` runs it rather than downloading a release.
+
+Pass `--no-daemon` first for a run without the daemon; `mill.bat` leaves it out of `MILL_PARAMS`. With the tester in daemon mode, the tester's `close()` also stops the daemon `mill.bat` started, as both use the workspace's `out/mill-daemon` folder.
+</learning>
+
+<learning>
+date: 2026-11-22
+---
+Mill 1.3.1 writes a cross module's name with dots, not brackets, both in task names and in `Segments.render` (so `module.moduleSegments.render`). The `test` module of the cross module `core` at `3.3.8` is `core.3_3_8.test`, and its task is `core.3_3_8.test.testForked`. Each `.`, `/` and `:` in a cross value becomes `_`. Mill's command line still accepts `core[3.3.8].test`, and `Segments.renderBracketSyntax` gives that form.
+
+A requirement, folder name or test that expects `core[3.3.8].test` as "the name Mill writes in a task name" is wrong under Mill 1.3.1. Check a cross name before writing it into a specification by running the build's checked-in launcher from the build's folder, such as `./mill.bat --no-daemon resolve 'core[3.3.8].test._'`.
+</learning>
+
+<learning>
+date: 2026-11-23
+---
+In Mill 1.3.1, `mill.javalib.TestModuleUtil.runTests` raises `testOnly`'s `Test selector does not match any test: <selectors>` in only two places:
+
+1. before any worker starts, where the class globs and test discovery leave no class in any fork group;
+2. after its scheduler returns `Result.Success` with no `TestResult`.
+
+It skips the second check whenever laying out a fork group fails or any worker does not succeed:
+
+- `prepareTestClassesFolder`, which writes a fork group's `test-classes` queue before its workers start, throws out of `runTests` when it fails;
+- a worker that throws, as where writing its `testargs` or spawning its JVM fails, propagates the exception out of `runTests`;
+- a worker whose JVM exits without writing `out.json`, as where it dies, gives `Result.Failure("Test reporting Failed: … does not exist")`, and `processTestResults` returns the joined failure.
+
+A plugin that matches `testOnly`'s failures must decide, for each of these cases, whether to add the no-match failure. `testOnly` adds it after none of them: only where every worker ended with a result and none held a test.
+</learning>

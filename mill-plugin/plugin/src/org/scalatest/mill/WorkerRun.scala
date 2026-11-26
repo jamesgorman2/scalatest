@@ -17,35 +17,40 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     // The reader starts when the worker starts, so a worker Mill has not yet scheduled holds no reader thread.
     started = WorkerRun.abandoningOnThrow(abandon())(Try(startWorker(() => startReading())))
     started match {
-      case Success(workerEnd) => workerEnd.onComplete(ended => reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started)))(using ExecutionContext.parasitic)
-      // A worker whose start threw may have started a process.
-      case Failure(_) => reader.workerHasEnded(WorkerProcess.Started)
+      case Success(workerEnd) => workerEnd.onComplete(tellReaderOfEnd)(using ExecutionContext.parasitic)
+      case Failure(_) => reader.workerEndIsUnknown()
     }
   }
 
-  def end(awaitWorker: Future[WorkerProcess] => Unit): Unit = {
+  def end(awaitWorker: Future[WorkerProcess] => Unit): WorkerRun.Ending = {
     val ended = WorkerRun.abandoningOnThrow(abandon()) {
       started.flatMap(workerEnd => Try(awaitWorker(workerEnd)).flatMap(_ => endOf(workerEnd)))
     }
     // Only a worker that ended normally has stopped Mill's threads pumping its output. A failed one, as when Mill
     // cancels the task, can leave its process and those threads running, so the capture's streams stay open.
     ended.foreach(_ => capture.endStreams())
-    // A worker whose end is unknown may have started a process, unless it never started.
-    reader.workerHasEnded(ended.getOrElse(WorkerProcess.Started))
-    val startedUncaptured = ended.toOption.contains(WorkerProcess.Started) && startReadingLate()
+    tellReaderOfEnd(ended)
+    val startedUncaptured = ended.toOption.exists(_.started) && startReadingLate()
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
     ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
     if (startedUncaptured) {
       consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
     }
     reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
+    WorkerRun.Ending.of(ended)
   }
 
   def abandon(): Unit = {
     closeReader()
-    reader.workerHasEnded(WorkerProcess.Started)
+    reader.workerEndIsUnknown()
     stopCapturing()
   }
+
+  private def tellReaderOfEnd(ended: Try[WorkerProcess]): Unit =
+    ended match {
+      case Success(process) => reader.workerHasEnded(process)
+      case Failure(_) => reader.workerEndIsUnknown()
+    }
 
   private def startReading(): Unit =
     synchronized {
@@ -80,6 +85,23 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
 
 private[mill] object WorkerRun {
 
+  enum Ending {
+    case EndedWithResult
+    case EndedWithoutResult
+    case StartedNoProcess
+    case Failed
+  }
+
+  object Ending {
+    def of(ended: Try[WorkerProcess]): Ending =
+      ended match {
+        case Failure(_) => Failed
+        case Success(WorkerProcess.EndedWithResult) => EndedWithResult
+        case Success(WorkerProcess.EndedWithoutResult) => EndedWithoutResult
+        case Success(WorkerProcess.NotStarted) => StartedNoProcess
+      }
+  }
+
   private enum ReaderState {
     case NotStarted
     case Started
@@ -98,12 +120,10 @@ private[mill] object WorkerRun {
       started :+ abandoningOnThrow(started.foreach(_.abandon()))(start(worker))
     }
 
-  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[WorkerProcess] => Unit): Unit =
+  def endEach(workerRuns: Seq[WorkerRun])(awaitWorker: Future[WorkerProcess] => Unit): Seq[Ending] =
     try {
-      workerRuns.tails.foreach {
-        case workerRun +: notYetEnded =>
-          abandoningOnThrow(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
-        case _ => ()
+      workerRuns.tails.toSeq.collect { case workerRun +: notYetEnded =>
+        abandoningOnThrow(notYetEnded.foreach(_.abandon()))(workerRun.end(awaitWorker))
       }
     } finally {
       // A failed worker can go on writing output, which must not reach a run that has ended.
