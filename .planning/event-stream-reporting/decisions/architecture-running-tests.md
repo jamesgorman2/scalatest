@@ -113,7 +113,7 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 - Every way of telling the discovery runner's file from a run's file fails in one case, and each leaves a discovery file that Windows cannot delete under the daemon.
 - Mill's own JVM test task, with a logger compiled in package `mill`, keeps the runner's progress off the console, but passes discovery the runner argument.
 
-**Reasoning** `../SPECIFICATION.md` R-072 gives the discovery runner no node. With the argument withheld from discovery, no discovery file appeared, while the workers received it and ran the same classes with the same results.
+**Reasoning** `../SPECIFICATION.md` R-072a gives the discovery runner no node. With the argument withheld from discovery, no discovery file appeared, while the workers received it and ran the same classes with the same results.
 
 **Costs** On the JVM the plugin must drive Mill's test queue itself, since evaluating the module's own test task passes discovery the same arguments as the workers. That route needs reflection on Mill's protected discovery member, `@experimental` `TestModuleUtil`, `@internal` `internalWorker`, `TestResult` and `TestRunnerUtils.globFilter`, `mill.javalib.api.internal.ZincOp` and a copy of Mill's test-queue scheduling, any of which a Mill release can break at run time, not compile time.
 

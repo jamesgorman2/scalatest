@@ -14,7 +14,7 @@ The test command takes exactly one module selector, which must name one JVM test
 
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against.
 - [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md) — how the test command checks every selected module before any test starts, and runs each module's tests inside its nested evaluation.
-- [../../../mill-plugin/consolidated.schema.json](../../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, including the root's `moduleSelectors` and `contents` (`$defs/root`, `$defs/moduleSelector` and `$defs/module`).
+- [../../../mill-plugin/consolidated.schema.json](../../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, including the root's `moduleSelectors` and `contents` and a module's `outcome` and `failures` (`$defs/root`, `$defs/moduleSelector`, `$defs/module` and `$defs/failure`).
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 
 Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../SPECIFICATION.md` R-nnn. Terms are defined in `.docs/ubiquitous-language.md`, among them *module selector*, *class glob*, *framework argument* and *module folder*.
@@ -25,6 +25,7 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 - The module nodes of the consolidated output and the JSON root's `moduleSelectors` when several test modules are selected.
 - Running every selected JVM test module's tests in one test command: each module's tests start once that module compiles, and run whatever happens to the other selected modules, whether or not Mill's `--keep-going` is given.
 - A selected test module whose tests cannot start, as where it fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
+- Each failure the test command can attribute to one selected test module, such as its tests not starting or its class globs matching no test, shown on that module's node in the JSON and human-readable outputs.
 - The class globs and framework arguments applying alike to every selected test module.
 - Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
 - Failing the test command before any test starts where a module selector resolves to:
@@ -144,7 +145,8 @@ Feature: Every selected module runs, whatever happens to the others
     And `alpha.test` holds the suite `Alpha1`, whose class is `samples.Alpha1`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
     And each of those suites is an `AnyFunSuite` with two tests, `fast` and `slow`, both of which succeed unless the scenario says otherwise
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`
-    And the test command is invoked as `mill -j 2 <flags> scalatest/test <selectors> -fJ <report>`, each argument reaching `mill` exactly as written, with no shell expansion
+    And the test command is invoked as `mill -j 2 <flags> scalatest/test <selectors> -fJ <report>` unless the scenario states its own `mill` command line
+    And each argument of a `mill` command line reaches `mill` exactly as written, with no shell expansion
     And `<report>` is an absolute path at which nothing exists
     And the JSON output is the JSON value parsed from the file at `<report>` once the test command has ended
 
@@ -160,7 +162,7 @@ Feature: Every selected module runs, whatever happens to the others
         | none           |
         | `--keep-going` |
 
-  Rule: A module whose tests cannot start has its module node and fails the test command, and does not stop another module's tests
+  Rule: A module whose tests cannot start has an aborted module node with one failure, fails the test command, and does not stop another module's tests
     A module's tests cannot start where the module fails to compile, a dependency of the module fails to resolve, or any other task the module's tests depend on fails.
     The test command starts no test of a module whose tests cannot start.
     A failing task of a selected test module does not stop the test command from running.
@@ -170,6 +172,9 @@ Feature: Every selected module runs, whatever happens to the others
       When the test command is invoked with the flags <flags> and the module selectors `alpha.test broken.test beta.test`
       Then the files `Alpha1.fast`, `Alpha1.slow`, `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the JSON output's root holds exactly the module nodes `alpha.test`, `beta.test` and `broken.test`, in that order
+      And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry
+      And the module nodes `alpha.test` and `beta.test` have no `outcome` and no `failures`
+      And the JSON output's root has no `outcome` and no `failures`
       And the test command fails
 
       Examples:
@@ -182,12 +187,23 @@ Feature: Every selected module runs, whatever happens to the others
       When the test command is invoked with no flags and the module selectors `alpha.test broken.test beta.test`
       Then the files `Alpha1.fast`, `Alpha1.slow`, `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the JSON output's root holds exactly the module nodes `alpha.test`, `beta.test` and `broken.test`, in that order
+      And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry
+      And the module nodes `alpha.test` and `beta.test` have no `outcome` and no `failures`
+      And the JSON output's root has no `outcome` and no `failures`
       And the test command fails
 
       Examples:
         | cause                                                                                       |
         | whose `mvnDeps` holds `com.example::absent:0.0.1`, which no repository the build uses holds |
         | whose `generatedSources` task throws an exception                                           |
+
+    Scenario: AC-023 broken.test's failure in the human-readable output
+      Given the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and whose sources do not compile
+      And `<human>` is an absolute path at which nothing exists
+      When `mill -j 2 scalatest/test alpha.test broken.test beta.test -fH <human>` is invoked
+      Then in the file at `<human>`, the line after the line `[broken.test]` is `*** MODULE ABORTED ***`, in red and indented one level more than `[broken.test]`
+      And one or more lines follow `*** MODULE ABORTED ***`, each in red and indented one level more than `*** MODULE ABORTED ***`
+      And the test command fails
 
   Rule: A module's tests start once that module and each module it depends on have compiled, without waiting for another selected test module to compile
     Scenario: AC-007 late.test compiles only after a test of alpha.test has run
@@ -215,6 +231,7 @@ Feature: Class globs and framework arguments across modules
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`
     And the test command is invoked as `mill -j 2 scalatest/test alpha.test beta.test -fJ <report> <arguments>`, each argument reaching `mill` exactly as written, with no shell expansion
     And `<report>` is an absolute path at which nothing exists
+    And the JSON output is the JSON value parsed from the file at `<report>` once the test command has ended
 
   Rule: Class globs and framework arguments reach every selected module
     Scenario Outline: AC-008 Arguments <arguments>
@@ -228,10 +245,23 @@ Feature: Class globs and framework arguments across modules
         | `-- -- -n samples.Fast`                    | `Alpha1.fast`, `Alpha2.fast` and `Beta1.fast`                          |
         | `-- *1 -- -z slow`                         | `Alpha1.slow` and `Beta1.slow`                                         |
 
-  Rule: Where no class glob matches a test class that a selected module's test framework discovers, no test of that module starts, the test command fails, and every other module's tests still run
+  Rule: Where no class glob matches a test class that a selected module's test framework discovers, no test of that module starts, that module's node is aborted with the failure Mill's `testOnly` fails with, the test command fails, and every other module's tests still run
     Scenario: AC-009 Class globs that match only alpha.test's classes
       When the test command is invoked with `-- samples.Alpha*`
       Then the files in `<markers>` are exactly `Alpha1.fast`, `Alpha1.slow`, `Alpha2.fast` and `Alpha2.slow`
+      And in the JSON output, the module node `beta.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry
+      And that entry's `message` is `Test selector does not match any test: samples.Alpha*` and `Run discoveredTestClasses to see available tests`, joined by a line feed
+      And in the JSON output, the module node `alpha.test` has no `outcome` and no `failures`
+      And the JSON output's root has no `outcome` and no `failures`
+      And the test command fails
+
+  Rule: Where class globs match a selected module's test classes but no test of that module reports a result, that module's node holds its runs and is aborted with the failure Mill's `testOnly` fails with, and the test command fails
+    Scenario: AC-022 Framework arguments that exclude every test the class globs keep
+      When the test command is invoked with `-- *1 -- -z nothing-matches`
+      Then no file exists in `<markers>`
+      And in the JSON output, the module nodes `alpha.test` and `beta.test` each hold one or more run nodes, and each has the `outcome` `aborted` and a `failures` that holds exactly one entry
+      And each of those entries' `message` is `Test selector does not match any test: *1` and `Run discoveredTestClasses to see available tests`, joined by a line feed
+      And the JSON output's root has no `outcome` and no `failures`
       And the test command fails
 ```
 
@@ -344,7 +374,7 @@ Each epic requirement this feature enables, with the criteria that test it:
 | Epic requirement             | Criteria                               |
 |------------------------------|----------------------------------------|
 | `../SPECIFICATION.md` R-028  | AC-002, AC-013, AC-014, AC-017         |
-| `../SPECIFICATION.md` R-053a | AC-008, AC-009                         |
+| `../SPECIFICATION.md` R-053a | AC-008, AC-009, AC-022                 |
 | `../SPECIFICATION.md` R-053b | AC-008                                 |
 | `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-008, AC-017, AC-018 |
 | `../SPECIFICATION.md` R-056a | AC-005, AC-006, AC-009, AC-015         |
@@ -352,9 +382,12 @@ Each epic requirement this feature enables, with the criteria that test it:
 | `../SPECIFICATION.md` R-059  | AC-010, AC-011, AC-020                 |
 | `../SPECIFICATION.md` R-061  | AC-006, AC-015                         |
 | `../SPECIFICATION.md` R-062  | AC-012, AC-021                         |
+| `../SPECIFICATION.md` R-072b | AC-006, AC-009, AC-015, AC-022         |
 | `../SPECIFICATION.md` R-077  | AC-010, AC-011, AC-016, AC-019         |
 | `../SPECIFICATION.md` R-096a | AC-001, AC-002, AC-003, AC-006, AC-013 |
+| `../SPECIFICATION.md` R-098e | AC-006, AC-009, AC-015, AC-022         |
 | `../SPECIFICATION.md` R-105  | AC-001, AC-003, AC-006                 |
+| `../SPECIFICATION.md` R-106d | AC-023                                 |
 | `../SPECIFICATION.md` R-110  | AC-004                                 |
-| `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015         |
+| `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015, AC-022 |
 | `../SPECIFICATION.md` R-142  | AC-019                                 |

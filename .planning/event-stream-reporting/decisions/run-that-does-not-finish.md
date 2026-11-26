@@ -52,7 +52,7 @@ Decisions behind `../SPECIFICATION.md` on what the consolidated output shows whe
 **Alternatives**
 
 - Starting a run at its first task drops from the output a worker that dies before its first task.
-- Counting every runner constructed while the test command executes tests also counts another module's discovery runner, against `../SPECIFICATION.md` R-072.
+- Counting every runner constructed while the test command executes tests also counts another module's discovery runner, against `../SPECIFICATION.md` R-072a.
 
 **Reasoning** A worker that dies before its first task is still a failure the reader must see (`../SPECIFICATION.md` R-102), and defining a run by its purpose leaves out every discovery runner, whenever it is constructed.
 

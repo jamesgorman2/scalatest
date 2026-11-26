@@ -105,7 +105,9 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-097b All output is attached to the most specific identifiable node.
 - R-043 All captured output keeps its order within a node, whatever its source.
 - R-076 Output captured from a forked execution, before any Runner is constructed, is associated with the most specific node that can be identified.
-- R-072 The execution of a runner that is not intended to produce test output, such as Mill's discovery runner, does not create nodes. Its failure state and output is attached to the root node.
+- R-072a The execution of a runner that is not intended to produce test output, such as Mill's discovery runner, does not create nodes.
+- R-072b A failure that the consolidated test command can attribute to one selected test module, such as the failure of a runner that is not intended to produce test output, is attached to that module's node.
+- R-072c The output of a runner that is not intended to produce test output is attached to the root node.
 - R-136 The node tree is constructed from the consolidated test command's execution, each process's assigned test classes, and the events emitted by all Runners
 
 ### Outcomes and durations

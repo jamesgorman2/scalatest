@@ -2,6 +2,36 @@
 
 Decisions behind the layout of the JSON output that [../../mill-plugin/consolidated.schema.json](../../mill-plugin/consolidated.schema.json) states, newest first.
 
+## A failure the test command can attribute to one selected module is attached to that module, not to the root.
+
+**Alternatives**
+
+- Keeping such failures on the root, each naming its module in its message, leaves a tool parsing messages to learn which module failed.
+- Moving only the failures of a module's tests not starting or its class globs matching no test puts failures of one kind, each naming one module, on two different nodes.
+
+**Reasoning** This fork exists so that tools read test output without parsing its text. The tree already names each module, so a failure on its module's node tells a reader which module failed without reading the message, and every failure that belongs to one module sits on that module whatever caused it.
+
+**Costs** Each existing placement of such a failure on the root, and each integration test that asserts one there, is rewritten. A reader collecting every failure must walk the modules as well as the root.
+
+**Settled by** [Many modules in one test command - How a module's error is shown](https://github.com/jamesgorman2/scalatest/issues/241).
+
+---
+
+## A module's failures are a `failures` array of `{ "message" }` objects beside an `outcome` of `aborted`, as the root's are.
+
+**Alternatives**
+
+- A run node's shape, an `outcome` with one `message`, must join a module's several failures into one string.
+- A new outcome value, such as `error`, is one more value every reader must handle, and pre-empts the outcome reason a later feature may add beside `outcome`.
+
+**Reasoning** A module, like the root, can be given several failures, none of which is a run's own abort. The root's keys give a reader one way to read failures on either node, and leave room for an outcome reason beside `outcome`.
+
+**Costs** A module's `outcome` does not say whether its tests started; a reader learns that from its `contents` and its failures' messages.
+
+**Settled by** [Many modules in one test command - How a module's error is shown](https://github.com/jamesgorman2/scalatest/issues/241).
+
+---
+
 ## A module's runs are numbered by their fork group's position in the module's `testForkGrouping`, then by their worker's index within the fork group.
 
 **Alternatives**

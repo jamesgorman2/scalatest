@@ -30,7 +30,7 @@
           "const": "aborted"
         },
         "failures": {
-          "description": "The failures attached to the root, which belong to no run, such as a worker failing to start. Absent where none is attached.",
+          "description": "The failures attached to the root: those of no single module, such as a failure of the test command itself. Absent where none is attached.",
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/failure" }
@@ -103,11 +103,11 @@
       "additionalProperties": false
     },
     "failure": {
-      "description": "A failure attached to the root: one that belongs to no run, such as laying out a fork group or starting a worker failing.",
+      "description": "A failure attached to the root or to a module: one that belongs to no run, such as laying out a fork group or starting a worker failing. A failure attached to a module does not name that module.",
       "type": "object",
       "properties": {
         "message": {
-          "description": "The failure's text, such as `Starting worker 0 of fork group 1 of core.test failed: …`.",
+          "description": "The failure's text, such as `Starting worker 0 of fork group 1 failed: …`.",
           "type": "string"
         }
       },
@@ -115,7 +115,7 @@
       "additionalProperties": false
     },
     "module": {
-      "description": "A module: a build tool's unit of build whose tests produced the runs it holds.",
+      "description": "A module: a build tool's unit of build whose tests produced the runs it holds. Its `outcome` and `failures` are present together or not at all.",
       "type": "object",
       "properties": {
         "kind": {
@@ -125,6 +125,16 @@
         "name": {
           "description": "The module's name as its build tool writes it, such as `core.test` for a Mill module.",
           "type": "string"
+        },
+        "outcome": {
+          "description": "The module's outcome, `aborted`, present only where a failure is attached to the module. No outcome is rolled up from the module's runs.",
+          "const": "aborted"
+        },
+        "failures": {
+          "description": "The failures attached to the module, such as its tests not starting or its class globs matching no test. Absent where none is attached.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/failure" }
         },
         "startedAt": {
           "description": "The module's start time, which the consolidation library's caller gives. Absent where the caller gives none.",
@@ -147,6 +157,8 @@
       "required": ["kind", "name", "contents"],
       "additionalProperties": false,
       "dependentRequired": {
+        "outcome": ["failures"],
+        "failures": ["outcome"],
         "duration": ["startedAt", "endedAt"]
       },
       "if": { "required": ["startedAt", "endedAt"] },
