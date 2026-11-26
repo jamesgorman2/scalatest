@@ -300,11 +300,10 @@ Feature: Class globs and framework arguments across modules
       Given `beta.test` also holds the class `samples.Noisy`, a public Java class that extends `org.scalatest.funsuite.AnyFunSuite` and holds no test
       And `samples.Noisy`'s only public constructor takes no argument
       And `samples.Noisy`'s static initializer writes the line `loading samples.Noisy` to stdout
-      And `<human>` is an absolute path at which nothing exists
-      When the test command is invoked with `-fH <human> -- samples.* -- -z nothing-matches`
-      Then in the file at `<human>`, the lines that follow `[beta.test]` and are indented more than it end with these lines, in this order:
+      When the test command is invoked with `-oH -- samples.* -- -z nothing-matches`
+      Then in the human-readable output on stdout, the lines that follow `[beta.test]` and are indented more than it end with these lines, in this order:
         | line                                               | indented more than `[beta.test]` by | colour |
-        | `loading samples.Noisy`                            | one level                           | any    |
+        | `[stdout] loading samples.Noisy`                   | one level                           | any    |
         | `*** MODULE ABORTED ***`                           | one level                           | red    |
         | `Test selector does not match any test: samples.*` | two levels                          | red    |
         | `Run discoveredTestClasses to see available tests` | two levels                          | red    |

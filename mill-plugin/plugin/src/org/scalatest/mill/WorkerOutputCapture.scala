@@ -1,6 +1,9 @@
 package org.scalatest.mill
 
+import java.io.OutputStream
+import java.io.PrintStream
 import java.nio.charset.Charset
+import java.util.Arrays
 import org.scalatest.consolidation.CapturedLine
 import scala.collection.mutable
 
@@ -15,6 +18,12 @@ private[mill] final class WorkerOutputCapture(charset: Charset) {
   def stdout(bytes: Array[Byte], length: Int): Unit = stdoutLines.append(bytes, length)
 
   def stderr(bytes: Array[Byte], length: Int): Unit = stderrLines.append(bytes, length)
+
+  def stdoutPrintStream(): PrintStream = printStreamOver(stdout)
+
+  def stderrPrintStream(): PrintStream = printStreamOver(stderr)
+
+  private def printStreamOver(append: (Array[Byte], Int) => Unit): PrintStream = new PrintStream(new AppendingStream(append), true, charset)
 
   def endStreams(): Unit = {
     stdoutLines.end()
@@ -45,6 +54,13 @@ private[mill] final class WorkerOutputCapture(charset: Charset) {
         }
       }
     }
+}
+
+private final class AppendingStream(append: (Array[Byte], Int) => Unit) extends OutputStream {
+
+  override def write(byte: Int): Unit = append(Array(byte.toByte), 1)
+
+  override def write(bytes: Array[Byte], offset: Int, length: Int): Unit = append(Arrays.copyOfRange(bytes, offset, offset + length), length)
 }
 
 private[mill] object WorkerOutputCapture {

@@ -1,7 +1,9 @@
 package org.scalatest.mill
 
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ForkGroup
@@ -223,6 +225,68 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
         JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, Nil, everyForkGroupLaidOut = true, Seq(EndedWithResult))
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
+      }
+    }
+  }
+
+  "Capturing what a module's test discovery writes" when {
+    "discovery writes lines to Console and to the streams it is given" should {
+      "attach each line to the module, tagged with its stream, in the order written" in {
+        consolidationEndedAfter { consolidation =>
+          JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8) { (stdout, stderr) =>
+            Console.out.println("loading samples.Noisy")
+            stderr.println("warn: slow discovery")
+            stdout.print("last line")
+          }
+        }.outputWithoutSummaryLine shouldBe Seq(
+          "[core.test]",
+          "  [stdout] loading samples.Noisy",
+          "  [stderr] warn: slow discovery",
+          "  [stdout] last line"
+        )
+      }
+
+      "give what discovery returns" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8)((_, _) => Set("samples.Noisy")) shouldBe Set("samples.Noisy")
+      }
+    }
+
+    "discovery throws after writing a line" should {
+      "attach that line to the module and rethrow what discovery threw" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        val thrown = the[ExceptionInInitializerError] thrownBy {
+          JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8) { (_, _) =>
+            Console.out.println("loading samples.Noisy")
+            throw new ExceptionInInitializerError("samples.Noisy failed to initialize")
+          }
+        }
+        consolidation.end()
+        (thrown.getMessage, consolidationUnderTest.outputWithoutSummaryLine) shouldBe
+          (("samples.Noisy failed to initialize", Seq("[core.test]", "  [stdout] loading samples.Noisy")))
+      }
+    }
+
+    "a thread that discovery started writes after discovery returns" should {
+      "attach nothing that thread writes to the module" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        val discoveryReturned = new CountDownLatch(1)
+        val lateWriter = JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8) { (_, _) =>
+          Console.out.println("during discovery")
+          val writer = new Thread(() => {
+            discoveryReturned.await()
+            Console.out.println("after discovery")
+            Console.err.println("after discovery")
+          })
+          writer.start()
+          writer
+        }
+        discoveryReturned.countDown()
+        lateWriter.join()
+        consolidation.end()
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]", "  [stdout] during discovery")
       }
     }
   }

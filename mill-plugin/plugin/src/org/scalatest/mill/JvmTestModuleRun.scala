@@ -1,12 +1,14 @@
 package org.scalatest.mill
 
 import java.io.IOException
+import java.io.PrintStream
 import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import mill.api.Logger
 import mill.api.Result
+import mill.api.SystemStreams
 import mill.api.TaskCtx
 import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.ZincOp
@@ -48,9 +50,9 @@ private[mill] final class JvmTestModuleRun(
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
   def execute(consolidation: Consolidation): Unit =
-    JvmTestModuleRun.launcherOrReportFailure(consolidation, module, layOutWorkers()).foreach(launcher => runWorkers(consolidation, launcher))
+    JvmTestModuleRun.launcherOrReportFailure(consolidation, module, layOutWorkers(consolidation)).foreach(launcher => runWorkers(consolidation, launcher))
 
-  private def layOutWorkers(): Either[WorkerLayoutFailure, WorkerLauncher] = {
+  private def layOutWorkers(consolidation: Consolidation): Either[WorkerLayoutFailure, WorkerLauncher] = {
     val moduleFolderIgnoresCase = () => filesystemIgnoresCase(moduleFolder.toNIO)
     // As Mill 1.3.1 does, batch workers run, without discovery, the classes in each fork group's `testForkGrouping` list
     // that the class globs match.
@@ -58,7 +60,7 @@ private[mill] final class JvmTestModuleRun(
       WorkerLayout.ofBatches(forkGroups, classGlobs, moduleFolderIgnoresCase).map(new BatchLauncher(_))
     else
       WorkerLayout
-        .ofQueue(forkGroups, discoveredTestClasses(), classGlobs, inputs.testParallelism, ctx.jobs, moduleFolderIgnoresCase)
+        .ofQueue(forkGroups, discoveredTestClasses(consolidation), classGlobs, inputs.testParallelism, ctx.jobs, moduleFolderIgnoresCase)
         .map(new QueueLauncher(_))
   }
 
@@ -80,21 +82,30 @@ private[mill] final class JvmTestModuleRun(
     )
   }
 
-  private def discoveredTestClasses(): Set[TestClassName] =
-    inputs.jvmWorker
-      .apply(
-        ZincOp.GetTestTasks(
-          (inputs.runClasspath ++ inputs.testrunnerEntrypointClasspath).map(_.path),
-          inputs.testClasspath.map(_.path),
-          inputs.testFramework,
-          classGlobs.map(_.text),
-          runArguments.commandLine,
-          inputs.discoveredClasses
-        ),
-        javaHome = inputs.javaHome
-      )(using ctx)
-      .map(TestClassName(_))
-      .toSet
+  private def discoveredTestClasses(consolidation: Consolidation): Set[TestClassName] =
+    // Without `javaHome`, discovery runs on this thread, and its writes reach `SystemStreams.current` through Mill's
+    // process-wide `System.out` and `System.err`. `SystemStreamsUtils.withStreams` would also bind `os.Inherit`, and so
+    // send the stderr of a JVM worker subprocess that discovery starts into the capture for the rest of its life.
+    // With or without `javaHome`, Mill's JVM encodes each of discovery's writes with its default charset, so the capture
+    // decodes with it too.
+    JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, Charset.defaultCharset()) { (stdout, stderr) =>
+      SystemStreams.current.withValue(new SystemStreams(stdout, stderr, SystemStreams.current.value.in)) {
+        inputs.jvmWorker
+          .apply(
+            ZincOp.GetTestTasks(
+              (inputs.runClasspath ++ inputs.testrunnerEntrypointClasspath).map(_.path),
+              inputs.testClasspath.map(_.path),
+              inputs.testFramework,
+              classGlobs.map(_.text),
+              runArguments.commandLine,
+              inputs.discoveredClasses
+            ),
+            javaHome = inputs.javaHome
+          )(using ctx)
+          .map(TestClassName(_))
+          .toSet
+      }
+    }
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
@@ -249,6 +260,27 @@ private[mill] object JvmTestModuleRun {
     } catch {
       case failure: IOException => Left(new FilesystemCaseNotChecked(failure))
     }
+
+  def attachingDiscoveryOutput[T](consolidation: Consolidation, module: ModuleName, charset: Charset)(
+      discover: (PrintStream, PrintStream) => T
+  ): T = {
+    val capture = new WorkerOutputCapture(charset)
+    val stdout = capture.stdoutPrintStream()
+    val stderr = capture.stderrPrintStream()
+    try {
+      // With `javaHome`, discovery runs in a JVM worker subprocess, which forwards its writes to this thread's `Console`.
+      Console.withOut(stdout) {
+        Console.withErr(stderr) {
+          discover(stdout, stderr)
+        }
+      }
+    } finally {
+      // A thread that discovery started inherits these streams, and may write after discovery has returned or thrown.
+      capture.endStreams()
+      capture.addTo(line => consolidation.addModuleOutput(module, line))
+      capture.stopCapturing()
+    }
+  }
 
   def launcherOrReportFailure[Launcher](
       consolidation: Consolidation,
