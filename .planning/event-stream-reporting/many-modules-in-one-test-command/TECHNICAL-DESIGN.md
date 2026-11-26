@@ -4,15 +4,15 @@
 
 The test command runs every selected JVM test module's tests in one nested evaluation with fail-fast off (`../ARCHITECTURE.md` § Data flow). This design places each module's run inside that evaluation. Each module's tests must start once that module compiles and run whatever happens to another module's compile, while no worker's output reaches the console. Every choice below ran on Mill 1.3.1 (`../research/mill-nested-module-run.md` § 3, § 4, § 5).
 
-Bare `R-nnn` IDs are `SPECIFICATION.md`'s.
+Bare `AC-nnn` IDs are `SPECIFICATION.md`'s.
 
 ## Critical code paths
 
 ### One task per module
 
 - Each module's own task (`../ARCHITECTURE.md` § Data flow) is a `Task.Anon`. Its one upstream task is the inputs task that `JvmTestModuleInputs` builds from the module's own tasks. Its body is the plugin's module run, `JvmTestModuleRun`.
-- The test command calls `execute` once, over every module's task, on the fail-fast-off evaluator (R-005).
-- No separate `execute` evaluates a module's inputs before the module runs. The command's own evaluator has fail-fast on. Evaluating every module's inputs before any module run would also hold each module's tests until every other module had compiled (R-006).
+- The test command calls `execute` once, over every module's task, on the fail-fast-off evaluator (AC-005, AC-006, AC-015).
+- No separate `execute` evaluates a module's inputs before the module runs. The command's own evaluator has fail-fast on. Evaluating every module's inputs before any module run would also hold each module's tests until every other module had compiled (AC-007).
 - Module resolution, the clearing of each module folder and the consolidation's **Start** stay in the command's body, before `execute`. A module's task cannot do them, because Mill gives a task that is not an exclusive command an `Evaluator` that throws.
 - Every module's task adds its runs to the one consolidation, each from a thread of Mill's pool.
 
@@ -29,4 +29,4 @@ Bare `R-nnn` IDs are `SPECIFICATION.md`'s.
 ### A module whose tests cannot start
 
 - Where a task upstream of a module's task fails, Mill marks the module's task `Skipped` and never runs its body. Such a module therefore never reaches the consolidation through its module run.
-- After `execute` returns and before **End**, the test command reads each module's task's result from the evaluation's results. For each module whose task is `Skipped`, the test command calls **Add a module whose tests did not start** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library). It gives that call the failure of each failed task upstream of the module's task, which the evaluation's results hold under that task's name (R-010).
+- After `execute` returns and before **End**, the test command reads each module's task's result from the evaluation's results. For each module whose task is `Skipped`, the test command calls **Add a module whose tests did not start** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library). It gives that call the failure of each failed task upstream of the module's task, which the evaluation's results hold under that task's name (AC-006, AC-015).
