@@ -37,7 +37,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
       consolidationUnderTest: ConsolidationUnderTest = new ConsolidationUnderTest
   ) {
     val consolidation: Consolidation = consolidationUnderTest.consolidation
-    val capture: WorkerOutputCapture = new WorkerOutputCapture(StandardCharsets.UTF_8)
+    val capture: OutputCapture = new OutputCapture(StandardCharsets.UTF_8)
     val counting: CountingConsolidation = new CountingConsolidation(consolidation, module)
     @volatile var processExited: Boolean = true
     private val reader = new EventLogReader(eventLogFile, addCapturedRun, () => counting.addProcessEndedBeforeAnyRun(), _ => processExited, pollInterval = 1.millis)

@@ -4,9 +4,9 @@ import java.nio.charset.StandardCharsets
 
 private[mill] object WorkerOutput {
 
-  def writeStdout(capture: WorkerOutputCapture, text: String): Unit = write(capture.stdout, text)
+  def writeStdout(capture: OutputCapture, text: String): Unit = write(capture.stdout, text)
 
-  def writeStderr(capture: WorkerOutputCapture, text: String): Unit = write(capture.stderr, text)
+  def writeStderr(capture: OutputCapture, text: String): Unit = write(capture.stderr, text)
 
   private def write(stream: (Array[Byte], Int) => Unit, text: String): Unit = {
     val bytes = text.getBytes(StandardCharsets.UTF_8)

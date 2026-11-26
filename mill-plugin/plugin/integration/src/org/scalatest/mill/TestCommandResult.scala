@@ -58,15 +58,19 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
       .map(line => TestCommandResult.colourMarked(TestCommandResult.withoutColouredMillPrefix(line)))
   }
 
-  def subtreeOf(nodeLine: String): Seq[String] = {
+  def subtreeOf(nodeLine: String): Seq[String] = linesOfSubtree(nodeLine, treeLines)
+
+  def colourMarkedSubtreeOf(nodeLine: String): Seq[String] = linesOfSubtree(nodeLine, colourMarkedTreeLines)
+
+  private def linesOfSubtree(nodeLine: String, lines: Seq[String]): Seq[String] = {
     val output = treeLines
     val start = output.indexWhere(_.trim == nodeLine)
     if (start < 0) {
       Nil
     } else {
       val indentation = output(start).takeWhile(_ == ' ').length
-      val under = output.drop(start + 1).takeWhile(line => line.takeWhile(_ == ' ').length > indentation)
-      (output(start) +: under).map(_.drop(indentation))
+      val underCount = output.drop(start + 1).takeWhile(line => line.takeWhile(_ == ' ').length > indentation).size
+      lines.slice(start, start + 1 + underCount).map(_.drop(indentation))
     }
   }
 

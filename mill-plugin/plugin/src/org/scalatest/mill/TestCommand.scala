@@ -65,7 +65,7 @@ private[mill] final class TestCommand private (
       startedAt = Some(now())
     )
     TestCommand.addModuleFailures(consolidation, checkFailures)
-    val workerCharset = WorkerOutputCapture.workerCharset(systemProperty)
+    val workerCharset = OutputCapture.workerCharset(systemProperty)
     val moduleRunTasks = runArguments.map { case (module, moduleRunArguments) =>
       module -> moduleRunTask(module, moduleRunArguments, moduleFolders(module), consolidation, workerCharset)
     }

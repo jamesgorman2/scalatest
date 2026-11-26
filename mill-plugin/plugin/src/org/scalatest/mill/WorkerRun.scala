@@ -14,7 +14,7 @@ private[mill] final class WorkerRun(
     module: ModuleName,
     workerName: String,
     reader: EventLogReader,
-    capture: WorkerOutputCapture
+    capture: OutputCapture
 ) {
 
   private var started: Try[Future[WorkerProcess]] = Failure(new IllegalStateException(s"$workerName was never started"))

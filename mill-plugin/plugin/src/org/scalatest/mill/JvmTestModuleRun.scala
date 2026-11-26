@@ -123,7 +123,7 @@ private[mill] final class JvmTestModuleRun(
       runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[WorkerProcess]
   ): WorkerRun = {
     val eventLogFile = inModuleFolder(plannedWorker.processFolder) / JvmTestModuleRun.eventLogFileName
-    val capture = new WorkerOutputCapture(workerCharset)
+    val capture = new OutputCapture(workerCharset)
     val reader = new EventLogReader(
       eventLogFileAt(eventLogFile.toNIO),
       readRun =>
@@ -264,7 +264,7 @@ private[mill] object JvmTestModuleRun {
   def attachingDiscoveryOutput[T](consolidation: Consolidation, module: ModuleName, charset: Charset)(
       discover: (PrintStream, PrintStream) => T
   ): T = {
-    val capture = new WorkerOutputCapture(charset)
+    val capture = new OutputCapture(charset)
     val stdout = capture.stdoutPrintStream()
     val stderr = capture.stderrPrintStream()
     try {
@@ -276,9 +276,7 @@ private[mill] object JvmTestModuleRun {
       }
     } finally {
       // A thread that discovery started inherits these streams, and may write after discovery has returned or thrown.
-      capture.endStreams()
-      capture.addTo(line => consolidation.addModuleOutput(module, line))
-      capture.stopCapturing()
+      capture.stopAndTakeLines().foreach(line => consolidation.addModuleOutput(module, line))
     }
   }
 

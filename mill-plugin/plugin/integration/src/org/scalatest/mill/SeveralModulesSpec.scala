@@ -23,6 +23,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       And("each of those suites is an AnyFunSuite with two tests, fast and slow, both of which succeed, and only fast is tagged samples.Fast")
       And("each of those modules holds the object samples.Fast, which is a Tag and not a test class")
       And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>")
+      And("the test command is invoked as mill -j 2 scalatest/test alpha.test beta.test -fJ <report> <arguments>, each argument reaching mill exactly as written, with no shell expansion")
       os.makeDir.all(build.markersFolder)
       test(build)
     }
@@ -103,12 +104,12 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     build.resultAndJsonOutput(runTestCommand(build, millFlags*)((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*))
   }
 
-  private def runOnBothModulesWritingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) = {
+  private def runOnBothModulesParsingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) = {
     When(s"the test command is invoked with ${arguments.mkString(" ")}")
-    build.resultAndJsonOutput(runOnBothModules(build, arguments*))
+    build.resultAndJsonOutput(runOnBothModulesWithReport(build, arguments*))
   }
 
-  private def runOnBothModules(build: FixtureBuild, arguments: String*): TestCommandResult =
+  private def runOnBothModulesWithReport(build: FixtureBuild, arguments: String*): TestCommandResult =
     runTestCommand(build)((Seq("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString) ++ arguments)*)
 
   private def runMillCommandLine(build: FixtureBuild, millArguments: String*): TestCommandResult =
@@ -515,7 +516,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     for ((arguments, markers) <- argumentsAndMarkers) {
       Scenario(s"Arguments ${arguments.mkString(" ")}") {
         withClassGlobsAcrossModules { build =>
-          val (result, _) = runOnBothModulesWritingJsonOutput(build, arguments*)
+          val (result, _) = runOnBothModulesParsingJsonOutput(build, arguments*)
 
           Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
           withClue(result.debugString) {
@@ -530,7 +531,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     Scenario("Class globs that match only alpha.test's classes") {
       withClassGlobsAcrossModules { build =>
-        val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "samples.Alpha*")
+        val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.Alpha*")
 
         withClue(result.debugString) {
           Then("the files in <markers> are exactly Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow")
@@ -559,7 +560,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     Scenario("Framework arguments that exclude every test the class globs keep") {
       withClassGlobsAcrossModules { build =>
-        val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
+        val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
 
         withClue(result.debugString) {
           Then("no file exists in <markers>")
@@ -596,7 +597,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           addNoisyToBetaTest(build)
           And(s"beta.test's javaHome is $javaHomeDescription")
           javaHome.foreach(path => addToBetaTest(build, s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }"))
-          val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")
+          val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")
 
           withClue(result.debugString) {
             Then("in the JSON output, the module node beta.test has an output that holds exactly one item, a stdio item whose stream is stdout and whose text is loading samples.Noisy followed by a line terminator")
@@ -621,14 +622,14 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       withClassGlobsAcrossModules { build =>
         addNoisyToBetaTest(build)
         When("the test command is invoked with -oH -- samples.* -- -z nothing-matches")
-        val result = runOnBothModules(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
-        val linesFromBeta = result.treeLines.zip(result.colourMarkedTreeLines).dropWhile { case (line, _) => line != "[beta.test]" }
-        val underBeta = linesFromBeta.drop(1).takeWhile { case (line, _) => indentationOf(line) > 0 }
+        val result = runOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
+        val betaSubtree = result.subtreeOf("[beta.test]")
+        val underBeta = betaSubtree.zip(result.colourMarkedSubtreeOf("[beta.test]")).drop(1)
         val (beforeLastFour, lastFour) = underBeta.splitAt(underBeta.size - 4)
 
         withClue(result.debugString) {
           Then("in the human-readable output on stdout, the lines that follow [beta.test] and are indented more than it end with these lines, in this order:")
-          linesFromBeta should not be empty
+          betaSubtree should not be empty
           lastFour.map(_._1) shouldBe Seq(
             "  [stdout] loading samples.Noisy",
             "  *** MODULE ABORTED ***",
