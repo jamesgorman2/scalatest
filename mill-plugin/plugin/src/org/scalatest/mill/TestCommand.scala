@@ -33,10 +33,10 @@ private[mill] final class TestCommand private (
     }
     TestCommand
       .runArgumentsFrom(moduleChecks, commandArguments.frameworkArguments)
-      .flatMap(runArguments => runSelectedModules(runArguments, checkFailures))
+      .flatMap(runArguments => consolidateSelectedModules(runArguments, checkFailures))
   }
 
-  private def runSelectedModules(
+  private def consolidateSelectedModules(
       runArguments: Seq[(SelectedTestModule, RunArguments)],
       checkFailures: Seq[(SelectedTestModule, String)]
   ): Either[TestCommandFailure, ConsolidationState] = {
@@ -63,7 +63,8 @@ private[mill] final class TestCommand private (
       module -> moduleRunTask(module, moduleRunArguments, moduleFolders(module), consolidation, workerCharset)
     }
     val runResults = EvaluatedTasks.of(failFastOffEvaluator.execute(moduleRunTasks.map(_._2), logger = ctx.log))
-    // Mill skips a module run task where a task upstream of it fails, so that module's run never adds the module.
+    // A module run task that fails, or that Mill skips because a task upstream of it failed, does not attach that
+    // failure to its module.
     TestCommand.addModuleFailures(
       consolidation,
       moduleRunTasks.flatMap { case (module, task) => runResults.valueOrFailure(task).left.toOption.map(module -> _) }

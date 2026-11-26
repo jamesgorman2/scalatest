@@ -8,7 +8,7 @@ final class FailedTaskSpec extends AnyWordSpec with should.Matchers {
   "A failed task's line" when {
     "the task has a name" should {
       "be the name, a space and the error" in {
-        FailedTask(Some("broken.test.compile"), "Compilation failed").line shouldBe "broken.test.compile Compilation failed"
+        FailedTask(Some(TaskName("broken.test.compile")), "Compilation failed").line shouldBe "broken.test.compile Compilation failed"
       }
     }
 
@@ -22,8 +22,8 @@ final class FailedTaskSpec extends AnyWordSpec with should.Matchers {
   "The message of several failed tasks" should {
     "hold one line for each, in order of task name, with a task that has no name first" in {
       val failedTasks = Seq(
-        FailedTask(Some("broken.test.generatedSources"), "generatedSources fails"),
-        FailedTask(Some("broken.compile"), "Compilation failed"),
+        FailedTask(Some(TaskName("broken.test.generatedSources")), "generatedSources fails"),
+        FailedTask(Some(TaskName("broken.compile")), "Compilation failed"),
         FailedTask(None, "Resolution failed")
       )
       FailedTask.message(failedTasks) shouldBe

@@ -110,6 +110,28 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     node.failureMessages.head should include(text)
   }
 
+  private def brokenTestShouldAbortWhileAlphaAndBetaRun(build: FixtureBuild, result: TestCommandResult, json: JsonNode, failureText: String): Unit = {
+    withClue(result.debugString) {
+      Then("the files Alpha1.fast, Alpha1.slow, Beta1.fast and Beta1.slow exist in <markers>")
+      build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow", "Beta1.fast", "Beta1.slow")
+
+      And("the JSON output's root holds exactly the module nodes alpha.test, beta.test and broken.test, in that order")
+      moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test", "broken.test")
+
+      And(s"the module node broken.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains $failureText")
+      shouldBeAbortedWithOneFailureContaining(json, "broken.test", failureText)
+
+      And("the module nodes alpha.test and beta.test have no outcome and no failures")
+      Seq("alpha.test", "beta.test").foreach(module => shouldHaveNoKeys(moduleNode(json, module), "outcome", "failures"))
+
+      And("the JSON output's root has no outcome and no failures")
+      shouldHaveNoKeys(json, "outcome", "failures")
+    }
+
+    And("the test command fails")
+    shouldFail(result)
+  }
+
   private def indentationOf(line: String): Int = line.takeWhile(_ == ' ').length
 
   private def runNodesOf(json: JsonNode, module: String): Seq[JsonNode] = moduleNode(json, module).nodes.filter(_.kind == NodeKind.Run)
@@ -303,30 +325,12 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           addBrokenTestThatDoesNotCompile(build)
           val (result, json) = runWritingJsonOutput(build, millFlags*)("alpha.test", "broken.test", "beta.test")
 
-          withClue(result.debugString) {
-            Then("the files Alpha1.fast, Alpha1.slow, Beta1.fast and Beta1.slow exist in <markers>")
-            build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow", "Beta1.fast", "Beta1.slow")
-
-            And("the JSON output's root holds exactly the module nodes alpha.test, beta.test and broken.test, in that order")
-            moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test", "broken.test")
-
-            And("the module node broken.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains broken.test.compile")
-            shouldBeAbortedWithOneFailureContaining(json, "broken.test", "broken.test.compile")
-
-            And("the module nodes alpha.test and beta.test have no outcome and no failures")
-            Seq("alpha.test", "beta.test").foreach(module => shouldHaveNoKeys(moduleNode(json, module), "outcome", "failures"))
-
-            And("the JSON output's root has no outcome and no failures")
-            shouldHaveNoKeys(json, "outcome", "failures")
-          }
-
-          And("the test command fails")
-          shouldFail(result)
+          brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
         }
       }
     }
 
-    val causesAndNamed = Seq(
+    val causesAndFailureTexts = Seq(
       (
         "whose mvnDeps holds com.example::absent:0.0.1, which no repository the build uses holds",
         """def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20", mvn"com.example::absent:0.0.1")""",
@@ -339,32 +343,14 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       )
     )
 
-    for ((cause, testModuleMember, named) <- causesAndNamed) {
+    for ((cause, testModuleMember, failureText) <- causesAndFailureTexts) {
       Scenario(s"broken.test's tests cannot start: $cause") {
         withSeveralModules { build =>
           Given(s"the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and $cause")
           addBrokenTest(build)(testModuleMember)
           val (result, json) = runWritingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
 
-          withClue(result.debugString) {
-            Then("the files Alpha1.fast, Alpha1.slow, Beta1.fast and Beta1.slow exist in <markers>")
-            build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow", "Beta1.fast", "Beta1.slow")
-
-            And("the JSON output's root holds exactly the module nodes alpha.test, beta.test and broken.test, in that order")
-            moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test", "broken.test")
-
-            And(s"the module node broken.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains $named")
-            shouldBeAbortedWithOneFailureContaining(json, "broken.test", named)
-
-            And("the module nodes alpha.test and beta.test have no outcome and no failures")
-            Seq("alpha.test", "beta.test").foreach(module => shouldHaveNoKeys(moduleNode(json, module), "outcome", "failures"))
-
-            And("the JSON output's root has no outcome and no failures")
-            shouldHaveNoKeys(json, "outcome", "failures")
-          }
-
-          And("the test command fails")
-          shouldFail(result)
+          brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, failureText)
         }
       }
     }
@@ -450,7 +436,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       withSeveralModules { build =>
         addBrokenModuleThatDoesNotCompile(build)
         And("<report> is an absolute path at which a file exists that an earlier test command wrote")
-        val earlier = runTestCommand(build)("alpha.test", "-fJ", build.jsonOutputFile.toString)
+        val earlier = runTestCommand(build)("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString)
         withClue(earlier.debugString) {
           os.exists(build.jsonOutputFile) shouldBe true
         }
