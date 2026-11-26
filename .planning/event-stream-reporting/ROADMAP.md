@@ -1,38 +1,8 @@
 # Roadmap - Event-stream test reporting for Mill
 
-Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then formatting, filtering and human-readable output to a file (feature 16), then filtering characters on JSON output (feature 18), then every worker, argument and module Mill runs, then supported Mill releases, then `--halt-on-failure`, then a module that presets a test command's arguments (feature 17), then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
+Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then every worker, argument and module Mill runs, then formatting, filtering and human-readable output to a file (feature 16), then filtering characters on JSON output (feature 18), then supported Mill releases, then `--halt-on-failure`, then a module that presets a test command's arguments (feature 17), then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
 
 No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
-
-## 5. Many modules in one test command
-
-The test command takes several module selectors, resolves each to its test modules (a module two module selectors name runs once), and runs every selected module's tests in one nested evaluation with fail-fast off: each starts on its own compile, whatever happens to the others. Builds on features 2 and 4.
-
-- One module node per module, in the order R-105 gives; the JSON root records each module selector with its modules.
-- A module whose tests cannot start, as when it fails to compile, has an outcome showing that error (R-098e), and fails the test command.
-- A module that does not test with this release of the fork fails the test command before any test starts (R-059). Until features 11–13, so does every Scala.js and Native module.
-- A failure under R-059 leaves no file at the `-fJ` path.
-- The class globs and framework arguments apply alike to every selected module. Each module in which the class globs select no test fails the test command with the message Mill's `testOnly` fails with.
-
-Enables:
-
-- `SPECIFICATION.md` R-055 (several module selectors; class globs and framework arguments across them), R-056a, R-056b, R-061, R-062, R-059 (test framework and fork release), R-098e, R-046c and R-137 (a module with an error), R-096a and R-105 (several modules)
-- `../../mill-plugin/consolidated.schema.json` `$defs/root`, `moduleSelectors` and `contents` (several module selectors; several modules)
-- `ARCHITECTURE.md` § Modules § Mill plugin (Test command: resolves the module selectors), § APIs § The Mill plugin and the consolidation library (Start: module selectors; Add a module whose tests did not start), § Data flow (one nested evaluation with fail-fast off)
-
-Settles:
-
-- How the test command tells that a module tests with this release of the fork (R-059).
-- What the test command does with a module selector that resolves to no test module.
-- How the error that stopped a module is shown, and the keys that record a module's outcome and failure in the JSON output (R-098e gives the module an outcome, not its form).
-- Where the failure for class globs that select no test in a module is shown when several modules are selected: on the root (R-098f) or on the module (R-098e).
-
-Risks:
-
-- `decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation of its own…" (Costs: reflection on a `private val`; a copy of `mill.exec.Execution`; its failure count on the prompt)
-- `research/mill-nested-keep-going.md` § 2 (concurrent `execute` calls break Mill's pool), § 5
-- `research/mill-command-lifetime.md` § 2.2 (the body is skipped after an earlier failure without `--keep-going`), § 2.6 (one evaluation, not one Mill command)
-- `decisions/test-command.md` "A selected test module that does not test with the release of this fork…" (Costs: mixed builds narrow their module selectors)
 
 ## 6. Supported Mill releases
 
