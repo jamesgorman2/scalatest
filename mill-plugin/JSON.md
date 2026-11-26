@@ -13,12 +13,12 @@ The consolidation as a whole, holding its modules.
 - `buildTool` — [Build tool](#build-tool) object: the build tool that started the runs. Absent where the consolidation library's caller gives no build tool.
 - `moduleSelectors` — array of [Module selector](#module-selector) objects, one for each module selector the test command was given. Empty where none was given.
 - `outcome` — string, always `aborted`. Present exactly when `failures` is. No outcome is rolled up from the modules.
-- `failures` — array of one or more [Failure](#failure) objects: the failures attached to the root, which belong to no run, such as a worker failing to start. Present exactly when `outcome` is; absent where no failure is attached.
+- `failures` — array of one or more [Failure](#failure) objects: the failures that the consolidation library's caller attaches to the root, which belong to no module. The test command attaches each of its failures to a module ([Module](#module)), so it attaches none to the root. Present exactly when `outcome` is; absent where no failure is attached.
 - `startedAt` — integer, epoch milliseconds: the root's start time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `endedAt` — integer, epoch milliseconds: the root's end time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `duration` — integer, milliseconds: `endedAt` less `startedAt`. Present exactly when both `startedAt` and `endedAt` are.
 - `contents` — array of [Module](#module) objects: the root's modules. Empty where there are none.
-- `output` — array of one or more [Captured output](#captured-output) items: the output captured against the root rather than against any module or run, in the order it was written. Absent where there is none.
+- `output` — array of one or more [Captured output](#captured-output) items: the output captured against the root rather than against any module or run, in the order it was written. The test command captures none against the root. Absent where there is none.
 
 ## Build tool
 
@@ -36,20 +36,23 @@ One module selector as the build tool was given it, with the test modules it res
 
 ## Failure
 
-A failure attached to the root: one that belongs to no run, such as laying out a fork group or starting a worker failing.
+A failure attached to the root or to a module: one that belongs to no run, such as a module's tests not starting or a worker failing to start. A failure attached to a module does not name the module. Text from the build tool in it, such as a task name, can.
 
-- `message` — string: the failure's text, such as `Starting worker 0 of fork group 1 of core.test failed: …`.
+- `message` — string: the failure's text, such as `Starting worker 0 of fork group 1 failed: …`.
 
 ## Module
 
-A build tool's unit of build whose tests produced the runs it holds.
+A build tool's unit of build, holding the runs its tests produced.
 
 - `kind` — string, always `module`.
 - `name` — string: the module name, such as `core.test` for a Mill module.
+- `outcome` — string, always `aborted`. Present exactly when `failures` is. No outcome is rolled up from the module's runs.
+- `failures` — array of one or more [Failure](#failure) objects: the failures attached to the module, which belong to none of its runs, in the order they were attached. Under the test command, these are the failures [README.md](README.md) § Running the test command lists as on the module's node, such as the module's tests not starting, its class globs matching no test, or a worker failing to start. Present exactly when `outcome` is; absent where no failure is attached.
 - `startedAt` — integer, epoch milliseconds: the module's start time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `endedAt` — integer, epoch milliseconds: the module's end time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `duration` — integer, milliseconds: `endedAt` less `startedAt`. Present exactly when both `startedAt` and `endedAt` are.
-- `contents` — array of [Run node](#run-node) objects, one for each of the module's runs. Empty where it has none.
+- `contents` — array of [Run node](#run-node) objects, one for each of the module's runs. Empty where it has none, as where its tests did not start.
+- `output` — array of one or more [Captured output](#captured-output) items: the output captured against the module rather than against any of its runs, in the order it was written. Under the test command, this is what Mill's test discovery wrote for the module. Absent where there is none.
 
 ## Run node
 
