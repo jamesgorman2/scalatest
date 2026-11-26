@@ -11,7 +11,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
   private def withSeveralModules[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.severalModules) { build =>
       Given("the JVM test modules alpha.test, holding Alpha1 and Alpha2, and beta.test, holding Beta1")
-      And("each suite's tests fast and slow succeed, each appending one line to a file in <markers> named after it as it runs")
+      And("each suite's tests fast and slow succeed, and each test, when it runs, appends one line to the file <suite>.<test> in <markers>")
       os.makeDir.all(build.markersFolder)
       test(build)
     }

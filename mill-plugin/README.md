@@ -87,7 +87,10 @@ mill scalatest/test <module selectors> [-oH | -o] [-fJ <path>] [-- [<class globs
 
 For example, `mill scalatest/test core.test util.test`.
 
-- **Module selectors**: one or more, each a separate argument before the first `--`, in any order among the output arguments. Each resolves to the JVM test modules it names, such as `__.test`, and keeps only its test modules, so `__` selects every test module. Each test module any module selector resolves to runs its tests once. Every selected module's tests run, whatever happens to the other modules' tests, whether or not Mill's `--keep-going` is given.
+- **Module selectors**: one or more, each a separate argument before the first `--`, in any order among the output arguments.
+  - Each resolves to the modules it names, such as `__.test`, and keeps only the test modules among them, so `__` selects every test module. Each test module it keeps must be a JVM test module.
+  - A test module that several module selectors resolve to runs its tests once.
+  - Every selected module's tests run, whatever happens to the other modules' tests, whether or not Mill's `--keep-going` is given.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
 - **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
@@ -132,7 +135,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
-- a task a selected module's tests depend on fails, such as the module's compile. That module's tests do not start, and Mill reports the task's error;
+- a task that a selected module's tests depend on fails, such as the module's compile. That module's tests do not start, and Mill reports the task's error;
 - class globs are given and none of them matches a test class of a selected module. No test of that module runs. The consolidated output is written, and its root holds the failure Mill's `testOnly` gives: `Test selector does not match any test: <class globs>` ([JSON.md](JSON.md) § Root);
 - class globs are given, and once every test worker of a module has ended, no run of that module has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The consolidated output is written, and its root holds the same failure unless laying out a fork group's files or starting or running a test worker failed. The failure is also left out where a test worker's JVM ended without writing its result and the test command already fails. Neither of these counts as such a report:
   - a test shown as ignored only because its suite's structure marks it ignored;
@@ -153,7 +156,7 @@ The test command writes a module's files in its module folder, `org.scalatest.mi
 
 - Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder. The exception is Mill's JUnit XML report: the test command writes none, whatever the module's `testReportXml`.
 - Once it has resolved its module selectors and read each selected module's own ScalaTest arguments, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, and also where none starts, as where no class glob matches.
-- A test command that fails on its arguments, such as on a framework argument it does not accept or a module's own ScalaTest argument ScalaTest's runner does not recognise, leaves every module folder as it was.
+- A test command that fails on its arguments, such as on a framework argument it does not accept or on a flag in a module's own ScalaTest arguments that ScalaTest's runner does not recognise, leaves every module folder as it was.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
 
 ## Runs in the human-readable output
